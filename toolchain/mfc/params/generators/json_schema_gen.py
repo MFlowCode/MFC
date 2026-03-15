@@ -3,13 +3,13 @@ JSON Schema Generator for MFC Case Files.
 
 Generates VS Code / PyCharm compatible JSON Schema for case file auto-completion.
 """
-# pylint: disable=import-outside-toplevel
 
 import json
-from typing import Dict, Any
-from ..schema import ParamType
+from typing import Any, Dict
+
+from .. import definitions  # noqa: F401
 from ..registry import REGISTRY
-from .. import definitions  # noqa: F401  pylint: disable=unused-import
+from ..schema import ParamType
 
 
 def _param_type_to_json_schema(param_type: ParamType, constraints: Dict = None) -> Dict[str, Any]:
@@ -85,17 +85,7 @@ def generate_json_schema(include_descriptions: bool = True) -> Dict[str, Any]:
 
 def generate_vscode_settings() -> Dict[str, Any]:
     """Generate VS Code settings snippet for JSON Schema association."""
-    return {
-        "json.schemas": [
-            {
-                "fileMatch": ["case.py", "**/case.py"],
-                "url": "./mfc-case-schema.json"
-            }
-        ],
-        "yaml.schemas": {
-            "./mfc-case-schema.json": ["case.yaml", "**/case.yaml"]
-        }
-    }
+    return {"json.schemas": [{"fileMatch": ["case.py", "**/case.py"], "url": "./mfc-case-schema.json"}], "yaml.schemas": {"./mfc-case-schema.json": ["case.yaml", "**/case.yaml"]}}
 
 
 def write_json_schema(output_path: str, include_descriptions: bool = True) -> None:
@@ -108,7 +98,7 @@ def write_json_schema(output_path: str, include_descriptions: bool = True) -> No
     """
     schema = generate_json_schema(include_descriptions)
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         json.dump(schema, f, indent=2)
 
 

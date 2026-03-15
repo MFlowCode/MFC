@@ -25,7 +25,6 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-
 NAME_LEN = 50  # Fortran character length for variable names
 
 _READ_POOL: Optional[ThreadPoolExecutor] = None
@@ -34,12 +33,10 @@ _POOL_LOCK = threading.Lock()
 
 def _get_pool() -> ThreadPoolExecutor:
     """Return a persistent module-level thread pool, creating it on first use."""
-    global _READ_POOL  # pylint: disable=global-statement
+    global _READ_POOL  # noqa: PLW0603
     with _POOL_LOCK:
         if _READ_POOL is None:
-            _READ_POOL = ThreadPoolExecutor(
-                max_workers=32, thread_name_prefix='mfc_binary'
-            )
+            _READ_POOL = ThreadPoolExecutor(max_workers=32, thread_name_prefix="mfc_binary")
             atexit.register(_READ_POOL.shutdown, wait=False)
         return _READ_POOL
 
@@ -57,6 +54,7 @@ class ProcessorData:
     it derives everything from x_cb/y_cb/z_cb lengths.  If future code
     needs m directly, this discrepancy must be resolved.
     """
+
     m: int
     n: int
     p: int
@@ -69,12 +67,12 @@ class ProcessorData:
 @dataclass
 class AssembledData:
     """Assembled multi-processor data on a global grid."""
+
     ndim: int
     x_cc: np.ndarray
     y_cc: np.ndarray
     z_cc: np.ndarray
     variables: Dict[str, np.ndarray] = field(default_factory=dict)
-
 
 
 def _detect_endianness(path: str) -> str:
@@ -83,19 +81,17 @@ def _detect_endianness(path: str) -> str:
     The header record contains 4 int32s (m, n, p, dbvars) = 16 bytes,
     so the leading Fortran record marker must be 16.
     """
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         raw = f.read(4)
     if len(raw) < 4:
         raise EOFError(f"File too short to detect endianness: {path}")
-    le = struct.unpack('<i', raw)[0]
+    le = struct.unpack("<i", raw)[0]
     if le == 16:
-        return '<'
-    be = struct.unpack('>i', raw)[0]
+        return "<"
+    be = struct.unpack(">i", raw)[0]
     if be == 16:
-        return '>'
-    raise ValueError(
-        f"Cannot detect endianness: first record marker is {le} (LE) / {be} (BE), expected 16"
-    )
+        return ">"
+    raise ValueError(f"Cannot detect endianness: first record marker is {le} (LE) / {be} (BE), expected 16")
 
 
 def _read_record_endian(f, endian: str) -> bytes:
@@ -103,7 +99,7 @@ def _read_record_endian(f, endian: str) -> bytes:
     raw = f.read(4)
     if len(raw) < 4:
         raise EOFError("Unexpected end of file reading record marker")
-    rec_len = struct.unpack(f'{endian}i', raw)[0]
+    rec_len = struct.unpack(f"{endian}i", raw)[0]
     if rec_len < 0:
         raise ValueError(f"Invalid Fortran record length: {rec_len}")
     payload = f.read(rec_len)
@@ -112,16 +108,13 @@ def _read_record_endian(f, endian: str) -> bytes:
     trail = f.read(4)
     if len(trail) < 4:
         raise EOFError("Unexpected end of file reading trailing record marker")
-    trail_len = struct.unpack(f'{endian}i', trail)[0]
+    trail_len = struct.unpack(f"{endian}i", trail)[0]
     if trail_len != rec_len:
-        raise ValueError(
-            f"Fortran record marker mismatch: leading={rec_len}, trailing={trail_len}. "
-            "File may be corrupted."
-        )
+        raise ValueError(f"Fortran record marker mismatch: leading={rec_len}, trailing={trail_len}. File may be corrupted.")
     return payload
 
 
-def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorData:  # pylint: disable=too-many-locals,too-many-statements
+def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorData:
     """
     Read a single MFC binary post-process file.
 
@@ -134,14 +127,12 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
     """
     endian = _detect_endianness(path)
 
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         # Record 1: header [m, n, p, dbvars] — 4 int32
         hdr = _read_record_endian(f, endian)
-        m, n, p, dbvars = struct.unpack(f'{endian}4i', hdr)
+        m, n, p, dbvars = struct.unpack(f"{endian}4i", hdr)
         if m < 0 or n < 0 or p < 0 or dbvars < 0:
-            raise ValueError(
-                f"Invalid header in {path}: m={m}, n={n}, p={p}, dbvars={dbvars}"
-            )
+            raise ValueError(f"Invalid header in {path}: m={m}, n={n}, p={p}, dbvars={dbvars}")
 
         # Record 2: grid coordinates — all in one record
         grid_raw = _read_record_endian(f, endian)
@@ -157,29 +148,26 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
 
         # Auto-detect grid precision from record size
         if grid_bytes == n_vals * 8:
-            grid_dtype = np.dtype(f'{endian}f8')
+            grid_dtype = np.dtype(f"{endian}f8")
         elif grid_bytes == n_vals * 4:
-            grid_dtype = np.dtype(f'{endian}f4')
+            grid_dtype = np.dtype(f"{endian}f4")
         else:
             bytes_per_val = grid_bytes / n_vals if n_vals else 0
-            raise ValueError(
-                f"Cannot determine grid precision: {grid_bytes} bytes for {n_vals} values "
-                f"({bytes_per_val:.1f} bytes/value)"
-            )
+            raise ValueError(f"Cannot determine grid precision: {grid_bytes} bytes for {n_vals} values ({bytes_per_val:.1f} bytes/value)")
 
         grid_arr = np.frombuffer(grid_raw, dtype=grid_dtype)
 
         # Split into x_cb, y_cb, z_cb
         offset = 0
-        x_cb = grid_arr[offset:offset + m + 2].astype(np.float64)
+        x_cb = grid_arr[offset : offset + m + 2].astype(np.float64)
         offset += m + 2
         if n > 0:
-            y_cb = grid_arr[offset:offset + n + 2].astype(np.float64)
+            y_cb = grid_arr[offset : offset + n + 2].astype(np.float64)
             offset += n + 2
         else:
             y_cb = np.array([0.0])
         if p > 0:
-            z_cb = grid_arr[offset:offset + p + 2].astype(np.float64)
+            z_cb = grid_arr[offset : offset + p + 2].astype(np.float64)
         else:
             z_cb = np.array([0.0])
 
@@ -194,14 +182,14 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
             raw_len = f.read(4)
             if len(raw_len) < 4:
                 raise EOFError("Unexpected end of file reading variable record marker")
-            rec_len = struct.unpack(f'{endian}i', raw_len)[0]
+            rec_len = struct.unpack(f"{endian}i", raw_len)[0]
             if rec_len < NAME_LEN:
                 raise ValueError(f"Variable record too short: {rec_len} bytes")
 
             name_raw = f.read(NAME_LEN)
             if len(name_raw) < NAME_LEN:
                 raise EOFError("Unexpected end of file reading variable name")
-            varname = name_raw.decode('ascii', errors='replace').strip()
+            varname = name_raw.decode("ascii", errors="replace").strip()
 
             data_bytes = rec_len - NAME_LEN
             if var_filter is not None and varname != var_filter:
@@ -215,37 +203,28 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
             trail = f.read(4)
             if len(trail) < 4:
                 raise EOFError("Unexpected end of file reading trailing variable record marker")
-            trail_len = struct.unpack(f'{endian}i', trail)[0]
+            trail_len = struct.unpack(f"{endian}i", trail)[0]
             if trail_len != rec_len:
-                raise ValueError(
-                    f"Fortran record marker mismatch for '{varname}': "
-                    f"leading={rec_len}, trailing={trail_len}"
-                )
+                raise ValueError(f"Fortran record marker mismatch for '{varname}': leading={rec_len}, trailing={trail_len}")
 
             # Auto-detect variable data precision from record size
             if data_bytes == data_size * 8:
-                var_dtype = np.dtype(f'{endian}f8')
+                var_dtype = np.dtype(f"{endian}f8")
             elif data_bytes == data_size * 4:
-                var_dtype = np.dtype(f'{endian}f4')
+                var_dtype = np.dtype(f"{endian}f4")
             elif data_bytes == data_size * 2:
-                raise ValueError(
-                    f"Variable '{varname}' appears to be half-precision (2 bytes/value). "
-                    "This is typical of --mixed builds. Half-precision viz is not yet supported."
-                )
+                raise ValueError(f"Variable '{varname}' appears to be half-precision (2 bytes/value). This is typical of --mixed builds. Half-precision viz is not yet supported.")
             else:
                 var_bpv = data_bytes / data_size if data_size else 0
-                raise ValueError(
-                    f"Cannot determine variable precision for '{varname}': "
-                    f"{data_bytes} bytes for {data_size} values ({var_bpv:.1f} bytes/value)"
-                )
+                raise ValueError(f"Cannot determine variable precision for '{varname}': {data_bytes} bytes for {data_size} values ({var_bpv:.1f} bytes/value)")
 
             data = np.frombuffer(data_raw, dtype=var_dtype).astype(np.float64)
 
             # Reshape for multi-dimensional data (Fortran column-major order)
             if p > 0:
-                data = data.reshape((m + 1, n + 1, p + 1), order='F')
+                data = data.reshape((m + 1, n + 1, p + 1), order="F")
             elif n > 0:
-                data = data.reshape((m + 1, n + 1), order='F')
+                data = data.reshape((m + 1, n + 1), order="F")
 
             variables[varname] = data
 
@@ -258,36 +237,32 @@ def discover_format(case_dir: str) -> str:
     Returns 'binary' or 'silo'.  Raises FileNotFoundError if neither exists.
     When both exist, emits a warnings.warn so callers can surface it.
     """
-    has_binary = os.path.isdir(os.path.join(case_dir, 'binary'))
-    has_silo   = os.path.isdir(os.path.join(case_dir, 'silo_hdf5'))
+    has_binary = os.path.isdir(os.path.join(case_dir, "binary"))
+    has_silo = os.path.isdir(os.path.join(case_dir, "silo_hdf5"))
     if has_binary and has_silo:
         warnings.warn(
-            "Both binary/ and silo_hdf5/ found; using binary. "
-            "Pass --format silo to override.",
+            "Both binary/ and silo_hdf5/ found; using binary. Pass --format silo to override.",
             stacklevel=2,
         )
     if has_binary:
-        return 'binary'
+        return "binary"
     if has_silo:
-        return 'silo'
-    raise FileNotFoundError(
-        f"No 'binary/' or 'silo_hdf5/' directory found in {case_dir}. "
-        "Run post_process with format=1 (Silo) or format=2 (binary) first."
-    )
+        return "silo"
+    raise FileNotFoundError(f"No 'binary/' or 'silo_hdf5/' directory found in {case_dir}. Run post_process with format=1 (Silo) or format=2 (binary) first.")
 
 
 def discover_timesteps(case_dir: str, fmt: str) -> List[int]:
     """Return sorted list of available timesteps."""
-    if fmt not in ('binary', 'silo'):
+    if fmt not in ("binary", "silo"):
         raise ValueError(f"Unknown format '{fmt}'. Supported: 'binary', 'silo'.")
 
-    if fmt == 'binary':
+    if fmt == "binary":
         # Check root/ first (1D), then p0/
-        root_dir = os.path.join(case_dir, 'binary', 'root')
+        root_dir = os.path.join(case_dir, "binary", "root")
         if os.path.isdir(root_dir):
             steps = set()
             for fname in os.listdir(root_dir):
-                if fname.endswith('.dat'):
+                if fname.endswith(".dat"):
                     try:
                         steps.add(int(fname[:-4]))
                     except ValueError:
@@ -296,23 +271,23 @@ def discover_timesteps(case_dir: str, fmt: str) -> List[int]:
                 return sorted(steps)
 
         # Multi-dimensional: look in p0/
-        p0_dir = os.path.join(case_dir, 'binary', 'p0')
+        p0_dir = os.path.join(case_dir, "binary", "p0")
         if os.path.isdir(p0_dir):
             steps = set()
             for fname in os.listdir(p0_dir):
-                if fname.endswith('.dat'):
+                if fname.endswith(".dat"):
                     try:
                         steps.add(int(fname[:-4]))
                     except ValueError:
                         pass
             return sorted(steps)
 
-    elif fmt == 'silo':
-        p0_dir = os.path.join(case_dir, 'silo_hdf5', 'p0')
+    elif fmt == "silo":
+        p0_dir = os.path.join(case_dir, "silo_hdf5", "p0")
         if os.path.isdir(p0_dir):
             steps = set()
             for fname in os.listdir(p0_dir):
-                if fname.endswith('.silo') and not fname.startswith('collection'):
+                if fname.endswith(".silo") and not fname.startswith("collection"):
                     try:
                         steps.add(int(fname[:-5]))
                     except ValueError:
@@ -324,30 +299,28 @@ def discover_timesteps(case_dir: str, fmt: str) -> List[int]:
 
 def _discover_processors(case_dir: str, fmt: str) -> List[int]:
     """Return sorted list of processor ranks."""
-    if fmt == 'binary':
-        base = os.path.join(case_dir, 'binary')
+    if fmt == "binary":
+        base = os.path.join(case_dir, "binary")
     else:
-        base = os.path.join(case_dir, 'silo_hdf5')
+        base = os.path.join(case_dir, "silo_hdf5")
 
     ranks = []
     if not os.path.isdir(base):
         return ranks
     for entry in os.listdir(base):
-        if entry.startswith('p') and entry[1:].isdigit():
+        if entry.startswith("p") and entry[1:].isdigit():
             ranks.append(int(entry[1:]))
     return sorted(ranks)
 
 
 def _is_1d(case_dir: str) -> bool:
     """Check if the output is 1D (binary/root/ exists with .dat files, no p0/ present)."""
-    root = os.path.join(case_dir, 'binary', 'root')
-    p0 = os.path.join(case_dir, 'binary', 'p0')
-    return (os.path.isdir(root)
-            and any(f.endswith('.dat') for f in os.listdir(root))
-            and not os.path.isdir(p0))
+    root = os.path.join(case_dir, "binary", "root")
+    p0 = os.path.join(case_dir, "binary", "p0")
+    return os.path.isdir(root) and any(f.endswith(".dat") for f in os.listdir(root)) and not os.path.isdir(p0)
 
 
-def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-statements
+def assemble_from_proc_data(
     proc_data: List[Tuple[int, ProcessorData]],
 ) -> AssembledData:
     """
@@ -368,7 +341,10 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-stateme
         z_cc = (pd.z_cb[:-1] + pd.z_cb[1:]) / 2.0 if pd.p > 0 else np.array([0.0])
         ndim = 1 + (pd.n > 0) + (pd.p > 0)
         return AssembledData(
-            ndim=ndim, x_cc=x_cc, y_cc=y_cc, z_cc=z_cc,
+            ndim=ndim,
+            x_cc=x_cc,
+            y_cc=y_cc,
+            z_cc=z_cc,
             variables=pd.variables,
         )
 
@@ -449,32 +425,36 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-stateme
                 global_vars[vn][xi] = data
 
     return AssembledData(
-        ndim=ndim, x_cc=global_x, y_cc=global_y, z_cc=global_z,
+        ndim=ndim,
+        x_cc=global_x,
+        y_cc=global_y,
+        z_cc=global_z,
         variables=global_vars,
     )
 
 
-def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=too-many-locals
-             var: Optional[str] = None) -> AssembledData:
+def assemble(case_dir: str, step: int, fmt: str = "binary", var: Optional[str] = None) -> AssembledData:
     """
     Read and assemble multi-processor data for a given timestep.
 
     For 1D, reads the root file directly.
     For 2D/3D, reads all processor files and assembles into global arrays.
     """
-    if fmt != 'binary':
+    if fmt != "binary":
         raise ValueError(f"Format '{fmt}' not supported by binary reader. Use silo_reader.")
 
     # 1D case: read root file directly
     if _is_1d(case_dir):
-        root_path = os.path.join(case_dir, 'binary', 'root', f'{step}.dat')
+        root_path = os.path.join(case_dir, "binary", "root", f"{step}.dat")
         if not os.path.isfile(root_path):
             raise FileNotFoundError(f"Root file not found: {root_path}")
         pdata = read_binary_file(root_path, var_filter=var)
         x_cc = (pdata.x_cb[:-1] + pdata.x_cb[1:]) / 2.0
         return AssembledData(
-            ndim=1, x_cc=x_cc,
-            y_cc=np.array([0.0]), z_cc=np.array([0.0]),
+            ndim=1,
+            x_cc=x_cc,
+            y_cc=np.array([0.0]),
+            z_cc=np.array([0.0]),
             variables=pdata.variables,
         )
 
@@ -486,12 +466,9 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
     # Validate all paths exist before spawning threads so errors are synchronous.
     rank_paths: List[tuple] = []
     for rank in ranks:
-        fpath = os.path.join(case_dir, 'binary', f'p{rank}', f'{step}.dat')
+        fpath = os.path.join(case_dir, "binary", f"p{rank}", f"{step}.dat")
         if not os.path.isfile(fpath):
-            raise FileNotFoundError(
-                f"Processor file not found: {fpath}. "
-                "Incomplete output (missing rank) would produce incorrect data."
-            )
+            raise FileNotFoundError(f"Processor file not found: {fpath}. Incomplete output (missing rank) would produce incorrect data.")
         rank_paths.append((rank, fpath))
 
     def _read_one(rank_fpath):
@@ -516,6 +493,7 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
 # Lagrange bubble position reader
 # ---------------------------------------------------------------------------
 
+
 @lru_cache(maxsize=32)
 def _nBubs_per_step(path: str) -> int:
     """Count how many bubble rows share the first time value in *path*.
@@ -523,7 +501,7 @@ def _nBubs_per_step(path: str) -> int:
     The result is cached so repeated calls for the same file (across
     different steps in an MP4 render) only scan the file once.
     """
-    with open(path, encoding='ascii', errors='replace') as f:
+    with open(path, encoding="ascii", errors="replace") as f:
         f.readline()  # skip header
         first = f.readline()
         if not first.strip():
@@ -552,11 +530,11 @@ def read_lag_bubbles_at_step(case_dir: str, step: int) -> Optional[np.ndarray]:
     simulation-normalized units across all MPI ranks, or ``None`` when
     no bubble data is found.
     """
-    d_dir = os.path.join(case_dir, 'D')
+    d_dir = os.path.join(case_dir, "D")
     if not os.path.isdir(d_dir):
         return None
 
-    files = sorted(glob.glob(os.path.join(d_dir, 'lag_bubble_evol_*.dat')))
+    files = sorted(glob.glob(os.path.join(d_dir, "lag_bubble_evol_*.dat")))
     if not files:
         return None
 
@@ -575,15 +553,14 @@ def read_lag_bubbles_at_step(case_dir: str, step: int) -> Optional[np.ndarray]:
             # not yet implemented.
             skip = 1 + step * nBubs
             rows = []
-            with open(fpath, encoding='ascii', errors='replace') as f:
+            with open(fpath, encoding="ascii", errors="replace") as f:
                 for _ in itertools.islice(f, skip):
                     pass
                 for line in itertools.islice(f, nBubs):
                     parts = line.split()
                     if len(parts) >= 8:
                         # cols: time id x y z mv conc r [rdot p]
-                        rows.append((float(parts[2]), float(parts[3]),
-                                     float(parts[4]), float(parts[7])))
+                        rows.append((float(parts[2]), float(parts[3]), float(parts[4]), float(parts[7])))
             if rows:
                 chunks.append(np.array(rows, dtype=np.float64))
         except (OSError, ValueError):
@@ -594,5 +571,5 @@ def read_lag_bubbles_at_step(case_dir: str, step: int) -> Optional[np.ndarray]:
 
 def has_lag_bubble_evol(case_dir: str) -> bool:
     """Return True if ``D/lag_bubble_evol_*.dat`` files exist in *case_dir*."""
-    d_dir = os.path.join(case_dir, 'D')
-    return bool(glob.glob(os.path.join(d_dir, 'lag_bubble_evol_*.dat')))
+    d_dir = os.path.join(case_dir, "D")
+    return bool(glob.glob(os.path.join(d_dir, "lag_bubble_evol_*.dat")))

@@ -3,7 +3,6 @@ IDE Configuration Module.
 
 Automatically configures IDE settings (VS Code, etc.) for MFC development.
 """
-# pylint: disable=import-outside-toplevel
 
 import re
 from pathlib import Path
@@ -16,7 +15,7 @@ _VSCODE_MARKER_END = "// MFC-SCHEMA-CONFIG-END"
 
 # The MFC schema configuration to insert
 # Matches common case file names - users get auto-completion for JSON/YAML case files
-_VSCODE_MFC_CONFIG = '''\
+_VSCODE_MFC_CONFIG = """\
     "json.schemas": [
         {
             "fileMatch": ["**/case.json", "**/input.json", "**/mfc-case.json", "**/mfc.json"],
@@ -25,7 +24,7 @@ _VSCODE_MFC_CONFIG = '''\
     ],
     "yaml.schemas": {
         "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/case.yml", "**/input.yaml", "**/input.yml", "**/mfc-case.yaml", "**/mfc.yaml"]
-    }'''
+    }"""
 
 
 def ensure_vscode_settings() -> bool:
@@ -59,26 +58,21 @@ def ensure_vscode_settings() -> bool:
             return False
 
         # Insert before the final closing brace
-        last_brace = content.rfind('}')
+        last_brace = content.rfind("}")
         if last_brace != -1:
             # Check if we need a comma
             before_brace = content[:last_brace].rstrip()
-            needs_comma = before_brace and not before_brace.endswith('{') and not before_brace.endswith(',')
-            comma = ',' if needs_comma else ''
-            new_content = (
-                content[:last_brace].rstrip() +
-                comma + '\n\n    ' +
-                marked_config + '\n' +
-                content[last_brace:]
-            )
+            needs_comma = before_brace and not before_brace.endswith("{") and not before_brace.endswith(",")
+            comma = "," if needs_comma else ""
+            new_content = content[:last_brace].rstrip() + comma + "\n\n    " + marked_config + "\n" + content[last_brace:]
         else:
             # Malformed JSON, just append
-            new_content = content + '\n' + marked_config
+            new_content = content + "\n" + marked_config
     else:
         # Ensure .vscode directory exists
         vscode_dir.mkdir(exist_ok=True)
         # Create new settings file with just our config
-        new_content = f'{{\n    {marked_config}\n}}\n'
+        new_content = f"{{\n    {marked_config}\n}}\n"
 
     settings_path.write_text(new_content)
     return True
@@ -106,31 +100,23 @@ def update_vscode_settings() -> None:
         content = settings_path.read_text()
 
         # Check if our markers already exist
-        marker_pattern = re.compile(
-            rf'{re.escape(_VSCODE_MARKER_BEGIN)}.*?{re.escape(_VSCODE_MARKER_END)}',
-            re.DOTALL
-        )
+        marker_pattern = re.compile(rf"{re.escape(_VSCODE_MARKER_BEGIN)}.*?{re.escape(_VSCODE_MARKER_END)}", re.DOTALL)
 
         if marker_pattern.search(content):
             # Replace existing marked section
             new_content = marker_pattern.sub(marked_config, content)
         else:
             # Insert before the final closing brace
-            last_brace = content.rfind('}')
+            last_brace = content.rfind("}")
             if last_brace != -1:
                 before_brace = content[:last_brace].rstrip()
-                needs_comma = before_brace and not before_brace.endswith('{') and not before_brace.endswith(',')
-                comma = ',' if needs_comma else ''
-                new_content = (
-                    content[:last_brace].rstrip() +
-                    comma + '\n\n    ' +
-                    marked_config + '\n' +
-                    content[last_brace:]
-                )
+                needs_comma = before_brace and not before_brace.endswith("{") and not before_brace.endswith(",")
+                comma = "," if needs_comma else ""
+                new_content = content[:last_brace].rstrip() + comma + "\n\n    " + marked_config + "\n" + content[last_brace:]
             else:
-                new_content = content + '\n' + marked_config
+                new_content = content + "\n" + marked_config
     else:
-        new_content = f'{{\n    {marked_config}\n}}\n'
+        new_content = f"{{\n    {marked_config}\n}}\n"
 
     settings_path.write_text(new_content)
     cons.print(f"[green]Updated[/green] {settings_path}")
