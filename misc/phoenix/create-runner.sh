@@ -92,7 +92,7 @@ if start_runner "$node" "$runner_dir"; then
     fi
 else
     echo "  ERROR: Failed to start."
-    echo "  Try: ssh $node 'cd $runner_dir && setsid bash -lc \"nohup ./run.sh >> runner-nohup.log 2>&1 &\"'"
+    echo "  Try: ssh $node 'cd $runner_dir && setsid bash -lc \"nohup ./run.sh >> runner.log 2>&1 < /dev/null &\"'"
 fi
 
 echo ""

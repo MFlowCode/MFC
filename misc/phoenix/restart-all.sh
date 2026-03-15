@@ -25,7 +25,7 @@ while IFS= read -r dir; do
         continue
     fi
 
-    worker=$(ssh -o ConnectTimeout=5 "$node" "ps aux | grep Runner.Worker | grep '$dir' | grep -v grep" 2>/dev/null || true)
+    worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '$dir' | grep -v grep" 2>/dev/null || true)
     if [ -n "$worker" ]; then
         echo "  $name: BUSY on $node"
         if [ "${FORCE:-0}" != "1" ]; then

@@ -12,7 +12,7 @@ source "$SCRIPT_DIR/config.sh"
 
 for node in "${NODES[@]}"; do
     echo "=== $node ==="
-    ssh -o ConnectTimeout=5 "$node" '
+    ssh $SSH_OPTS "$node" '
         for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
             cwd=$(readlink -f /proc/$p/cwd 2>/dev/null || echo "???")
             has_slurm=$(cat /proc/$p/environ 2>/dev/null | tr "\0" "\n" | grep -c /opt/slurm || echo 0)
@@ -27,7 +27,7 @@ for node in "${NODES[@]}"; do
         done
     ' 2>/dev/null || echo "  (unreachable)"
 
-    rss=$(ssh -o ConnectTimeout=5 "$node" "ps -u \$(whoami) -o rss= 2>/dev/null | awk '{sum+=\$1} END {printf \"%.0f\", sum/1024}'" 2>/dev/null || echo "?")
+    rss=$(ssh $SSH_OPTS "$node" "ps -u \$(whoami) -o rss= 2>/dev/null | awk '{sum+=\$1} END {printf \"%.0f\", sum/1024}'" 2>/dev/null || echo "?")
     [[ "$rss" =~ ^[0-9]+$ ]] || rss=0
     echo "  --- Total: ${rss} MB / ${CGROUP_LIMIT} MB ($(( CGROUP_LIMIT - rss )) MB free) ---"
     echo ""

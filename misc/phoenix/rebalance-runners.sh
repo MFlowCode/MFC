@@ -43,7 +43,7 @@ for i in "${!dirs[@]}"; do
     runner_node[$i]="$node"
     if [ "$node" != "offline" ]; then
         node_runners[$node]="${node_runners[$node]:-} $i"
-        worker=$(ssh -o ConnectTimeout=5 "$node" "ps aux | grep Runner.Worker | grep '${dirs[$i]}' | grep -v grep" 2>/dev/null || true)
+        worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '${dirs[$i]}' | grep -v grep" 2>/dev/null || true)
         [ -n "$worker" ] && runner_busy[$i]=1 || runner_busy[$i]=0
     else
         runner_busy[$i]=0
