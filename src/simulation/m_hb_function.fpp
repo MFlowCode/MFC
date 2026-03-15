@@ -1,5 +1,5 @@
 !>
-!! @file m_hb_function.f90
+!! @file m_hb_function.fpp
 !! @brief Contains module m_hb_function
 
 #:include 'macros.fpp'

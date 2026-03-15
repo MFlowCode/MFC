@@ -1,5 +1,5 @@
 !>
-!! @file m_re_visc.f90
+!! @file m_re_visc.fpp
 !! @brief Contains module m_re_visc
 
 #:include 'macros.fpp'
