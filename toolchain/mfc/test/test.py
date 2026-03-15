@@ -1,21 +1,25 @@
-import os, typing, shutil, time, itertools, threading
+import itertools
+import os
+import shutil
+import sys
+import threading
+import time
+import typing
 from random import sample, seed
 
-import rich, rich.table
+import rich
+import rich.table
 from rich.panel import Panel
 
-from ..printer import cons
-from ..        import common
-from ..state   import ARG
-from .case     import TestCase
-from .cases    import list_cases
-from ..        import sched
-from ..common  import MFCException, does_command_exist, format_list_to_string, get_program_output
-from ..build   import build, HDF5, PRE_PROCESS, SIMULATION, POST_PROCESS
-
-from ..packer import tol as packtol
+from .. import common, sched
+from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
+from ..common import MFCException, does_command_exist, format_list_to_string, get_program_output
 from ..packer import packer
-
+from ..packer import tol as packtol
+from ..printer import cons
+from ..state import ARG
+from .case import TestCase
+from .cases import list_cases
 
 nFAIL = 0
 nPASS = 0
@@ -39,8 +43,10 @@ TEST_TIMEOUT_SECONDS = 3600
 # from worker threads which could leave the scheduler in an undefined state.
 abort_tests = threading.Event()
 
+
 class TestTimeoutError(MFCException):
     pass
+
 
 def _filter_only(cases, skipped_cases):
     """Filter cases by --only terms using AND for labels, OR for UUIDs.
@@ -49,10 +55,11 @@ def _filter_only(cases, skipped_cases):
     UUIDs (8-char hex terms): case must match ANY UUID (OR logic).
     Mixed: keep case if all labels match OR any UUID matches.
     """
-    def is_uuid(term):
-        return len(term) == 8 and all(c in '0123456789abcdefABCDEF' for c in term)
 
-    uuids  = [t for t in ARG("only") if is_uuid(t)]
+    def is_uuid(term):
+        return len(term) == 8 and all(c in "0123456789abcdefABCDEF" for c in term)
+
+    uuids = [t for t in ARG("only") if is_uuid(t)]
     labels = [t for t in ARG("only") if not is_uuid(t)]
 
     for case in cases[:]:
@@ -60,7 +67,7 @@ def _filter_only(cases, skipped_cases):
         check.add(case.get_uuid())
 
         label_ok = all(label in check for label in labels) if labels else True
-        uuid_ok  = any(u in check for u in uuids)  if uuids  else True
+        uuid_ok = any(u in check for u in uuids) if uuids else True
 
         if labels and uuids:
             keep = label_ok or uuid_ok
@@ -76,22 +83,21 @@ def _filter_only(cases, skipped_cases):
     return cases, skipped_cases
 
 
-# pylint: disable=too-many-branches, too-many-statements, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
     selected_cases = []
-    skipped_cases  = []
+    skipped_cases = []
 
     # Check "--from" and "--to" exist and are in the right order
     bFoundFrom, bFoundTo = (False, False)
     from_i = -1
     for i, case in enumerate(cases):
         if case.get_uuid() == ARG("from"):
-            from_i     = i
+            from_i = i
             bFoundFrom = True
             # Do not "continue" because "--to" might be the same as "--from"
         if bFoundFrom and case.get_uuid() == ARG("to"):
-            cases    = cases[from_i:i+1]
+            cases = cases[from_i : i + 1]
             skipped_cases = [case for case in cases_ if case not in cases]
             bFoundTo = True
             break
@@ -103,10 +109,7 @@ def __filter(cases_) -> typing.List[TestCase]:
         cases, skipped_cases = _filter_only(cases, skipped_cases)
 
         if not cases:
-            raise MFCException(
-                f"--only filter matched zero test cases. "
-                f"Specified: {ARG('only')}. Check that UUIDs/names are valid."
-            )
+            raise MFCException(f"--only filter matched zero test cases. Specified: {ARG('only')}. Check that UUIDs/names are valid.")
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -115,15 +118,14 @@ def __filter(cases_) -> typing.List[TestCase]:
 
     for case in cases[:]:
         if ARG("single"):
-            skip = ['low_Mach', 'Hypoelasticity', 'teno', 'Chemistry', 'Phase Change model 6'
-            ,'Axisymmetric', 'Transducer', 'Transducer Array', 'Cylindrical', 'HLLD', 'Example']
+            skip = ["low_Mach", "Hypoelasticity", "teno", "Chemistry", "Phase Change model 6", "Axisymmetric", "Transducer", "Transducer Array", "Cylindrical", "HLLD", "Example"]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
                 skipped_cases.append(case)
 
     for case in cases[:]:
         if ARG("gpu"):
-            skip = ['Gauss Seidel']
+            skip = ["Gauss Seidel"]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 
@@ -141,25 +143,22 @@ def __filter(cases_) -> typing.List[TestCase]:
         cases = [c for i, c in enumerate(cases) if i % shard_count == shard_idx - 1]
 
         if not cases:
-            raise MFCException(
-                f"--shard {ARG('shard')} matched zero test cases. "
-                f"Total cases before sharding may be less than shard count."
-            )
+            raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
     if ARG("percent") == 100:
         return cases, skipped_cases
 
     seed(time.time())
 
-    selected_cases = sample(cases, k=int(len(cases)*ARG("percent")/100.0))
+    selected_cases = sample(cases, k=int(len(cases) * ARG("percent") / 100.0))
     skipped_cases += [item for item in cases if item not in selected_cases]
 
     return selected_cases, skipped_cases
 
+
 def test():
-    # pylint: disable=global-statement, global-variable-not-assigned, too-many-statements, too-many-locals
-    global nFAIL, nPASS, nSKIP, total_test_count
-    global errors, failed_tests, test_start_time
+    global nFAIL, nPASS, nSKIP, total_test_count  # noqa: PLW0603
+    global errors, failed_tests, test_start_time  # noqa: PLW0603
 
     test_start_time = time.time()  # Start timing
     failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
@@ -168,7 +167,7 @@ def test():
     # Delete UUIDs that are not in the list of cases from tests/
     if ARG("remove_old_tests"):
         dir_uuids = set(os.listdir(common.MFC_TEST_DIR))
-        new_uuids = { case.get_uuid() for case in cases }
+        new_uuids = {case.get_uuid() for case in cases}
 
         for old_uuid in dir_uuids - new_uuids:
             cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
@@ -177,7 +176,7 @@ def test():
         return
 
     cases, skipped_cases = __filter(cases)
-    cases = [ _.to_case() for _ in cases ]
+    cases = [_.to_case() for _ in cases]
     total_test_count = len(cases)
 
     if ARG("list"):
@@ -196,7 +195,7 @@ def test():
     # Some cases require a specific build of MFC for features like Chemistry,
     # Analytically defined patches, and --case-optimization. Here, we build all
     # the unique versions of MFC we need to run cases.
-    codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG('test_all') else [])
+    codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG("test_all") else [])
     unique_builds = set()
     for case, code in itertools.product(cases, codes):
         slug = code.get_slug(case.to_input_file())
@@ -211,7 +210,7 @@ def test():
     if len(ARG("only")) > 0:
         range_str = "Only " + format_list_to_string(ARG("only"), "bold magenta", "Nothing to run")
 
-    cons.print(f"[bold]Test {format_list_to_string([ x.name for x in codes ], 'magenta')}[/bold] | {range_str} ({len(cases)} test{'s' if len(cases) != 1 else ''})")
+    cons.print(f"[bold]Test {format_list_to_string([x.name for x in codes], 'magenta')}[/bold] | {range_str} ({len(cases)} test{'s' if len(cases) != 1 else ''})")
     cons.indent()
 
     # Run cases with multiple threads (if available)
@@ -224,9 +223,7 @@ def test():
     # because running a test case may cause it to rebuild, and thus
     # interfere with the other test cases. It is a niche feature so we won't
     # engineer around this issue (for now).
-    sched.sched(
-        [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
-        ARG("jobs"), ARG("gpus"))
+    sched.sched([sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases], ARG("jobs"), ARG("gpus"))
 
     # Check if we aborted due to high failure rate
     if abort_tests.is_set():
@@ -241,13 +238,8 @@ def test():
         cons.print()
         cons.unindent()
         if total_completed > 0:
-            raise MFCException(
-                f"Excessive test failures: {nFAIL}/{total_completed} "
-                f"failed ({nFAIL/total_completed*100:.1f}%)"
-            )
-        raise MFCException(
-            f"Excessive test failures: {nFAIL} failed, but no tests were completed."
-        )
+            raise MFCException(f"Excessive test failures: {nFAIL}/{total_completed} failed ({nFAIL / total_completed * 100:.1f}%)")
+        raise MFCException(f"Excessive test failures: {nFAIL} failed, but no tests were completed.")
 
     nSKIP = len(skipped_cases)
     cons.print()
@@ -265,16 +257,14 @@ def test():
     if failed_tests:
         with open(failed_uuids_path, "w") as f:
             for test_info in failed_tests:
-                f.write(test_info['uuid'] + "\n")
+                f.write(test_info["uuid"] + "\n")
     elif os.path.exists(failed_uuids_path):
         os.remove(failed_uuids_path)
 
-    exit(nFAIL)
+    sys.exit(nFAIL)
 
 
-def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float,
-                        failed_test_list: list, _skipped_cases: list):
-    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals
+def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float, failed_test_list: list, _skipped_cases: list):
     """Print a comprehensive test summary report."""
     total = passed + failed + skipped
 
@@ -312,9 +302,9 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
         summary_lines.append("")
         summary_lines.append("  [bold red]Failed Tests:[/bold red]")
         for test_info in failed_test_list[:10]:  # Limit to first 10
-            trace = test_info.get('trace', 'Unknown')
-            uuid = test_info.get('uuid', 'Unknown')
-            error_type = test_info.get('error_type', '')
+            trace = test_info.get("trace", "Unknown")
+            uuid = test_info.get("uuid", "Unknown")
+            error_type = test_info.get("error_type", "")
             if len(trace) > 40:
                 trace = trace[:37] + "..."
             summary_lines.append(f"    [red]•[/red] {trace}")
@@ -333,16 +323,10 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
         summary_lines.append("    • Run specific test: [cyan]./mfc.sh test --only <UUID>[/cyan]")
 
     cons.print()
-    cons.raw.print(Panel(
-        "\n".join(summary_lines),
-        title="[bold]Test Summary[/bold]",
-        border_style=border_style,
-        padding=(1, 2)
-    ))
+    cons.raw.print(Panel("\n".join(summary_lines), title="[bold]Test Summary[/bold]", border_style=border_style, padding=(1, 2)))
     cons.print()
 
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
     """Process a single silo file with h5dump and check for NaNs/Infinities."""
     h5dump = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
@@ -355,27 +339,17 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
     output, err = get_program_output([h5dump, silo_filepath])
 
     if err != 0:
-        raise MFCException(
-            f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, "
-            f"and the case dictionary in {case.get_filepath()}."
-        )
+        raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
     if "nan," in output:
-        raise MFCException(
-            f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, "
-            f"and the case dictionary in {case.get_filepath()}."
-        )
+        raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
     if "inf," in output:
-        raise MFCException(
-            f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, "
-            f"and the case dictionary in {case.get_filepath()}."
-        )
+        raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
 
 def _handle_case(case: TestCase, devices: typing.Set[int]):
-    # pylint: disable=global-statement, global-variable-not-assigned
-    global current_test_number
+    global current_test_number  # noqa: PLW0603
     start_time = time.time()
 
     # Set timeout using threading.Timer (works in worker threads)
@@ -456,7 +430,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
-            silo_dir = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')
+            silo_dir = os.path.join(case.get_dirpath(), "silo_hdf5", "p0")
             if os.path.isdir(silo_dir):
                 for silo_filename in os.listdir(silo_dir):
                     silo_filepath = os.path.join(silo_dir, silo_filename)
@@ -474,36 +448,29 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         cons.print(f"  {progress_str}    {trace_display:50s}  {duration:6.2f}    [magenta]{case.get_uuid()}[/magenta]")
 
     except TestTimeoutError as exc:
-        log_path = os.path.join(case.get_dirpath(), 'out_pre_sim.txt')
+        log_path = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
         if os.path.exists(log_path):
             log_msg = f"Check the log at: {log_path}"
         else:
-            log_msg = (
-                f"Log file ({log_path}) may not exist if the timeout occurred early."
-            )
-        raise MFCException(
-            f"Test {case} exceeded 1 hour timeout. "
-            f"This may indicate a hung simulation or misconfigured case. "
-            f"{log_msg}"
-        ) from exc
+            log_msg = f"Log file ({log_path}) may not exist if the timeout occurred early."
+        raise MFCException(f"Test {case} exceeded 1 hour timeout. This may indicate a hung simulation or misconfigured case. {log_msg}") from exc
     finally:
         timeout_timer.cancel()  # Cancel timeout timer
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    # pylint: disable=global-statement, global-variable-not-assigned
-    global nFAIL, nPASS, nSKIP
-    global errors, failed_tests
+    global nFAIL, nPASS, nSKIP  # noqa: PLW0603
+    global errors, failed_tests  # noqa: PLW0603
 
     # Check if we should abort before processing this case
     if abort_tests.is_set():
         return  # Exit gracefully if abort was requested
 
     nAttempts = 0
-    if ARG('single'):
-        max_attempts = max(ARG('max_attempts'), 3)
+    if ARG("single"):
+        max_attempts = max(ARG("max_attempts"), 3)
     else:
-        max_attempts = ARG('max_attempts')
+        max_attempts = ARG("max_attempts")
 
     while True:
         nAttempts += 1
@@ -535,13 +502,13 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             # Provide helpful hints based on error type
             exc_lower = str(exc).lower()
             if "tolerance" in exc_lower or "golden" in exc_lower or "mismatch" in exc_lower:
-                cons.print(f"    [dim]Hint: Consider --generate to update golden files or check tolerances[/dim]")
+                cons.print("    [dim]Hint: Consider --generate to update golden files or check tolerances[/dim]")
             elif "timeout" in exc_lower:
-                cons.print(f"    [dim]Hint: Test may be hanging - check case configuration[/dim]")
+                cons.print("    [dim]Hint: Test may be hanging - check case configuration[/dim]")
             elif "nan" in exc_lower:
-                cons.print(f"    [dim]Hint: NaN detected - check numerical stability of the case[/dim]")
+                cons.print("    [dim]Hint: NaN detected - check numerical stability of the case[/dim]")
             elif "failed to execute" in exc_lower:
-                cons.print(f"    [dim]Hint: Check build logs and case parameters[/dim]")
+                cons.print("    [dim]Hint: Check build logs and case parameters[/dim]")
             cons.print()
 
             # Track failed test details for summary
@@ -556,12 +523,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             elif "failed to execute" in exc_lower:
                 error_type = "execution failed"
 
-            failed_tests.append({
-                'trace': case.trace,
-                'uuid': case.get_uuid(),
-                'error_type': error_type,
-                'attempts': nAttempts
-            })
+            failed_tests.append({"trace": case.trace, "uuid": case.get_uuid(), "error_type": error_type, "attempts": nAttempts})
 
             # Still collect for final summary
             errors.append(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
@@ -574,7 +536,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             if total_completed >= MIN_CASES_BEFORE_ABORT:
                 failure_rate = nFAIL / total_completed
                 if failure_rate >= FAILURE_RATE_THRESHOLD:
-                    cons.print(f"\n[bold red]CRITICAL: {failure_rate*100:.1f}% failure rate detected after {total_completed} tests.[/bold red]")
+                    cons.print(f"\n[bold red]CRITICAL: {failure_rate * 100:.1f}% failure rate detected after {total_completed} tests.[/bold red]")
                     cons.print("[bold red]This suggests a systemic issue (bad build, broken environment, etc.)[/bold red]")
                     cons.print("[bold red]Aborting remaining tests to fail fast.[/bold red]\n")
                     # Set abort flag instead of raising exception from worker thread

@@ -1,16 +1,16 @@
-import os, dataclasses
+import dataclasses
+import os
 
-from .        import state, common
-from .state   import MFCConfig
+from . import common, state
 from .printer import cons
-
+from .state import MFCConfig
 
 MFC_LOCK_CURRENT_VERSION: int = 8
 
 
 @dataclasses.dataclass
 class MFCLockData:
-    config:  MFCConfig
+    config: MFCConfig
     version: int
 
 
@@ -18,12 +18,11 @@ data: MFCLockData = None
 
 
 def init():
-    # pylint: disable=global-statement
-    global data
+    global data  # noqa: PLW0603
 
     if not os.path.exists(common.MFC_LOCK_FILEPATH):
         config = MFCConfig()
-        data   = MFCLockData(config, MFC_LOCK_CURRENT_VERSION)
+        data = MFCLockData(config, MFC_LOCK_CURRENT_VERSION)
         state.gCFG = config
 
         common.create_file(common.MFC_LOCK_FILEPATH)
@@ -33,8 +32,7 @@ def init():
 
 
 def load():
-    # pylint: disable=global-statement
-    global data
+    global data  # noqa: PLW0603
 
     d = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
 
@@ -48,20 +46,18 @@ build/ directory and run MFC again. (v{d["version"]} -> v{MFC_LOCK_CURRENT_VERSI
 """)
 
     config = MFCConfig.from_dict(d["config"])
-    data   = MFCLockData(config, d["version"])
+    data = MFCLockData(config, d["version"])
     state.gCFG = config
 
 
 def write():
-    # pylint: disable=global-statement, global-variable-not-assigned
-    global data
+    global data  # noqa: PLW0603
 
     common.file_dump_yaml(common.MFC_LOCK_FILEPATH, dataclasses.asdict(data))
 
 
 def switch(to: MFCConfig):
-    # pylint: disable=global-statement, global-variable-not-assigned
-    global data
+    global data  # noqa: PLW0603
 
     if to == data.config:
         return
@@ -70,5 +66,5 @@ def switch(to: MFCConfig):
     cons.print("")
 
     data.config = to
-    state.gCFG  = to
+    state.gCFG = to
     write()

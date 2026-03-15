@@ -4,9 +4,9 @@
 # - hypoelasticity : T
 # - riemann_solver : 1
 
+import argparse
 import json
 import math
-import argparse
 
 parser = argparse.ArgumentParser(prog="Benchmarkin Case 3", description="This MFC case was created for the purposes of benchmarking MFC.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 

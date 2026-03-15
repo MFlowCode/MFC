@@ -3,17 +3,19 @@ MFC Parameter Search and Discovery Command.
 
 Provides CLI access to search and explore MFC's ~3,300 case parameters.
 """
-# pylint: disable=import-outside-toplevel
 
 import re
-from .state import ARG
+
 from .printer import cons
+from .state import ARG
 
 
 def params():
     """Execute the params command based on CLI arguments."""
-    from .params import REGISTRY
-    from .params import definitions  # noqa: F401  pylint: disable=unused-import
+    from .params import (
+        REGISTRY,
+        definitions,  # noqa: F401
+    )
 
     query = ARG("query")
     type_filter = ARG("param_type")
@@ -46,7 +48,7 @@ def params():
         cons.print("     Use './mfc.sh params -F' to see all feature groups")
 
 
-def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def _collapse_indexed_params(matches):
     """
     Collapse indexed parameters into patterns.
 
@@ -57,9 +59,9 @@ def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-ma
     """
     # Patterns for different index positions
     # Pattern 1: prefix(N)%suffix or prefix(N)%suffix(M)
-    prefix_pattern = re.compile(r'^([^(]+)\((\d+)\)%(.+)$')
+    prefix_pattern = re.compile(r"^([^(]+)\((\d+)\)%(.+)$")
     # Pattern 2: name(N) or name(N, M) at end
-    suffix_pattern = re.compile(r'^(.+)\((\d+)(?:,\s*(\d+))?\)$')
+    suffix_pattern = re.compile(r"^(.+)\((\d+)(?:,\s*(\d+))?\)$")
 
     # Two-level grouping: first by base pattern (with indices replaced), then collect indices
     groups = {}  # normalized_pattern -> {indices: [...], param_type, stages, pattern_type}
@@ -92,10 +94,10 @@ def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-ma
 
             if base_pattern not in groups:
                 groups[base_pattern] = {
-                    'indices': [],
-                    'param_type': param.param_type,
-                                    }
-            groups[base_pattern]['indices'].append((indices_key, param))
+                    "indices": [],
+                    "param_type": param.param_type,
+                }
+            groups[base_pattern]["indices"].append((indices_key, param))
             continue
 
         # Try suffix-only pattern: name(N) or name(N, M)
@@ -114,26 +116,26 @@ def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-ma
 
             if base_pattern not in groups:
                 groups[base_pattern] = {
-                    'indices': [],
-                    'param_type': param.param_type,
-                                    }
-            groups[base_pattern]['indices'].append((indices_key, param))
+                    "indices": [],
+                    "param_type": param.param_type,
+                }
+            groups[base_pattern]["indices"].append((indices_key, param))
             continue
 
         # No index pattern - add as-is
         if name not in groups:
             groups[name] = {
-                'indices': [(None, param)],
-                'param_type': param.param_type,
-                            }
+                "indices": [(None, param)],
+                "param_type": param.param_type,
+            }
         else:
-            groups[name]['indices'].append((None, param))
+            groups[name]["indices"].append((None, param))
 
     # Build collapsed results
     collapsed = []
 
     for pattern, data in sorted(groups.items()):
-        indices = data['indices']
+        indices = data["indices"]
         param = indices[0][1]  # Get param from first entry
         count = len(indices)
 
@@ -146,11 +148,11 @@ def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-ma
             # Reconstruct the actual name
             actual_name = pattern
             if idx_tuple[0] is not None:
-                actual_name = actual_name.replace('(N)', f'({idx_tuple[0]})', 1)
+                actual_name = actual_name.replace("(N)", f"({idx_tuple[0]})", 1)
             if idx_tuple[1] is not None:
-                actual_name = actual_name.replace('(M)', f'({idx_tuple[1]})', 1)
+                actual_name = actual_name.replace("(M)", f"({idx_tuple[1]})", 1)
             if idx_tuple[2] is not None:
-                actual_name = actual_name.replace('(K)', f'({idx_tuple[2]})', 1)
+                actual_name = actual_name.replace("(K)", f"({idx_tuple[2]})", 1)
             collapsed.append((actual_name, param, 1))
         else:
             # Multiple indices - build range string
@@ -211,7 +213,7 @@ def _show_feature_groups(registry):
     cons.print("  Use './mfc.sh params --feature <name>' to see parameters for a feature.")
     cons.print()
     cons.print(f"  {'Feature':<20} {'Description'}")
-    cons.print(f"  {'-'*20} {'-'*50}")
+    cons.print(f"  {'-' * 20} {'-' * 50}")
 
     # Get all tags from registry and show with descriptions
     all_tags = registry.get_all_tags()
@@ -288,7 +290,7 @@ def _show_families(registry, limit):
     cons.print("[bold]Parameter Families[/bold]")
     cons.print()
     cons.print(f"  {'Family':<40} {'Count':>6}")
-    cons.print(f"  {'-'*40} {'-'*6}")
+    cons.print(f"  {'-' * 40} {'-' * 6}")
 
     for prefix, count in sorted_families[:limit]:
         cons.print(f"  {prefix:<40} {count:>6}")
@@ -300,7 +302,7 @@ def _show_families(registry, limit):
     cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to see parameters in a family")
 
 
-def _search_params(registry, query, type_filter, limit, describe=False, search_descriptions=True):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def _search_params(registry, query, type_filter, limit, describe=False, search_descriptions=True):
     """Search for parameters matching a query."""
     from .params.descriptions import get_description
 
@@ -348,7 +350,7 @@ def _search_params(registry, query, type_filter, limit, describe=False, search_d
         cons.print(f"  [dim]... {len(collapsed) - limit} more patterns (use -n {len(collapsed)} to show all)[/dim]")
 
 
-def _show_collapsed_results(collapsed, describe=False):  # pylint: disable=too-many-branches
+def _show_collapsed_results(collapsed, describe=False):
     """Show collapsed search results."""
     from .params.descriptions import get_description, get_pattern_description
 
@@ -380,21 +382,20 @@ def _show_collapsed_results(collapsed, describe=False):  # pylint: disable=too-m
         # Compact table mode
         if has_ranges:
             cons.print(f"  {'Parameter':<40} {'Type':12} {'#':>4}  {'Index Range'}")
-            cons.print(f"  {'-'*40} {'-'*12} {'-'*4}  {'-'*15}")
+            cons.print(f"  {'-' * 40} {'-' * 12} {'-' * 4}  {'-' * 15}")
         else:
             cons.print(f"  {'Parameter':<40} {'Type':12}")
-            cons.print(f"  {'-'*40} {'-'*12}")
+            cons.print(f"  {'-' * 40} {'-' * 12}")
 
         for item in collapsed:
             if len(item) == 4:
                 name, param, count, range_str = item
                 if count > 1:
                     cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}  {range_str}")
+                elif has_ranges:
+                    cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
                 else:
-                    if has_ranges:
-                        cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
-                    else:
-                        cons.print(f"  {name:<40} {param.param_type.name:12}")
+                    cons.print(f"  {name:<40} {param.param_type.name:12}")
             else:
                 name, param, count = item
                 if has_ranges:
@@ -406,6 +407,7 @@ def _show_collapsed_results(collapsed, describe=False):  # pylint: disable=too-m
 def _suggest_alternatives(registry, query):
     """Suggest similar parameter names."""
     import difflib
+
     all_names = list(registry.all_params.keys())
     suggestions = difflib.get_close_matches(query, all_names, n=5, cutoff=0.5)
 

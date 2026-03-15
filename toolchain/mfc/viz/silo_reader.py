@@ -41,6 +41,7 @@ _DB_QUADVAR = 501
 # File-structure cache
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _SiloStructure:
     """Cached HDF5 layout for one processor's silo files.
@@ -48,12 +49,13 @@ class _SiloStructure:
     All timestep files in the same rank directory have the same internal
     path assignments, so we only need to parse this once.
     """
+
     ndims: int
-    coord_paths: List[bytes]          # HDF5 paths for x, y[, z] node coords
+    coord_paths: List[bytes]  # HDF5 paths for x, y[, z] node coords
     var_paths: Dict[str, bytes] = field(default_factory=dict)  # varname → data path
 
 
-_struct_cache: Dict[str, _SiloStructure] = {}   # key = rank directory path
+_struct_cache: Dict[str, _SiloStructure] = {}  # key = rank directory path
 _struct_lock = threading.Lock()
 
 
@@ -129,13 +131,14 @@ def clear_structure_cache() -> None:
 # File reader
 # ---------------------------------------------------------------------------
 
+
 def _resolve_path(h5file, path_bytes):
     """Resolve a silo internal path (e.g. b'/.silo/#000003') to a numpy array."""
     path = path_bytes.decode() if isinstance(path_bytes, (bytes, np.bytes_)) else str(path_bytes)
     return np.array(h5file[path])
 
 
-def read_silo_file(  # pylint: disable=too-many-locals
+def read_silo_file(
     path: str,
     var_filter: Optional[str] = None,
     rank_dir: Optional[str] = None,
@@ -181,12 +184,10 @@ def read_silo_file(  # pylint: disable=too-many-locals
             # buffer.  HDF5 stores it row-major.  Reinterpret in Fortran order
             # so data[i,j,k] = value at (x_i, y_j, z_k).
             if data.ndim >= 2:
-                data = np.ascontiguousarray(data).ravel().reshape(data.shape, order='F')
+                data = np.ascontiguousarray(data).ravel().reshape(data.shape, order="F")
             variables[var_name] = data
 
-    return ProcessorData(
-        m=m, n=n, p=p, x_cb=x_cb, y_cb=y_cb, z_cb=z_cb, variables=variables
-    )
+    return ProcessorData(m=m, n=n, p=p, x_cb=x_cb, y_cb=y_cb, z_cb=z_cb, variables=variables)
 
 
 # ---------------------------------------------------------------------------
@@ -199,12 +200,10 @@ _POOL_LOCK = threading.Lock()
 
 def _get_pool() -> ThreadPoolExecutor:
     """Return a module-level thread pool, creating it on first use."""
-    global _READ_POOL  # pylint: disable=global-statement
+    global _READ_POOL  # noqa: PLW0603
     with _POOL_LOCK:
         if _READ_POOL is None:
-            _READ_POOL = ThreadPoolExecutor(
-                max_workers=32, thread_name_prefix="mfc_silo"
-            )
+            _READ_POOL = ThreadPoolExecutor(max_workers=32, thread_name_prefix="mfc_silo")
             atexit.register(_READ_POOL.shutdown, wait=False)
         return _READ_POOL
 
@@ -212,6 +211,7 @@ def _get_pool() -> ThreadPoolExecutor:
 # ---------------------------------------------------------------------------
 # Assembly
 # ---------------------------------------------------------------------------
+
 
 def assemble_silo(
     case_dir: str,
@@ -241,10 +241,7 @@ def assemble_silo(
         rank_dir = os.path.join(base, f"p{rank}")
         silo_file = os.path.join(rank_dir, f"{step}.silo")
         if not os.path.isfile(silo_file):
-            raise FileNotFoundError(
-                f"Processor file not found: {silo_file}. "
-                "Incomplete output (missing rank) would produce incorrect data."
-            )
+            raise FileNotFoundError(f"Processor file not found: {silo_file}. Incomplete output (missing rank) would produce incorrect data.")
         rank_paths.append((rank, rank_dir, silo_file))
 
     def _read_one(args):

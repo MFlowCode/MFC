@@ -36,22 +36,37 @@ PARAM_RE = re.compile(r"`([a-z_][a-z0-9_%]*)(?:\s*[=><][^`]*)?\s*`")
 # Parameter-like names to skip (not actual MFC parameters)
 PARAM_SKIP = re.compile(
     r"^(src/|toolchain/|\.github|docs/|examples/|tests/)"  # file paths
-    r"|^\.(?:true|false)\.$"   # Fortran logicals
-    r"|^\d"                     # numeric values
-    r"|^[A-Z]"                  # constants/types (uppercase start)
+    r"|^\.(?:true|false)\.$"  # Fortran logicals
+    r"|^\d"  # numeric values
+    r"|^[A-Z]"  # constants/types (uppercase start)
 )
 
 # Backtick tokens in case.md that are not real parameters (analytical shorthands,
 # stress tensor component names, prose identifiers, hardcoded constants)
 CASE_MD_SKIP = {
     # Analytical shorthand variables (stretching formulas, "Analytical Definition" table)
-    "eps", "lx", "ly", "lz", "xc", "yc", "zc", "x_cb",
+    "eps",
+    "lx",
+    "ly",
+    "lz",
+    "xc",
+    "yc",
+    "zc",
+    "x_cb",
     # Stress tensor component names (descriptive, not params)
-    "tau_xx", "tau_xy", "tau_xz", "tau_yy", "tau_yz", "tau_zz",
+    "tau_xx",
+    "tau_xy",
+    "tau_xz",
+    "tau_yy",
+    "tau_yz",
+    "tau_zz",
     # Prose identifiers (example names, math symbols)
-    "scaling", "c_h", "thickness",
+    "scaling",
+    "c_h",
+    "thickness",
     # Hardcoded Fortran constants (not case-file params)
-    "init_dir", "zeros_default",
+    "init_dir",
+    "zeros_default",
 }
 
 # Docs to check for parameter references, with per-file skip sets
@@ -79,10 +94,7 @@ def check_docs(repo_root: Path) -> list[str]:
             # Strip trailing punctuation that may have leaked in
             path_str = path_str.rstrip(".,;:!?")
             if not (repo_root / path_str).exists():
-                errors.append(
-                    f"  {doc} references '{path_str}' but it does not exist."
-                    " Fix: update the path or remove the reference"
-                )
+                errors.append(f"  {doc} references '{path_str}' but it does not exist. Fix: update the path or remove the reference")
     return errors
 
 
@@ -111,10 +123,7 @@ def check_cite_keys(repo_root: Path) -> list[str]:
         for match in CITE_RE.finditer(text):
             key = match.group(1)
             if key.lower() not in valid_keys:
-                errors.append(
-                    f"  {rel} uses \\cite {key} but no bib entry found."
-                    " Fix: add entry to docs/references.bib or fix the key"
-                )
+                errors.append(f"  {rel} uses \\cite {key} but no bib entry found. Fix: add entry to docs/references.bib or fix the key")
 
     return errors
 
@@ -138,14 +147,14 @@ def _is_valid_param(param: str, valid_params: set, sub_params: set) -> bool:
     if "(" in param or ")" in param:
         return True  # Skip indexed refs like patch_icpp(i)%vel(j)
 
-    base = param.split("%")[0] if "%" in param else param
+    base = param.split("%", maxsplit=1)[0] if "%" in param else param
 
     if base in valid_params or base in sub_params:
         return True
 
     # Compound params (with %): validate both family prefix and attribute
     if "%" in param:
-        sub = param.split("%")[-1]
+        sub = param.rsplit("%", maxsplit=1)[-1]
         family_ok = any(p.startswith(base + "%") for p in valid_params)
         return family_ok and sub in sub_params
 
@@ -156,14 +165,14 @@ def _is_valid_param(param: str, valid_params: set, sub_params: set) -> bool:
     return False
 
 
-def check_param_refs(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
+def check_param_refs(repo_root: Path) -> list[str]:
     """Check that parameter names in documentation exist in the MFC registry."""
     # Import REGISTRY from the toolchain
     toolchain_dir = str(repo_root / "toolchain")
     if toolchain_dir not in sys.path:
         sys.path.insert(0, toolchain_dir)
     try:
-        from mfc.params import REGISTRY  # pylint: disable=import-outside-toplevel
+        from mfc.params import REGISTRY
     except ImportError:
         print("  Warning: could not import REGISTRY, skipping parameter check")
         return []
@@ -209,10 +218,7 @@ def check_param_refs(repo_root: Path) -> list[str]:  # pylint: disable=too-many-
             # Normalize %% to % for lookup
             normalized = param.replace("%%", "%")
             if not _is_valid_param(normalized, valid_params, sub_params):
-                errors.append(
-                    f"  {doc_rel} references parameter '{param}' not in REGISTRY."
-                    " Fix: check spelling or add to definitions.py"
-                )
+                errors.append(f"  {doc_rel} references parameter '{param}' not in REGISTRY. Fix: check spelling or add to definitions.py")
 
     return errors
 
@@ -242,18 +248,12 @@ def check_math_syntax(repo_root: Path) -> list[str]:
             cleaned = re.sub(r"\\f\[.*?\\f\]", "", cleaned)
 
             if "$$" in cleaned:
-                errors.append(
-                    f"  {rel}:{i} uses $$...$$ display math."
-                    " Fix: replace $$ with \\f[ and \\f]"
-                )
+                errors.append(f"  {rel}:{i} uses $$...$$ display math. Fix: replace $$ with \\f[ and \\f]")
                 continue
 
             for m in re.finditer(r"\$([^$\n]+?)\$", cleaned):
                 if re.search(r"\\[a-zA-Z]", m.group(1)):
-                    errors.append(
-                        f"  {rel}:{i} uses $...$ with LaTeX commands."
-                        " Fix: replace $ delimiters with \\f$ and \\f$"
-                    )
+                    errors.append(f"  {rel}:{i} uses $...$ with LaTeX commands. Fix: replace $ delimiters with \\f$ and \\f$")
                     break  # one error per line
 
     return errors
@@ -261,18 +261,18 @@ def check_math_syntax(repo_root: Path) -> list[str]:
 
 def _gitignored_docs(repo_root: Path) -> set[str]:
     """Return set of gitignored doc file basenames."""
-    import subprocess  # pylint: disable=import-outside-toplevel
+    import subprocess
 
     doc_dir = repo_root / "docs" / "documentation"
     try:
         result = subprocess.run(
             ["git", "ls-files", "--ignored", "--exclude-standard", "-o"],
-            capture_output=True, text=True, cwd=repo_root, check=False,
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+            check=False,
         )
-        return {
-            Path(f).name for f in result.stdout.splitlines()
-            if f.startswith(str(doc_dir.relative_to(repo_root)))
-        }
+        return {Path(f).name for f in result.stdout.splitlines() if f.startswith(str(doc_dir.relative_to(repo_root)))}
     except FileNotFoundError:
         return set()
 
@@ -312,12 +312,7 @@ def check_section_anchors(repo_root: Path) -> list[str]:
                 continue
             for m in re.finditer(r"\]\(#([\w-]+)\)", line):
                 if m.group(1) not in anchors:
-                    errors.append(
-                        f"  {rel}:{i} links to #{m.group(1)}"
-                        f" but no {{#{m.group(1)}}} anchor exists."
-                        f" Fix: add {{#{m.group(1)}}} to the target"
-                        " section header"
-                    )
+                    errors.append(f"  {rel}:{i} links to #{m.group(1)} but no {{#{m.group(1)}}} anchor exists. Fix: add {{#{m.group(1)}}} to the target section header")
 
     return errors
 
@@ -355,10 +350,7 @@ def check_doxygen_percent(repo_root: Path) -> list[str]:
                 span = m.group(1) or m.group(2)
                 if bad_pct_re.search(span):
                     fixed = bad_pct_re.sub("%%", span)
-                    errors.append(
-                        f"  {rel}:{i} Doxygen will eat the % in `{span}`."
-                        f" Fix: `{fixed}`"
-                    )
+                    errors.append(f"  {rel}:{i} Doxygen will eat the % in `{span}`. Fix: `{fixed}`")
 
     return errors
 
@@ -396,10 +388,7 @@ def check_page_refs(repo_root: Path) -> list[str]:
         for match in REF_RE.finditer(text):
             ref_target = match.group(1)
             if ref_target not in page_ids:
-                errors.append(
-                    f"  {rel} uses @ref {ref_target} but no @page with that ID exists."
-                    " Fix: check the page ID or add @page declaration"
-                )
+                errors.append(f"  {rel} uses @ref {ref_target} but no @page with that ID exists. Fix: check the page ID or add @page declaration")
 
     return errors
 
@@ -410,8 +399,8 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
     if toolchain_dir not in sys.path:
         sys.path.insert(0, toolchain_dir)
     try:
-        from mfc.case_validator import PHYSICS_DOCS  # pylint: disable=import-outside-toplevel
-        from mfc.params.ast_analyzer import analyze_case_validator  # pylint: disable=import-outside-toplevel
+        from mfc.case_validator import PHYSICS_DOCS
+        from mfc.params.ast_analyzer import analyze_case_validator
     except ImportError:
         return []
 
@@ -419,28 +408,28 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
     # references, and explanation) to case_validator.py to remove from this set.
     skip = {
         # Structural/mechanical checks (no physics meaning)
-        "check_parameter_types",     # type validation
-        "check_output_format",       # output format selection
-        "check_restart",             # restart file logistics
+        "check_parameter_types",  # type validation
+        "check_output_format",  # output format selection
+        "check_restart",  # restart file logistics
         "check_parallel_io_pre_process",  # parallel I/O settings
-        "check_build_flags",              # build-flag compatibility (no physics meaning)
+        "check_build_flags",  # build-flag compatibility (no physics meaning)
         "check_geometry_precision_simulation",  # build-flag compatibility (no physics meaning)
-        "check_misc_pre_process",    # miscellaneous pre-process flags
-        "check_bc_patches",          # boundary patch geometry
-        "check_grid_stretching",     # grid stretching parameters
-        "check_qbmm_pre_process",    # QBMM pre-process settings
+        "check_misc_pre_process",  # miscellaneous pre-process flags
+        "check_bc_patches",  # boundary patch geometry
+        "check_grid_stretching",  # grid stretching parameters
+        "check_qbmm_pre_process",  # QBMM pre-process settings
         "check_probe_integral_output",  # probe/integral output settings
-        "check_finite_difference",   # fd_order value validation
-        "check_flux_limiter",        # output dimension requirements
-        "check_liutex_post",         # output dimension requirements
-        "check_momentum_post",       # output dimension requirements
-        "check_velocity_post",       # output dimension requirements
+        "check_finite_difference",  # fd_order value validation
+        "check_flux_limiter",  # output dimension requirements
+        "check_liutex_post",  # output dimension requirements
+        "check_momentum_post",  # output dimension requirements
+        "check_velocity_post",  # output dimension requirements
         "check_surface_tension_post",  # output feature dependency
-        "check_no_flow_variables",   # output variable selection
-        "check_partial_domain",      # output format settings
-        "check_perturb_density",     # parameter pairing validation
-        "check_qm",                  # output dimension requirements
-        "check_chemistry",           # runtime Cantera validation only
+        "check_no_flow_variables",  # output variable selection
+        "check_partial_domain",  # output format settings
+        "check_perturb_density",  # parameter pairing validation
+        "check_qm",  # output dimension requirements
+        "check_chemistry",  # runtime Cantera validation only
         # Awaiting proper physics documentation (math, references, explanation)
         "check_adaptive_time_stepping",
         "check_adv_n",
@@ -474,11 +463,7 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
             continue
         if method in skip:
             continue
-        errors.append(
-            f"  {method} has validation rules but no PHYSICS_DOCS entry."
-            " Fix: add entry to PHYSICS_DOCS in case_validator.py"
-            " or add to skip set in lint_docs.py"
-        )
+        errors.append(f"  {method} has validation rules but no PHYSICS_DOCS entry. Fix: add entry to PHYSICS_DOCS in case_validator.py or add to skip set in lint_docs.py")
 
     return errors
 
@@ -508,17 +493,11 @@ def check_identifier_refs(repo_root: Path) -> list[str]:
             continue
         source_path = repo_root / source_file
         if not source_path.exists():
-            errors.append(
-                f"  contributing.md references `{identifier}` in {source_file}"
-                f" but {source_file} does not exist"
-            )
+            errors.append(f"  contributing.md references `{identifier}` in {source_file} but {source_file} does not exist")
             continue
         source_text = source_path.read_text(encoding="utf-8")
         if identifier not in source_text:
-            errors.append(
-                f"  contributing.md references `{identifier}` but it was not"
-                f" found in {source_file}. Fix: update the docs or the identifier"
-            )
+            errors.append(f"  contributing.md references `{identifier}` but it was not found in {source_file}. Fix: update the docs or the identifier")
 
     return errors
 
@@ -533,7 +512,7 @@ def check_cli_refs(repo_root: Path) -> list[str]:
     if toolchain_dir not in sys.path:
         sys.path.insert(0, toolchain_dir)
     try:
-        from mfc.cli.commands import MFC_CLI_SCHEMA  # pylint: disable=import-outside-toplevel
+        from mfc.cli.commands import MFC_CLI_SCHEMA
     except ImportError:
         return []
 
@@ -554,11 +533,7 @@ def check_cli_refs(repo_root: Path) -> list[str]:
             seen.add(cmd)
             continue
         seen.add(cmd)
-        errors.append(
-            f"  running.md references './mfc.sh {cmd}' but '{cmd}'"
-            " is not a known CLI command."
-            " Fix: update the command name or remove the reference"
-        )
+        errors.append(f"  running.md references './mfc.sh {cmd}' but '{cmd}' is not a known CLI command. Fix: update the command name or remove the reference")
 
     return errors
 
@@ -590,36 +565,23 @@ def check_unpaired_math(repo_root: Path) -> list[str]:
             # Count \f$ occurrences (should be even per line for inline math)
             inline_count = len(re.findall(r"\\f\$", line))
             if inline_count % 2 != 0:
-                errors.append(
-                    f"  {rel}:{i} has {inline_count} \\f$ delimiter(s) (odd)."
-                    " Fix: ensure every \\f$ has a matching closing \\f$"
-                )
+                errors.append(f"  {rel}:{i} has {inline_count} \\f$ delimiter(s) (odd). Fix: ensure every \\f$ has a matching closing \\f$")
 
             # Track \f[ / \f] balance
             opens = len(re.findall(r"\\f\[", line))
             closes = len(re.findall(r"\\f\]", line))
             for _ in range(opens):
                 if display_math_open:
-                    errors.append(
-                        f"  {rel}:{i} opens \\f[ but previous \\f["
-                        f" from line {display_math_open} is still open."
-                        " Fix: add missing \\f]"
-                    )
+                    errors.append(f"  {rel}:{i} opens \\f[ but previous \\f[ from line {display_math_open} is still open. Fix: add missing \\f]")
                 display_math_open = i
             for _ in range(closes):
                 if not display_math_open:
-                    errors.append(
-                        f"  {rel}:{i} has \\f] without a preceding \\f[."
-                        " Fix: add missing \\f[ or remove extra \\f]"
-                    )
+                    errors.append(f"  {rel}:{i} has \\f] without a preceding \\f[. Fix: add missing \\f[ or remove extra \\f]")
                 else:
                     display_math_open = 0
 
         if display_math_open:
-            errors.append(
-                f"  {rel}:{display_math_open} opens \\f[ that is never closed."
-                " Fix: add \\f] to close the display math block"
-            )
+            errors.append(f"  {rel}:{display_math_open} opens \\f[ that is never closed. Fix: add \\f] to close the display math block")
 
     return errors
 
@@ -627,19 +589,45 @@ def check_unpaired_math(repo_root: Path) -> list[str]:
 # Doxygen block commands that are incorrectly processed inside backtick
 # code spans (known Doxygen bug, see github.com/doxygen/doxygen/issues/6054).
 _DOXYGEN_BLOCK_CMDS = {
-    "code", "endcode", "verbatim", "endverbatim",
-    "dot", "enddot", "msc", "endmsc",
-    "startuml", "enduml",
-    "latexonly", "endlatexonly", "htmlonly", "endhtmlonly",
-    "xmlonly", "endxmlonly", "rtfonly", "endrtfonly",
-    "manonly", "endmanonly", "docbookonly", "enddocbookonly",
-    "todo", "deprecated", "bug", "test",
-    "note", "warning", "attention", "remark",
-    "brief", "details", "param", "return", "returns",
+    "code",
+    "endcode",
+    "verbatim",
+    "endverbatim",
+    "dot",
+    "enddot",
+    "msc",
+    "endmsc",
+    "startuml",
+    "enduml",
+    "latexonly",
+    "endlatexonly",
+    "htmlonly",
+    "endhtmlonly",
+    "xmlonly",
+    "endxmlonly",
+    "rtfonly",
+    "endrtfonly",
+    "manonly",
+    "endmanonly",
+    "docbookonly",
+    "enddocbookonly",
+    "todo",
+    "deprecated",
+    "bug",
+    "test",
+    "note",
+    "warning",
+    "attention",
+    "remark",
+    "brief",
+    "details",
+    "param",
+    "return",
+    "returns",
 }
 
 
-def check_doxygen_commands_in_backticks(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
+def check_doxygen_commands_in_backticks(repo_root: Path) -> list[str]:
     """Check for Doxygen @/\\ commands inside backtick code spans.
 
     Doxygen processes certain block commands even inside backtick code
@@ -674,11 +662,7 @@ def check_doxygen_commands_in_backticks(repo_root: Path) -> list[str]:  # pylint
                 cmd_match = doxy_cmd_re.search(span)
                 if cmd_match:
                     cmd = cmd_match.group(0)
-                    errors.append(
-                        f"  {rel}:{i} backtick span contains Doxygen"
-                        f" command '{cmd}' which may be processed."
-                        " Fix: use a fenced code block or rephrase"
-                    )
+                    errors.append(f"  {rel}:{i} backtick span contains Doxygen command '{cmd}' which may be processed. Fix: use a fenced code block or rephrase")
 
     return errors
 
@@ -713,11 +697,7 @@ def check_single_quote_in_backtick(repo_root: Path) -> list[str]:
             for m in single_bt_re.finditer(line):
                 span = m.group(1)
                 if "'" in span:
-                    errors.append(
-                        f"  {rel}:{i} single-backtick span `{span}` contains"
-                        " a single quote, which Doxygen treats as ending the"
-                        f" span. Fix: use double backticks ``{span}``"
-                    )
+                    errors.append(f"  {rel}:{i} single-backtick span `{span}` contains a single quote, which Doxygen treats as ending the span. Fix: use double backticks ``{span}``")
 
     return errors
 
@@ -734,7 +714,7 @@ _AMSMATH_ONLY_CMDS = {
 }
 
 
-def check_amsmath_in_doxygen_math(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
+def check_amsmath_in_doxygen_math(repo_root: Path) -> list[str]:
     """Flag AMSmath-only commands in Doxygen math that may not render."""
     doc_dir = repo_root / "docs" / "documentation"
     if not doc_dir.exists():
@@ -766,10 +746,7 @@ def check_amsmath_in_doxygen_math(repo_root: Path) -> list[str]:  # pylint: disa
             for m in inline_re.finditer(line):
                 for cm in ams_re.finditer(m.group(1)):
                     alt = _AMSMATH_ONLY_CMDS[cm.group(1)]
-                    errors.append(
-                        f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in"
-                        f" math. Fix: use \\{alt} instead"
-                    )
+                    errors.append(f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in math. Fix: use \\{alt} instead")
 
             # Check display math lines between \f[ and \f]
             if "\\f[" in line:
@@ -777,10 +754,7 @@ def check_amsmath_in_doxygen_math(repo_root: Path) -> list[str]:  # pylint: disa
             if in_display:
                 for cm in ams_re.finditer(line):
                     alt = _AMSMATH_ONLY_CMDS[cm.group(1)]
-                    errors.append(
-                        f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in"
-                        f" math. Fix: use \\{alt} instead"
-                    )
+                    errors.append(f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in math. Fix: use \\{alt} instead")
             if "\\f]" in line:
                 in_display = False
 
@@ -823,10 +797,7 @@ def check_module_briefs(repo_root: Path) -> list[str]:
 
         if not found_brief:
             rel = fpp.relative_to(repo_root)
-            errors.append(
-                f"  {rel} has no module-level !> @brief before the module declaration."
-                " Fix: add '!> @brief <description>' on the line before 'module ...'"
-            )
+            errors.append(f"  {rel} has no module-level !> @brief before the module declaration. Fix: add '!> @brief <description>' on the line before 'module ...'")
 
     return errors
 
@@ -856,7 +827,7 @@ def check_module_categories(repo_root: Path) -> list[str]:
             cats = ", ".join(e["category"] for e in categories)
             errors.append(
                 f"  {rel}: module {name} is not in docs/module_categories.json.\n"
-                f"    Fix: open docs/module_categories.json and add \"{name}\" to one of: {cats}.\n"
+                f'    Fix: open docs/module_categories.json and add "{name}" to one of: {cats}.\n'
                 f"    This ensures it appears on the Code Architecture page."
             )
 

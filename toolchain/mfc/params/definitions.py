@@ -3,12 +3,13 @@ MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
 This replaces the definitions/ directory.
-"""  # pylint: disable=too-many-lines
+"""
 
 import re
-from typing import Dict, Any
-from .schema import ParamDef, ParamType
+from typing import Any, Dict
+
 from .registry import REGISTRY
+from .schema import ParamDef, ParamType
 
 # Index limits
 NP, NF, NI, NA, NPR, NB = 10, 10, 1000, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
@@ -337,12 +338,26 @@ def _auto_describe(name: str) -> str:
     # Last resort: clean up the name
     return name.replace("_", " ").replace("%", " ")
 
+
 # Parameters that can be hard-coded for GPU case optimization
 CASE_OPT_PARAMS = {
-    "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order",
-    "num_fluids", "mhd", "relativity", "igr_order", "viscous",
-    "igr_iter_solver", "igr", "igr_pres_lim", "recon_type",
-    "muscl_order", "muscl_lim"
+    "mapped_weno",
+    "wenoz",
+    "teno",
+    "wenoz_q",
+    "nb",
+    "weno_order",
+    "num_fluids",
+    "mhd",
+    "relativity",
+    "igr_order",
+    "viscous",
+    "igr_iter_solver",
+    "igr",
+    "igr_pres_lim",
+    "recon_type",
+    "muscl_order",
+    "muscl_lim",
 }
 
 
@@ -428,24 +443,24 @@ PREFIX_HINTS = {
 
 def _lookup_hint(name):
     """Auto-derive constraint hint from HINTS dict using family+attribute matching."""
-    if '%' not in name:
+    if "%" not in name:
         # Check PREFIX_HINTS for simple params
         for prefix, label in PREFIX_HINTS.items():
             if name.startswith(prefix):
                 return label
         return ""
     # Compound name: extract family and attribute
-    prefix, attr_full = name.split('%', 1)
+    prefix, attr_full = name.split("%", 1)
     # Normalize family: "bc_x" → "bc", "patch_bc(1)" → "patch"
-    family = re.sub(r'[_(].*', '', prefix)
+    family = re.sub(r"[_(].*", "", prefix)
     if family not in HINTS:
         # Fallback: keep underscores — "patch_bc" → "patch_bc", "simplex_params" → "simplex_params"
-        m = re.match(r'^[a-zA-Z_]+', prefix)
+        m = re.match(r"^[a-zA-Z_]+", prefix)
         family = m.group(0) if m else ""
     if family not in HINTS:
         return ""
     # Strip index from attr: "vel_in(1)" → "vel_in"
-    m = re.match(r'^[a-zA-Z_0-9]+', attr_full)
+    m = re.match(r"^[a-zA-Z_0-9]+", attr_full)
     if not m:
         return ""
     attr = m.group(0)
@@ -465,19 +480,13 @@ _VALID_CONDITION_KEYS = {"requires", "recommends", "requires_value"}
 def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
     """Validate a constraint dict has valid keys with 'did you mean?' suggestions."""
     # Import here to avoid circular import at module load time
-    from .suggest import invalid_key_error  # pylint: disable=import-outside-toplevel
+    from .suggest import invalid_key_error
 
     invalid_keys = set(constraint.keys()) - _VALID_CONSTRAINT_KEYS
     if invalid_keys:
         # Get suggestion for the first invalid key
         first_invalid = next(iter(invalid_keys))
-        raise ValueError(
-            invalid_key_error(
-                f"constraint for '{param_name}'",
-                first_invalid,
-                _VALID_CONSTRAINT_KEYS
-            )
-        )
+        raise ValueError(invalid_key_error(f"constraint for '{param_name}'", first_invalid, _VALID_CONSTRAINT_KEYS))
 
     # Validate types
     if "choices" in constraint and not isinstance(constraint["choices"], list):
@@ -492,63 +501,37 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
         if "choices" in constraint:
             for key in constraint["value_labels"]:
                 if key not in constraint["choices"]:
-                    raise ValueError(
-                        f"value_labels key {key!r} for '{param_name}' "
-                        f"not in choices {constraint['choices']}"
-                    )
+                    raise ValueError(f"value_labels key {key!r} for '{param_name}' not in choices {constraint['choices']}")
 
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
     """Validate a dependency dict has valid structure with 'did you mean?' suggestions."""
     # Import here to avoid circular import at module load time
-    from .suggest import invalid_key_error  # pylint: disable=import-outside-toplevel
+    from .suggest import invalid_key_error
 
     invalid_keys = set(dependency.keys()) - _VALID_DEPENDENCY_KEYS
     if invalid_keys:
         first_invalid = next(iter(invalid_keys))
-        raise ValueError(
-            invalid_key_error(
-                f"dependency for '{param_name}'",
-                first_invalid,
-                _VALID_DEPENDENCY_KEYS
-            )
-        )
+        raise ValueError(invalid_key_error(f"dependency for '{param_name}'", first_invalid, _VALID_DEPENDENCY_KEYS))
 
     def _validate_condition(cond_label: str, condition: Any) -> None:
         """Validate a condition dict (shared by when_true, when_set, when_value entries)."""
         if not isinstance(condition, dict):
-            raise ValueError(
-                f"Dependency '{cond_label}' for '{param_name}' must be a dict"
-            )
+            raise ValueError(f"Dependency '{cond_label}' for '{param_name}' must be a dict")
         invalid_cond_keys = set(condition.keys()) - _VALID_CONDITION_KEYS
         if invalid_cond_keys:
             first_invalid = next(iter(invalid_cond_keys))
-            raise ValueError(
-                invalid_key_error(
-                    f"condition in '{cond_label}' for '{param_name}'",
-                    first_invalid,
-                    _VALID_CONDITION_KEYS
-                )
-            )
+            raise ValueError(invalid_key_error(f"condition in '{cond_label}' for '{param_name}'", first_invalid, _VALID_CONDITION_KEYS))
         for req_key in ["requires", "recommends"]:
             if req_key in condition and not isinstance(condition[req_key], list):
-                raise ValueError(
-                    f"Dependency '{cond_label}/{req_key}' for '{param_name}' "
-                    "must be a list"
-                )
+                raise ValueError(f"Dependency '{cond_label}/{req_key}' for '{param_name}' must be a list")
         if "requires_value" in condition:
             rv = condition["requires_value"]
             if not isinstance(rv, dict):
-                raise ValueError(
-                    f"Dependency '{cond_label}/requires_value' for '{param_name}' "
-                    "must be a dict"
-                )
+                raise ValueError(f"Dependency '{cond_label}/requires_value' for '{param_name}' must be a dict")
             for rv_param, rv_vals in rv.items():
                 if not isinstance(rv_vals, list):
-                    raise ValueError(
-                        f"Dependency '{cond_label}/requires_value/{rv_param}' "
-                        f"for '{param_name}' must be a list"
-                    )
+                    raise ValueError(f"Dependency '{cond_label}/requires_value/{rv_param}' for '{param_name}' must be a list")
 
     for condition_key in ["when_true", "when_set"]:
         if condition_key in dependency:
@@ -557,9 +540,7 @@ def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
     if "when_value" in dependency:
         wv = dependency["when_value"]
         if not isinstance(wv, dict):
-            raise ValueError(
-                f"Dependency 'when_value' for '{param_name}' must be a dict"
-            )
+            raise ValueError(f"Dependency 'when_value' for '{param_name}' must be a dict")
         for val, condition in wv.items():
             _validate_condition(f"when_value/{val}", condition)
 
@@ -610,13 +591,11 @@ CONSTRAINTS = {
         "choices": [1, 2, 3, 4, 5],
         "value_labels": {1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
     },
-
     # Time stepping
     "time_stepper": {
         "choices": [1, 2, 3],
         "value_labels": {1: "RK1 (Forward Euler)", 2: "RK2", 3: "RK3 (SSP)"},
     },
-
     # Riemann solver
     "riemann_solver": {
         "choices": [1, 2, 3, 4, 5],
@@ -630,19 +609,16 @@ CONSTRAINTS = {
         "choices": [1, 2],
         "value_labels": {1: "Roe", 2: "arithmetic"},
     },
-
     # Model equations
     "model_eqns": {
         "choices": [1, 2, 3, 4],
         "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
     },
-
     # Bubbles
     "bubble_model": {
         "choices": [1, 2, 3],
         "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
     },
-
     # Output
     "format": {
         "choices": [1, 2],
@@ -652,7 +628,6 @@ CONSTRAINTS = {
         "choices": [1, 2],
         "value_labels": {1: "single", 2: "double"},
     },
-
     # Time stepping (must be positive)
     "dt": {"min": 0},
     "t_stop": {"min": 0},
@@ -661,14 +636,11 @@ CONSTRAINTS = {
     "t_step_print": {"min": 1},
     "cfl_target": {"min": 0},
     "cfl_max": {"min": 0},
-
     # WENO
     "weno_eps": {"min": 0},
-
     # Physics (must be non-negative)
     "R0ref": {"min": 0},
     "sigma": {"min": 0},
-
     # Counts (must be positive)
     "num_fluids": {"min": 1, "max": 10},
     "num_patches": {"min": 0, "max": 10},
@@ -808,7 +780,8 @@ DEPENDENCIES = {
     },
 }
 
-def _r(name, ptype, tags=None, desc=None, hint=None, math=None):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+
+def _r(name, ptype, tags=None, desc=None, hint=None, math=None):
     """Register a parameter with optional feature tags and description."""
     if hint is None:
         hint = _lookup_hint(name)
@@ -818,20 +791,22 @@ def _r(name, ptype, tags=None, desc=None, hint=None, math=None):  # pylint: disa
         labels = constraint["value_labels"]
         suffix = ", ".join(f"{v}={labels[v]}" for v in sorted(labels))
         description = f"{description} ({suffix})"
-    REGISTRY.register(ParamDef(
-        name=name,
-        param_type=ptype,
-        description=description,
-        case_optimization=(name in CASE_OPT_PARAMS),
-        constraints=constraint,
-        dependencies=DEPENDENCIES.get(name),
-        tags=tags if tags else set(),
-        hint=hint,
-        math_symbol=math or "",
-    ))
+    REGISTRY.register(
+        ParamDef(
+            name=name,
+            param_type=ptype,
+            description=description,
+            case_optimization=(name in CASE_OPT_PARAMS),
+            constraints=constraint,
+            dependencies=DEPENDENCIES.get(name),
+            tags=tags if tags else set(),
+            hint=hint,
+            math_symbol=math or "",
+        )
+    )
 
 
-def _load():  # pylint: disable=too-many-locals,too-many-statements
+def _load():
     """Load all parameter definitions."""
     INT, REAL, LOG, STR = ParamType.INT, ParamType.REAL, ParamType.LOG, ParamType.STR
     A_REAL = ParamType.ANALYTIC_REAL
@@ -855,8 +830,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         _r(f"{d}_domain%end", REAL, {"grid"})
 
     # --- Time stepping ---
-    for n in ["time_stepper", "t_step_old", "t_step_start", "t_step_stop",
-              "t_step_save", "t_step_print", "adap_dt_max_iters"]:
+    for n in ["time_stepper", "t_step_old", "t_step_start", "t_step_stop", "t_step_save", "t_step_print", "adap_dt_max_iters"]:
         _r(n, INT, {"time"})
     _r("dt", REAL, {"time"}, math=r"\f$\Delta t\f$")
     _r("cfl_target", REAL, {"time"}, math=r"\f$\mathrm{CFL}\f$")
@@ -931,22 +905,56 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("schlieren_alpha", REAL, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt",
-              "cons_vars_wrt", "fft_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt"]:
         _r(n, LOG, {"output"})
-    for n in ["schlieren_wrt", "alpha_rho_wrt", "rho_wrt", "mom_wrt", "vel_wrt",
-              "flux_wrt", "E_wrt", "pres_wrt", "alpha_wrt", "kappa_wrt", "gamma_wrt",
-              "heat_ratio_wrt", "pi_inf_wrt", "pres_inf_wrt", "c_wrt",
-              "omega_wrt", "qm_wrt", "liutex_wrt", "cf_wrt", "sim_data", "output_partial_domain"]:
+    for n in [
+        "schlieren_wrt",
+        "alpha_rho_wrt",
+        "rho_wrt",
+        "mom_wrt",
+        "vel_wrt",
+        "flux_wrt",
+        "E_wrt",
+        "pres_wrt",
+        "alpha_wrt",
+        "kappa_wrt",
+        "gamma_wrt",
+        "heat_ratio_wrt",
+        "pi_inf_wrt",
+        "pres_inf_wrt",
+        "c_wrt",
+        "omega_wrt",
+        "qm_wrt",
+        "liutex_wrt",
+        "cf_wrt",
+        "sim_data",
+        "output_partial_domain",
+    ]:
         _r(n, LOG, {"output"})
     for d in ["x", "y", "z"]:
         _r(f"{d}_output%beg", REAL, {"output"})
         _r(f"{d}_output%end", REAL, {"output"})
     # Lagrangian output
-    for v in ["lag_header", "lag_txt_wrt", "lag_db_wrt", "lag_id_wrt", "lag_pos_wrt",
-              "lag_pos_prev_wrt", "lag_vel_wrt", "lag_rad_wrt", "lag_rvel_wrt",
-              "lag_r0_wrt", "lag_rmax_wrt", "lag_rmin_wrt", "lag_dphidt_wrt",
-              "lag_pres_wrt", "lag_mv_wrt", "lag_mg_wrt", "lag_betaT_wrt", "lag_betaC_wrt"]:
+    for v in [
+        "lag_header",
+        "lag_txt_wrt",
+        "lag_db_wrt",
+        "lag_id_wrt",
+        "lag_pos_wrt",
+        "lag_pos_prev_wrt",
+        "lag_vel_wrt",
+        "lag_rad_wrt",
+        "lag_rvel_wrt",
+        "lag_r0_wrt",
+        "lag_rmax_wrt",
+        "lag_rmin_wrt",
+        "lag_dphidt_wrt",
+        "lag_pres_wrt",
+        "lag_mv_wrt",
+        "lag_mg_wrt",
+        "lag_betaT_wrt",
+        "lag_betaC_wrt",
+    ]:
         _r(v, LOG, {"bubbles", "output"})
 
     # --- Boundary conditions ---
@@ -958,12 +966,28 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     _r("relativity", LOG, {"relativity"})
 
     # --- Other (no specific feature tag) ---
-    for n in ["model_eqns", "num_fluids", "thermal", "relax_model", "igr_order",
-              "num_bc_patches", "num_patches", "perturb_flow_fluid", "perturb_sph_fluid",
-              "dist_type", "mixlayer_perturb_nk", "elliptic_smoothing_iters",
-              "n_start_old", "n_start", "fd_order", "num_igr_iters",
-              "num_igr_warm_start_iters", "igr_iter_solver", "nv_uvm_igr_temps_on_gpu",
-              "flux_lim"]:
+    for n in [
+        "model_eqns",
+        "num_fluids",
+        "thermal",
+        "relax_model",
+        "igr_order",
+        "num_bc_patches",
+        "num_patches",
+        "perturb_flow_fluid",
+        "perturb_sph_fluid",
+        "dist_type",
+        "mixlayer_perturb_nk",
+        "elliptic_smoothing_iters",
+        "n_start_old",
+        "n_start",
+        "fd_order",
+        "num_igr_iters",
+        "num_igr_warm_start_iters",
+        "igr_iter_solver",
+        "nv_uvm_igr_temps_on_gpu",
+        "flux_lim",
+    ]:
         _r(n, INT)
     _r("pref", REAL, math=r"\f$p_\text{ref}\f$")
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
@@ -971,16 +995,47 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
-    for n in ["mixlayer_vel_coef", "mixlayer_domain", "mixlayer_perturb_k0",
-              "perturb_flow_mag", "fluid_rho", "sigR", "sigV", "rhoRV",
-              "tau_star", "cont_damage_s", "alpha_bar", "alf_factor",
-              "ic_eps", "ic_beta"]:
+    for n in [
+        "mixlayer_vel_coef",
+        "mixlayer_domain",
+        "mixlayer_perturb_k0",
+        "perturb_flow_mag",
+        "fluid_rho",
+        "sigR",
+        "sigV",
+        "rhoRV",
+        "tau_star",
+        "cont_damage_s",
+        "alpha_bar",
+        "alf_factor",
+        "ic_eps",
+        "ic_beta",
+    ]:
         _r(n, REAL)
-    for n in ["mpp_lim", "relax", "adv_n", "cont_damage", "igr", "down_sample",
-              "old_grid", "old_ic", "mixlayer_vel_profile", "mixlayer_perturb",
-              "perturb_flow", "perturb_sph", "pre_stress", "elliptic_smoothing",
-              "simplex_perturb", "alt_soundspeed", "mixture_err", "rdma_mpi",
-              "igr_pres_lim", "int_comp", "nv_uvm_out_of_core", "nv_uvm_pref_gpu"]:
+    for n in [
+        "mpp_lim",
+        "relax",
+        "adv_n",
+        "cont_damage",
+        "igr",
+        "down_sample",
+        "old_grid",
+        "old_ic",
+        "mixlayer_vel_profile",
+        "mixlayer_perturb",
+        "perturb_flow",
+        "perturb_sph",
+        "pre_stress",
+        "elliptic_smoothing",
+        "simplex_perturb",
+        "alt_soundspeed",
+        "mixture_err",
+        "rdma_mpi",
+        "igr_pres_lim",
+        "int_comp",
+        "nv_uvm_out_of_core",
+        "nv_uvm_pref_gpu",
+    ]:
         _r(n, LOG)
     _r("case_dir", STR)
 
@@ -1003,12 +1058,9 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
             _r(f"{px}{a}", INT)
         for a in ["smoothen", "alter_patch"] if i >= 2 else ["smoothen"]:
             _r(f"{px}{a}", LOG)
-        for a, sym in [("rho", r"\f$\rho\f$"), ("gamma", r"\f$\gamma\f$"),
-                       ("pi_inf", r"\f$\pi_\infty\f$"), ("cv", r"\f$c_v\f$"),
-                       ("qv", r"\f$q_v\f$"), ("qvp", r"\f$q'_v\f$")]:
+        for a, sym in [("rho", r"\f$\rho\f$"), ("gamma", r"\f$\gamma\f$"), ("pi_inf", r"\f$\pi_\infty\f$"), ("cv", r"\f$c_v\f$"), ("qv", r"\f$q_v\f$"), ("qvp", r"\f$q'_v\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        for a in ["radius", "radii", "epsilon", "beta", "normal", "alpha_rho",
-                  "non_axis_sym", "smooth_coeff", "vel", "alpha", "model_threshold"]:
+        for a in ["radius", "radii", "epsilon", "beta", "normal", "alpha_rho", "non_axis_sym", "smooth_coeff", "vel", "alpha", "model_threshold"]:
             _r(f"{px}{a}", REAL)
         # Bubble fields
         for a in ["r0", "v0", "p0", "m0"]:
@@ -1058,9 +1110,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     # --- fluid_pp (10 fluids) ---
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
-        for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"),
-                       ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"),
-                       ("qvp", r"\f$q'_{v,k}\f$")]:
+        for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
         _r(f"{px}mul0", REAL, {"viscosity"}, math=r"\f$\mu_{l,k}\f$")
         _r(f"{px}ss", REAL, {"surface_tension"}, math=r"\f$\sigma_k\f$")
@@ -1071,16 +1121,28 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
 
     # --- bub_pp (bubble properties) ---
-    for a, sym in [("R0ref", r"\f$R_0\f$"), ("p0ref", r"\f$p_0\f$"),
-                   ("rho0ref", r"\f$\rho_l\f$"), ("T0ref", r"\f$T_0\f$"),
-                   ("ss", r"\f$\sigma\f$"), ("pv", r"\f$p_v\f$"),
-                   ("vd", r"\f$D\f$"), ("mu_l", r"\f$\mu_l\f$"),
-                   ("mu_v", r"\f$\mu_v\f$"), ("mu_g", r"\f$\mu_g\f$"),
-                   ("gam_v", r"\f$\gamma_v\f$"), ("gam_g", r"\f$\gamma_g\f$"),
-                   ("M_v", r"\f$M_v\f$"), ("M_g", r"\f$M_g\f$"),
-                   ("k_v", r"\f$k_v\f$"), ("k_g", r"\f$k_g\f$"),
-                   ("cp_v", r"\f$c_{p,v}\f$"), ("cp_g", r"\f$c_{p,g}\f$"),
-                   ("R_v", r"\f$R_v\f$"), ("R_g", r"\f$R_g\f$")]:
+    for a, sym in [
+        ("R0ref", r"\f$R_0\f$"),
+        ("p0ref", r"\f$p_0\f$"),
+        ("rho0ref", r"\f$\rho_l\f$"),
+        ("T0ref", r"\f$T_0\f$"),
+        ("ss", r"\f$\sigma\f$"),
+        ("pv", r"\f$p_v\f$"),
+        ("vd", r"\f$D\f$"),
+        ("mu_l", r"\f$\mu_l\f$"),
+        ("mu_v", r"\f$\mu_v\f$"),
+        ("mu_g", r"\f$\mu_g\f$"),
+        ("gam_v", r"\f$\gamma_v\f$"),
+        ("gam_g", r"\f$\gamma_g\f$"),
+        ("M_v", r"\f$M_v\f$"),
+        ("M_g", r"\f$M_g\f$"),
+        ("k_v", r"\f$k_v\f$"),
+        ("k_g", r"\f$k_g\f$"),
+        ("cp_v", r"\f$c_{p,v}\f$"),
+        ("cp_g", r"\f$c_{p,g}\f$"),
+        ("R_v", r"\f$R_v\f$"),
+        ("R_g", r"\f$R_g\f$"),
+    ]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
     # --- patch_ib (10 immersed boundaries) ---
@@ -1088,8 +1150,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         px = f"patch_ib({i})%"
         for a in ["geometry", "moving_ibm"]:
             _r(f"{px}{a}", INT, {"ib"})
-        for a, pt in [("radius", REAL), ("theta", REAL), ("slip", LOG), ("c", REAL),
-                      ("p", REAL), ("t", REAL), ("m", REAL), ("mass", REAL)]:
+        for a, pt in [("radius", REAL), ("theta", REAL), ("slip", LOG), ("c", REAL), ("p", REAL), ("t", REAL), ("m", REAL), ("mass", REAL)]:
             _r(f"{px}{a}", pt, {"ib"})
         for j in range(1, 4):
             _r(f"{px}angles({j})", REAL, {"ib"})
@@ -1111,11 +1172,25 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         for a in ["pulse", "support", "num_elements", "element_on", "bb_num_freq"]:
             _r(f"{px}{a}", INT, {"acoustic"})
         _r(f"{px}dipole", LOG, {"acoustic"})
-        for a in ["mag", "length", "height", "wavelength", "frequency",
-                  "gauss_sigma_dist", "gauss_sigma_time", "npulse",
-                  "dir", "delay", "foc_length", "aperture",
-                  "element_spacing_angle", "element_polygon_ratio",
-                  "rotate_angle", "bb_bandwidth", "bb_lowest_freq"]:
+        for a in [
+            "mag",
+            "length",
+            "height",
+            "wavelength",
+            "frequency",
+            "gauss_sigma_dist",
+            "gauss_sigma_time",
+            "npulse",
+            "dir",
+            "delay",
+            "foc_length",
+            "aperture",
+            "element_spacing_angle",
+            "element_polygon_ratio",
+            "rotate_angle",
+            "bb_bandwidth",
+            "bb_lowest_freq",
+        ]:
             _r(f"{px}{a}", REAL, {"acoustic"})
         for j in range(1, 4):
             _r(f"{px}loc({j})", REAL, {"acoustic"})
@@ -1170,8 +1245,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # --- lag_params (Lagrangian bubbles) ---
-    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector",
-              "write_bubbles", "write_bubbles_stats"]:
+    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
     for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
@@ -1219,9 +1293,7 @@ def _init_registry():
         REGISTRY.freeze()
     except Exception as e:
         # Re-raise with context to help debugging initialization failures
-        raise RuntimeError(
-            f"Failed to initialize parameter registry: {e}\n"
-            "This is likely a bug in the parameter definitions."
-        ) from e
+        raise RuntimeError(f"Failed to initialize parameter registry: {e}\nThis is likely a bug in the parameter definitions.") from e
+
 
 _init_registry()
