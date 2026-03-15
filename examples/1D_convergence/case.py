@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-import math
-import json
 import argparse
+import json
+import math
 
 # Parsing command line arguments
 parser = argparse.ArgumentParser(description="Generate JSON case configuration for two-fluid convergence simulation.")
@@ -67,10 +67,10 @@ print(
             "patch_icpp(1)%length_x": 1.0,
             "patch_icpp(1)%vel(1)": 1.0,
             "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%alpha_rho(1)": f"0.5 - 0.5*sin(2*pi*x)",
-            "patch_icpp(1)%alpha(1)": f"0.5 - 0.5*sin(2*pi*x)",
-            "patch_icpp(1)%alpha_rho(2)": f"0.5 + 0.5*sin(2*pi*x)",
-            "patch_icpp(1)%alpha(2)": f"0.5 + 0.5*sin(2*pi*x)",
+            "patch_icpp(1)%alpha_rho(1)": "0.5 - 0.5*sin(2*pi*x)",
+            "patch_icpp(1)%alpha(1)": "0.5 - 0.5*sin(2*pi*x)",
+            "patch_icpp(1)%alpha_rho(2)": "0.5 + 0.5*sin(2*pi*x)",
+            "patch_icpp(1)%alpha(2)": "0.5 + 0.5*sin(2*pi*x)",
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
