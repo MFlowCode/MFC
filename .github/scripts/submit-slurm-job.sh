@@ -185,6 +185,7 @@ job_device="$device"
 job_interface="$interface"
 job_shard="$shard"
 job_cluster="$cluster"
+export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c $compiler_flag -m $module_mode
 
