@@ -37,16 +37,17 @@ print(d.get('agentName', ''))
 
 # --- Login-node process management ---
 
-# Find PIDs of a runner on a node by matching its CWD.
-# (Runner.Listener's command line is just "Runner.Listener run" — no path.)
+# Find PIDs of a runner on a node by matching its executable path.
+# Matches /proc/$p/exe against $dir/bin/Runner.Listener — intrinsic to
+# the binary, independent of CWD or how the process was launched.
 # Output is filtered to numeric lines only to strip SSH MOTD noise.
 # Args: $1 = node, $2 = runner directory
 # Prints: space-separated PIDs, or empty.
 find_pids() {
     ssh $SSH_OPTS "$1" '
         for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
-            cwd=$(readlink -f /proc/$p/cwd 2>/dev/null || true)
-            [ "$cwd" = "'"$2"'" ] && echo "$p"
+            exe=$(readlink -f /proc/$p/exe 2>/dev/null || true)
+            [ "$exe" = "'"$2"'/bin/Runner.Listener" ] && echo "$p"
         done
     ' 2>/dev/null | grep -E '^[0-9]+$' | tr '\n' ' ' || true
 }
