@@ -826,6 +826,10 @@ class CaseValidator:
             # Check Re(1) requirement
             self.prohibit(Re1 is None and viscous, f"viscous is set to true, but fluid_pp({i})%Re(1) is not specified")
 
+        # weno_Re_flux requires viscous
+        weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
+        self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""
         mhd = self.get("mhd", "F") == "T"
