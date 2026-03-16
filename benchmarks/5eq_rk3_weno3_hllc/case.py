@@ -6,9 +6,9 @@
 # - weno_order : 3
 # - riemann_solver : 2
 
+import argparse
 import json
 import math
-import argparse
 
 parser = argparse.ArgumentParser(prog="Benchmarking Case 1", description="This MFC case was created for the purposes of benchmarking MFC.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 

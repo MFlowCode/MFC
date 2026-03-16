@@ -25,10 +25,11 @@ After freezing, it is safe to read from multiple threads. Attempts to
 register new parameters after freezing will raise RuntimeError.
 """
 
-from typing import Dict, Set, Mapping, Any
-from types import MappingProxyType
+import re
 from collections import defaultdict
 from functools import lru_cache
+from types import MappingProxyType
+from typing import Any, Dict, Mapping, Set
 
 from .schema import ParamDef
 
@@ -96,10 +97,7 @@ class ParamRegistry:
                 a different type (type mismatch is not allowed).
         """
         if self._frozen:
-            raise RegistryFrozenError(
-                f"Cannot register '{param.name}': registry is frozen. "
-                "All parameters must be registered during module initialization."
-            )
+            raise RegistryFrozenError(f"Cannot register '{param.name}': registry is frozen. All parameters must be registered during module initialization.")
 
         if param.name in self._params:
             existing = self._params[param.name]
@@ -153,18 +151,34 @@ class ParamRegistry:
         """
         Generate JSON schema for case file validation.
 
+        Indexed parameter families (e.g., patch_ib(1)%radius through
+        patch_ib(1000)%radius) are collapsed into patternProperties
+        regexes to keep the schema small (~500 entries vs ~40,000).
+
         Returns:
             JSON schema dict compatible with fastjsonschema.
         """
-        properties = {
-            name: param.param_type.json_schema
-            for name, param in self.all_params.items()
-        }
+        properties = {}
+        pattern_props = {}
+
+        for name, param in self.all_params.items():
+            if "(" not in name:
+                # Scalar param — explicit property
+                properties[name] = param.param_type.json_schema
+            else:
+                # Indexed param — collapse into pattern
+                # Replace digit sequences inside parens: (1) -> (\d+)
+                pattern = re.sub(r"\(\d+\)", "__IDX__", name)
+                pattern = re.escape(pattern).replace("__IDX__", r"\(\d+\)")
+                pattern = f"^{pattern}$"
+                if pattern not in pattern_props:
+                    pattern_props[pattern] = param.param_type.json_schema
 
         return {
             "type": "object",
             "properties": properties,
-            "additionalProperties": False
+            "patternProperties": pattern_props,
+            "additionalProperties": False,
         }
 
     def get_validator(self):
@@ -179,12 +193,13 @@ class ParamRegistry:
 
 
 @lru_cache(maxsize=1)
-def _get_cached_validator(registry_id: int):  # pylint: disable=unused-argument
+def _get_cached_validator(registry_id: int):
     """Cache the validator at module level (registry is immutable after freeze).
 
     Note: registry_id is used as cache key to invalidate when registry changes.
     """
-    import fastjsonschema  # pylint: disable=import-outside-toplevel
+    import fastjsonschema
+
     return fastjsonschema.compile(REGISTRY.get_json_schema())
 
 

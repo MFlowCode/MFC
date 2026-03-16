@@ -11,7 +11,6 @@ TEND = 200000
 
 for i in range(len(N)):
     for j in range(len(Ord)):
-
         sim_a1 = pd.read_csv(f"N{N[i]}_O{Ord[j]}/D/cons.5.00.{TEND}.dat", sep=r"\s+", header=None, names=["x", "y"])
         sim_a2 = pd.read_csv(f"N{N[i]}_O{Ord[j]}/D/cons.6.00.{TEND}.dat", sep=r"\s+", header=None, names=["x", "y"])
 
