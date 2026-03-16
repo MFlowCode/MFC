@@ -5,7 +5,19 @@
 # misc/phoenix/config.sh). Callers must define ORG, NODES, and SSH_OPTS
 # before sourcing this file.
 
+# Default: no cgroup memory limit displayed. Override in site config (e.g. CGROUP_LIMIT=4096).
+CGROUP_LIMIT=${CGROUP_LIMIT:-0}
+
 # --- GitHub API ---
+
+# List runners from the GitHub API, filtered to this site's label.
+# Prints: id name status busy (one runner per line)
+gh_list_runners() {
+    gh api "orgs/$ORG/actions/runners" --paginate \
+        --jq ".runners[]
+              | select(.labels | map(.name) | index(\"$RUNNER_LABEL\"))
+              | \"\(.id) \(.name) \(.status) \(.busy)\""
+}
 
 # Get a registration token for new runners.
 gh_registration_token() {
@@ -60,6 +72,40 @@ find_node() {
         [ -n "$(find_pids "$node" "$1")" ] && echo "$node" && return
     done
     echo "offline"
+}
+
+# Check if a runner process has a slurm directory in its PATH.
+# Works across sites regardless of the specific slurm installation path.
+# Args: $1 = node, $2 = PID (or "PID rest..." — uses first token only)
+has_slurm() {
+    local node="$1" pid="${2%% *}"
+    ssh $SSH_OPTS "$node" \
+        "tr '\0' '\n' < /proc/$pid/environ 2>/dev/null | grep -q '^PATH=.*slurm'" \
+        2>/dev/null
+}
+
+# Sweep all nodes in parallel, writing per-node result files to tmpdir.
+# Each output line: RUNNER <node> <dir> <rss_mb> <slurm_ok>
+#   dir      = runner directory derived from the Runner.Listener exe path
+#   slurm_ok = "ok" if slurm appears in the process PATH, "MISSING" otherwise
+# Caller must create tmpdir and parse the output files.
+# Args: $1 = tmpdir
+sweep_all_nodes() {
+    local tmpdir="$1" node
+    for node in "${NODES[@]}"; do
+        ssh $SSH_OPTS "$node" '
+            for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
+                exe=$(readlink -f /proc/$p/exe 2>/dev/null || true)
+                [ -z "$exe" ] && continue
+                dir=$(dirname "$(dirname "$exe")")
+                rss=$(ps -p $p -o rss= 2>/dev/null | awk "{printf \"%.0f\", \$1/1024}" || echo 0)
+                slurm=$(tr "\0" "\n" < /proc/$p/environ 2>/dev/null | grep -c "^PATH=.*slurm" || echo 0)
+                [ "$slurm" -gt 0 ] && slurm_ok="ok" || slurm_ok="MISSING"
+                echo "RUNNER '"$node"' $dir $rss $slurm_ok"
+            done
+        ' 2>/dev/null > "$tmpdir/$node.out" &
+    done
+    wait
 }
 
 # Start a runner on a node.

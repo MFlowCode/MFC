@@ -1,8 +1,8 @@
 #!/bin/bash
 # Shared configuration for Phoenix GitHub Actions runner management.
 #
-# Sourced by all other scripts. Provides Phoenix constants, GitHub API
-# helpers, and login-node process management functions.
+# Sourced by all other scripts. Provides Phoenix constants and
+# site-specific functions. Common functions live in ../common/runner-lib.sh.
 
 # --- Phoenix constants ---
 ORG="MFlowCode"
@@ -21,17 +21,6 @@ RUNNER_PARENT_DIRS=(
 
 source "$(dirname "${BASH_SOURCE[0]}")/../common/runner-lib.sh"
 
-# --- GitHub API ---
-
-# List Phoenix runners from the GitHub API.
-# Prints: id name status busy (one runner per line)
-gh_list_runners() {
-    gh api "orgs/$ORG/actions/runners" --paginate \
-        --jq ".runners[]
-              | select(.labels | map(.name) | index(\"$RUNNER_LABEL\"))
-              | \"\(.id) \(.name) \(.status) \(.busy)\""
-}
-
 # --- Local filesystem ---
 
 # Find all runner directories on shared storage.
@@ -42,16 +31,4 @@ find_runner_dirs() {
             [ -f "$conf" ] && dirname "$conf"
         done
     done
-}
-
-# --- Login-node process management (Phoenix-specific) ---
-
-# Check if a runner process has /opt/slurm in PATH.
-# Args: $1 = node, $2 = PID
-has_slurm() {
-    local count
-    count=$(ssh $SSH_OPTS "$1" \
-        "cat /proc/${2%% *}/environ 2>/dev/null | tr '\0' '\n' | grep -c /opt/slurm" \
-        2>/dev/null || echo 0)
-    [ "$count" -gt 0 ]
 }

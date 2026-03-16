@@ -83,6 +83,7 @@ echo "  Configured."
 # Start
 echo "Starting on $node..."
 if start_runner "$node" "$runner_dir"; then
+    echo "$node" > "$runner_dir/runner.node"
     pids=$(find_pids "$node" "$runner_dir")
     pid=${pids%% *}
     if has_slurm "$node" "$pid"; then
