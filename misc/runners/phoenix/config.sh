@@ -23,6 +23,22 @@ source "$(dirname "${BASH_SOURCE[0]}")/../common/runner-lib.sh"
 
 # --- Local filesystem ---
 
+# No shared cache: each runner downloads its own tarball independently.
+TARBALL_CACHE_DIR=""
+
+# Return the directory where a named runner should be installed.
+# Auto-increments the actions-runner-N suffix within RUNNER_PARENT_DIRS[0].
+# Args: $1 = runner name (unused; directory is numbered, not named), $2 = optional override dir
+runner_install_dir() {
+    local override="${2:-}"
+    [ -n "$override" ] && echo "$override" && return
+    local parent="${RUNNER_PARENT_DIRS[0]}"
+    local existing next_num
+    existing=$(ls -d "$parent"/actions-runner-* 2>/dev/null | sed 's/.*actions-runner-//' | sort -n | tail -1)
+    next_num=$(( ${existing:-0} + 1 ))
+    echo "$parent/actions-runner-$next_num"
+}
+
 # Find all runner directories on shared storage.
 # Prints: one directory path per line.
 find_runner_dirs() {

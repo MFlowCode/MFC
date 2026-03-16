@@ -16,16 +16,16 @@ requires stopping the process on one node and starting it on another.
 Runners must be started with a **login shell** (`bash -l`) so they inherit
 `/opt/slurm/current/bin` in PATH (required for `sbatch`, `squeue`, `sacct`).
 
-All commands are run via the dispatcher at `misc/runner.sh`:
+All commands are run via the dispatcher at `misc/runners/runner.sh`:
 
 ```bash
-bash misc/runner.sh phoenix <command> [args...]
+bash misc/runners/runner.sh phoenix <command> [args...]
 ```
 
 ## Quick Reference
 
 ```bash
-R="bash misc/runner.sh phoenix"
+R="bash misc/runners/runner.sh phoenix"
 
 # Check health (quick, one SSH per node)
 $R check-runners
@@ -61,9 +61,8 @@ APPLY=1 $R rerun-failed           # execute
 
 | Script | Purpose |
 |---|---|
-| `config.sh` | Shared config: Phoenix constants (`ORG`, `RUNNER_GROUP`, `RUNNER_LABEL`, `NODES`, `CGROUP_LIMIT`, `RUNNER_PARENT_DIRS`) and `find_runner_dirs()`. Sources `../common/runner-lib.sh` for shared functions. |
-| `create-runner.sh` | Download runner binary, register with GitHub via API, start on target node. Usage: `create-runner <name> <node> [parent-dir]` |
-| `../common/` | All other commands (`check-runners`, `list-runners`, `rebalance-runners`, etc.) live here and are dispatched via `misc/runner.sh`. |
+| `config.sh` | Shared config: Phoenix constants (`ORG`, `RUNNER_GROUP`, `RUNNER_LABEL`, `NODES`, `CGROUP_LIMIT`, `RUNNER_PARENT_DIRS`), `find_runner_dirs()`, and `runner_install_dir()`. Sources `../common/runner-lib.sh` for shared functions. |
+| `../common/` | All commands (`check-runners`, `list-runners`, `create-runner`, `rebalance-runners`, etc.) live here and are dispatched via `misc/runners/runner.sh`. |
 
 ## Safety
 
@@ -85,13 +84,13 @@ Edit `config.sh` to change:
 ## Troubleshooting
 
 **"sbatch: command not found"** — Runner started without login shell.
-Fix: `bash misc/runner.sh phoenix restart-runner <node> <runner-dir>`
+Fix: `bash misc/runners/runner.sh phoenix restart-runner <node> <runner-dir>`
 
 **OOM kills** — Too many runners on one node.
-Fix: `bash misc/runner.sh phoenix check-runners` then `APPLY=1 bash misc/runner.sh phoenix rebalance-runners`
+Fix: `bash misc/runners/runner.sh phoenix check-runners` then `APPLY=1 bash misc/runners/runner.sh phoenix rebalance-runners`
 
 **Runner OFFLINE** — Process died or node rebooted.
-Fix: `APPLY=1 bash misc/runner.sh phoenix rebalance-runners` (auto-places on least-loaded node)
+Fix: `APPLY=1 bash misc/runners/runner.sh phoenix rebalance-runners` (auto-places on least-loaded node)
 
 **All runners down** — Node maintenance.
-Fix: `APPLY=1 bash misc/runner.sh phoenix restart-all`
+Fix: `APPLY=1 bash misc/runners/runner.sh phoenix restart-all`

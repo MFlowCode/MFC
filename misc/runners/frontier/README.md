@@ -26,16 +26,16 @@ connections to GitHub's broker. Run `rebalance-runners` to restart and
 redistribute them. Login nodes vary in stability — if a runner keeps dying on a
 particular node, move it to a quieter one (login01 tends to have low load).
 
-All commands are run via the dispatcher at `misc/runner.sh`:
+All commands are run via the dispatcher at `misc/runners/runner.sh`:
 
 ```bash
-bash misc/runner.sh frontier <command> [args...]
+bash misc/runners/runner.sh frontier <command> [args...]
 ```
 
 ## Quick Reference
 
 ```bash
-R="bash misc/runner.sh frontier"
+R="bash misc/runners/runner.sh frontier"
 
 # List all runners with GitHub status, node, slurm, and memory usage
 $R list-runners
@@ -78,14 +78,14 @@ APPLY=1 $R rerun-failed
 | `config.sh` | Shared configuration: Frontier constants, `find_runner_dirs()`, and `sync_runner_nodes()`. Sources `../common/runner-lib.sh` for shared functions. |
 | `make-runner.sh` | Download runner binary, register with GitHub, start on target node. Usage: `make-runner <num> [node]` |
 | `deploy-runners.sh` | Deploy multiple runners across nodes in parallel. Usage: `deploy-runners <start-num> <node1> [node2 ...]` |
-| `../common/` | All other commands (`check-runners`, `list-runners`, `rebalance-runners`, etc.) live here and are dispatched via `misc/runner.sh`. |
+| `../common/` | All other commands (`check-runners`, `list-runners`, `rebalance-runners`, etc.) live here and are dispatched via `misc/runners/runner.sh`. |
 
 ## Troubleshooting
 
 **Runner goes OFFLINE repeatedly on the same node** — That login node may have
 process culling or high memory pressure. Move it to a different node:
 ```bash
-bash misc/runner.sh frontier move-runner frontier-1 login01
+bash misc/runners/runner.sh frontier move-runner frontier-1 login01
 ```
 
 **Multiple runners OFFLINE at once** — Usually a transient OLCF network blip

@@ -6,7 +6,7 @@
 # misc/<site>/. All site-specific scripts source their own config, so
 # the dispatcher only pre-loads config for common commands.
 #
-# Usage: bash misc/runner.sh <site> <command> [args...]
+# Usage: bash misc/runners/runner.sh <site> <command> [args...]
 #
 # Sites:    frontier  phoenix
 # Common:   check-runners  list-runners  move-runner  rebalance-runners
@@ -15,12 +15,12 @@
 # Phoenix:  create-runner
 #
 # Examples:
-#   bash misc/runner.sh frontier check-runners
-#   bash misc/runner.sh phoenix list-runners
-#   APPLY=1 bash misc/runner.sh frontier rebalance-runners
-#   bash misc/runner.sh frontier restart-runner login01 /path/to/runner
-#   bash misc/runner.sh frontier make-runner 23 login01
-#   bash misc/runner.sh phoenix create-runner phoenix-11 login-phoenix-gnr-2
+#   bash misc/runners/runner.sh frontier check-runners
+#   bash misc/runners/runner.sh phoenix list-runners
+#   APPLY=1 bash misc/runners/runner.sh frontier rebalance-runners
+#   bash misc/runners/runner.sh frontier restart-runner login01 /path/to/runner
+#   bash misc/runners/runner.sh frontier make-runner 23 login01
+#   bash misc/runners/runner.sh phoenix create-runner phoenix-11 login-phoenix-gnr-2
 
 set -euo pipefail
 

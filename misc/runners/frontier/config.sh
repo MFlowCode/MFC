@@ -17,6 +17,17 @@ source "$(dirname "${BASH_SOURCE[0]}")/../common/runner-lib.sh"
 
 # --- Local filesystem ---
 
+# Cache downloaded runner tarballs here so parallel deployments don't race.
+TARBALL_CACHE_DIR="$SHARED_DIR"
+
+# Return the directory where a named runner should be installed.
+# Args: $1 = runner name, $2 = optional override dir
+runner_install_dir() {
+    local name="$1" override="${2:-}"
+    [ -n "$override" ] && echo "$override" && return
+    echo "$SHARED_DIR/$name"
+}
+
 # Find all runner directories on shared storage.
 # Prints: one directory path per line.
 find_runner_dirs() {
