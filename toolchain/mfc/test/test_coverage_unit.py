@@ -233,8 +233,7 @@ class TestShouldRunAllTests(unittest.TestCase):
         assert should_run_all_tests({"src/common/include/macros.fpp"}) is True
 
     def test_cases_py_triggers_all(self):
-        # TEMP: cases.py removed from ALWAYS_RUN_ALL for testing — restore before merge
-        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is False
+        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is True
 
     def test_case_py_triggers_all(self):
         assert should_run_all_tests({"toolchain/mfc/test/case.py"}) is True
@@ -248,10 +247,8 @@ class TestShouldRunAllTests(unittest.TestCase):
     def test_case_validator_triggers_all(self):
         assert should_run_all_tests({"toolchain/mfc/case_validator.py"}) is True
 
-    def test_cmakelists_does_not_trigger_all(self):
-        # TEMP: CMakeLists.txt is omitted from ALWAYS_RUN_ALL for CI testing.
-        # Change this assertion to True and add CMakeLists.txt to ALWAYS_RUN_ALL before merge.
-        assert should_run_all_tests({"CMakeLists.txt"}) is False
+    def test_cmakelists_triggers_all(self):
+        assert should_run_all_tests({"CMakeLists.txt"}) is True
 
     def test_case_fpp_triggers_all(self):
         assert should_run_all_tests({"src/common/include/case.fpp"}) is True
@@ -468,8 +465,7 @@ class TestDesignCornerCases(unittest.TestCase):
         _parse_diff_files includes it -> should_run_all_tests fires.
         """
         files = _parse_diff_files("toolchain/mfc/test/cases.py\n")
-        # TEMP: cases.py removed from ALWAYS_RUN_ALL for testing — restore before merge
-        assert should_run_all_tests(files) is False
+        assert should_run_all_tests(files) is True
 
     def test_niche_feature_pruning(self):
         """
@@ -777,11 +773,9 @@ class TestLoadCoverageCache(unittest.TestCase):
         assert self._run() is None
 
     def test_stale_cache_returns_none(self):
-        """Cache with wrong cases_hash -> None (staleness check).
-        TEMP: staleness check disabled for testing — restore assertion before merge."""
+        """Cache with wrong cases_hash -> None."""
         self._write_cache({"_meta": {"cases_hash": "wrong_hash"}, "TEST1": ["src/simulation/m_rhs.fpp"]})
-        # TEMP: staleness check disabled, so stale cache is accepted
-        assert self._run() is not None
+        assert self._run() is None
 
     def test_empty_cache_returns_none(self):
         """Cache with only _meta and no test entries -> None."""

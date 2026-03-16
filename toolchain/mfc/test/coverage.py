@@ -38,10 +38,9 @@ COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_cover
 # Changes to these files trigger the full test suite.
 # CPU coverage cannot tell us about GPU directive changes (macro files), and
 # toolchain files define or change the set of tests themselves.
-# TEMP: CMakeLists.txt is omitted to test the cache rebuild pipeline in CI.
-# Add "CMakeLists.txt" to this set before merge.
 ALWAYS_RUN_ALL = frozenset(
     [
+        "CMakeLists.txt",
         "src/common/include/parallel_macros.fpp",
         "src/common/include/acc_macros.fpp",
         "src/common/include/omp_macros.fpp",
@@ -49,8 +48,7 @@ ALWAYS_RUN_ALL = frozenset(
         "src/common/include/macros.fpp",
         "src/common/include/case.fpp",
         "toolchain/mfc/test/case.py",
-        # TEMP: cases.py removed to test pruning on this PR — restore before merge
-        # "toolchain/mfc/test/cases.py",
+        "toolchain/mfc/test/cases.py",
         "toolchain/mfc/test/coverage.py",
         "toolchain/mfc/params/definitions.py",
         "toolchain/mfc/run/input.py",
@@ -665,17 +663,16 @@ def load_coverage_cache(root_dir: str) -> Optional[dict]:
         cons.print("[yellow]Warning: Coverage cache has unexpected format.[/yellow]")
         return None
 
-    # TEMP: staleness check disabled to test pruning on this PR — restore before merge
-    # cases_py = Path(root_dir) / "toolchain/mfc/test/cases.py"
-    # try:
-    #     current_hash = hashlib.sha256(cases_py.read_bytes()).hexdigest()
-    # except OSError as exc:
-    #     cons.print(f"[yellow]Warning: Cannot read cases.py for cache staleness check: {exc}[/yellow]")
-    #     return None
-    # stored_hash = cache.get("_meta", {}).get("cases_hash", "")
-    # if current_hash != stored_hash:
-    #     cons.print("[yellow]Warning: Coverage cache is stale (cases.py changed).[/yellow]")
-    #     return None
+    cases_py = Path(root_dir) / "toolchain/mfc/test/cases.py"
+    try:
+        current_hash = hashlib.sha256(cases_py.read_bytes()).hexdigest()
+    except OSError as exc:
+        cons.print(f"[yellow]Warning: Cannot read cases.py for cache staleness check: {exc}[/yellow]")
+        return None
+    stored_hash = cache.get("_meta", {}).get("cases_hash", "")
+    if current_hash != stored_hash:
+        cons.print("[yellow]Warning: Coverage cache is stale (cases.py changed).[/yellow]")
+        return None
 
     cache = _normalize_cache(cache)
 
