@@ -10,12 +10,15 @@ They use mocks and in-memory data structures to verify logic.
 # pylint: disable=protected-access,exec-used,too-few-public-methods,wrong-import-position
 
 import gzip
+import hashlib
 import importlib.util
 import json
 import os
 import sys
+import tempfile
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
@@ -111,6 +114,8 @@ try:
     _parse_diff_files = _coverage_mod._parse_diff_files
     _parse_gcov_json_output = _coverage_mod._parse_gcov_json_output
     _normalize_cache = _coverage_mod._normalize_cache
+    _compute_gcov_prefix_strip = _coverage_mod._compute_gcov_prefix_strip
+    load_coverage_cache = _coverage_mod.load_coverage_cache
     should_run_all_tests = _coverage_mod.should_run_all_tests
     filter_tests_by_coverage = _coverage_mod.filter_tests_by_coverage
     ALWAYS_RUN_ALL = _coverage_mod.ALWAYS_RUN_ALL
@@ -147,6 +152,8 @@ except AttributeError:
     _parse_diff_files = _globals["_parse_diff_files"]
     _parse_gcov_json_output = _globals["_parse_gcov_json_output"]
     _normalize_cache = _globals["_normalize_cache"]
+    _compute_gcov_prefix_strip = _globals["_compute_gcov_prefix_strip"]
+    load_coverage_cache = _globals["load_coverage_cache"]
     should_run_all_tests = _globals["should_run_all_tests"]
     filter_tests_by_coverage = _globals["filter_tests_by_coverage"]
     ALWAYS_RUN_ALL = _globals["ALWAYS_RUN_ALL"]
@@ -694,6 +701,103 @@ class TestCachePath(unittest.TestCase):
     def test_cache_path_is_gzipped(self):
         """Cache file must use .json.gz so it can be committed to the repo."""
         assert str(COVERAGE_CACHE_PATH).endswith(".json.gz")
+
+
+# ===========================================================================
+# Group 8: _compute_gcov_prefix_strip
+# ===========================================================================
+
+
+class TestComputeGcovPrefixStrip(unittest.TestCase):
+    def test_typical_linux_path(self):
+        """Standard absolute path strips all components except root /."""
+        # /a/b/c has 4 parts: ('/', 'a', 'b', 'c'), strip = 3
+        result = _compute_gcov_prefix_strip("/a/b/c")
+        assert result == "3"
+
+    def test_root_path(self):
+        """Root / has 1 part, strip = 0."""
+        result = _compute_gcov_prefix_strip("/")
+        assert result == "0"
+
+    def test_deep_path(self):
+        """/storage/scratch1/6/user/MFC has 6 parts, strip = 5."""
+        result = _compute_gcov_prefix_strip("/storage/scratch1/6/user/MFC")
+        assert result == "5"
+
+
+# ===========================================================================
+# Group 9: load_coverage_cache
+# ===========================================================================
+
+
+class TestLoadCoverageCache(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.cases_py = os.path.join(self.tmpdir, "toolchain", "mfc", "test", "cases.py")
+        os.makedirs(os.path.dirname(self.cases_py), exist_ok=True)
+        with open(self.cases_py, "w") as f:
+            f.write("# test cases\n")
+        self.cases_hash = hashlib.sha256(Path(self.cases_py).read_bytes()).hexdigest()
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _cache_path(self):
+        return Path(self.tmpdir) / "toolchain/mfc/test/test_coverage_cache.json.gz"
+
+    def _write_cache(self, data):
+        cp = self._cache_path()
+        with gzip.open(cp, "wt", encoding="utf-8") as f:
+            json.dump(data, f)
+
+    def _run(self):
+        """Call load_coverage_cache with COVERAGE_CACHE_PATH patched to tmpdir."""
+        mod = sys.modules.get("toolchain.mfc.test.coverage", _coverage_mod)
+        old = getattr(mod, "COVERAGE_CACHE_PATH", COVERAGE_CACHE_PATH)
+        try:
+            mod.COVERAGE_CACHE_PATH = self._cache_path()
+            return load_coverage_cache(self.tmpdir)
+        finally:
+            mod.COVERAGE_CACHE_PATH = old
+
+    def test_missing_file_returns_none(self):
+        """No cache file -> None."""
+        assert self._run() is None
+
+    def test_corrupt_gzip_returns_none(self):
+        """Corrupt gzip -> None."""
+        cp = self._cache_path()
+        with open(cp, "wb") as f:
+            f.write(b"not gzip at all")
+        assert self._run() is None
+
+    def test_stale_cache_returns_none(self):
+        """Cache with wrong cases_hash -> None."""
+        self._write_cache({"_meta": {"cases_hash": "wrong_hash"}, "TEST1": ["src/simulation/m_rhs.fpp"]})
+        assert self._run() is None
+
+    def test_empty_cache_returns_none(self):
+        """Cache with only _meta and no test entries -> None."""
+        self._write_cache({"_meta": {"cases_hash": self.cases_hash}})
+        assert self._run() is None
+
+    def test_valid_cache_returns_dict(self):
+        """Valid cache with matching hash -> dict with test entries."""
+        self._write_cache({"_meta": {"cases_hash": self.cases_hash}, "TEST1": ["src/simulation/m_rhs.fpp"]})
+        result = self._run()
+        assert result is not None
+        assert "TEST1" in result
+        assert result["TEST1"] == ["src/simulation/m_rhs.fpp"]
+
+    def test_non_dict_json_returns_none(self):
+        """Cache containing a JSON array instead of dict -> None."""
+        cp = self._cache_path()
+        with gzip.open(cp, "wt", encoding="utf-8") as f:
+            json.dump([1, 2, 3], f)
+        assert self._run() is None
 
 
 if __name__ == "__main__":

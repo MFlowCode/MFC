@@ -253,6 +253,10 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
                 gcno_copies.append(gcno_dst)
 
     if not gcno_copies:
+        # Genuinely no matching .gcno files — return empty list (not None).
+        # None means "collection failed, conservatively include"; empty list
+        # means "test produced .gcda but no .gcno matched", which is a real
+        # (if unusual) result that should be cached as-is.
         return uuid, []
 
     # Batch: single gcov call for all .gcno files in this test.
