@@ -47,9 +47,9 @@ APPLY=1 bash rerun-failed.sh           # execute
 
 | Script | Purpose |
 |---|---|
-| `config.sh` | Shared config: Phoenix constants (`ORG`, `RUNNER_GROUP`, `RUNNER_LABEL`, `NODES`), GitHub API helpers (`gh_list_runners`, `gh_registration_token`), and process management (`start_runner`, `stop_runner`, `find_node`, `find_pids`, `has_slurm`). |
-| `check-runners.sh` | Quick per-node health check. One SSH per node. Shows runner names, idle/BUSY status, slurm PATH, RSS, and total memory. |
-| `list-runners.sh` | Detailed table combining GitHub API status (online/offline/busy) with login-node process info. Slower (one SSH per runner + API call). |
+| `config.sh` | Shared config: Phoenix constants (`ORG`, `RUNNER_GROUP`, `RUNNER_LABEL`, `NODES`, `CGROUP_LIMIT`, `RUNNER_PARENT_DIRS`) and `find_runner_dirs()`. Sources `../common/runner-lib.sh` for shared functions. |
+| `check-runners.sh` | Quick per-node health check. One SSH per node. Shows runner names, idle/BUSY status, slurm PATH, RSS, and total cgroup memory. |
+| `list-runners.sh` | Table combining GitHub API status with live node info from a parallel SSH sweep. Shows slurm status and flags stale `runner.node` entries. |
 | `restart-runner.sh` | Stop and restart one runner on a given node with proper login shell PATH and SSH detachment. |
 | `restart-all.sh` | Restart all runners in place. Skips BUSY runners unless `FORCE=1`. |
 | `rebalance-runners.sh` | Auto-compute optimal distribution and move runners. Prefers idle runners. Also places OFFLINE runners. |
@@ -61,7 +61,7 @@ APPLY=1 bash rerun-failed.sh           # execute
 - **Dry run by default**: `rebalance-runners.sh`, `restart-all.sh`, and
   `rerun-failed.sh` show what they would do unless `APPLY=1` is set.
 - **Busy runner protection**: Scripts skip BUSY runners unless `FORCE=1`.
-- **Slurm PATH verification**: After starting, scripts verify `/opt/slurm` is
+- **Slurm PATH verification**: After starting, scripts verify `slurm` appears
   in the runner's PATH and warn if missing.
 
 ## Configuration
