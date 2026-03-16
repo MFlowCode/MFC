@@ -16,37 +16,45 @@ requires stopping the process on one node and starting it on another.
 Runners must be started with a **login shell** (`bash -l`) so they inherit
 `/opt/slurm/current/bin` in PATH (required for `sbatch`, `squeue`, `sacct`).
 
+All commands are run via the dispatcher at `misc/runner.sh`:
+
+```bash
+bash misc/runner.sh phoenix <command> [args...]
+```
+
 ## Quick Reference
 
 ```bash
+R="bash misc/runner.sh phoenix"
+
 # Check health (quick, one SSH per node)
-bash check-runners.sh
+$R check-runners
 
 # Detailed table with GitHub API status
-bash list-runners.sh
+$R list-runners
 
 # Auto-rebalance across nodes (also restarts offline runners)
-bash rebalance-runners.sh              # dry run
-APPLY=1 bash rebalance-runners.sh      # execute
+$R rebalance-runners              # dry run
+APPLY=1 $R rebalance-runners     # execute
 
 # Restart all runners in place (e.g. after a node reboot)
-APPLY=1 bash restart-all.sh
+APPLY=1 $R restart-all
 
 # Restart one specific runner
-bash restart-runner.sh login-phoenix-gnr-2 /path/to/actions-runner-3
+$R restart-runner login-phoenix-gnr-2 /path/to/actions-runner-3
 
 # Move a runner to a different login node
-bash move-runner.sh phoenix-3 login-phoenix-gnr-1
+$R move-runner phoenix-3 login-phoenix-gnr-1
 
 # Stop and deregister a runner
-bash stop-runner.sh phoenix-3
+$R stop-runner phoenix-3
 
 # Create a new runner (needs gh CLI with admin:org scope)
-bash create-runner.sh phoenix-11 login-phoenix-gnr-2
+$R create-runner phoenix-11 login-phoenix-gnr-2
 
 # Rerun failed CI on open PRs
-bash rerun-failed.sh                   # dry run
-APPLY=1 bash rerun-failed.sh           # execute
+$R rerun-failed                   # dry run
+APPLY=1 $R rerun-failed           # execute
 ```
 
 ## Scripts
@@ -54,20 +62,13 @@ APPLY=1 bash rerun-failed.sh           # execute
 | Script | Purpose |
 |---|---|
 | `config.sh` | Shared config: Phoenix constants (`ORG`, `RUNNER_GROUP`, `RUNNER_LABEL`, `NODES`, `CGROUP_LIMIT`, `RUNNER_PARENT_DIRS`) and `find_runner_dirs()`. Sources `../common/runner-lib.sh` for shared functions. |
-| `check-runners.sh` | Quick per-node health check. One SSH per node. Shows runner names, idle/BUSY status, slurm PATH, RSS, and total cgroup memory. |
-| `list-runners.sh` | Table combining GitHub API status with live node info from a parallel SSH sweep. Shows slurm status and flags stale `runner.node` entries. |
-| `rebalance-runners.sh` | Auto-compute optimal distribution and move runners. Prefers idle runners. Also places OFFLINE runners. Dry run by default. |
-| `restart-all.sh` | Restart all runners in place. Skips BUSY runners unless `FORCE=1`. Dry run by default. |
-| `restart-runner.sh` | Stop and restart one runner on a given node. Usage: `restart-runner.sh <node> <runner-dir>` |
-| `move-runner.sh` | Move a runner to a different login node by name. Usage: `move-runner.sh <runner-name> <target-node>` |
-| `stop-runner.sh` | Stop the runner process and deregister from GitHub. Usage: `stop-runner.sh <runner-name>` |
-| `create-runner.sh` | Download runner binary, register with GitHub via API, start on target node. Usage: `create-runner.sh <name> <node> [parent-dir]` |
-| `rerun-failed.sh` | Scan open non-draft PRs and master for failed workflows, rerun failed jobs only. |
+| `create-runner.sh` | Download runner binary, register with GitHub via API, start on target node. Usage: `create-runner <name> <node> [parent-dir]` |
+| `../common/` | All other commands (`check-runners`, `list-runners`, `rebalance-runners`, etc.) live here and are dispatched via `misc/runner.sh`. |
 
 ## Safety
 
-- **Dry run by default**: `rebalance-runners.sh`, `restart-all.sh`, and
-  `rerun-failed.sh` show what they would do unless `APPLY=1` is set.
+- **Dry run by default**: `rebalance-runners`, `restart-all`, and
+  `rerun-failed` show what they would do unless `APPLY=1` is set.
 - **Busy runner protection**: Scripts skip BUSY runners unless `FORCE=1`.
 - **Slurm PATH verification**: After starting, scripts verify `slurm` appears
   in the runner's PATH and warn if missing.
@@ -84,13 +85,13 @@ Edit `config.sh` to change:
 ## Troubleshooting
 
 **"sbatch: command not found"** — Runner started without login shell.
-Fix: `bash restart-runner.sh <node> <runner-dir>`
+Fix: `bash misc/runner.sh phoenix restart-runner <node> <runner-dir>`
 
 **OOM kills** — Too many runners on one node.
-Fix: `bash check-runners.sh` then `APPLY=1 bash rebalance-runners.sh`
+Fix: `bash misc/runner.sh phoenix check-runners` then `APPLY=1 bash misc/runner.sh phoenix rebalance-runners`
 
 **Runner OFFLINE** — Process died or node rebooted.
-Fix: `APPLY=1 bash rebalance-runners.sh` (auto-places on least-loaded node)
+Fix: `APPLY=1 bash misc/runner.sh phoenix rebalance-runners` (auto-places on least-loaded node)
 
 **All runners down** — Node maintenance.
-Fix: `APPLY=1 bash restart-all.sh`
+Fix: `APPLY=1 bash misc/runner.sh phoenix restart-all`

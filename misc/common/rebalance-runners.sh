@@ -176,4 +176,4 @@ for move in "${moves[@]}"; do
 done
 
 echo ""
-bash "${SITE_SCRIPT_DIR}/check-runners.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/check-runners.sh"
