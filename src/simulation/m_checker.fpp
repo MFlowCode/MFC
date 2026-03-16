@@ -40,6 +40,8 @@ contains
 
         call s_check_inputs_time_stepping
 
+        @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
+
     end subroutine s_check_inputs
 
     !> Checks constraints on compiler options

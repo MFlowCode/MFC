@@ -215,6 +215,7 @@ _SIMPLE_DESCS = {
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "run_time_info": "Print runtime info",
+    "ib_state_wrt": "Write IB state and load data",
     # Misc
     "case_dir": "Case directory path",
     "cantera_file": "Cantera mechanism file",
@@ -905,7 +906,7 @@ def _load():
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("schlieren_alpha", REAL, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
