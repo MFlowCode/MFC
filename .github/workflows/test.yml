@@ -166,11 +166,12 @@ jobs:
 
   github:
     name: Github
-    needs: [lint-gate, file-changes]
+    needs: [lint-gate, file-changes, rebuild-cache]
     if: >-
       !cancelled() &&
       needs.lint-gate.result == 'success' &&
       needs.file-changes.result == 'success' &&
+      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
       needs.file-changes.outputs.checkall == 'true'
     strategy:
       matrix:
@@ -261,11 +262,12 @@ jobs:
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
-    needs: [lint-gate, file-changes]
+    needs: [lint-gate, file-changes, rebuild-cache]
     if: >-
       !cancelled() &&
       needs.lint-gate.result == 'success' &&
       needs.file-changes.result == 'success' &&
+      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
       github.repository == 'MFlowCode/MFC' &&
       needs.file-changes.outputs.checkall == 'true' &&
       github.event.pull_request.draft != true
