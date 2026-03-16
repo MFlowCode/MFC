@@ -131,7 +131,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         cache = load_coverage_cache(common.MFC_ROOT_DIR)
         if cache is None:
             cons.print("[yellow]Coverage cache missing or stale.[/yellow]")
-            cons.print("[yellow]Run: ./mfc.sh build --gcov -j 8 && ./mfc.sh test --build-coverage-cache[/yellow]")
+            cons.print("[yellow]Run: ./mfc.sh build --gcov -j 8 && ./mfc.sh test --build-coverage-cache --gcov -j 8[/yellow]")
             cons.print("[yellow]Falling back to full test suite.[/yellow]")
         else:
             changed_files = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"))
@@ -250,7 +250,7 @@ def test():
         all_cases = [b.to_case() for b in cases]
 
         # Build all unique slugs (Chemistry, case-optimization, etc.) so every
-        # test has a compatible binary when run with --no-build.
+        # test has a pre-built binary available for direct execution in Phase 2.
         codes = [PRE_PROCESS, SIMULATION, POST_PROCESS]
         unique_builds = set()
         for case, code in itertools.product(all_cases, codes):

@@ -8,6 +8,7 @@ When files change on a PR, intersect the changed .fpp files against each test's
 covered file set. Only tests that touch at least one changed file run.
 
 Workflow:
+    ./mfc.sh build --gcov -j 8                        # one-time: instrumented build
     ./mfc.sh test --build-coverage-cache --gcov -j 8  # one-time: populate the cache
     ./mfc.sh test --only-changes -j 8                 # fast: run only affected tests
 """
@@ -70,7 +71,7 @@ def _get_gcov_version(gcov_binary: str) -> str:
         for line in result.stdout.splitlines():
             if line.strip():
                 return line.strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         pass
     return "unknown"
 
@@ -261,7 +262,7 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
         proc = subprocess.run(cmd, capture_output=True, cwd=root_dir, timeout=120, check=False)
     except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError) as exc:
         cons.print(f"[yellow]Warning: gcov failed for {uuid}: {exc}[/yellow]")
-        return uuid, []
+        return uuid, None
     finally:
         for g in gcno_copies:
             try:
@@ -272,7 +273,7 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
     if proc.returncode != 0 or not proc.stdout:
         if proc.returncode != 0:
             cons.print(f"[yellow]Warning: gcov exited {proc.returncode} for {uuid}[/yellow]")
-        return uuid, []
+        return uuid, None
 
     coverage = _parse_gcov_json_output(proc.stdout, root_dir)
     if coverage is None:
@@ -348,7 +349,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     return uuid, test_gcda, failures
 
 
-def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argument,too-many-locals
+def _prepare_test(case) -> dict:  # pylint: disable=too-many-locals
     """
     Prepare a test for direct execution: create directory, generate .inp
     files, and resolve binary paths.  All Python/toolchain overhead happens
@@ -444,7 +445,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
 def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
     root_dir: str,
     cases: list,
-    n_jobs: int = None,
+    n_jobs: Optional[int] = None,
 ) -> None:
     """
     Build the file-level coverage cache by running tests in parallel.
@@ -485,7 +486,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
     test_infos = []
     for i, case in enumerate(cases):
         try:
-            test_infos.append(_prepare_test(case, root_dir))
+            test_infos.append(_prepare_test(case))
         except Exception as exc:  # pylint: disable=broad-except
             cons.print(f"  [yellow]Warning: skipping {case.get_uuid()} — prep failed: {exc}[/yellow]")
         if (i + 1) % 100 == 0 or (i + 1) == len(cases):
@@ -605,7 +606,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
 
     cons.print()
     cons.print(f"[bold green]Coverage cache written to {COVERAGE_CACHE_PATH}[/bold green]")
-    cons.print(f"[dim]Cache has {len(cases)} test entries.[/dim]")
+    cons.print(f"[dim]Cache has {len(cache) - 1} test entries.[/dim]")
 
     # Clean up test output directories from Phase 1/2 (grid files, restart files,
     # silo output, etc.).  These live on NFS scratch and can total several GB for
@@ -662,8 +663,8 @@ def load_coverage_cache(root_dir: str) -> Optional[dict]:
     cases_py = Path(root_dir) / "toolchain/mfc/test/cases.py"
     try:
         current_hash = hashlib.sha256(cases_py.read_bytes()).hexdigest()
-    except FileNotFoundError:
-        cons.print("[yellow]Warning: cases.py not found; cannot verify cache staleness.[/yellow]")
+    except OSError as exc:
+        cons.print(f"[yellow]Warning: Cannot read cases.py for cache staleness check: {exc}[/yellow]")
         return None
     stored_hash = cache.get("_meta", {}).get("cases_hash", "")
 
@@ -707,6 +708,7 @@ def get_changed_files(root_dir: str, compare_branch: str = "master") -> Optional
             if merge_base_result.returncode == 0:
                 break
         else:
+            cons.print(f"[yellow]Warning: git merge-base failed for {compare_branch}: {merge_base_result.stderr.strip()}[/yellow]")
             return None
         merge_base = merge_base_result.stdout.strip()
         if not merge_base:
@@ -714,10 +716,12 @@ def get_changed_files(root_dir: str, compare_branch: str = "master") -> Optional
 
         diff_result = subprocess.run(["git", "diff", merge_base, "HEAD", "--name-only", "--no-color"], capture_output=True, text=True, cwd=root_dir, timeout=30, check=False)
         if diff_result.returncode != 0:
+            cons.print(f"[yellow]Warning: git diff failed: {diff_result.stderr.strip()}[/yellow]")
             return None
 
         return _parse_diff_files(diff_result.stdout)
-    except (subprocess.TimeoutExpired, OSError):
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        cons.print(f"[yellow]Warning: git command failed: {exc}[/yellow]")
         return None
 
 

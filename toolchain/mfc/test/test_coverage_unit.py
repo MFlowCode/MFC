@@ -322,6 +322,15 @@ class TestFilterTestsByCoverage(unittest.TestCase):
         assert len(to_run) == 1
         assert len(skipped) == 0
 
+    def test_f_extension_under_src_runs_all(self):
+        """.f files under src/ also trigger run-all."""
+        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
+        changed = {"src/common/something.f"}
+        cases = [FakeCase("AAAA0001")]
+        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
+        assert len(to_run) == 1
+        assert len(skipped) == 0
+
     def test_f90_outside_src_does_not_trigger_run_all(self):
         """.f90 files outside src/ (e.g. misc/) should not trigger run-all."""
         cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
