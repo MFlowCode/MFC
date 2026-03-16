@@ -25,15 +25,21 @@ bash check-runners.sh
 # Detailed table with GitHub API status
 bash list-runners.sh
 
-# Restart one runner
-bash restart-runner.sh login-phoenix-gnr-2 /path/to/actions-runner-3
-
-# Restart all runners in place
-APPLY=1 bash restart-all.sh
-
-# Auto-rebalance across nodes
+# Auto-rebalance across nodes (also restarts offline runners)
 bash rebalance-runners.sh              # dry run
 APPLY=1 bash rebalance-runners.sh      # execute
+
+# Restart all runners in place (e.g. after a node reboot)
+APPLY=1 bash restart-all.sh
+
+# Restart one specific runner
+bash restart-runner.sh login-phoenix-gnr-2 /path/to/actions-runner-3
+
+# Move a runner to a different login node
+bash move-runner.sh phoenix-3 login-phoenix-gnr-1
+
+# Stop and deregister a runner
+bash stop-runner.sh phoenix-3
 
 # Create a new runner (needs gh CLI with admin:org scope)
 bash create-runner.sh phoenix-11 login-phoenix-gnr-2
@@ -50,10 +56,12 @@ APPLY=1 bash rerun-failed.sh           # execute
 | `config.sh` | Shared config: Phoenix constants (`ORG`, `RUNNER_GROUP`, `RUNNER_LABEL`, `NODES`, `CGROUP_LIMIT`, `RUNNER_PARENT_DIRS`) and `find_runner_dirs()`. Sources `../common/runner-lib.sh` for shared functions. |
 | `check-runners.sh` | Quick per-node health check. One SSH per node. Shows runner names, idle/BUSY status, slurm PATH, RSS, and total cgroup memory. |
 | `list-runners.sh` | Table combining GitHub API status with live node info from a parallel SSH sweep. Shows slurm status and flags stale `runner.node` entries. |
-| `restart-runner.sh` | Stop and restart one runner on a given node with proper login shell PATH and SSH detachment. |
-| `restart-all.sh` | Restart all runners in place. Skips BUSY runners unless `FORCE=1`. |
-| `rebalance-runners.sh` | Auto-compute optimal distribution and move runners. Prefers idle runners. Also places OFFLINE runners. |
-| `create-runner.sh` | Download runner binary, register with GitHub via API, start on target node. Only needs runner name and node — org, group, and label come from `config.sh`. |
+| `rebalance-runners.sh` | Auto-compute optimal distribution and move runners. Prefers idle runners. Also places OFFLINE runners. Dry run by default. |
+| `restart-all.sh` | Restart all runners in place. Skips BUSY runners unless `FORCE=1`. Dry run by default. |
+| `restart-runner.sh` | Stop and restart one runner on a given node. Usage: `restart-runner.sh <node> <runner-dir>` |
+| `move-runner.sh` | Move a runner to a different login node by name. Usage: `move-runner.sh <runner-name> <target-node>` |
+| `stop-runner.sh` | Stop the runner process and deregister from GitHub. Usage: `stop-runner.sh <runner-name>` |
+| `create-runner.sh` | Download runner binary, register with GitHub via API, start on target node. Usage: `create-runner.sh <name> <node> [parent-dir]` |
 | `rerun-failed.sh` | Scan open non-draft PRs and master for failed workflows, rerun failed jobs only. |
 
 ## Safety

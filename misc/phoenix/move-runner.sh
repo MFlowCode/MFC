@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Move a Frontier runner to a different login node.
+# Move a Phoenix runner to a different login node.
 # Thin wrapper — see misc/common/move-runner.sh for the implementation.
 #
 # Usage: bash move-runner.sh <runner-name> <target-node>

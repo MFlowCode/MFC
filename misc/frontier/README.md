@@ -35,16 +35,16 @@ bash list-runners.sh
 # Check runner health across all login nodes
 bash check-runners.sh
 
-# Restart offline runners and rebalance across all 11 nodes
+# Rebalance runners across all 11 nodes (also restarts offline runners)
 bash rebalance-runners.sh              # dry run
 APPLY=1 bash rebalance-runners.sh      # execute
 APPLY=1 FORCE=1 bash rebalance-runners.sh  # move busy runners too
 
-# Deploy a new runner on a specific node
-bash make-runner.sh 23 login01
+# Restart all runners in place (e.g. after a node reboot)
+APPLY=1 bash restart-all.sh
 
-# Deploy multiple runners across nodes (e.g. runners 23, 24, 25)
-bash deploy-runners.sh 23 login01 login02 login03
+# Restart one specific runner
+bash restart-runner.sh login01 /path/to/runner-dir
 
 # Move a runner to a different login node
 bash move-runner.sh frontier-1 login01
@@ -52,7 +52,13 @@ bash move-runner.sh frontier-1 login01
 # Stop and deregister a runner
 bash stop-runner.sh frontier-12
 
-# Rerun failed CI workflows (site-agnostic, also available at misc/common/)
+# Deploy a new runner on a specific node
+bash make-runner.sh 23 login01
+
+# Deploy multiple runners across nodes (e.g. runners 23, 24, 25)
+bash deploy-runners.sh 23 login01 login02 login03
+
+# Rerun failed CI workflows
 bash ../common/rerun-failed.sh
 APPLY=1 bash ../common/rerun-failed.sh
 ```
@@ -63,13 +69,15 @@ APPLY=1 bash ../common/rerun-failed.sh
 |---|---|
 | `config.sh` | Shared configuration: Frontier constants, `find_runner_dirs()`, and `sync_runner_nodes()`. Sources `../common/runner-lib.sh` for shared functions. |
 | `check-runners.sh` | SSH to each login node, show Runner.Listener processes with name, status (idle/BUSY), slurm PATH, and RSS memory. |
-| `list-runners.sh` | List all runners with GitHub API status, actual node (from parallel SSH sweep), slurm status, and RSS memory. Flags stale `runner.node` entries. |
-| `rebalance-runners.sh` | Sync node locations, compute optimal distribution, and move runners across all 11 login nodes. Handles offline runners. Dry run by default. |
-| `make-runner.sh` | Download runner binary, register with GitHub via API, start on target node. Usage: `make-runner.sh <num> [login-node]` |
-| `move-runner.sh` | Move a runner to a different login node: stop on current node, update `runner.node`, start on target. Usage: `move-runner.sh <runner-name> <target-node>` |
-| `deploy-runners.sh` | Deploy multiple runners across login nodes in parallel. Usage: `deploy-runners.sh <start-num> <node1> [node2 ...]` |
-| `stop-runner.sh` | Locate runner via EXE-based discovery, stop the process, and deregister from GitHub. Usage: `stop-runner.sh <runner-name>` |
-| `../common/rerun-failed.sh` | Rerun failed GitHub Actions workflows on open PRs and master. No site-specific code. |
+| `list-runners.sh` | List all runners with GitHub API status, actual node (parallel SSH sweep), slurm status, and RSS. Flags stale `runner.node`. |
+| `rebalance-runners.sh` | Sync node locations, compute optimal distribution, move runners across all 11 nodes. Handles offline runners. Dry run by default. |
+| `restart-all.sh` | Restart all runners in place. Skips busy unless `FORCE=1`. Dry run by default. |
+| `restart-runner.sh` | Stop and restart one runner on a given node. Usage: `restart-runner.sh <node> <runner-dir>` |
+| `move-runner.sh` | Move a runner to a different login node by name. Usage: `move-runner.sh <runner-name> <target-node>` |
+| `stop-runner.sh` | Stop the runner process and deregister from GitHub. Usage: `stop-runner.sh <runner-name>` |
+| `make-runner.sh` | Download runner binary, register with GitHub, start on target node. Usage: `make-runner.sh <num> [node]` |
+| `deploy-runners.sh` | Deploy multiple runners across nodes in parallel. Usage: `deploy-runners.sh <start-num> <node1> [node2 ...]` |
+| `../common/rerun-failed.sh` | Rerun failed GitHub Actions workflows on open PRs and master. |
 
 ## Troubleshooting
 

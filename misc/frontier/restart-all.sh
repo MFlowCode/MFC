@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restart all Phoenix runners in place on their current nodes.
+# Restart all Frontier runners in place on their current nodes.
 # Thin wrapper — see misc/common/restart-all.sh for the implementation.
 #
 # Usage: bash restart-all.sh              # dry run

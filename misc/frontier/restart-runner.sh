@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restart a single Phoenix runner on a given node.
+# Restart a single Frontier runner on a given node.
 # Thin wrapper — see misc/common/restart-runner.sh for the implementation.
 #
 # Usage: bash restart-runner.sh <node> <runner-dir>

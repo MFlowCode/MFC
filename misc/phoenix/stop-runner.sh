@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop and deregister a Frontier runner.
+# Stop and deregister a Phoenix runner.
 # Thin wrapper — see misc/common/stop-runner.sh for the implementation.
 #
 # Usage: bash stop-runner.sh <runner-name>

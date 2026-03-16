@@ -1,27 +1,19 @@
 # Common Runner Management Scripts
 
-This directory contains site-agnostic scripts shared between the Phoenix and
-Frontier runner management setups. Scripts here have no site-specific logic and
-can be invoked directly or via thin site-specific wrappers.
+Site-agnostic scripts shared between the Frontier and Phoenix runner setups.
+All logic lives here; site directories contain only thin wrappers that source
+`config.sh` then the relevant script from this directory.
 
 ## Scripts
 
 | Script | Purpose |
 |---|---|
-| `rerun-failed.sh` | Rerun failed GitHub Actions workflows on open non-draft MFC PRs and master. Dry-run by default; set `APPLY=1` to actually trigger reruns. |
-
-## Usage
-
-```bash
-# Dry run — show which failed workflows would be rerun
-bash misc/common/rerun-failed.sh
-
-# Actually rerun failed workflows
-APPLY=1 bash misc/common/rerun-failed.sh
-```
-
-## Site wrappers
-
-`misc/phoenix/rerun-failed.sh` is a thin wrapper that delegates to this
-script, so both `bash misc/phoenix/rerun-failed.sh` and
-`bash misc/common/rerun-failed.sh` invoke the same logic.
+| `runner-lib.sh` | Shared library: GitHub API helpers, EXE-based process discovery, parallel node sweep, start/stop primitives. Sourced by site `config.sh` files. |
+| `check-runners.sh` | Per-node health check: Runner.Listener processes with name, idle/BUSY, slurm PATH, RSS. Optional cgroup memory footer. |
+| `list-runners.sh` | Full table: GitHub API status × parallel node sweep. Shows slurm status, flags stale `runner.node`. Optional cgroup memory footer. |
+| `rebalance-runners.sh` | Compute optimal distribution and move runners across nodes. Handles offline runners. Writes `runner.node`. Dry run by default. |
+| `restart-runner.sh` | Stop and restart one runner on a given node. Verifies slurm in PATH. Writes `runner.node`. |
+| `restart-all.sh` | Restart all runners in place. Skips busy unless `FORCE=1`. Dry run by default. |
+| `move-runner.sh` | Move a runner to a different login node by name. Stops on current node, starts on target. Writes `runner.node`. |
+| `stop-runner.sh` | Stop a runner process and remove its GitHub registration. |
+| `rerun-failed.sh` | Rerun failed GitHub Actions workflows on open non-draft PRs and master. Dry run by default. |
