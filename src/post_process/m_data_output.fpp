@@ -1518,8 +1518,7 @@ contains
         open (newunit=iu_in, file=trim(in_file), form='unformatted', access='stream', &
               status='old', action='read', iostat=ios)
         if (ios /= 0) then
-            print *, 'ERROR: cannot open input file: ', trim(in_file), ' iostat=', ios
-            return
+            call s_mpi_abort('Cannot open IB state input file: '//trim(in_file))
         end if
 
         allocate (iu_out(num_ibs))
@@ -1527,13 +1526,7 @@ contains
             write (out_file, '(A,I0,A)') trim(file_loc)//'/ib_', i, '.txt'
             open (newunit=iu_out(i), file=trim(out_file), form='formatted', status='replace', action='write', iostat=ios)
             if (ios /= 0) then
-                print *, 'ERROR: cannot open output file: ', trim(out_file), ' iostat=', ios
-                close (iu_in)
-                do rec_id = 1, i - 1
-                    close (iu_out(rec_id))
-                end do
-                deallocate (iu_out)
-                return
+                call s_mpi_abort('Cannot open IB state output file: '//trim(out_file))
             end if
             write (iu_out(i), '(A)') &
                 'mytime fx fy fz Tau_x Tau_y Tau_z vx vy vz omega_x omega_y omega_z angle_x angle_y angle_z x_c y_c z_c'

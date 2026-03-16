@@ -164,7 +164,7 @@ contains
         if (parallel_io) then
             write (file_loc, '(A)') trim(file_loc_base)//'ib.dat'
         else
-            write (file_loc, '(A)') trim(file_loc_base)//'/ib.dat'
+            write (file_loc, '(A)') trim(file_loc_base)//'/ib_data.dat'
         end if
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 

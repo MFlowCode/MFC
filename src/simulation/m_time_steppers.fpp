@@ -641,7 +641,7 @@ contains
                 end if
 
                 ! Write IB state to file if requested and at the RK final stage
-                if (ib_state_wrt .and. s == nstage) then
+                if (proc_rank == 0 .and. ib_state_wrt .and. s == nstage) then
                     call s_write_ib_state_file()
                 end if
 

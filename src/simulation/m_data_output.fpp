@@ -52,6 +52,8 @@ module m_data_output
               s_close_ib_state_file, &
               s_finalize_data_output_module
 
+    integer :: ib_state_unit !< I/O unit for IB state binary file
+
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
@@ -258,15 +260,14 @@ contains
     end subroutine s_open_probe_files
 
     impure subroutine s_open_ib_state_file
-        character(LEN=path_len + 2*name_len) :: file_loc
+        character(len=path_len + 2*name_len) :: file_loc
 
         write (file_loc, '(A)') 'ib_state.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-        open (92, FILE=trim(file_loc), &
-              FORM='unformatted', &
-              ACCESS='stream', &
-              STATUS='replace', &
-              POSITION='append')
+        open (newunit=ib_state_unit, file=trim(file_loc), &
+              form='unformatted', &
+              access='stream', &
+              status='replace')
     end subroutine s_open_ib_state_file
 
     !>  The goal of the procedure is to output to the run-time
@@ -1153,25 +1154,22 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> @brief Writes IB state records to D/ib_state.dat on rank 0.
+    !> @brief Writes IB state records to D/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file()
 
-        if (proc_rank == 0) then
-            block
-                integer :: i
-                do i = 1, num_ibs
-                    write (92) mytime, i, &
-                        patch_ib(i)%force, &
-                        patch_ib(i)%torque, &
-                        patch_ib(i)%vel, &
-                        patch_ib(i)%angular_vel, &
-                        patch_ib(i)%angles, &
-                        patch_ib(i)%x_centroid, &
-                        patch_ib(i)%y_centroid, &
-                        patch_ib(i)%z_centroid
-                end do
-            end block
-        end if
+        integer :: i
+
+        do i = 1, num_ibs
+            write (ib_state_unit) mytime, i, &
+                patch_ib(i)%force, &
+                patch_ib(i)%torque, &
+                patch_ib(i)%vel, &
+                patch_ib(i)%angular_vel, &
+                patch_ib(i)%angles, &
+                patch_ib(i)%x_centroid, &
+                patch_ib(i)%y_centroid, &
+                patch_ib(i)%z_centroid
+        end do
 
     end subroutine s_write_ib_state_file
 
@@ -1946,7 +1944,7 @@ contains
 
     impure subroutine s_close_ib_state_file
 
-        close (92)
+        close (ib_state_unit)
 
     end subroutine s_close_ib_state_file
 
