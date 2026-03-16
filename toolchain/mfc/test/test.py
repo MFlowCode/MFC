@@ -117,7 +117,6 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
             filter_tests_by_coverage,
             get_changed_files,
             load_coverage_cache,
-            should_run_all_tests,
         )
 
         # Example-based tests cover no unique files beyond non-example tests,
@@ -138,12 +137,15 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
 
             if changed_files is None:
                 cons.print("[yellow]git diff failed — falling back to full test suite.[/yellow]")
-            elif should_run_all_tests(changed_files):
-                cons.print()
-                cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                cons.print("-" * 50)
-                cons.print("[yellow]Infrastructure or macro file changed — running full test suite.[/yellow]")
-                cons.print("-" * 50)
+            # TEMP: should_run_all_tests check disabled to test pruning on this PR
+            # (coverage.py and case.py are in the diff, which triggers full suite).
+            # Restore this block before merge:
+            # elif should_run_all_tests(changed_files):
+            #     cons.print()
+            #     cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
+            #     cons.print("-" * 50)
+            #     cons.print("[yellow]Infrastructure or macro file changed — running full test suite.[/yellow]")
+            #     cons.print("-" * 50)
             else:
                 changed_fpp = {f for f in changed_files if f.endswith(".fpp")}
                 changed_f90 = {f for f in changed_files if f.startswith("src/") and (f.endswith(".f90") or f.endswith(".f"))}
