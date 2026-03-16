@@ -47,7 +47,7 @@ for i in "${!dirs[@]}"; do
     runner_node[$i]="$node"
     if [ "$node" != "offline" ]; then
         node_runners[$node]="${node_runners[$node]:-} $i"
-        worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '${dirs[$i]}' | grep -v grep" 2>/dev/null || true)
+        worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '${dirs[$i]}/' | grep -v grep" 2>/dev/null || true)
         [ -n "$worker" ] && runner_busy[$i]=1 || runner_busy[$i]=0
     else
         runner_busy[$i]=0
@@ -155,7 +155,12 @@ echo "=== Executing ==="
 for move in "${moves[@]}"; do
     read -r src dst idx <<< "$move"
     echo "Moving ${names[$idx]}: $src -> $dst"
-    [ "$src" != "offline" ] && stop_runner "$src" "${dirs[$idx]}"
+    if [ "$src" != "offline" ]; then
+        if ! stop_runner "$src" "${dirs[$idx]}"; then
+            echo "  ERROR: Failed to stop ${names[$idx]} on $src; skipping move" >&2
+            continue
+        fi
+    fi
     if start_runner "$dst" "${dirs[$idx]}"; then
         echo "$dst" > "${dirs[$idx]}/runner.node"
         pids=$(find_pids "$dst" "${dirs[$idx]}")

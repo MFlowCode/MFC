@@ -40,9 +40,11 @@ for pr in $prs; do
                 --json jobs --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .name' \
                 2>/dev/null) || { echo "  WARNING: could not fetch jobs for run $run_id, skipping"; continue; }
             echo "  Run $run_id ($run_name):"
-            while read -r job; do
-                echo "    - $job"
-            done <<< "$failed_jobs"
+            if [ -n "$failed_jobs" ]; then
+                while read -r job; do
+                    echo "    - $job"
+                done <<< "$failed_jobs"
+            fi
 
             if [ "${APPLY:-0}" = "1" ]; then
                 echo "  Rerunning failed jobs..."
@@ -60,7 +62,15 @@ master_failed=$(gh run list --repo "$REPO" --branch master --limit 5 \
     --jq '.[] | select(.conclusion == "failure") | "\(.databaseId) \(.name)"')
 if [ -n "$master_failed" ]; then
     while read -r run_id run_name; do
-        echo "  Run $run_id ($run_name)"
+        failed_jobs=$(gh run view --repo "$REPO" "$run_id" \
+            --json jobs --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .name' \
+            2>/dev/null) || { echo "  WARNING: could not fetch jobs for run $run_id, skipping"; continue; }
+        echo "  Run $run_id ($run_name):"
+        if [ -n "$failed_jobs" ]; then
+            while read -r job; do
+                echo "    - $job"
+            done <<< "$failed_jobs"
+        fi
         if [ "${APPLY:-0}" = "1" ]; then
             echo "  Rerunning failed jobs..."
             gh run rerun --repo "$REPO" "$run_id" --failed || echo "  WARNING: rerun failed"

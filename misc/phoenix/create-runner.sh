@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Create and register a new GitHub Actions runner on Phoenix.
 #
 # Downloads the runner binary, registers with MFlowCode org, and starts
@@ -64,7 +64,10 @@ echo "  Version: $version"
 
 mkdir -p "$runner_dir"
 cd "$runner_dir"
-curl -sL "$url" | tar xz
+tmp="runner-download.tmp.$$"
+curl -fsSL "$url" -o "$tmp"
+tar xz < "$tmp"
+rm -f "$tmp"
 echo "  Extracted."
 
 # Configure

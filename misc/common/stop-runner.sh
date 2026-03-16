@@ -39,9 +39,13 @@ fi
 # Deregister from GitHub
 echo "==> Fetching runner ID from GitHub..."
 runner_id=""
+runner_list=$(gh_list_runners 2>/dev/null) || {
+    echo "WARNING: GitHub API call failed; runner may still be registered on GitHub." >&2
+    exit 0
+}
 while read -r id name _status _busy; do
     [ "$name" = "$RUNNER_NAME" ] && runner_id="$id" && break
-done < <(gh_list_runners)
+done <<< "$runner_list"
 
 if [ -n "$runner_id" ]; then
     echo "==> Deregistering runner (ID $runner_id)..."

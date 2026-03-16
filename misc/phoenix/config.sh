@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Shared configuration for Phoenix GitHub Actions runner management.
 #
 # Sourced by all other scripts. Provides Phoenix constants and

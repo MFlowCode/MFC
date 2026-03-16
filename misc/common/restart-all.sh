@@ -16,7 +16,7 @@ declare -f sync_runner_nodes > /dev/null 2>&1 && {
 }
 
 echo "=== Discovering runners ==="
-declare -a restart_list=()
+declare -a restart_nodes=() restart_dirs=() restart_names=()
 
 while IFS= read -r dir; do
     name=$(get_runner_name "$dir")
@@ -28,7 +28,7 @@ while IFS= read -r dir; do
         continue
     fi
 
-    worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '$dir' | grep -v grep" 2>/dev/null || true)
+    worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '$dir/' | grep -v grep" 2>/dev/null || true)
     if [ -n "$worker" ]; then
         echo "  $name: BUSY on $node"
         if [ "${FORCE:-0}" != "1" ]; then
@@ -39,16 +39,18 @@ while IFS= read -r dir; do
         echo "  $name: idle on $node"
     fi
 
-    restart_list+=("$node $dir $name")
+    restart_nodes+=("$node")
+    restart_dirs+=("$dir")
+    restart_names+=("$name")
 done < <(find_runner_dirs)
 
-if [ ${#restart_list[@]} -eq 0 ]; then
+if [ ${#restart_nodes[@]} -eq 0 ]; then
     echo "Nothing to restart."
     exit 0
 fi
 
 echo ""
-echo "${#restart_list[@]} runners will be restarted."
+echo "${#restart_nodes[@]} runners will be restarted."
 
 if [ "${APPLY:-0}" != "1" ]; then
     echo "Dry run — set APPLY=1 to execute."
@@ -58,10 +60,16 @@ fi
 echo ""
 echo "=== Restarting ==="
 success=0; fail=0
-for entry in "${restart_list[@]}"; do
-    read -r node dir name <<< "$entry"
+for i in "${!restart_nodes[@]}"; do
+    node="${restart_nodes[$i]}"
+    dir="${restart_dirs[$i]}"
+    name="${restart_names[$i]}"
     echo "--- $name on $node ---"
-    stop_runner "$node" "$dir"
+    if ! stop_runner "$node" "$dir"; then
+        echo "  ERROR: Failed to stop; skipping restart" >&2
+        fail=$((fail + 1))
+        continue
+    fi
     if start_runner "$node" "$dir"; then
         echo "$node" > "$dir/runner.node"
         pids=$(find_pids "$node" "$dir")

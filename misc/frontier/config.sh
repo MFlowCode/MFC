@@ -6,7 +6,7 @@
 
 # --- Frontier constants ---
 ORG="MFlowCode"
-RUNNER_GROUP="phoenix"
+RUNNER_GROUP="phoenix"  # Both sites share one GitHub runner group named "phoenix"
 RUNNER_LABEL="frontier"
 NODES=(login01 login02 login03 login04 login05 login06 login07 login08 login09 login10 login11)
 SHARED_DIR="/lustre/orion/cfd154/proj-shared/runners"

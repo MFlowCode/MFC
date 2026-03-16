@@ -32,4 +32,5 @@ if start_runner "$node" "$dir"; then
     fi
 else
     echo "  ERROR: Failed to start on $node"
+    exit 1
 fi

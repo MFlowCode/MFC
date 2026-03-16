@@ -33,12 +33,27 @@ if [ ! -f "${SHARED_DIR}/${TARBALL}" ]; then
 fi
 export RUNNER_VERSION
 
+declare -a pids=() nums=() deploy_nodes=()
 for i in "${!TARGET_NODES[@]}"; do
     NODE="${TARGET_NODES[$i]}"
     NUM=$((START_NUM + i))
     echo "==> Deploying frontier-${NUM} on ${NODE}..."
     "$SCRIPT_DIR/make-runner.sh" "${NUM}" "${NODE}" &
+    pids+=($!)
+    nums+=("$NUM")
+    deploy_nodes+=("$NODE")
 done
 
-wait
+failed=0
+for i in "${!pids[@]}"; do
+    if ! wait "${pids[$i]}"; then
+        echo "ERROR: frontier-${nums[$i]} on ${deploy_nodes[$i]} failed." >&2
+        failed=$((failed + 1))
+    fi
+done
+
+if [ "$failed" -gt 0 ]; then
+    echo "==> $failed runner(s) failed to deploy." >&2
+    exit 1
+fi
 echo "==> All runners deployed."

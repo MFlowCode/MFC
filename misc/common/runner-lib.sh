@@ -38,20 +38,26 @@ gh_remove_runner() {
 # --- Local filesystem ---
 
 # Get the GitHub runner name from a .runner config file.
+# Uses sys.argv to avoid path injection into Python source code.
+# Prints the agentName, or empty string if the file is missing or unparsable
+# (with a warning to stderr).
 # Args: $1 = runner directory
 get_runner_name() {
     python3 -c "
-import json
-d = json.loads(open('$1/.runner').read().lstrip('\ufeff'))
+import json, sys
+d = json.loads(open(sys.argv[1] + '/.runner').read().lstrip('\ufeff'))
 print(d.get('agentName', ''))
-" 2>/dev/null
+" "$1" 2>/dev/null \
+        || echo "WARNING: could not read runner name from '$1/.runner'" >&2
 }
 
 # --- Login-node process management ---
 
 # Find PIDs of a runner on a node by matching its executable path.
-# Matches /proc/$p/exe against $dir/bin/Runner.Listener — intrinsic to
-# the binary, independent of CWD or how the process was launched.
+# Candidate PIDs are found by grepping ps for Runner.Listener; each
+# candidate's /proc/$p/exe is then resolved and matched against
+# $dir/bin/Runner.Listener to confirm identity. This makes the confirmation
+# step independent of CWD or process arguments.
 # Output is filtered to numeric lines only to strip SSH MOTD noise.
 # Args: $1 = node, $2 = runner directory
 # Prints: space-separated PIDs, or empty.
@@ -76,9 +82,11 @@ find_node() {
 
 # Check if a runner process has a slurm directory in its PATH.
 # Works across sites regardless of the specific slurm installation path.
-# Args: $1 = node, $2 = PID (or "PID rest..." — uses first token only)
+# Returns non-zero if slurm is absent OR if the SSH check itself fails
+# (callers should treat non-zero as "could not confirm slurm present").
+# Args: $1 = node, $2 = PID
 has_slurm() {
-    local node="$1" pid="${2%% *}"
+    local node="$1" pid="$2"
     ssh $SSH_OPTS "$node" \
         "tr '\0' '\n' < /proc/$pid/environ 2>/dev/null | grep -q '^PATH=.*slurm'" \
         2>/dev/null
@@ -88,6 +96,7 @@ has_slurm() {
 # Each output line: RUNNER <node> <dir> <rss_mb> <slurm_ok>
 #   dir      = runner directory derived from the Runner.Listener exe path
 #   slurm_ok = "ok" if slurm appears in the process PATH, "MISSING" otherwise
+# Warns to stderr for any node whose output file is empty (SSH likely failed).
 # Caller must create tmpdir and parse the output files.
 # Args: $1 = tmpdir
 sweep_all_nodes() {
@@ -106,22 +115,34 @@ sweep_all_nodes() {
         ' 2>/dev/null > "$tmpdir/$node.out" &
     done
     wait
+    for node in "${NODES[@]}"; do
+        if [ ! -s "$tmpdir/$node.out" ]; then
+            echo "WARNING: no runner data from $node (SSH may have failed)" >&2
+        fi
+    done
 }
 
 # Start a runner on a node.
 # Uses a login shell (bash -lc) so site PATH (e.g. SLURM) is available.
+# SSH launch failures are logged to stderr but do not prevent the function
+# from checking whether the process appeared (find_pids after 3s).
 # Args: $1 = node, $2 = runner directory
-# Returns: 0 if running after start, 1 otherwise.
+# Returns: 0 if a Runner.Listener process is found after start, 1 otherwise.
 start_runner() {
     local node="$1" dir="$2"
     timeout 15 ssh $SSH_OPTS "$node" \
         "cd $dir && setsid bash -lc 'nohup ./run.sh >> runner.log 2>&1 < /dev/null &'" \
-        </dev/null 2>/dev/null || true
+        </dev/null 2>/dev/null \
+        || echo "WARNING: SSH launch to $node failed; checking for process anyway..." >&2
     sleep 3
     [ -n "$(find_pids "$node" "$dir")" ]
 }
 
-# Stop a runner on a node (SIGTERM then SIGKILL).
+# Stop a runner on a node (SIGTERM, 3s grace, then SIGKILL).
+# After SIGKILL, waits 1s then re-checks with find_pids. If the process is
+# still alive (e.g. SSH kill failed, wrong UID, kernel stuck), emits a warning
+# to stderr and returns 1 so callers can react. Returns 0 if the runner is
+# confirmed stopped or was never running.
 # Args: $1 = node, $2 = runner directory
 stop_runner() {
     local node="$1" dir="$2" pids
@@ -136,4 +157,9 @@ stop_runner() {
         ssh $SSH_OPTS "$node" "kill -9 $pid" 2>/dev/null || true
     done
     sleep 1
+    pids=$(find_pids "$node" "$dir")
+    if [ -n "$pids" ]; then
+        echo "WARNING: process(es) $pids on $node survived SIGKILL; runner may still be running" >&2
+        return 1
+    fi
 }
