@@ -32,7 +32,7 @@ TARBALL_CACHE_DIR=""
 runner_install_dir() {
     local override="${2:-}"
     [ -n "$override" ] && echo "$override" && return
-    local parent="${RUNNER_PARENT_DIRS[0]}"
+    local parent="${RUNNER_PARENT_DIRS[1]}"
     local existing next_num
     existing=$(ls -d "$parent"/actions-runner-* 2>/dev/null | sed 's/.*actions-runner-//' | sort -n | tail -1)
     next_num=$(( ${existing:-0} + 1 ))
