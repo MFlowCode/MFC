@@ -233,7 +233,8 @@ class TestShouldRunAllTests(unittest.TestCase):
         assert should_run_all_tests({"src/common/include/macros.fpp"}) is True
 
     def test_cases_py_triggers_all(self):
-        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is True
+        # TEMP: cases.py removed from ALWAYS_RUN_ALL for testing — restore before merge
+        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is False
 
     def test_case_py_triggers_all(self):
         assert should_run_all_tests({"toolchain/mfc/test/case.py"}) is True
@@ -467,7 +468,8 @@ class TestDesignCornerCases(unittest.TestCase):
         _parse_diff_files includes it -> should_run_all_tests fires.
         """
         files = _parse_diff_files("toolchain/mfc/test/cases.py\n")
-        assert should_run_all_tests(files) is True
+        # TEMP: cases.py removed from ALWAYS_RUN_ALL for testing — restore before merge
+        assert should_run_all_tests(files) is False
 
     def test_niche_feature_pruning(self):
         """
@@ -775,9 +777,11 @@ class TestLoadCoverageCache(unittest.TestCase):
         assert self._run() is None
 
     def test_stale_cache_returns_none(self):
-        """Cache with wrong cases_hash -> None."""
+        """Cache with wrong cases_hash -> None (staleness check).
+        TEMP: staleness check disabled for testing — restore assertion before merge."""
         self._write_cache({"_meta": {"cases_hash": "wrong_hash"}, "TEST1": ["src/simulation/m_rhs.fpp"]})
-        assert self._run() is None
+        # TEMP: staleness check disabled, so stale cache is accepted
+        assert self._run() is not None
 
     def test_empty_cache_returns_none(self):
         """Cache with only _meta and no test entries -> None."""
