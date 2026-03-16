@@ -52,7 +52,7 @@ module m_data_output
               s_close_ib_state_file, &
               s_finalize_data_output_module
 
-    integer :: ib_state_unit !< I/O unit for IB state binary file
+    integer :: ib_state_unit = -1 !< I/O unit for IB state binary file
 
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
@@ -261,13 +261,16 @@ contains
 
     impure subroutine s_open_ib_state_file
         character(len=path_len + 2*name_len) :: file_loc
+        integer :: ios
 
         write (file_loc, '(A)') 'ib_state.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
         open (newunit=ib_state_unit, file=trim(file_loc), &
               form='unformatted', &
               access='stream', &
-              status='replace')
+              status='replace', &
+              iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: '//trim(file_loc))
     end subroutine s_open_ib_state_file
 
     !>  The goal of the procedure is to output to the run-time
