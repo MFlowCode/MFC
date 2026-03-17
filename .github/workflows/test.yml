@@ -195,23 +195,33 @@ jobs:
           - nvhpc: '23.11'
             target: cpu
           - nvhpc: '23.11'
-            target: gpu
+            target: gpu-acc
+          - nvhpc: '23.11'
+            target: gpu-omp
           - nvhpc: '24.5'
             target: cpu
           - nvhpc: '24.5'
-            target: gpu
+            target: gpu-acc
+          - nvhpc: '24.5'
+            target: gpu-omp
           - nvhpc: '24.11'
             target: cpu
           - nvhpc: '24.11'
-            target: gpu
+            target: gpu-acc
+          - nvhpc: '24.11'
+            target: gpu-omp
           - nvhpc: '25.1'
             target: cpu
           - nvhpc: '25.1'
-            target: gpu
+            target: gpu-acc
+          - nvhpc: '25.1'
+            target: gpu-omp
           - nvhpc: '25.3'
             target: cpu
           - nvhpc: '25.3'
-            target: gpu
+            target: gpu-acc
+          - nvhpc: '25.3'
+            target: gpu-omp
 
       fail-fast: false
     continue-on-error: true
@@ -304,7 +314,9 @@ jobs:
       # --- NVHPC build + test ---
       - name: Build (NVHPC)
         if:   matrix.nvhpc
-        run:  /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all ${{ matrix.target == 'gpu' && '--gpu acc' || '' }}
+        run:  /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all $GPU
+        env:
+          GPU: ${{ matrix.target == 'gpu-acc' && '--gpu acc' || matrix.target == 'gpu-omp' && '--gpu mp' || '' }}
 
       - name: Test (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
