@@ -44,15 +44,13 @@ module m_ibm
     $:GPU_DECLARE(create='[ib_markers]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
-    type(ghost_point), dimension(:), allocatable :: inner_points
-    $:GPU_DECLARE(create='[ghost_points,inner_points]')
+    $:GPU_DECLARE(create='[ghost_points]')
 
     integer :: num_gps !< Number of ghost points
-    integer :: num_inner_gps !< Number of ghost points
 #if defined(MFC_OpenACC)
-    $:GPU_DECLARE(create='[gp_layers,num_gps,num_inner_gps]')
+    $:GPU_DECLARE(create='[gp_layers,num_gps]')
 #elif defined(MFC_OpenMP)
-    $:GPU_DECLARE(create='[num_gps,num_inner_gps]')
+    $:GPU_DECLARE(create='[num_gps]')
 #endif
     logical :: moving_immersed_boundary_flag
 
@@ -73,7 +71,7 @@ contains
 
         @:ACC_SETUP_SFs(ib_markers)
 
-        $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
+        $:GPU_ENTER_DATA(copyin='[num_gps]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -84,7 +82,7 @@ contains
     impure subroutine s_ibm_setup()
 
         integer :: i, j, k
-        integer :: max_num_gps, max_num_inner_gps
+        integer :: max_num_gps
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
@@ -119,19 +117,20 @@ contains
         end do
 
         ! find the number of ghost points and set them to be the maximum total across ranks
-        call s_find_num_ghost_points(num_gps, num_inner_gps)
-        call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
-        call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
-        max_num_gps = min(max_num_gps, (m + 1)*(n + 1)*(p + 1)/2)
-        max_num_inner_gps = min(max_num_inner_gps, (m + 1)*(n + 1)*(p + 1)/2)
+        call s_find_num_ghost_points(num_gps)
+        if (moving_immersed_boundary_flag) then
+            call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
+            max_num_gps = min(max_num_gps*2, (m + 1)*(n + 1)*(p + 1))
+        else
+            max_num_gps = num_gps
+        end if
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
-        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
-        @:ALLOCATE(inner_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
+        $:GPU_UPDATE(device='[num_gps]')
+        @:ALLOCATE(ghost_points(1:max_num_gps))
 
-        $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
-        call s_find_ghost_points(ghost_points, inner_points)
+        $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
 
         call s_compute_image_points(ghost_points)
@@ -193,7 +192,7 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
-        ! set the Moving IBM interior Pressure Values
+        ! set the Moving IBM interior conservative variables
         $:GPU_PARALLEL_LOOP(private='[i,j,k,patch_id,rho]', copyin='[E_idx,momxb]', collapse=3)
         do l = 0, p
             do k = 0, n
@@ -201,18 +200,16 @@ contains
                     patch_id = ib_markers%sf(j, k, l)
                     if (patch_id /= 0) then
                         q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
-                        if (patch_ib(patch_id)%moving_ibm > 0) then
-                            rho = 0._wp
-                            do i = 1, num_fluids
-                                rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
-                            end do
+                        rho = 0._wp
+                        do i = 1, num_fluids
+                            rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
+                        end do
 
-                            ! Sets the momentum
-                            do i = 1, num_dims
-                                q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
-                                q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
-                            end do
-                        end if
+                        ! Sets the momentum
+                        do i = 1, num_dims
+                            q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
+                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
+                        end do
                     end if
                 end do
             end do
@@ -402,24 +399,6 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        !Correct the state of the inner points in IBs
-        if (num_inner_gps > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
-            do i = 1, num_inner_gps
-
-                innerp = inner_points(i)
-                j = innerp%loc(1)
-                k = innerp%loc(2)
-                l = innerp%loc(3)
-
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = momxb, momxe
-                    q_cons_vf(q)%sf(j, k, l) = 0._wp
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
     end subroutine s_ibm_correct_state
 
     !>  Function that computes the image points for each ghost point
@@ -534,21 +513,19 @@ contains
 
     !> Subroutine that finds the number of ghost points, used for allocating
     !! memory.
-    subroutine s_find_num_ghost_points(num_gps_out, num_inner_gps_out)
+    subroutine s_find_num_ghost_points(num_gps_out)
 
         integer, intent(out) :: num_gps_out
-        integer, intent(out) :: num_inner_gps_out
 
         integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
-        integer :: num_gps_local, num_inner_gps_local !< local copies of the gp count to support GPU compute
+        integer :: num_gps_local !< local copies of the gp count to support GPU compute
         logical :: is_gp
 
         num_gps_local = 0
-        num_inner_gps_local = 0
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp]', copy='[num_gps_local,num_inner_gps_local]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp]', copy='[num_gps_local]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -569,9 +546,6 @@ contains
                         if (is_gp) then
                             $:GPU_ATOMIC(atomic='update')
                             num_gps_local = num_gps_local + 1
-                        else
-                            $:GPU_ATOMIC(atomic='update')
-                            num_inner_gps_local = num_inner_gps_local + 1
                         end if
                     end if
                 end do
@@ -580,15 +554,13 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         num_gps_out = num_gps_local
-        num_inner_gps_out = num_inner_gps_local
 
     end subroutine s_find_num_ghost_points
 
     !> Function that finds the ghost points
-    subroutine s_find_ghost_points(ghost_points_in, inner_points_in)
+    subroutine s_find_ghost_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
-        type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points_in
         integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
         integer :: xp, yp, zp !< periodicities
         integer :: count, count_i, local_idx
@@ -659,20 +631,6 @@ contains
                                     ghost_points_in(local_idx)%DB(3) = 0
                                 end if
                             end if
-
-                        else
-                            $:GPU_ATOMIC(atomic='capture')
-                            count_i = count_i + 1
-                            local_idx = count_i
-                            $:END_GPU_ATOMIC_CAPTURE()
-
-                            inner_points_in(local_idx)%loc = [i, j, k]
-                            encoded_patch_id = ib_markers%sf(i, j, k)
-                            call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
-                            inner_points_in(local_idx)%ib_patch_id = patch_id
-                            ! ib_markers%sf(i, j, k) = patch_id
-                            inner_points_in(local_idx)%slip = patch_ib(patch_id)%slip
-
                         end if
                     end if
                 end do
@@ -973,8 +931,8 @@ contains
 
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
-        call s_find_num_ghost_points(num_gps, num_inner_gps)
-        call s_find_ghost_points(ghost_points, inner_points)
+        call s_find_num_ghost_points(num_gps)
+        call s_find_ghost_points(ghost_points)
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-IMAGE-POINTS")
@@ -998,7 +956,7 @@ contains
 
         integer :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
+        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2 ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp) :: cell_volume, dx, dy, dz, dynamic_viscosity
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -1022,7 +980,7 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosities]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1051,11 +1009,7 @@ contains
                             end if
                         end do
 
-                        ! Update the force values atomically to prevent race conditions
-                        call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
-
                         ! get the viscous stress and add its contribution if that is considered
-                        ! TODO :: This is really bad code
                         if (viscous) then
                             ! compute the volume-weighted local dynamic viscosity
                             dynamic_viscosity = 0._wp
@@ -1064,46 +1018,29 @@ contains
                                 dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k)*dynamic_viscosities(fluid_idx))
                             end do
 
-                            ! get the linear force component first
+                            ! get the linear force components first
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i - 1, j, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i + 1, j, k)
-                            viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dx) ! get the x derivative of the viscous stress tensor
-                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, 1:3) ! add te x components of the derivative to the force
-                            do l = 1, 3
-                                ! take the cross products for the torque component
-                                call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
-                                call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
-                            end do
-
-                            viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dx) ! get the x derivative of the cross product
-                            local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(1, 1:3) ! apply the cross product derivative to the torque
+                            viscous_stress_div(1, 1:3) = (viscous_stress_div_2(1, 1:3) - viscous_stress_div_1(1, 1:3))/(2._wp*dx) ! get x derivative of the first-row of viscous stress tensor
+                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, 1:3) ! add the x components of the divergence to the force
 
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j - 1, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j + 1, k)
-                            viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dy)
-                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, 1:3)
-                            do l = 1, 3
-                                call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
-                                call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
-                            end do
-
-                            viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dy)
-                            local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(2, 1:3)
+                            viscous_stress_div(2, 1:3) = (viscous_stress_div_2(2, 1:3) - viscous_stress_div_1(2, 1:3))/(2._wp*dy) ! get y derivative of the second-row of viscous stress tensor
+                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, 1:3) ! add the y components of the divergence to the force
 
                             if (num_dims == 3) then
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j, k - 1)
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j, k + 1)
-                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dz)
-                                local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3)
-                                do l = 1, 3
-                                    call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
-                                    call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
-                                end do
-                                viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dz)
-                                local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(3, 1:3)
+                                viscous_stress_div(3, 1:3) = (viscous_stress_div_2(3, 1:3) - viscous_stress_div_1(3, 1:3))/(2._wp*dz) ! get z derivative of the third-row of viscous stress tensor
+                                local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3) ! add the z components of the divergence to the force
                             end if
+
                         end if
 
+                        call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
+
+                        ! Update the force and torque values atomically to prevent race conditions
                         do l = 1, 3
                             $:GPU_ATOMIC(atomic='update')
                             forces(ib_idx, l) = forces(ib_idx, l) + (local_force_contribution(l)*cell_volume)

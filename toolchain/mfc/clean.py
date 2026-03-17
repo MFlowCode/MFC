@@ -5,8 +5,8 @@ MFC Clean Command - Remove build artifacts.
 import os
 import shutil
 
-from .printer import cons
 from .common import MFC_BUILD_DIR
+from .printer import cons
 
 
 def clean():

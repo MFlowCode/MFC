@@ -32,7 +32,7 @@ module m_start_up
 
     use m_acoustic_src      !< Acoustic source calculations
 
-    use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
+    use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
     use m_chemistry            !< Chemistry module
 
@@ -144,7 +144,8 @@ contains
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
-            collision_model, coefficient_of_restitution, collision_time, ib_coefficient_of_friction, &
+            collision_model, coefficient_of_restitution, collision_time, 
+            ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
@@ -576,7 +577,7 @@ contains
                 m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(4._wp, MPI_OFFSET_KIND)
+                WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
@@ -653,7 +654,7 @@ contains
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
@@ -846,12 +847,13 @@ contains
             end do
         end if
 
-        mytime = mytime + dt
-
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (any(time_stepper == (/1, 2, 3/))) then
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
+
+        ! Advance time after RK so source terms see current-step time
+        mytime = mytime + dt
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 

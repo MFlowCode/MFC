@@ -406,6 +406,7 @@ module m_global_parameters
     real(wp) :: coefficient_of_restitution
     real(wp) :: collision_time
     real(wp) :: ib_coefficient_of_friction
+    logical :: ib_state_wrt
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
@@ -729,6 +730,7 @@ contains
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
+        ib_state_wrt = .false.
 
         ! Bubble modeling
         bubbles_euler = .false.
@@ -829,8 +831,8 @@ contains
             integral(i)%xmax = dflt_real
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
+            integral(i)%zmin = dflt_real
+            integral(i)%zmax = dflt_real
         end do
 
         ! GRCBC flags
@@ -894,7 +896,7 @@ contains
             patch_ib(i)%model_spc = num_ray
             patch_ib(i)%model_threshold = ray_tracing_threshold
 
-            ! Variables to handle moving imersed boundaries, defaulting to no movement
+            ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
             patch_ib(i)%vel(:) = 0._wp
             patch_ib(i)%angles(:) = 0._wp
@@ -1230,8 +1232,8 @@ contains
         end if
 
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
-            allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
-            allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
+            allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
+            allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
         elseif (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
@@ -1247,7 +1249,7 @@ contains
             end do
         end if
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
-            do i = sys_size + 1, sys_size + 2*nb*4
+            do i = sys_size + 1, sys_size + 2*nb*nnode
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
