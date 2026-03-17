@@ -317,7 +317,7 @@ jobs:
       # --- NVHPC build + test ---
       - name: Build (NVHPC)
         if:   matrix.nvhpc
-        run:  /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all $GPU
+        run:  /bin/bash mfc.sh test -v --dry-run -j ${{ matrix.target == 'cpu' && '$(nproc)' || '2' }} --test-all $GPU
         env:
           GPU: ${{ matrix.target == 'gpu-acc' && '--gpu acc' || matrix.target == 'gpu-omp' && '--gpu mp' || '' }}
 
