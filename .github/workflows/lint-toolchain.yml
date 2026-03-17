@@ -17,8 +17,8 @@ jobs:
     - name: Initialize MFC
       run: ./mfc.sh init
 
-    - name: Lint and test the toolchain
-      run: ./mfc.sh lint
+    - name: Precheck (format, spelling, lint, source lint, docs)
+      run: ./mfc.sh precheck -j $(nproc)
 
     - name: Generate toolchain files
       run: ./mfc.sh generate

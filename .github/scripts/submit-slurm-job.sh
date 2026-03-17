@@ -200,5 +200,9 @@ echo "Submitted batch job $job_id"
 echo "$job_id" > "$id_file"
 echo "Job ID written to $id_file"
 
-# --- Monitor ---
-bash "$SCRIPT_DIR/run_monitored_slurm_job.sh" "$job_id" "$output_file"
+# --- Monitor (skip if SUBMIT_ONLY=1, e.g. for parallel submission) ---
+if [ "${SUBMIT_ONLY:-0}" = "1" ]; then
+    echo "SUBMIT_ONLY mode: skipping monitor (job_id=$job_id output=$output_file)"
+else
+    bash "$SCRIPT_DIR/run_monitored_slurm_job.sh" "$job_id" "$output_file"
+fi

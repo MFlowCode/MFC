@@ -1,27 +1,29 @@
-import os, yaml, typing, shutil, subprocess, logging
+import logging
+import os
+import shutil
+import subprocess
+import typing
+from os.path import abspath, dirname, join, normpath, realpath
 
-from os.path import join, abspath, normpath, dirname, realpath
+import yaml
 
 from .printer import cons
-
 
 # Debug logging infrastructure
 _debug_logger = None
 
+
 def setup_debug_logging(enabled: bool = False):
     """Setup debug logging for troubleshooting."""
-    global _debug_logger  # pylint: disable=global-statement
+    global _debug_logger  # noqa: PLW0603
     if enabled:
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='[DEBUG %(asctime)s] %(message)s',
-            datefmt='%H:%M:%S'
-        )
-        _debug_logger = logging.getLogger('mfc')
+        logging.basicConfig(level=logging.DEBUG, format="[DEBUG %(asctime)s] %(message)s", datefmt="%H:%M:%S")
+        _debug_logger = logging.getLogger("mfc")
         _debug_logger.setLevel(logging.DEBUG)
         cons.print("[dim]Debug logging enabled[/dim]")
     else:
         _debug_logger = None
+
 
 def debug(msg: str):
     """Log a debug message if debug logging is enabled."""
@@ -30,13 +32,13 @@ def debug(msg: str):
         cons.print(f"[dim][DEBUG][/dim] {msg}")
 
 
-MFC_ROOT_DIR       = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))
-MFC_TEST_DIR       = abspath(join(MFC_ROOT_DIR, "tests"))
-MFC_BUILD_DIR      = abspath(join(MFC_ROOT_DIR, "build"))
-MFC_TOOLCHAIN_DIR  = abspath(join(MFC_ROOT_DIR, "toolchain"))
+MFC_ROOT_DIR = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))
+MFC_TEST_DIR = abspath(join(MFC_ROOT_DIR, "tests"))
+MFC_BUILD_DIR = abspath(join(MFC_ROOT_DIR, "build"))
+MFC_TOOLCHAIN_DIR = abspath(join(MFC_ROOT_DIR, "toolchain"))
 MFC_EXAMPLE_DIRPATH = abspath(join(MFC_ROOT_DIR, "examples"))
-MFC_LOCK_FILEPATH  = abspath(join(MFC_BUILD_DIR, "lock.yaml"))
-MFC_TEMPLATE_DIR   = abspath(join(MFC_TOOLCHAIN_DIR, "templates"))
+MFC_LOCK_FILEPATH = abspath(join(MFC_BUILD_DIR, "lock.yaml"))
+MFC_TEMPLATE_DIR = abspath(join(MFC_TOOLCHAIN_DIR, "templates"))
 MFC_BENCH_FILEPATH = abspath(join(MFC_TOOLCHAIN_DIR, "bench.yaml"))
 MFC_MECHANISMS_DIR = abspath(join(MFC_TOOLCHAIN_DIR, "mechanisms"))
 
@@ -56,8 +58,9 @@ MFC_LOGO = """\
 class MFCException(Exception):
     pass
 
-def system(command: typing.List[str], print_cmd = None, **kwargs) -> subprocess.CompletedProcess:
-    cmd = [ str(x) for x in command if not isspace(str(x)) ]
+
+def system(command: typing.List[str], print_cmd=None, **kwargs) -> subprocess.CompletedProcess:
+    cmd = [str(x) for x in command if not isspace(str(x))]
 
     if print_cmd in [True, None]:
         cons.print(f"$ {' '.join(cmd)}")
@@ -127,12 +130,12 @@ def delete_directory(dirpath: str) -> None:
 
 
 def get_program_output(arguments: typing.List[str] = None, cwd=None):
-    with subprocess.Popen([ str(_) for _ in arguments ] or [], cwd=cwd, stdout=subprocess.PIPE) as proc:
+    with subprocess.Popen([str(_) for _ in arguments] or [], cwd=cwd, stdout=subprocess.PIPE) as proc:
         return (proc.communicate()[0].decode(), proc.returncode)
 
 
 def get_py_program_output(filepath: str, arguments: typing.List[str] = None):
-    dirpath  = os.path.abspath (os.path.dirname(filepath))
+    dirpath = os.path.abspath(os.path.dirname(filepath))
     filename = os.path.basename(filepath)
 
     return get_program_output(["python3", filename] + arguments, cwd=dirpath)
@@ -169,7 +172,7 @@ def format_list_to_string(arr: list, item_style=None, empty=None):
 
     pre, post = "", ""
     if item_style is not None:
-        pre  = f"[{item_style}]"
+        pre = f"[{item_style}]"
         post = f"[/{item_style}]"
 
     if len(arr) == 0:
@@ -181,7 +184,7 @@ def format_list_to_string(arr: list, item_style=None, empty=None):
     if len(arr) == 2:
         return f"{pre}{arr[0]}{post} and {pre}{arr[1]}{post}"
 
-    lhs = ', '.join([ f"{pre}{e}{post}" for e in arr[:-1]])
+    lhs = ", ".join([f"{pre}{e}{post}" for e in arr[:-1]])
     rhs = f", and {pre}{arr[-1]}{post}"
 
     return lhs + rhs
@@ -199,7 +202,6 @@ def find(predicate, arr: list):
     return None, None
 
 
-# pylint: disable=redefined-builtin
 def quit(sig):
     os.kill(os.getpid(), sig)
 
@@ -229,27 +231,26 @@ def is_number(x: str) -> bool:
 def get_cpuinfo():
     if does_command_exist("lscpu"):
         # Linux
-        with subprocess.Popen(['lscpu'], stdout=subprocess.PIPE, universal_newlines=True) as proc:
+        with subprocess.Popen(["lscpu"], stdout=subprocess.PIPE, universal_newlines=True) as proc:
             output = f"From lscpu\n{proc.communicate()[0]}"
     elif does_command_exist("sysctl"):
         # MacOS
-        with subprocess.Popen(['sysctl', '-a'], stdout=subprocess.PIPE) as proc1:
-            with subprocess.Popen(['grep', 'machdep.cpu'], stdin=proc1.stdout,
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                  universal_newlines=True) as proc2:
-                proc1.stdout.close() # Allow proc1 to receive a SIGPIPE if proc2 exits.
+        with subprocess.Popen(["sysctl", "-a"], stdout=subprocess.PIPE) as proc1:
+            with subprocess.Popen(["grep", "machdep.cpu"], stdin=proc1.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True) as proc2:
+                proc1.stdout.close()  # Allow proc1 to receive a SIGPIPE if proc2 exits.
                 output = f"From sysctl -a \n{proc2.communicate()[0]}"
     else:
         output = "No CPU info found"
 
     return f"CPU Info:\n{output}"
 
+
 def generate_git_tagline() -> str:
     if not does_command_exist("git"):
         return "Could not find git"
 
-    rev    = system(["git", "rev-parse",                 "HEAD"], print_cmd=False, stdout=subprocess.PIPE).stdout.decode().strip()
+    rev = system(["git", "rev-parse", "HEAD"], print_cmd=False, stdout=subprocess.PIPE).stdout.decode().strip()
     branch = system(["git", "rev-parse", "--abbrev-ref", "HEAD"], print_cmd=False, stdout=subprocess.PIPE).stdout.decode().strip()
-    dirty  = "dirty" if system(["git", "diff", "--quiet"], print_cmd=False).returncode != 0 else "clean"
+    dirty = "dirty" if system(["git", "diff", "--quiet"], print_cmd=False).returncode != 0 else "clean"
 
     return f"{rev} on {branch} ({dirty})"

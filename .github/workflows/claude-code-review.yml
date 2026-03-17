@@ -2,10 +2,31 @@ name: Claude Code Review
 
 on:
   pull_request_target:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize, ready_for_review, reopened, labeled]
+  issue_comment:
+    types: [created]
 
 jobs:
   claude-review:
+    if: >
+      (
+        github.event_name == 'pull_request_target' &&
+        (
+          github.event.action == 'opened' ||
+          github.event.action == 'ready_for_review' ||
+          github.event.action == 'reopened' ||
+          github.event.action == 'synchronize' ||
+          (
+            github.event.action == 'labeled' &&
+            github.event.label.name == 'claude-full-review'
+          )
+        )
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        contains(github.event.comment.body, '@claude full review')
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,11 +41,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip
 
-      # IMPORTANT: checkout BASE repo only (safe on forks)
+      # Base checkout only
       - name: Checkout base repo (safe)
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Determine PR number and review mode
+        id: mode
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            if [[ "${{ github.event.action }}" == "opened" || "${{ github.event.action }}" == "ready_for_review" || "${{ github.event.action }}" == "reopened" ]]; then
+              REVIEW_MODE="full"
+            elif [[ "${{ github.event.action }}" == "synchronize" ]]; then
+              REVIEW_MODE="incremental"
+            elif [[ "${{ github.event.action }}" == "labeled" && "${{ github.event.label.name }}" == "claude-full-review" ]]; then
+              REVIEW_MODE="full"
+            else
+              REVIEW_MODE="full"
+            fi
+          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+            REVIEW_MODE="full"
+          else
+            REVIEW_MODE="full"
+          fi
+
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "review_mode=${REVIEW_MODE:-full}" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
@@ -35,8 +81,6 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
 
-          # NOTE: do NOT use --dangerouslyDisableSandbox (it can crash the CLI).
-          # This flag is for non-interactive CI runs (bypasses approval prompts).
           claude_args: >
             --dangerously-skip-permissions
             --max-turns 90
@@ -44,7 +88,11 @@ jobs:
             "Bash"
 
           prompt: |
-            You are running in pull_request_target.
+            You are running in pull_request_target / issue_comment automation.
+
+            REVIEW MODE: ${{ steps.mode.outputs.review_mode }}
+            PR NUMBER: ${{ steps.mode.outputs.pr_number }}
+
             DO NOT read or inspect any checked-out PR/fork code. Review ONLY using GitHub API/gh commands.
 
             You may read local guidance ONLY from:
@@ -52,19 +100,81 @@ jobs:
             - ./.claude/rules/*.md if present (max 10 files)
 
             Keep tool calls minimal and in this order:
+
+            Phase 1 — Local guidance (base branch only, safe):
             1) ls -1 .claude/rules 2>/dev/null || true
             2) cat CLAUDE.md 2>/dev/null || true
             3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
-            4) gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid
-            5) gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
-            6) Post ONE top-level PR comment titled "Claude Code Review", then STOP.
 
-            Output format:
-            - Head SHA
-            - Files changed count + list up to 10 file paths
-            - Summary (3–6 bullets, minimal)
-            - Findings with file + line numbers when possible
-            - If no issues: 0–3 improvement opportunities (only if confident)
+            Phase 2 — PR metadata and diff:
+            4) gh pr view ${{ steps.mode.outputs.pr_number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid,comments
+            5) gh pr diff ${{ steps.mode.outputs.pr_number }} --repo ${{ github.repository }}
+
+            Phase 3 — Full file context (read via GitHub API, NOT local checkout):
+            After reviewing the diff, fetch full contents of changed files to understand
+            surrounding context. This is critical for catching issues the diff alone hides
+            (e.g., duplicate code, broken callers, missing cleanup, variable shadowing).
+
+            Use this pattern to fetch file contents at the PR head SHA:
+              gh api repos/${{ github.repository }}/contents/{path}?ref={head_sha} --jq '.content' | base64 -d
+
+            Rules for Phase 3:
+            - Get the head SHA from step 4's headRefOid field.
+            - Fetch up to 15 changed files (skip files >500 lines or binary files).
+            - Prioritize: source code (.fpp, .f90, .py, .yml) over docs/config.
+            - For Fortran/Fypp files: also fetch files that the changed file imports
+              (look for "use m_<name>" or "#:include" in the fetched content) if they
+              seem relevant to the review. Limit to 5 additional related files.
+            - Do NOT fetch files that are unchanged and unrelated to the diff.
+            - If a file fetch fails (404, too large), skip it and continue.
+
+            Review policy:
+            - FULL mode:
+              - Review the current PR normally.
+              - Post or update ONE top-level PR comment titled "Claude Code Review".
+            - INCREMENTAL mode:
+              - Find the most recent prior Claude review comment on this PR.
+              - Look for a hidden marker in the form:
+                <!-- claude-review: reviewed_sha=<sha>; mode=<mode> -->
+              - Compare the prior reviewed SHA to the current head SHA.
+              - Review ONLY for newly introduced issues since the previous Claude-reviewed SHA.
+              - DO NOT repeat earlier findings.
+              - DO NOT restate the full PR summary.
+              - If there are no new high-confidence findings, DO NOT post a new comment. STOP.
+              - If there are new findings, update the existing Claude review comment if possible; otherwise post one new top-level comment.
+
+            Re-review policy:
+            - A full review is explicitly requested only when:
+              - the workflow was triggered by PR label "claude-full-review", or
+              - the workflow was triggered by an issue comment containing "@claude full review"
+
+            Output format for FULL mode:
+            Claude Code Review
+
+            Head SHA: <sha>
+
+            Files changed:
+            - <count>
+            - <up to 10 paths>
+
+            Summary:
+            - <3-6 minimal bullets>
+
+            Findings:
+            - <file + line numbers when possible>
+            - <minimal, high-confidence only>
+
+            Output format for INCREMENTAL mode:
+            Claude Code Review
+
+            Incremental review from: <previous_sha>
+            Head SHA: <current_sha>
+
+            New findings since last Claude review:
+            - <only genuinely new issues, file + line numbers when possible>
+
+            When posting a comment, include this hidden marker at the end:
+            <!-- claude-review: reviewed_sha=<current_head_sha>; mode=${{ steps.mode.outputs.review_mode }} -->
 
             If posting is blocked, write the full review to the GitHub Actions job summary instead, then STOP.
 

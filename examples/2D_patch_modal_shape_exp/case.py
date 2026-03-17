@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Minimal 2D acoustic case with geometry 13 in exponential form (modal_use_exp_form)."""
-import math
+
 import json
+import math
 
 Nx, Ny = 64, 64
 Lx = 8.0
