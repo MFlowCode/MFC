@@ -134,7 +134,7 @@ def find_gcno_files(root_dir: str) -> list:
     return gcno_files
 
 
-def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
+def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> Optional[set]:
     """
     Parse gcov JSON output and return the set of .fpp file paths with coverage.
     Handles both gzip-compressed (gcov 13+) and raw JSON (gcov 12) formats.
