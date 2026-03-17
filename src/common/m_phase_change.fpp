@@ -754,6 +754,7 @@ contains
                 ! updating saturation temperature
                 TSat = TSat - Om*FT/dFdT
 
+                if (abs(FT) <= ptgalpha_eps) exit
             end do
 
         end if

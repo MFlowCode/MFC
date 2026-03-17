@@ -583,11 +583,17 @@ contains
 
     end function f_model_is_inside
 
-    !> This procedure, given a cell center will determine if a point exists instide a surface
-    !! @param ntrs     Number of triangles in the model
-    !! @param pid      Patch ID od this model
+    !> This procedure determines if a point is inside a surface using
+    !! the generalized winding number (Jacobson et al., SIGGRAPH 2013).
+    !! In 3D, sums the solid angle subtended by each triangle (Van
+    !! Oosterom-Strackee formula). In 2D (p==0), sums the signed
+    !! angle subtended by each boundary edge. Returns ~1.0 inside,
+    !! ~0.0 outside. Unlike ray casting, this is robust to small
+    !! triangles/edges and vertex winding order.
+    !! @param ntrs     Number of triangles in the model.
+    !! @param pid      Patch ID of this model.
     !! @param point    Point to test.
-    !! @return fraction The perfentage of candidate rays cast indicate that we are inside the model
+    !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
     function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -597,52 +603,76 @@ contains
         real(wp), dimension(1:3), intent(in) :: point
 
         real(wp) :: fraction
-        type(t_ray) :: ray
-        type(t_triangle) :: tri
-        integer :: i, j, k, q, nInOrOut, nHits
 
-        ! cast 26 rays from the point and count the number at leave the boundary
-        nInOrOut = 0
-        do i = -1, 1
-            do j = -1, 1
-                do k = -1, 1
-                    if (i /= 0 .or. j /= 0 .or. k /= 0) then
-                        ! We cannot get inersections if the ray is exactly in line with triangle plane
-                        if (p == 0 .and. k == 0) cycle
+        real(wp) :: r1(3), r2(3), r3(3)
+        real(wp) :: r1_mag, r2_mag, r3_mag
+        real(wp) :: numerator, denominator
+        real(wp) :: d1(2), d2(2)
+        integer :: q
 
-                        ! generate the ray
-                        ray%o = point
-                        ray%d(:) = [real(i, wp), real(j, wp), real(k, wp)]
-                        ray%d = ray%d/sqrt(real(abs(i) + abs(j) + abs(k), wp))
-
-                        ! count the number of intersections
-                        nHits = 0
-                        do q = 1, ntrs
-                            tri%v(:, :) = gpu_trs_v(:, :, q, pid)
-                            tri%n(1:3) = gpu_trs_n(1:3, q, pid)
-                            nHits = nHits + f_intersects_triangle(ray, tri)
-                        end do
-                        ! if the ray intersected an odd number of times, we must be inside
-                        nInOrOut = nInOrOut + mod(nHits, 2)
-                    end if
-                end do
-            end do
-        end do
+        fraction = 0.0_wp
 
         if (p == 0) then
-            ! in 2D, we skipped 8 rays
-            fraction = real(nInOrOut)/18._wp
+            ! 2D winding number: sum signed angles subtended by
+            ! each boundary edge at the query point.
+            do q = 1, gpu_boundary_edge_count(pid)
+                d1(1) = gpu_boundary_v(q, 1, 1, pid) - point(1)
+                d1(2) = gpu_boundary_v(q, 1, 2, pid) - point(2)
+                d2(1) = gpu_boundary_v(q, 2, 1, pid) - point(1)
+                d2(2) = gpu_boundary_v(q, 2, 2, pid) - point(2)
+
+                ! Signed angle = atan2(d1 x d2, d1 . d2)
+                fraction = fraction + atan2( &
+                           d1(1)*d2(2) - d1(2)*d2(1), &
+                           d1(1)*d2(1) + d1(2)*d2(2))
+            end do
+
+            ! 2D winding number = total angle / (2*pi)
+            fraction = fraction/(2.0_wp*acos(-1.0_wp))
         else
-            fraction = real(nInOrOut)/26._wp
+            ! 3D winding number: sum solid angles via Van
+            ! Oosterom-Strackee formula.
+            do q = 1, ntrs
+                r1 = gpu_trs_v(1, :, q, pid) - point
+                r2 = gpu_trs_v(2, :, q, pid) - point
+                r3 = gpu_trs_v(3, :, q, pid) - point
+
+                r1_mag = sqrt(dot_product(r1, r1))
+                r2_mag = sqrt(dot_product(r2, r2))
+                r3_mag = sqrt(dot_product(r3, r3))
+
+                ! Skip if query point is coincident with a vertex
+                ! (magnitudes are zero/subnormal).
+                if (r1_mag*r2_mag*r3_mag < tiny(1.0_wp)) cycle
+
+                ! tan(Omega/2) = numerator / denominator
+                ! numerator = scalar triple product r1 . (r2 x r3)
+                numerator = r1(1)*(r2(2)*r3(3) - r2(3)*r3(2)) &
+                            + r1(2)*(r2(3)*r3(1) - r2(1)*r3(3)) &
+                            + r1(3)*(r2(1)*r3(2) - r2(2)*r3(1))
+
+                denominator = r1_mag*r2_mag*r3_mag &
+                              + dot_product(r1, r2)*r3_mag &
+                              + dot_product(r2, r3)*r1_mag &
+                              + dot_product(r3, r1)*r2_mag
+
+                fraction = fraction + atan2(numerator, denominator)
+            end do
+
+            ! Each atan2 returns Omega/2 per triangle; divide
+            ! by 2*pi to get winding number = sum(Omega)/(4*pi).
+            fraction = fraction/(2.0_wp*acos(-1.0_wp))
         end if
 
     end function f_model_is_inside_flat
 
-    ! From https://www.scratchapixel.com/lessons/3e-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
-    !> This procedure checks if a ray intersects a triangle.
+    !> This procedure checks if a ray intersects a triangle using the
+    !! Moller-Trumbore algorithm (barycentric coordinates). Unlike the
+    !! previous cross-product sign test, this is vertex winding-order
+    !! independent.
     !! @param ray      Ray.
     !! @param triangle Triangle.
-    !! @return         True if the ray intersects the triangle, false otherwise.
+    !! @return         1 if the ray intersects the triangle, 0 otherwise.
     function f_intersects_triangle(ray, triangle) result(intersects)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -652,46 +682,34 @@ contains
 
         integer :: intersects
 
-        real(wp) :: N(3), P(3), C(3), edge(3), vp(3)
-        real(wp) :: d, t, NdotRayDirection
+        real(wp) :: edge1(3), edge2(3), h(3), s(3), q(3)
+        real(wp) :: a, f, u, v, t
 
         intersects = 0
 
-        N(1:3) = triangle%n(1:3)
-        NdotRayDirection = dot_product(N(1:3), ray%d(1:3))
-        if (abs(NdotRayDirection) < 0.0000001_wp) then
-            return
-        end if
+        edge1 = triangle%v(2, :) - triangle%v(1, :)
+        edge2 = triangle%v(3, :) - triangle%v(1, :)
+        h = f_cross(ray%d, edge2)
+        a = dot_product(edge1, h)
 
-        d = -sum(N(:)*triangle%v(1, :))
-        t = -(sum(N(:)*ray%o(:)) + d)/NdotRayDirection
-        if (t < 0) then
-            return
-        end if
+        ! Ray nearly parallel to triangle plane. In single precision
+        ! builds epsilon(1.0) ~ 1.2e-7, so use 10*epsilon as a floor.
+        if (abs(a) < max(1e-7_wp, 10.0_wp*epsilon(1.0_wp))) return
 
-        P = ray%o + t*ray%d
-        edge = triangle%v(2, :) - triangle%v(1, :)
-        vp = P - triangle%v(1, :)
-        C = f_cross(edge, vp)
-        if (sum(N(:)*C(:)) < 0) then
-            return
-        end if
+        f = 1.0_wp/a
+        s = ray%o - triangle%v(1, :)
+        u = f*dot_product(s, h)
 
-        edge = triangle%v(3, :) - triangle%v(2, :)
-        vp = P - triangle%v(2, :)
-        C = f_cross(edge, vp)
-        if (sum(N(:)*C(:)) < 0) then
-            return
-        end if
+        if (u < 0.0_wp .or. u > 1.0_wp) return
 
-        edge = triangle%v(1, :) - triangle%v(3, :)
-        vp = P - triangle%v(3, :)
-        C = f_cross(edge, vp)
-        if (sum(N(:)*C(:)) < 0) then
-            return
-        end if
+        q = f_cross(s, edge1)
+        v = f*dot_product(ray%d, q)
 
-        intersects = 1
+        if (v < 0.0_wp .or. u + v > 1.0_wp) return
+
+        t = f*dot_product(edge2, q)
+
+        if (t > 0.0_wp) intersects = 1
 
     end function f_intersects_triangle
 

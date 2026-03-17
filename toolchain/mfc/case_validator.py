@@ -558,9 +558,12 @@ class CaseValidator:
         n = self.get("n", 0)
         num_ibs = self.get("num_ibs", 0)
 
+        ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
+
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
         self.prohibit(ib and (num_ibs <= 0 or num_ibs > 1000), "num_ibs must be between 1 and num_patches_max (1000)")
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
+        self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
@@ -825,6 +828,10 @@ class CaseValidator:
 
             # Check Re(1) requirement
             self.prohibit(Re1 is None and viscous, f"viscous is set to true, but fluid_pp({i})%Re(1) is not specified")
+
+        # weno_Re_flux requires viscous
+        weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
+        self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
 
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""
