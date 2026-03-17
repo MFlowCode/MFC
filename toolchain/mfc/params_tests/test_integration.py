@@ -129,12 +129,19 @@ class TestCaseDictsIntegration(unittest.TestCase):
         # ALL should be populated
         self.assertIsNotNone(case_dicts.ALL)
 
-    def test_case_dicts_all_contains_all_params(self):
-        """case_dicts.ALL should contain all registry params."""
+    def test_case_dicts_all_contains_registry_params(self):
+        """case_dicts.ALL should recognize all registry params."""
         from ..run import case_dicts
 
-        # ALL should have approximately the same params as registry
-        self.assertEqual(len(case_dicts.ALL), len(REGISTRY.all_params))
+        # ALL should contain scalar params and family params
+        self.assertIn("m", case_dicts.ALL)
+        self.assertIn("model_eqns", case_dicts.ALL)
+        # Family params should also be recognized via pattern matching
+        self.assertIn("patch_ib(1)%geometry", case_dicts.ALL)
+        self.assertIn("patch_ib(500)%radius", case_dicts.ALL)
+        # Out-of-range index or bogus attr should not match
+        self.assertNotIn("nonexistent_param", case_dicts.ALL)
+        self.assertNotIn("patch_ib(1)%bogus_attr", case_dicts.ALL)
 
     def test_case_optimization_params_from_registry(self):
         """CASE_OPTIMIZATION should be populated from registry."""
@@ -172,19 +179,13 @@ class TestCaseDictsIntegration(unittest.TestCase):
         self.assertTrue(callable(validator))
 
     def test_get_input_dict_keys(self):
-        """get_input_dict_keys should return target-specific params."""
+        """get_input_dict_keys should return target-aware set supporting 'in'."""
         from ..run import case_dicts
 
-        # Each target gets a filtered subset of params based on Fortran namelists
+        # Each target gets a set-like object that checks base name against namelists
         pre_keys = case_dicts.get_input_dict_keys("pre_process")
         sim_keys = case_dicts.get_input_dict_keys("simulation")
         post_keys = case_dicts.get_input_dict_keys("post_process")
-
-        # pre_process has most params (includes patch_icpp, patch_bc)
-        self.assertGreater(len(pre_keys), 2500)
-        # simulation and post_process have fewer (no patch_icpp, etc.)
-        self.assertGreater(len(sim_keys), 500)
-        self.assertGreater(len(post_keys), 400)
 
         # Verify target-specific filtering based on Fortran namelists
         self.assertIn("num_patches", pre_keys)
@@ -196,10 +197,12 @@ class TestCaseDictsIntegration(unittest.TestCase):
         self.assertNotIn("run_time_info", post_keys)
 
         # Verify indexed params are filtered correctly
-        patch_icpp_pre = [k for k in pre_keys if k.startswith("patch_icpp")]
-        patch_icpp_sim = [k for k in sim_keys if k.startswith("patch_icpp")]
-        self.assertGreater(len(patch_icpp_pre), 1000)  # Many patch_icpp params
-        self.assertEqual(len(patch_icpp_sim), 0)  # None in simulation
+        self.assertIn("patch_icpp(1)%geometry", pre_keys)
+        self.assertNotIn("patch_icpp(1)%geometry", sim_keys)
+
+        # Verify family params (patch_ib) work for simulation target
+        self.assertIn("patch_ib(1)%geometry", sim_keys)
+        self.assertIn("patch_ib(500)%radius", sim_keys)
 
         # Verify shared params are in all targets
         self.assertIn("m", pre_keys)

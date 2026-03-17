@@ -115,7 +115,7 @@ class TestGlobalRegistry(unittest.TestCase):
         """Global REGISTRY should have parameters loaded."""
         from ..params import REGISTRY
 
-        self.assertGreater(len(REGISTRY.all_params), 3500)
+        self.assertGreater(len(REGISTRY.all_params), 3000)
 
     def test_global_registry_cannot_be_modified(self):
         """Global REGISTRY should reject new registrations."""

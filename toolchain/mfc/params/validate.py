@@ -60,7 +60,7 @@ def check_unknown_params(params: Dict[str, Any]) -> List[str]:
     errors = []
 
     for name in params.keys():
-        if name not in REGISTRY.all_params:
+        if not REGISTRY.is_known_param(name):
             suggestions = suggest_parameter(name)
             errors.append(unknown_param_error(name, suggestions))
 
@@ -80,7 +80,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     errors = []
 
     for name, value in params.items():
-        param_def = REGISTRY.all_params.get(name)
+        param_def = REGISTRY.get_param_def(name)
         if param_def is None:
             continue  # Unknown params handled by check_unknown_params
 
@@ -150,7 +150,7 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:
     warnings = []
 
     for name, value in params.items():
-        param_def = REGISTRY.all_params.get(name)
+        param_def = REGISTRY.get_param_def(name)
         if param_def is None or param_def.dependencies is None:
             continue
 
