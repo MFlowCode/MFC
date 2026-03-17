@@ -2,8 +2,6 @@
 
 Checks for patterns that indicate copy-paste bugs, non-standard constructs,
 and hardcoded assumptions that break under different build configurations.
-Consolidates all source lint checks (previously split between grep one-liners
-and this script) into a single entry point.
 """
 
 from __future__ import annotations
@@ -155,6 +153,8 @@ def check_raw_directives(repo_root: Path) -> list[str]:
     """Flag raw OpenACC/OpenMP directives outside of macro definition files.
 
     All GPU directives must use the GPU_* Fypp macros from parallel_macros.fpp.
+    Note: directives like !$acc start with '!' so they look like Fortran comments.
+    We must NOT use _is_comment_or_blank here, and must search the full line.
     """
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
@@ -168,9 +168,9 @@ def check_raw_directives(repo_root: Path) -> list[str]:
 
         for i, line in enumerate(lines):
             stripped = line.strip()
-            if _is_comment_or_blank(stripped):
+            if not stripped or stripped.startswith("#:"):
                 continue
-            if directive_re.search(stripped.split("!")[0]):
+            if directive_re.search(stripped):
                 errors.append(f"  {rel}:{i + 1} raw OpenACC/OpenMP directive. Fix: use GPU_* Fypp macros instead")
 
     return errors
@@ -188,7 +188,7 @@ def check_double_precision(repo_root: Path) -> list[str]:
         r"\b(?:double_precision|double\s+precision|dsqrt|dexp|dlog|dble|dabs|"
         r"dprod|dmin|dmax|dfloat|dreal|dcos|dsin|dtan|dsign|dtanh|dsinh|dcosh)\b|"
         r"\breal\s*\(\s*[48]\s*\)|"
-        r"\dd0\b",
+        r"[0-9]d0",
         re.IGNORECASE,
     )
 
