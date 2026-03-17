@@ -13,9 +13,7 @@ Then run `./mfc.sh generate` to update completions.
 
 from .schema import ArgAction, Argument, CLISchema, Command, CommonArgumentSet, Completion, CompletionType, Example, MutuallyExclusiveGroup, Positional
 
-# =============================================================================
 # CONSTANTS (shared with other modules)
-# =============================================================================
 
 TARGET_NAMES = ["fftw", "hdf5", "silo", "lapack", "hipfort", "pre_process", "simulation", "post_process", "syscheck", "documentation"]
 
@@ -30,9 +28,7 @@ ENGINE_OPTIONS = ["interactive", "batch"]
 MPI_BINARIES = ["mpirun", "jsrun", "srun", "mpiexec"]
 
 
-# =============================================================================
 # COMMON ARGUMENT SETS
-# =============================================================================
 
 COMMON_TARGETS = CommonArgumentSet(
     name="targets",
@@ -114,9 +110,7 @@ COMMON_MFC_CONFIG = CommonArgumentSet(
 )
 
 
-# =============================================================================
 # COMMAND DEFINITIONS
-# =============================================================================
 
 BUILD_COMMAND = Command(
     name="build",
@@ -1265,9 +1259,7 @@ PARAMS_COMMAND = Command(
 )
 
 
-# =============================================================================
 # HELP TOPICS
-# =============================================================================
 
 HELP_TOPICS = {
     "gpu": {
@@ -1289,9 +1281,7 @@ HELP_TOPICS = {
 }
 
 
-# =============================================================================
 # COMPLETE CLI SCHEMA
-# =============================================================================
 
 MFC_CLI_SCHEMA = CLISchema(
     prog="./mfc.sh",
@@ -1344,9 +1334,7 @@ started, run `./mfc.sh build -h`.""",
 )
 
 
-# =============================================================================
 # DERIVED DATA (for use by other modules)
-# =============================================================================
 
 # Command aliases mapping (replaces COMMAND_ALIASES in user_guide.py)
 COMMAND_ALIASES = {}

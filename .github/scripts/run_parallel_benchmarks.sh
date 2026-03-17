@@ -20,9 +20,9 @@ cluster="$3"
 # Get the directory where this script lives (pr/.github/scripts/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "=========================================="
+echo "===================="
 echo "Starting benchmark jobs..."
-echo "=========================================="
+echo "===================="
 
 # For Phoenix GPU benchmarks, select a consistent GPU partition so PR and
 # master always land on the same GPU type.
@@ -82,9 +82,9 @@ if [ "${pr_exit}" -ne 0 ] || [ "${master_exit}" -ne 0 ]; then
     echo "WARNING: Benchmark jobs had failures: pr=${pr_exit}, master=${master_exit}"
     echo "Checking for partial results..."
 else
-    echo "=========================================="
+    echo "===================="
     echo "Both benchmark jobs completed successfully!"
-    echo "=========================================="
+    echo "===================="
 fi
 
 pr_yaml="pr/${job_slug}.yaml"

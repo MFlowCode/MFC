@@ -41,9 +41,7 @@ try:
 except (ImportError, OSError):
     _tj = None
 
-# ---------------------------------------------------------------------------
 # Fast PNG generation via 256-entry colormap LUT
-# ---------------------------------------------------------------------------
 
 # Both caches grow to at most one entry per named colormap (~10 entries max).
 # Concurrent writes are benign: both threads produce identical data for the
@@ -436,14 +434,11 @@ def _get_cached_3d_mesh(
         return _mesh3_cache.get(key)
 
 
-# ---------------------------------------------------------------------------
 
 # (PyVista code removed — server-side rendering uses kaleido on Linux)
 
 
-# ---------------------------------------------------------------------------
 # Colormaps available in the picker
-# ---------------------------------------------------------------------------
 _CMAPS = [
     "viridis",
     "plasma",
@@ -494,9 +489,7 @@ _CMAPS = [
     "Wistia",
 ]
 
-# ---------------------------------------------------------------------------
 # Catppuccin Mocha palette
-# ---------------------------------------------------------------------------
 _BG = "#181825"
 _SURF = "#1e1e2e"
 _OVER = "#313244"
@@ -511,16 +504,12 @@ _BLUE = "#89b4fa"
 _TEAL = "#94e2d5"
 _YELLOW = "#f9e2af"
 
-# ---------------------------------------------------------------------------
 # Server-side data cache  {step -> AssembledData}  (bounded to avoid OOM)
-# ---------------------------------------------------------------------------
 _load = _step_cache.load
 _CACHE_MAX = _step_cache.CACHE_MAX
 
 
-# ---------------------------------------------------------------------------
 # Layout helpers
-# ---------------------------------------------------------------------------
 
 
 def _section(title, *children):
@@ -609,9 +598,7 @@ def _num(sid, placeholder="auto"):
     )
 
 
-# ---------------------------------------------------------------------------
 # 3D figure builder
-# ---------------------------------------------------------------------------
 
 
 def _make_cbar(title_text: str, cmin: float, cmax: float, n: int = 6) -> dict:
@@ -855,9 +842,7 @@ def _build_3d(
     return trace, title
 
 
-# ---------------------------------------------------------------------------
 # Kaleido server-side Plotly rendering (fast playback for 3D)
-# ---------------------------------------------------------------------------
 
 
 def _kaleido_available() -> bool:
@@ -888,9 +873,7 @@ def _kaleido_render(
     return f"data:image/jpeg;base64,{b64}"
 
 
-# ---------------------------------------------------------------------------
 # Contour overlay helpers
-# ---------------------------------------------------------------------------
 
 
 def _interp_indices(indices, coords):
@@ -993,9 +976,7 @@ def _compute_contour_traces_3d(
     return traces
 
 
-# ---------------------------------------------------------------------------
 # Main entry point
-# ---------------------------------------------------------------------------
 
 
 def run_interactive(
@@ -1123,9 +1104,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         mode_opts = [{"label": "  Line", "value": "line"}]
     default_mode = mode_opts[0]["value"]
 
-    # ------------------------------------------------------------------
     # Sidebar layout
-    # ------------------------------------------------------------------
     sidebar = html.Div(
         [
             # Header
@@ -1506,9 +1485,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         },
     )
 
-    # ------------------------------------------------------------------
     # Callbacks
-    # ------------------------------------------------------------------
 
     # Playback flag — set by _toggle_play, read by _update.
     # Avoids adding State('playing-st') to _update (which triggers Dash 4
@@ -1891,14 +1868,12 @@ input[type=radio] + span, label { color: %(tx)s !important; }
 
         _t_prep = time.perf_counter()
 
-        # ----------------------------------------------------------------------
         # Kaleido server-side rendering for 3D during playback (Linux only).
         # Builds the exact same Plotly figure as the interactive path but
         # renders it to JPEG on the server via kaleido, bypassing the
         # JSON serialization → SSH → browser WebGL round-trip.
         # Only active during playback; static views use Plotly for
         # interactive rotation and hover.
-        # ----------------------------------------------------------------------
         global _KALEIDO_OK  # noqa: PLW0603
         if _KALEIDO_OK is None:
             _KALEIDO_OK = _kaleido_available()
@@ -2016,13 +1991,11 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         title = ""
 
         if ad.ndim == 3:
-            # ------------------------------------------------------------------
             # 3D Patch() fast path: on step / vmin / vmax changes only update
             # the data arrays without rebuilding the full figure.  Slice mode
             # also patches surfacecolor; iso/vol patch value + thresholds.
             # Colormap, variable, mode, and axis changes always trigger a full
             # render because they require new coordinate arrays or trace types.
-            # ------------------------------------------------------------------
             _has_overlay_3d = overlay_var and overlay_var != "__none__"
             _trig3 = {t.get("prop_id", "") for t in (callback_context.triggered or [])}
             _PT_BASE = {"step-sel.data", "vmin-inp.value", "vmax-inp.value"}
@@ -2673,7 +2646,6 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         _min_frame_gap[0] = max(0.8, min(3.0, _server_s + 0.7))
         return fig, status, no_update, _SRV_HIDE, _GRAPH_SHOW
 
-    # ------------------------------------------------------------------
     cons.print(f"\n[bold green]Interactive viz server:[/bold green] [bold]http://{host}:{port}[/bold]")
     if host in ("127.0.0.1", "localhost"):
         cons.print(

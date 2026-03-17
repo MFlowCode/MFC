@@ -489,9 +489,7 @@ def assemble(case_dir: str, step: int, fmt: str = "binary", var: Optional[str] =
     return assemble_from_proc_data(proc_data)
 
 
-# ---------------------------------------------------------------------------
 # Lagrange bubble position reader
-# ---------------------------------------------------------------------------
 
 
 @lru_cache(maxsize=32)

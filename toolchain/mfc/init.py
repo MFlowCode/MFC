@@ -22,9 +22,7 @@ Usage:
 import math
 import json
 
-# =============================================================================
 # SIMULATION PARAMETERS - Modify these for your case
-# =============================================================================
 
 # Grid resolution
 Nx = 399                    # Number of cells in x-direction
@@ -50,15 +48,11 @@ pres_R = 0.1                # Pressure
 # Fluid properties
 gamma = 1.4                 # Ratio of specific heats
 
-# =============================================================================
 # DERIVED QUANTITIES - Usually don't need to modify
-# =============================================================================
 dx = (x_end - x_start) / (Nx + 1)
 dt = t_end / Nt
 
-# =============================================================================
 # CASE DICTIONARY - MFC configuration
-# =============================================================================
 print(json.dumps({
     # Logistics
     "run_time_info": "T",
@@ -132,9 +126,7 @@ Usage:
 import math
 import json
 
-# =============================================================================
 # SIMULATION PARAMETERS - Modify these for your case
-# =============================================================================
 
 # Grid resolution
 Nx = 99                     # Cells in x-direction
@@ -164,9 +156,7 @@ pres_pert = 2.0e5
 # Fluid properties
 gamma = 1.4
 
-# =============================================================================
 # CASE DICTIONARY - MFC configuration
-# =============================================================================
 print(json.dumps({
     # Logistics
     "run_time_info": "T",
@@ -250,9 +240,7 @@ Usage:
 import math
 import json
 
-# =============================================================================
 # SIMULATION PARAMETERS - Modify these for your case
-# =============================================================================
 
 # Grid resolution (keep low for testing, increase for production)
 Nx = 49                     # Cells in x-direction
@@ -283,9 +271,7 @@ pres_pert = 2.0e5
 # Fluid properties
 gamma = 1.4
 
-# =============================================================================
 # CASE DICTIONARY - MFC configuration
-# =============================================================================
 print(json.dumps({
     # Logistics
     "run_time_info": "T",
