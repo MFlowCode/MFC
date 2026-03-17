@@ -434,7 +434,6 @@ def _get_cached_3d_mesh(
         return _mesh3_cache.get(key)
 
 
-
 # (PyVista code removed — server-side rendering uses kaleido on Linux)
 
 
