@@ -56,9 +56,7 @@ def generate_constraint_tests() -> List[ConstraintTest]:
     """Generate test cases for each constraint in case_validator.py."""
     tests = []
 
-    # ===================================================================
     # check_simulation_domain constraints
-    # ===================================================================
     tests.extend(
         [
             ConstraintTest(
@@ -113,9 +111,7 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
-    # ===================================================================
     # check_model_eqns_and_num_fluids constraints
-    # ===================================================================
     tests.extend(
         [
             ConstraintTest(
@@ -149,9 +145,7 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
-    # ===================================================================
     # check_time_stepping constraints
-    # ===================================================================
     tests.extend(
         [
             ConstraintTest(
@@ -178,9 +172,7 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
-    # ===================================================================
     # check_weno constraints
-    # ===================================================================
     tests.extend(
         [
             ConstraintTest(
@@ -200,9 +192,7 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
-    # ===================================================================
     # check_boundary_conditions constraints
-    # ===================================================================
     tests.extend(
         [
             ConstraintTest(
@@ -222,9 +212,7 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
-    # ===================================================================
     # check_bubbles constraints
-    # ===================================================================
     bubble_case = {**BASE_CASE, "bubbles_euler": "T", "bubble_model": 2, "nb": 1}
     tests.extend(
         [
@@ -238,9 +226,7 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
-    # ===================================================================
     # check_acoustic_source constraints (the biggest method)
-    # ===================================================================
     tests.extend(
         [
             ConstraintTest(

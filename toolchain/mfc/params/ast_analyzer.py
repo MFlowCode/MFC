@@ -16,9 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-# ---------------------------------------------------------------------------
 # Data structures
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -32,9 +30,7 @@ class Rule:
     severity: str = "error"  # "error" (prohibit) or "warning" (warn)
 
 
-# ---------------------------------------------------------------------------
 # F-string message extraction
-# ---------------------------------------------------------------------------
 
 
 def _extract_message(node: ast.AST) -> Optional[str]:
@@ -99,9 +95,7 @@ def _is_self_get(call: ast.Call) -> bool:
     return isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name) and call.func.value.id == "self" and call.func.attr == "get" and bool(call.args)
 
 
-# ---------------------------------------------------------------------------
 # AST analysis: methods, call graph, rules
-# ---------------------------------------------------------------------------
 
 
 class CaseValidatorAnalyzer(ast.NodeVisitor):
@@ -134,7 +128,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
         # Line numbers of prohibit/warn calls handled by loop expansion (skip in visit_Call)
         self._expanded_prohibit_lines: Set[int] = set()
 
-    # --- top-level entrypoint ---
+    # top-level entrypoint
 
     def visit_ClassDef(self, node: ast.ClassDef):
         if node.name == "CaseValidator":
@@ -150,7 +144,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
         else:
             self.generic_visit(node)
 
-    # --- per-method analysis ---
+    # per-method analysis
 
     def _analyze_method(self, func: ast.FunctionDef):
         """Analyze a single method: local param mapping, call graph, rules."""
@@ -274,7 +268,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
                     alias_map[target.id] = sources
         return alias_map
 
-    # --- literal-list for-loop expansion ---
+    # literal-list for-loop expansion
 
     def _expand_literal_loops(self, func: ast.FunctionDef, local_param_map: Dict[str, str]):
         """Expand `for var in [x, y, z]:` loops into concrete Rules."""
@@ -397,7 +391,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
                         params.add(resolved)
         return params
 
-    # --- visit calls to build call graph + rules ---
+    # visit calls to build call graph + rules
 
     def visit_Call(self, node: ast.Call):
         # record method call edges: self.some_method(...)
@@ -481,9 +475,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
         return params
 
 
-# ---------------------------------------------------------------------------
 # Trigger detection helpers
-# ---------------------------------------------------------------------------
 
 
 def _extract_method_guard(func: ast.FunctionDef, local_param_map: Dict[str, str]) -> Optional[str]:
@@ -564,9 +556,7 @@ def _extract_trigger_from_condition(condition: ast.AST, local_param_map: Dict[st
     return None
 
 
-# ---------------------------------------------------------------------------
 # Stage inference from validate_* roots and call graph
-# ---------------------------------------------------------------------------
 
 STAGE_ROOTS: Dict[str, List[str]] = {
     "common": ["validate_common"],
@@ -603,9 +593,7 @@ def compute_method_stages(call_graph: Dict[str, Set[str]]) -> Dict[str, Set[str]
     return method_stages
 
 
-# ---------------------------------------------------------------------------
 # Classification of messages for nicer grouping
-# ---------------------------------------------------------------------------
 
 
 def classify_message(msg: str) -> str:
@@ -692,9 +680,7 @@ def feature_title(param: str) -> str:
     return param
 
 
-# ---------------------------------------------------------------------------
 # Convenience: full analysis pipeline
-# ---------------------------------------------------------------------------
 
 _DEFAULT_VALIDATOR_PATH = Path(__file__).resolve().parent.parent / "case_validator.py"
 

@@ -13,9 +13,7 @@ Then run `./mfc.sh generate` to update completions.
 
 from .schema import ArgAction, Argument, CLISchema, Command, CommonArgumentSet, Completion, CompletionType, Example, MutuallyExclusiveGroup, Positional
 
-# =============================================================================
 # CONSTANTS (shared with other modules)
-# =============================================================================
 
 TARGET_NAMES = ["fftw", "hdf5", "silo", "lapack", "hipfort", "pre_process", "simulation", "post_process", "syscheck", "documentation"]
 
@@ -30,9 +28,7 @@ ENGINE_OPTIONS = ["interactive", "batch"]
 MPI_BINARIES = ["mpirun", "jsrun", "srun", "mpiexec"]
 
 
-# =============================================================================
 # COMMON ARGUMENT SETS
-# =============================================================================
 
 COMMON_TARGETS = CommonArgumentSet(
     name="targets",
@@ -114,9 +110,7 @@ COMMON_MFC_CONFIG = CommonArgumentSet(
 )
 
 
-# =============================================================================
 # COMMAND DEFINITIONS
-# =============================================================================
 
 BUILD_COMMAND = Command(
     name="build",
@@ -444,6 +438,27 @@ TEST_COMMAND = Command(
             type=str,
             default=None,
         ),
+        Argument(
+            name="build-coverage-cache",
+            help="Run all tests with gcov instrumentation to build the file-level coverage cache. Pass --gcov to enable coverage instrumentation in the internal build step.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="build_coverage_cache",
+        ),
+        Argument(
+            name="only-changes",
+            help="Only run tests whose covered files overlap with files changed since branching from master (uses file-level gcov coverage cache).",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="only_changes",
+        ),
+        Argument(
+            name="changes-branch",
+            help="Branch to compare against for --only-changes (default: master).",
+            type=str,
+            default="master",
+            dest="changes_branch",
+        ),
     ],
     mutually_exclusive=[
         MutuallyExclusiveGroup(
@@ -476,6 +491,8 @@ TEST_COMMAND = Command(
         Example("./mfc.sh test -j 4", "Run with 4 parallel jobs"),
         Example("./mfc.sh test --only 3D", "Run only 3D tests"),
         Example("./mfc.sh test --generate", "Regenerate golden files"),
+        Example("./mfc.sh test --only-changes -j 4", "Run tests affected by changed files"),
+        Example("./mfc.sh build --gcov -j 8 && ./mfc.sh test --build-coverage-cache", "One-time: build file-coverage cache"),
     ],
     key_options=[
         ("-j, --jobs N", "Number of parallel test jobs"),
@@ -483,6 +500,8 @@ TEST_COMMAND = Command(
         ("-f, --from UUID", "Start from specific test"),
         ("--generate", "Generate/update golden files"),
         ("--no-build", "Skip rebuilding MFC"),
+        ("--build-coverage-cache", "Build file-level gcov coverage cache (one-time)"),
+        ("--only-changes", "Run tests affected by changed files (requires cache)"),
     ],
 )
 
@@ -1265,9 +1284,7 @@ PARAMS_COMMAND = Command(
 )
 
 
-# =============================================================================
 # HELP TOPICS
-# =============================================================================
 
 HELP_TOPICS = {
     "gpu": {
@@ -1289,9 +1306,7 @@ HELP_TOPICS = {
 }
 
 
-# =============================================================================
 # COMPLETE CLI SCHEMA
-# =============================================================================
 
 MFC_CLI_SCHEMA = CLISchema(
     prog="./mfc.sh",
@@ -1344,9 +1359,7 @@ started, run `./mfc.sh build -h`.""",
 )
 
 
-# =============================================================================
 # DERIVED DATA (for use by other modules)
-# =============================================================================
 
 # Command aliases mapping (replaces COMMAND_ALIASES in user_guide.py)
 COMMAND_ALIASES = {}

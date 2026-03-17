@@ -36,9 +36,7 @@ from mfc.params.ast_analyzer import (  # noqa: E402
     feature_title,
 )
 
-# ---------------------------------------------------------------------------
 # Case Playbook Generation (from working examples)
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -284,9 +282,7 @@ def generate_playbook() -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
 # Markdown rendering
-# ---------------------------------------------------------------------------
 
 
 def render_markdown(rules: Iterable[Rule]) -> str:
@@ -723,9 +719,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
 
 
 def main(as_string: bool = False) -> str:
