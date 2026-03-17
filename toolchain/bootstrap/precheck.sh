@@ -101,31 +101,15 @@ PID_SPELL=$!
 ) &
 PID_LINT=$!
 
-# Fortran/Fypp static analysis
+# Source lint (all checks consolidated in lint_source.py)
 (
     if python3 toolchain/mfc/lint_source.py > /dev/null 2>&1; then
-        echo "0" > "$TMPDIR_PC/fortran_exit"
+        echo "0" > "$TMPDIR_PC/source_exit"
     else
-        echo "1" > "$TMPDIR_PC/fortran_exit"
+        echo "1" > "$TMPDIR_PC/source_exit"
     fi
 ) &
-PID_FORTRAN=$!
-
-# Source lint (fast grep checks — run inline)
-SOURCE_FAILED=0
-SOURCE_MSGS=""
-if grep -qiR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="acc_macros.fpp" --exclude="omp_macros.fpp" --exclude="shared_parallel_macros.fpp" --exclude="syscheck.fpp" ./src/* 2>/dev/null; then
-    SOURCE_MSGS+="Found raw OpenACC/OpenMP directives. Use macros instead.\n"
-    SOURCE_FAILED=1
-fi
-if grep -qiR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/* 2>/dev/null; then
-    SOURCE_MSGS+="Found double precision intrinsics. Use generic intrinsics.\n"
-    SOURCE_FAILED=1
-fi
-if grep -qiR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/* 2>/dev/null; then
-    SOURCE_MSGS+="Found junk code patterns (..., ---, ===) in source.\n"
-    SOURCE_FAILED=1
-fi
+PID_SOURCE=$!
 
 # Doc reference check
 DOC_FAILED=0
@@ -137,7 +121,7 @@ fi
 
 FAILED=0
 
-log "[$CYAN 1/6$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
+log "[$CYAN 1/5$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
 if [ "$FORMAT_OK" = "1" ]; then
     error "Formatting check failed to run."
     FAILED=1
@@ -152,7 +136,7 @@ else
 fi
 
 wait $PID_SPELL
-log "[$CYAN 2/6$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
+log "[$CYAN 2/5$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 SPELL_RC=$(cat "$TMPDIR_PC/spell_exit" 2>/dev/null || echo "1")
 if [ "$SPELL_RC" = "0" ]; then
     ok "Spell check passed."
@@ -162,7 +146,7 @@ else
 fi
 
 wait $PID_LINT
-log "[$CYAN 3/6$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
+log "[$CYAN 3/5$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
 LINT_RC=$(cat "$TMPDIR_PC/lint_exit" 2>/dev/null || echo "1")
 if [ "$LINT_RC" = "0" ]; then
     ok "Toolchain lint passed."
@@ -171,27 +155,17 @@ else
     FAILED=1
 fi
 
-log "[$CYAN 4/6$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET checks..."
-if [ $SOURCE_FAILED -eq 0 ]; then
+wait $PID_SOURCE
+log "[$CYAN 4/5$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
+SOURCE_RC=$(cat "$TMPDIR_PC/source_exit" 2>/dev/null || echo "1")
+if [ "$SOURCE_RC" = "0" ]; then
     ok "Source lint passed."
 else
-    echo -e "$SOURCE_MSGS" | while read -r msg; do
-        [ -n "$msg" ] && error "$msg"
-    done
+    error "Source lint failed. Run$MAGENTA python3 toolchain/mfc/lint_source.py$COLOR_RESET for details."
     FAILED=1
 fi
 
-wait $PID_FORTRAN
-log "[$CYAN 5/6$COLOR_RESET] Running$MAGENTA Fortran/Fypp analysis$COLOR_RESET..."
-FORTRAN_RC=$(cat "$TMPDIR_PC/fortran_exit" 2>/dev/null || echo "1")
-if [ "$FORTRAN_RC" = "0" ]; then
-    ok "Fortran/Fypp analysis passed."
-else
-    error "Fortran/Fypp analysis failed. Run$MAGENTA python3 toolchain/mfc/lint_source.py$COLOR_RESET for details."
-    FAILED=1
-fi
-
-log "[$CYAN 6/6$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
+log "[$CYAN 5/5$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if [ $DOC_FAILED -eq 0 ]; then
     ok "Doc references are valid."
 else
