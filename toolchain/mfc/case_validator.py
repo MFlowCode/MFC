@@ -18,7 +18,7 @@ from functools import lru_cache
 from typing import Any, Dict, List, Set
 
 from .common import MFCException
-from .params.definitions import CONSTRAINTS, NI
+from .params.definitions import CONSTRAINTS
 from .state import CFG
 
 # Physics documentation for check methods.
@@ -559,7 +559,7 @@ class CaseValidator:
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
 
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
-        self.prohibit(ib and (num_ibs <= 0 or num_ibs > NI), f"num_ibs must be between 1 and {NI}")
+        self.prohibit(ib and num_ibs <= 0, "num_ibs must be >= 1 when ib is enabled")
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 

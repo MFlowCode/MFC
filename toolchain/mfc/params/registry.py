@@ -98,9 +98,7 @@ class _FamilyAwareMapping(Mapping):
         for fam in families.values():
             for attr_name, (ptype, tags) in fam.attrs.items():
                 key = f"{fam.base_name}(1)%{attr_name}"
-                self._examples[key] = ParamDef(
-                    name=key, param_type=ptype, tags=set(tags)
-                )
+                self._examples[key] = ParamDef(name=key, param_type=ptype, tags=set(tags))
 
     def _resolve_family(self, name: str) -> Optional[ParamDef]:
         """Try to resolve a name against indexed families. Returns ParamDef or None."""
@@ -196,9 +194,7 @@ class ParamRegistry:
         """
         if not self._frozen:
             self._frozen = True
-            self._all_params_view = _FamilyAwareMapping(
-                self._params, self._families
-            )
+            self._all_params_view = _FamilyAwareMapping(self._params, self._families)
 
     @property
     def is_frozen(self) -> bool:
@@ -393,9 +389,7 @@ class ParamRegistry:
             for attr_name, (ptype, _tags) in fam.attrs.items():
                 # Escape the attr name but replace sub-indices with \(\d+\)
                 attr_pattern = re.sub(r"\(\d+\)", "__IDX__", attr_name)
-                attr_pattern = re.escape(attr_pattern).replace(
-                    "__IDX__", r"\(\d+\)"
-                )
+                attr_pattern = re.escape(attr_pattern).replace("__IDX__", r"\(\d+\)")
                 pattern = f"^{base_esc}\\(\\d+\\)%{attr_pattern}$"
                 if pattern not in pattern_props:
                     pattern_props[pattern] = ptype.json_schema

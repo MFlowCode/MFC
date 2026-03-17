@@ -639,7 +639,7 @@ CONSTRAINTS = {
     # Counts (must be positive)
     "num_fluids": {"min": 1, "max": 10},
     "num_patches": {"min": 0, "max": 10},
-    "num_ibs": {"min": 0, "max": NI},
+    "num_ibs": {"min": 0},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "num_integrals": {"min": 1},
@@ -1157,9 +1157,13 @@ def _load():
     for j in range(1, 4):
         _ib_attrs[f"vel({j})"] = (A_REAL, _ib_tags)
         _ib_attrs[f"angular_vel({j})"] = (A_REAL, _ib_tags)
-    REGISTRY.register_family(IndexedFamily(
-        base_name="patch_ib", attrs=_ib_attrs, tags=_ib_tags, max_index=NI,
-    ))
+    REGISTRY.register_family(
+        IndexedFamily(
+            base_name="patch_ib",
+            attrs=_ib_attrs,
+            tags=_ib_tags,
+        )
+    )
 
     # acoustic sources (4 sources)
     for i in range(1, NA + 1):
