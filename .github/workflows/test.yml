@@ -165,7 +165,7 @@ jobs:
           fi
 
   github:
-    name: Github
+    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || 'Github' }}
     needs: [lint-gate, file-changes, rebuild-cache]
     if: >-
       !cancelled() &&
@@ -191,9 +191,38 @@ jobs:
             debug: no-debug
             intel: false
 
+          # NVHPC compiler matrix (CPU build+test, GPU build-only)
+          - nvhpc: '23.11'
+            target: cpu
+          - nvhpc: '23.11'
+            target: gpu
+          - nvhpc: '24.5'
+            target: cpu
+          - nvhpc: '24.5'
+            target: gpu
+          - nvhpc: '24.11'
+            target: cpu
+          - nvhpc: '24.11'
+            target: gpu
+          - nvhpc: '25.1'
+            target: cpu
+          - nvhpc: '25.1'
+            target: gpu
+          - nvhpc: '25.3'
+            target: cpu
+          - nvhpc: '25.3'
+            target: gpu
+
       fail-fast: false
     continue-on-error: true
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.nvhpc && 'ubuntu-22.04' || format('{0}-latest', matrix.os) }}
+    container: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda_multi-ubuntu22.04', matrix.nvhpc) || '' }}
+    env:
+      CC:  ${{ matrix.nvhpc && 'nvc' || '' }}
+      CXX: ${{ matrix.nvhpc && 'nvc++' || '' }}
+      FC:  ${{ matrix.nvhpc && 'nvfortran' || '' }}
+      OMPI_ALLOW_RUN_AS_ROOT:         ${{ matrix.nvhpc && '1' || '' }}
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: ${{ matrix.nvhpc && '1' || '' }}
 
     steps:
       - name: Clone
@@ -212,8 +241,9 @@ jobs:
           path: toolchain/mfc/test
         continue-on-error: true
 
+      # --- Standard (non-NVHPC) setup ---
       - name: Setup MacOS
-        if:   matrix.os == 'macos'
+        if:   matrix.os == 'macos' && !matrix.nvhpc
         run:  |
           brew update
           brew upgrade
@@ -222,7 +252,7 @@ jobs:
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
       - name: Setup Ubuntu
-        if:   matrix.os == 'ubuntu' && matrix.intel == false
+        if:   matrix.os == 'ubuntu' && matrix.intel == false && !matrix.nvhpc
         run: |
            sudo apt update -y
            sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
@@ -245,7 +275,17 @@ jobs:
           printenv | sort > /tmp/env_after
           diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
 
+      # --- NVHPC container setup ---
+      - name: Setup NVHPC
+        if:   matrix.nvhpc
+        run: |
+          apt-get update -y
+          apt-get install -y cmake python3 python3-venv python3-pip \
+                             libfftw3-dev git
+
+      # --- Standard build + test ---
       - name: Build
+        if:   '!matrix.nvhpc'
         run:  |
           /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
@@ -253,12 +293,26 @@ jobs:
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
+        if:   '!matrix.nvhpc'
         run:  |
           /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $ONLY_CHANGES $TEST_ALL $TEST_PCT
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
           ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
+
+      # --- NVHPC build + test ---
+      - name: Build (NVHPC CPU)
+        if:   matrix.nvhpc && matrix.target == 'cpu'
+        run:  /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all
+
+      - name: Test (NVHPC CPU)
+        if:   matrix.nvhpc && matrix.target == 'cpu'
+        run:  /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
+
+      - name: Build (NVHPC GPU)
+        if:   matrix.nvhpc && matrix.target == 'gpu'
+        run:  /bin/bash mfc.sh test -v --dry-run --gpu acc -j $(nproc) --test-all
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
