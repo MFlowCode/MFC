@@ -180,6 +180,8 @@ jobs:
         precision: ['']
         debug: ['debug', 'no-debug']
         intel: [true, false]
+        nvhpc: ['']
+        target: ['']
         exclude:
           - os:    macos
             intel: true
