@@ -165,7 +165,7 @@ jobs:
           fi
 
   github:
-    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || 'Github' }}
+    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || format('Github ({0}, {1}, {2}, intel={3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel) }}
     needs: [lint-gate, file-changes, rebuild-cache]
     if: >-
       !cancelled() &&
