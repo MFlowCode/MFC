@@ -29,9 +29,7 @@ from mfc.viz import assemble_silo, discover_timesteps
 matplotlib.use("Agg")
 
 
-# ---------------------------------------------------------------------------
 # Configuration
-# ---------------------------------------------------------------------------
 CASE_DIR = "."
 Y_MAJORS = {"H", "O", "OH", "HO2"}
 Y_MINORS = {"H2O", "H2O2"}
@@ -40,9 +38,7 @@ oh_idx = sol.species_index("OH")
 skinner_induction_time = 0.052e-3  # Skinner & Ringrose (1965)
 
 
-# ---------------------------------------------------------------------------
 # Load MFC output
-# ---------------------------------------------------------------------------
 steps = discover_timesteps(CASE_DIR, "silo")
 if not steps:
     sys.exit("No silo timesteps found — did you run post_process?")
@@ -61,9 +57,7 @@ for step in tqdm(steps, desc="Loading MFC output"):
     for y in Y_VARS:
         mfc_Ys[y].append(float(assembled.variables[f"Y_{y}"][mid]))
 
-# ---------------------------------------------------------------------------
 # Cantera 0-D reference
-# ---------------------------------------------------------------------------
 time_save = Tend / SAVE_COUNT
 
 
@@ -86,9 +80,7 @@ def generate_ct_saves():
 
 ct_ts, ct_Ys, ct_rhos = generate_ct_saves()
 
-# ---------------------------------------------------------------------------
 # Induction time: first step where [OH] molar concentration >= 1e-6 mol/m^3
-# ---------------------------------------------------------------------------
 
 
 def find_induction_time(ts, Ys_OH, rhos):
@@ -106,9 +98,7 @@ print(f"  Skinner et al.: {skinner_induction_time:.3e} s")
 print(f"  Cantera:        {ct_induction:.3e} s" if ct_induction is not None else "  Cantera:        not reached")
 print(f"  (Che)MFC:       {mfc_induction:.3e} s" if mfc_induction is not None else "  (Che)MFC:       not reached")
 
-# ---------------------------------------------------------------------------
 # Plot
-# ---------------------------------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 _colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 _color = {y: _colors[i % len(_colors)] for i, y in enumerate(sorted(Y_VARS))}

@@ -15,9 +15,7 @@ from .schema import ParamDef, ParamType
 NP, NF, NI, NA, NPR, NB = 10, 10, 1000, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
 
 
-# =============================================================================
 # Auto-generated Descriptions
-# =============================================================================
 # Descriptions are auto-generated from parameter names using naming conventions.
 # Override with explicit desc= parameter when auto-generation is inadequate.
 
@@ -362,9 +360,7 @@ CASE_OPT_PARAMS = {
 }
 
 
-# =============================================================================
 # Data-driven Annotations for Doc Generation
-# =============================================================================
 # These dicts are the single source of truth for parameter hints in the docs.
 # To annotate a new param, add an entry here instead of editing docs_gen.py.
 
@@ -468,9 +464,7 @@ def _lookup_hint(name):
     return HINTS[family].get(attr, "")
 
 
-# ============================================================================
 # Schema Validation for Constraints and Dependencies
-# ============================================================================
 # Uses rapidfuzz for "did you mean?" suggestions when typos are detected
 
 _VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels"}
@@ -812,11 +806,9 @@ def _load():
     INT, REAL, LOG, STR = ParamType.INT, ParamType.REAL, ParamType.LOG, ParamType.STR
     A_REAL = ParamType.ANALYTIC_REAL
 
-    # ==========================================================================
     # SIMPLE PARAMETERS (non-indexed)
-    # ==========================================================================
 
-    # --- Grid ---
+    # Grid
     for n in ["m", "n", "p"]:
         _r(n, INT, {"grid"})
     _r("cyl_coord", LOG, {"grid"})
@@ -830,7 +822,7 @@ def _load():
         _r(f"{d}_domain%beg", REAL, {"grid"})
         _r(f"{d}_domain%end", REAL, {"grid"})
 
-    # --- Time stepping ---
+    # Time stepping
     for n in ["time_stepper", "t_step_old", "t_step_start", "t_step_stop", "t_step_save", "t_step_print", "adap_dt_max_iters"]:
         _r(n, INT, {"time"})
     _r("dt", REAL, {"time"}, math=r"\f$\Delta t\f$")
@@ -840,7 +832,7 @@ def _load():
     for n in ["cfl_adap_dt", "cfl_const_dt", "cfl_dt", "adap_dt"]:
         _r(n, LOG, {"time"})
 
-    # --- WENO/reconstruction ---
+    # WENO/reconstruction
     _r("weno_order", INT, {"weno"})
     _r("recon_type", INT)
     _r("muscl_order", INT)
@@ -852,18 +844,18 @@ def _load():
         _r(n, LOG, {"weno"})
     _r("weno_Re_flux", LOG, {"weno", "viscosity"})
 
-    # --- Riemann solver ---
+    # Riemann solver
     for n in ["riemann_solver", "wave_speeds", "avg_state", "low_Mach"]:
         _r(n, INT, {"riemann"})
 
-    # --- MHD ---
+    # MHD
     _r("Bx0", REAL, {"mhd"}, math=r"\f$B_{x,0}\f$")
     _r("hyper_cleaning_speed", REAL, {"mhd"}, math=r"\f$c_h\f$")
     _r("hyper_cleaning_tau", REAL, {"mhd"})
     for n in ["mhd", "hyper_cleaning", "powell"]:
         _r(n, LOG, {"mhd"})
 
-    # --- Bubbles ---
+    # Bubbles
     _r("R0ref", REAL, {"bubbles"}, math=r"\f$R_0\f$")
     _r("nb", REAL, {"bubbles"}, math=r"\f$N_b\f$")
     _r("Web", REAL, {"bubbles"}, math=r"\f$\mathrm{We}\f$")
@@ -873,36 +865,36 @@ def _load():
     for n in ["polytropic", "bubbles_euler", "polydisperse", "qbmm", "bubbles_lagrange"]:
         _r(n, LOG, {"bubbles"})
 
-    # --- Viscosity ---
+    # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
-    # --- Elasticity ---
+    # Elasticity
     for n in ["hypoelasticity", "hyperelasticity"]:
         _r(n, LOG, {"elasticity"})
 
-    # --- Surface tension ---
+    # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
 
-    # --- Chemistry ---
+    # Chemistry
     _r("cantera_file", STR, {"chemistry"})
     _r("chemistry", LOG, {"chemistry"})
 
-    # --- Acoustic ---
+    # Acoustic
     _r("num_source", INT, {"acoustic"})
     _r("acoustic_source", LOG, {"acoustic"})
 
-    # --- Immersed boundary ---
+    # Immersed boundary
     _r("num_ibs", INT, {"ib"})
     _r("ib", LOG, {"ib"})
 
-    # --- Probes ---
+    # Probes
     for n in ["num_probes", "num_integrals"]:
         _r(n, INT, {"probes"})
     _r("probe_wrt", LOG, {"output", "probes"})
     _r("integral_wrt", LOG, {"output", "probes"})
 
-    # --- Output ---
+    # Output
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("schlieren_alpha", REAL, {"output"})
@@ -958,15 +950,15 @@ def _load():
     ]:
         _r(v, LOG, {"bubbles", "output"})
 
-    # --- Boundary conditions ---
+    # Boundary conditions
     for d in ["x", "y", "z"]:
         _r(f"bc_{d}%beg", INT, {"bc"})
         _r(f"bc_{d}%end", INT, {"bc"})
 
-    # --- Relativity ---
+    # Relativity
     _r("relativity", LOG, {"relativity"})
 
-    # --- Other (no specific feature tag) ---
+    # Other (no specific feature tag)
     for n in [
         "model_eqns",
         "num_fluids",
@@ -1048,11 +1040,9 @@ def _load():
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
-    # ==========================================================================
     # INDEXED PARAMETERS
-    # ==========================================================================
 
-    # --- patch_icpp (10 patches) ---
+    # patch_icpp (10 patches)
     for i in range(1, NP + 1):
         px = f"patch_icpp({i})%"
         for a in ["geometry", "smooth_patch_id", "hcid", "model_spc"]:
@@ -1108,7 +1098,7 @@ def _load():
             for mm in range(-ll, ll + 1):
                 _r(f"{px}sph_har_coeff({ll},{mm})", REAL)
 
-    # --- fluid_pp (10 fluids) ---
+    # fluid_pp (10 fluids)
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
@@ -1121,7 +1111,7 @@ def _load():
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
 
-    # --- bub_pp (bubble properties) ---
+    # bub_pp (bubble properties)
     for a, sym in [
         ("R0ref", r"\f$R_0\f$"),
         ("p0ref", r"\f$p_0\f$"),
@@ -1146,7 +1136,7 @@ def _load():
     ]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
-    # --- patch_ib (10 immersed boundaries) ---
+    # patch_ib (10 immersed boundaries)
     for i in range(1, NI + 1):
         px = f"patch_ib({i})%"
         for a in ["geometry", "moving_ibm"]:
@@ -1167,7 +1157,7 @@ def _load():
             _r(f"{px}vel({j})", A_REAL, {"ib"})
             _r(f"{px}angular_vel({j})", A_REAL, {"ib"})
 
-    # --- acoustic sources (4 sources) ---
+    # acoustic sources (4 sources)
     for i in range(1, NA + 1):
         px = f"acoustic({i})%"
         for a in ["pulse", "support", "num_elements", "element_on", "bb_num_freq"]:
@@ -1196,18 +1186,18 @@ def _load():
         for j in range(1, 4):
             _r(f"{px}loc({j})", REAL, {"acoustic"})
 
-    # --- probes (10 probes) ---
+    # probes (10 probes)
     for i in range(1, NPR + 1):
         for d in ["x", "y", "z"]:
             _r(f"probe({i})%{d}", REAL, {"probes"})
 
-    # --- integrals (5 integral regions) ---
+    # integrals (5 integral regions)
     for i in range(1, 6):
         for d in ["x", "y", "z"]:
             _r(f"integral({i})%{d}min", REAL, {"probes"})
             _r(f"integral({i})%{d}max", REAL, {"probes"})
 
-    # --- Extended BC ---
+    # Extended BC
     for d in ["x", "y", "z"]:
         px = f"bc_{d}%"
         for a in ["vb1", "vb2", "vb3", "ve1", "ve2", "ve3", "pres_in", "pres_out"]:
@@ -1221,7 +1211,7 @@ def _load():
             _r(f"{px}vel_in({j})", REAL, {"bc"})
             _r(f"{px}vel_out({j})", REAL, {"bc"})
 
-    # --- patch_bc (10 BC patches) ---
+    # patch_bc (10 BC patches)
     for i in range(1, NB + 1):
         px = f"patch_bc({i})%"
         for a in ["geometry", "type", "dir", "loc"]:
@@ -1231,7 +1221,7 @@ def _load():
             _r(f"{px}length({j})", REAL, {"bc"})
         _r(f"{px}radius", REAL, {"bc"})
 
-    # --- simplex_params ---
+    # simplex_params
     for f in range(1, NF + 1):
         _r(f"simplex_params%perturb_dens({f})", LOG)
         _r(f"simplex_params%perturb_dens_freq({f})", REAL)
@@ -1245,7 +1235,7 @@ def _load():
         for j in range(1, 4):
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
-    # --- lag_params (Lagrangian bubbles) ---
+    # lag_params (Lagrangian bubbles)
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
     for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
@@ -1253,13 +1243,13 @@ def _load():
     for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
 
-    # --- chem_params ---
+    # chem_params
     for a in ["diffusion", "reactions"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})
     for a in ["gamma_method", "transport_model"]:
         _r(f"chem_params%{a}", INT, {"chemistry"})
 
-    # --- Per-fluid output arrays ---
+    # Per-fluid output arrays
     for f in range(1, NF + 1):
         _r(f"schlieren_alpha({f})", REAL, {"output"})
         for a in ["alpha_rho_wrt", "alpha_wrt", "kappa_wrt", "alpha_rho_e_wrt"]:
@@ -1268,12 +1258,12 @@ def _load():
         for a in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
             _r(f"{a}({j})", LOG, {"output"})
 
-    # --- chem_wrt (chemistry output) ---
+    # chem_wrt (chemistry output)
     for j in range(1, 101):
         _r(f"chem_wrt_Y({j})", LOG, {"chemistry", "output"})
     _r("chem_wrt_T", LOG, {"chemistry", "output"})
 
-    # --- fluid_rho ---
+    # fluid_rho
     for f in range(1, NF + 1):
         _r(f"fluid_rho({f})", REAL)
 

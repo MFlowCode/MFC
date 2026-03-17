@@ -36,9 +36,9 @@ if [ ! -f "$yaml_file" ]; then
     echo ""
     output_file="${job_slug}.out"
     echo "[$dir] Last 100 lines of job output ($output_file):"
-    echo "----------------------------------------"
+    echo "--------------------"
     tail -n 100 "$output_file" 2>/dev/null || echo "  Could not read output file"
-    echo "----------------------------------------"
+    echo "--------------------"
     exit 1
 fi
 

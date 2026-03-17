@@ -26,7 +26,7 @@ from .state import CFG
 # to auto-generate docs/documentation/physics_constraints.md.
 # See the contributing guide for how to add entries.
 PHYSICS_DOCS = {
-    # --- Thermodynamic Constraints ---
+    # Thermodynamic Constraints
     "check_stiffened_eos": {
         "title": "Stiffened EOS Positivity",
         "category": "Thermodynamic Constraints",
@@ -47,7 +47,7 @@ PHYSICS_DOCS = {
         "math": r"p > 0, \quad \alpha_i \rho_i \geq 0, \quad 0 \leq \alpha_i \leq 1",
         "explanation": ("All initial patch pressures must be strictly positive. Partial densities must be non-negative. Volume fractions must be in [0,1]."),
     },
-    # --- Mixture Constraints ---
+    # Mixture Constraints
     "check_volume_fraction_sum": {
         "title": "Volume Fraction Sum",
         "category": "Mixture Constraints",
@@ -67,7 +67,7 @@ PHYSICS_DOCS = {
         "math": r"\alpha_j = 0 \Rightarrow \alpha_j \rho_j = 0, \quad \alpha_j > 0 \Rightarrow \alpha_j \rho_j > 0",
         "explanation": ("Warns about physically inconsistent combinations: density assigned to an absent phase, or a present phase with zero density."),
     },
-    # --- Domain and Geometry ---
+    # Domain and Geometry
     "check_domain_bounds": {
         "title": "Domain Bounds",
         "category": "Domain and Geometry",
@@ -85,7 +85,7 @@ PHYSICS_DOCS = {
         "category": "Domain and Geometry",
         "explanation": ("For patches with centroid + length geometry, the bounding box must not be entirely outside the computational domain. Skipped when grid stretching is active."),
     },
-    # --- Velocity and Dimensional Consistency ---
+    # Velocity and Dimensional Consistency
     "check_velocity_components": {
         "title": "Velocity Components in Inactive Dimensions",
         "category": "Velocity and Dimensional Consistency",
@@ -93,20 +93,20 @@ PHYSICS_DOCS = {
         "explanation": "Setting velocity components in dimensions that do not exist is almost certainly a mistake.",
         "exceptions": ["MHD simulations (transverse velocity couples to magnetic field in 1D)"],
     },
-    # --- Model Equations ---
+    # Model Equations
     "check_model_eqns_and_num_fluids": {
         "title": "Model Equation Selection",
         "category": "Model Equations",
         "explanation": ("Model 1: gamma-law single-fluid. Model 2: five-equation (Allaire). Model 3: six-equation (Saurel). Model 4: four-equation (single-component with bubbles)."),
         "references": ["Wilfong26", "Allaire02", "Saurel09"],
     },
-    # --- Boundary Conditions ---
+    # Boundary Conditions
     "check_boundary_conditions": {
         "title": "Boundary Condition Compatibility",
         "category": "Boundary Conditions",
         "explanation": ("Periodicity must match on both ends. Valid BC values range from -1 to -17. Cylindrical coordinates have specific BC requirements at the axis."),
     },
-    # --- Bubble Physics ---
+    # Bubble Physics
     "check_bubbles_euler": {
         "title": "Euler-Euler Bubble Model",
         "category": "Bubble Physics",
@@ -123,7 +123,7 @@ PHYSICS_DOCS = {
         "category": "Bubble Physics",
         "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3.",
     },
-    # --- Numerical Schemes ---
+    # Numerical Schemes
     "check_weno": {
         "title": "WENO Reconstruction",
         "category": "Numerical Schemes",
@@ -145,7 +145,7 @@ PHYSICS_DOCS = {
         "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
         "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
     },
-    # --- Feature Compatibility ---
+    # Feature Compatibility
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
         "category": "Feature Compatibility",
@@ -176,13 +176,13 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
-    # --- Acoustic Sources ---
+    # Acoustic Sources
     "check_acoustic_source": {
         "title": "Acoustic Sources",
         "category": "Acoustic Sources",
         "explanation": ("Dimension-specific support types. Pulse type in {1,2,3,4}. Non-planar sources require foc_length and aperture."),
     },
-    # --- Post-Processing ---
+    # Post-Processing
     "check_vorticity": {
         "title": "Vorticity Output",
         "category": "Post-Processing",
@@ -270,9 +270,7 @@ class CaseValidator:
             self.prohibit(not self.is_set("x_domain%beg"), "x_domain%beg must be set when m > 0")
             self.prohibit(not self.is_set("x_domain%end"), "x_domain%end must be set when m > 0")
 
-    # ===================================================================
     # Common Checks (All Stages)
-    # ===================================================================
 
     def check_simulation_domain(self):
         """Checks constraints on dimensionality and number of cells"""
@@ -459,7 +457,7 @@ class CaseValidator:
         self.prohibit(model_eqns == 4 and num_fluids != 1, "4-equation model (model_eqns = 4) is single-component and requires num_fluids = 1")
         self.prohibit(cyl_coord, "Bubble models untested in cylindrical coordinates")
 
-        # === BUBBLE PHYSICS PARAMETERS ===
+        # BUBBLE PHYSICS PARAMETERS
         # Validate bubble reference parameters (bub_pp%)
         R0ref = self.get("bub_pp%R0ref")
         p0ref = self.get("bub_pp%p0ref")
@@ -627,9 +625,7 @@ class CaseValidator:
         self.prohibit(mhd and n is not None and n == 0 and Bx0 is None, "Bx0 must be set in 1D MHD simulations")
         self.prohibit(mhd and n is not None and n > 0 and Bx0 is not None, "Bx0 must not be set in 2D/3D MHD simulations")
 
-    # ===================================================================
     # Simulation-Specific Checks
-    # ===================================================================
 
     def check_riemann_solver(self):
         """Checks constraints on Riemann solver (simulation only)"""
@@ -1168,9 +1164,7 @@ class CaseValidator:
         self.prohibit(model_eqns == 1, "hyperelasticity is not supported for model_eqns = 1")
         self.prohibit(model_eqns is not None and model_eqns > 3, "hyperelasticity is not supported for model_eqns > 3")
 
-    # ===================================================================
     # Pre-Process Specific Checks
-    # ===================================================================
 
     def check_restart(self):
         """Checks constraints on restart parameters (pre-process)"""
@@ -1337,7 +1331,7 @@ class CaseValidator:
             alter_patches = [self.get(f"patch_icpp({i})%alter_patch({j})") == "T" for j in range(1, num_patches + 1)]
             is_special = hcid is not None or any(alter_patches)
 
-            # === THERMODYNAMICS ===
+            # THERMODYNAMICS
             # Pressure must be positive for physical stability
             # (skip for special patches where values are computed differently)
             if not is_special:
@@ -1345,7 +1339,7 @@ class CaseValidator:
                 if pres is not None and self._is_numeric(pres):
                     self.prohibit(pres <= 0, f"patch_icpp({istr})%pres must be positive (got {pres})")
 
-            # === FLUID PROPERTIES ===
+            # FLUID PROPERTIES
             # (skip for special patches where values are computed differently)
             if not is_special:
                 for j in range(1, num_fluids + 1):
@@ -1365,7 +1359,7 @@ class CaseValidator:
                     if alpha_rho is not None and self._is_numeric(alpha_rho):
                         self.prohibit(alpha_rho < 0, f"patch_icpp({istr})%alpha_rho({jstr}) must be non-negative (got {alpha_rho})")
 
-            # === GEOMETRY ===
+            # GEOMETRY
             # Patch dimensions must be positive (except in cylindrical coords where
             # length_y/length_z can be sentinel values like -1000000.0)
             length_x = self.get(f"patch_icpp({i})%length_x")
@@ -1384,7 +1378,7 @@ class CaseValidator:
             if radius is not None and self._is_numeric(radius):
                 self.prohibit(radius <= 0, f"patch_icpp({istr})%radius must be positive (got {radius})")
 
-            # === BUBBLES ===
+            # BUBBLES
             # Bubble radius must be positive
             if bubbles_euler:
                 r0 = self.get(f"patch_icpp({i})%r0")
@@ -1438,9 +1432,7 @@ class CaseValidator:
                 # BC types -14 to -4, -1 (periodic), or < -17 (dirichlet) are incompatible with patches
                 self.prohibit((-14 <= bc_type <= -4) or bc_type == -1 or bc_type < -17, f"Incompatible BC type for boundary condition patch {i}")
 
-    # ===================================================================
     # Post-Process Specific Checks
-    # ===================================================================
 
     def check_output_format(self):
         """Checks output format parameters (post-process)"""
@@ -1681,9 +1673,7 @@ class CaseValidator:
 
         self.prohibit(not has_output, "None of the flow variables have been selected for post-process")
 
-    # ===================================================================
     # Cross-Cutting Physics Checks
-    # ===================================================================
 
     def check_domain_bounds(self):
         """Checks that domain end > domain begin for each active dimension"""
@@ -1944,9 +1934,7 @@ class CaseValidator:
                 if vel3 is not None and self._is_numeric(vel3):
                     self.prohibit(vel3 != 0, f"patch_icpp({i})%vel(3) = {vel3} but p = 0 (1D/2D simulation)")
 
-    # ===================================================================
     # Build-Flag Compatibility Checks
-    # ===================================================================
 
     def check_build_flags(self):
         """Checks case parameters against the active build configuration.
@@ -1964,9 +1952,7 @@ class CaseValidator:
         p = self.get("p", 0)
         self.prohibit(CFG().single and cyl_coord and p > 0, "Fully 3D cylindrical geometry (cyl_coord = T, p > 0) is not supported in single precision (--single)")
 
-    # ===================================================================
     # Main Validation Entry Points
-    # ===================================================================
 
     def validate_common(self):
         """Validate parameters common to all stages"""

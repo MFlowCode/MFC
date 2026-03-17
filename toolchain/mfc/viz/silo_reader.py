@@ -37,9 +37,7 @@ _DB_QUADMESH = 130
 _DB_QUADVAR = 501
 
 
-# ---------------------------------------------------------------------------
 # File-structure cache
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -127,9 +125,7 @@ def clear_structure_cache() -> None:
         _struct_cache.clear()
 
 
-# ---------------------------------------------------------------------------
 # File reader
-# ---------------------------------------------------------------------------
 
 
 def _resolve_path(h5file, path_bytes):
@@ -190,9 +186,7 @@ def read_silo_file(
     return ProcessorData(m=m, n=n, p=p, x_cb=x_cb, y_cb=y_cb, z_cb=z_cb, variables=variables)
 
 
-# ---------------------------------------------------------------------------
 # Persistent thread pool for parallel rank reads
-# ---------------------------------------------------------------------------
 
 _READ_POOL: Optional[ThreadPoolExecutor] = None
 _POOL_LOCK = threading.Lock()
@@ -208,9 +202,7 @@ def _get_pool() -> ThreadPoolExecutor:
         return _READ_POOL
 
 
-# ---------------------------------------------------------------------------
 # Assembly
-# ---------------------------------------------------------------------------
 
 
 def assemble_silo(

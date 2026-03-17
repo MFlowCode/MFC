@@ -24,9 +24,7 @@ from .cli.commands import COMMANDS
 from .common import MFC_ROOT_DIR
 from .printer import cons
 
-# =============================================================================
 # DYNAMIC CLUSTER HELP GENERATION
-# =============================================================================
 
 # Organization mapping based on system name prefixes and known clusters
 CLUSTER_ORGS = {
@@ -182,9 +180,7 @@ MFC includes pre-configured module sets for many clusters.
   • CMake 3.18+, Python 3.11+"""
 
 
-# =============================================================================
 # MARKDOWN-BASED HELP (Single source of truth from docs/)
-# =============================================================================
 
 # Mapping of help topics to their source markdown files and optional section
 # Format: {"topic": ("file_path", "section_heading" or None for full file)}
@@ -270,9 +266,7 @@ def _generate_markdown_help(topic: str):
     return loader
 
 
-# =============================================================================
 # HELP TOPICS
-# =============================================================================
 
 HELP_TOPICS = {
     "gpu": {
@@ -363,9 +357,7 @@ def print_help_topics():
     cons.print()
 
 
-# =============================================================================
 # ENHANCED HELP OUTPUT
-# =============================================================================
 
 
 def _truncate_desc(desc: str, max_len: int = 50) -> str:
@@ -455,9 +447,7 @@ def print_command_help(command: str, show_argparse: bool = True):
     return True
 
 
-# =============================================================================
 # CONTEXTUAL TIPS
-# =============================================================================
 
 
 class Tips:
@@ -535,9 +525,7 @@ class Tips:
         cons.print("[dim]Tip: Run [cyan]./mfc.sh validate case.py[/cyan] to check for errors before running[/dim]")
 
 
-# =============================================================================
 # ONBOARDING FOR NEW USERS
-# =============================================================================
 
 
 def is_first_time_user() -> bool:
@@ -575,9 +563,7 @@ def print_welcome():
     cons.print()
 
 
-# =============================================================================
 # INTERACTIVE MODE
-# =============================================================================
 
 
 def interactive_mode():
