@@ -83,7 +83,7 @@ def _filter_only(cases, skipped_cases):
     return cases, skipped_cases
 
 
-def __filter(cases_) -> typing.List[TestCase]:
+def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
     cases = cases_[:]
     selected_cases = []
     skipped_cases = []
@@ -110,6 +110,64 @@ def __filter(cases_) -> typing.List[TestCase]:
 
         if not cases:
             raise MFCException(f"--only filter matched zero test cases. Specified: {ARG('only')}. Check that UUIDs/names are valid.")
+
+    # --only-changes: filter based on file-level gcov coverage
+    if ARG("only_changes"):
+        from .coverage import (  # pylint: disable=import-outside-toplevel
+            filter_tests_by_coverage,
+            get_changed_files,
+            load_coverage_cache,
+            should_run_all_tests,
+        )
+
+        cache = load_coverage_cache(common.MFC_ROOT_DIR)
+        if cache is None:
+            cons.print("[yellow]Coverage cache missing or stale.[/yellow]")
+            cons.print("[yellow]Run: ./mfc.sh build --gcov -j 8 && ./mfc.sh test --build-coverage-cache --gcov -j 8[/yellow]")
+            cons.print("[yellow]Falling back to full test suite.[/yellow]")
+        else:
+            changed_files = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"))
+
+            if changed_files is None:
+                cons.print("[yellow]git diff failed — falling back to full test suite.[/yellow]")
+            elif should_run_all_tests(changed_files):
+                cons.print()
+                cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
+                cons.print("-" * 50)
+                cons.print("[yellow]Infrastructure or macro file changed — running full test suite.[/yellow]")
+                cons.print("-" * 50)
+            else:
+                changed_fpp = {f for f in changed_files if f.endswith(".fpp")}
+                changed_f90 = {f for f in changed_files if f.startswith("src/") and (f.endswith(".f90") or f.endswith(".f"))}
+                if changed_f90:
+                    cons.print()
+                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
+                    cons.print("-" * 50)
+                    cons.print("[yellow].f90/.f source changed — running full test suite.[/yellow]")
+                    for f in sorted(changed_f90):
+                        cons.print(f"  [yellow]*[/yellow] {f}")
+                    cons.print("-" * 50)
+                elif not changed_fpp:
+                    cons.print()
+                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
+                    cons.print("-" * 50)
+                    cons.print("[green]No Fortran source changes detected — skipping all tests.[/green]")
+                    cons.print("-" * 50)
+                    cons.print()
+                    skipped_cases += cases
+                    cases = []
+                else:
+                    cons.print()
+                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
+                    cons.print("-" * 50)
+                    for fpp_file in sorted(changed_fpp):
+                        cons.print(f"  [green]*[/green] {fpp_file}")
+
+                    cases, new_skipped = filter_tests_by_coverage(cases, cache, changed_files)
+                    skipped_cases += new_skipped
+                    cons.print(f"\n[bold]Tests to run: {len(cases)} / {len(cases) + len(new_skipped)}[/bold]")
+                    cons.print("-" * 50)
+                    cons.print()
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -173,6 +231,24 @@ def test():
             cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
             common.delete_directory(f"{common.MFC_TEST_DIR}/{old_uuid}")
 
+        return
+
+    if ARG("build_coverage_cache"):
+        from .coverage import build_coverage_cache  # pylint: disable=import-outside-toplevel
+
+        all_cases = [b.to_case() for b in cases]
+
+        # Build all unique slugs (Chemistry, case-optimization, etc.) so every
+        # test has a pre-built binary available for direct execution in Phase 2.
+        codes = [PRE_PROCESS, SIMULATION, POST_PROCESS]
+        unique_builds = set()
+        for case, code in itertools.product(all_cases, codes):
+            slug = code.get_slug(case.to_input_file())
+            if slug not in unique_builds:
+                build(code, case.to_input_file())
+                unique_builds.add(slug)
+
+        build_coverage_cache(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
         return
 
     cases, skipped_cases = __filter(cases)
