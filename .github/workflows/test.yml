@@ -302,17 +302,13 @@ jobs:
           ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
 
       # --- NVHPC build + test ---
-      - name: Build (NVHPC CPU)
-        if:   matrix.nvhpc && matrix.target == 'cpu'
-        run:  /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all
+      - name: Build (NVHPC)
+        if:   matrix.nvhpc
+        run:  /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all ${{ matrix.target == 'gpu' && '--gpu acc' || '' }}
 
-      - name: Test (NVHPC CPU)
+      - name: Test (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run:  /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
-
-      - name: Build (NVHPC GPU)
-        if:   matrix.nvhpc && matrix.target == 'gpu'
-        run:  /bin/bash mfc.sh test -v --dry-run --gpu acc -j $(nproc) --test-all
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
