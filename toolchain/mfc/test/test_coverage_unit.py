@@ -21,10 +21,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-# ---------------------------------------------------------------------------
 # Import the module under test.
 # We patch the module-level imports that require the full toolchain.
-# ---------------------------------------------------------------------------
 
 
 # Create minimal stubs for toolchain modules so coverage.py can be imported
@@ -160,9 +158,7 @@ except AttributeError:
     COVERAGE_CACHE_PATH = _globals["COVERAGE_CACHE_PATH"]
 
 
-# ---------------------------------------------------------------------------
 # Helper: minimal fake test case
-# ---------------------------------------------------------------------------
 
 
 class FakeCase:
@@ -175,9 +171,7 @@ class FakeCase:
         return self._uuid
 
 
-# ===========================================================================
 # Group 1: _parse_diff_files — git diff --name-only parsing
-# ===========================================================================
 
 
 class TestParseDiffFiles(unittest.TestCase):
@@ -211,9 +205,7 @@ class TestParseDiffFiles(unittest.TestCase):
         assert "CMakeLists.txt" in result
 
 
-# ===========================================================================
 # Group 2: should_run_all_tests — ALWAYS_RUN_ALL detection
-# ===========================================================================
 
 
 class TestShouldRunAllTests(unittest.TestCase):
@@ -280,9 +272,7 @@ class TestShouldRunAllTests(unittest.TestCase):
         )
 
 
-# ===========================================================================
 # Group 3: filter_tests_by_coverage — core file-level selection logic
-# ===========================================================================
 
 
 class TestFilterTestsByCoverage(unittest.TestCase):
@@ -428,9 +418,7 @@ class TestFilterTestsByCoverage(unittest.TestCase):
         assert len(skipped) == 1
 
 
-# ===========================================================================
 # Group 4: Corner cases from design discussion
-# ===========================================================================
 
 
 class TestDesignCornerCases(unittest.TestCase):
@@ -487,9 +475,7 @@ class TestDesignCornerCases(unittest.TestCase):
         assert len(skipped) == 3
 
 
-# ===========================================================================
 # Group 5: _parse_gcov_json_output — gcov JSON parsing (file-level)
-# ===========================================================================
 
 
 class TestParseGcovJsonOutput(unittest.TestCase):
@@ -650,9 +636,7 @@ class TestParseGcovJsonOutput(unittest.TestCase):
         assert result == {"src/simulation/m_rhs.fpp"}
 
 
-# ===========================================================================
 # Group 6: _normalize_cache — old format conversion
-# ===========================================================================
 
 
 class TestNormalizeCache(unittest.TestCase):
@@ -690,9 +674,7 @@ class TestNormalizeCache(unittest.TestCase):
         assert result["TEST_A"] == []
 
 
-# ===========================================================================
 # Group 7: Cache path format
-# ===========================================================================
 
 
 class TestCachePath(unittest.TestCase):
@@ -701,9 +683,7 @@ class TestCachePath(unittest.TestCase):
         assert str(COVERAGE_CACHE_PATH).endswith(".json.gz")
 
 
-# ===========================================================================
 # Group 8: _compute_gcov_prefix_strip
-# ===========================================================================
 
 
 class TestComputeGcovPrefixStrip(unittest.TestCase):
@@ -724,9 +704,7 @@ class TestComputeGcovPrefixStrip(unittest.TestCase):
         assert result == "5"
 
 
-# ===========================================================================
 # Group 9: load_coverage_cache
-# ===========================================================================
 
 
 class TestLoadCoverageCache(unittest.TestCase):
