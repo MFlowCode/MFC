@@ -27,9 +27,7 @@ FIX_3D_SILO = os.path.join(FIXTURES, "3d_silo")
 FIX_1D_BIN_2RANK = os.path.join(FIXTURES, "1d_binary_2rank")
 
 
-# ---------------------------------------------------------------------------
 # Tests: _parse_steps
-# ---------------------------------------------------------------------------
 
 
 class TestParseSteps(unittest.TestCase):
@@ -135,9 +133,7 @@ class TestParseSteps(unittest.TestCase):
             self._parse("0-100", [0, 100])
 
 
-# ---------------------------------------------------------------------------
 # Tests: pretty_label
-# ---------------------------------------------------------------------------
 
 
 @unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
@@ -169,9 +165,7 @@ class TestPrettyLabel(unittest.TestCase):
         self.assertEqual(self._label("my_custom_var"), "my_custom_var")
 
 
-# ---------------------------------------------------------------------------
 # Tests: discover_format
-# ---------------------------------------------------------------------------
 
 
 class TestDiscoverFormat(unittest.TestCase):
@@ -201,9 +195,7 @@ class TestDiscoverFormat(unittest.TestCase):
             os.rmdir(d)
 
 
-# ---------------------------------------------------------------------------
 # Tests: discover_timesteps
-# ---------------------------------------------------------------------------
 
 
 class TestDiscoverTimesteps(unittest.TestCase):
@@ -228,9 +220,7 @@ class TestDiscoverTimesteps(unittest.TestCase):
         self.assertGreater(len(steps), 1)
 
 
-# ---------------------------------------------------------------------------
 # Tests: binary read + assemble (1D, 2D, 3D)
-# ---------------------------------------------------------------------------
 
 
 class TestAssembleBinary1D(unittest.TestCase):
@@ -350,9 +340,7 @@ class TestAssembleBinary3D(unittest.TestCase):
         self.assertEqual(pres.shape, (len(data.x_cc), len(data.y_cc), len(data.z_cc)))
 
 
-# ---------------------------------------------------------------------------
 # Tests: silo read + assemble (1D, 2D, 3D)
-# ---------------------------------------------------------------------------
 
 
 class TestAssembleSilo1D(unittest.TestCase):
@@ -413,9 +401,7 @@ class TestAssembleSilo3D(unittest.TestCase):
         self.assertEqual(pres.shape, (len(data.x_cc), len(data.y_cc), len(data.z_cc)))
 
 
-# ---------------------------------------------------------------------------
 # Tests: binary vs silo consistency
-# ---------------------------------------------------------------------------
 
 
 class TestBinarySiloConsistency(unittest.TestCase):
@@ -462,9 +448,7 @@ class TestBinarySiloConsistency(unittest.TestCase):
             )
 
 
-# ---------------------------------------------------------------------------
 # Tests: 1D rendering (requires matplotlib/imageio)
-# ---------------------------------------------------------------------------
 
 
 @unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
@@ -542,9 +526,7 @@ class TestRender3DSlice(unittest.TestCase):
             os.unlink(out)
 
 
-# ---------------------------------------------------------------------------
 # Tests: _steps_hint
-# ---------------------------------------------------------------------------
 
 
 class TestStepsHint(unittest.TestCase):
@@ -576,9 +558,7 @@ class TestStepsHint(unittest.TestCase):
         self.assertIn("1900", result)  # tail present
 
 
-# ---------------------------------------------------------------------------
 # Tests: _validate_cmap
-# ---------------------------------------------------------------------------
 
 
 class TestValidateCmap(unittest.TestCase):
@@ -611,9 +591,7 @@ class TestValidateCmap(unittest.TestCase):
         self.assertIn("viridis", str(ctx.exception))
 
 
-# ---------------------------------------------------------------------------
 # Tests: bounded TUI cache
-# ---------------------------------------------------------------------------
 
 
 class TestTuiCache(unittest.TestCase):
@@ -665,9 +643,7 @@ class TestTuiCache(unittest.TestCase):
         self.assertEqual(self._mod._cache[0], "preloaded")
 
 
-# ---------------------------------------------------------------------------
 # Tests: log scale rendering (new feature smoke tests)
-# ---------------------------------------------------------------------------
 
 
 @unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
@@ -705,9 +681,7 @@ class TestRenderLogScale(unittest.TestCase):
             os.unlink(out)
 
 
-# ---------------------------------------------------------------------------
 # Tests: multi-rank assembly (ghost-cell deduplication)
-# ---------------------------------------------------------------------------
 
 
 class TestMultiRankAssembly(unittest.TestCase):
@@ -794,9 +768,7 @@ class TestMultiRankAssembly(unittest.TestCase):
         np.testing.assert_allclose(result.variables["pres"], [1.0, 2.0, 3.0, 4.0])
 
 
-# ---------------------------------------------------------------------------
 # Tests: render_2d_tiled
-# ---------------------------------------------------------------------------
 
 
 @unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
@@ -819,9 +791,7 @@ class TestRender2DTiled(unittest.TestCase):
             os.unlink(out)
 
 
-# ---------------------------------------------------------------------------
 # Tests: render_3d_slice non-default axes and selectors
-# ---------------------------------------------------------------------------
 
 
 @unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
@@ -863,9 +833,7 @@ class TestRender3DSliceAxes(unittest.TestCase):
         self._render(slice_value=z_mid)
 
 
-# ---------------------------------------------------------------------------
 # Tests: render_mp4
-# ---------------------------------------------------------------------------
 
 
 @unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
@@ -919,9 +887,7 @@ class TestRenderMp4(unittest.TestCase):
             render_mp4("pres", [], "/tmp/unused.mp4", read_func=lambda s: None)
 
 
-# ---------------------------------------------------------------------------
 # Tests: silo assemble_silo var_filter
-# ---------------------------------------------------------------------------
 
 
 class TestAssembleSiloVarFilter(unittest.TestCase):

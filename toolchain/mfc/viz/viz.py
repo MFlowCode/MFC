@@ -341,7 +341,7 @@ def viz():
         run_interactive(init_var, requested_steps, read_step, port=int(port), host=str(host), bubble_func=bubble_func, read_one_var_func=read_step_one_var)
         return
 
-    # --- PNG / MP4 rendering options (not used by TUI or interactive) ---
+    # PNG / MP4 rendering options (not used by TUI or interactive)
     render_opts = {
         "cmap": ARG("cmap"),
         "dpi": ARG("dpi"),

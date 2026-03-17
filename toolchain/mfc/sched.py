@@ -122,7 +122,7 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Optional[typi
             case_uuid = case.get_uuid() if hasattr(case, "get_uuid") else "unknown"
             case_trace = getattr(case, "trace", "")
 
-            # --- interactive: dimension-aware thresholds ---
+            # interactive: dimension-aware thresholds
             if interactive:
                 threshold = get_threshold_for_case(case)
 
@@ -137,7 +137,7 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Optional[typi
                         cons.print(f"  [italic yellow]Still running[/italic yellow] ({dim_label}, >{time_label}) [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
                         holder.notified_interactive = True
 
-            # --- headless: milestone notifications at 2, 10, 30 minutes ---
+            # headless: milestone notifications at 2, 10, 30 minutes
             else:
                 # 2 minutes
                 if (not holder.notified_2m) and elapsed >= 2 * 60:

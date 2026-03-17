@@ -213,7 +213,10 @@ def check_double_precision(repo_root: Path) -> list[str]:
 
 
 def check_junk_code(repo_root: Path) -> list[str]:
-    """Flag junk patterns (..., ---, ===) in Fortran source."""
+    """Flag junk patterns (..., ---, ===) in Fortran source, including comments.
+
+    Separator comments like ``! ========`` are also forbidden.
+    """
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
     junk_re = re.compile(r"\.\.\.|---|===")
@@ -224,10 +227,9 @@ def check_junk_code(repo_root: Path) -> list[str]:
 
         for i, line in enumerate(lines):
             stripped = line.strip()
-            if _is_comment_or_blank(stripped):
+            if not stripped or stripped.startswith("#:"):
                 continue
-            code = stripped.split("!")[0]
-            match = junk_re.search(code)
+            match = junk_re.search(stripped)
             if match:
                 errors.append(f"  {rel}:{i + 1} junk code pattern '{match.group()}'. Fix: remove placeholder/separator text")
 
@@ -263,11 +265,16 @@ def check_false_integers(repo_root: Path) -> list[str]:
 
 
 def check_junk_comments(repo_root: Path) -> list[str]:
-    """Flag junk separator comments (# ===, ===) in example and benchmark Python files."""
-    errors: list[str] = []
-    junk_re = re.compile(r"#\s*===|===")
+    """Flag junk separator patterns (===, ----+) in Python and shell scripts.
 
-    for subdir in ["examples", "benchmarks"]:
+    Three dashes (---) is valid markdown, but four or more is a separator.
+    Checks both comment lines and echo/print statements with separator strings.
+    """
+    errors: list[str] = []
+    junk_re = re.compile(r"===|-{4,}")
+
+    # Python files: check comment lines
+    for subdir in ["examples", "benchmarks", "toolchain"]:
         d = repo_root / subdir
         if not d.exists():
             continue
@@ -276,8 +283,31 @@ def check_junk_comments(repo_root: Path) -> list[str]:
             rel = py.relative_to(repo_root)
 
             for i, line in enumerate(lines):
-                if junk_re.search(line):
-                    errors.append(f"  {rel}:{i + 1} junk separator comment. Fix: remove '===' patterns")
+                stripped = line.strip()
+                if not stripped.startswith("#"):
+                    continue
+                match = junk_re.search(stripped)
+                if match:
+                    errors.append(f"  {rel}:{i + 1} junk separator pattern '{match.group()}'. Fix: remove separator comment")
+
+    # Shell files: check comments and overly long echo separators
+    long_sep_re = re.compile(r"[=]{21,}|-{21,}")
+    for subdir in ["toolchain", ".github"]:
+        d = repo_root / subdir
+        if not d.exists():
+            continue
+        for sh in sorted(d.rglob("*.sh")):
+            lines = sh.read_text(encoding="utf-8").splitlines()
+            rel = sh.relative_to(repo_root)
+
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    match = junk_re.search(stripped)
+                    if match:
+                        errors.append(f"  {rel}:{i + 1} junk separator pattern '{match.group()}'. Fix: remove separator comment")
+                elif long_sep_re.search(stripped):
+                    errors.append(f"  {rel}:{i + 1} echo separator too long (max 20 chars). Fix: shorten to 20 or fewer")
 
     return errors
 

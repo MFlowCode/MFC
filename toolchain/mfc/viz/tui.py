@@ -72,9 +72,7 @@ _ASPECT_MAX: float = 5.0
 _HEADER_ROWS: int = 1
 
 
-# ---------------------------------------------------------------------------
 # Plot widget
-# ---------------------------------------------------------------------------
 
 
 class MFCPlot(PlotextPlot):
@@ -125,9 +123,7 @@ class MFCPlot(PlotextPlot):
         self._last_ix: Optional[np.ndarray] = None
         self._last_iy: Optional[np.ndarray] = None
 
-    # ------------------------------------------------------------------
     # Zoom helpers (Feature 6)
-    # ------------------------------------------------------------------
 
     def reset_zoom(self) -> None:
         """Reset to full view."""
@@ -154,9 +150,7 @@ class MFCPlot(PlotextPlot):
             return
         self._zoom = (new_x0, new_x1, new_y0, new_y1)
 
-    # ------------------------------------------------------------------
     # Mouse scroll handlers — zoom (Feature 6)
-    # ------------------------------------------------------------------
 
     def _scroll_zoom(self, event, factor: float) -> None:
         """Zoom by *factor* centred on the scroll cursor position."""
@@ -389,9 +383,7 @@ class MFCPlot(PlotextPlot):
         return RichGroup(header, *lines, footer)
 
 
-# ---------------------------------------------------------------------------
 # Main TUI app
-# ---------------------------------------------------------------------------
 
 
 class MFCTuiApp(App):
@@ -500,9 +492,7 @@ class MFCTuiApp(App):
                 lv.index = i
                 break
 
-    # ------------------------------------------------------------------
     # Reactive watchers
-    # ------------------------------------------------------------------
 
     def watch_step_idx(self, _old: int, _new: int) -> None:
         self._click_info = ""
@@ -524,18 +514,14 @@ class MFCTuiApp(App):
             self._play_timer.stop()
             self._play_timer = None
 
-    # ------------------------------------------------------------------
     # MFCPlot.Clicked handler — update status bar (Feature 5)
-    # ------------------------------------------------------------------
 
     def on_mfcplot_clicked(self, event: MFCPlot.Clicked) -> None:
         """Receive the heatmap click message and update the status bar."""
         self._click_info = f"  │  x={event.x_val:.4f}  y={event.y_val:.4f}  val={event.val:.6g}"
         self.query_one("#status", Static).update(self._status_text())
 
-    # ------------------------------------------------------------------
     # Background data loading (Feature 4)
-    # ------------------------------------------------------------------
 
     @work(exclusive=True, thread=True)
     def _push_data(self) -> None:
@@ -617,9 +603,7 @@ class MFCTuiApp(App):
 
         self.query_one("#status", Static).update(self._status_text())
 
-    # ------------------------------------------------------------------
     # Helpers
-    # ------------------------------------------------------------------
 
     def _status_text(self) -> str:
         step = self._steps[self.step_idx] if self._steps else 0
@@ -634,9 +618,7 @@ class MFCTuiApp(App):
         flag_str = ("  " + "  ".join(flags)) if flags else ""
         return f" step {step}  [{self.step_idx + 1}/{total}]  var: {self.var_name}  cmap: {self.cmap_name}{flag_str}{self._click_info}"
 
-    # ------------------------------------------------------------------
     # Actions
-    # ------------------------------------------------------------------
 
     @on(ListView.Selected, "#var-list")
     def on_var_selected(self, event: ListView.Selected) -> None:
@@ -678,9 +660,7 @@ class MFCTuiApp(App):
         self.step_idx = (self.step_idx + 1) % len(self._steps)
 
 
-# ---------------------------------------------------------------------------
 # Public entry point
-# ---------------------------------------------------------------------------
 
 
 def run_tui(
