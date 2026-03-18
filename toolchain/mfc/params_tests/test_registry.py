@@ -168,6 +168,35 @@ class TestIndexedFamily(unittest.TestCase):
         self.assertIsNone(reg.get_param_def("thing(1)%bogus"))
         self.assertIsNone(reg.get_param_def("unknown(1)%geom"))
 
+    def test_all_params_iteration_bounded(self):
+        """Iterating all_params should yield scalars + one example per family attr."""
+        reg = ParamRegistry()
+        reg.register(ParamDef(name="scalar1", param_type=ParamType.INT))
+        reg.register(ParamDef(name="scalar2", param_type=ParamType.REAL))
+        reg.register_family(
+            IndexedFamily(
+                base_name="thing",
+                attrs={
+                    "geom": (ParamType.INT, {"tag1"}),
+                    "vel(1)": (ParamType.REAL, {"tag1"}),
+                },
+                tags={"tag1"},
+            )
+        )
+        reg.freeze()
+
+        keys = list(reg.all_params)
+        # 2 scalars + 2 family attrs (one example each at index=1)
+        self.assertEqual(len(reg.all_params), 4)
+        self.assertEqual(len(keys), 4)
+        self.assertIn("scalar1", keys)
+        self.assertIn("scalar2", keys)
+        # Family examples use index=1
+        self.assertIn("thing(1)%geom", keys)
+        self.assertIn("thing(1)%vel(1)", keys)
+        # Arbitrary indices should NOT appear in iteration
+        self.assertNotIn("thing(42)%geom", keys)
+
     def test_all_params_contains_family(self):
         """all_params mapping should resolve family params via __contains__."""
         reg = self._make_registry_with_family()

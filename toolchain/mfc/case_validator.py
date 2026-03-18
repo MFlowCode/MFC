@@ -560,6 +560,7 @@ class CaseValidator:
 
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
         self.prohibit(ib and num_ibs <= 0, "num_ibs must be >= 1 when ib is enabled")
+        self.prohibit(ib and num_ibs > 1000, "num_ibs must be <= 1000 (num_patches_max in m_constants.fpp)")
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 

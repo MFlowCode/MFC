@@ -46,9 +46,14 @@ from .suggest import suggest_parameter
 
 def _family_attr_error(name: str) -> Optional[str]:
     """
-    Check if name matches a known family base but has an invalid attribute.
+    Diagnose why a family-pattern param was rejected by the registry.
 
-    Returns a targeted error message if so, or None if it doesn't match
+    Distinguishes three cases for known family bases:
+    - Invalid index (0 or exceeding max_index)
+    - Unknown attribute
+    - Unknown family base (returns None to let caller handle)
+
+    Returns a targeted error message, or None if name doesn't match
     any family pattern.
     """
     from .registry import _INDEXED_RE
@@ -56,13 +61,22 @@ def _family_attr_error(name: str) -> Optional[str]:
     m = _INDEXED_RE.match(name)
     if m is None:
         return None
-    base, _, attr = m.groups()
+    base, idx_str, attr = m.groups()
     fam = REGISTRY.families.get(base)
     if fam is None:
         return None
-    # Known family, unknown attribute — provide targeted message
+
+    # Check if the problem is the index (attr is valid but index is out of range)
+    idx = int(idx_str)
+    if attr in fam.attrs:
+        if idx < 1:
+            return f"Invalid index {idx} for {base}: indices are 1-based (must be >= 1)"
+        if fam.max_index is not None and idx > fam.max_index:
+            return f"Index {idx} exceeds maximum ({fam.max_index}) for {base}"
+        return None  # Both attr and index look valid; shouldn't reach here
+
+    # Unknown attribute — provide targeted message
     valid = sorted(fam.attrs.keys())
-    # Truncate long lists
     if len(valid) > 8:
         shown = ", ".join(valid[:8]) + f", ... ({len(valid)} total)"
     else:

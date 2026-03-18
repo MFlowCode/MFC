@@ -76,20 +76,21 @@ def _resolve_family(
     return entry if entry is not None else None
 
 
-@dataclass
+@dataclass(frozen=True)
 class IndexedFamily:
     """
     Template for an indexed parameter family like patch_ib(N)%attr.
 
-    Instead of registering patch_ib(1)%geometry through patch_ib(1000000)%geometry
-    individually (~30M entries), we store one template with the attribute definitions
-    and validate parameter names via pattern matching.
+    Instead of registering every index individually (e.g., patch_ib(1)%geometry
+    through patch_ib(N)%geometry for all attributes), we store one template and
+    validate parameter names via pattern matching.
 
     Attributes:
         base_name: Family prefix (e.g., "patch_ib")
         attrs: Mapping of attribute name to (ParamType, tags) — attribute names
                may include sub-indices like "vel(1)", "angles(3)".
-        tags: Default tags applied to all attributes in this family.
+        tags: Metadata-only tags for this family (not used in resolution;
+              per-attribute tags in ``attrs`` are what get returned).
         max_index: Upper bound on the index (1-based). None = unlimited.
     """
 

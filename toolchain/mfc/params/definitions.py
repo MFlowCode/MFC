@@ -1137,9 +1137,9 @@ def _load():
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
-    # max_index is intentionally None (unlimited): the Fortran side allocates
-    # 1:num_ibs and the case_validator enforces num_ibs >= 1 when ib is enabled.
-    # Indices beyond num_ibs are harmless (ignored at runtime).
+    # max_index is None so the parameter registry stays compact (no enumeration).
+    # The Fortran-side upper bound (num_patches_max = 1000 in m_constants.fpp) is
+    # enforced by the case_validator check on num_ibs, not by max_index here.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm"]:
