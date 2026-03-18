@@ -206,7 +206,7 @@ def _compute_gcov_prefix_strip(root_dir: str) -> str:
     return str(len(Path(real_root).parts) - 1)  # -1 excludes root '/'
 
 
-def _collect_single_test_coverage(  # pylint: disable=too-many-locals
+def _collect_single_test_coverage(
     uuid: str,
     test_gcda: str,
     root_dir: str,
@@ -286,7 +286,7 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
     return uuid, sorted(coverage)
 
 
-def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple:  # pylint: disable=too-many-locals
+def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple:
     """
     Run a single test by invoking Fortran executables directly.
 
@@ -352,7 +352,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     return uuid, test_gcda, failures
 
 
-def _prepare_test(case) -> dict:  # pylint: disable=too-many-locals
+def _prepare_test(case) -> dict:
     """
     Prepare a test for direct execution: create directory, generate .inp
     files, and resolve binary paths.  All Python/toolchain overhead happens
@@ -445,7 +445,7 @@ def _prepare_test(case) -> dict:  # pylint: disable=too-many-locals
     }
 
 
-def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
+def build_coverage_cache(
     root_dir: str,
     cases: list,
     n_jobs: Optional[int] = None,
@@ -490,7 +490,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
     for i, case in enumerate(cases):
         try:
             test_infos.append(_prepare_test(case))
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:
             cons.print(f"  [yellow]Warning: skipping {case.get_uuid()} — prep failed: {exc}[/yellow]")
         if (i + 1) % 100 == 0 or (i + 1) == len(cases):
             cons.print(f"  [{i + 1:3d}/{len(cases):3d}] prepared")
@@ -507,7 +507,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
             for i, future in enumerate(as_completed(futures)):
                 try:
                     uuid, test_gcda, failures = future.result()
-                except Exception as exc:  # pylint: disable=broad-except
+                except Exception as exc:
                     info = futures[future]
                     cons.print(f"  [yellow]Warning: {info['uuid']} failed to run: {exc}[/yellow]")
                     continue
@@ -560,7 +560,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
             for future in as_completed(futures):
                 try:
                     uuid, coverage = future.result()
-                except Exception as exc:  # pylint: disable=broad-except
+                except Exception as exc:
                     uuid = futures[future]
                     cons.print(f"  [yellow]Warning: {uuid} coverage failed: {exc}[/yellow]")
                     # Do NOT store entry — absent entries are conservatively
