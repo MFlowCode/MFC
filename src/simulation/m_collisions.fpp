@@ -122,10 +122,10 @@ contains
                     eta = damping_parameter*effective_mass
 
                     ! Get the vectors and velcoities
-                    radial_vector = normal_vector * (patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
+                    radial_vector = normal_vector*(patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
                     call s_cross_product(patch_ib(pid1)%angular_vel, radial_vector, rotation_velocity)
                     vel1 = patch_ib(pid1)%vel + rotation_velocity
-                    radial_vector = normal_vector * (-1.0_wp) * (patch_ib(pid2)%radius - 0.5_wp*overlap_distance)
+                    radial_vector = normal_vector*(-1.0_wp)*(patch_ib(pid2)%radius - 0.5_wp*overlap_distance)
                     call s_cross_product(patch_ib(pid2)%angular_vel, radial_vector, rotation_velocity)
                     vel2 = patch_ib(pid2)%vel + rotation_velocity
 
@@ -149,7 +149,7 @@ contains
                         $:GPU_ATOMIC(atomic='update')
                         forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
-                        torques(pid2, l) = torques(pid2, l) - torque(l) * patch_ib(pid2)%radius / patch_ib(pid1)%radius
+                        torques(pid2, l) = torques(pid2, l) - torque(l)*patch_ib(pid2)%radius/patch_ib(pid1)%radius
                     end do
                 end if
             end if
@@ -197,7 +197,7 @@ contains
                     eta = damping_parameter*patch_ib(patch_id)%mass
 
                     ! get the vector that points from the centroid to the point of collision
-                    radial_vector = normal_vector * (patch_ib(patch_id)%radius - wall_overlap_distances(patch_id, i))
+                    radial_vector = normal_vector*(patch_ib(patch_id)%radius - wall_overlap_distances(patch_id, i))
                     ! convert the angular velocity to linear velocity
                     call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
                     velocity = patch_ib(patch_id)%vel + rotation_velocity
@@ -290,7 +290,7 @@ contains
             ! skip self-collisions (an IB cannot collide with its own periodic image)
             if (decoded_pairs(1) == decoded_pairs(2)) cycle
 
-            ! need to swap to garuntee the smaller decoded marker value is in index 1 and prevent double-counting
+            ! need to swap to guarantee the smaller decoded marker value is in index 1 and prevent double-counting
             if (decoded_pairs(2) < decoded_pairs(1)) then
                 decoded_pairs(1) = decoded_pairs(1) + decoded_pairs(2)
                 decoded_pairs(2) = decoded_pairs(1) - decoded_pairs(2)
