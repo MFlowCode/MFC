@@ -464,6 +464,43 @@ def parse_all_namelists(mfc_root: Path) -> Dict[str, Set[str]]:
     return result
 
 
+def parse_fortran_constants(filepath: Path) -> Dict[str, int]:
+    """
+    Parse integer parameter constants from a Fortran source file.
+
+    Extracts lines like ``integer, parameter :: name = 123`` and returns
+    a dict mapping constant names to their integer values.
+    """
+    constants: Dict[str, int] = {}
+    pattern = re.compile(
+        r"integer\s*,\s*parameter\s*::\s*(\w+)\s*=\s*(\d+)", re.IGNORECASE
+    )
+    try:
+        text = filepath.read_text()
+    except FileNotFoundError:
+        return constants
+    for m in pattern.finditer(text):
+        constants[m.group(1)] = int(m.group(2))
+    return constants
+
+
+# Module-level cache for Fortran constants
+_FORTRAN_CONSTANTS_CACHE: Dict[str, int] = {}
+
+
+def get_fortran_constants() -> Dict[str, int]:
+    """
+    Get Fortran compile-time constants from m_constants.fpp.
+
+    Cached after first call. Returns empty dict if source unavailable.
+    """
+    if not _FORTRAN_CONSTANTS_CACHE:
+        root = get_mfc_root()
+        path = root / "src" / "common" / "m_constants.fpp"
+        _FORTRAN_CONSTANTS_CACHE.update(parse_fortran_constants(path))
+    return _FORTRAN_CONSTANTS_CACHE
+
+
 def get_mfc_root() -> Path:
     """Get the MFC root directory from this file's location."""
     # This file is at toolchain/mfc/params/namelist_parser.py

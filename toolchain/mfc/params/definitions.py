@@ -8,11 +8,34 @@ This replaces the definitions/ directory.
 import re
 from typing import Any, Dict
 
+from .namelist_parser import get_fortran_constants
 from .registry import REGISTRY, IndexedFamily
 from .schema import ParamDef, ParamType
 
-# Index limits
-NP, NF, NA, NPR, NB = 10, 10, 4, 10, 10  # patches, fluids, acoustic, probes, bc_patches
+# Index limits — sourced from Fortran compile-time constants (m_constants.fpp).
+# These must stay in sync with Fortran; we error if the source can't be parsed.
+_FC = get_fortran_constants()
+
+
+def _fc(name: str) -> int:
+    """Get a required Fortran constant, raising if unavailable."""
+    if name not in _FC:
+        raise RuntimeError(
+            f"Fortran constant '{name}' not found in m_constants.fpp. "
+            f"Toolchain is out of sync with Fortran source."
+        )
+    return _FC[name]
+
+
+NF = _fc("num_fluids_max")  # fluid_pp
+NPR = _fc("num_probes_max")  # probe, acoustic, integral
+NB = _fc("num_bc_patches_max")  # patch_bc
+NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp, patch_ib (Fortran array bound)
+# Enumeration limits for families not yet converted to IndexedFamily.
+# These are smaller than the Fortran array bounds to keep the registry compact.
+# The CONSTRAINTS dict below uses the Fortran constants for validation.
+NP = 10  # patch_icpp: has per-index variations, can't easily be IndexedFamily
+NA = 4  # acoustic sources: enumerated individually
 
 
 # Auto-generated Descriptions
@@ -637,8 +660,8 @@ CONSTRAINTS = {
     "R0ref": {"min": 0},
     "sigma": {"min": 0},
     # Counts (must be positive)
-    "num_fluids": {"min": 1, "max": 10},
-    "num_patches": {"min": 0, "max": 10},
+    "num_fluids": {"min": 1, "max": NF},
+    "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
@@ -1138,8 +1161,8 @@ def _load():
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
     # max_index is None so the parameter registry stays compact (no enumeration).
-    # The Fortran-side upper bound (num_patches_max = 1000 in m_constants.fpp) is
-    # enforced by the case_validator check on num_ibs, not by max_index here.
+    # The Fortran-side upper bound (num_patches_max in m_constants.fpp) is parsed
+    # and enforced by the case_validator, not by max_index here.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm"]:
