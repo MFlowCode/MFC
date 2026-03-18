@@ -23,11 +23,12 @@ register new parameters will raise RegistryFrozenError.
 # and freezes it. It must come after REGISTRY is imported and must not be removed.
 from . import definitions  # noqa: F401
 from .definitions import CONSTRAINTS, DEPENDENCIES, get_value_label
-from .registry import REGISTRY, RegistryFrozenError
+from .registry import REGISTRY, IndexedFamily, RegistryFrozenError
 from .schema import ParamDef, ParamType
 
 __all__ = [
     "REGISTRY",
+    "IndexedFamily",
     "RegistryFrozenError",
     "ParamDef",
     "ParamType",

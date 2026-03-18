@@ -191,7 +191,7 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
-        ! set the Moving IBM interior Pressure Values
+        ! set the Moving IBM interior conservative variables
         $:GPU_PARALLEL_LOOP(private='[i,j,k,patch_id,rho]', copyin='[E_idx,momxb]', collapse=3)
         do l = 0, p
             do k = 0, n
