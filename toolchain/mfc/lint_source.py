@@ -312,6 +312,33 @@ def check_junk_comments(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_pylint_directives(repo_root: Path) -> list[str]:
+    """Flag ``# pylint:`` directives in Python files.
+
+    MFC uses ruff for linting; leftover pylint directives are dead code.
+    """
+    errors: list[str] = []
+    pylint_re = re.compile(r"#\s*pylint\s*:", re.IGNORECASE)
+    self_path = Path(__file__).resolve()
+
+    for subdir in ["examples", "benchmarks", "toolchain"]:
+        d = repo_root / subdir
+        if not d.exists():
+            continue
+        for py in sorted(d.rglob("*.py")):
+            if py.resolve() == self_path:
+                continue
+            lines = py.read_text(encoding="utf-8").splitlines()
+            rel = py.relative_to(repo_root)
+
+            for i, line in enumerate(lines):
+                match = pylint_re.search(line)
+                if match:
+                    errors.append(f"  {rel}:{i + 1} pylint directive. Fix: remove (use ruff noqa comments if needed)")
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -324,6 +351,7 @@ def main():
     all_errors.extend(check_fypp_list_duplicates(repo_root))
     all_errors.extend(check_duplicate_lines(repo_root))
     all_errors.extend(check_hardcoded_byte_size(repo_root))
+    all_errors.extend(check_pylint_directives(repo_root))
 
     if all_errors:
         print("Source lint failed:")
