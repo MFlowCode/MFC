@@ -7,7 +7,6 @@ Run with:
 These tests are fully offline (no build, no git, no gcov binary required).
 They use mocks and in-memory data structures to verify logic.
 """
-# pylint: disable=protected-access,exec-used,too-few-public-methods,wrong-import-position
 
 import gzip
 import hashlib
