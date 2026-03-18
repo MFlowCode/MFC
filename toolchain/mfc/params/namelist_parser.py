@@ -11,7 +11,7 @@ fallback parameter set is used instead.
 
 import re
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Optional, Set
 
 # Fallback parameters for when Fortran source files are not available.
 # Generated from the namelist definitions in src/*/m_start_up.fpp.
@@ -484,8 +484,8 @@ def parse_fortran_constants(filepath: Path) -> Dict[str, int]:
     return constants
 
 
-# Module-level cache for Fortran constants
-_FORTRAN_CONSTANTS_CACHE: Dict[str, int] = {}
+# Module-level cache for Fortran constants (None = not yet loaded)
+_FORTRAN_CONSTANTS_CACHE: Optional[Dict[str, int]] = None
 
 
 def get_fortran_constants() -> Dict[str, int]:
@@ -494,10 +494,11 @@ def get_fortran_constants() -> Dict[str, int]:
 
     Cached after first call. Returns empty dict if source unavailable.
     """
-    if not _FORTRAN_CONSTANTS_CACHE:
+    global _FORTRAN_CONSTANTS_CACHE  # noqa: PLW0603
+    if _FORTRAN_CONSTANTS_CACHE is None:
         root = get_mfc_root()
         path = root / "src" / "common" / "m_constants.fpp"
-        _FORTRAN_CONSTANTS_CACHE.update(parse_fortran_constants(path))
+        _FORTRAN_CONSTANTS_CACHE = parse_fortran_constants(path)
     return _FORTRAN_CONSTANTS_CACHE
 
 
