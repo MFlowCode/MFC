@@ -8,11 +8,34 @@ This replaces the definitions/ directory.
 import re
 from typing import Any, Dict
 
-from .registry import REGISTRY
+from .namelist_parser import get_fortran_constants
+from .registry import REGISTRY, IndexedFamily
 from .schema import ParamDef, ParamType
 
-# Index limits
-NP, NF, NI, NA, NPR, NB = 10, 10, 1000, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
+# Index limits — sourced from Fortran compile-time constants (m_constants.fpp).
+# These must stay in sync with Fortran; we error if the source can't be parsed.
+_FC = get_fortran_constants()
+
+
+def _fc(name: str) -> int:
+    """Get a required Fortran constant, raising if unavailable."""
+    if name not in _FC:
+        raise RuntimeError(
+            f"Fortran constant '{name}' not found in m_constants.fpp. "
+            f"Toolchain is out of sync with Fortran source."
+        )
+    return _FC[name]
+
+
+NF = _fc("num_fluids_max")  # fluid_pp
+NPR = _fc("num_probes_max")  # probe, acoustic, integral
+NB = _fc("num_bc_patches_max")  # patch_bc
+NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp, patch_ib (Fortran array bound)
+# Enumeration limits for families not yet converted to IndexedFamily.
+# These are smaller than the Fortran array bounds to keep the registry compact.
+# The CONSTRAINTS dict below uses the Fortran constants for validation.
+NP = 10  # patch_icpp: has per-index variations, can't easily be IndexedFamily
+NA = 4  # acoustic sources: enumerated individually
 
 
 # Auto-generated Descriptions
@@ -641,9 +664,9 @@ CONSTRAINTS = {
     "R0ref": {"min": 0},
     "sigma": {"min": 0},
     # Counts (must be positive)
-    "num_fluids": {"min": 1, "max": 10},
-    "num_patches": {"min": 0, "max": 10},
-    "num_ibs": {"min": 0, "max": 1000},
+    "num_fluids": {"min": 1, "max": NF},
+    "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
+    "num_ibs": {"min": 0},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "num_integrals": {"min": 1},
@@ -1149,26 +1172,37 @@ def _load():
     ]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
-    # patch_ib (10 immersed boundaries)
-    for i in range(1, NI + 1):
-        px = f"patch_ib({i})%"
-        for a in ["geometry", "moving_ibm"]:
-            _r(f"{px}{a}", INT, {"ib"})
-        for a, pt in [("radius", REAL), ("theta", REAL), ("slip", LOG), ("c", REAL), ("p", REAL), ("t", REAL), ("m", REAL), ("mass", REAL)]:
-            _r(f"{px}{a}", pt, {"ib"})
+    # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
+    # max_index is None so the parameter registry stays compact (no enumeration).
+    # The Fortran-side upper bound (num_patches_max in m_constants.fpp) is parsed
+    # and enforced by the case_validator, not by max_index here.
+    _ib_tags = {"ib"}
+    _ib_attrs: Dict[str, tuple] = {}
+    for a in ["geometry", "moving_ibm"]:
+        _ib_attrs[a] = (INT, _ib_tags)
+    for a, pt in [("radius", REAL), ("theta", REAL), ("slip", LOG), ("c", REAL), ("p", REAL), ("t", REAL), ("m", REAL), ("mass", REAL)]:
+        _ib_attrs[a] = (pt, _ib_tags)
+    for j in range(1, 4):
+        _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
+    for d in ["x", "y", "z"]:
+        _ib_attrs[f"{d}_centroid"] = (REAL, _ib_tags)
+        _ib_attrs[f"length_{d}"] = (REAL, _ib_tags)
+    for a, pt in [("model_filepath", STR), ("model_spc", INT), ("model_threshold", REAL)]:
+        _ib_attrs[a] = (pt, _ib_tags)
+    for t in ["translate", "scale", "rotate"]:
         for j in range(1, 4):
-            _r(f"{px}angles({j})", REAL, {"ib"})
-        for d in ["x", "y", "z"]:
-            _r(f"{px}{d}_centroid", REAL, {"ib"})
-            _r(f"{px}length_{d}", REAL, {"ib"})
-        for a, pt in [("model_filepath", STR), ("model_spc", INT), ("model_threshold", REAL)]:
-            _r(f"{px}{a}", pt, {"ib"})
-        for t in ["translate", "scale", "rotate"]:
-            for j in range(1, 4):
-                _r(f"{px}model_{t}({j})", REAL, {"ib"})
-        for j in range(1, 4):
-            _r(f"{px}vel({j})", A_REAL, {"ib"})
-            _r(f"{px}angular_vel({j})", A_REAL, {"ib"})
+            _ib_attrs[f"model_{t}({j})"] = (REAL, _ib_tags)
+    for j in range(1, 4):
+        _ib_attrs[f"vel({j})"] = (A_REAL, _ib_tags)
+        _ib_attrs[f"angular_vel({j})"] = (A_REAL, _ib_tags)
+    REGISTRY.register_family(
+        IndexedFamily(
+            base_name="patch_ib",
+            attrs=_ib_attrs,
+            tags=_ib_tags,
+            max_index=NUM_PATCHES_MAX,
+        )
+    )
 
     # acoustic sources (4 sources)
     for i in range(1, NA + 1):

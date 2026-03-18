@@ -8,8 +8,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # PRs: group by branch (new push cancels old). Push to master: unique per SHA (never cancelled).
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   lint-gate:
@@ -148,6 +149,8 @@ jobs:
 
       - name: Commit Cache to Master
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
+        env:
+          CACHE_PUSH_TOKEN: ${{ secrets.CACHE_PUSH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -155,13 +158,17 @@ jobs:
           if git diff --cached --quiet; then
             echo "Coverage cache unchanged."
           else
-            git commit -m "Regenerate gcov coverage cache [skip ci]"
+            git commit --no-verify -m "Regenerate gcov coverage cache [skip ci]"
             # Rebase onto latest master in case it advanced during the build
             # (which can take 20-240 minutes). Only test_coverage_cache.json.gz
             # is changed, so rebase conflicts are essentially impossible.
             git fetch origin master
-            git rebase origin/master
-            git push origin HEAD:refs/heads/master
+            git rebase origin/master || { git rebase --abort; echo "Rebase conflict — cache will be regenerated on the next trigger."; exit 0; }
+            # Push using admin token to bypass branch protection rulesets.
+            # The default GITHUB_TOKEN lacks the Repository Admin role needed
+            # to push directly to master. Use credential helper to avoid
+            # leaking the token in git error messages.
+            git -c "http.https://github.com/.extraheader=Authorization: basic $(echo -n "x-access-token:${CACHE_PUSH_TOKEN}" | base64)" push origin HEAD:refs/heads/master
           fi
 
   github:

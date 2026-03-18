@@ -62,7 +62,7 @@ class Case:
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
         cons.indent()
 
-        MASTER_KEYS: list = case_dicts.get_input_dict_keys(target.name)
+        MASTER_KEYS = case_dicts.get_input_dict_keys(target.name)
 
         ignored = []
 

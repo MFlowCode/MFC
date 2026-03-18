@@ -113,7 +113,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
 
     # --only-changes: filter based on file-level gcov coverage
     if ARG("only_changes"):
-        from .coverage import (  # pylint: disable=import-outside-toplevel
+        from .coverage import (
             filter_tests_by_coverage,
             get_changed_files,
             load_coverage_cache,
@@ -234,7 +234,7 @@ def test():
         return
 
     if ARG("build_coverage_cache"):
-        from .coverage import build_coverage_cache  # pylint: disable=import-outside-toplevel
+        from .coverage import build_coverage_cache
 
         all_cases = [b.to_case() for b in cases]
 

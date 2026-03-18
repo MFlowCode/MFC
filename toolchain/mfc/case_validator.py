@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Set
 
 from .common import MFCException
 from .params.definitions import CONSTRAINTS
+from .params.namelist_parser import get_fortran_constants
 from .state import CFG
 
 # Physics documentation for check methods.
@@ -559,7 +560,12 @@ class CaseValidator:
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
 
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
-        self.prohibit(ib and (num_ibs <= 0 or num_ibs > 1000), "num_ibs must be between 1 and num_patches_max (1000)")
+        self.prohibit(ib and num_ibs <= 0, "num_ibs must be >= 1 when ib is enabled")
+        num_patches_max = get_fortran_constants().get("num_patches_max", 1000)
+        self.prohibit(
+            ib and num_ibs > num_patches_max,
+            f"num_ibs must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
+        )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
@@ -1177,6 +1183,11 @@ class CaseValidator:
         self.prohibit(old_grid and t_step_old is None, "old_grid requires t_step_old to be set")
         self.prohibit(num_patches < 0, "num_patches must be non-negative")
         self.prohibit(num_patches == 0 and t_step_old is None, "num_patches must be positive for the non-restart case")
+        num_patches_max = get_fortran_constants().get("num_patches_max", 1000)
+        self.prohibit(
+            num_patches > num_patches_max,
+            f"num_patches must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
+        )
 
     def check_qbmm_pre_process(self):
         """Checks QBMM constraints for pre-process"""
@@ -1388,7 +1399,7 @@ class CaseValidator:
     def check_bc_patches(self):
         """Checks boundary condition patch geometry (pre-process)"""
         num_bc_patches = self.get("num_bc_patches", 0)
-        num_bc_patches_max = self.get("num_bc_patches_max", 10)
+        num_bc_patches_max = get_fortran_constants().get("num_bc_patches_max", 10)
 
         if num_bc_patches <= 0:
             return
