@@ -1187,6 +1187,7 @@ def _load():
             base_name="patch_ib",
             attrs=_ib_attrs,
             tags=_ib_tags,
+            max_index=NUM_PATCHES_MAX,
         )
     )
 
