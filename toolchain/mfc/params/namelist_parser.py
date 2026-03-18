@@ -11,7 +11,7 @@ fallback parameter set is used instead.
 
 import re
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Optional, Set
 
 # Fallback parameters for when Fortran source files are not available.
 # Generated from the namelist definitions in src/*/m_start_up.fpp.
@@ -462,6 +462,44 @@ def parse_all_namelists(mfc_root: Path) -> Dict[str, Set[str]]:
         result[target_name] = parse_namelist_from_file(filepath)
 
     return result
+
+
+def parse_fortran_constants(filepath: Path) -> Dict[str, int]:
+    """
+    Parse integer parameter constants from a Fortran source file.
+
+    Extracts lines like ``integer, parameter :: name = 123`` and returns
+    a dict mapping constant names to their integer values.
+    """
+    constants: Dict[str, int] = {}
+    pattern = re.compile(
+        r"integer\s*,\s*parameter\s*::\s*(\w+)\s*=\s*(\d+)", re.IGNORECASE
+    )
+    try:
+        text = filepath.read_text()
+    except FileNotFoundError:
+        return constants
+    for m in pattern.finditer(text):
+        constants[m.group(1)] = int(m.group(2))
+    return constants
+
+
+# Module-level cache for Fortran constants (None = not yet loaded)
+_FORTRAN_CONSTANTS_CACHE: Optional[Dict[str, int]] = None
+
+
+def get_fortran_constants() -> Dict[str, int]:
+    """
+    Get Fortran compile-time constants from m_constants.fpp.
+
+    Cached after first call. Returns empty dict if source unavailable.
+    """
+    global _FORTRAN_CONSTANTS_CACHE  # noqa: PLW0603
+    if _FORTRAN_CONSTANTS_CACHE is None:
+        root = get_mfc_root()
+        path = root / "src" / "common" / "m_constants.fpp"
+        _FORTRAN_CONSTANTS_CACHE = parse_fortran_constants(path)
+    return _FORTRAN_CONSTANTS_CACHE
 
 
 def get_mfc_root() -> Path:

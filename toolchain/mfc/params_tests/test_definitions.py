@@ -154,10 +154,12 @@ class TestParameterCounts(unittest.TestCase):
     """Tests for expected parameter counts."""
 
     def test_total_param_count(self):
-        """Total parameter count should be around 40000."""
+        """Total parameter count (scalars + family examples) should be reasonable."""
         count = len(REGISTRY.all_params)
-        self.assertGreater(count, 39000, f"Too few parameters. Got {count}.")
-        self.assertLess(count, 41000, f"Too many parameters. Got {count}.")
+        # After indexed family refactor: patch_ib contributes ~30 examples
+        # instead of NI*30 individual entries.
+        self.assertGreater(count, 3000, f"Too few parameters. Got {count}.")
+        self.assertLess(count, 5000, f"Too many parameters. Got {count}.")
 
     def test_log_params_count(self):
         """Should have many LOG type parameters."""

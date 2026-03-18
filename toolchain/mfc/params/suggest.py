@@ -98,6 +98,9 @@ def suggest_parameter(unknown_param: str) -> List[str]:
     """
     Suggest similar parameter names from the registry.
 
+    For indexed family params, suggests the matching family attribute
+    with index 1 as a representative example.
+
     Args:
         unknown_param: Unknown parameter name.
 
@@ -107,6 +110,7 @@ def suggest_parameter(unknown_param: str) -> List[str]:
     # Import here to avoid circular import (registry imports definitions which may use suggest)
     from .registry import REGISTRY
 
+    # all_params.keys() includes scalar params + one example per family attr
     return suggest_similar(unknown_param, REGISTRY.all_params.keys())
 
 
