@@ -20,7 +20,7 @@ collision_time = 200. * dt
 # parerticle properties
 radius = 5e-3
 collision_angle_degrees = 60.
-collision_anlge_radians = collision_angle_degrees * math.pi / 180.
+collision_angle_radians = collision_angle_degrees * math.pi / 180.
 domain_size = 3. * radius
 lead_distance = 0.02 * radius
 
@@ -105,14 +105,14 @@ print(json.dumps({
         "patch_icpp(1)%alpha(1)": 1.0e00,
         # Patch: Sphere Immersed Boundary
         "patch_ib(1)%geometry": 8,
-        "patch_ib(1)%x_centroid": -1. * lead_distance * math.sin(collision_anlge_radians), # get a lead up distance to the collision
-        "patch_ib(1)%y_centroid": radius + lead_distance * math.sin(collision_anlge_radians),
+        "patch_ib(1)%x_centroid": -1. * lead_distance * math.sin(collision_angle_radians), # get a lead up distance to the collision
+        "patch_ib(1)%y_centroid": radius + lead_distance * math.sin(collision_angle_radians),
         "patch_ib(1)%z_centroid": 0.0,
         "patch_ib(1)%radius": radius,
         "patch_ib(1)%slip": "F",
         "patch_ib(1)%mass": 1.0e6, # arbitrarily high mass to ignore fluid
-        "patch_ib(1)%vel(1)": velocity * math.sin(collision_anlge_radians),
-        "patch_ib(1)%vel(2)": -velocity * math.cos(collision_anlge_radians),
+        "patch_ib(1)%vel(1)": velocity * math.sin(collision_angle_radians),
+        "patch_ib(1)%vel(2)": -velocity * math.cos(collision_angle_radians),
         "patch_ib(1)%moving_ibm": 2
         # Collisions
         "collision_model": 1,
