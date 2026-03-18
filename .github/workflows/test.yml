@@ -155,7 +155,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Coverage cache unchanged."
           else
-            git commit -m "Regenerate gcov coverage cache [skip ci]"
+            git commit --no-verify -m "Regenerate gcov coverage cache [skip ci]"
             # Rebase onto latest master in case it advanced during the build
             # (which can take 20-240 minutes). Only test_coverage_cache.json.gz
             # is changed, so rebase conflicts are essentially impossible.
