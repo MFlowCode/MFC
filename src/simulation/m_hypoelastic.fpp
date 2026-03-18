@@ -371,12 +371,12 @@ contains
         !!  Supports 1D, 2D Cartesian, 2D axisymmetric, and 3D Cartesian.
         !!  @param q_prim_vf Primitive variables
         !!  @param rhs_vf rhs variables
-        !!  @param hypo_iface_vel_n Interface velocities per direction
-    subroutine s_compute_hypoelastic_rhs_iface(q_prim_vf, rhs_vf, hypo_iface_vel_n)
+        !!  @param nc_iface_vel_n Interface velocities per direction
+    subroutine s_compute_hypoelastic_rhs_iface(q_prim_vf, rhs_vf, nc_iface_vel_n)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(vector_field), dimension(:), intent(in) :: hypo_iface_vel_n
+        type(vector_field), dimension(:), intent(in) :: nc_iface_vel_n
 
         real(wp) :: rho_K, G_K
         real(wp) :: A_x, B_x, C_x, D_x, E_x, F_x, H_x, J1_x, J2_x
@@ -393,7 +393,7 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        du_dx(k, l, q) = (hypo_iface_vel_n(1)%vf(1)%sf(k, l, q) - hypo_iface_vel_n(1)%vf(1)%sf(k-1, l, q))/dx(k)
+                        du_dx(k, l, q) = (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) - nc_iface_vel_n(1)%vf(1)%sf(k-1, l, q))/dx(k)
                     end do
                 end do
             end do
@@ -404,9 +404,9 @@ contains
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            du_dy(k, l, q) = (hypo_iface_vel_n(2)%vf(1)%sf(k, l, q) - hypo_iface_vel_n(2)%vf(1)%sf(k, l-1, q))/dy(l)
-                            dv_dx(k, l, q) = (hypo_iface_vel_n(1)%vf(2)%sf(k, l, q) - hypo_iface_vel_n(1)%vf(2)%sf(k-1, l, q))/dx(k)
-                            dv_dy(k, l, q) = (hypo_iface_vel_n(2)%vf(2)%sf(k, l, q) - hypo_iface_vel_n(2)%vf(2)%sf(k, l-1, q))/dy(l)
+                            du_dy(k, l, q) = (nc_iface_vel_n(2)%vf(1)%sf(k, l, q) - nc_iface_vel_n(2)%vf(1)%sf(k, l-1, q))/dy(l)
+                            dv_dx(k, l, q) = (nc_iface_vel_n(1)%vf(2)%sf(k, l, q) - nc_iface_vel_n(1)%vf(2)%sf(k-1, l, q))/dx(k)
+                            dv_dy(k, l, q) = (nc_iface_vel_n(2)%vf(2)%sf(k, l, q) - nc_iface_vel_n(2)%vf(2)%sf(k, l-1, q))/dy(l)
                         end do
                     end do
                 end do
@@ -418,11 +418,11 @@ contains
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            du_dz(k, l, q) = (hypo_iface_vel_n(3)%vf(1)%sf(k, l, q) - hypo_iface_vel_n(3)%vf(1)%sf(k, l, q-1))/dz(q)
-                            dv_dz(k, l, q) = (hypo_iface_vel_n(3)%vf(2)%sf(k, l, q) - hypo_iface_vel_n(3)%vf(2)%sf(k, l, q-1))/dz(q)
-                            dw_dx(k, l, q) = (hypo_iface_vel_n(1)%vf(3)%sf(k, l, q) - hypo_iface_vel_n(1)%vf(3)%sf(k-1, l, q))/dx(k)
-                            dw_dy(k, l, q) = (hypo_iface_vel_n(2)%vf(3)%sf(k, l, q) - hypo_iface_vel_n(2)%vf(3)%sf(k, l-1, q))/dy(l)
-                            dw_dz(k, l, q) = (hypo_iface_vel_n(3)%vf(3)%sf(k, l, q) - hypo_iface_vel_n(3)%vf(3)%sf(k, l, q-1))/dz(q)
+                            du_dz(k, l, q) = (nc_iface_vel_n(3)%vf(1)%sf(k, l, q) - nc_iface_vel_n(3)%vf(1)%sf(k, l, q-1))/dz(q)
+                            dv_dz(k, l, q) = (nc_iface_vel_n(3)%vf(2)%sf(k, l, q) - nc_iface_vel_n(3)%vf(2)%sf(k, l, q-1))/dz(q)
+                            dw_dx(k, l, q) = (nc_iface_vel_n(1)%vf(3)%sf(k, l, q) - nc_iface_vel_n(1)%vf(3)%sf(k-1, l, q))/dx(k)
+                            dw_dy(k, l, q) = (nc_iface_vel_n(2)%vf(3)%sf(k, l, q) - nc_iface_vel_n(2)%vf(3)%sf(k, l-1, q))/dy(l)
+                            dw_dz(k, l, q) = (nc_iface_vel_n(3)%vf(3)%sf(k, l, q) - nc_iface_vel_n(3)%vf(3)%sf(k, l, q-1))/dz(q)
                         end do
                     end do
                 end do
@@ -572,18 +572,18 @@ contains
 
         if (grid_geometry == 2) then
             call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, &
-                                                             hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf, 1.0_wp)
+                                                             nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf, 1.0_wp)
         end if
 
     end subroutine s_compute_hypoelastic_rhs_iface
 
     subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, &
-                                                           hypo_iface_vel_x_vf, hypo_iface_vel_y_vf, weight)
+                                                           nc_iface_vel_x_vf, nc_iface_vel_y_vf, weight)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), dimension(:), intent(in)           :: hypo_iface_vel_x_vf
-        type(scalar_field), dimension(:), intent(in)           :: hypo_iface_vel_y_vf
+        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_x_vf
+        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_vf
         real(wp), intent(in)                                   :: weight
 
         integer  :: i, k, l, q
@@ -593,11 +593,11 @@ contains
         do q = 0, p
             do l = 0, n
                 do k = 0, m
-                    du_dx(k, l, q) = (hypo_iface_vel_x_vf(1)%sf(k, l, q) - &
-                                      hypo_iface_vel_x_vf(1)%sf(k - 1, l, q))/dx(k)
+                    du_dx(k, l, q) = (nc_iface_vel_x_vf(1)%sf(k, l, q) - &
+                                      nc_iface_vel_x_vf(1)%sf(k - 1, l, q))/dx(k)
 
-                    dv_dy(k, l, q) = (hypo_iface_vel_y_vf(2)%sf(k, l, q) - &
-                                      hypo_iface_vel_y_vf(2)%sf(k, l - 1, q))/dy(l)
+                    dv_dy(k, l, q) = (nc_iface_vel_y_vf(2)%sf(k, l, q) - &
+                                      nc_iface_vel_y_vf(2)%sf(k, l - 1, q))/dy(l)
                 end do
             end do
         end do

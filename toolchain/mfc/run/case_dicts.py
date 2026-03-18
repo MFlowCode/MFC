@@ -24,7 +24,7 @@ class ParamType(Enum):
 COMMON = {
     'mhd': ParamType.LOG,
     'hypoelasticity': ParamType.LOG,
-    'hypo_hll_fallback': ParamType.LOG,
+    'hll_alpha_interface': ParamType.LOG,
     'hyperelasticity': ParamType.LOG,
     'cyl_coord': ParamType.LOG,
     'pref': ParamType.REAL,
@@ -260,7 +260,7 @@ SIMULATION.update({
     'weno_avg': ParamType.LOG,
     'weno_Re_flux': ParamType.LOG,
     'riemann_solver': ParamType.INT,
-    'riemann_ADC': ParamType.LOG,
+    'riemann_hypo_ADC': ParamType.LOG,
     'ADC_kappa': ParamType.REAL,
     'hypo_hll_interface_rhs': ParamType.LOG,
     'wave_speeds': ParamType.INT,

@@ -270,6 +270,12 @@ contains
             "3D cylindrical hypoelastic HLLD is not supported")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
             "HLLD hypoelasticity currently requires exactly 2 fluid components")
+        @:PROHIBIT(riemann_solver == 4 .and. (.not. mhd) .and. (.not. hypoelasticity), &
+            "HLLD is only available for MHD or hypoelasticity")
+        @:PROHIBIT(riemann_hypo_ADC .and. .not. hypoelasticity, &
+            "riemann_hypo_ADC requires hypoelasticity = T")
+        @:PROHIBIT(riemann_hypo_ADC .and. riemann_solver /= 2 .and. riemann_solver /= 4, &
+            "riemann_hypo_ADC only applies to hypo HLLC/HLLD")
         @:PROHIBIT(hypo_hll_interface_rhs .and. .not. hypoelasticity, &
             "hypo_hll_interface_rhs requires hypoelasticity = T")
         @:PROHIBIT(hypo_hll_interface_rhs .and. riemann_solver /= 1, &
@@ -298,8 +304,6 @@ contains
     !> Checks constraints on alternative sound speed parameters (alt_soundspeed)
     subroutine s_check_inputs_alt_soundspeed
         @:PROHIBIT(alt_soundspeed .and. model_eqns /= 2, "5-equation model (model_eqns = 2) is required for alt_soundspeed")
-        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1, &
-            "alt_soundspeed is not supported with HLL (riemann_solver = 1)")
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. .not. hypoelasticity, &
             "alt_soundspeed with HLLD requires hypoelasticity = T")
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. num_fluids /= 2, &
@@ -370,7 +374,7 @@ contains
     subroutine s_check_inputs_mhd
         @:PROHIBIT(mhd .and. (riemann_solver /= 1 .and. riemann_solver /= 4), &
             "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
-        ! @:PROHIBIT(riemann_solver == 4 .and. .not. mhd, "HLLD is only available for MHD simulations")
+        ! (HLLD guard now in s_check_inputs_hypoelasticity)
         @:PROHIBIT(riemann_solver == 4 .and. relativity, "HLLD is not available for RMHD")
         @:PROHIBIT(powell .and. .not. mhd)
         @:PROHIBIT(powell .and. n == 0, "Powell's method is not supported for 1D simulations")

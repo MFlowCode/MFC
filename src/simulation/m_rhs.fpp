@@ -131,8 +131,8 @@ module m_rhs
     !$acc declare create(flux_n, flux_src_n, flux_gsrc_n)
     !> @}
 
-    type(vector_field), allocatable, dimension(:) :: hypo_iface_vel_n
-    !$acc declare create(hypo_iface_vel_n)
+    type(vector_field), allocatable, dimension(:) :: nc_iface_vel_n
+    !$acc declare create(nc_iface_vel_n)
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
     !$acc declare create(qL_prim, qR_prim)
@@ -553,7 +553,7 @@ contains
             @:ACC_SETUP_VFs(flux_n(i), flux_src_n(i), flux_gsrc_n(i))
 
             if (i == 1) then
-                if (riemann_solver /= 1 .and. riemann_solver /= 4) then
+                if (.not. ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4)) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
@@ -570,23 +570,24 @@ contains
 
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:ALLOCATE(hypo_iface_vel_n(1:num_dims))
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            @:ALLOCATE(nc_iface_vel_n(1:num_dims))
             do i = 1, num_dims
-                @:ALLOCATE(hypo_iface_vel_n(i)%vf(1:num_dims))
+                @:ALLOCATE(nc_iface_vel_n(i)%vf(1:num_dims))
                 do l = 1, num_dims
-                    @:ALLOCATE(hypo_iface_vel_n(i)%vf(l)%sf( &
+                    @:ALLOCATE(nc_iface_vel_n(i)%vf(l)%sf( &
                         idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
                 end do
             end do
             if (num_dims == 2) then
-                @:ACC_SETUP_VFs(hypo_iface_vel_n(1), hypo_iface_vel_n(2))
+                @:ACC_SETUP_VFs(nc_iface_vel_n(1), nc_iface_vel_n(2))
             else if (num_dims == 3) then
-                @:ACC_SETUP_VFs(hypo_iface_vel_n(1), hypo_iface_vel_n(2), hypo_iface_vel_n(3))
+                @:ACC_SETUP_VFs(nc_iface_vel_n(1), nc_iface_vel_n(2), nc_iface_vel_n(3))
             else
-                @:ACC_SETUP_VFs(hypo_iface_vel_n(1))
+                @:ACC_SETUP_VFs(nc_iface_vel_n(1))
             end if
         end if
 
@@ -829,8 +830,9 @@ contains
                                   id, irx, iry, irz, is_hat_L)
             call nvtxEndRange
 
-            if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-                call s_finalize_hypo_iface_vel(hypo_iface_vel_n(id)%vf, id)
+            if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+                .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+                call s_finalize_nc_iface_vel(nc_iface_vel_n(id)%vf, id)
             end if
 
             ! Additional physics and source terms
@@ -902,7 +904,7 @@ contains
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
         if (hypo_nc_interface) then
             call nvtxStartRange("RHS-HYPOELASTICITY-IFACE")
-            call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, hypo_iface_vel_n)
+            call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, nc_iface_vel_n)
             call nvtxEndRange
         end if
         if (hypo_nc_dual_pass .and. grid_geometry == 2) then
@@ -910,7 +912,7 @@ contains
             ! the full contribution with a symmetric average of face velocities.
             call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
             call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_vf, &
-                                                              hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf, 0.5_wp)
+                                                              nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf, 0.5_wp)
             call nvtxEndRange
         end if
 
@@ -1116,53 +1118,62 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
-                if (.not. hypo_nc_dual_pass) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do j = advxb, advxe
-                        do q = 0, p
-                            do l = 0, n
-                                do k = 0, m
-                                    rhs_vf(j)%sf(k, l, q) = &
-                                        rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
-                                        q_prim_vf%vf(contxe + idir)%sf(k, l, q)* &
-                                        (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
-                                        - flux_src_n(1)%vf(j)%sf(k, l, q))
-                                end do
+            if (riemann_solver == 1 .and. hll_alpha_interface) then
+                ! Branch A: HLL Method 1 - alpha transport + optional K div u
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do j = advxb, advxe
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(j)%sf(k, l, q) = &
+                                    rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
+                                    q_prim_vf%vf(contxe + idir)%sf(k, l, q)* &
+                                    (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
+                                    - flux_src_n(1)%vf(j)%sf(k, l, q))
+                            end do
+                        end do
+                    end do
+                end do
+                if (alt_soundspeed .and. (bubbles_euler .neqv. .true.)) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(advxb)%sf(k, l, q) = rhs_vf(advxb)%sf(k, l, q) + &
+                                    Kterm(k, l, q)/dx(k)* &
+                                    (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) &
+                                     - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))
+                                rhs_vf(advxe)%sf(k, l, q) = rhs_vf(advxe)%sf(k, l, q) - &
+                                    Kterm(k, l, q)/dx(k)* &
+                                    (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) &
+                                     - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))
                             end do
                         end do
                     end do
                 end if
-            else
-                if (alt_soundspeed) then
-                    do j = advxb, advxe
-                        if ((j == advxe) .and. (bubbles_euler .neqv. .true.)) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
-                            do q = 0, p
-                                do l = 0, n
-                                    do k = 0, m
-                                        rhs_vf(j)%sf(k, l, q) = &
-                                            rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
-                                            (q_cons_vf%vf(j)%sf(k, l, q) - Kterm(k, l, q))* &
-                                            (flux_src_n(1)%vf(j)%sf(k, l, q) &
-                                             - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
-                                    end do
-                                end do
+            else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
+                ! Branch C: HLLD dual-pass skips NC terms here
+                continue
+            else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
+                     riemann_solver == 2 .or. riemann_solver == 3) then
+                ! Branch B: HLL Method 2 / HLLC Method 2 / Exact
+                if (alt_soundspeed .and. (bubbles_euler .neqv. .true.)) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(advxb)%sf(k, l, q) = &
+                                    rhs_vf(advxb)%sf(k, l, q) + 1._wp/dx(k)* &
+                                    (q_cons_vf%vf(advxb)%sf(k, l, q) + Kterm(k, l, q))* &
+                                    (flux_src_n(1)%vf(advxb)%sf(k, l, q) &
+                                     - flux_src_n(1)%vf(advxb)%sf(k - 1, l, q))
+                                rhs_vf(advxe)%sf(k, l, q) = &
+                                    rhs_vf(advxe)%sf(k, l, q) + 1._wp/dx(k)* &
+                                    (q_cons_vf%vf(advxe)%sf(k, l, q) - Kterm(k, l, q))* &
+                                    (flux_src_n(1)%vf(advxe)%sf(k, l, q) &
+                                     - flux_src_n(1)%vf(advxe)%sf(k - 1, l, q))
                             end do
-                        else if ((j == advxb) .and. (bubbles_euler .neqv. .true.)) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
-                            do q = 0, p
-                                do l = 0, n
-                                    do k = 0, m
-                                        rhs_vf(j)%sf(k, l, q) = &
-                                            rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
-                                            (q_cons_vf%vf(j)%sf(k, l, q) + Kterm(k, l, q))* &
-                                            (flux_src_n(1)%vf(j)%sf(k, l, q) &
-                                             - flux_src_n(1)%vf(j)%sf(k - 1, l, q))
-                                    end do
-                                end do
-                            end do
-                        end if
+                        end do
                     end do
                 else
                     !$acc parallel loop collapse(4) gang vector default(present)
@@ -1180,6 +1191,22 @@ contains
                         end do
                     end do
                 end if
+            else if (riemann_solver == 4) then
+                ! Non-hypo HLLD: same as old HLL/HLLD alpha transport
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do j = advxb, advxe
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(j)%sf(k, l, q) = &
+                                    rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
+                                    q_prim_vf%vf(contxe + idir)%sf(k, l, q)* &
+                                    (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
+                                    - flux_src_n(1)%vf(j)%sf(k, l, q))
+                            end do
+                        end do
+                    end do
+                end do
             end if
 
         elseif (idir == 2) then
@@ -1292,83 +1319,93 @@ contains
                 end do
             end if
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
-                if (.not. hypo_nc_dual_pass) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do j = advxb, advxe
-                        do l = 0, p
-                            do k = 0, n
-                                do q = 0, m
-                                    rhs_vf(j)%sf(q, k, l) = &
-                                        rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
-                                        q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
-                                        (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
-                                        - flux_src_n(2)%vf(j)%sf(q, k, l))
-                                end do
+            if (riemann_solver == 1 .and. hll_alpha_interface) then
+                ! Branch A: HLL Method 1 - alpha transport + optional K div u
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do j = advxb, advxe
+                    do l = 0, p
+                        do k = 0, n
+                            do q = 0, m
+                                rhs_vf(j)%sf(q, k, l) = &
+                                    rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
+                                    q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
+                                    (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
+                                    - flux_src_n(2)%vf(j)%sf(q, k, l))
                             end do
                         end do
                     end do
-                end if
-            else
-
-                if (alt_soundspeed) then
-                    do j = advxb, advxe
-                        if ((j == advxe) .and. (bubbles_euler .neqv. .true.)) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
-                            do l = 0, p
-                                do k = 0, n
-                                    do q = 0, m
-                                        rhs_vf(j)%sf(q, k, l) = &
-                                            rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
-                                            (q_cons_vf%vf(j)%sf(q, k, l) - Kterm(q, k, l))* &
-                                            (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                             - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
-                                    end do
-                                end do
+                end do
+                if (alt_soundspeed .and. (bubbles_euler .neqv. .true.)) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do q = 0, m
+                                rhs_vf(advxb)%sf(q, k, l) = rhs_vf(advxb)%sf(q, k, l) + &
+                                    Kterm(q, k, l)/dy(k)* &
+                                    (nc_iface_vel_n(2)%vf(2)%sf(q, k, l) &
+                                     - nc_iface_vel_n(2)%vf(2)%sf(q, k - 1, l))
+                                rhs_vf(advxe)%sf(q, k, l) = rhs_vf(advxe)%sf(q, k, l) - &
+                                    Kterm(q, k, l)/dy(k)* &
+                                    (nc_iface_vel_n(2)%vf(2)%sf(q, k, l) &
+                                     - nc_iface_vel_n(2)%vf(2)%sf(q, k - 1, l))
                             end do
-                            if (cyl_coord) then
-                                !$acc parallel loop collapse(3) gang vector default(present)
-                                do l = 0, p
-                                    do k = 0, n
-                                        do q = 0, m
-                                            rhs_vf(j)%sf(q, k, l) = &
-                                                rhs_vf(j)%sf(q, k, l) - &
-                                                (Kterm(q, k, l)/2._wp/y_cc(k))* &
-                                                (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                 + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
-                                        end do
-                                    end do
-                                end do
-                            end if
-                        else if ((j == advxb) .and. (bubbles_euler .neqv. .true.)) then
-                            !$acc parallel loop collapse(3) gang vector default(present)
-                            do l = 0, p
-                                do k = 0, n
-                                    do q = 0, m
-                                        rhs_vf(j)%sf(q, k, l) = &
-                                            rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
-                                            (q_cons_vf%vf(j)%sf(q, k, l) + Kterm(q, k, l))* &
-                                            (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                             - flux_src_n(2)%vf(j)%sf(q, k - 1, l))
-                                    end do
-                                end do
-                            end do
-                            if (cyl_coord) then
-                                !$acc parallel loop collapse(3) gang vector default(present)
-                                do l = 0, p
-                                    do k = 0, n
-                                        do q = 0, m
-                                            rhs_vf(j)%sf(q, k, l) = &
-                                                rhs_vf(j)%sf(q, k, l) + &
-                                                (Kterm(q, k, l)/2._wp/y_cc(k))* &
-                                                (flux_src_n(2)%vf(j)%sf(q, k, l) &
-                                                 + flux_src_n(2)%vf(j)%sf(q, k - 1, l))
-                                        end do
-                                    end do
-                                end do
-                            end if
-                        end if
+                        end do
                     end do
+                    if (cyl_coord) then
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 0, p
+                            do k = 0, n
+                                do q = 0, m
+                                    rhs_vf(advxb)%sf(q, k, l) = rhs_vf(advxb)%sf(q, k, l) + &
+                                        Kterm(q, k, l)*q_prim_vf%vf(momxb + 1)%sf(q, k, l)/y_cc(k)
+                                    rhs_vf(advxe)%sf(q, k, l) = rhs_vf(advxe)%sf(q, k, l) - &
+                                        Kterm(q, k, l)*q_prim_vf%vf(momxb + 1)%sf(q, k, l)/y_cc(k)
+                                end do
+                            end do
+                        end do
+                    end if
+                end if
+            else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
+                ! Branch C: HLLD dual-pass skips NC terms here
+                continue
+            else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
+                     riemann_solver == 2 .or. riemann_solver == 3) then
+                ! Branch B: HLL Method 2 / HLLC Method 2 / Exact
+                if (alt_soundspeed .and. (bubbles_euler .neqv. .true.)) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do q = 0, m
+                                rhs_vf(advxb)%sf(q, k, l) = &
+                                    rhs_vf(advxb)%sf(q, k, l) + 1._wp/dy(k)* &
+                                    (q_cons_vf%vf(advxb)%sf(q, k, l) + Kterm(q, k, l))* &
+                                    (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
+                                     - flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
+                                rhs_vf(advxe)%sf(q, k, l) = &
+                                    rhs_vf(advxe)%sf(q, k, l) + 1._wp/dy(k)* &
+                                    (q_cons_vf%vf(advxe)%sf(q, k, l) - Kterm(q, k, l))* &
+                                    (flux_src_n(2)%vf(advxe)%sf(q, k, l) &
+                                     - flux_src_n(2)%vf(advxe)%sf(q, k - 1, l))
+                            end do
+                        end do
+                    end do
+                    if (cyl_coord) then
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 0, p
+                            do k = 0, n
+                                do q = 0, m
+                                    rhs_vf(advxb)%sf(q, k, l) = rhs_vf(advxb)%sf(q, k, l) + &
+                                        (q_cons_vf%vf(advxb)%sf(q, k, l) + Kterm(q, k, l))/(2._wp*y_cc(k))* &
+                                        (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
+                                         + flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
+                                    rhs_vf(advxe)%sf(q, k, l) = rhs_vf(advxe)%sf(q, k, l) + &
+                                        (q_cons_vf%vf(advxe)%sf(q, k, l) - Kterm(q, k, l))/(2._wp*y_cc(k))* &
+                                        (flux_src_n(2)%vf(advxe)%sf(q, k, l) &
+                                         + flux_src_n(2)%vf(advxe)%sf(q, k - 1, l))
+                                end do
+                            end do
+                        end do
+                    end if
                 else
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
@@ -1385,6 +1422,22 @@ contains
                         end do
                     end do
                 end if
+            else if (riemann_solver == 4) then
+                ! Non-hypo HLLD: same as old HLL/HLLD alpha transport
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do j = advxb, advxe
+                    do l = 0, p
+                        do k = 0, n
+                            do q = 0, m
+                                rhs_vf(j)%sf(q, k, l) = &
+                                    rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
+                                    q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
+                                    (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
+                                    - flux_src_n(2)%vf(j)%sf(q, k, l))
+                            end do
+                        end do
+                    end do
+                end do
             end if
 
         elseif (idir == 3) then
@@ -1495,7 +1548,7 @@ contains
             end if
 
             if (grid_geometry == 3) then
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .or. riemann_solver == 4) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do l = 0, p
@@ -1588,53 +1641,61 @@ contains
                     end if
                 end if
             else
-                if (riemann_solver == 1 .or. riemann_solver == 4) then
-                    if (.not. hypo_nc_dual_pass) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
-                        !$acc parallel loop collapse(4) gang vector default(present)
-                        do j = advxb, advxe
-                            do k = 0, p
-                                do q = 0, n
-                                    do l = 0, m
-                                        rhs_vf(j)%sf(l, q, k) = &
-                                            rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
-                                            q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
-                                            (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
-                                            - flux_src_n(3)%vf(j)%sf(l, q, k))
-                                    end do
+                if (riemann_solver == 1 .and. hll_alpha_interface) then
+                    ! Branch A: HLL Method 1 - alpha transport + optional K div u
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = advxb, advxe
+                        do k = 0, p
+                            do q = 0, n
+                                do l = 0, m
+                                    rhs_vf(j)%sf(l, q, k) = &
+                                        rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
+                                        q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
+                                        (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
+                                        - flux_src_n(3)%vf(j)%sf(l, q, k))
+                                end do
+                            end do
+                        end do
+                    end do
+                    if (alt_soundspeed .and. (bubbles_euler .neqv. .true.)) then
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do k = 0, p
+                            do q = 0, n
+                                do l = 0, m
+                                    rhs_vf(advxb)%sf(l, q, k) = rhs_vf(advxb)%sf(l, q, k) + &
+                                        Kterm(l, q, k)/dz(k)* &
+                                        (nc_iface_vel_n(3)%vf(3)%sf(l, q, k) &
+                                         - nc_iface_vel_n(3)%vf(3)%sf(l, q, k - 1))
+                                    rhs_vf(advxe)%sf(l, q, k) = rhs_vf(advxe)%sf(l, q, k) - &
+                                        Kterm(l, q, k)/dz(k)* &
+                                        (nc_iface_vel_n(3)%vf(3)%sf(l, q, k) &
+                                         - nc_iface_vel_n(3)%vf(3)%sf(l, q, k - 1))
                                 end do
                             end do
                         end do
                     end if
-                else
-                    if (alt_soundspeed) then
-                        do j = advxb, advxe
-                            if ((j == advxe) .and. (bubbles_euler .neqv. .true.)) then
-                                !$acc parallel loop collapse(3) gang vector default(present)
-                                do k = 0, p
-                                    do q = 0, n
-                                        do l = 0, m
-                                            rhs_vf(j)%sf(l, q, k) = &
-                                                rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
-                                                (q_cons_vf%vf(j)%sf(l, q, k) - Kterm(l, q, k))* &
-                                                (flux_src_n(3)%vf(j)%sf(l, q, k) &
-                                                 - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
-                                        end do
-                                    end do
+                else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
+                    continue
+                else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
+                         riemann_solver == 2 .or. riemann_solver == 3) then
+                    ! Branch B: HLL Method 2 / HLLC Method 2 / Exact
+                    if (alt_soundspeed .and. (bubbles_euler .neqv. .true.)) then
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do k = 0, p
+                            do q = 0, n
+                                do l = 0, m
+                                    rhs_vf(advxb)%sf(l, q, k) = &
+                                        rhs_vf(advxb)%sf(l, q, k) + 1._wp/dz(k)* &
+                                        (q_cons_vf%vf(advxb)%sf(l, q, k) + Kterm(l, q, k))* &
+                                        (flux_src_n(3)%vf(advxb)%sf(l, q, k) &
+                                         - flux_src_n(3)%vf(advxb)%sf(l, q, k - 1))
+                                    rhs_vf(advxe)%sf(l, q, k) = &
+                                        rhs_vf(advxe)%sf(l, q, k) + 1._wp/dz(k)* &
+                                        (q_cons_vf%vf(advxe)%sf(l, q, k) - Kterm(l, q, k))* &
+                                        (flux_src_n(3)%vf(advxe)%sf(l, q, k) &
+                                         - flux_src_n(3)%vf(advxe)%sf(l, q, k - 1))
                                 end do
-                            else if ((j == advxb) .and. (bubbles_euler .neqv. .true.)) then
-                                !$acc parallel loop collapse(3) gang vector default(present)
-                                do k = 0, p
-                                    do q = 0, n
-                                        do l = 0, m
-                                            rhs_vf(j)%sf(l, q, k) = &
-                                                rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
-                                                (q_cons_vf%vf(j)%sf(l, q, k) + Kterm(l, q, k))* &
-                                                (flux_src_n(3)%vf(j)%sf(l, q, k) &
-                                                 - flux_src_n(3)%vf(j)%sf(l, q, k - 1))
-                                        end do
-                                    end do
-                                end do
-                            end if
+                            end do
                         end do
                     else
                         !$acc parallel loop collapse(4) gang vector default(present)
@@ -1652,6 +1713,22 @@ contains
                             end do
                         end do
                     end if
+                else if (riemann_solver == 4) then
+                    ! Non-hypo HLLD
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = advxb, advxe
+                        do k = 0, p
+                            do q = 0, n
+                                do l = 0, m
+                                    rhs_vf(j)%sf(l, q, k) = &
+                                        rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
+                                        q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
+                                        (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
+                                        - flux_src_n(3)%vf(j)%sf(l, q, k))
+                                end do
+                            end do
+                        end do
+                    end do
                 end if
             end if
         end if ! id loop
@@ -2426,14 +2503,15 @@ contains
 
         @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
             do i = 1, num_dims
                 do l = 1, num_dims
-                    @:DEALLOCATE(hypo_iface_vel_n(i)%vf(l)%sf)
+                    @:DEALLOCATE(nc_iface_vel_n(i)%vf(l)%sf)
                 end do
-                @:DEALLOCATE(hypo_iface_vel_n(i)%vf)
+                @:DEALLOCATE(nc_iface_vel_n(i)%vf)
             end do
-            @:DEALLOCATE(hypo_iface_vel_n)
+            @:DEALLOCATE(nc_iface_vel_n)
         end if
 
         if (viscous .and. cyl_coord) then

@@ -141,9 +141,9 @@ module m_global_parameters
     logical :: weno_avg       ! Average left/right cell-boundary states
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
     integer :: riemann_solver !< Riemann solver algorithm
-    logical :: riemann_ADC
+    logical :: riemann_hypo_ADC
     real(wp) :: ADC_kappa
-    logical :: hypo_hll_fallback   !< Hypo HLL fallback when degenerate (denom/S_M); .false. = exit, .true. = use HLL (HLLC/HLLD)
+    logical :: hll_alpha_interface  !< T = HLL Method 1 (alpha-interface), F = HLL Method 2 (u-interface)
     logical :: hypo_hll_interface_rhs !< When T, HLL hypo uses interface-consistent RHS instead of legacy FD
     logical :: hypo_nc_finite_diff
     logical :: hypo_nc_interface
@@ -184,7 +184,7 @@ module m_global_parameters
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage, riemann_ADC, ADC_kappa, hypo_hll_fallback, hypo_hll_interface_rhs)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage, riemann_hypo_ADC, ADC_kappa, hll_alpha_interface, hypo_hll_interface_rhs)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -551,9 +551,9 @@ contains
         weno_avg = .false.
         weno_Re_flux = .false.
         riemann_solver = dflt_int
-        riemann_ADC = .false.
+        riemann_hypo_ADC = .false.
         ADC_kappa = 1.0
-        hypo_hll_fallback = .false.
+        hll_alpha_interface = .true.
         hypo_hll_interface_rhs = .false.
         hypo_nc_finite_diff = .false.
         hypo_nc_interface = .false.
@@ -1255,7 +1255,7 @@ contains
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
         !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach)
-        !$acc update device(riemann_ADC, ADC_kappa, hypo_hll_fallback, hypo_hll_interface_rhs)
+        !$acc update device(riemann_hypo_ADC, ADC_kappa, hll_alpha_interface, hypo_hll_interface_rhs)
 
         !$acc update device(Bx0, powell)
 

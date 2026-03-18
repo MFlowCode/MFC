@@ -55,7 +55,7 @@ module m_riemann_solvers
  s_hllc_riemann_solver, &
  s_hlld_riemann_solver, &
  s_hypo_hlld_riemann_solver, &
- s_finalize_hypo_iface_vel, &
+ s_finalize_nc_iface_vel, &
  s_finalize_riemann_solvers_module
 
     !> The cell-boundary values of the fluxes (src - source) that are computed
@@ -81,10 +81,10 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:, :, :, :) :: flux_gsrc_rsz_vf !<
     !$acc declare create( flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf )
 
-    real(wp), allocatable, dimension(:, :, :, :) :: hypo_iface_vel_rsx_vf
-    real(wp), allocatable, dimension(:, :, :, :) :: hypo_iface_vel_rsy_vf
-    real(wp), allocatable, dimension(:, :, :, :) :: hypo_iface_vel_rsz_vf
-    !$acc declare create(hypo_iface_vel_rsx_vf, hypo_iface_vel_rsy_vf, hypo_iface_vel_rsz_vf)
+    real(wp), allocatable, dimension(:, :, :, :) :: nc_iface_vel_rsx_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: nc_iface_vel_rsy_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: nc_iface_vel_rsz_vf
+    !$acc declare create(nc_iface_vel_rsx_vf, nc_iface_vel_rsy_vf, nc_iface_vel_rsz_vf)
     !> @}
 
     ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as
@@ -1008,91 +1008,76 @@ contains
                                 end do
                             end if
 
-                            ! HLL interface velocity export for interface-consistent hypo RHS
-                            if (hypoelasticity .and. hypo_hll_interface_rhs) then
-                                if (s_L >= 0._wp) then
-                                    u_n_iface = vel_L(dir_idx(1))
-                                    u_t_iface = 0._wp
-                                    u_t2_iface = 0._wp
-                                    if (num_dims > 1) u_t_iface = vel_L(dir_idx(2))
-                                    if (num_dims > 2) u_t2_iface = vel_L(dir_idx(3))
-                                elseif (s_R <= 0._wp) then
-                                    u_n_iface = vel_R(dir_idx(1))
-                                    u_t_iface = 0._wp
-                                    u_t2_iface = 0._wp
-                                    if (num_dims > 1) u_t_iface = vel_R(dir_idx(2))
-                                    if (num_dims > 2) u_t2_iface = vel_R(dir_idx(3))
-                                else
-                                    pTot_L_ex = pres_L - tau_e_L(dir_idx_tau(1))
-                                    pTot_R_ex = pres_R - tau_e_R(dir_idx_tau(1))
-
-                                    rho_HLL_ex = (s_R*rho_R - s_L*rho_L &
-                                                  + rho_L*vel_L(dir_idx(1)) - rho_R*vel_R(dir_idx(1))) &
-                                                 /(s_R - s_L)
-
-                                    rhou_n_HLL_ex = (s_R*rho_R*vel_R(dir_idx(1)) - s_L*rho_L*vel_L(dir_idx(1)) &
-                                                     + (rho_L*vel_L(dir_idx(1))**2 + pTot_L_ex) &
-                                                     - (rho_R*vel_R(dir_idx(1))**2 + pTot_R_ex)) &
-                                                    /(s_R - s_L)
-
-                                    u_n_iface = rhou_n_HLL_ex/(rho_HLL_ex + verysmall)
-
-                                    u_t_iface = 0._wp
-                                    if (num_dims > 1) then
-                                        rhou_t_HLL_ex = (s_R*rho_R*vel_R(dir_idx(2)) - s_L*rho_L*vel_L(dir_idx(2)) &
-                                                         + (rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(2)) - tau_e_L(dir_idx_tau(2))) &
-                                                         - (rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(2)) - tau_e_R(dir_idx_tau(2)))) &
-                                                        /(s_R - s_L)
-                                        u_t_iface = rhou_t_HLL_ex/(rho_HLL_ex + verysmall)
-                                    end if
-
-                                    u_t2_iface = 0._wp
-                                    if (num_dims > 2) then
-                                        rhou_t2_HLL_ex = (s_R*rho_R*vel_R(dir_idx(3)) - s_L*rho_L*vel_L(dir_idx(3)) &
-                                                          + (rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(3)) - tau_e_L(dir_idx_tau(3))) &
-                                                          - (rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(3)) - tau_e_R(dir_idx_tau(3)))) &
-                                                         /(s_R - s_L)
-                                        u_t2_iface = rhou_t2_HLL_ex/(rho_HLL_ex + verysmall)
-                                    end if
-                                end if
-
-                                if (p == 0) then
-                                    if (dir_idx(1) == 1) then
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_iface
+                            ! For velocity traces for NC terms, always use Method 2
+                            ! (used by interface-consistent hypo RHS and HLL Method 1 K div u)
+                            if (hypo_nc_interface .or. alt_soundspeed) then
+                                ! Compute scalar HLL transport traces: F_HLL(U=1, F=u_i)
+                                !$acc loop seq
+                                do i = 1, num_dims
+                                    if (0._wp <= s_L) then
+                                        nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i))
+                                    else if (s_R <= 0._wp) then
+                                        nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i))
                                     else
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_iface
+                                        nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
+                                            (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i)))/(s_R - s_L)
                                     end if
-                                else
-                                    if (dir_idx(1) == 1) then
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_iface
-                                    else if (dir_idx(1) == 2) then
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_iface
-                                    else
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t2_iface
-                                        hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_iface
-                                    end if
-                                end if
+                                end do
                             end if
 
-                            ! Advection
-                            !$acc loop seq
-                            do i = advxb, advxe
-                                flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                    (qL_prim_rs${XYZ}$_vf(j, k, l, i) &
-                                     - qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)) &
-                                    *s_M*s_P/(s_M - s_P)
-                                flux_src_rs${XYZ}$_vf(j, k, l, i) = &
-                                    (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
-                                     - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, i)) &
-                                    /(s_M - s_P)
-                            end do
+                            ! Advection: Method 1 / Method 2 split
+                            if (hll_alpha_interface) then
+                                ! Method 1: F(alpha)=0, source trace = F_HLL(U=1, F=alpha)
+                                !$acc loop seq
+                                do i = advxb, advxe
+                                    if (0._wp <= s_L .or. s_R <= 0._wp) then
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                    else
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                            s_M*s_P*(qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                                     - qL_prim_rs${XYZ}$_vf(j, k, l, i)) &
+                                            /(s_R - s_L)
+                                    end if
+                                    if (0._wp <= s_L) then
+                                        flux_src_rs${XYZ}$_vf(j, k, l, i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    else if (s_R <= 0._wp) then
+                                        flux_src_rs${XYZ}$_vf(j, k, l, i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                    else
+                                        flux_src_rs${XYZ}$_vf(j, k, l, i) = &
+                                            (s_R*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                             - s_L*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)) &
+                                            /(s_R - s_L)
+                                    end if
+                                end do
+                            else
+                                ! Method 2: F(alpha)=alpha*u_n, source trace = F_HLL(U=1, F=u_n)
+                                !$acc loop seq
+                                do i = advxb, advxe
+                                    if (0._wp <= s_L) then
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, i)*vel_L(dir_idx(1))
+                                    else if (s_R <= 0._wp) then
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*vel_R(dir_idx(1))
+                                    else
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                            (s_R*qL_prim_rs${XYZ}$_vf(j, k, l, i)*vel_L(dir_idx(1)) &
+                                             - s_L*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*vel_R(dir_idx(1)) &
+                                             + s_L*s_R*(qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                                        - qL_prim_rs${XYZ}$_vf(j, k, l, i))) &
+                                            /(s_R - s_L)
+                                    end if
+                                end do
+                                ! Store Psi_u (normal velocity trace) in advxb slot
+                                if (0._wp <= s_L) then
+                                    flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_L(dir_idx(1))
+                                else if (s_R <= 0._wp) then
+                                    flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_R(dir_idx(1))
+                                else
+                                    flux_src_rs${XYZ}$_vf(j, k, l, advxb) = &
+                                        (s_R*vel_L(dir_idx(1)) - s_L*vel_R(dir_idx(1)))/(s_R - s_L)
+                                end if
+                            end if
 
                             ! Xi field
                             !if ( hyperelasticity ) then
@@ -3199,29 +3184,29 @@ contains
                                     elseif (s_R <= 0._wp) then
                                         u_n_HLLC = vel_R(idx1); u_t_HLLC = u_t_R; u_t2_HLLC = u_t2_R
                                     else
-                                        u_n_HLLC = s_S; u_t_HLLC = u_t_star; u_t2_HLLC = u_t2_star
+                                        u_n_HLLC = s_S*(xi_M*xi_L + xi_P*xi_R); u_t_HLLC = u_t_star; u_t2_HLLC = u_t2_star
                                     end if
                                     if (p == 0) then
                                         if (idx1 == 1) then
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
                                         else
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
                                         end if
                                     else
                                         if (idx1 == 1) then
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
                                         else if (idx1 == 2) then
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
                                         else
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t2_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t2_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_HLLC
                                         end if
                                     end if
                                 end if
@@ -3285,7 +3270,7 @@ contains
                                 end if
 
                                 ! ===== HLLC-ADC blending for hypoelasticity =====
-                                if (riemann_ADC .and. hypoelasticity) then
+                                if (riemann_hypo_ADC .and. hypoelasticity) then
 
                                     ! --- Build U_L, U_R and F_L, F_R in local-basis layout ---
                                     !$acc loop seq
@@ -3382,15 +3367,10 @@ contains
                                             U_HLL(i) = (s_R*U_R(i) - s_L*U_L(i) - (F_R(i) - F_L(i))) &
                                                        /(s_R - s_L + verysmall)
                                         end do
-                                        rho_HLL = 0._wp
-                                        !$acc loop seq
-                                        do i = 1, contxe
-                                            rho_HLL = rho_HLL + U_HLL(i)
-                                        end do
-                                        u_n_HLL = U_HLL(momxb)/(rho_HLL + verysmall)
+                                        u_n_HLL = (s_R*u_n_L - s_L*u_n_R)/(s_R - s_L + verysmall)
                                         u_t_HLL = 0._wp; u_t2_HLL = 0._wp
-                                        if (n > 0) u_t_HLL = U_HLL(momxb + 1)/(rho_HLL + verysmall)
-                                        if (p > 0) u_t2_HLL = U_HLL(momxb + 2)/(rho_HLL + verysmall)
+                                        if (n > 0) u_t_HLL = (s_R*u_t_L - s_L*u_t_R)/(s_R - s_L + verysmall)
+                                        if (p > 0) u_t2_HLL = (s_R*u_t2_L - s_L*u_t2_R)/(s_R - s_L + verysmall)
                                     end if
 
                                     ! --- ADC sensor ---
@@ -3482,28 +3462,28 @@ contains
                                     ! Update advection source flux with blended normal velocity
                                     flux_src_rs${XYZ}$_vf(j, k, l, advxb) = u_n_HLLC
 
-                                    ! Overwrite hypo_iface_vel with blended velocities
+                                    ! Overwrite nc_iface_vel with blended velocities
                                     if (p == 0) then
                                         if (idx1 == 1) then
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
                                         else
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
                                         end if
                                     else
                                         if (idx1 == 1) then
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
                                         else if (idx1 == 2) then
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
                                         else
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t2_HLLC
-                                            hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t2_HLLC
+                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_HLLC
                                         end if
                                     end if
 
@@ -3664,7 +3644,7 @@ contains
 
                                 !     ! === ADC BLENDING ===
 
-                                !     if (riemann_ADC) then
+                                !     if (riemann_hypo_ADC) then
 
                                 !         ! Find F_HLL and velocity fluxes for ADC
                                 !         F_HLL = F_HLLC
@@ -3731,8 +3711,8 @@ contains
                                 !             flux_rs${XYZ}$_vf(j, k, l, momxb)     = F_HLLC(momxb)
                                 !             flux_rs${XYZ}$_vf(j, k, l, momxb + 1) = F_HLLC(momxb + 1)
 
-                                !             hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                !             hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
+                                !             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                !             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
                                 !         else
                                 !             flux_rs${XYZ}$_vf(j, k, l, strxb)     = F_HLLC(strxb + 2)
                                 !             flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_HLLC(strxb + 1)
@@ -3741,8 +3721,8 @@ contains
                                 !             flux_rs${XYZ}$_vf(j, k, l, momxb)     = F_HLLC(momxb + 1)
                                 !             flux_rs${XYZ}$_vf(j, k, l, momxb + 1) = F_HLLC(momxb)
 
-                                !             hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                !             hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
+                                !             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
+                                !             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
                                 !         end if
                                 !     end if
 
@@ -3771,7 +3751,7 @@ contains
                                             p_face = pres_tot_star + tau_nn_R; tau_qq_face = tau_qq_R
                                         end if
                                         ! ADC blending of axisym face state
-                                        if (riemann_ADC) then
+                                        if (riemann_hypo_ADC) then
                                             if (s_L >= 0._wp) then
                                                 p_face_HLL = pres_L; tau_qq_face_HLL = tau_qq_L
                                             elseif (s_R <= 0._wp) then
@@ -4926,7 +4906,7 @@ contains
 
                             ! ==================== ADC blending (HLLD ↔ HLL) ====================
 
-                            if (riemann_ADC) then
+                            if (riemann_hypo_ADC) then
 
                                 F_HLL(1:ncomp) = F_hlld(1:ncomp)
                                 if (S_L < 0._wp .and. S_R > 0._wp) then
@@ -5038,11 +5018,11 @@ contains
                                     u_n_face = u_n_R; u_t_face = u_t_R
                                 end if
                                 if (dir_idx(1) == 1) then
-                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_face
-                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_face
+                                    nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_face
+                                    nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_face
                                 else
-                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_face
-                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_face
+                                    nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_face
+                                    nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_face
                                 end if
                             end if
 
@@ -5141,8 +5121,9 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:ALLOCATE(hypo_iface_vel_rsx_vf(is1%beg:is1%end, &
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            @:ALLOCATE(nc_iface_vel_rsx_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
         end if
@@ -5175,8 +5156,9 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:ALLOCATE(hypo_iface_vel_rsy_vf(is1%beg:is1%end, &
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            @:ALLOCATE(nc_iface_vel_rsy_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
         end if
@@ -5209,8 +5191,9 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:ALLOCATE(hypo_iface_vel_rsz_vf(is1%beg:is1%end, &
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            @:ALLOCATE(nc_iface_vel_rsz_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
         end if
@@ -6903,7 +6886,7 @@ contains
                 end do
             end do
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
@@ -6923,11 +6906,11 @@ contains
     !>  Copy hypo interface velocities from Riemann-space buffers to
         !!  physical-space output arrays. Called after the Riemann solver
         !!  for each sweep direction when hypo_nc_interface is active.
-        !!  @param hypo_iface_vel_vf Output: physical velocity components at interfaces
+        !!  @param nc_iface_vel_vf Output: physical velocity components at interfaces
         !!  @param norm_dir Sweep direction (1=x, 2=y, 3=z)
-    subroutine s_finalize_hypo_iface_vel(hypo_iface_vel_vf, norm_dir)
+    subroutine s_finalize_nc_iface_vel(nc_iface_vel_vf, norm_dir)
 
-        type(scalar_field), dimension(:), intent(inout) :: hypo_iface_vel_vf
+        type(scalar_field), dimension(:), intent(inout) :: nc_iface_vel_vf
         integer, intent(in) :: norm_dir
 
         integer :: i, j, k, l
@@ -6938,8 +6921,8 @@ contains
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
-                            hypo_iface_vel_vf(i)%sf(k, j, l) = &
-                                hypo_iface_vel_rsy_vf(j, k, l, i)
+                            nc_iface_vel_vf(i)%sf(k, j, l) = &
+                                nc_iface_vel_rsy_vf(j, k, l, i)
                         end do
                     end do
                 end do
@@ -6950,8 +6933,8 @@ contains
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
-                            hypo_iface_vel_vf(i)%sf(j, k, l) = &
-                                hypo_iface_vel_rsx_vf(j, k, l, i)
+                            nc_iface_vel_vf(i)%sf(j, k, l) = &
+                                nc_iface_vel_rsx_vf(j, k, l, i)
                         end do
                     end do
                 end do
@@ -6962,15 +6945,15 @@ contains
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
-                            hypo_iface_vel_vf(i)%sf(l, k, j) = &
-                                hypo_iface_vel_rsz_vf(j, k, l, i)
+                            nc_iface_vel_vf(i)%sf(l, k, j) = &
+                                nc_iface_vel_rsz_vf(j, k, l, i)
                         end do
                     end do
                 end do
             end do
         end if
 
-    end subroutine s_finalize_hypo_iface_vel
+    end subroutine s_finalize_nc_iface_vel
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_riemann_solvers_module
@@ -6982,8 +6965,9 @@ contains
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:DEALLOCATE(hypo_iface_vel_rsx_vf)
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            @:DEALLOCATE(nc_iface_vel_rsx_vf)
         end if
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsx_vf)
@@ -6998,8 +6982,9 @@ contains
         @:DEALLOCATE(flux_rsy_vf)
         @:DEALLOCATE(flux_src_rsy_vf)
         @:DEALLOCATE(flux_gsrc_rsy_vf)
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:DEALLOCATE(hypo_iface_vel_rsy_vf)
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            @:DEALLOCATE(nc_iface_vel_rsy_vf)
         end if
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsy_vf)
@@ -7014,8 +6999,9 @@ contains
         @:DEALLOCATE(flux_rsz_vf)
         @:DEALLOCATE(flux_src_rsz_vf)
         @:DEALLOCATE(flux_gsrc_rsz_vf)
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:DEALLOCATE(hypo_iface_vel_rsz_vf)
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            @:DEALLOCATE(nc_iface_vel_rsz_vf)
         end if
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsz_vf)
