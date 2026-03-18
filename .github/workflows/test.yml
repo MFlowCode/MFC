@@ -166,9 +166,9 @@ jobs:
             git rebase origin/master || { git rebase --abort; echo "Rebase conflict — cache will be regenerated on the next trigger."; exit 0; }
             # Push using admin token to bypass branch protection rulesets.
             # The default GITHUB_TOKEN lacks the Repository Admin role needed
-            # to push directly to master. Use credential helper to avoid
-            # leaking the token in git error messages.
-            git -c "http.https://github.com/.extraheader=Authorization: basic $(echo -n "x-access-token:${CACHE_PUSH_TOKEN}" | base64)" push origin HEAD:refs/heads/master
+            # to push directly to master.
+            git remote set-url origin "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git"
+            git push origin HEAD:refs/heads/master
           fi
 
   github:
