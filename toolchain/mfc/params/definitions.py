@@ -30,7 +30,8 @@ def _fc(name: str) -> int:
 NF = _fc("num_fluids_max")  # fluid_pp
 NPR = _fc("num_probes_max")  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max")  # patch_bc
-NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp, patch_ib (Fortran array bound)
+NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp (Fortran array bound)
+NIB = _fc("num_ib_patches_max")  # patch_ib (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -1174,7 +1175,7 @@ def _load():
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
     # max_index is None so the parameter registry stays compact (no enumeration).
-    # The Fortran-side upper bound (num_patches_max in m_constants.fpp) is parsed
+    # The Fortran-side upper bound (num_ib_patches_max in m_constants.fpp) is parsed
     # and enforced by the case_validator, not by max_index here.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
@@ -1200,7 +1201,7 @@ def _load():
             base_name="patch_ib",
             attrs=_ib_attrs,
             tags=_ib_tags,
-            max_index=NUM_PATCHES_MAX,
+            max_index=NIB,
         )
     )
 

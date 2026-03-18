@@ -235,13 +235,13 @@ module m_global_parameters
     integer :: num_ibs      !< Number of immersed boundaries
     integer :: Np
 
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib
 
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     !! Database of the immersed boundary patch parameters for each of the
     !! patches employed in the configuration of the initial condition. Note that
-    !! the maximum allowable number of patches, num_patches_max, may be changed
-    !! in the module m_derived_types.f90.
+    !! the maximum allowable number of IB patches, num_ib_patches_max, may be
+    !! changed in the module m_constants.fpp.
 
     !> @}
 
@@ -546,7 +546,7 @@ contains
         ib = .false.
         num_ibs = dflt_int
 
-        do i = 1, num_patches_max
+        do i = 1, num_ib_patches_max
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = dflt_real
             patch_ib(i)%y_centroid = dflt_real
