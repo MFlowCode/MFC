@@ -100,8 +100,12 @@ contains
             call s_decode_patch_periodicity(encoded_pid1, pid1, xp1, yp1, zp1)
             call s_decode_patch_periodicity(encoded_pid2, pid2, xp2, yp2, zp2)
 
-            centroid_1 = [patch_ib(pid1)%x_centroid + real(xp1, wp)*(x_domain%end - x_domain%beg), patch_ib(pid1)%y_centroid + real(yp1, wp)*(y_domain%end - y_domain%beg), 0._wp]
-            centroid_2 = [patch_ib(pid2)%x_centroid + real(xp2, wp)*(x_domain%end - x_domain%beg), patch_ib(pid2)%y_centroid + real(yp2, wp)*(y_domain%end - y_domain%beg), 0._wp]
+            centroid_1(1) = patch_ib(pid1)%x_centroid + real(xp1, wp)*(x_domain%end - x_domain%beg)
+            centroid_1(2) = patch_ib(pid1)%y_centroid + real(yp1, wp)*(y_domain%end - y_domain%beg)
+            centroid_1(3) = 0._wp
+            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp2, wp)*(x_domain%end - x_domain%beg)
+            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp2, wp)*(y_domain%end - y_domain%beg)
+            centroid_2(3) = 0._wp
             if (num_dims == 3) then
                 centroid_1(3) = patch_ib(pid1)%z_centroid + real(zp1, wp)*(z_domain%end - z_domain%beg)
                 centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp2, wp)*(z_domain%end - z_domain%beg)
@@ -121,7 +125,7 @@ contains
                     radial_vector = normal_vector * (patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
                     call s_cross_product(patch_ib(pid1)%angular_vel, radial_vector, rotation_velocity)
                     vel1 = patch_ib(pid1)%vel + rotation_velocity
-                    radial_vector = normal_vector * -1.0_wp * (patch_ib(pid2)%radius - 0.5_wp*overlap_distance)
+                    radial_vector = normal_vector * (-1.0_wp) * (patch_ib(pid2)%radius - 0.5_wp*overlap_distance)
                     call s_cross_product(patch_ib(pid2)%angular_vel, radial_vector, rotation_velocity)
                     vel2 = patch_ib(pid2)%vel + rotation_velocity
 

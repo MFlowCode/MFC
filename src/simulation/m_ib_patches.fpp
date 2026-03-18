@@ -609,6 +609,16 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         radius = patch_ib(patch_id)%radius
 
+        ! completely skip particles no in the domain
+        if (center(1) + radius > x_cc(m + gp_layers + 1) .or. &
+            center(1) - radius < x_cc(-gp_layers - 1) .or. &
+            center(2) + radius > y_cc(n + gp_layers + 1) .or. &
+            center(2) - radius < y_cc(-gp_layers - 1) .or. &
+            center(3) + radius > z_cc(p + gp_layers + 1) .or. &
+            center(3) - radius < z_cc(-gp_layers - 1)) then
+            return
+        end if
+
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
