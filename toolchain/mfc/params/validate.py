@@ -44,12 +44,39 @@ from .registry import REGISTRY
 from .suggest import suggest_parameter
 
 
+def _family_attr_error(name: str) -> Optional[str]:
+    """
+    Check if name matches a known family base but has an invalid attribute.
+
+    Returns a targeted error message if so, or None if it doesn't match
+    any family pattern.
+    """
+    from .registry import _INDEXED_RE
+
+    m = _INDEXED_RE.match(name)
+    if m is None:
+        return None
+    base, _, attr = m.groups()
+    fam = REGISTRY.families.get(base)
+    if fam is None:
+        return None
+    # Known family, unknown attribute — provide targeted message
+    valid = sorted(fam.attrs.keys())
+    # Truncate long lists
+    if len(valid) > 8:
+        shown = ", ".join(valid[:8]) + f", ... ({len(valid)} total)"
+    else:
+        shown = ", ".join(valid)
+    return f"Unknown attribute '{attr}' for {base}. Valid attributes: {shown}"
+
+
 def check_unknown_params(params: Dict[str, Any]) -> List[str]:
     """
     Check for unknown parameters and suggest corrections.
 
-    Uses fuzzy matching via rapidfuzz to provide "Did you mean?" suggestions
-    for parameter names that don't exist in the registry.
+    For indexed family params with a known base but invalid attribute,
+    provides a targeted "valid attributes" message. Otherwise, uses
+    fuzzy matching to provide "Did you mean?" suggestions.
 
     Args:
         params: Dictionary of parameter name -> value
@@ -61,8 +88,12 @@ def check_unknown_params(params: Dict[str, Any]) -> List[str]:
 
     for name in params.keys():
         if not REGISTRY.is_known_param(name):
-            suggestions = suggest_parameter(name)
-            errors.append(unknown_param_error(name, suggestions))
+            family_err = _family_attr_error(name)
+            if family_err:
+                errors.append(family_err)
+            else:
+                suggestions = suggest_parameter(name)
+                errors.append(unknown_param_error(name, suggestions))
 
     return errors
 

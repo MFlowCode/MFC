@@ -12,7 +12,7 @@ from .registry import REGISTRY, IndexedFamily
 from .schema import ParamDef, ParamType
 
 # Index limits
-NP, NF, NI, NA, NPR, NB = 10, 10, 1000, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
+NP, NF, NA, NPR, NB = 10, 10, 4, 10, 10  # patches, fluids, acoustic, probes, bc_patches
 
 
 # Auto-generated Descriptions
@@ -1137,7 +1137,9 @@ def _load():
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
-    # Max index is NI; attributes are pattern-matched, not enumerated.
+    # max_index is intentionally None (unlimited): the Fortran side allocates
+    # 1:num_ibs and the case_validator enforces num_ibs >= 1 when ib is enabled.
+    # Indices beyond num_ibs are harmless (ignored at runtime).
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm"]:

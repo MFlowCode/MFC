@@ -77,6 +77,33 @@ class TestRegistryJsonSchema(unittest.TestCase):
         self.assertEqual(len(properties), scalar_count)
         self.assertGreater(len(pattern_props), 0)
 
+    def test_family_pattern_matches_param_names(self):
+        """patternProperties regexes should match valid family param names."""
+        import re
+
+        schema = REGISTRY.get_json_schema()
+        patterns = schema.get("patternProperties", {})
+
+        # These valid names must match at least one pattern
+        valid_names = [
+            "patch_ib(1)%geometry",
+            "patch_ib(99)%vel(1)",
+            "patch_ib(5)%model_translate(2)",
+            "patch_ib(1000)%radius",
+        ]
+        for name in valid_names:
+            matched = any(re.match(p, name) for p in patterns)
+            self.assertTrue(matched, f"'{name}' did not match any patternProperties regex")
+
+        # These invalid names must NOT match any pattern
+        invalid_names = [
+            "patch_ib(0)%geometry",
+            "patch_ib(1)%bogus_attr",
+        ]
+        for name in invalid_names:
+            matched = any(re.match(p, name) for p in patterns)
+            self.assertFalse(matched, f"'{name}' should not match any patternProperties regex")
+
     def test_core_params_in_schema(self):
         """Core params should be in JSON schema."""
         schema = REGISTRY.get_json_schema()
@@ -139,9 +166,11 @@ class TestCaseDictsIntegration(unittest.TestCase):
         # Family params should also be recognized via pattern matching
         self.assertIn("patch_ib(1)%geometry", case_dicts.ALL)
         self.assertIn("patch_ib(500)%radius", case_dicts.ALL)
-        # Out-of-range index or bogus attr should not match
+        # Bogus attr, unknown family, and zero index should not match
         self.assertNotIn("nonexistent_param", case_dicts.ALL)
         self.assertNotIn("patch_ib(1)%bogus_attr", case_dicts.ALL)
+        self.assertNotIn("patch_ib(0)%geometry", case_dicts.ALL)
+        self.assertNotIn("unknown_family(1)%geometry", case_dicts.ALL)
 
     def test_case_optimization_params_from_registry(self):
         """CASE_OPTIMIZATION should be populated from registry."""

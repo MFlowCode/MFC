@@ -33,6 +33,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Any, Dict, Iterator, Optional, Set, Tuple
 
 from .schema import ParamDef, ParamType
@@ -46,6 +47,33 @@ class RegistryFrozenError(RuntimeError):
 #   patch_ib(123)%vel(1)  -> base="patch_ib", index=123, attr="vel(1)"
 #   patch_ib(1)%geometry  -> base="patch_ib", index=1,   attr="geometry"
 _INDEXED_RE = re.compile(r"^([a-zA-Z_]\w*)\((\d+)\)%(.+)$")
+
+
+def _resolve_family(
+    name: str, families: Dict[str, "IndexedFamily"]
+) -> Optional[Tuple[ParamType, Set[str]]]:
+    """
+    Resolve a parameter name against indexed families.
+
+    Returns (ParamType, tags) if the name matches a registered family
+    attribute, or None otherwise.  This is the single implementation of
+    family pattern-matching used by both _FamilyAwareMapping and
+    ParamRegistry.
+    """
+    m = _INDEXED_RE.match(name)
+    if m is None:
+        return None
+    base, idx_str, attr = m.groups()
+    fam = families.get(base)
+    if fam is None:
+        return None
+    idx = int(idx_str)
+    if idx < 1:
+        return None
+    if fam.max_index is not None and idx > fam.max_index:
+        return None
+    entry = fam.attrs.get(attr)
+    return entry if entry is not None else None
 
 
 @dataclass
@@ -70,6 +98,12 @@ class IndexedFamily:
     tags: Set[str] = field(default_factory=set)
     max_index: Optional[int] = None
 
+    def __post_init__(self):
+        if not self.base_name or not re.match(r"^[a-zA-Z_]\w*$", self.base_name):
+            raise ValueError(f"Invalid base_name: {self.base_name!r}")
+        if self.max_index is not None and self.max_index < 1:
+            raise ValueError(f"max_index must be >= 1 or None, got {self.max_index}")
+
 
 class _FamilyAwareMapping(Mapping):
     """
@@ -82,6 +116,9 @@ class _FamilyAwareMapping(Mapping):
     For iteration (items/keys/values/len), only scalar params and one
     representative example per family attribute (index=1) are yielded.
     This keeps iteration bounded regardless of max_index.
+
+    keys(), items(), values() are inherited from collections.abc.Mapping
+    and return proper KeysView/ItemsView/ValuesView objects.
     """
 
     __slots__ = ("_scalars", "_families", "_examples")
@@ -100,24 +137,12 @@ class _FamilyAwareMapping(Mapping):
                 key = f"{fam.base_name}(1)%{attr_name}"
                 self._examples[key] = ParamDef(name=key, param_type=ptype, tags=set(tags))
 
-    def _resolve_family(self, name: str) -> Optional[ParamDef]:
-        """Try to resolve a name against indexed families. Returns ParamDef or None."""
-        m = _INDEXED_RE.match(name)
-        if m is None:
+    def _make_param_def(self, name: str) -> Optional[ParamDef]:
+        """Build a ParamDef from a family match, or return None."""
+        result = _resolve_family(name, self._families)
+        if result is None:
             return None
-        base, idx_str, attr = m.groups()
-        fam = self._families.get(base)
-        if fam is None:
-            return None
-        idx = int(idx_str)
-        if idx < 1:
-            return None
-        if fam.max_index is not None and idx > fam.max_index:
-            return None
-        entry = fam.attrs.get(attr)
-        if entry is None:
-            return None
-        ptype, tags = entry
+        ptype, tags = result
         return ParamDef(name=name, param_type=ptype, tags=set(tags))
 
     def __getitem__(self, key: str) -> ParamDef:
@@ -125,23 +150,20 @@ class _FamilyAwareMapping(Mapping):
             return self._scalars[key]
         except KeyError:
             pass
-        result = self._resolve_family(key)
+        result = self._make_param_def(key)
         if result is not None:
             return result
         raise KeyError(key)
 
     def __contains__(self, key: object) -> bool:
+        # Note: this intentionally deviates from the standard Mapping contract.
+        # `key in self` may be True for family params (e.g., patch_ib(500)%geometry)
+        # that do NOT appear in iter(self) (which only yields index=1 examples).
         if key in self._scalars:
             return True
         if isinstance(key, str):
-            return self._resolve_family(key) is not None
+            return _resolve_family(key, self._families) is not None
         return False
-
-    def get(self, key: str, default=None):
-        if key in self._scalars:
-            return self._scalars[key]
-        result = self._resolve_family(key)
-        return result if result is not None else default
 
     def __iter__(self) -> Iterator[str]:
         yield from self._scalars
@@ -149,17 +171,6 @@ class _FamilyAwareMapping(Mapping):
 
     def __len__(self) -> int:
         return len(self._scalars) + len(self._examples)
-
-    def keys(self):
-        return set(self._scalars.keys()) | set(self._examples.keys())
-
-    def items(self):
-        yield from self._scalars.items()
-        yield from self._examples.items()
-
-    def values(self):
-        yield from self._scalars.values()
-        yield from self._examples.values()
 
 
 class ParamRegistry:
@@ -257,9 +268,9 @@ class ParamRegistry:
                 self._by_tag[tag].add(example)
 
     @property
-    def families(self) -> Dict[str, IndexedFamily]:
-        """Get all registered indexed families."""
-        return self._families
+    def families(self) -> Mapping[str, IndexedFamily]:
+        """Get all registered indexed families (read-only view)."""
+        return MappingProxyType(self._families)
 
     @property
     def all_params(self) -> Mapping[str, ParamDef]:
@@ -272,10 +283,17 @@ class ParamRegistry:
         - Iteration: yields scalar params + one example per family attr
 
         If the registry is frozen, returns an immutable view.
-        If not frozen, returns the internal dict (no family support).
+        If not frozen and no families are registered, returns the internal dict.
+        If not frozen but families exist, raises RuntimeError (the plain dict
+        cannot resolve family params — call freeze() first).
         """
         if self._frozen and self._all_params_view is not None:
             return self._all_params_view
+        if self._families:
+            raise RuntimeError(
+                "Cannot access all_params before freeze() when indexed families "
+                "are registered. Call freeze() first."
+            )
         return self._params
 
     def is_known_param(self, name: str) -> bool:
@@ -287,20 +305,7 @@ class ParamRegistry:
         """
         if name in self._params:
             return True
-        # Check indexed families via pattern matching
-        m = _INDEXED_RE.match(name)
-        if m is None:
-            return False
-        base, idx_str, attr = m.groups()
-        fam = self._families.get(base)
-        if fam is None:
-            return False
-        idx = int(idx_str)
-        if idx < 1:
-            return False
-        if fam.max_index is not None and idx > fam.max_index:
-            return False
-        return attr in fam.attrs
+        return _resolve_family(name, self._families) is not None
 
     def get_param_def(self, name: str) -> Optional[ParamDef]:
         """
@@ -310,22 +315,10 @@ class ParamRegistry:
         """
         if name in self._params:
             return self._params[name]
-        m = _INDEXED_RE.match(name)
-        if m is None:
+        result = _resolve_family(name, self._families)
+        if result is None:
             return None
-        base, idx_str, attr = m.groups()
-        fam = self._families.get(base)
-        if fam is None:
-            return None
-        idx = int(idx_str)
-        if idx < 1:
-            return None
-        if fam.max_index is not None and idx > fam.max_index:
-            return None
-        entry = fam.attrs.get(attr)
-        if entry is None:
-            return None
-        ptype, tags = entry
+        ptype, tags = result
         return ParamDef(name=name, param_type=ptype, tags=set(tags))
 
     def get_params_by_tag(self, tag: str) -> Dict[str, ParamDef]:
@@ -390,7 +383,7 @@ class ParamRegistry:
                 # Escape the attr name but replace sub-indices with \(\d+\)
                 attr_pattern = re.sub(r"\(\d+\)", "__IDX__", attr_name)
                 attr_pattern = re.escape(attr_pattern).replace("__IDX__", r"\(\d+\)")
-                pattern = f"^{base_esc}\\(\\d+\\)%{attr_pattern}$"
+                pattern = f"^{base_esc}\\([1-9]\\d*\\)%{attr_pattern}$"
                 if pattern not in pattern_props:
                     pattern_props[pattern] = ptype.json_schema
 

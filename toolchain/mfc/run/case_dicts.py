@@ -10,21 +10,22 @@ Exports:
     CASE_OPTIMIZATION: Parameters that can be hard-coded for GPU builds
     SCHEMA: JSON schema for fastjsonschema validation
     get_validator(): Returns compiled JSON schema validator
-    is_valid_for_target(): Check if a parameter is valid for a target
+    get_input_dict_keys(): Get set-like object for target parameter checking
 """
 
 import re
+from collections.abc import Mapping
 
 from ..state import ARG
 
 
-class _ParamTypeMapping:
+class _ParamTypeMapping(Mapping):
     """
-    Mapping-like object that wraps REGISTRY for {name: ParamType} access.
+    Read-only mapping wrapping REGISTRY's all_params for {name: ParamType} access.
 
-    Supports O(1) containment checks for indexed family params (e.g.,
-    ``'patch_ib(500000)%geometry' in ALL`` is True) without enumerating
-    all possible indices.
+    Delegates containment checks and lookup to the registry's family-aware
+    mapping, so indexed families like ``patch_ib(500000)%geometry`` resolve
+    in O(1) without enumerating all possible indices.
 
     For iteration, yields scalar params plus one example per family attr.
     """
@@ -32,35 +33,19 @@ class _ParamTypeMapping:
     def __init__(self):
         from ..params import REGISTRY
 
-        self._registry = REGISTRY
+        self._view = REGISTRY.all_params
 
     def __contains__(self, key):
-        return self._registry.is_known_param(key)
+        return key in self._view
 
     def __getitem__(self, key):
-        param_def = self._registry.get_param_def(key)
-        if param_def is None:
-            raise KeyError(key)
-        return param_def.param_type
-
-    def get(self, key, default=None):
-        param_def = self._registry.get_param_def(key)
-        return param_def.param_type if param_def is not None else default
-
-    def keys(self):
-        return self._registry.all_params.keys()
-
-    def values(self):
-        return (p.param_type for p in self._registry.all_params.values())
-
-    def items(self):
-        return ((n, p.param_type) for n, p in self._registry.all_params.items())
+        return self._view[key].param_type
 
     def __iter__(self):
-        return iter(self._registry.all_params)
+        return iter(self._view)
 
     def __len__(self):
-        return len(self._registry.all_params)
+        return len(self._view)
 
 
 def _load_case_optimization_params():
