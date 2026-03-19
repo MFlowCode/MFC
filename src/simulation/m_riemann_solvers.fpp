@@ -1010,7 +1010,7 @@ contains
 
                             ! For velocity traces for NC terms, always use Method 2
                             ! (used by interface-consistent hypo RHS and HLL Method 1 K div u)
-                            if (hypo_nc_interface .or. alt_soundspeed) then
+                            if (hypo_nc_interface .or. (alt_soundspeed .and. hll_alpha_interface)) then
                                 ! Compute scalar HLL transport traces: F_HLL(U=1, F=u_i)
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -1381,8 +1381,9 @@ contains
 
         ! --- ADC (HLL -> HLLC) ---
         real(wp), dimension(sys_size) :: F_HLL, U_HLL
-        real(wp) :: u_n_HLL, u_t_HLL
-        real(wp) :: u_t2_HLL
+        real(wp) :: u_n_HLL_trace, u_t_HLL_trace
+        real(wp) :: u_t2_HLL_trace
+        real(wp) :: u_n_HLL_cons
         real(wp) :: rho_HLL
         real(wp) :: p_face_HLL, tau_qq_face_HLL, tau_nn_HLL
         real(wp) :: phi
@@ -3186,7 +3187,9 @@ contains
                                     else
                                         u_n_HLLC = s_S*(xi_M*xi_L + xi_P*xi_R); u_t_HLLC = u_t_star; u_t2_HLLC = u_t2_star
                                     end if
-                                    if (p == 0) then
+                                    if (num_dims == 1) then
+                                        nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                    else if (num_dims == 2) then
                                         if (idx1 == 1) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
@@ -3350,7 +3353,8 @@ contains
                                             U_HLL(i) = U_L(i)
                                         end do
                                         rho_HLL = rho_L
-                                        u_n_HLL = u_n_L; u_t_HLL = u_t_L; u_t2_HLL = u_t2_L
+                                        u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L; u_t2_HLL_trace = u_t2_L
+                                        u_n_HLL_cons = u_n_L
                                     elseif (s_R <= 0._wp) then
                                         !$acc loop seq
                                         do i = 1, sys_size
@@ -3358,7 +3362,8 @@ contains
                                             U_HLL(i) = U_R(i)
                                         end do
                                         rho_HLL = rho_R
-                                        u_n_HLL = u_n_R; u_t_HLL = u_t_R; u_t2_HLL = u_t2_R
+                                        u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R; u_t2_HLL_trace = u_t2_R
+                                        u_n_HLL_cons = u_n_R
                                     else
                                         !$acc loop seq
                                         do i = 1, sys_size
@@ -3367,10 +3372,16 @@ contains
                                             U_HLL(i) = (s_R*U_R(i) - s_L*U_L(i) - (F_R(i) - F_L(i))) &
                                                        /(s_R - s_L + verysmall)
                                         end do
-                                        u_n_HLL = (s_R*u_n_L - s_L*u_n_R)/(s_R - s_L + verysmall)
-                                        u_t_HLL = 0._wp; u_t2_HLL = 0._wp
-                                        if (n > 0) u_t_HLL = (s_R*u_t_L - s_L*u_t_R)/(s_R - s_L + verysmall)
-                                        if (p > 0) u_t2_HLL = (s_R*u_t2_L - s_L*u_t2_R)/(s_R - s_L + verysmall)
+                                        rho_HLL = 0._wp
+                                        !$acc loop seq
+                                        do i = 1, contxe
+                                            rho_HLL = rho_HLL + U_HLL(i)
+                                        end do
+                                        u_n_HLL_cons = U_HLL(momxb)/(rho_HLL + verysmall)
+                                        u_n_HLL_trace = (s_R*u_n_L - s_L*u_n_R)/(s_R - s_L + verysmall)
+                                        u_t_HLL_trace = 0._wp; u_t2_HLL_trace = 0._wp
+                                        if (n > 0) u_t_HLL_trace = (s_R*u_t_L - s_L*u_t_R)/(s_R - s_L + verysmall)
+                                        if (p > 0) u_t2_HLL_trace = (s_R*u_t2_L - s_L*u_t2_R)/(s_R - s_L + verysmall)
                                     end if
 
                                     ! --- ADC sensor ---
@@ -3449,10 +3460,10 @@ contains
                                             F_HLL(strxe) + phi*(flux_rs${XYZ}$_vf(j, k, l, strxe) - F_HLL(strxe))
                                     end if
 
-                                    ! --- Blend interface velocities ---
-                                    u_n_HLLC = u_n_HLL + phi*(u_n_HLLC - u_n_HLL)
-                                    u_t_HLLC = u_t_HLL + phi*(u_t_HLLC - u_t_HLL)
-                                    u_t2_HLLC = u_t2_HLL + phi*(u_t2_HLLC - u_t2_HLL)
+                                    ! --- Blend interface velocities (scalar HLL traces) ---
+                                    u_n_HLLC = u_n_HLL_trace + phi*(u_n_HLLC - u_n_HLL_trace)
+                                    u_t_HLLC = u_t_HLL_trace + phi*(u_t_HLLC - u_t_HLL_trace)
+                                    u_t2_HLLC = u_t2_HLL_trace + phi*(u_t2_HLLC - u_t2_HLL_trace)
 
                                     ! Overwrite vel_src with blended velocities
                                     vel_src_rs${XYZ}$_vf(j, k, l, idx1) = u_n_HLLC
@@ -3463,7 +3474,9 @@ contains
                                     flux_src_rs${XYZ}$_vf(j, k, l, advxb) = u_n_HLLC
 
                                     ! Overwrite nc_iface_vel with blended velocities
-                                    if (p == 0) then
+                                    if (num_dims == 1) then
+                                        nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
+                                    else if (num_dims == 2) then
                                         if (idx1 == 1) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
@@ -3759,7 +3772,7 @@ contains
                                             else
                                                 tau_nn_HLL = U_HLL(strxb)/(rho_HLL + verysmall)
                                                 tau_qq_face_HLL = U_HLL(strxe)/(rho_HLL + verysmall)
-                                                p_face_HLL = F_HLL(momxb) - rho_HLL*u_n_HLL*u_n_HLL + tau_nn_HLL
+                                                p_face_HLL = F_HLL(momxb) - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
                                             end if
                                             p_face = p_face_HLL + phi*(p_face - p_face_HLL)
                                             tau_qq_face = tau_qq_face_HLL + phi*(tau_qq_face - tau_qq_face_HLL)
