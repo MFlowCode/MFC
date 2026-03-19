@@ -223,14 +223,16 @@ class TestShouldRunAllTests(unittest.TestCase):
     def test_macros_fpp_triggers_all(self):
         assert should_run_all_tests({"src/common/include/macros.fpp"}) is True
 
-    def test_cases_py_triggers_all(self):
-        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is True
+    def test_cases_py_does_not_trigger_all(self):
+        """cases.py removed from ALWAYS_RUN_ALL: new tests are conservatively included."""
+        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is False
 
     def test_case_py_triggers_all(self):
         assert should_run_all_tests({"toolchain/mfc/test/case.py"}) is True
 
-    def test_definitions_py_triggers_all(self):
-        assert should_run_all_tests({"toolchain/mfc/params/definitions.py"}) is True
+    def test_definitions_py_does_not_trigger_all(self):
+        """definitions.py removed from ALWAYS_RUN_ALL: new params are covered by .fpp changes."""
+        assert should_run_all_tests({"toolchain/mfc/params/definitions.py"}) is False
 
     def test_input_py_triggers_all(self):
         assert should_run_all_tests({"toolchain/mfc/run/input.py"}) is True
@@ -448,10 +450,10 @@ class TestDesignCornerCases(unittest.TestCase):
 
     def test_non_fpp_always_run_all_detected(self):
         """
-        End-to-end: diff lists only cases.py (non-.fpp) ->
+        End-to-end: diff lists only case.py (non-.fpp, in ALWAYS_RUN_ALL) ->
         _parse_diff_files includes it -> should_run_all_tests fires.
         """
-        files = _parse_diff_files("toolchain/mfc/test/cases.py\n")
+        files = _parse_diff_files("toolchain/mfc/test/case.py\n")
         assert should_run_all_tests(files) is True
 
     def test_niche_feature_pruning(self):
@@ -749,10 +751,12 @@ class TestLoadCoverageCache(unittest.TestCase):
             f.write(b"not gzip at all")
         assert self._run() is None
 
-    def test_stale_cache_returns_none(self):
-        """Cache with wrong cases_hash -> None."""
+    def test_stale_cache_still_loads(self):
+        """Cache with wrong cases_hash still loads (new tests included conservatively)."""
         self._write_cache({"_meta": {"cases_hash": "wrong_hash"}, "TEST1": ["src/simulation/m_rhs.fpp"]})
-        assert self._run() is None
+        result = self._run()
+        assert result is not None
+        assert "TEST1" in result
 
     def test_empty_cache_returns_none(self):
         """Cache with only _meta and no test entries -> None."""
