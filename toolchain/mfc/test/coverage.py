@@ -37,7 +37,13 @@ COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_cover
 
 # Changes to these files trigger the full test suite.
 # CPU coverage cannot tell us about GPU directive changes (macro files), and
-# toolchain files define or change the set of tests themselves.
+# toolchain files that affect .inp generation or test execution must run all.
+#
+# NOT included (safe to prune):
+#   - cases.py: adding a test doesn't invalidate existing coverage; new tests
+#     are conservatively included (not in cache -> always runs).
+#   - definitions.py: adding a parameter doesn't affect tests that don't use it;
+#     the PR's .fpp changes trigger the relevant tests via coverage overlap.
 ALWAYS_RUN_ALL = frozenset(
     [
         "CMakeLists.txt",
@@ -48,9 +54,7 @@ ALWAYS_RUN_ALL = frozenset(
         "src/common/include/macros.fpp",
         "src/common/include/case.fpp",
         "toolchain/mfc/test/case.py",
-        "toolchain/mfc/test/cases.py",
         "toolchain/mfc/test/coverage.py",
-        "toolchain/mfc/params/definitions.py",
         "toolchain/mfc/run/input.py",
         "toolchain/mfc/case_validator.py",
     ]
