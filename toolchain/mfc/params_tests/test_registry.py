@@ -228,9 +228,7 @@ class TestIndexedFamily(unittest.TestCase):
         reg = ParamRegistry()
         reg.freeze()
         with self.assertRaises(RegistryFrozenError):
-            reg.register_family(
-                IndexedFamily(base_name="late", attrs={}, tags=set())
-            )
+            reg.register_family(IndexedFamily(base_name="late", attrs={}, tags=set()))
 
     def test_invalid_base_name_raises(self):
         """IndexedFamily with empty or invalid base_name should raise."""

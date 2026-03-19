@@ -20,10 +20,7 @@ _FC = get_fortran_constants()
 def _fc(name: str) -> int:
     """Get a required Fortran constant, raising if unavailable."""
     if name not in _FC:
-        raise RuntimeError(
-            f"Fortran constant '{name}' not found in m_constants.fpp. "
-            f"Toolchain is out of sync with Fortran source."
-        )
+        raise RuntimeError(f"Fortran constant '{name}' not found in m_constants.fpp. Toolchain is out of sync with Fortran source.")
     return _FC[name]
 
 
@@ -187,14 +184,12 @@ _SIMPLE_DESCS = {
     "t_save": "Save interval (time)",
     "time_stepper": "Time integration scheme",
     "cfl_target": "Target CFL number",
-    "cfl_max": "Maximum CFL number",
     "cfl_adap_dt": "Enable adaptive CFL time stepping",
     "cfl_const_dt": "Use constant CFL time stepping",
     "cfl_dt": "Enable CFL-based time stepping",
     "adap_dt": "Enable adaptive time stepping",
     "adap_dt_tol": "Adaptive time stepping tolerance",
     "adap_dt_max_iters": "Max iterations for adaptive dt",
-    "t_tol": "Time tolerance",
     # Model
     "model_eqns": "Model equations",
     "num_fluids": "Number of fluids",
@@ -217,7 +212,6 @@ _SIMPLE_DESCS = {
     "hyper_cleaning": "Enable hyperbolic divergence cleaning",
     "hyper_cleaning_speed": "Divergence cleaning wave speed",
     "hyper_cleaning_tau": "Divergence cleaning damping time",
-    "powell": "Enable Powell source terms for MHD",
     "bubbles_euler": "Enable Euler bubble model",
     "bubbles_lagrange": "Enable Lagrangian bubbles",
     "polytropic": "Enable polytropic gas",
@@ -293,7 +287,6 @@ _SIMPLE_DESCS = {
     "pi_inf_wrt": "Write pi_inf field",
     "pres_inf_wrt": "Write reference pressure",
     "fft_wrt": "Write FFT output",
-    "kappa_wrt": "Write curvature field",
     "chem_wrt_T": "Write temperature (chemistry)",
     # Misc physics
     "alt_soundspeed": "Alternative sound speed formulation",
@@ -653,7 +646,6 @@ CONSTRAINTS = {
     "t_step_save": {"min": 1},
     "t_step_print": {"min": 1},
     "cfl_target": {"min": 0},
-    "cfl_max": {"min": 0},
     # WENO
     "weno_eps": {"min": 0},
     # Physics (must be non-negative)
@@ -850,7 +842,7 @@ def _load():
         _r(n, INT, {"time"})
     _r("dt", REAL, {"time"}, math=r"\f$\Delta t\f$")
     _r("cfl_target", REAL, {"time"}, math=r"\f$\mathrm{CFL}\f$")
-    for n in ["cfl_max", "t_tol", "adap_dt_tol", "t_stop", "t_save"]:
+    for n in ["adap_dt_tol", "t_stop", "t_save"]:
         _r(n, REAL, {"time"})
     for n in ["cfl_adap_dt", "cfl_const_dt", "cfl_dt", "adap_dt"]:
         _r(n, LOG, {"time"})
@@ -875,7 +867,7 @@ def _load():
     _r("Bx0", REAL, {"mhd"}, math=r"\f$B_{x,0}\f$")
     _r("hyper_cleaning_speed", REAL, {"mhd"}, math=r"\f$c_h\f$")
     _r("hyper_cleaning_tau", REAL, {"mhd"})
-    for n in ["mhd", "hyper_cleaning", "powell"]:
+    for n in ["mhd", "hyper_cleaning"]:
         _r(n, LOG, {"mhd"})
 
     # Bubbles
@@ -933,7 +925,6 @@ def _load():
         "E_wrt",
         "pres_wrt",
         "alpha_wrt",
-        "kappa_wrt",
         "gamma_wrt",
         "heat_ratio_wrt",
         "pi_inf_wrt",
@@ -1013,7 +1004,6 @@ def _load():
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
     for n in [
         "mixlayer_vel_coef",
-        "mixlayer_domain",
         "mixlayer_perturb_k0",
         "perturb_flow_mag",
         "fluid_rho",
@@ -1286,7 +1276,7 @@ def _load():
     # Per-fluid output arrays
     for f in range(1, NF + 1):
         _r(f"schlieren_alpha({f})", REAL, {"output"})
-        for a in ["alpha_rho_wrt", "alpha_wrt", "kappa_wrt", "alpha_rho_e_wrt"]:
+        for a in ["alpha_rho_wrt", "alpha_wrt", "alpha_rho_e_wrt"]:
             _r(f"{a}({f})", LOG, {"output"})
     for j in range(1, 4):
         for a in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
