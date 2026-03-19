@@ -1,7 +1,8 @@
 """Check parameter documentation completeness.
 
 Tier 1 (blocking): Parameters with DESCRIPTIONS entries must appear in case.md.
-Tier 2 (warnings): Fortran namelist / REGISTRY sync checks.
+Tier 2 (blocking): Fortran namelist params must be in REGISTRY.
+Tier 3 (blocking): Scalar REGISTRY params must have descriptions.
 """
 
 from __future__ import annotations
@@ -90,9 +91,11 @@ def _parse_namelist_params(fpp_path: Path) -> set[str]:
         stripped = line.strip()
         if stripped.startswith("!") or stripped.startswith("#:") or stripped.startswith("#"):
             continue
-        if "namelist /user_inputs/" in stripped.lower():
-            in_namelist = True
-            accum = stripped.split("/user_inputs/", 1)[1] if "/user_inputs/" in stripped else ""
+        lower = stripped.lower()
+        if "namelist /user_inputs/" in lower:
+            idx = lower.index("/user_inputs/") + len("/user_inputs/")
+            accum += " " + stripped[idx:]
+            in_namelist = accum.rstrip().endswith("&")
             continue
         if in_namelist:
             if stripped.startswith("&"):
