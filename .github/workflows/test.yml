@@ -219,7 +219,7 @@ jobs:
         run: |
           if [ "${{ steps.cache-artifact.outcome }}" = "success" ]; then
             echo "Coverage cache: loaded from rebuild artifact (this run)"
-          elif [ "${{ steps.cache-restore.outcome }}" = "success" ]; then
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
             echo "Coverage cache: restored from actions/cache (previous run)"
           elif [ -f toolchain/mfc/test/test_coverage_cache.json.gz ]; then
             echo "Coverage cache: using committed fallback in repo"
@@ -398,7 +398,7 @@ jobs:
         run: |
           if [ "${{ steps.cache-artifact.outcome }}" = "success" ]; then
             echo "Coverage cache: loaded from rebuild artifact (this run)"
-          elif [ "${{ steps.cache-restore.outcome }}" = "success" ]; then
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
             echo "Coverage cache: restored from actions/cache (previous run)"
           elif [ -f toolchain/mfc/test/test_coverage_cache.json.gz ]; then
             echo "Coverage cache: using committed fallback in repo"
