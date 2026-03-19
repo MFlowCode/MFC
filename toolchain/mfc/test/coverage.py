@@ -669,7 +669,8 @@ def load_coverage_cache(root_dir: str) -> Optional[dict]:
     cases_py = Path(root_dir) / "toolchain/mfc/test/cases.py"
     try:
         current_hash = hashlib.sha256(cases_py.read_bytes()).hexdigest()
-    except OSError:
+    except OSError as exc:
+        cons.print(f"[yellow]Warning: Cannot read cases.py for staleness check: {exc}[/yellow]")
         current_hash = ""
     stored_hash = cache.get("_meta", {}).get("cases_hash", "")
     if current_hash != stored_hash:

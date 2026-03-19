@@ -209,7 +209,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: toolchain/mfc/test/test_coverage_cache.json.gz
-          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
           restore-keys: |
             coverage-cache-${{ github.event.pull_request.number || 'master' }}-
             coverage-cache-master-
@@ -388,7 +388,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: toolchain/mfc/test/test_coverage_cache.json.gz
-          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
           restore-keys: |
             coverage-cache-${{ github.event.pull_request.number || 'master' }}-
             coverage-cache-master-
