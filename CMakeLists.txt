@@ -113,6 +113,8 @@ endif()
 # debug builds. These include optimization and debug flags, as well as some that
 # are required for a successful build of MFC.
 
+set(FYPP_GCOV_OPTS "")
+
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>
@@ -131,13 +133,20 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
-            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
-	    )
+        )
 
         add_link_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
             $<$<COMPILE_LANGUAGE:Fortran>:--coverage>
         )
+
+        # Override Release -O3 with -O1 for gcov: coverage instrumentation is
+        # inaccurate at -O3, and aggressive codegen (e.g. AVX-512 FP16 on
+        # Granite Rapids) can emit instructions that older assemblers reject.
+        set(CMAKE_Fortran_FLAGS_RELEASE "-O1 -DNDEBUG" CACHE STRING "" FORCE)
+
+        # Use gfortran5 line markers so gcov can map coverage to .fpp sources.
+        set(FYPP_GCOV_OPTS "--line-marker-format=gfortran5")
     endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -246,8 +255,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
         endif()
     endif()
 
-    # Enable LTO/IPO if supported
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+    # Enable LTO/IPO if supported (skip for gcov — LTO interferes with coverage
+    # instrumentation and can trigger assembler errors on newer architectures).
+    if (MFC_GCov)
+        message(STATUS "LTO/IPO disabled for gcov build")
+    elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         if (MFC_Unified)
             message(STATUS "LTO/IPO is not available with NVHPC using Unified Memory")
         elseif (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER "24.11" AND CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "25.9")
@@ -393,6 +405,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  --no-folding
 								 --line-length=999
 		 						 --line-numbering-mode=nocontlines
+                                 ${FYPP_GCOV_OPTS}
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"

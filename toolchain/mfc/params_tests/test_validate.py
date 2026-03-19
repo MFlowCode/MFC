@@ -79,6 +79,29 @@ class TestCheckUnknownParams(unittest.TestCase):
         self.assertIn("Unknown parameter", errors[0])
         self.assertIn("totally_unknown_xyz_123", errors[0])
 
+    def test_family_attr_typo_gives_targeted_error(self):
+        """Typo in family attribute should list valid attributes."""
+        params = {"patch_ib(1)%geometri": 1}
+        errors = check_unknown_params(params)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Valid attributes", errors[0])
+        self.assertIn("geometry", errors[0])
+        self.assertNotIn("Did you mean", errors[0])
+
+    def test_family_valid_attr_no_error(self):
+        """Valid family param should not generate an error."""
+        params = {"patch_ib(1)%geometry": 1}
+        errors = check_unknown_params(params)
+        self.assertEqual(errors, [])
+
+    def test_family_zero_index_gives_index_error(self):
+        """Zero index on valid attr should report index error, not attr error."""
+        params = {"patch_ib(0)%geometry": 1}
+        errors = check_unknown_params(params)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("1-based", errors[0])
+        self.assertNotIn("Unknown attribute", errors[0])
+
     @unittest.skipUnless(RAPIDFUZZ_AVAILABLE, "rapidfuzz not installed")
     def test_similar_param_suggests_correction(self):
         """Typo near valid param should suggest 'did you mean?'."""
