@@ -749,10 +749,12 @@ class TestLoadCoverageCache(unittest.TestCase):
             f.write(b"not gzip at all")
         assert self._run() is None
 
-    def test_stale_cache_returns_none(self):
-        """Cache with wrong cases_hash -> None."""
+    def test_stale_cache_still_loads(self):
+        """Cache with wrong cases_hash still loads (new tests included conservatively)."""
         self._write_cache({"_meta": {"cases_hash": "wrong_hash"}, "TEST1": ["src/simulation/m_rhs.fpp"]})
-        assert self._run() is None
+        result = self._run()
+        assert result is not None
+        assert "TEST1" in result
 
     def test_empty_cache_returns_none(self):
         """Cache with only _meta and no test entries -> None."""
