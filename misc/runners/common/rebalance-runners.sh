@@ -106,6 +106,16 @@ done
 # Add offline runners to be placed
 for i in "${offline[@]}"; do to_place+=("offline $i"); done
 
+# Shuffle to_place so sequential runner numbers spread across nodes
+# (avoids overloading one node when jobs arrive in number order)
+shuffled=()
+while [ ${#to_place[@]} -gt 0 ]; do
+    rand=$(( RANDOM % ${#to_place[@]} ))
+    shuffled+=("${to_place[$rand]}")
+    to_place=("${to_place[@]:0:$rand}" "${to_place[@]:$((rand+1))}")
+done
+to_place=("${shuffled[@]}")
+
 # Assign to underloaded nodes
 moves=()
 for entry in "${to_place[@]}"; do
