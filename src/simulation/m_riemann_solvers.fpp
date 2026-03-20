@@ -1359,7 +1359,7 @@ contains
         real(wp), dimension(sys_size) :: U_L, U_R, U_star_L, U_star_R
         real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
         real(wp) :: u_n_HLLC, u_t_HLLC, u_t2_HLLC
-        
+
         real(wp) :: pres_tot_L, pres_tot_R
         real(wp) :: u_n_L, u_n_R, u_t_L, u_t_R
         real(wp) :: u_t2_L, u_t2_R
@@ -1397,7 +1397,6 @@ contains
 
         real(wp), parameter :: ADC_power = 1.0_wp
 
-        
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
 
@@ -1635,10 +1634,10 @@ contains
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                                                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                                                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -2928,10 +2927,10 @@ contains
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                                                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
                                                                            (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                                                                                                            (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -3000,9 +2999,9 @@ contains
                                     A_L = rho_L*(s_L - vel_L(idx1))
                                     A_R = rho_R*(s_R - vel_R(idx1))
                                     denom_A = A_R - A_L
-                                    u_t_star    = (A_R*u_t_R - A_L*u_t_L + (tau_nt_R - tau_nt_L))/(denom_A + sgm_eps)
+                                    u_t_star = (A_R*u_t_R - A_L*u_t_L + (tau_nt_R - tau_nt_L))/(denom_A + sgm_eps)
                                     tau_nt_star = (A_R*tau_nt_R - A_L*tau_nt_L)/(denom_A + sgm_eps)
-                                    u_t2_star    = (A_R*u_t2_R - A_L*u_t2_L + (tau_nt2_R - tau_nt2_L))/(denom_A + sgm_eps)
+                                    u_t2_star = (A_R*u_t2_R - A_L*u_t2_L + (tau_nt2_R - tau_nt2_L))/(denom_A + sgm_eps)
                                     tau_nt2_star = (A_R*tau_nt2_R - A_L*tau_nt2_L)/(denom_A + sgm_eps)
                                     pres_tot_star = pres_tot_L + A_L*(s_S - vel_L(idx1))
                                 end if
@@ -3070,18 +3069,18 @@ contains
                                               s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
                                                          (rho_L*s_S + pres_tot_L/(s_L - vel_L(idx1))) &
                                                          + (u_t_L*tau_nt_L - u_t_star*tau_nt_star) &
-                                                           /(s_L - vel_L(idx1)) &
+                                                         /(s_L - vel_L(idx1)) &
                                                          + (u_t2_L*tau_nt2_L - u_t2_star*tau_nt2_star) &
-                                                           /(s_L - vel_L(idx1))) &
+                                                         /(s_L - vel_L(idx1))) &
                                                    - E_L)) &
                                         + xi_P*((E_R + pres_tot_R)*vel_R(idx1) &
                                                 - u_t_R*tau_nt_R - u_t2_R*tau_nt2_R + &
                                                 s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                            (rho_R*s_S + pres_tot_R/(s_R - vel_R(idx1))) &
                                                            + (u_t_R*tau_nt_R - u_t_star*tau_nt_star) &
-                                                             /(s_R - vel_R(idx1)) &
+                                                           /(s_R - vel_R(idx1)) &
                                                            + (u_t2_R*tau_nt2_R - u_t2_star*tau_nt2_star) &
-                                                             /(s_R - vel_R(idx1))) &
+                                                           /(s_R - vel_R(idx1))) &
                                                      - E_R)) &
                                         + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
                                 else
@@ -3705,7 +3704,6 @@ contains
 
                                 !     ! === END ADC BLENDING ===
 
-
                                 !     ! Assign flux_rs to F_HLLC with the right indexing order
                                 !     do i = 1, num_fluids
                                 !         flux_rs${XYZ}$_vf(j, k, l, i) = F_HLLC(i)
@@ -4256,7 +4254,7 @@ contains
         real(wp) :: tau_qq_L, tau_qq_R
 
         real(wp) :: G_L, G_R
-        real(wp), dimension(strxe-strxb+1) :: tau_e_L, tau_e_R
+        real(wp), dimension(strxe - strxb + 1) :: tau_e_L, tau_e_R
 
         real(wp) :: alpha1_L_star, alpha1_R_star, alpha2_L_star, alpha2_R_star
         real(wp) :: u_t_star, tau_nt_star
@@ -4281,7 +4279,7 @@ contains
         real(wp) :: tau_nt2_hat, tau_t2t2_hat, tau_t1t2_hat
         real(wp), dimension(num_fluids) :: alpha_hat, alpha_rho_hat
         real(wp), dimension(num_vels) :: vel_hat
-        real(wp), dimension(strxe-strxb+1) :: tau_e_hat
+        real(wp), dimension(strxe - strxb + 1) :: tau_e_hat
 
         real(wp) :: pres_hat, blkmod1_hat, blkmod2_hat, K_hat
         real(wp) :: C_hat_1, C_hat_2
@@ -4319,23 +4317,23 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
                                 #:if NORM_DIR == 1
-                                if (is_hat_L) then
-                                    q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j  ,k,l)
-                                else
-                                    q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j+1,k,l)
-                                end if
+                                    if (is_hat_L) then
+                                        q_hat_prim_x_vf(j, k, l, i) = q_prim_vf(i)%sf(j, k, l)
+                                    else
+                                        q_hat_prim_x_vf(j, k, l, i) = q_prim_vf(i)%sf(j + 1, k, l)
+                                    end if
                                 #:elif NORM_DIR == 2
-                                if (is_hat_L) then
-                                    q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j  ,l)
-                                else
-                                    q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j+1,l)
-                                end if
+                                    if (is_hat_L) then
+                                        q_hat_prim_y_vf(j, k, l, i) = q_prim_vf(i)%sf(k, j, l)
+                                    else
+                                        q_hat_prim_y_vf(j, k, l, i) = q_prim_vf(i)%sf(k, j + 1, l)
+                                    end if
                                 #:else
-                                if (is_hat_L) then
-                                    q_hat_prim_z_vf(j,k,l,i) = q_prim_vf(i)%sf(l,k,j  )
-                                else
-                                    q_hat_prim_z_vf(j,k,l,i) = q_prim_vf(i)%sf(l,k,j+1)
-                                end if
+                                    if (is_hat_L) then
+                                        q_hat_prim_z_vf(j, k, l, i) = q_prim_vf(i)%sf(l, k, j)
+                                    else
+                                        q_hat_prim_z_vf(j, k, l, i) = q_prim_vf(i)%sf(l, k, j + 1)
+                                    end if
                                 #:endif
                             end do
                         end do
@@ -4526,7 +4524,6 @@ contains
                                 rho_hat = rho_hat + alpha_rho_hat(i)
                             end do
 
-
                             G_L = 0._wp; G_R = 0._wp; G_hat = 0._wp
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -4584,18 +4581,18 @@ contains
                                 ! 3D Cartesian: 14-state compact basis
                                 U_L(1) = alpha_rho_L(1); U_R(1) = alpha_rho_R(1)
                                 U_L(2) = alpha_rho_L(2); U_R(2) = alpha_rho_R(2)
-                                U_L(3) = rho%L*u_n_L;   U_R(3) = rho%R*u_n_R
-                                U_L(4) = rho%L*u_t_L;   U_R(4) = rho%R*u_t_R
-                                U_L(5) = rho%L*u_t2_L;  U_R(5) = rho%R*u_t2_R
-                                U_L(6) = E%L;            U_R(6) = E%R
-                                U_L(7) = alpha_L(1);     U_R(7) = alpha_R(1)
-                                U_L(8) = alpha_L(2);     U_R(8) = alpha_R(2)
-                                U_L(9) = rho%L*tau_nn_L;     U_R(9) = rho%R*tau_nn_R
-                                U_L(10) = rho%L*tau_nt_L;    U_R(10) = rho%R*tau_nt_R
-                                U_L(11) = rho%L*tau_nt2_L;   U_R(11) = rho%R*tau_nt2_R
-                                U_L(12) = rho%L*tau_tt_L;    U_R(12) = rho%R*tau_tt_R
-                                U_L(13) = rho%L*tau_t2t2_L;  U_R(13) = rho%R*tau_t2t2_R
-                                U_L(14) = rho%L*tau_t1t2_L;  U_R(14) = rho%R*tau_t1t2_R
+                                U_L(3) = rho%L*u_n_L; U_R(3) = rho%R*u_n_R
+                                U_L(4) = rho%L*u_t_L; U_R(4) = rho%R*u_t_R
+                                U_L(5) = rho%L*u_t2_L; U_R(5) = rho%R*u_t2_R
+                                U_L(6) = E%L; U_R(6) = E%R
+                                U_L(7) = alpha_L(1); U_R(7) = alpha_R(1)
+                                U_L(8) = alpha_L(2); U_R(8) = alpha_R(2)
+                                U_L(9) = rho%L*tau_nn_L; U_R(9) = rho%R*tau_nn_R
+                                U_L(10) = rho%L*tau_nt_L; U_R(10) = rho%R*tau_nt_R
+                                U_L(11) = rho%L*tau_nt2_L; U_R(11) = rho%R*tau_nt2_R
+                                U_L(12) = rho%L*tau_tt_L; U_R(12) = rho%R*tau_tt_R
+                                U_L(13) = rho%L*tau_t2t2_L; U_R(13) = rho%R*tau_t2t2_R
+                                U_L(14) = rho%L*tau_t1t2_L; U_R(14) = rho%R*tau_t1t2_R
 
                                 F_L(1) = U_L(1)*u_n_L; F_R(1) = U_R(1)*u_n_R
                                 F_L(2) = U_L(2)*u_n_L; F_R(2) = U_R(2)*u_n_R
@@ -4684,7 +4681,7 @@ contains
                             A_R = rho%R*(S_R - u_n_R)
                             denomA = (A_R - A_L)
 
-                            S_M = ((pTot_R - pTot_L) + A_L*u_n_L - A_R*u_n_R) / (A_L - A_R + verysmall)
+                            S_M = ((pTot_R - pTot_L) + A_L*u_n_L - A_R*u_n_R)/(A_L - A_R + verysmall)
 
                             ! Degenerate wave structure: denom ~ 0 or S_M not in [S_L,S_R]
                             if (abs(denomA) < verysmall .or. &
@@ -4703,278 +4700,278 @@ contains
                                 ! Initialize star-state variables to safe fallback values so
                                 ! subsequent face-state and axisymmetric source logic never
                                 ! reads uninitialized memory regardless of wave configuration.
-                                pTot_star     = 5e-1_wp*(pTot_L + pTot_R)
-                                S_Lstar       = S_L
-                                S_Rstar       = S_R
-                                u_t_star      = 5e-1_wp*(u_t_L + u_t_R)
+                                pTot_star = 5e-1_wp*(pTot_L + pTot_R)
+                                S_Lstar = S_L
+                                S_Rstar = S_R
+                                u_t_star = 5e-1_wp*(u_t_L + u_t_R)
                                 tau_nn_L_star = tau_nn_L
                                 tau_nn_R_star = tau_nn_R
                                 tau_qq_L_star = tau_qq_L
                                 tau_qq_R_star = tau_qq_R
                             else
 
-                            pTot_star = pTot_L + A_L*(S_M - u_n_L)
+                                pTot_star = pTot_L + A_L*(S_M - u_n_L)
 
-                            rhoL_star = rho%L * (S_L - u_n_L) / (S_L - S_M + verysmall)
-                            rhoR_star = rho%R * (S_R - u_n_R) / (S_R - S_M + verysmall)
-                            fac_L = (S_L - u_n_L) / (S_L - S_M + verysmall)
-                            fac_R = (S_R - u_n_R) / (S_R - S_M + verysmall)
+                                rhoL_star = rho%L*(S_L - u_n_L)/(S_L - S_M + verysmall)
+                                rhoR_star = rho%R*(S_R - u_n_R)/(S_R - S_M + verysmall)
+                                fac_L = (S_L - u_n_L)/(S_L - S_M + verysmall)
+                                fac_R = (S_R - u_n_R)/(S_R - S_M + verysmall)
 
-                            C_NC = rho_hat*(G_hat + tau_nn_hat)
-                            sqrtC_NC = sqrt(max(C_NC, verysmall))
+                                C_NC = rho_hat*(G_hat + tau_nn_hat)
+                                sqrtC_NC = sqrt(max(C_NC, verysmall))
 
-                            S_Lstar = S_M - sqrtC_NC/rhoL_star
-                            S_Rstar = S_M + sqrtC_NC/rhoR_star
+                                S_Lstar = S_M - sqrtC_NC/rhoL_star
+                                S_Rstar = S_M + sqrtC_NC/rhoR_star
 
-                            u_t_star    = 0.5_wp*((tau_nt_R - tau_nt_L)/sqrtC_NC + (u_t_R + u_t_L))
-                            tau_nt_star = 0.5_wp*((u_t_R - u_t_L)*sqrtC_NC + (tau_nt_R + tau_nt_L))
+                                u_t_star = 0.5_wp*((tau_nt_R - tau_nt_L)/sqrtC_NC + (u_t_R + u_t_L))
+                                tau_nt_star = 0.5_wp*((u_t_R - u_t_L)*sqrtC_NC + (tau_nt_R + tau_nt_L))
 
-                            u_t2_star    = 0.5_wp*((tau_nt2_R - tau_nt2_L)/sqrtC_NC + (u_t2_R + u_t2_L))
-                            tau_nt2_star = 0.5_wp*((u_t2_R - u_t2_L)*sqrtC_NC + (tau_nt2_R + tau_nt2_L))
+                                u_t2_star = 0.5_wp*((tau_nt2_R - tau_nt2_L)/sqrtC_NC + (u_t2_R + u_t2_L))
+                                tau_nt2_star = 0.5_wp*((u_t2_R - u_t2_L)*sqrtC_NC + (tau_nt2_R + tau_nt2_L))
 
-                            tau_nn_L_star = tau_nn_L - (rho_hat*(G_hat*4._wp/3._wp + tau_nn_hat)*(u_n_L - S_M)) &
-                                            /(rho%L*(u_n_L - S_L))
-                            tau_nn_R_star = tau_nn_R - (rho_hat*(G_hat*4._wp/3._wp + tau_nn_hat)*(u_n_R - S_M)) &
-                                            /(rho%R*(u_n_R - S_R))
+                                tau_nn_L_star = tau_nn_L - (rho_hat*(G_hat*4._wp/3._wp + tau_nn_hat)*(u_n_L - S_M)) &
+                                                /(rho%L*(u_n_L - S_L))
+                                tau_nn_R_star = tau_nn_R - (rho_hat*(G_hat*4._wp/3._wp + tau_nn_hat)*(u_n_R - S_M)) &
+                                                /(rho%R*(u_n_R - S_R))
 
-                            tau_tt_L_star = tau_tt_L + (rho_hat*(G_hat*2._wp/3._wp + tau_tt_hat)*(u_n_L - S_M)) &
-                                            /(rho%L*(u_n_L - S_L))
-                            tau_tt_R_star = tau_tt_R + (rho_hat*(G_hat*2._wp/3._wp + tau_tt_hat)*(u_n_R - S_M)) &
-                                            /(rho%R*(u_n_R - S_R))
+                                tau_tt_L_star = tau_tt_L + (rho_hat*(G_hat*2._wp/3._wp + tau_tt_hat)*(u_n_L - S_M)) &
+                                                /(rho%L*(u_n_L - S_L))
+                                tau_tt_R_star = tau_tt_R + (rho_hat*(G_hat*2._wp/3._wp + tau_tt_hat)*(u_n_R - S_M)) &
+                                                /(rho%R*(u_n_R - S_R))
 
-                            tau_t2t2_L_star = tau_t2t2_L + (rho_hat*(G_hat*2._wp/3._wp + tau_t2t2_hat)*(u_n_L - S_M)) &
-                                              /(rho%L*(u_n_L - S_L))
-                            tau_t2t2_R_star = tau_t2t2_R + (rho_hat*(G_hat*2._wp/3._wp + tau_t2t2_hat)*(u_n_R - S_M)) &
-                                              /(rho%R*(u_n_R - S_R))
+                                tau_t2t2_L_star = tau_t2t2_L + (rho_hat*(G_hat*2._wp/3._wp + tau_t2t2_hat)*(u_n_L - S_M)) &
+                                                  /(rho%L*(u_n_L - S_L))
+                                tau_t2t2_R_star = tau_t2t2_R + (rho_hat*(G_hat*2._wp/3._wp + tau_t2t2_hat)*(u_n_R - S_M)) &
+                                                  /(rho%R*(u_n_R - S_R))
 
-                            tau_t1t2_L_star = tau_t1t2_L + (rho_hat*tau_t1t2_hat*(u_n_L - S_M)) &
-                                              /(rho%L*(u_n_L - S_L))
-                            tau_t1t2_R_star = tau_t1t2_R + (rho_hat*tau_t1t2_hat*(u_n_R - S_M)) &
-                                              /(rho%R*(u_n_R - S_R))
+                                tau_t1t2_L_star = tau_t1t2_L + (rho_hat*tau_t1t2_hat*(u_n_L - S_M)) &
+                                                  /(rho%L*(u_n_L - S_L))
+                                tau_t1t2_R_star = tau_t1t2_R + (rho_hat*tau_t1t2_hat*(u_n_R - S_M)) &
+                                                  /(rho%R*(u_n_R - S_R))
 
-                            tau_qq_L_star = tau_qq_L + (rho_hat*(G_hat*2._wp/3._wp + tau_qq_hat)*(u_n_L - S_M)) &
-                                            /(rho%L*(u_n_L - S_L))
-                            tau_qq_R_star = tau_qq_R + (rho_hat*(G_hat*2._wp/3._wp + tau_qq_hat)*(u_n_R - S_M)) &
-                                            /(rho%R*(u_n_R - S_R))
+                                tau_qq_L_star = tau_qq_L + (rho_hat*(G_hat*2._wp/3._wp + tau_qq_hat)*(u_n_L - S_M)) &
+                                                /(rho%L*(u_n_L - S_L))
+                                tau_qq_R_star = tau_qq_R + (rho_hat*(G_hat*2._wp/3._wp + tau_qq_hat)*(u_n_R - S_M)) &
+                                                /(rho%R*(u_n_R - S_R))
 
-                            tau_tt_L_starstar = tau_tt_L_star + 2._wp*rho_hat*tau_nt_hat/sqrtC_NC*(u_t_star - u_t_L)
-                            tau_tt_R_starstar = tau_tt_R_star - 2._wp*rho_hat*tau_nt_hat/sqrtC_NC*(u_t_star - u_t_R)
+                                tau_tt_L_starstar = tau_tt_L_star + 2._wp*rho_hat*tau_nt_hat/sqrtC_NC*(u_t_star - u_t_L)
+                                tau_tt_R_starstar = tau_tt_R_star - 2._wp*rho_hat*tau_nt_hat/sqrtC_NC*(u_t_star - u_t_R)
 
-                            tau_t2t2_L_starstar = tau_t2t2_L_star + 2._wp*rho_hat*tau_nt2_hat/sqrtC_NC*(u_t2_star - u_t2_L)
-                            tau_t2t2_R_starstar = tau_t2t2_R_star - 2._wp*rho_hat*tau_nt2_hat/sqrtC_NC*(u_t2_star - u_t2_R)
+                                tau_t2t2_L_starstar = tau_t2t2_L_star + 2._wp*rho_hat*tau_nt2_hat/sqrtC_NC*(u_t2_star - u_t2_L)
+                                tau_t2t2_R_starstar = tau_t2t2_R_star - 2._wp*rho_hat*tau_nt2_hat/sqrtC_NC*(u_t2_star - u_t2_R)
 
-                            tau_t1t2_L_starstar = tau_t1t2_L_star &
-                                + rho_hat*(tau_nt2_hat*(u_t_star - u_t_L) + tau_nt_hat*(u_t2_star - u_t2_L))/sqrtC_NC
-                            tau_t1t2_R_starstar = tau_t1t2_R_star &
-                                - rho_hat*(tau_nt2_hat*(u_t_star - u_t_R) + tau_nt_hat*(u_t2_star - u_t2_R))/sqrtC_NC
+                                tau_t1t2_L_starstar = tau_t1t2_L_star &
+                                                      + rho_hat*(tau_nt2_hat*(u_t_star - u_t_L) + tau_nt_hat*(u_t2_star - u_t2_L))/sqrtC_NC
+                                tau_t1t2_R_starstar = tau_t1t2_R_star &
+                                                      - rho_hat*(tau_nt2_hat*(u_t_star - u_t_R) + tau_nt_hat*(u_t2_star - u_t2_R))/sqrtC_NC
 
-                            E_L_star = (E%L*(u_n_L - S_L) + u_n_L*pTot_L - S_M*pTot_star)/(S_M - S_L)
-                            E_R_star = (E%R*(u_n_R - S_R) + u_n_R*pTot_R - S_M*pTot_star)/(S_M - S_R)
-                            E_L_starstar = E_L_star + (rhoL_star/sqrtC_NC)* &
-                                ((u_t_star*tau_nt_star - u_t_L*tau_nt_L) + (u_t2_star*tau_nt2_star - u_t2_L*tau_nt2_L))
-                            E_R_starstar = E_R_star - (rhoR_star/sqrtC_NC)* &
-                                ((u_t_star*tau_nt_star - u_t_R*tau_nt_R) + (u_t2_star*tau_nt2_star - u_t2_R*tau_nt2_R))
+                                E_L_star = (E%L*(u_n_L - S_L) + u_n_L*pTot_L - S_M*pTot_star)/(S_M - S_L)
+                                E_R_star = (E%R*(u_n_R - S_R) + u_n_R*pTot_R - S_M*pTot_star)/(S_M - S_R)
+                                E_L_starstar = E_L_star + (rhoL_star/sqrtC_NC)* &
+                                               ((u_t_star*tau_nt_star - u_t_L*tau_nt_L) + (u_t2_star*tau_nt2_star - u_t2_L*tau_nt2_L))
+                                E_R_starstar = E_R_star - (rhoR_star/sqrtC_NC)* &
+                                               ((u_t_star*tau_nt_star - u_t_R*tau_nt_R) + (u_t2_star*tau_nt2_star - u_t2_R*tau_nt2_R))
 
-                            alpha1_L_star = (alpha_L(1)*(S_L - u_n_L) - C_hat_1*(S_M - u_n_L))/(S_L - S_M)
-                            alpha1_R_star = (alpha_R(1)*(S_R - u_n_R) - C_hat_1*(S_M - u_n_R))/(S_R - S_M)
+                                alpha1_L_star = (alpha_L(1)*(S_L - u_n_L) - C_hat_1*(S_M - u_n_L))/(S_L - S_M)
+                                alpha1_R_star = (alpha_R(1)*(S_R - u_n_R) - C_hat_1*(S_M - u_n_R))/(S_R - S_M)
 
-                            alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - C_hat_2*(S_M - u_n_L))/(S_L - S_M)
-                            alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - C_hat_2*(S_M - u_n_R))/(S_R - S_M)
+                                alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - C_hat_2*(S_M - u_n_L))/(S_L - S_M)
+                                alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - C_hat_2*(S_M - u_n_R))/(S_R - S_M)
 
-                            ! ==================== Compute U ====================
+                                ! ==================== Compute U ====================
 
-                            if (p > 0 .and. .not. cyl_coord) then
-                                ! 3D Cartesian: 14-state
-                                U_starL(1) = U_L(1) * fac_L
-                                U_starL(2) = U_L(2) * fac_L
-                                U_starL(3) = rhoL_star * S_M
-                                U_starL(4) = rhoL_star * u_t_L
-                                U_starL(5) = rhoL_star * u_t2_L
-                                U_starL(6) = E_L_star
-                                U_starL(7) = alpha1_L_star
-                                U_starL(8) = alpha2_L_star
-                                U_starL(9) = rhoL_star * tau_nn_L_star
-                                U_starL(10) = rhoL_star * tau_nt_L
-                                U_starL(11) = rhoL_star * tau_nt2_L
-                                U_starL(12) = rhoL_star * tau_tt_L_star
-                                U_starL(13) = rhoL_star * tau_t2t2_L_star
-                                U_starL(14) = rhoL_star * tau_t1t2_L_star
+                                if (p > 0 .and. .not. cyl_coord) then
+                                    ! 3D Cartesian: 14-state
+                                    U_starL(1) = U_L(1)*fac_L
+                                    U_starL(2) = U_L(2)*fac_L
+                                    U_starL(3) = rhoL_star*S_M
+                                    U_starL(4) = rhoL_star*u_t_L
+                                    U_starL(5) = rhoL_star*u_t2_L
+                                    U_starL(6) = E_L_star
+                                    U_starL(7) = alpha1_L_star
+                                    U_starL(8) = alpha2_L_star
+                                    U_starL(9) = rhoL_star*tau_nn_L_star
+                                    U_starL(10) = rhoL_star*tau_nt_L
+                                    U_starL(11) = rhoL_star*tau_nt2_L
+                                    U_starL(12) = rhoL_star*tau_tt_L_star
+                                    U_starL(13) = rhoL_star*tau_t2t2_L_star
+                                    U_starL(14) = rhoL_star*tau_t1t2_L_star
 
-                                U_starR(1) = U_R(1) * fac_R
-                                U_starR(2) = U_R(2) * fac_R
-                                U_starR(3) = rhoR_star * S_M
-                                U_starR(4) = rhoR_star * u_t_R
-                                U_starR(5) = rhoR_star * u_t2_R
-                                U_starR(6) = E_R_star
-                                U_starR(7) = alpha1_R_star
-                                U_starR(8) = alpha2_R_star
-                                U_starR(9) = rhoR_star * tau_nn_R_star
-                                U_starR(10) = rhoR_star * tau_nt_R
-                                U_starR(11) = rhoR_star * tau_nt2_R
-                                U_starR(12) = rhoR_star * tau_tt_R_star
-                                U_starR(13) = rhoR_star * tau_t2t2_R_star
-                                U_starR(14) = rhoR_star * tau_t1t2_R_star
+                                    U_starR(1) = U_R(1)*fac_R
+                                    U_starR(2) = U_R(2)*fac_R
+                                    U_starR(3) = rhoR_star*S_M
+                                    U_starR(4) = rhoR_star*u_t_R
+                                    U_starR(5) = rhoR_star*u_t2_R
+                                    U_starR(6) = E_R_star
+                                    U_starR(7) = alpha1_R_star
+                                    U_starR(8) = alpha2_R_star
+                                    U_starR(9) = rhoR_star*tau_nn_R_star
+                                    U_starR(10) = rhoR_star*tau_nt_R
+                                    U_starR(11) = rhoR_star*tau_nt2_R
+                                    U_starR(12) = rhoR_star*tau_tt_R_star
+                                    U_starR(13) = rhoR_star*tau_t2t2_R_star
+                                    U_starR(14) = rhoR_star*tau_t1t2_R_star
 
-                                U_starstarL(1) = U_L(1) * fac_L
-                                U_starstarL(2) = U_L(2) * fac_L
-                                U_starstarL(3) = rhoL_star * S_M
-                                U_starstarL(4) = rhoL_star * u_t_star
-                                U_starstarL(5) = rhoL_star * u_t2_star
-                                U_starstarL(6) = E_L_starstar
-                                U_starstarL(7) = alpha1_L_star
-                                U_starstarL(8) = alpha2_L_star
-                                U_starstarL(9) = rhoL_star * tau_nn_L_star
-                                U_starstarL(10) = rhoL_star * tau_nt_star
-                                U_starstarL(11) = rhoL_star * tau_nt2_star
-                                U_starstarL(12) = rhoL_star * tau_tt_L_starstar
-                                U_starstarL(13) = rhoL_star * tau_t2t2_L_starstar
-                                U_starstarL(14) = rhoL_star * tau_t1t2_L_starstar
+                                    U_starstarL(1) = U_L(1)*fac_L
+                                    U_starstarL(2) = U_L(2)*fac_L
+                                    U_starstarL(3) = rhoL_star*S_M
+                                    U_starstarL(4) = rhoL_star*u_t_star
+                                    U_starstarL(5) = rhoL_star*u_t2_star
+                                    U_starstarL(6) = E_L_starstar
+                                    U_starstarL(7) = alpha1_L_star
+                                    U_starstarL(8) = alpha2_L_star
+                                    U_starstarL(9) = rhoL_star*tau_nn_L_star
+                                    U_starstarL(10) = rhoL_star*tau_nt_star
+                                    U_starstarL(11) = rhoL_star*tau_nt2_star
+                                    U_starstarL(12) = rhoL_star*tau_tt_L_starstar
+                                    U_starstarL(13) = rhoL_star*tau_t2t2_L_starstar
+                                    U_starstarL(14) = rhoL_star*tau_t1t2_L_starstar
 
-                                U_starstarR(1) = U_R(1) * fac_R
-                                U_starstarR(2) = U_R(2) * fac_R
-                                U_starstarR(3) = rhoR_star * S_M
-                                U_starstarR(4) = rhoR_star * u_t_star
-                                U_starstarR(5) = rhoR_star * u_t2_star
-                                U_starstarR(6) = E_R_starstar
-                                U_starstarR(7) = alpha1_R_star
-                                U_starstarR(8) = alpha2_R_star
-                                U_starstarR(9) = rhoR_star * tau_nn_R_star
-                                U_starstarR(10) = rhoR_star * tau_nt_star
-                                U_starstarR(11) = rhoR_star * tau_nt2_star
-                                U_starstarR(12) = rhoR_star * tau_tt_R_starstar
-                                U_starstarR(13) = rhoR_star * tau_t2t2_R_starstar
-                                U_starstarR(14) = rhoR_star * tau_t1t2_R_starstar
-                            else
-                                ! 2D/axisym: 11-state (unchanged)
-                                U_starL(1) = U_L(1) * fac_L
-                                U_starL(2) = U_L(2) * fac_L
-                                U_starL(3) = rhoL_star * S_M
-                                U_starL(4) = rhoL_star * u_t_L
-                                U_starL(5) = E_L_star
-                                U_starL(6) = alpha1_L_star
-                                U_starL(7) = alpha2_L_star
-                                U_starL(8) = rhoL_star * tau_nn_L_star
-                                U_starL(9) = rhoL_star * tau_nt_L
-                                U_starL(10) = rhoL_star * tau_tt_L_star
-                                U_starL(11) = rhoL_star * tau_qq_L_star
+                                    U_starstarR(1) = U_R(1)*fac_R
+                                    U_starstarR(2) = U_R(2)*fac_R
+                                    U_starstarR(3) = rhoR_star*S_M
+                                    U_starstarR(4) = rhoR_star*u_t_star
+                                    U_starstarR(5) = rhoR_star*u_t2_star
+                                    U_starstarR(6) = E_R_starstar
+                                    U_starstarR(7) = alpha1_R_star
+                                    U_starstarR(8) = alpha2_R_star
+                                    U_starstarR(9) = rhoR_star*tau_nn_R_star
+                                    U_starstarR(10) = rhoR_star*tau_nt_star
+                                    U_starstarR(11) = rhoR_star*tau_nt2_star
+                                    U_starstarR(12) = rhoR_star*tau_tt_R_starstar
+                                    U_starstarR(13) = rhoR_star*tau_t2t2_R_starstar
+                                    U_starstarR(14) = rhoR_star*tau_t1t2_R_starstar
+                                else
+                                    ! 2D/axisym: 11-state (unchanged)
+                                    U_starL(1) = U_L(1)*fac_L
+                                    U_starL(2) = U_L(2)*fac_L
+                                    U_starL(3) = rhoL_star*S_M
+                                    U_starL(4) = rhoL_star*u_t_L
+                                    U_starL(5) = E_L_star
+                                    U_starL(6) = alpha1_L_star
+                                    U_starL(7) = alpha2_L_star
+                                    U_starL(8) = rhoL_star*tau_nn_L_star
+                                    U_starL(9) = rhoL_star*tau_nt_L
+                                    U_starL(10) = rhoL_star*tau_tt_L_star
+                                    U_starL(11) = rhoL_star*tau_qq_L_star
 
-                                U_starR(1) = U_R(1) * fac_R
-                                U_starR(2) = U_R(2) * fac_R
-                                U_starR(3) = rhoR_star * S_M
-                                U_starR(4) = rhoR_star * u_t_R
-                                U_starR(5) = E_R_star
-                                U_starR(6) = alpha1_R_star
-                                U_starR(7) = alpha2_R_star
-                                U_starR(8) = rhoR_star * tau_nn_R_star
-                                U_starR(9) = rhoR_star * tau_nt_R
-                                U_starR(10) = rhoR_star * tau_tt_R_star
-                                U_starR(11) = rhoR_star * tau_qq_R_star
+                                    U_starR(1) = U_R(1)*fac_R
+                                    U_starR(2) = U_R(2)*fac_R
+                                    U_starR(3) = rhoR_star*S_M
+                                    U_starR(4) = rhoR_star*u_t_R
+                                    U_starR(5) = E_R_star
+                                    U_starR(6) = alpha1_R_star
+                                    U_starR(7) = alpha2_R_star
+                                    U_starR(8) = rhoR_star*tau_nn_R_star
+                                    U_starR(9) = rhoR_star*tau_nt_R
+                                    U_starR(10) = rhoR_star*tau_tt_R_star
+                                    U_starR(11) = rhoR_star*tau_qq_R_star
 
-                                U_starstarL(1) = U_L(1) * fac_L
-                                U_starstarL(2) = U_L(2) * fac_L
-                                U_starstarL(3) = rhoL_star * S_M
-                                U_starstarL(4) = rhoL_star * u_t_star
-                                U_starstarL(5) = E_L_starstar
-                                U_starstarL(6) = alpha1_L_star
-                                U_starstarL(7) = alpha2_L_star
-                                U_starstarL(8) = rhoL_star * tau_nn_L_star
-                                U_starstarL(9) = rhoL_star * tau_nt_star
-                                U_starstarL(10) = rhoL_star * tau_tt_L_starstar
-                                U_starstarL(11) = rhoL_star * tau_qq_L_star
+                                    U_starstarL(1) = U_L(1)*fac_L
+                                    U_starstarL(2) = U_L(2)*fac_L
+                                    U_starstarL(3) = rhoL_star*S_M
+                                    U_starstarL(4) = rhoL_star*u_t_star
+                                    U_starstarL(5) = E_L_starstar
+                                    U_starstarL(6) = alpha1_L_star
+                                    U_starstarL(7) = alpha2_L_star
+                                    U_starstarL(8) = rhoL_star*tau_nn_L_star
+                                    U_starstarL(9) = rhoL_star*tau_nt_star
+                                    U_starstarL(10) = rhoL_star*tau_tt_L_starstar
+                                    U_starstarL(11) = rhoL_star*tau_qq_L_star
 
-                                U_starstarR(1) = U_R(1) * fac_R
-                                U_starstarR(2) = U_R(2) * fac_R
-                                U_starstarR(3) = rhoR_star * S_M
-                                U_starstarR(4) = rhoR_star * u_t_star
-                                U_starstarR(5) = E_R_starstar
-                                U_starstarR(6) = alpha1_R_star
-                                U_starstarR(7) = alpha2_R_star
-                                U_starstarR(8) = rhoR_star * tau_nn_R_star
-                                U_starstarR(9) = rhoR_star * tau_nt_star
-                                U_starstarR(10) = rhoR_star * tau_tt_R_starstar
-                                U_starstarR(11) = rhoR_star * tau_qq_R_star
-                            end if
-
-                            ! ==================== Compute F and select F_HLLD ====================
-
-                            F_starL(1:ncomp) = F_L(1:ncomp) + S_L*(U_starL(1:ncomp) - U_L(1:ncomp))
-                            F_starR(1:ncomp) = F_R(1:ncomp) + S_R*(U_starR(1:ncomp) - U_R(1:ncomp))
-
-                            if (0.0_wp <= S_L) then
-                                F_hlld(1:ncomp) = F_L(1:ncomp)
-                            else if (0.0_wp <= S_Lstar) then
-                                F_hlld(1:ncomp) = F_starL(1:ncomp)
-                            else if (0.0_wp <= s_M) then
-                                F_hlld(1:ncomp) = F_starL(1:ncomp) + S_Lstar*(U_starstarL(1:ncomp) - U_starL(1:ncomp))
-                            else if (0.0_wp <= S_Rstar) then
-                                F_hlld(1:ncomp) = F_starR(1:ncomp) + S_Rstar*(U_starstarR(1:ncomp) - U_starR(1:ncomp))
-                            else if (0.0_wp <= S_R) then
-                                F_hlld(1:ncomp) = F_starR(1:ncomp)
-                            else
-                                F_hlld(1:ncomp) = F_R(1:ncomp)
-                            end if
-
-                            ! ==================== ADC blending (HLLD ↔ HLL) ====================
-
-                            if (riemann_hypo_ADC) then
-
-                                F_HLL(1:ncomp) = F_hlld(1:ncomp)
-                                if (S_L < 0._wp .and. S_R > 0._wp) then
-                                    do i = 1, ncomp
-                                        F_HLL(i) = ( S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i)) ) &
-                                                   / (S_R - S_L + verysmall)
-                                    end do
+                                    U_starstarR(1) = U_R(1)*fac_R
+                                    U_starstarR(2) = U_R(2)*fac_R
+                                    U_starstarR(3) = rhoR_star*S_M
+                                    U_starstarR(4) = rhoR_star*u_t_star
+                                    U_starstarR(5) = E_R_starstar
+                                    U_starstarR(6) = alpha1_R_star
+                                    U_starstarR(7) = alpha2_R_star
+                                    U_starstarR(8) = rhoR_star*tau_nn_R_star
+                                    U_starstarR(9) = rhoR_star*tau_nt_star
+                                    U_starstarR(10) = rhoR_star*tau_tt_R_starstar
+                                    U_starstarR(11) = rhoR_star*tau_qq_R_star
                                 end if
 
-                                if (cyl_coord) then
-                                    if (0._wp <= S_L) then
-                                        u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L
-                                        p_face_HLL = pres%L; tau_qq_face_HLL = tau_qq_L
-                                    elseif (S_R <= 0._wp) then
-                                        u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R
-                                        p_face_HLL = pres%R; tau_qq_face_HLL = tau_qq_R
-                                    else
-                                        u_n_HLL_trace = (S_R*u_n_L - S_L*u_n_R)/(S_R - S_L + verysmall)
-                                        u_t_HLL_trace = (S_R*u_t_L - S_L*u_t_R)/(S_R - S_L + verysmall)
+                                ! ==================== Compute F and select F_HLLD ====================
+
+                                F_starL(1:ncomp) = F_L(1:ncomp) + S_L*(U_starL(1:ncomp) - U_L(1:ncomp))
+                                F_starR(1:ncomp) = F_R(1:ncomp) + S_R*(U_starR(1:ncomp) - U_R(1:ncomp))
+
+                                if (0.0_wp <= S_L) then
+                                    F_hlld(1:ncomp) = F_L(1:ncomp)
+                                else if (0.0_wp <= S_Lstar) then
+                                    F_hlld(1:ncomp) = F_starL(1:ncomp)
+                                else if (0.0_wp <= s_M) then
+                                    F_hlld(1:ncomp) = F_starL(1:ncomp) + S_Lstar*(U_starstarL(1:ncomp) - U_starL(1:ncomp))
+                                else if (0.0_wp <= S_Rstar) then
+                                    F_hlld(1:ncomp) = F_starR(1:ncomp) + S_Rstar*(U_starstarR(1:ncomp) - U_starR(1:ncomp))
+                                else if (0.0_wp <= S_R) then
+                                    F_hlld(1:ncomp) = F_starR(1:ncomp)
+                                else
+                                    F_hlld(1:ncomp) = F_R(1:ncomp)
+                                end if
+
+                                ! ==================== ADC blending (HLLD ↔ HLL) ====================
+
+                                if (riemann_hypo_ADC) then
+
+                                    F_HLL(1:ncomp) = F_hlld(1:ncomp)
+                                    if (S_L < 0._wp .and. S_R > 0._wp) then
                                         do i = 1, ncomp
-                                            U_HLL(i) = (S_R*U_R(i) - S_L*U_L(i) - (F_R(i) - F_L(i))) &
+                                            F_HLL(i) = (S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i))) &
                                                        /(S_R - S_L + verysmall)
                                         end do
-                                        rho_HLL = U_HLL(1) + U_HLL(2)
-                                        u_n_HLL_cons = U_HLL(3)/(rho_HLL + verysmall)
-                                        tau_nn_HLL = U_HLL(8)/(rho_HLL + verysmall)
-                                        tau_qq_face_HLL = U_HLL(11)/(rho_HLL + verysmall)
-                                        p_face_HLL = F_HLL(3) - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
                                     end if
+
+                                    if (cyl_coord) then
+                                        if (0._wp <= S_L) then
+                                            u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L
+                                            p_face_HLL = pres%L; tau_qq_face_HLL = tau_qq_L
+                                        elseif (S_R <= 0._wp) then
+                                            u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R
+                                            p_face_HLL = pres%R; tau_qq_face_HLL = tau_qq_R
+                                        else
+                                            u_n_HLL_trace = (S_R*u_n_L - S_L*u_n_R)/(S_R - S_L + verysmall)
+                                            u_t_HLL_trace = (S_R*u_t_L - S_L*u_t_R)/(S_R - S_L + verysmall)
+                                            do i = 1, ncomp
+                                                U_HLL(i) = (S_R*U_R(i) - S_L*U_L(i) - (F_R(i) - F_L(i))) &
+                                                           /(S_R - S_L + verysmall)
+                                            end do
+                                            rho_HLL = U_HLL(1) + U_HLL(2)
+                                            u_n_HLL_cons = U_HLL(3)/(rho_HLL + verysmall)
+                                            tau_nn_HLL = U_HLL(8)/(rho_HLL + verysmall)
+                                            tau_qq_face_HLL = U_HLL(11)/(rho_HLL + verysmall)
+                                            p_face_HLL = F_HLL(3) - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
+                                        end if
+                                    end if
+
+                                    Sigma_L = pTot_L
+                                    Sigma_R = pTot_R
+                                    dSigma = Sigma_R - Sigma_L
+                                    Sigma_ref = max(max(abs(Sigma_L), abs(Sigma_R)), verysmall)
+
+                                    a_L_ref = sqrt(max(verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L))
+                                    a_R_ref = sqrt(max(verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R))
+                                    a_ref = max(max(a_L_ref, a_R_ref), verysmall)
+
+                                    du_t = u_t_R - u_t_L
+                                    dtau_nt = tau_nt_R - tau_nt_L
+                                    du_t2 = u_t2_R - u_t2_L
+                                    dtau_nt2 = tau_nt2_R - tau_nt2_L
+
+                                    sensor_ptot = (dSigma*dSigma)/((ADC_kappa*Sigma_ref)**2 + verysmall)
+                                    sensor_vt = (du_t*du_t + du_t2*du_t2)/((ADC_kappa*a_ref)**2 + verysmall)
+                                    sensor_tnt = (dtau_nt*dtau_nt + dtau_nt2*dtau_nt2)/((ADC_kappa*Sigma_ref)**2 + verysmall)
+
+                                    sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
+
+                                    phi = exp(-(sensor_combined**ADC_power))
+
+                                    do i = 1, ncomp
+                                        F_hlld(i) = F_HLL(i) + phi*(F_hlld(i) - F_HLL(i))
+                                    end do
+
                                 end if
-
-                                Sigma_L   = pTot_L
-                                Sigma_R   = pTot_R
-                                dSigma    = Sigma_R - Sigma_L
-                                Sigma_ref = max( max(abs(Sigma_L), abs(Sigma_R)), verysmall )
-
-                                a_L_ref = sqrt( max( verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L ) )
-                                a_R_ref = sqrt( max( verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R ) )
-                                a_ref   = max( max(a_L_ref, a_R_ref), verysmall )
-
-                                du_t    = u_t_R    - u_t_L
-                                dtau_nt = tau_nt_R - tau_nt_L
-                                du_t2    = u_t2_R    - u_t2_L
-                                dtau_nt2 = tau_nt2_R - tau_nt2_L
-
-                                sensor_ptot = (dSigma*dSigma)      / ( (ADC_kappa*Sigma_ref)**2 + verysmall )
-                                sensor_vt   = (du_t*du_t + du_t2*du_t2) / ( (ADC_kappa*a_ref)**2 + verysmall )
-                                sensor_tnt  = (dtau_nt*dtau_nt + dtau_nt2*dtau_nt2) / ( (ADC_kappa*Sigma_ref)**2 + verysmall )
-
-                                sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
-
-                                phi = exp( - (sensor_combined**ADC_power) )
-
-                                do i = 1, ncomp
-                                    F_hlld(i) = F_HLL(i) + phi*(F_hlld(i) - F_HLL(i))
-                                end do
-
-                            end if
 
                             end if
 
@@ -4991,21 +4988,21 @@ contains
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx + 2) = F_hlld(8)
                                 ! Map local stress to physical stress indices
                                 if (dir_idx(1) == 1) then
-                                    flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(9)  ! tau_nn=tau_xx
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb) = F_hlld(9)  ! tau_nn=tau_xx
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_hlld(10) ! tau_nt1=tau_xy
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(12) ! tau_t1t1=tau_yy
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 3) = F_hlld(11) ! tau_nt2=tau_xz
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 4) = F_hlld(14) ! tau_t1t2=tau_yz
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 5) = F_hlld(13) ! tau_t2t2=tau_zz
                                 else if (dir_idx(1) == 2) then
-                                    flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(12) ! tau_t1t1=tau_xx
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb) = F_hlld(12) ! tau_t1t1=tau_xx
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_hlld(10) ! tau_nt1=tau_xy
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(9)  ! tau_nn=tau_yy
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 3) = F_hlld(14) ! tau_t1t2=tau_xz
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 4) = F_hlld(11) ! tau_nt2=tau_yz
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 5) = F_hlld(13) ! tau_t2t2=tau_zz
                                 else
-                                    flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(12) ! tau_t1t1=tau_xx
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb) = F_hlld(12) ! tau_t1t1=tau_xx
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_hlld(14) ! tau_t1t2=tau_xy
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(13) ! tau_t2t2=tau_yy
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 3) = F_hlld(10) ! tau_nt1=tau_xz
@@ -5023,11 +5020,11 @@ contains
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx + 2) = F_hlld(7)
                                 flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_hlld(9)
                                 if (dir_idx(1) == 1) then
-                                    flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(8 )
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb) = F_hlld(8)
                                     flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(10)
                                 else
-                                    flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(10)
-                                    flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(8 )
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb) = F_hlld(10)
+                                    flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(8)
                                 end if
                                 if (cyl_coord) then
                                     flux_rs${XYZ}$_vf(j, k, l, strxe) = F_hlld(11)

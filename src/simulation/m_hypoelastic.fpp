@@ -166,8 +166,8 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dz(k, l, q) = 0_wp; dv_dz(k, l, q) = 0_wp; dw_dx(k, l, q) = 0_wp;
-                                dw_dy(k, l, q) = 0_wp; dw_dz(k, l, q) = 0_wp;
+                                du_dz(k, l, q) = 0_wp; dv_dz(k, l, q) = 0_wp; dw_dx(k, l, q) = 0_wp; 
+                                dw_dy(k, l, q) = 0_wp; dw_dz(k, l, q) = 0_wp; 
                             end do
                         end do
                     end do
@@ -389,81 +389,81 @@ contains
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    du_dx(k, l, q) = (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))/dx(k)
+                end do
+            end do
+        end do
+        !$acc end parallel loop
+
+        if (ndirs > 1) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        du_dx(k, l, q) = (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) - nc_iface_vel_n(1)%vf(1)%sf(k-1, l, q))/dx(k)
+                        du_dy(k, l, q) = (nc_iface_vel_n(2)%vf(1)%sf(k, l, q) - nc_iface_vel_n(2)%vf(1)%sf(k, l - 1, q))/dy(l)
+                        dv_dx(k, l, q) = (nc_iface_vel_n(1)%vf(2)%sf(k, l, q) - nc_iface_vel_n(1)%vf(2)%sf(k - 1, l, q))/dx(k)
+                        dv_dy(k, l, q) = (nc_iface_vel_n(2)%vf(2)%sf(k, l, q) - nc_iface_vel_n(2)%vf(2)%sf(k, l - 1, q))/dy(l)
                     end do
                 end do
             end do
             !$acc end parallel loop
+        end if
 
-            if (ndirs > 1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            du_dy(k, l, q) = (nc_iface_vel_n(2)%vf(1)%sf(k, l, q) - nc_iface_vel_n(2)%vf(1)%sf(k, l-1, q))/dy(l)
-                            dv_dx(k, l, q) = (nc_iface_vel_n(1)%vf(2)%sf(k, l, q) - nc_iface_vel_n(1)%vf(2)%sf(k-1, l, q))/dx(k)
-                            dv_dy(k, l, q) = (nc_iface_vel_n(2)%vf(2)%sf(k, l, q) - nc_iface_vel_n(2)%vf(2)%sf(k, l-1, q))/dy(l)
-                        end do
-                    end do
-                end do
-                !$acc end parallel loop
-            end if
-
-            if (ndirs == 3) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            du_dz(k, l, q) = (nc_iface_vel_n(3)%vf(1)%sf(k, l, q) - nc_iface_vel_n(3)%vf(1)%sf(k, l, q-1))/dz(q)
-                            dv_dz(k, l, q) = (nc_iface_vel_n(3)%vf(2)%sf(k, l, q) - nc_iface_vel_n(3)%vf(2)%sf(k, l, q-1))/dz(q)
-                            dw_dx(k, l, q) = (nc_iface_vel_n(1)%vf(3)%sf(k, l, q) - nc_iface_vel_n(1)%vf(3)%sf(k-1, l, q))/dx(k)
-                            dw_dy(k, l, q) = (nc_iface_vel_n(2)%vf(3)%sf(k, l, q) - nc_iface_vel_n(2)%vf(3)%sf(k, l-1, q))/dy(l)
-                            dw_dz(k, l, q) = (nc_iface_vel_n(3)%vf(3)%sf(k, l, q) - nc_iface_vel_n(3)%vf(3)%sf(k, l, q-1))/dz(q)
-                        end do
-                    end do
-                end do
-                !$acc end parallel loop
-            end if
-
+        if (ndirs == 3) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        rho_K = 0._wp; G_K = 0._wp
-                        do i = 1, num_fluids
-                            rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
-                            G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)
-                        end do
-
-                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
-
-                        rho_K_field(k, l, q) = rho_K
-                        G_K_field(k, l, q) = G_K
-
-                        if (G_K < verysmall) then
-                            G_K_field(k, l, q) = 0
-                        end if
+                        du_dz(k, l, q) = (nc_iface_vel_n(3)%vf(1)%sf(k, l, q) - nc_iface_vel_n(3)%vf(1)%sf(k, l, q - 1))/dz(q)
+                        dv_dz(k, l, q) = (nc_iface_vel_n(3)%vf(2)%sf(k, l, q) - nc_iface_vel_n(3)%vf(2)%sf(k, l, q - 1))/dz(q)
+                        dw_dx(k, l, q) = (nc_iface_vel_n(1)%vf(3)%sf(k, l, q) - nc_iface_vel_n(1)%vf(3)%sf(k - 1, l, q))/dx(k)
+                        dw_dy(k, l, q) = (nc_iface_vel_n(2)%vf(3)%sf(k, l, q) - nc_iface_vel_n(2)%vf(3)%sf(k, l - 1, q))/dy(l)
+                        dw_dz(k, l, q) = (nc_iface_vel_n(3)%vf(3)%sf(k, l, q) - nc_iface_vel_n(3)%vf(3)%sf(k, l, q - 1))/dz(q)
                     end do
                 end do
             end do
+            !$acc end parallel loop
+        end if
 
-            ! 1D: tau_xx RHS from du/dx
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do q = 0, p
-                do l = 0, n
-                    do k = 0, m
-                        rhs_vf(strxb)%sf(k, l, q) = &
-                            rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                            ((4._wp*G_K_field(k, l, q)/3._wp) + &
-                             q_prim_vf(strxb)%sf(k, l, q))* &
-                            du_dx(k, l, q)
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    rho_K = 0._wp; G_K = 0._wp
+                    do i = 1, num_fluids
+                        rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
+                        G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)
                     end do
+
+                    if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
+
+                    rho_K_field(k, l, q) = rho_K
+                    G_K_field(k, l, q) = G_K
+
+                    if (G_K < verysmall) then
+                        G_K_field(k, l, q) = 0
+                    end if
                 end do
             end do
+        end do
+
+        ! 1D: tau_xx RHS from du/dx
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    rhs_vf(strxb)%sf(k, l, q) = &
+                        rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                        ((4._wp*G_K_field(k, l, q)/3._wp) + &
+                         q_prim_vf(strxb)%sf(k, l, q))* &
+                        du_dx(k, l, q)
+                end do
+            end do
+        end do
 
         if (ndirs > 1) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -513,7 +513,7 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        txx = q_prim_vf(strxb    )%sf(k, l, q)
+                        txx = q_prim_vf(strxb)%sf(k, l, q)
                         txy = q_prim_vf(strxb + 1)%sf(k, l, q)
                         tyy = q_prim_vf(strxb + 2)%sf(k, l, q)
                         txz = q_prim_vf(strxb + 3)%sf(k, l, q)
@@ -524,20 +524,20 @@ contains
                         C_z = -(2._wp/3._wp*G_K_field(k, l, q) + txx)
                         D_z = 2._wp*txz
                         rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                            (C_z*dw_dz(k, l, q) + D_z*du_dz(k, l, q))
+                                                    (C_z*dw_dz(k, l, q) + D_z*du_dz(k, l, q))
 
                         ! z-direction contributions to tau_xy
                         H_z = -txy
                         J1_z = tyz
                         J2_z = txz
                         rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                            (H_z*dw_dz(k, l, q) + J1_z*du_dz(k, l, q) + J2_z*dv_dz(k, l, q))
+                                                        (H_z*dw_dz(k, l, q) + J1_z*du_dz(k, l, q) + J2_z*dv_dz(k, l, q))
 
                         ! tau_yy: z-direction contributions
                         E_z = -(2._wp/3._wp*G_K_field(k, l, q) + tyy)
                         F_z = 2._wp*tyz
                         rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                            (E_z*dw_dz(k, l, q) + F_z*dv_dz(k, l, q))
+                                                        (E_z*dw_dz(k, l, q) + F_z*dv_dz(k, l, q))
 
                         ! tau_xz (strxb+3)
                         B_x = G_K_field(k, l, q) + txx
@@ -546,7 +546,7 @@ contains
                         J2_y = txy
                         B_z = G_K_field(k, l, q) + tzz
                         rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                            (B_x*dw_dx(k, l, q) + H_y*dv_dy(k, l, q) + J1_y*du_dy(k, l, q) + J2_y*dw_dy(k, l, q) + B_z*du_dz(k, l, q))
+                                                        (B_x*dw_dx(k, l, q) + H_y*dv_dy(k, l, q) + J1_y*du_dy(k, l, q) + J2_y*dw_dy(k, l, q) + B_z*du_dz(k, l, q))
 
                         ! tau_yz (strxb+4)
                         H_x = -tyz
@@ -554,8 +554,8 @@ contains
                         J2_x = txy
                         B_y = G_K_field(k, l, q) + tyy
                         rhs_vf(strxb + 4)%sf(k, l, q) = rhs_vf(strxb + 4)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                            (H_x*du_dx(k, l, q) + J1_x*dv_dx(k, l, q) + J2_x*dw_dx(k, l, q) + &
-                             B_y*dw_dy(k, l, q) + B_z*dv_dz(k, l, q))
+                                                        (H_x*du_dx(k, l, q) + J1_x*dv_dx(k, l, q) + J2_x*dw_dx(k, l, q) + &
+                                                         B_y*dw_dy(k, l, q) + B_z*dv_dz(k, l, q))
 
                         ! tau_zz (strxb+5)
                         E_x = -(2._wp/3._wp*G_K_field(k, l, q) + tzz)
@@ -564,7 +564,7 @@ contains
                         F_y = 2._wp*tyz
                         A_z = 4._wp/3._wp*G_K_field(k, l, q) + tzz
                         rhs_vf(strxb + 5)%sf(k, l, q) = rhs_vf(strxb + 5)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                            (E_x*du_dx(k, l, q) + F_x*dw_dx(k, l, q) + E_y*dv_dy(k, l, q) + F_y*dw_dy(k, l, q) + A_z*dw_dz(k, l, q))
+                                                        (E_x*du_dx(k, l, q) + F_x*dw_dx(k, l, q) + E_y*dv_dy(k, l, q) + F_y*dw_dy(k, l, q) + A_z*dw_dz(k, l, q))
                     end do
                 end do
             end do
@@ -580,13 +580,13 @@ contains
     subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, &
                                                            nc_iface_vel_x_vf, nc_iface_vel_y_vf, weight)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_x_vf
-        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_vf
-        real(wp), intent(in)                                   :: weight
+        type(scalar_field), dimension(:), intent(in) :: nc_iface_vel_x_vf
+        type(scalar_field), dimension(:), intent(in) :: nc_iface_vel_y_vf
+        real(wp), intent(in) :: weight
 
-        integer  :: i, k, l, q
+        integer :: i, k, l, q
         real(wp) :: rho_K, G_K, v_over_r, divU_axi
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -607,10 +607,10 @@ contains
             do l = 0, n
                 do k = 0, m
                     rho_K = 0._wp
-                    G_K   = 0._wp
+                    G_K = 0._wp
                     do i = 1, num_fluids
                         rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
-                        G_K   = G_K   + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)
+                        G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)
                     end do
 
                     if (cont_damage) G_K = G_K*max(1._wp - q_prim_vf(damage_idx)%sf(k, l, q), 0._wp)
@@ -619,17 +619,17 @@ contains
                     divU_axi = du_dx(k, l, q) + dv_dy(k, l, q) + v_over_r
 
                     rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
-                        weight*rho_K*v_over_r*(q_prim_vf(strxb)%sf(k, l, q) + 2._wp*G_K/3._wp)
+                                                weight*rho_K*v_over_r*(q_prim_vf(strxb)%sf(k, l, q) + 2._wp*G_K/3._wp)
 
                     rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
-                        weight*rho_K*v_over_r*q_prim_vf(strxb + 1)%sf(k, l, q)
+                                                    weight*rho_K*v_over_r*q_prim_vf(strxb + 1)%sf(k, l, q)
 
                     rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
-                        weight*rho_K*v_over_r*(q_prim_vf(strxb + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
+                                                    weight*rho_K*v_over_r*(q_prim_vf(strxb + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
 
                     rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + weight*rho_K*( &
-                        -(q_prim_vf(strxb + 3)%sf(k, l, q) + 2._wp*G_K/3._wp)*divU_axi &
-                        + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K)*v_over_r)
+                                                    -(q_prim_vf(strxb + 3)%sf(k, l, q) + 2._wp*G_K/3._wp)*divU_axi &
+                                                    + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K)*v_over_r)
                 end do
             end do
         end do

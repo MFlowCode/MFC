@@ -912,10 +912,9 @@ contains
             ! the full contribution with a symmetric average of face velocities.
             call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
             call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_vf, &
-                                                              nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf, 0.5_wp)
+                                                             nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf, 0.5_wp)
             call nvtxEndRange
         end if
-
 
         if (ib) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -1075,7 +1074,7 @@ contains
                             do k = 0, m
                                 rhs_vf(j)%sf(k, l, q) = 1._wp/dx(k)* &
                                                         (flux_n(1)%vf(j)%sf(k - 1, l, q) &
-                                                        - flux_n(1)%vf(j)%sf(k, l, q))
+                                                         - flux_n(1)%vf(j)%sf(k, l, q))
                             end do
                         end do
                     end do
@@ -1089,7 +1088,7 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                rhs_vf(j)%sf(k, l, q) = - 1._wp/dx(k)*flux_n(1)%vf(j)%sf(k, l, q)
+                                rhs_vf(j)%sf(k, l, q) = -1._wp/dx(k)*flux_n(1)%vf(j)%sf(k, l, q)
                             end do
                         end do
                     end do
@@ -1106,7 +1105,6 @@ contains
                     end do
                 end do
             end if
-
 
             if (model_eqns == 3) then
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1138,7 +1136,7 @@ contains
                                     rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
                                     q_prim_vf%vf(contxe + idir)%sf(k, l, q)* &
                                     (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
-                                    - flux_src_n(1)%vf(j)%sf(k, l, q))
+                                     - flux_src_n(1)%vf(j)%sf(k, l, q))
                             end do
                         end do
                     end do
@@ -1149,13 +1147,13 @@ contains
                         do l = 0, n
                             do k = 0, m
                                 rhs_vf(advxb)%sf(k, l, q) = rhs_vf(advxb)%sf(k, l, q) + &
-                                    Kterm(k, l, q)/dx(k)* &
-                                    (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) &
-                                     - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))
+                                                            Kterm(k, l, q)/dx(k)* &
+                                                            (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) &
+                                                             - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))
                                 rhs_vf(advxe)%sf(k, l, q) = rhs_vf(advxe)%sf(k, l, q) - &
-                                    Kterm(k, l, q)/dx(k)* &
-                                    (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) &
-                                     - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))
+                                                            Kterm(k, l, q)/dx(k)* &
+                                                            (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) &
+                                                             - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))
                             end do
                         end do
                     end do
@@ -1186,13 +1184,13 @@ contains
                         do l = 0, n
                             do k = 0, m
                                 rhs_vf(advxb)%sf(k, l, q) = rhs_vf(advxb)%sf(k, l, q) + &
-                                    Kterm(k, l, q)/dx(k)* &
-                                    (flux_src_n(1)%vf(advxb)%sf(k, l, q) &
-                                     - flux_src_n(1)%vf(advxb)%sf(k - 1, l, q))
+                                                            Kterm(k, l, q)/dx(k)* &
+                                                            (flux_src_n(1)%vf(advxb)%sf(k, l, q) &
+                                                             - flux_src_n(1)%vf(advxb)%sf(k - 1, l, q))
                                 rhs_vf(advxe)%sf(k, l, q) = rhs_vf(advxe)%sf(k, l, q) - &
-                                    Kterm(k, l, q)/dx(k)* &
-                                    (flux_src_n(1)%vf(advxb)%sf(k, l, q) &
-                                     - flux_src_n(1)%vf(advxb)%sf(k - 1, l, q))
+                                                            Kterm(k, l, q)/dx(k)* &
+                                                            (flux_src_n(1)%vf(advxb)%sf(k, l, q) &
+                                                             - flux_src_n(1)%vf(advxb)%sf(k - 1, l, q))
                             end do
                         end do
                     end do
@@ -1321,7 +1319,7 @@ contains
                                     rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
                                     q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
                                     (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
-                                    - flux_src_n(2)%vf(j)%sf(q, k, l))
+                                     - flux_src_n(2)%vf(j)%sf(q, k, l))
                             end do
                         end do
                     end do
@@ -1332,13 +1330,13 @@ contains
                         do k = 0, n
                             do q = 0, m
                                 rhs_vf(advxb)%sf(q, k, l) = rhs_vf(advxb)%sf(q, k, l) + &
-                                    Kterm(q, k, l)/dy(k)* &
-                                    (nc_iface_vel_n(2)%vf(2)%sf(q, k, l) &
-                                     - nc_iface_vel_n(2)%vf(2)%sf(q, k - 1, l))
+                                                            Kterm(q, k, l)/dy(k)* &
+                                                            (nc_iface_vel_n(2)%vf(2)%sf(q, k, l) &
+                                                             - nc_iface_vel_n(2)%vf(2)%sf(q, k - 1, l))
                                 rhs_vf(advxe)%sf(q, k, l) = rhs_vf(advxe)%sf(q, k, l) - &
-                                    Kterm(q, k, l)/dy(k)* &
-                                    (nc_iface_vel_n(2)%vf(2)%sf(q, k, l) &
-                                     - nc_iface_vel_n(2)%vf(2)%sf(q, k - 1, l))
+                                                            Kterm(q, k, l)/dy(k)* &
+                                                            (nc_iface_vel_n(2)%vf(2)%sf(q, k, l) &
+                                                             - nc_iface_vel_n(2)%vf(2)%sf(q, k - 1, l))
                             end do
                         end do
                     end do
@@ -1348,9 +1346,9 @@ contains
                             do k = 0, n
                                 do q = 0, m
                                     rhs_vf(advxb)%sf(q, k, l) = rhs_vf(advxb)%sf(q, k, l) + &
-                                        Kterm(q, k, l)*q_prim_vf%vf(momxb + 1)%sf(q, k, l)/y_cc(k)
+                                                                Kterm(q, k, l)*q_prim_vf%vf(momxb + 1)%sf(q, k, l)/y_cc(k)
                                     rhs_vf(advxe)%sf(q, k, l) = rhs_vf(advxe)%sf(q, k, l) - &
-                                        Kterm(q, k, l)*q_prim_vf%vf(momxb + 1)%sf(q, k, l)/y_cc(k)
+                                                                Kterm(q, k, l)*q_prim_vf%vf(momxb + 1)%sf(q, k, l)/y_cc(k)
                                 end do
                             end do
                         end do
@@ -1382,13 +1380,13 @@ contains
                         do k = 0, n
                             do q = 0, m
                                 rhs_vf(advxb)%sf(q, k, l) = rhs_vf(advxb)%sf(q, k, l) + &
-                                    Kterm(q, k, l)/dy(k)* &
-                                    (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
-                                     - flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
+                                                            Kterm(q, k, l)/dy(k)* &
+                                                            (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
+                                                             - flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
                                 rhs_vf(advxe)%sf(q, k, l) = rhs_vf(advxe)%sf(q, k, l) - &
-                                    Kterm(q, k, l)/dy(k)* &
-                                    (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
-                                     - flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
+                                                            Kterm(q, k, l)/dy(k)* &
+                                                            (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
+                                                             - flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
                             end do
                         end do
                     end do
@@ -1401,13 +1399,13 @@ contains
                             do k = 0, n
                                 do q = 0, m
                                     rhs_vf(advxb)%sf(q, k, l) = rhs_vf(advxb)%sf(q, k, l) + &
-                                        Kterm(q, k, l)/(2._wp*y_cc(k))* &
-                                        (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
-                                         + flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
+                                                                Kterm(q, k, l)/(2._wp*y_cc(k))* &
+                                                                (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
+                                                                 + flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
                                     rhs_vf(advxe)%sf(q, k, l) = rhs_vf(advxe)%sf(q, k, l) - &
-                                        Kterm(q, k, l)/(2._wp*y_cc(k))* &
-                                        (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
-                                         + flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
+                                                                Kterm(q, k, l)/(2._wp*y_cc(k))* &
+                                                                (flux_src_n(2)%vf(advxb)%sf(q, k, l) &
+                                                                 + flux_src_n(2)%vf(advxb)%sf(q, k - 1, l))
                                 end do
                             end do
                         end do
@@ -1628,7 +1626,7 @@ contains
                                         rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
                                         q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
                                         (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
-                                        - flux_src_n(3)%vf(j)%sf(l, q, k))
+                                         - flux_src_n(3)%vf(j)%sf(l, q, k))
                                 end do
                             end do
                         end do
@@ -1639,13 +1637,13 @@ contains
                             do q = 0, n
                                 do l = 0, m
                                     rhs_vf(advxb)%sf(l, q, k) = rhs_vf(advxb)%sf(l, q, k) + &
-                                        Kterm(l, q, k)/dz(k)* &
-                                        (nc_iface_vel_n(3)%vf(3)%sf(l, q, k) &
-                                         - nc_iface_vel_n(3)%vf(3)%sf(l, q, k - 1))
+                                                                Kterm(l, q, k)/dz(k)* &
+                                                                (nc_iface_vel_n(3)%vf(3)%sf(l, q, k) &
+                                                                 - nc_iface_vel_n(3)%vf(3)%sf(l, q, k - 1))
                                     rhs_vf(advxe)%sf(l, q, k) = rhs_vf(advxe)%sf(l, q, k) - &
-                                        Kterm(l, q, k)/dz(k)* &
-                                        (nc_iface_vel_n(3)%vf(3)%sf(l, q, k) &
-                                         - nc_iface_vel_n(3)%vf(3)%sf(l, q, k - 1))
+                                                                Kterm(l, q, k)/dz(k)* &
+                                                                (nc_iface_vel_n(3)%vf(3)%sf(l, q, k) &
+                                                                 - nc_iface_vel_n(3)%vf(3)%sf(l, q, k - 1))
                                 end do
                             end do
                         end do
@@ -1675,13 +1673,13 @@ contains
                             do q = 0, n
                                 do l = 0, m
                                     rhs_vf(advxb)%sf(l, q, k) = rhs_vf(advxb)%sf(l, q, k) + &
-                                        Kterm(l, q, k)/dz(k)* &
-                                        (flux_src_n(3)%vf(advxb)%sf(l, q, k) &
-                                         - flux_src_n(3)%vf(advxb)%sf(l, q, k - 1))
+                                                                Kterm(l, q, k)/dz(k)* &
+                                                                (flux_src_n(3)%vf(advxb)%sf(l, q, k) &
+                                                                 - flux_src_n(3)%vf(advxb)%sf(l, q, k - 1))
                                     rhs_vf(advxe)%sf(l, q, k) = rhs_vf(advxe)%sf(l, q, k) - &
-                                        Kterm(l, q, k)/dz(k)* &
-                                        (flux_src_n(3)%vf(advxb)%sf(l, q, k) &
-                                         - flux_src_n(3)%vf(advxb)%sf(l, q, k - 1))
+                                                                Kterm(l, q, k)/dz(k)* &
+                                                                (flux_src_n(3)%vf(advxb)%sf(l, q, k) &
+                                                                 - flux_src_n(3)%vf(advxb)%sf(l, q, k - 1))
                                 end do
                             end do
                         end do
