@@ -32,24 +32,33 @@ def _extract_mpi_config(template_name: str) -> Optional[MPIConfig]:
         return None
 
     content = common.file_read(filepath)
-    idx = content.find("mpi_config")
+    # Anchor on the assignment to avoid matching usage sites like ${mpi_config['binary']}
+    idx = content.find("mpi_config =")
+    if idx == -1:
+        idx = content.find("mpi_config=")
     if idx == -1:
         return None
 
-    brace_start = content.index("{", idx)
-    depth = 0
-    for i in range(brace_start, len(content)):
-        if content[i] == "{":
-            depth += 1
-        elif content[i] == "}":
-            depth -= 1
-            if depth == 0:
-                d = ast.literal_eval(content[brace_start : i + 1])
-                return MPIConfig(
-                    binary=d["binary"],
-                    flags=d.get("flags", []),
-                    env=d.get("env", {}),
-                )
+    brace_start = content.find("{", idx)
+    if brace_start == -1:
+        return None
+
+    try:
+        depth = 0
+        for i in range(brace_start, len(content)):
+            if content[i] == "{":
+                depth += 1
+            elif content[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    d = ast.literal_eval(content[brace_start : i + 1])
+                    return MPIConfig(
+                        binary=d["binary"],
+                        flags=d.get("flags", []),
+                        env=d.get("env", {}),
+                    )
+    except (ValueError, SyntaxError, KeyError):
+        return None
 
     return None
 
@@ -69,7 +78,7 @@ def _get_mpi_config() -> MPIConfig:
     if _resolved_mpi_config is not None:
         return _resolved_mpi_config
 
-    extra = ARG("--")
+    extra = ARG("--") or []
     computer = None
     for i, arg in enumerate(extra):
         if arg in ("-c", "--computer") and i + 1 < len(extra):
@@ -295,15 +304,32 @@ class TestCase(case.Case):
             bin_path = target_obj.get_install_binpath(slug_case)
             cmd = _mpi_cmd(cfg, self.ppn, bin_path)
 
-            result = subprocess.run(
-                cmd,
-                cwd=dirpath,
-                env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=False,
-            )
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=dirpath,
+                    env=env,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                    timeout=3600,
+                )
+            except subprocess.TimeoutExpired:
+                all_output.append(f"TIMEOUT after 3600s: {' '.join(cmd)}")
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=-1,
+                    stdout="\n".join(all_output),
+                )
+            except (subprocess.SubprocessError, OSError) as exc:
+                all_output.append(f"LAUNCH FAILED: {exc}")
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=-1,
+                    stdout="\n".join(all_output),
+                )
+
             all_output.append(result.stdout or "")
 
             if result.returncode != 0:
