@@ -88,7 +88,7 @@ END
     flags_str = ' '.join(all_flags)
 %>\
 % if b == 'flux':
-        (set -x; ${profiler} flux run --ntasks=${nprocs} ${flags_str} "${binary_path}")
+        (set -x; ${profiler} flux ${flags_str} --ntasks=${nprocs} "${binary_path}")
 % elif b == 'srun':
         (set -x; ${profiler} srun --ntasks ${nprocs} ${flags_str} "${binary_path}")
 % else:
