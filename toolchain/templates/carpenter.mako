@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 
 <%namespace name="helpers" file="helpers.mako"/>
+<%
+mpi_config = {
+    "binary": "mpirun",
+    "flags":  [],
+    "env":    {},
+}
+%>
 
 % if engine == 'batch':
 #PBS -l select=${nodes}:ncpus=192:mpiprocs=${tasks_per_node}
@@ -35,9 +42,7 @@ echo
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; ${profiler}                              \
-            mpirun -np ${nodes*tasks_per_node}            \
-                   "${target.get_install_binpath(case)}")
+    ${helpers.mpi_cmd(nodes*tasks_per_node, target.get_install_binpath(case))}
     % endif
             
     ${helpers.run_epilogue(target)}

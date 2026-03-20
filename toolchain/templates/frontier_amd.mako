@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 
 <%namespace name="helpers" file="helpers.mako"/>
+<%
+mpi_config = {
+    "binary": "srun",
+    "flags":  ["--unbuffered", "--cpus-per-task", "7"],
+    "env":    {},
+}
+%>
 
 % if engine == 'batch':
 #SBATCH --nodes=${nodes}
@@ -52,10 +59,9 @@ ulimit -s unlimited
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; srun --unbuffered \
+        (set -x; ${mpi_config['binary']} ${' '.join(mpi_config['flags'])} \
         % if engine == 'interactive':
-                --unbuffered --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
-                --cpus-per-task 7                                    \
+                --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
             % if gpu_enabled:
                 --gpus-per-task 1 --gpu-bind closest                 \
             % endif

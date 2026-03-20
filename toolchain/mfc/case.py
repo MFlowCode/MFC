@@ -54,6 +54,31 @@ class Case:
     def gen_json_dict_str(self) -> str:
         return json.dumps(self.params, indent=4)
 
+    def _get_inp_content(self, _target) -> str:
+        """Generate Fortran namelist .inp content without console output."""
+        from . import build
+
+        target = build.get_target(_target)
+        MASTER_KEYS = case_dicts.get_input_dict_keys(target.name)
+
+        dict_str = ""
+        for key, val in self.params.items():
+            if key in MASTER_KEYS and key not in case_dicts.IGNORE:
+                if self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val):
+                    dict_str += f"{key} = 0d0\n"
+                    continue
+
+                if not isinstance(val, str) or len(val) == 1:
+                    dict_str += f"{key} = {val}\n"
+                else:
+                    dict_str += f"{key} = '{val}'\n"
+            elif key not in case_dicts.ALL:
+                suggestions = _suggest_similar_params(key, list(case_dicts.ALL.keys()))
+                hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+                raise common.MFCException(f"Unknown parameter '{key}'.{hint}")
+
+        return f"&user_inputs\n{dict_str}&end/\n"
+
     def get_inp(self, _target) -> str:
         from . import build
 
@@ -62,35 +87,15 @@ class Case:
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
         cons.indent()
 
+        result = self._get_inp_content(_target)
+
+        # Count ignored params for info message
         MASTER_KEYS = case_dicts.get_input_dict_keys(target.name)
-
-        ignored = []
-
-        # Create Fortran-style input file content string
-        dict_str = ""
-        for key, val in self.params.items():
-            if key in MASTER_KEYS and key not in case_dicts.IGNORE:
-                if self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val):
-                    dict_str += f"{key} = 0d0\n"
-                    ignored.append(key)
-                    continue
-
-                if not isinstance(val, str) or len(val) == 1:
-                    dict_str += f"{key} = {val}\n"
-                else:
-                    dict_str += f"{key} = '{val}'\n"
-            else:
-                ignored.append(key)
-
-            if key not in case_dicts.ALL:
-                suggestions = _suggest_similar_params(key, list(case_dicts.ALL.keys()))
-                hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
-                raise common.MFCException(f"Unknown parameter '{key}'.{hint}")
-
+        ignored = [k for k in self.params if k not in MASTER_KEYS or k in case_dicts.IGNORE]
         cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params) - len(ignored)}/{len(self.params)} parameters.")
         cons.unindent()
 
-        return f"&user_inputs\n{dict_str}&end/\n"
+        return result
 
     def validate_params(self, origin_txt: str = None):
         """Validates parameters read from case file:
