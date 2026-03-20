@@ -3749,11 +3749,15 @@ contains
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord .and. hypoelasticity) then
+                                        ! Axisymmetric geometric flux (ADC-consistent):
+                                        ! - Non-momentum components: use flux_rs (already ADC-blended conservative flux)
+                                        ! - Momentum: kept pure HLLC under ADC, so face state is also pure HLLC
+                                        ! - Advection: zero
                                         !$acc loop seq
                                         do i = 1, sys_size
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
-                                        ! HLLC face state for radial momentum gsrc
+                                        ! Pure HLLC face state for radial momentum geometric source
                                         if (s_L >= 0._wp) then
                                             p_face = pres_L; tau_qq_face = tau_qq_L
                                         elseif (s_R <= 0._wp) then
@@ -3762,20 +3766,6 @@ contains
                                             p_face = pres_tot_star + tau_nn_L; tau_qq_face = tau_qq_L
                                         else
                                             p_face = pres_tot_star + tau_nn_R; tau_qq_face = tau_qq_R
-                                        end if
-                                        ! ADC blending of axisym face state
-                                        if (riemann_hypo_ADC) then
-                                            if (s_L >= 0._wp) then
-                                                p_face_HLL = pres_L; tau_qq_face_HLL = tau_qq_L
-                                            elseif (s_R <= 0._wp) then
-                                                p_face_HLL = pres_R; tau_qq_face_HLL = tau_qq_R
-                                            else
-                                                tau_nn_HLL = U_HLL(strxb)/(rho_HLL + verysmall)
-                                                tau_qq_face_HLL = U_HLL(strxe)/(rho_HLL + verysmall)
-                                                p_face_HLL = F_HLL(momxb) - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
-                                            end if
-                                            p_face = p_face_HLL + phi*(p_face - p_face_HLL)
-                                            tau_qq_face = tau_qq_face_HLL + phi*(tau_qq_face - tau_qq_face_HLL)
                                         end if
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
                                             flux_rs${XYZ}$_vf(j, k, l, contxe + idx1) - p_face + tau_qq_face
@@ -4248,6 +4238,10 @@ contains
         real(wp), dimension(14) :: U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR
         real(wp), dimension(14) :: F_L, F_R, F_starL, F_starR, F_hlld
         real(wp), dimension(14) :: F_HLL  ! for ADC blending
+        real(wp), dimension(14) :: U_HLL  ! for ADC axisym geometric flux
+        real(wp) :: rho_HLL, u_n_HLL_cons, tau_nn_HLL
+        real(wp) :: u_n_HLL_trace, u_t_HLL_trace
+        real(wp) :: p_face_HLL, tau_qq_face_HLL
         integer :: ncomp  ! 11 for 2D/axisym, 14 for 3D Cartesian
 
         ! HLLD Hypo variables
@@ -4929,6 +4923,28 @@ contains
                                     end do
                                 end if
 
+                                if (cyl_coord) then
+                                    if (0._wp <= S_L) then
+                                        u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L
+                                        p_face_HLL = pres%L; tau_qq_face_HLL = tau_qq_L
+                                    elseif (S_R <= 0._wp) then
+                                        u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R
+                                        p_face_HLL = pres%R; tau_qq_face_HLL = tau_qq_R
+                                    else
+                                        u_n_HLL_trace = (S_R*u_n_L - S_L*u_n_R)/(S_R - S_L + verysmall)
+                                        u_t_HLL_trace = (S_R*u_t_L - S_L*u_t_R)/(S_R - S_L + verysmall)
+                                        do i = 1, ncomp
+                                            U_HLL(i) = (S_R*U_R(i) - S_L*U_L(i) - (F_R(i) - F_L(i))) &
+                                                       /(S_R - S_L + verysmall)
+                                        end do
+                                        rho_HLL = U_HLL(1) + U_HLL(2)
+                                        u_n_HLL_cons = U_HLL(3)/(rho_HLL + verysmall)
+                                        tau_nn_HLL = U_HLL(8)/(rho_HLL + verysmall)
+                                        tau_qq_face_HLL = U_HLL(11)/(rho_HLL + verysmall)
+                                        p_face_HLL = F_HLL(3) - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
+                                    end if
+                                end if
+
                                 Sigma_L   = pTot_L
                                 Sigma_R   = pTot_R
                                 dSigma    = Sigma_R - Sigma_L
@@ -5030,6 +5046,11 @@ contains
                                 else
                                     u_n_face = u_n_R; u_t_face = u_t_R
                                 end if
+                                ! ADC blend NC face velocities with HLL scalar traces
+                                if (riemann_hypo_ADC) then
+                                    u_n_face = u_n_HLL_trace + phi*(u_n_face - u_n_HLL_trace)
+                                    u_t_face = u_t_HLL_trace + phi*(u_t_face - u_t_HLL_trace)
+                                end if
                                 if (dir_idx(1) == 1) then
                                     nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_face
                                     nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_face
@@ -5046,6 +5067,7 @@ contains
                                     do i = 1, sys_size
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
+                                    ! Pure HLLD face state
                                     if (0._wp <= S_L) then
                                         p_face = pres%L; tau_qq_face = tau_qq_L
                                     elseif (0._wp <= S_Lstar .or. 0._wp <= S_M) then
@@ -5054,6 +5076,11 @@ contains
                                         p_face = pTot_star + tau_nn_R_star; tau_qq_face = tau_qq_R_star
                                     else
                                         p_face = pres%R; tau_qq_face = tau_qq_R
+                                    end if
+                                    ! ADC blend face state (HLLD ADC blends all components)
+                                    if (riemann_hypo_ADC) then
+                                        p_face = p_face_HLL + phi*(p_face - p_face_HLL)
+                                        tau_qq_face = tau_qq_face_HLL + phi*(tau_qq_face - tau_qq_face_HLL)
                                     end if
                                     flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) - p_face + tau_qq_face
