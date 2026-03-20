@@ -7,15 +7,14 @@
     ! Arrays to stor position and radii of jets from input file
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
     ! Variables to describe initial condition of jet
-    real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
-    real(wp) :: rcut, xcut ! Intermediate variables for creating smooth initial condition
-
+    real(wp)                      :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
+    real(wp)                      :: rcut, xcut ! Intermediate variables for creating smooth initial condition
     real(wp), dimension(0:n, 0:p) :: rcut_arr
-    integer :: l, q, s ! Iterators for reading input files
-    integer :: start, end ! Ints to keep track of position in file
-    character(len=1000) :: line ! String to store line in ile
-    character(len=25) :: value ! String to store value in line
-    integer :: NJet ! Number of jets
+    integer                       :: l, q, s ! Iterators for reading input files
+    integer                       :: start, end ! Ints to keep track of position in file
+    character(len=1000)           :: line ! String to store line in ile
+    character(len=25)             :: value ! String to store value in line
+    integer                       :: NJet ! Number of jets
 
     eps = 1e-9_wp
 
@@ -31,20 +30,20 @@
 
         open (unit=10, file="jets.csv", status="old", action="read")
         do q = 0, NJet - 1
-            read (10, '(A)') line  ! Read a full line as a string
+            read (10, '(A)') line ! Read a full line as a string
             start = 1
 
             do l = 0, 2
-                end = index(line(start:), ',')  ! Find the next comma
+                end = index(line(start:), ',') ! Find the next comma
                 if (end == 0) then
-                    value = trim(adjustl(line(start:)))  ! Last value in the line
+                    value = trim(adjustl(line(start:))) ! Last value in the line
                 else
-                    value = trim(adjustl(line(start:start + end - 2)))  ! Extract substring
-                    start = start + end  ! Move to next value
+                    value = trim(adjustl(line(start:start + end - 2))) ! Extract substring
+                    start = start + end ! Move to next value
                 end if
                 if (l == 0) then
-                    read (value, *) y_th_arr(q)  ! Convert string to numeric value
-                elseif (l == 1) then
+                    read (value, *) y_th_arr(q) ! Convert string to numeric value
+                else if (l == 1) then
                     read (value, *) z_th_arr(q)
                 else
                     read (value, *) r_th_arr(q)
@@ -64,11 +63,9 @@
             end do
         end do
     end if
-
 #:enddef
 
 #:def Hardcoded3D()
-
     select case (patch_icpp(patch_id)%hcid)
     case (300) ! Rayleigh-Taylor instability
         rhoH = 3._wp
@@ -101,7 +98,6 @@
             pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
             q_prim_vf(E_idx)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
-
     case (301) ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
         h = 0.0_wp
         lam = 1.0_wp
@@ -114,7 +110,6 @@
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
-
     case (302) ! 3D Jet with IGR
         ux_th = 10*sqrt(1.4*0.4)
         ux_am = 0.0*sqrt(1.4)
@@ -145,7 +140,6 @@
         end if
 
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
-
     case (303) ! 3D Multijet
 
         eps_smooth = 3.0_wp
@@ -173,25 +167,22 @@
         end if
 
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
-
     case (370)
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
-
     case (380)
         ! This is patch is hard-coded for test suite optimization used in the
         ! 3D_TaylorGreenVortex case:
         ! This analytic patch used geometry 9
         Mach = 0.1
         if (patch_id == 1) then
-            q_prim_vf(E_idx)%sf(i, j, k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
+            q_prim_vf(E_idx)%sf(i, j, &
+                      & k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
             q_prim_vf(momxb + 0)%sf(i, j, k) = Mach*376.636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
             q_prim_vf(momxb + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
         end if
-
     case default
         call s_int_to_str(patch_id, iStr)
-        call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
+        call s_mpi_abort("Invalid hcid specified for patch " // trim(iStr))
     end select
-
 #:enddef

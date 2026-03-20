@@ -7,7 +7,6 @@
 
 !> @brief MPI halo exchange, domain decomposition, and buffer packing/unpacking for the simulation solver
 module m_mpi_proxy
-
 #ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
 #endif
@@ -40,24 +39,18 @@ module m_mpi_proxy
 
     integer :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
-
 contains
 
     !> @brief Allocates immersed boundary communication buffers for MPI halo exchanges.
     subroutine s_initialize_mpi_proxy_module()
-
 #ifdef MFC_MPI
         if (ib) then
             if (n > 0) then
                 if (p > 0) then
-                    i_halo_size = -1 + buff_size* &
-                                            & (m + 2*buff_size + 1)* &
-                                            & (n + 2*buff_size + 1)* &
-                                            & (p + 2*buff_size + 1)/ &
-                                            & (cells_bounds%mnp_min + 2*buff_size + 1)
+                    i_halo_size = -1 + buff_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)*(p + 2*buff_size + 1) &
+                                                  & /(cells_bounds%mnp_min + 2*buff_size + 1)
                 else
-                    i_halo_size = -1 + buff_size* &
-                                            & (cells_bounds%mn_max + 2*buff_size + 1)
+                    i_halo_size = -1 + buff_size*(cells_bounds%mn_max + 2*buff_size + 1)
                 end if
             else
                 i_halo_size = -1 + buff_size
@@ -67,16 +60,11 @@ contains
             @:ALLOCATE(ib_buff_send(0:i_halo_size), ib_buff_recv(0:i_halo_size))
         end if
 #endif
-
     end subroutine s_initialize_mpi_proxy_module
-
-    !>  Since only the processor with rank 0 reads and verifies
-        !!      the consistency of user inputs, these are initially not
-        !!      available to the other processors. Then, the purpose of
-        !!      this subroutine is to distribute the user inputs to the
-        !!      remaining processors in the communicator.
+    !> Since only the processor with rank 0 reads and verifies the consistency of user inputs, these are initially not available to
+    !! the other processors. Then, the purpose of this subroutine is to distribute the user inputs to the remaining processors in
+    !! the communicator.
     impure subroutine s_mpi_bcast_user_inputs()
-
 #ifdef MFC_MPI
 
         integer :: i, j !< Generic loop iterator
@@ -253,32 +241,24 @@ contains
         call MPI_BCAST(nv_uvm_out_of_core, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(nv_uvm_igr_temps_on_gpu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(nv_uvm_pref_gpu, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
 #endif
-
     end subroutine s_mpi_bcast_user_inputs
-
     !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
-        integer, intent(in) :: num_freq
+        integer, intent(in)                            :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         call MPI_BCAST(phi_rn, num_freq, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
-
     end subroutine s_mpi_send_random_number
-
     !> @brief Deallocates immersed boundary MPI communication buffers.
     subroutine s_finalize_mpi_proxy_module()
-
 #ifdef MFC_MPI
         if (ib) then
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
 #endif
-
     end subroutine s_finalize_mpi_proxy_module
-
 end module m_mpi_proxy

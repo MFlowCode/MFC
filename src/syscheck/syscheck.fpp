@@ -58,7 +58,6 @@
 #:enddef OMP
 
 program syscheck
-
     @:MPI(use mpi)
     @:ACC(use openacc)
     @:OMP(use omp_lib)
@@ -102,11 +101,9 @@ program syscheck
 
     @:LOG("")
     @:LOG("Syscheck: PASSED.")
-
 end program syscheck
 
 subroutine assert(condition)
-
     use iso_fortran_env, only: output_unit, error_unit
 
     logical, intent(in) :: condition
@@ -116,5 +113,4 @@ subroutine assert(condition)
         call flush (int(error_unit))
         stop 1
     end if
-
 end subroutine assert

@@ -2,18 +2,16 @@
 !! @file
 !! @brief Contains program p_main
 
-!> @brief This program takes care of setting up the initial condition and
-!!              grid data for the multicomponent flow code.
+!> @brief This program takes care of setting up the initial condition and              grid data for the multicomponent flow code.
 program p_main
-
     use m_global_parameters     !< Global parameters for the code
 
     use m_start_up
 
     implicit none
 
-    logical :: file_exists
-    real(wp) :: start, finish, time_avg, time_final
+    logical                             :: file_exists
+    real(wp)                            :: start, finish, time_avg, time_final
     real(wp), allocatable, dimension(:) :: proc_time
 
     call random_seed()
@@ -37,5 +35,4 @@ program p_main
     deallocate (proc_time)
 
     call s_finalize_modules()
-
 end program p_main

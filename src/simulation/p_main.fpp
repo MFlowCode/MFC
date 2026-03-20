@@ -2,18 +2,13 @@
 !! @file
 !! @brief Contains program p_main
 
-!> @brief  Quasi-conservative, shock- and interface- capturing finite-volume
-!!              scheme for the multicomponent Navier-Stokes equations. The system
-!!              is augmented with the relevant advection equations to capture the
-!!              material interfaces and closed by the stiffened equation of state
-!!              as well as any required mixture relations. The effects of surface
-!!              tension are included and modeled through a volume force that acts
-!!              across the diffuse material interface regions. The implementation
-!!              specifics of surface tension may be found in the work by Perigaud
-!!              and Saurel (2005). Note that both viscous and capillarity effects
-!!              are only available in the volume fraction model.
+!> @brief Quasi-conservative, shock- and interface- capturing finite-volume scheme for the multicomponent Navier-Stokes equations.
+!! The system is augmented with the relevant advection equations to capture the material interfaces and closed by the stiffened
+!! equation of state as well as any required mixture relations. The effects of surface tension are included and modeled through a
+!! volume force that acts across the diffuse material interface regions. The implementation specifics of surface tension may be
+!! found in the work by Perigaud and Saurel (2005). Note that both viscous and capillarity effects are only available in the volume
+!! fraction model.
 program p_main
-
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_start_up
@@ -24,25 +19,25 @@ program p_main
 
     implicit none
 
-    integer :: t_step !< Iterator for the time-stepping loop
-    real(wp) :: time_avg, time_final
-    real(wp) :: io_time_avg, io_time_final
+    integer                             :: t_step !< Iterator for the time-stepping loop
+    real(wp)                            :: time_avg, time_final
+    real(wp)                            :: io_time_avg, io_time_final
     real(wp), allocatable, dimension(:) :: proc_time
     real(wp), allocatable, dimension(:) :: io_proc_time
-    logical :: file_exists
-    real(wp) :: start, finish
-    integer :: nt
+    logical                             :: file_exists
+    real(wp)                            :: start, finish
+    integer                             :: nt
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
     call nvtxStartRange("INIT")
 
-    !Initialize MPI
+    ! Initialize MPI
     call nvtxStartRange("INIT-MPI")
     call s_initialize_mpi_domain()
     call nvtxEndRange
 
-    !Initialize Modules
+    ! Initialize Modules
     call nvtxStartRange("INIT-MODULES")
     call s_initialize_modules()
     call nvtxEndRange
@@ -73,17 +68,16 @@ program p_main
     call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop
     do
-
         if (cfl_dt) then
             if (mytime >= t_stop) then
-                call s_save_performance_metrics(time_avg, time_final, io_time_avg, &
-                                                io_time_final, proc_time, io_proc_time, file_exists)
+                call s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
+                                                & file_exists)
                 exit
             end if
         else
             if (t_step == t_step_stop) then
-                call s_save_performance_metrics(time_avg, time_final, io_time_avg, &
-                                                io_time_final, proc_time, io_proc_time, file_exists)
+                call s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
+                                                & file_exists)
                 exit
             end if
         end if
@@ -110,5 +104,4 @@ program p_main
     call nvtxStartRange("FINALIZE-MODULES")
     call s_finalize_modules()
     call nvtxEndRange
-
 end program p_main

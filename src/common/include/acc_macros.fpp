@@ -196,7 +196,7 @@
     #:if data_dependency is not None
         #:assert isinstance(data_dependency, str)
         #:assert (data_dependency == 'auto' or data_dependency == 'independent')
-        #:set data_dependency_val = data_dependency 
+        #:set data_dependency_val = data_dependency
     #:else
         #:set data_dependency_val = ''
     #:endif
@@ -229,7 +229,7 @@
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
-        & no_create_val.strip('\n') + present_val.strip('\n') + & 
+        & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n') + &
         & default_val.strip('\n')
     #:set acc_directive = '!$acc data ' + clause_val + extraAccArgs_val.strip('\n')

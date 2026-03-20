@@ -7,7 +7,6 @@
 
 !> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters
@@ -16,10 +15,7 @@ module m_sim_helpers
 
     implicit none
 
-    private; public :: s_compute_enthalpy, &
- s_compute_stability_from_dt, &
- s_compute_dt_from_cfl
-
+    private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl
 contains
 
     !> Computes the modified dtheta for Fourier filtering in azimuthal direction
@@ -29,13 +25,13 @@ contains
     function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
         $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: k, l
-        real(wp) :: fltr_dtheta
-        integer :: Nfq
+        real(wp)            :: fltr_dtheta
+        integer             :: Nfq
 
         if (grid_geometry == 3) then
             if (k == 0) then
                 fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
-            elseif (k <= fourier_rings) then
+            else if (k <= fourier_rings) then
                 Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
                 fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
             else
@@ -45,7 +41,6 @@ contains
             fltr_dtheta = 0._wp
         end if
     end function f_compute_filtered_dtheta
-
     !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only)
         !! @param vel directional velocities
         !! @param c mixture speed of sound
@@ -56,33 +51,27 @@ contains
     function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
-        real(wp), intent(in) :: c
-        integer, intent(in) :: j, k, l
-        real(wp) :: cfl_terms
-        real(wp) :: fltr_dtheta
+        real(wp), intent(in)                      :: c
+        integer, intent(in)                       :: j, k, l
+        real(wp)                                  :: cfl_terms
+        real(wp)                                  :: fltr_dtheta
 
         fltr_dtheta = f_compute_filtered_dtheta(k, l)
 
         if (p > 0) then
-            !3D
+            ! 3D
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 if (grid_geometry == 3) then
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
-                                    dy(k)/(abs(vel(2)) + c), &
-                                    fltr_dtheta/(abs(vel(3)) + c))
+                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
                 else
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
-                                    dy(k)/(abs(vel(2)) + c), &
-                                    dz(l)/(abs(vel(3)) + c))
+                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
                 end if
             #:endif
         else
-            !2D
-            cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
-                            dy(k)/(abs(vel(2)) + c))
+            ! 2D
+            cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         end if
     end function f_compute_multidim_cfl_terms
-
     !> Computes enthalpy
         !! @param q_prim_vf cell centered primitive variables
         !! @param pres mixture pressure
@@ -99,8 +88,7 @@ contains
         !! @param k y index
         !! @param l z index
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
-        $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
-            & cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -108,11 +96,11 @@ contains
             real(wp), intent(inout), dimension(3) :: vel
         #:else
             real(wp), intent(inout), dimension(num_fluids) :: alpha
-            real(wp), intent(inout), dimension(num_vels) :: vel
+            real(wp), intent(inout), dimension(num_vels)   :: vel
         #:endif
-        real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
-        real(wp), intent(out) :: qv
-        integer, intent(in) :: j, k, l
+        real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, H, pres
+        real(wp), intent(out)                 :: qv
+        integer, intent(in)                   :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_rho, Gs
@@ -120,14 +108,12 @@ contains
             real(wp), dimension(num_fluids) :: alpha_rho, Gs
         #:endif
         real(wp) :: E, G_local
-
-        integer :: i
+        integer  :: i
 
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
         if (elasticity) then
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
-                                                            alpha_rho, Re, G_local, Gs)
+            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
         else
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
@@ -164,9 +150,7 @@ contains
         end if
 
         H = (E + pres)/rho
-
     end subroutine s_compute_enthalpy
-
     !> Computes stability criterion for a specified dt
         !! @param vel directional velocities
         !! @param c mixture speed of sound
@@ -180,14 +164,13 @@ contains
         !! @param Rc_sf (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in), dimension(num_vels) :: vel
-        real(wp), intent(in) :: c, rho
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
+        real(wp), intent(in), dimension(num_vels)                   :: vel
+        real(wp), intent(in)                                        :: c, rho
+        real(wp), dimension(0:m, 0:n, 0:p), intent(inout)           :: icfl_sf
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout), optional :: vcfl_sf, Rc_sf
-        real(wp), dimension(2), intent(in) :: Re_l
-        integer, intent(in) :: j, k, l
-
-        real(wp) :: fltr_dtheta
+        real(wp), dimension(2), intent(in)                          :: Re_l
+        integer, intent(in)                                         :: j, k, l
+        real(wp)                                                    :: fltr_dtheta
 
         ! Inviscid CFL calculation
         if (p > 0 .or. n > 0) then
@@ -202,39 +185,29 @@ contains
         if (viscous) then
             if (p > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    !3D
+                    ! 3D
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                           /min(dx(j), dy(k), fltr_dtheta)**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                             dy(k)*(abs(vel(2)) + c), &
-                                             fltr_dtheta*(abs(vel(3)) + c)) &
-                                         /maxval(1._wp/Re_l)
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), fltr_dtheta)**2._wp
+                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
+                              & fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     else
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                           /min(dx(j), dy(k), dz(l))**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                             dy(k)*(abs(vel(2)) + c), &
-                                             dz(l)*(abs(vel(3)) + c)) &
-                                         /maxval(1._wp/Re_l)
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), dz(l))**2._wp
+                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
+                              & dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     end if
                 #:endif
-            elseif (n > 0) then
-                !2D
+            else if (n > 0) then
+                ! 2D
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
-                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                     dy(k)*(abs(vel(2)) + c)) &
-                                 /maxval(1._wp/Re_l)
+                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c))/maxval(1._wp/Re_l)
             else
-                !1D
+                ! 1D
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
                 Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
-
     end subroutine s_compute_stability_from_dt
-
     !> Computes dt for a specified CFL number
         !! @param vel directional velocities
         !! @param c Speed of sound
@@ -246,14 +219,13 @@ contains
         !! @param l z coordinate
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in) :: vel
-        real(wp), intent(in) :: c, rho
+        real(wp), dimension(num_vels), intent(in)         :: vel
+        real(wp), intent(in)                              :: c, rho
         real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt
-        real(wp), dimension(2), intent(in) :: Re_l
-        integer, intent(in) :: j, k, l
-
-        real(wp) :: icfl_dt, vcfl_dt
-        real(wp) :: fltr_dtheta
+        real(wp), dimension(2), intent(in)                :: Re_l
+        integer, intent(in)                               :: j, k, l
+        real(wp)                                          :: icfl_dt, vcfl_dt
+        real(wp)                                          :: fltr_dtheta
 
         ! Inviscid CFL calculation
         if (p > 0 .or. n > 0) then
@@ -267,20 +239,18 @@ contains
         ! Viscous calculations
         if (viscous) then
             if (p > 0) then
-                !3D
+                ! 3D
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
-                              /maxval(1/(rho*Re_l))
+                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
                 else
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
-                              /maxval(1/(rho*Re_l))
+                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)/maxval(1/(rho*Re_l))
                 end if
-            elseif (n > 0) then
-                !2D
+            else if (n > 0) then
+                ! 2D
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             else
-                !1D
+                ! 1D
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
         end if
@@ -290,7 +260,5 @@ contains
         else
             max_dt(j, k, l) = icfl_dt
         end if
-
     end subroutine s_compute_dt_from_cfl
-
 end module m_sim_helpers

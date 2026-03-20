@@ -16,7 +16,6 @@
 #else
     $:code
 #endif
-
 #:enddef
 
 #:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
@@ -32,11 +31,9 @@
 #elif defined(MFC_OpenMP)
     $:omp_directive
 #endif
-
 #:enddef
 
 #:def END_GPU_PARALLEL_LOOP()
-
     #:set acc_end_directive = '!$acc end parallel loop'
     #:set omp_end_directive = END_OMP_PARALLEL_LOOP()
 
@@ -45,7 +42,6 @@
 #elif defined(MFC_OpenMP)
     $:omp_end_directive
 #endif
-
 #:enddef
 
 #:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, cray_noinline=False, extraAccArgs=None, extraOmpArgs=None)
@@ -142,7 +138,6 @@
 #:enddef
 
 #:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, extraAccArgs=None, extraOmpArgs=None)
-
     #:if use_device_addr is not None and use_device_ptr is not None
         #:set use_device_addr_end_index = len(use_device_addr) - 1
         #:set use_device = use_device_addr + use_device_ptr
@@ -235,13 +230,11 @@
 #:enddef
 
 #:def USE_GPU_MODULE()
-
 #if defined(MFC_OpenACC)
     use openacc
 #elif defined(MFC_OpenMP)
     use omp_lib
 #endif
-
 #:enddef
 
 #:def DEF_AMD(code)

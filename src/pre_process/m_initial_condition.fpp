@@ -4,23 +4,22 @@
 
 !> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
+    use m_derived_types ! Definitions of the derived types
 
-    use m_derived_types         ! Definitions of the derived types
-
-    use m_global_parameters     ! Global parameters for the code
+    use m_global_parameters ! Global parameters for the code
 
     use m_mpi_proxy              !< Message passing interface (MPI) module proxy
 
     use m_helper
 
-    use m_variables_conversion  ! Subroutines to change the state variables from
+    use m_variables_conversion ! Subroutines to change the state variables from
     ! one form to another
 
     use m_icpp_patches
 
     use m_assign_variables
 
-    use m_perturbation          ! Subroutines to perturb initial flow fields
+    use m_perturbation ! Subroutines to perturb initial flow fields
 
     use m_chemistry
 
@@ -32,30 +31,24 @@ module m_initial_condition
     ! a procedure such that the choice of the model equations does not have to
     ! be queried every time the patch primitive variables are to be assigned in
     ! a cell in the computational domain.
-    type(scalar_field), allocatable, dimension(:) :: q_prim_vf !< primitive variables
+    type(scalar_field), allocatable, dimension(:)    :: q_prim_vf !< primitive variables
+    type(scalar_field), allocatable, dimension(:)    :: q_cons_vf !< conservative variables
+    type(scalar_field)                               :: q_T_sf !< Temperature field
+    type(integer_field), dimension(:,:), allocatable :: bc_type !< bc_type fields
 
-    type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
-
-    type(scalar_field) :: q_T_sf !< Temperature field
-
-    type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
-
-!> @cond
+    !> @cond
 #ifdef MFC_MIXED_PRECISION
-    integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
+    integer(kind=1), allocatable, dimension(:,:,:) :: patch_id_fp
 #else
-!> @endcond
-    integer, allocatable, dimension(:, :, :) :: patch_id_fp
-!> @cond
+    !> @endcond
+    integer, allocatable, dimension(:,:,:) :: patch_id_fp
+    !> @cond
 #endif
-!> @endcond
-
+    !> @endcond
 contains
 
-    !> Computation of parameters, allocation procedures, and/or
-        !!              any other tasks needed to properly setup the module
+    !> Computation of parameters, allocation procedures, and/or              any other tasks needed to properly setup the module
     impure subroutine s_initialize_initial_condition_module
-
         integer :: i, j, k, l !< generic loop iterators
 
         ! Allocating the primitive and conservative variables
@@ -63,12 +56,8 @@ contains
         allocate (q_cons_vf(1:sys_size))
 
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                                      idwbuff(2)%beg:idwbuff(2)%end, &
-                                      idwbuff(3)%beg:idwbuff(3)%end))
-            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                                      idwbuff(2)%beg:idwbuff(2)%end, &
-                                      idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         if (chemistry) then
@@ -79,13 +68,9 @@ contains
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         if (qbmm .and. .not. polytropic) then
-            !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
-            allocate (pb%sf(0:m, &
-                            0:n, &
-                            0:p, 1:nnode, 1:nb))
-            allocate (mv%sf(0:m, &
-                            0:n, &
-                            0:p, 1:nnode, 1:nb))
+            ! Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
+            allocate (pb%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
+            allocate (mv%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
         end if
 
         ! Setting default values for conservative and primitive variables so
@@ -153,26 +138,17 @@ contains
         ! extent of application that the overwrite permissions give a patch
         ! when it is being applied in the domain.
         patch_id_fp = 0
-
     end subroutine s_initialize_initial_condition_module
-
-    !>  This subroutine peruses the patches and depending on the
-        !!              type of geometry associated with a particular patch, it
-        !!              calls the related subroutine to setup the said geometry
-        !!              on the grid using the primitive variables included with
-        !!              the patch parameters. The subroutine is complete once the
-        !!              primitive variables are converted to conservative ones.
+    !> This subroutine peruses the patches and depending on the type of geometry associated with a particular patch, it calls the
+    !! related subroutine to setup the said geometry on the grid using the primitive variables included with the patch parameters.
+    !! The subroutine is complete once the primitive variables are converted to conservative ones.
     impure subroutine s_generate_initial_condition
-
         integer :: i
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
         if (old_ic) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, &
-                                                               q_T_sf, &
-                                                               q_prim_vf, &
-                                                               idwbuff)
+            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
         end if
 
         call s_apply_icpp_patches(patch_id_fp, q_prim_vf)
@@ -191,16 +167,13 @@ contains
         if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
-            !Initialize pb and mv
+            ! Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
-
     end subroutine s_generate_initial_condition
-
-    !>  Deallocation procedures for the module
+    !> Deallocation procedures for the module
     impure subroutine s_finalize_initial_condition_module
-
         integer :: i !< Generic loop iterator
 
         ! Dellocating the primitive and conservative variables
@@ -233,7 +206,5 @@ contains
         end if
 
         deallocate (bc_type)
-
     end subroutine s_finalize_initial_condition_module
-
 end module m_initial_condition

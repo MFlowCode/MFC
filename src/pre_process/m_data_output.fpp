@@ -4,7 +4,6 @@
 
 !> @brief Writes grid and initial condition data to serial or parallel output files
 module m_data_output
-
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
@@ -35,33 +34,22 @@ module m_data_output
 
     implicit none
 
-    private; 
-    public :: s_write_serial_data_files, &
-              s_write_parallel_data_files, &
-              s_write_data_files, &
-              s_initialize_data_output_module, &
-              s_finalize_data_output_module
+    private;
+    public :: s_write_serial_data_files, s_write_parallel_data_files, s_write_data_files, s_initialize_data_output_module, &
+        & s_finalize_data_output_module
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
     abstract interface
 
-        !>  Interface for the conservative data
+        !> Interface for the conservative data
         !! @param q_cons_vf Conservative variables
         impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type)
-
-            import :: scalar_field, integer_field, sys_size, m, n, p, &
-                pres_field, num_dims
+            import :: scalar_field, integer_field, sys_size, m, n, p, pres_field, num_dims
 
             ! Conservative variables
-            type(scalar_field), &
-                dimension(sys_size), &
-                intent(inout) :: q_cons_vf, q_prim_vf
-
-            type(integer_field), &
-                dimension(1:num_dims, -1:1), &
-                intent(in) :: bc_type
-
+            type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
+            type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         end subroutine s_write_abstract_data_files
     end interface
 
@@ -72,49 +60,36 @@ module m_data_output
     !! Restart data folder
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
-
 contains
 
-    !>  Writes grid and initial condition data files to the "0"
-        !!  time-step directory in the local processor rank folder
+    !> Writes grid and initial condition data files to the "0"  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param bc_type Boundary condition types
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type)
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(inout) :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_prim_vf
 
         ! BC types
-        type(integer_field), &
-            dimension(1:num_dims, -1:1), &
-            intent(in) :: bc_type
-
-        logical :: file_exist !< checks if file exists
-
-        character(LEN=15) :: FMT
-        character(LEN=3) :: status
-
-        character(LEN= &
-                  int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !< Used to store
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        logical                                                      :: file_exist !< checks if file exists
+        character(LEN=15)                                            :: FMT
+        character(LEN=3)                                             :: status
+        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1)     :: file_num !< Used to store
             !! the number, in character form, of the currently
             !! manipulated conservative variable data file
 
         character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !<
             !! Generic string used to store the address of a particular file
 
-        integer :: i, j, k, l, r, c !< Generic loop iterator
-        integer :: t_step
-
+        integer                 :: i, j, k, l, r, c !< Generic loop iterator
+        integer                 :: t_step
         real(wp), dimension(nb) :: nRtmp         !< Temporary bubble concentration
-        real(wp) :: nbub                         !< Temporary bubble number density
-        real(wp) :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(wp) :: rho                          !< Temporary density
-        real(wp) :: pres, T                         !< Temporary pressure
-
-        real(wp) :: rhoYks(1:num_species) !< Temporary species mass fractions
-
-        real(wp) :: pres_mag
+        real(wp)                :: nbub                         !< Temporary bubble number density
+        real(wp)                :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
+        real(wp)                :: rho                          !< Temporary density
+        real(wp)                :: pres, T                         !< Temporary pressure
+        real(wp)                :: rhoYks(1:num_species) !< Temporary species mass fractions
+        real(wp)                :: pres_mag
 
         pres_mag = 0._wp
 
@@ -139,25 +114,23 @@ contains
         end if
 
         ! x-coordinate direction
-        file_loc = trim(t_step_dir)//'/x_cb.dat'
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+        file_loc = trim(t_step_dir) // '/x_cb.dat'
+        open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
         write (1) x_cb(-1:m)
         close (1)
 
         ! y- and z-coordinate directions
         if (n > 0) then
             ! y-coordinate direction
-            file_loc = trim(t_step_dir)//'/y_cb.dat'
-            open (1, FILE=trim(file_loc), FORM='unformatted', &
-                  STATUS=status)
+            file_loc = trim(t_step_dir) // '/y_cb.dat'
+            open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
             write (1) y_cb(-1:n)
             close (1)
 
             ! z-coordinate direction
             if (p > 0) then
-                file_loc = trim(t_step_dir)//'/z_cb.dat'
-                open (1, FILE=trim(file_loc), FORM='unformatted', &
-                      STATUS=status)
+                file_loc = trim(t_step_dir) // '/z_cb.dat'
+                open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
                 write (1) z_cb(-1:p)
                 close (1)
             end if
@@ -166,24 +139,20 @@ contains
         ! Outputting Conservative Variables
         do i = 1, sys_size
             write (file_num, '(I0)') i
-            file_loc = trim(t_step_dir)//'/q_cons_vf'//trim(file_num) &
-                       //'.dat'
-            open (1, FILE=trim(file_loc), FORM='unformatted', &
-                  STATUS=status)
+            file_loc = trim(t_step_dir) // '/q_cons_vf' // trim(file_num) // '.dat'
+            open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
             write (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
             close (1)
         end do
 
-        !Outputting pb and mv for non-polytropic qbmm
+        ! Outputting pb and mv for non-polytropic qbmm
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
                     write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
-                    file_loc = trim(t_step_dir)//'/pb'//trim(file_num) &
-                               //'.dat'
-                    open (1, FILE=trim(file_loc), FORM='unformatted', &
-                          STATUS=status)
-                    write (1) pb%sf(:, :, :, r, i)
+                    file_loc = trim(t_step_dir) // '/pb' // trim(file_num) // '.dat'
+                    open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+                    write (1) pb%sf(:,:,:, r, i)
                     close (1)
                 end do
             end do
@@ -191,11 +160,9 @@ contains
             do i = 1, nb
                 do r = 1, nnode
                     write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
-                    file_loc = trim(t_step_dir)//'/mv'//trim(file_num) &
-                               //'.dat'
-                    open (1, FILE=trim(file_loc), FORM='unformatted', &
-                          STATUS=status)
-                    write (1) mv%sf(:, :, :, r, i)
+                    file_loc = trim(t_step_dir) // '/mv' // trim(file_num) // '.dat'
+                    open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+                    write (1) mv%sf(:,:,:, r, i)
                     close (1)
                 end do
             end do
@@ -212,8 +179,8 @@ contains
             FMT = "(2F40.14)"
         end if
 
-        write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/D'
-        file_loc = trim(t_step_dir)//'/.'
+        write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/D'
+        file_loc = trim(t_step_dir) // '/.'
 
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -221,15 +188,14 @@ contains
 
         if (cfl_dt) t_step = n_start
 
-        !1D
+        ! 1D
         if (n == 0 .and. p == 0) then
             if (model_eqns == 2) then
                 do i = 1, sys_size
-                    write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
+                    write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
                     open (2, FILE=trim(file_loc))
                     do j = 0, m
-
                         if (chemistry) then
                             do c = 1, num_species
                                 rhoYks(c) = q_cons_vf(chemxb + c - 1)%sf(j, 0, 0)
@@ -242,27 +208,22 @@ contains
 
                         if ((i >= chemxb) .and. (i <= chemxe)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
-                        else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
-                                 .or. &
-                                 ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                 .or. &
-                                 ((i >= chemxb) .and. (i <= chemxe)) &
-                                 ) then
+                        else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) .or. ((i >= adv_idx%beg) .and. (i <= adv_idx%end) &
+                                 & ) .or. ((i >= chemxb) .and. (i <= chemxe))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == mom_idx%beg) then !u
+                        else if (i == mom_idx%beg) then ! u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == stress_idx%beg) then !tau_e
+                        else if (i == stress_idx%beg) then ! tau_e
                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == E_idx) then !p
+                        else if (i == E_idx) then ! p
                             if (mhd) then
-                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)**2)
+                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, &
+                                                   & 0, 0)**2)
                             end if
 
-                            call s_compute_pressure( &
-                                q_cons_vf(E_idx)%sf(j, 0, 0), &
-                                q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
-                                pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
+                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j, 0, 0), q_cons_vf(alf_idx)%sf(j, 0, 0), &
+                                                    & 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, rho, &
+                                                    & qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
                             if (i == mom_idx%beg + 1) then ! v
@@ -275,7 +236,6 @@ contains
                                 write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)/rho
                             end if
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
-
                             if (qbmm) then
                                 nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
                             else
@@ -301,7 +261,7 @@ contains
             end if
 
             do i = 1, sys_size
-                write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
+                write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step, '.dat'
 
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
@@ -313,7 +273,8 @@ contains
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -324,7 +285,8 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -345,7 +307,7 @@ contains
         ! 2D
         if ((n > 0) .and. (p == 0)) then
             do i = 1, sys_size
-                write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
+                write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
                     do k = 0, n
@@ -359,7 +321,8 @@ contains
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -372,7 +335,8 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -395,7 +359,7 @@ contains
         ! 3D
         if (p > 0) then
             do i = 1, sys_size
-                write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
+                write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step, '.dat'
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
                     do k = 0, n
@@ -412,7 +376,8 @@ contains
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/pres.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -427,7 +392,8 @@ contains
                 end do
                 do i = 1, nb
                     do r = 1, nnode
-                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/mv.', i, '.', r, '.', proc_rank, '.', t_step, '.dat'
+                        write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -442,40 +408,30 @@ contains
                 end do
             end if
         end if
-
     end subroutine s_write_serial_data_files
-
-    !> Writes grid and initial condition data files in parallel to the "0"
-        !!  time-step directory in the local processor rank folder
+    !> Writes grid and initial condition data files in parallel to the "0"  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param bc_type Boundary condition types
     impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type)
-
         ! Conservative variables
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(inout) :: q_cons_vf, q_prim_vf
-
-        type(integer_field), &
-            dimension(1:num_dims, -1:1), &
-            intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
 #ifdef MFC_MPI
 
-        integer :: ifile, ierr, data_size
-        integer, dimension(MPI_STATUS_SIZE) :: status
-        integer(KIND=MPI_OFFSET_KIND) :: disp
-        integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
-        integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
-        integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
-        integer(KIND=MPI_OFFSET_KIND) :: MOK
-
+        integer                              :: ifile, ierr, data_size
+        integer, dimension(MPI_STATUS_SIZE)  :: status
+        integer(KIND=MPI_OFFSET_KIND)        :: disp
+        integer(KIND=MPI_OFFSET_KIND)        :: m_MOK, n_MOK, p_MOK
+        integer(KIND=MPI_OFFSET_KIND)        :: WP_MOK, var_MOK, str_MOK
+        integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
+        integer(KIND=MPI_OFFSET_KIND)        :: MOK
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical :: file_exist, dir_check
+        logical                              :: file_exist, dir_check
 
         ! Generic loop iterators
-        integer :: i, j, k, l
+        integer  :: i, j, k, l
         real(wp) :: loc_violations, glb_violations
 
         ! Downsample variables
@@ -491,17 +447,17 @@ contains
             end if
             call s_mpi_allreduce_sum(loc_violations, glb_violations)
             if (proc_rank == 0 .and. nint(glb_violations) > 0) then
-                print *, "WARNING: Attempting to downsample data but there are"// &
-                    "processors with local problem sizes that are not divisible by 3."
+                print *, &
+                    & "WARNING: Attempting to downsample data but there are" &
+                    & // "processors with local problem sizes that are not divisible by 3."
             end if
             call s_populate_variables_buffers(bc_type, q_cons_vf)
-            call s_downsample_data(q_cons_vf, q_cons_temp, &
-                                   m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+            call s_downsample_data(q_cons_vf, q_cons_temp, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
         end if
 
         if (file_per_process) then
             if (proc_rank == 0) then
-                file_loc = trim(case_dir)//'/restart_data/lustre_0'
+                file_loc = trim(case_dir) // '/restart_data/lustre_0'
                 call my_inquire(file_loc, dir_check)
                 if (dir_check .neqv. .true.) then
                     call s_create_directory(trim(file_loc))
@@ -524,14 +480,13 @@ contains
             else
                 write (file_loc, '(I0,A,i7.7,A)') t_step_start, '_', proc_rank, '.dat'
             end if
-            file_loc = trim(restart_dir)//'/lustre_0'//trim(mpiiofs)//trim(file_loc)
+            file_loc = trim(restart_dir) // '/lustre_0' // trim(mpiiofs) // trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             if (file_exist) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                               mpi_info_int, ifile, ierr)
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
             if (down_sample) then
                 ! Size of local arrays
@@ -558,19 +513,17 @@ contains
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size! adv_idx%end
+                do i = 1, sys_size ! adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
-                                            mpi_io_p, status, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
-                !Additional variables pb and mv for non-polytropic qbmm
+                ! Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
-                                                mpi_io_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 end if
             else
@@ -578,21 +531,18 @@ contains
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size*mpi_io_type, &
-                                                mpi_io_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 else
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
-                                                mpi_io_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 end if
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
-
         else
             call s_initialize_mpi_data(q_cons_vf)
 
@@ -602,13 +552,12 @@ contains
             else
                 write (file_loc, '(I0,A)') t_step_start, '.dat'
             end if
-            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+            file_loc = trim(restart_dir) // trim(mpiiofs) // trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                               mpi_info_int, ifile, ierr)
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -624,18 +573,16 @@ contains
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size! adv_idx%end
+                do i = 1, sys_size ! adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
-                                           'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
-                                            mpi_io_p, status, ierr)
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
-                !Additional variables pb and mv for non-polytropic qbmm
+                ! Additional variables pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -643,26 +590,21 @@ contains
                         ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
-                                                mpi_io_p, status, ierr)
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 end if
             else
-                do i = 1, sys_size !TODO: check if this is right
+                do i = 1, sys_size ! TODO: check if this is right
                     !            do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
-                                           'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
-                                            mpi_io_p, status, ierr)
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
-
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -676,27 +618,23 @@ contains
                 call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
             end if
         end if
-
     end subroutine s_write_parallel_data_files
-
-    !> Computation of parameters, allocation procedures, and/or
-        !!              any other tasks needed to properly setup the module
+    !> Computation of parameters, allocation procedures, and/or              any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_output_module
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
-        character(len=15) :: temp
-        character(LEN=1), dimension(3), parameter :: coord = (/'x', 'y', 'z'/)
+        character(len=15)                              :: temp
+        character(LEN=1), dimension(3), parameter      :: coord = (/'x', 'y', 'z'/)
 
         ! Generic logical used to check the existence of directories
         logical :: dir_check
         integer :: i
-
         integer :: m_ds, n_ds, p_ds !< down sample dimensions
 
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
             write (t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'
-            t_step_dir = trim(case_dir)//trim(t_step_dir)
+            t_step_dir = trim(case_dir) // trim(t_step_dir)
 
             ! Checking the existence of the time-step directory, removing it, if
             ! it exists, and creating a new copy. Note that if preexisting grid
@@ -704,25 +642,22 @@ contains
             ! location, then the above described steps are not executed here but
             ! rather in the module m_start_up.f90.
             if (old_grid .neqv. .true.) then
-
-                file_loc = trim(t_step_dir)//'/'
+                file_loc = trim(t_step_dir) // '/'
 
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check) call s_delete_directory(trim(t_step_dir))
 
                 call s_create_directory(trim(t_step_dir))
-
             end if
 
             s_write_data_files => s_write_serial_data_files
         else
             write (restart_dir, '(A)') '/restart_data'
-            restart_dir = trim(case_dir)//trim(restart_dir)
+            restart_dir = trim(case_dir) // trim(restart_dir)
 
             if ((old_grid .neqv. .true.) .and. (proc_rank == 0)) then
-
-                file_loc = trim(restart_dir)//'/'
+                file_loc = trim(restart_dir) // '/'
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check) call s_delete_directory(trim(restart_dir))
@@ -732,7 +667,6 @@ contains
             call s_mpi_barrier()
 
             s_write_data_files => s_write_parallel_data_files
-
         end if
 
         open (1, FILE='indices.dat', STATUS='unknown')
@@ -744,21 +678,23 @@ contains
         write (1, '(A)') "    "
         do i = contxb, contxe
             write (temp, '(I0)') i - contxb + 1
-            write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"} \rho_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"} \rho"
+            write (1, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "} \rho_{" // trim(temp) // "}", &
+                   & "\alpha_{" // trim(temp) // "} \rho"
         end do
         do i = momxb, momxe
-            write (1, '(I3,A20,A20)') i, "\rho u_"//coord(i - momxb + 1), "u_"//coord(i - momxb + 1)
+            write (1, '(I3,A20,A20)') i, "\rho u_" // coord(i - momxb + 1), "u_" // coord(i - momxb + 1)
         end do
         do i = E_idx, E_idx
             write (1, '(I3,A20,A20)') i, "\rho U", "p"
         end do
         do i = advxb, advxe
             write (temp, '(I0)') i - contxb + 1
-            write (1, '(I3,A20,A20)') i, "\alpha_{"//trim(temp)//"}", "\alpha_{"//trim(temp)//"}"
+            write (1, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "}", "\alpha_{" // trim(temp) // "}"
         end do
         if (chemistry) then
             do i = 1, num_species
-                write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{"//trim(species_names(i))//"} \rho", "Y_{"//trim(species_names(i))//"}"
+                write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{" // trim(species_names(i)) // "} \rho", &
+                       & "Y_{" // trim(species_names(i)) // "}"
             end do
         end if
 
@@ -784,12 +720,9 @@ contains
                 allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
-
     end subroutine s_initialize_data_output_module
-
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module
-
         integer :: i
 
         s_write_data_files => null()
@@ -800,7 +733,5 @@ contains
             end do
             deallocate (q_cons_temp)
         end if
-
     end subroutine s_finalize_data_output_module
-
 end module m_data_output

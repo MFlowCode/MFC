@@ -4,7 +4,6 @@
 
 !> @brief Broadcasts user inputs and decomposes the domain across MPI ranks for pre-processing
 module m_mpi_proxy
-
 #ifdef MFC_MPI
     use mpi                    !< Message passing interface (MPI) module
 #endif
@@ -18,15 +17,10 @@ module m_mpi_proxy
     use m_mpi_common
 
     implicit none
-
 contains
-    !> Since only processor with rank 0 is in charge of reading
-            !!       and checking the consistency of the user provided inputs,
-            !!       these are not available to the remaining processors. This
-            !!       subroutine is then in charge of broadcasting the required
-            !!       information.
+    !> Since only processor with rank 0 is in charge of reading and checking the consistency of the user provided inputs, these are
+    !! not available to the remaining processors. This subroutine is then in charge of broadcasting the required information.
     impure subroutine s_mpi_bcast_user_inputs
-
 #ifdef MFC_MPI
 
         ! Generic loop iterator
@@ -176,9 +170,6 @@ contains
                 call MPI_BCAST(simplex_params%perturb_vel_offset(i, j), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             end do
         end do
-
 #endif
-
     end subroutine s_mpi_bcast_user_inputs
-
 end module m_mpi_proxy
