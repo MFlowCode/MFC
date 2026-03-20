@@ -1022,6 +1022,14 @@ contains
         integer :: i, j, k, l, q
         logical :: add_geom
         real(wp) :: geom_fac
+        real(wp) :: G1_eff, G2_eff
+
+        G1_eff = 0._wp
+        G2_eff = 0._wp
+        if (hypoelasticity) then
+            G1_eff = fluid_pp(1)%G
+            G2_eff = fluid_pp(2)%G
+        end if
 
         if (alt_soundspeed) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -1029,9 +1037,9 @@ contains
                 do k = 0, n
                     do j = 0, m
                         blkmod1(j, k, l) = ((gammas(1) + 1._wp)*q_prim_vf%vf(E_idx)%sf(j, k, l) + &
-                                            pi_infs(1))/gammas(1)
+                                            pi_infs(1))/gammas(1) + (4._wp/3._wp)*G1_eff
                         blkmod2(j, k, l) = ((gammas(2) + 1._wp)*q_prim_vf%vf(E_idx)%sf(j, k, l) + &
-                                            pi_infs(2))/gammas(2)
+                                            pi_infs(2))/gammas(2) + (4._wp/3._wp)*G2_eff
                         alpha1(j, k, l) = q_cons_vf%vf(advxb)%sf(j, k, l)
 
                         if (bubbles_euler) then

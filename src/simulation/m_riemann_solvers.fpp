@@ -1162,19 +1162,20 @@ contains
 
                             #:if (NORM_DIR == 2)
                                 if (cyl_coord) then
-                                    !Substituting the advective flux into the inviscid geometrical source flux
+                                    ! Axisymmetric geometric source flux:
+                                    ! - start from the conservative face flux for conservative equations
+                                    ! - recompute the radial momentum face term
+                                    ! - export zero geometric flux for the advection equations
                                     !$acc loop seq
                                     do i = 1, E_idx
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
-                                    ! Recalculating the radial momentum geometric source flux
                                     flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + 2) = &
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + 2) &
                                         - (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
-                                    ! Geometrical source of the void fraction(s) is zero
                                     !$acc loop seq
                                     do i = advxb, advxe
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                     end do
                                 end if
 
@@ -4569,8 +4570,10 @@ contains
                             K_hat = 0._wp
                             if (alt_soundspeed) then
                                 pres_hat = q_hat_prim_${XYZ}$_vf(j, k, l, E_idx)
-                                blkmod1_hat = ((gammas(1) + 1._wp)*pres_hat + pi_infs(1))/gammas(1)
-                                blkmod2_hat = ((gammas(2) + 1._wp)*pres_hat + pi_infs(2))/gammas(2)
+                                blkmod1_hat = ((gammas(1) + 1._wp)*pres_hat + pi_infs(1))/gammas(1) + &
+                                              (4._wp/3._wp)*Gs(1)
+                                blkmod2_hat = ((gammas(2) + 1._wp)*pres_hat + pi_infs(2))/gammas(2) + &
+                                              (4._wp/3._wp)*Gs(2)
                                 K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat) &
                                         /(alpha_hat(1)*blkmod2_hat + alpha_hat(2)*blkmod1_hat + verysmall)
                             end if
