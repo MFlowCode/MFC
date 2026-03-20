@@ -310,14 +310,8 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
 
     env = {**os.environ, "GCOV_PREFIX": test_gcda, "GCOV_PREFIX_STRIP": strip}
 
-    # MPI-compiled binaries must be launched via an MPI launcher (even ppn=1).
-    # Use --bind-to none to avoid binding issues with concurrent launches.
-    if shutil.which("mpirun"):
-        mpi_cmd = ["mpirun", "--bind-to", "none", "-np", str(ppn)]
-    elif shutil.which("srun"):
-        mpi_cmd = ["srun", "--ntasks", str(ppn)]
-    else:
-        raise MFCException("No MPI launcher found (mpirun or srun). MFC binaries require an MPI launcher.\n  On Ubuntu: sudo apt install openmpi-bin\n  On macOS:  brew install open-mpi")
+    # Use the same MPI config as TestCase.run() so -c <computer> is respected.
+    from .case import _get_mpi_config, _mpi_cmd
 
     failures = []
     for target_name, bin_path in binaries:
@@ -336,7 +330,8 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
             failures.append((target_name, "missing-inp", f"{inp_file} not found before launch"))
             break
 
-        cmd = mpi_cmd + [bin_path]
+        cfg = _get_mpi_config()
+        cmd = _mpi_cmd(cfg, ppn, bin_path)
         try:
             result = subprocess.run(cmd, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=test_dir, timeout=600)
             if result.returncode != 0:
