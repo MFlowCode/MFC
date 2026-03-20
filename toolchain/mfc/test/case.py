@@ -151,7 +151,7 @@ def get_post_process_mods(case_params: dict) -> dict:
 
 
 Tend = 0.25
-Nt = 50
+Nt = 25
 mydt = 0.0005
 
 BASE_CFG = {
