@@ -1157,7 +1157,7 @@ contains
                 continue
             else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
                      riemann_solver == 2 .or. riemann_solver == 3) then
-                ! Branch B: HLL Method 2 / HLLC Method 2 / Exact
+                ! Branch B: HLL Method 2 / HLLC Method 2 / Exact (Exact is prohibited when hypoelasticity = T)
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do q = 0, p
@@ -1353,7 +1353,7 @@ contains
                 continue
             else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
                      riemann_solver == 2 .or. riemann_solver == 3) then
-                ! Branch B: HLL Method 2 / HLLC Method 2 / Exact
+                ! Branch B: HLL Method 2 / HLLC Method 2 / Exact (Exact is prohibited when hypoelasticity = T)
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = advxb, advxe
                     do l = 0, p
@@ -1646,7 +1646,7 @@ contains
                     continue
                 else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
                          riemann_solver == 2 .or. riemann_solver == 3) then
-                    ! Branch B: HLL Method 2 / HLLC Method 2 / Exact
+                    ! Branch B: HLL Method 2 / HLLC Method 2 / Exact (Exact is prohibited when hypoelasticity = T)
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do k = 0, p

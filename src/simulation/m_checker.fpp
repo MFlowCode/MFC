@@ -264,6 +264,8 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 3, &
+            "Exact Riemann (riemann_solver = 3) is not supported with hypoelasticity")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. cyl_coord .and. p > 0, &
             "3D cylindrical hypoelastic HLLC is not supported")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. n == 0, &

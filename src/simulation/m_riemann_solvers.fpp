@@ -6836,7 +6836,7 @@ contains
                 end do
             end do
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
@@ -6889,7 +6889,7 @@ contains
                 end do
             end do
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
