@@ -1,10 +1,10 @@
-This file was created on 2026-03-20 01:53:55.868277.
+This file was created on 2026-03-20 19:52:49.647734.
 
 mfc.sh:
 
-    Invocation: test -j 10 --generate -- -c phoenix
+    Invocation: test -j 4 -o 986BC1A2 70EC99CE C7927D03 B2EC143C --generate -- -c phoenix
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        dd5e370071eae0f1c55d79dcb44654d41ae61c75 on threading (dirty)
+    Git:        81490a110acc1497dedf2a98b03d664787574792 on threading (dirty)
 
 post_process:
 
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               2
     Stepping:                                7
-    CPU(s) scaling MHz:                      86%
+    CPU(s) scaling MHz:                      99%
     CPU max MHz:                             2700.0000
     CPU min MHz:                             1200.0000
     BogoMIPS:                                5400.00

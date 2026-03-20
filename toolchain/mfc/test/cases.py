@@ -1566,6 +1566,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case["t_step_stop"] = 25
                     case["t_step_save"] = 25
 
+                # Adaptive-dt examples use t_stop/t_save instead of
+                # t_step_stop/t_step_save.  Clamp t_stop = t_save so
+                # only save indices 0 and 1 are produced (always
+                # consecutive).  Without this, large adaptive steps
+                # skip save indices and post_process aborts on the gap.
+                if case.get("cfl_adap_dt", "F") == "T":
+                    t_save = float(case.get("t_save", 1.0))
+                    case["t_stop"] = t_save
+
                 caseSize = case["m"] * max(case["n"], 1) * max(case["p"], 1)
                 if caseSize > 25 * 25:
                     if case["n"] == 0 and case["p"] == 0:

@@ -506,6 +506,10 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
+            if cmd.returncode != 0:
+                cons.print(cmd.stdout)
+                raise MFCException(f"Test {case}: Failed to execute MFC (post_process pass).")
+
             silo_dir = os.path.join(case.get_dirpath(), "silo_hdf5", "p0")
             if os.path.isdir(silo_dir):
                 for silo_filename in os.listdir(silo_dir):
