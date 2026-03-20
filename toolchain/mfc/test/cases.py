@@ -1566,12 +1566,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case["t_step_stop"] = 25
                     case["t_step_save"] = 25
 
-                # Adaptive-dt examples: clamp t_stop so post_process
-                # only reads save files that actually exist.
-                if case.get("cfl_adap_dt", "F") == "T":
-                    t_save = float(case.get("t_save", 1.0))
-                    case["t_stop"] = t_save
-
                 caseSize = case["m"] * max(case["n"], 1) * max(case["p"], 1)
                 if caseSize > 25 * 25:
                     if case["n"] == 0 and case["p"] == 0:
