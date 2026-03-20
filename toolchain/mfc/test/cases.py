@@ -924,6 +924,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for name, path, param in case_specs:
             cases.append(define_case_f(name, path, mods=param))
 
+    def hypo_example_cases():
+        example_specs = [
+            ("2D -> Hypoelasticity", "examples/2D_hypo_hlld/case.py"),
+            ("2D -> Axisymmetric -> Hypoelasticity", "examples/2D_axisym_hypo_hlld/case.py"),
+            ("3D -> Hypoelasticity", "examples/3D_hypo_hlld/case.py"),
+        ]
+        solver_specs = [
+            ("HLLD", {"riemann_solver": 4}),
+            ("HLLD -> ADC", {"riemann_solver": 4, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}),
+            ("HLLC", {"riemann_solver": 2}),
+            ("HLLC -> ADC", {"riemann_solver": 2, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}),
+            ("HLL -> Interface RHS", {"riemann_solver": 1, "hypo_hll_interface_rhs": "T"}),
+        ]
+
+        def modify_hypo_example_case(case: dict, solver_mods: dict, alt_soundspeed: str):
+            for key in ["riemann_hypo_ADC", "ADC_kappa", "hypo_hll_interface_rhs"]:
+                case.pop(key, None)
+
+            case["alt_soundspeed"] = alt_soundspeed
+            case.update(solver_mods)
+
+        for base_trace, path in example_specs:
+            for solver_trace, solver_mods in solver_specs:
+                for alt_soundspeed in ["F", "T"]:
+                    trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
+                    cases.append(define_case_f(
+                        trace,
+                        path,
+                        mods={},
+                        functor=lambda case, solver_mods=solver_mods, alt_soundspeed=alt_soundspeed: modify_hypo_example_case(case, solver_mods, alt_soundspeed)
+                    ))
+
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
@@ -1011,6 +1043,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     foreach_dimension()
 
     mhd_cases()
+    hypo_example_cases()
 
     foreach_example()
 
