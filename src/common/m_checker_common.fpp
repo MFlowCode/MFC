@@ -32,7 +32,6 @@ contains
     end subroutine s_check_inputs_common
 
 #ifndef MFC_SIMULATION
-
     !> @brief Verifies that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.
     impure subroutine s_check_total_cells
 

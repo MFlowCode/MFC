@@ -129,7 +129,6 @@ contains
 
         if (bc_y%beg >= 0) return
 #if defined(MFC_GPU)
-
         $:GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
             do j = 0, m
@@ -300,7 +299,6 @@ contains
 
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
 #if defined(__PGI)
-
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)
 #else

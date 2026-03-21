@@ -409,7 +409,6 @@ contains
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
 #ifdef MFC_MPI
-
         integer                              :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE)  :: status
         integer(KIND=MPI_OFFSET_KIND)        :: disp

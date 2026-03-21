@@ -119,7 +119,6 @@ contains
         integer, dimension(1)                               :: airfoil_glb, airfoil_loc, airfoil_start
 
 #ifdef MFC_MPI
-
         ! Generic loop iterator
         integer :: i, j
         integer :: ierr !< Generic flag used to identify and report MPI errors
@@ -202,7 +201,6 @@ contains
         integer, dimension(3)                               :: sf_start_idx
 
 #ifdef MFC_MPI
-
         ! Generic loop iterator
         integer :: i, j, q, k, l, m_ds, n_ds, p_ds, ierr
 
@@ -989,7 +987,6 @@ contains
     subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
-
         integer :: num_procs_x, num_procs_y, num_procs_z !< Optimal number of processors in the x-, y- and z-directions
         !> Non-optimal number of processors in the x-, y- and z-directions
         real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z

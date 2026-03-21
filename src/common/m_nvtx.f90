@@ -28,7 +28,6 @@ module m_nvtx
     end type nvtxEventAttributes
 
 #if defined(MFC_GPU) && defined(__PGI)
-
     interface nvtxRangePush
         ! push range with custom label and standard color
         subroutine nvtxRangePushA(name) bind(C, name='nvtxRangePushA')

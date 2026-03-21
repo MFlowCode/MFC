@@ -143,7 +143,6 @@ module m_global_parameters
     integer, allocatable, dimension(:)  :: proc_coords        !< Processor coordinates in MPI_CART_COMM
     integer, allocatable, dimension(:)  :: start_idx          !< Starting cell-center index of local processor in global grid
 #ifdef MFC_MPI
-
     type(mpi_io_var), public :: MPI_IO_DATA
     character(LEN=name_len)  :: mpiiofs
     integer                  :: mpi_info_int !< MPI info for parallel IO with Lustre file systems
@@ -846,7 +845,6 @@ contains
                                            & bubbles_lagrange, m, n, p, num_dims, igr, ib)
 
 #ifdef MFC_MPI
-
         if (qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
@@ -913,7 +911,6 @@ contains
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
-
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
         mpiiofs = trim(mpiiofs)
@@ -947,7 +944,6 @@ contains
         deallocate (proc_coords)
 
 #ifdef MFC_MPI
-
         if (parallel_io) then
             deallocate (start_idx)
             do i = 1, sys_size

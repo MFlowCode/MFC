@@ -322,7 +322,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
 #ifdef MFC_MPI
-
         real(wp), allocatable, dimension(:)  :: x_cb_glb, y_cb_glb, z_cb_glb
         integer                              :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE)  :: status
@@ -1090,10 +1089,9 @@ contains
         $:GPU_UPDATE(device='[chem_params]')
 
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
-                     & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, polytropic, &
-                     & polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, &
-                         & adap_dt_max_iters, &
-                     & n_idx, pi_fac, low_Mach]')
+                     & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
+                     & polytropic, polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, &
+                     & adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
 
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight, R0]')

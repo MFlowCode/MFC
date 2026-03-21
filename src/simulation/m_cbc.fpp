@@ -641,10 +641,9 @@ contains
                 ! FD2 or FD4 of RHS at j = 0
                 $:GPU_PARALLEL_LOOP(collapse=2, private='[r, k, alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, &
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
-                                        & h_k, &
-                                    & Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, H, gamma, &
-                                    & pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, vel_dv_dt_sum, i, &
-                                    & j]', copyin='[dir_idx]')
+                                    & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, H, &
+                                    & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
+                                    & vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Transferring the Primitive Variables

@@ -158,7 +158,6 @@ contains
     impure subroutine s_generate_parallel_grid
 
 #ifdef MFC_MPI
-
         real(wp) :: length !< domain lengths
         ! Locations of cell boundaries
         real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb !< Locations of cell boundaries

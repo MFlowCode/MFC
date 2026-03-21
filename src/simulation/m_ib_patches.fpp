@@ -426,8 +426,8 @@ contains
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
         call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, ma, &
-                            & ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, &
+                            & ma, ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
         do l = ll, lr
             do j = jl, jr
                 do i = il, ir
@@ -525,8 +525,8 @@ contains
         ! Checking whether the rectangle covers a particular cell in the domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
         ! this cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', &
-                            & copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, y_cc]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, &
+                            & y_cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
@@ -793,8 +793,8 @@ contains
         call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y_cc, jl, jr)
 
         ! Checking whether the ellipse covers a particular cell in the domain
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, ellipse_coeffs, inverse_rotation, x_cc, &
-                            & y_cc]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, ellipse_coeffs, inverse_rotation, &
+                            & x_cc, y_cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
@@ -871,9 +871,8 @@ contains
         call get_bounding_indices(bbox_min(1), bbox_max(1), x_cc, il, ir)
         call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', &
-                            & copyin='[patch_id, encoded_patch_id, center, inverse_rotation, offset, &
-                            & spc, threshold]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', copyin='[patch_id, encoded_patch_id, center, inverse_rotation, &
+                            & offset, spc, threshold]', collapse=2)
         do i = il, ir
             do j = jl, jr
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]

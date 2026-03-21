@@ -393,7 +393,8 @@ contains
 
         bounds_error = .false.
 
-        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, physical_loc, patch_id, dist, norm, dim, bound, dir, index, temp_loc, s_cc]', copy='[bounds_error]')
+        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, physical_loc, patch_id, dist, norm, dim, bound, dir, index, temp_loc, &
+                            & s_cc]', copy='[bounds_error]')
         do q = 1, num_gps
             gp = ghost_points_in(q)
             i = gp%loc(1)

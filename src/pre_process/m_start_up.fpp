@@ -396,7 +396,6 @@ contains
     impure subroutine s_read_parallel_grid_data_files
 
 #ifdef MFC_MPI
-
         real(wp), allocatable, dimension(:)  :: x_cb_glb, y_cb_glb, z_cb_glb
         integer                              :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE)  :: status
@@ -496,7 +495,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf_in
 
 #ifdef MFC_MPI
-
         integer                              :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE)  :: status
         integer(KIND=MPI_OFFSET_KIND)        :: disp

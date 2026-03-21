@@ -62,7 +62,6 @@ contains
     impure subroutine s_mpi_bcast_user_inputs()
 
 #ifdef MFC_MPI
-
         integer :: i, j !< Generic loop iterator
         integer :: ierr !< Generic flag used to identify and report MPI errors
 

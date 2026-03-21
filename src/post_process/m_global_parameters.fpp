@@ -161,7 +161,6 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx        !< Starting cell-center index of local processor in global grid
     integer                            :: num_ibs          !< Number of immersed boundaries
 #ifdef MFC_MPI
-
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
     type(mpi_io_levelset_var), public             :: MPI_IO_levelset_DATA
@@ -934,7 +933,6 @@ contains
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
-
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
         mpiiofs = trim(mpiiofs)
@@ -975,7 +973,6 @@ contains
         deallocate (adv)
 
 #ifdef MFC_MPI
-
         if (parallel_io) then
             deallocate (start_idx)
             do i = 1, sys_size

@@ -384,7 +384,6 @@ contains
         $:GPU_UPDATE(device='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc]')
 
 #ifdef MFC_SIMULATION
-
         if (viscous) then
             @:ALLOCATE(Res_vc(1:2, 1:Re_size_max))
             do i = 1, 2

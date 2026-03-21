@@ -198,8 +198,7 @@ contains
 
         $:GPU_UPDATE(device='[lag_id, bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, gas_p, gas_mv, &
                      & intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                         & gas_dmvdt, &
-                     & mtn_dposdt, mtn_dveldt, nBubs]')
+                     & gas_dmvdt, mtn_dposdt, mtn_dveldt, nBubs]')
 
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)

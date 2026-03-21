@@ -1255,8 +1255,7 @@ contains
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, &
                      & bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, &
-                         & cyl_coord, &
-                     & mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach]')
+                     & cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach]')
 
         $:GPU_UPDATE(device='[Bx0]')
 
@@ -1328,7 +1327,6 @@ contains
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
-
         ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
         mpiiofs = trim(mpiiofs)

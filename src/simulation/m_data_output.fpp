@@ -705,7 +705,6 @@ contains
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
 #ifdef MFC_MPI
-
         integer                              :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE)  :: status
         integer(kind=MPI_OFFSET_kind)        :: disp
@@ -948,7 +947,6 @@ contains
         integer, intent(in) :: time_step
 
 #ifdef MFC_MPI
-
         character(LEN=path_len + 2*name_len) :: file_loc
         integer(kind=MPI_OFFSET_kind)        :: disp
         integer(kind=MPI_OFFSET_kind)        :: m_MOK, n_MOK, p_MOK

@@ -9,7 +9,6 @@
 module m_phase_change
 
 #ifndef MFC_POST_PROCESS
-
     use m_derived_types        !< Definitions of the derived types
     use m_global_parameters    !< Definitions of the global parameters
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
@@ -100,8 +99,8 @@ contains
 
         ! starting equilibrium solver
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok, pS, pSOV, pSSL, TS, &
-                            & TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok, pS, pSOV, pSSL, &
+                            & TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p

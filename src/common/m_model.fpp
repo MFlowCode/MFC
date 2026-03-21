@@ -1004,7 +1004,6 @@ contains
     end subroutine s_distance_normals_2D
 
 #ifdef MFC_SIMULATION
-
     subroutine s_instantiate_STL_models()
 
         ! Variables for IBM+STL

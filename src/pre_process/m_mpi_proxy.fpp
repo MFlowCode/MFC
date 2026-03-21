@@ -22,7 +22,6 @@ contains
     impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
-
         ! Generic loop iterator
         integer :: i, j
         ! Generic flag used to identify and report MPI errors

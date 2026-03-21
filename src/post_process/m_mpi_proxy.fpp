@@ -29,7 +29,6 @@ contains
     impure subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
-
         integer :: i    !< Generic loop iterator
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Allocating and configuring the receive counts and the displacement vector variables used in variable-gather communication
@@ -315,7 +314,6 @@ contains
     impure subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
-
         ! Deallocating the receive counts and the displacement vector variables used in variable-gather communication procedures
         if ((format == 1 .and. n > 0) .or. n == 0) then
             deallocate (recvcounts)

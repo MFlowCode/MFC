@@ -288,7 +288,6 @@ contains
         integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
-
         real(wp), allocatable, dimension(:)  :: x_cb_glb, y_cb_glb, z_cb_glb
         integer                              :: ifile, ierr, data_size, filetype, stride
         integer, dimension(MPI_STATUS_SIZE)  :: status
