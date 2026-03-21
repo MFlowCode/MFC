@@ -1074,9 +1074,8 @@ contains
                                             tau = abs(beta(2) - beta(0)) ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = d_cbL_${XYZ}$ (q, &
-                                                      & j)*(1._wp + (tau/beta(q))) &
-                                                      & ! Equation 28 (note: weno_eps was already added to beta)
+                                                alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q)))
+                                                ! Equation 28 (note: weno_eps was already added to beta)
                                             end do
                                         else if (teno) then
                                             ! Fu, et al. (2016) Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
