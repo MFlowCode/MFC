@@ -2,7 +2,7 @@
 
 # Developer's note:
 #  CMake has extensive documentation available online. Searching "cmake <variable>"
-#  or "cmake <function_name>" will return a cmake.org page with more information
+#  or "cmake <function_name>" will return a cmake.org page with more information.
 #  than you might expect to find or need. Note that any variable or symbol
 #  prefixed by CMAKE_ is reserved by CMake and has special meaning.
 
