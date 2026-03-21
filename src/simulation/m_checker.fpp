@@ -100,7 +100,7 @@ contains
         @:PROHIBIT(all(low_Mach /= (/0, 1, 2/)), "low_Mach must be 0, 1 or 2")
         @:PROHIBIT(riemann_solver /= 2 .and. low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
         @:PROHIBIT(low_Mach /= 0 .and. all(model_eqns /= (/2, 3/)), "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
-        @:PROHIBIT((riemann_solver == 1) .and. (.not. hll_alpha_interface) .and. cyl_coord .and. p > 0, &
+        @:PROHIBIT((riemann_solver == 1) .and. hll_u_interface .and. cyl_coord .and. p > 0, &
             "HLL Method 2 is not supported for 3D cylindrical geometry")
     end subroutine s_check_inputs_riemann_solver
 
@@ -313,7 +313,7 @@ contains
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. num_fluids /= 2, &
             "alt_soundspeed with HLLD requires exactly 2 fluid components")
         @:PROHIBIT(alt_soundspeed .and. num_fluids /= 2 .and. num_fluids /= 3)
-        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. hll_alpha_interface .and. cyl_coord .and. p == 0, &
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. (.not. hll_u_interface) .and. cyl_coord .and. p == 0, &
             "alt_soundspeed with HLL Method 1 is not supported for 2D axisymmetric geometry")
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. cyl_coord .and. p > 0, &
             "alt_soundspeed with HLL is not currently supported for 3D cylindrical geometry")

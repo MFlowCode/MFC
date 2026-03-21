@@ -523,7 +523,7 @@ contains
                          & idwbuff(2)%beg:idwbuff(2)%end, &
                          & idwbuff(3)%beg:idwbuff(3)%end))
 
-                if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
+                if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -553,7 +553,7 @@ contains
             @:ACC_SETUP_VFs(flux_n(i), flux_src_n(i), flux_gsrc_n(i))
 
             if (i == 1) then
-                if (.not. ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4)) then
+                if (.not. ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4)) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
@@ -571,7 +571,7 @@ contains
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
 
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             @:ALLOCATE(nc_iface_vel_n(1:num_dims))
             do i = 1, num_dims
                 @:ALLOCATE(nc_iface_vel_n(i)%vf(1:num_dims))
@@ -831,7 +831,7 @@ contains
             call nvtxEndRange
 
             if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-                .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+                .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
                 call s_finalize_nc_iface_vel(nc_iface_vel_n(id)%vf, id)
             end if
 
@@ -1124,7 +1124,7 @@ contains
                 end do
             end if
 
-            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. &
+            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. &
                 (riemann_solver == 4 .and. .not. hypo_nc_dual_pass)) then
                 ! Branch A: legacy alpha transport (HLL Method 1 / non-hypo HLLD)
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1161,7 +1161,7 @@ contains
             else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
                 ! Branch C: HLLD dual-pass skips NC terms here
                 continue
-            else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
+            else if ((riemann_solver == 1 .and. hll_u_interface) .or. &
                      riemann_solver == 2 .or. riemann_solver == 3) then
                 ! Branch B: HLL Method 2 / HLLC Method 2 / Exact (Exact is prohibited when hypoelasticity = T)
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1307,7 +1307,7 @@ contains
                 end do
             end if
 
-            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. &
+            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. &
                 (riemann_solver == 4 .and. .not. hypo_nc_dual_pass)) then
                 ! Branch A: legacy alpha transport (HLL Method 1 / non-hypo HLLD)
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1357,7 +1357,7 @@ contains
             else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
                 ! Branch C: HLLD dual-pass skips NC terms here
                 continue
-            else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
+            else if ((riemann_solver == 1 .and. hll_u_interface) .or. &
                      riemann_solver == 2 .or. riemann_solver == 3) then
                 ! Branch B: HLL Method 2 / HLLC Method 2 / Exact (Exact is prohibited when hypoelasticity = T)
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1614,7 +1614,7 @@ contains
                     end if
                 end if
             else
-                if ((riemann_solver == 1 .and. hll_alpha_interface) .or. &
+                if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. &
                     (riemann_solver == 4 .and. .not. hypo_nc_dual_pass)) then
                     ! Branch A: legacy alpha transport (HLL Method 1 / non-hypo HLLD)
                     !$acc parallel loop collapse(4) gang vector default(present)
@@ -1650,7 +1650,7 @@ contains
                     end if
                 else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
                     continue
-                else if ((riemann_solver == 1 .and. .not. hll_alpha_interface) .or. &
+                else if ((riemann_solver == 1 .and. hll_u_interface) .or. &
                          riemann_solver == 2 .or. riemann_solver == 3) then
                     ! Branch B: HLL Method 2 / HLLC Method 2 / Exact (Exact is prohibited when hypoelasticity = T)
                     !$acc parallel loop collapse(4) gang vector default(present)
@@ -2440,7 +2440,7 @@ contains
                     end do
                 end if
 
-                if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
+                if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do
@@ -2459,7 +2459,7 @@ contains
         @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
 
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             do i = 1, num_dims
                 do l = 1, num_dims
                     @:DEALLOCATE(nc_iface_vel_n(i)%vf(l)%sf)

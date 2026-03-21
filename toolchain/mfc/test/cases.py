@@ -177,12 +177,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(
             stack,
             f"{trace_prefix} -> u-interface",
-            {'riemann_solver': 1, 'hll_alpha_interface': 'F'}
+            {'riemann_solver': 1, 'hll_u_interface': 'T'}
         ))
         cases.append(define_case_d(
             stack,
             f"{trace_prefix} -> u-interface -> alt_soundspeed",
-            {'riemann_solver': 1, 'hll_alpha_interface': 'F', 'alt_soundspeed': 'T'}
+            {'riemann_solver': 1, 'hll_u_interface': 'T', 'alt_soundspeed': 'T'}
         ))
 
     def alter_low_Mach_correction():
@@ -951,11 +951,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {"trace": "HLLC", "mods": {"riemann_solver": 2}},
             {"trace": "HLLC -> ADC", "mods": {"riemann_solver": 2, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}},
             {"trace": "HLL -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T"}},
-            {"trace": "HLL -> u-interface -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T", "hll_alpha_interface": "F"}},
+            {"trace": "HLL -> u-interface -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T", "hll_u_interface": "T"}},
         ]
 
         def modify_hypo_example_case(case: dict, solver_mods: dict, alt_soundspeed: str):
-            for key in ["riemann_hypo_ADC", "ADC_kappa", "hypo_hll_interface_rhs", "hll_alpha_interface"]:
+            for key in ["riemann_hypo_ADC", "ADC_kappa", "hypo_hll_interface_rhs", "hll_u_interface"]:
                 case.pop(key, None)
 
             case["alt_soundspeed"] = alt_soundspeed

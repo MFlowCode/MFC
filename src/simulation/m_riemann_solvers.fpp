@@ -1010,7 +1010,7 @@ contains
 
                             ! For velocity traces for NC terms, always use Method 2
                             ! (used by interface-consistent hypo RHS and HLL Method 1 K div u)
-                            if (hypo_nc_interface .or. (alt_soundspeed .and. hll_alpha_interface)) then
+                            if (hypo_nc_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
                                 ! Compute scalar HLL transport traces: F_HLL(U=1, F=u_i)
                                 !$acc loop seq
                                 do i = 1, num_dims
@@ -1026,7 +1026,7 @@ contains
                             end if
 
                             ! Advection: Method 1 / Method 2 split
-                            if (hll_alpha_interface) then
+                            if (.not. hll_u_interface) then
                                 ! Method 1: F(alpha)=0, source trace = F_HLL(U=1, F=alpha)
                                 !$acc loop seq
                                 do i = advxb, advxe
@@ -1176,7 +1176,7 @@ contains
                                         - (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
                                     !$acc loop seq
                                     do i = advxb, advxe
-                                        if (hll_alpha_interface) then
+                                        if (.not. hll_u_interface) then
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         else
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
@@ -5167,7 +5167,7 @@ contains
         end if
 
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             @:ALLOCATE(nc_iface_vel_rsx_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
@@ -5202,7 +5202,7 @@ contains
         end if
 
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             @:ALLOCATE(nc_iface_vel_rsy_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
@@ -5237,7 +5237,7 @@ contains
         end if
 
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             @:ALLOCATE(nc_iface_vel_rsz_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
@@ -6841,7 +6841,7 @@ contains
                 end do
             end do
 
-            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
+            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
@@ -6894,7 +6894,7 @@ contains
                 end do
             end do
 
-            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
+            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
@@ -6931,7 +6931,7 @@ contains
                 end do
             end do
 
-            if ((riemann_solver == 1 .and. hll_alpha_interface) .or. riemann_solver == 4) then
+            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
@@ -7011,7 +7011,7 @@ contains
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             @:DEALLOCATE(nc_iface_vel_rsx_vf)
         end if
         if (qbmm) then
@@ -7028,7 +7028,7 @@ contains
         @:DEALLOCATE(flux_src_rsy_vf)
         @:DEALLOCATE(flux_gsrc_rsy_vf)
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             @:DEALLOCATE(nc_iface_vel_rsy_vf)
         end if
         if (qbmm) then
@@ -7045,7 +7045,7 @@ contains
         @:DEALLOCATE(flux_src_rsz_vf)
         @:DEALLOCATE(flux_gsrc_rsz_vf)
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. hll_alpha_interface .and. alt_soundspeed)) then
+            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
             @:DEALLOCATE(nc_iface_vel_rsz_vf)
         end if
         if (qbmm) then
