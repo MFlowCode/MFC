@@ -313,6 +313,8 @@ contains
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. num_fluids /= 2, &
             "alt_soundspeed with HLLD requires exactly 2 fluid components")
         @:PROHIBIT(alt_soundspeed .and. num_fluids /= 2 .and. num_fluids /= 3)
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. hll_alpha_interface .and. cyl_coord .and. p == 0, &
+            "alt_soundspeed with HLL Method 1 is not supported for 2D axisymmetric geometry")
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. cyl_coord .and. p > 0, &
             "alt_soundspeed with HLL is not currently supported for 3D cylindrical geometry")
     end subroutine s_check_inputs_alt_soundspeed

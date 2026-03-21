@@ -173,6 +173,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def add_hll_u_interface_cases(trace_prefix: str):
+        cases.append(define_case_d(
+            stack,
+            f"{trace_prefix} -> u-interface",
+            {'riemann_solver': 1, 'hll_alpha_interface': 'F'}
+        ))
+        cases.append(define_case_d(
+            stack,
+            f"{trace_prefix} -> u-interface -> alt_soundspeed",
+            {'riemann_solver': 1, 'hll_alpha_interface': 'F', 'alt_soundspeed': 'T'}
+        ))
+
     def alter_low_Mach_correction():
         stack.push('', {'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'dt': 1e-7})
 
@@ -203,6 +215,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     alter_capillary()
 
             alter_riemann_solvers(num_fluids)
+            if num_fluids == 2 and len(dimInfo[0]) > 1:
+                add_hll_u_interface_cases("riemann_solver=1")
             alter_low_Mach_correction()
             alter_ib(dimInfo)
 
@@ -256,6 +270,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "model_eqns=2", {'model_eqns': 2}))
         cases.append(define_case_d(stack, "model_eqns=3", {'model_eqns': 3}))
         cases.append(define_case_d(stack, "HLL", {'riemann_solver': 1}))
+        add_hll_u_interface_cases("HLL")
 
         stack.push("Viscous", {
             'fluid_pp(1)%Re(1)' : 0.0001, 'fluid_pp(1)%Re(2)' : 0.0001,
@@ -931,23 +946,31 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ("3D -> Hypoelasticity", "examples/3D_hypo_hlld/case.py"),
         ]
         solver_specs = [
-            ("HLLD", {"riemann_solver": 4}),
-            ("HLLD -> ADC", {"riemann_solver": 4, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}),
-            ("HLLC", {"riemann_solver": 2}),
-            ("HLLC -> ADC", {"riemann_solver": 2, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}),
-            ("HLL -> Interface RHS", {"riemann_solver": 1, "hypo_hll_interface_rhs": "T"}),
+            {"trace": "HLLD", "mods": {"riemann_solver": 4}},
+            {"trace": "HLLD -> ADC", "mods": {"riemann_solver": 4, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}},
+            {"trace": "HLLC", "mods": {"riemann_solver": 2}},
+            {"trace": "HLLC -> ADC", "mods": {"riemann_solver": 2, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}},
+            {"trace": "HLL -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T"}},
+            {"trace": "HLL -> u-interface -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T", "hll_alpha_interface": "F"}},
         ]
 
         def modify_hypo_example_case(case: dict, solver_mods: dict, alt_soundspeed: str):
-            for key in ["riemann_hypo_ADC", "ADC_kappa", "hypo_hll_interface_rhs"]:
+            for key in ["riemann_hypo_ADC", "ADC_kappa", "hypo_hll_interface_rhs", "hll_alpha_interface"]:
                 case.pop(key, None)
 
             case["alt_soundspeed"] = alt_soundspeed
             case.update(solver_mods)
 
         for base_trace, path in example_specs:
-            for solver_trace, solver_mods in solver_specs:
+            for solver_spec in solver_specs:
+                solver_trace = solver_spec["trace"]
+                solver_mods = solver_spec["mods"]
                 for alt_soundspeed in ["F", "T"]:
+                    # 2D axisymmetric HLL Method 1 + alt_soundspeed remains intentionally unsupported.
+                    if (base_trace == "2D -> Axisymmetric -> Hypoelasticity" and
+                            solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T"):
+                        continue
+
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
                     cases.append(define_case_f(
                         trace,

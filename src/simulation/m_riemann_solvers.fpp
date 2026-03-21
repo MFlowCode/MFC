@@ -1165,7 +1165,8 @@ contains
                                     ! Axisymmetric geometric source flux:
                                     ! - start from the conservative face flux for conservative equations
                                     ! - recompute the radial momentum face term
-                                    ! - export zero geometric flux for the advection equations
+                                    ! - export legacy HLL geometric flux for Method 1 advection equations
+                                    ! - export zero geometric flux for Method 2 advection equations
                                     !$acc loop seq
                                     do i = 1, E_idx
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
@@ -1175,7 +1176,11 @@ contains
                                         - (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
                                     !$acc loop seq
                                     do i = advxb, advxe
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        if (hll_alpha_interface) then
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        else
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end if
                                     end do
                                 end if
 
