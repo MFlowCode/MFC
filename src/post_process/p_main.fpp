@@ -61,9 +61,7 @@ program p_main
                 exit
             end if
         else
-            ! Modifies the time-step iterator so that it may reach the final time- step to be post-processed, in the case that this
-            ! one is not originally attainable through constant incrementation from the first time-step. This modification is
-            ! performed upon reaching the final time-step. In case that it is not needed, the post-processor is done and may exit.
+            ! Adjust time-step iterator to reach final step if needed, else exit
             if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
                 t_step = t_step_stop - t_step_save
             else if (t_step == t_step_stop) then

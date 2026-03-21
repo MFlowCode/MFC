@@ -628,9 +628,7 @@ contains
             write (t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'
             t_step_dir = trim(case_dir) // trim(t_step_dir)
 
-            ! Checking the existence of the time-step directory, removing it, if it exists, and creating a new copy. Note that if
-            ! preexisting grid and/or initial condition data are to be read in from the very same location, then the above described
-            ! steps are not executed here but rather in the module m_start_up.f90.
+            ! Remove existing time-step dir if needed (unless reading preexisting data; handled in m_start_up)
             if (old_grid .neqv. .true.) then
                 file_loc = trim(t_step_dir) // '/'
 

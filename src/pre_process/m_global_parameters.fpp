@@ -48,9 +48,7 @@ module m_global_parameters
     real(wp) :: dx, dy, dz                            !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     logical :: stretch_x, stretch_y, stretch_z        !< Grid stretching flags for the x-, y- and z-coordinate directions
-    ! Parameters of the grid stretching function for the x-, y- and z-coordinate directions. The "a" parameters are a measure of the
-    ! rate at which the grid is stretched while the remaining parameters are indicative of the location on the grid at which the
-    ! stretching begins.
+    ! Grid stretching: a_x/a_y/a_z = rate, x_a/y_a/z_a = location
     real(wp) :: a_x, a_y, a_z
     integer  :: loops_x, loops_y, loops_z
     real(wp) :: x_a, y_a, z_a
@@ -104,8 +102,7 @@ module m_global_parameters
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
-    ! Cell Indices for the entire (local) domain. In simulation and post_process, this includes the buffer region. idwbuff and
-    ! idwint are the same otherwise. Stands for "InDices With BUFFer".
+    ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
     integer               :: shear_num !! Number of shear stress components

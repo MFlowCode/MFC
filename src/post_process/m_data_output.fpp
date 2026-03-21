@@ -22,13 +22,10 @@ module m_data_output
         & s_write_energy_data_file, s_close_formatted_database_file, s_close_intf_data_file, s_close_energy_data_file, &
         & s_finalize_data_output_module
 
-    ! Including the Silo Fortran interface library that features the subroutines and parameters that are required to write in the
-    ! Silo-HDF5 database format INCLUDE 'silo.inc'
+    ! Include Silo-HDF5 interface library
     include 'silo_f9x.inc'
 
-    ! Generic storage for flow variable(s) that are to be written to formatted database file(s). Note that for 1D simulations,
-    ! q_root_sf is employed to gather the flow variable(s) from all sub-domains on to the root process. If the run is not parallel,
-    ! but serial, then q_root_sf is equal to q_sf.
+    ! Flow variable storage; q_root_sf gathers to rank 0 in 1D parallel runs
     real(wp), allocatable, dimension(:,:,:), public :: q_sf
     real(wp), allocatable, dimension(:,:,:)         :: q_root_sf
     real(wp), allocatable, dimension(:,:,:)         :: cyl_q_sf
@@ -38,20 +35,15 @@ module m_data_output
     real(sp), allocatable, dimension(:,:,:)         :: q_root_sf_s
     real(sp), allocatable, dimension(:,:,:)         :: cyl_q_sf_s
 
-    ! The spatial and data extents array variables contain information about the minimum and maximum values of the grid and flow
-    ! variable(s), respectively. The purpose of bookkeeping this information is to boost the visualization of the Silo-HDF5 database
-    ! file(s) in VisIt.
+    ! Spatial and data extents for VisIt visualization
     real(wp), allocatable, dimension(:,:) :: spatial_extents
     real(wp), allocatable, dimension(:,:) :: data_extents
 
-    ! The size of the ghost zone layer at beginning of each coordinate direction (lo) and at end of each coordinate direction (hi).
-    ! Adding this information to Silo-HDF5 database file(s) is recommended since it supplies VisIt with connectivity information
-    ! between the sub-domains of a parallel data set.
+    ! Ghost zone layer sizes (lo/hi) for subdomain connectivity in VisIt
     integer, allocatable, dimension(:) :: lo_offset
     integer, allocatable, dimension(:) :: hi_offset
 
-    ! For Silo-HDF5 database format, this variable is used to keep track of the number of cell-boundaries, for the grid associated
-    ! with the local process, in each of the active coordinate directions.
+    ! Track cell-boundary count per active coordinate direction
     integer, allocatable, dimension(:) :: dims
 
     ! Locations of various folders in the case's directory tree, associated with the choice of the formatted database format. These
@@ -404,11 +396,7 @@ contains
     !> @brief Open (or create) the Silo-HDF5 or Binary formatted database slave and master files for a given time step.
     impure subroutine s_open_formatted_database_file(t_step)
 
-        ! Description: This subroutine opens a new formatted database file, or replaces an old one, and readies it for the data
-        ! storage of the grid and the flow variable(s) associated with the current time-step, t_step. This is performed by all the
-        ! local process(es). The root processor, in addition, must also generate a master formatted database file whose job will be
-        ! to link, and thus combine, the data from all of the local process(es). Note that for the Binary format, this extra task
-        ! that is assigned to the root process is not performed in multidimensions.
+        ! Open/create DB file for current time-step; rank 0 creates master file (Silo only)
 
         ! Time-step that is currently being post-processed
         integer, intent(in) :: t_step

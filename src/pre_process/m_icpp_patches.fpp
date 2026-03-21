@@ -202,13 +202,10 @@ contains
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
 
-        ! Since the line segment patch does not allow for its boundaries to be smoothed out, the pseudo volume fraction is set to 1
-        ! to ensure that only the current patch contributes to the fluid state in the cells that this patch covers.
+        ! Set eta=1 (no smoothing for this patch type)
         eta = 1._wp
 
-        ! Checking whether the line segment covers a particular cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
-        ! this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do i = 0, m
             if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, &
                 & 0, 0))) then
@@ -326,12 +323,10 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value will be modified as the patch is laid out on the grid, but
-        ! only in the case that smoothing of the circular patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the circle covers a particular cell in the domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
 
         do j = 0, n
             do i = 0, m
@@ -386,12 +381,10 @@ contains
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         thickness = patch_icpp(patch_id)%epsilon
 
-        ! Initializing the pseudo volume fraction value to 1. The value will be modified as the patch is laid out on the grid, but
-        ! only in the case that smoothing of the circular patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the circle covers a particular cell in the domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
                 myr = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
@@ -450,14 +443,12 @@ contains
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         thickness = patch_icpp(patch_id)%epsilon
 
-        ! Initializing the pseudo volume fraction value to 1. The value will be modified as the patch is laid out on the grid, but
-        ! only in the case that smoothing of the circular patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
         ! write for all z
 
-        ! Checking whether the circle covers a particular cell in the domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -514,12 +505,10 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value be modified as the patch is laid out on the grid, but only
-        ! in the case that smoothing of the elliptical patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the ellipse covers a particular cell in the domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
@@ -580,13 +569,10 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value be modified as the patch is laid out on the grid, but only
-        ! in the case that smoothing of the ellipsoidal patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the ellipsoid covers a particular cell in the domain and verifying whether the current patch has
-        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
-        ! this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -662,13 +648,10 @@ contains
         y_boundary%beg = y_centroid - 0.5_wp*length_y
         y_boundary%end = y_centroid + 0.5_wp*length_y
 
-        ! Since the rectangular patch does not allow for its boundaries to be smoothed out, the pseudo volume fraction is set to 1
-        ! to ensure that only the current patch contributes to the fluid state in the cells that this patch covers.
+        ! Set eta=1 (no smoothing for this patch type)
         eta = 1._wp
 
-        ! Checking whether the rectangle covers a particular cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
-        ! this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
                 if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. y_boundary%beg <= y_cc(j) &
@@ -733,13 +716,10 @@ contains
         b = patch_icpp(patch_id)%normal(2)
         c = -a*x_centroid - b*y_centroid
 
-        ! Initializing the pseudo volume fraction value to 1. The value will be modified as the patch is laid out on the grid, but
-        ! only in the case that smoothing of the sweep line patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the region swept by the line covers a particular cell in the domain and verifying whether the current
-        ! patch has the permission to write to that cell. If both queries check out, the primitive variables of the current patch
-        ! are written to this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
@@ -802,16 +782,13 @@ contains
         y_boundary%beg = y_centroid - 0.5_wp*length_y
         y_boundary%end = y_centroid + 0.5_wp*length_y
 
-        ! Since the patch doesn't allow for its boundaries to be smoothed out, the pseudo volume fraction is set to 1 to ensure that
-        ! only the current patch contributes to the fluid state in the cells that this patch covers.
+        ! Set eta=1 (no smoothing for this patch type)
         eta = 1._wp
         ! U0 is the characteristic velocity of the vortex
         U0 = patch_icpp(patch_id)%vel(1)
         ! L0 is the characteristic length of the vortex
         L0 = patch_icpp(patch_id)%vel(2)
-        ! Checking whether the patch covers a particular cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
-        ! this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
                 if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. y_boundary%beg <= y_cc(j) &
@@ -877,13 +854,10 @@ contains
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
 
-        ! Since the patch doesn't allow for its boundaries to be smoothed out, the pseudo volume fraction is set to 1 to ensure that
-        ! only the current patch contributes to the fluid state in the cells that this patch covers.
+        ! Set eta=1 (no smoothing for this patch type)
         eta = 1._wp
 
-        ! Checking whether the line segment covers a particular cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
-        ! this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do i = 0, m
             if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, &
                 & 0, 0))) then
@@ -1054,12 +1028,10 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value will be modified as the patch is laid out on the grid, but
-        ! only in the case that smoothing of the spherical patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the sphere covers a particular cell in the domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1131,13 +1103,10 @@ contains
         z_boundary%beg = z_centroid - 0.5_wp*length_z
         z_boundary%end = z_centroid + 0.5_wp*length_z
 
-        ! Since the cuboidal patch does not allow for its boundaries to get smoothed out, the pseudo volume fraction is set to 1 to
-        ! make sure that only the current patch contributes to the fluid state in the cells that this patch covers.
+        ! Set eta=1 (no smoothing for this patch type)
         eta = 1._wp
 
-        ! Checking whether the cuboid covers a particular cell in the domain and verifying whether the current patch has permission
-        ! to write to to that cell. If both queries check out, the primitive variables of the current patch are assigned to this
-        ! cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1212,13 +1181,10 @@ contains
         z_boundary%beg = z_centroid - 0.5_wp*length_z
         z_boundary%end = z_centroid + 0.5_wp*length_z
 
-        ! Initializing the pseudo volume fraction value to 1. The value will be modified as the patch is laid out on the grid, but
-        ! only in the case that smearing of the cylindrical patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the cylinder covers a particular cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
-        ! this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1306,13 +1272,10 @@ contains
         c = patch_icpp(patch_id)%normal(3)
         d = -a*x_centroid - b*y_centroid - c*z_centroid
 
-        ! Initializing the pseudo volume fraction value to 1. The value will be modified as the patch is laid out on the grid, but
-        ! only in the case that smearing of the sweep plane patch's boundary is enabled.
+        ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
 
-        ! Checking whether the region swept by the plane covers a particular cell in the domain and verifying whether the current
-        ! patch has the permission to write to that cell. If both queries check out, the primitive variables of the current patch
-        ! are written to this cell.
+        ! Assign patch vars if cell is covered and patch has write permission
         do k = 0, p
             do j = 0, n
                 do i = 0, m

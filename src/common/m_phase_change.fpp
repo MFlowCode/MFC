@@ -144,9 +144,7 @@ contains
                     ! case, MFL cannot be either 0 or 1, so I chose it to be 2
                     call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
 
-                    ! check if pTg-equilibrium is required NOTE that NOTHING else needs to be updated OTHER than the individual
-                    ! partial densities given the outputs from the pT- and pTg-equilibrium solvers are just p and one of the partial
-                    ! masses (pTg- case)
+                    ! Check if pTg-equilibrium needed; only partial densities require updating
                     if ((relax_model == 6) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, &
                         & l) > mixM*rM) .and. (q_cons_vf(vp + contxb - 1)%sf(j, k, &
                         & l) > mixM*rM)) .and. (pS < pCr) .and. (TS < TCr)) then
@@ -567,8 +565,7 @@ contains
             end if
         end if
 
-        ! Defining the correction in terms of an absolute value might not be the best practice. Maybe a good way to do this is to
-        ! partition the partial densities, giving a small percentage of the total reacting density
+        ! TODO: Consider partitioning partial densities instead of absolute-value correction
         MCT = 2*mixM
 
         ! correcting the partial densities of the reacting fluids. What to do for the nonreacting ones?

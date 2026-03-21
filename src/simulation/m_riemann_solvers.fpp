@@ -50,8 +50,7 @@ module m_riemann_solvers
     $:GPU_DECLARE(create='[flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf]')
     !> @}
 
-    ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as part of Riemann problem solution and is used to
-    ! evaluate the source flux.
+    ! Cell-boundary velocity from Riemann solution; used for source flux
 
     real(wp), allocatable, dimension(:,:,:,:) :: vel_src_rsx_vf
     real(wp), allocatable, dimension(:,:,:,:) :: vel_src_rsy_vf

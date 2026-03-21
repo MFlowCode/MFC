@@ -1046,9 +1046,7 @@ contains
                     end do
                 else
                     if (cyl_coord .and. p > 0) then
-                        ! Implement pencil processor blocking if using cylindrical coordinates so that all cells in azimuthal
-                        ! direction are stored on a single processor. This is necessary for efficient application of Fourier filter
-                        ! near axis.
+                        ! Pencil blocking for cylindrical coordinates (Fourier filter near axis)
 
                         ! Initial values of the processor factorization optimization
                         num_procs_x = 1

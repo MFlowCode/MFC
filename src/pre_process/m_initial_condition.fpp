@@ -20,9 +20,7 @@ module m_initial_condition
 
     implicit none
 
-    ! NOTE: The abstract interface allows for the declaration of a pointer to a procedure such that the choice of the model
-    ! equations does not have to be queried every time the patch primitive variables are to be assigned in a cell in the
-    ! computational domain.
+    ! NOTE: Abstract interface enables dynamic dispatch without repeated model_eqns checks
     type(scalar_field), allocatable, dimension(:)    :: q_prim_vf !< primitive variables
     type(scalar_field), allocatable, dimension(:)    :: q_cons_vf !< conservative variables
     type(scalar_field)                               :: q_T_sf    !< Temperature field
@@ -66,9 +64,7 @@ contains
             allocate (mv%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
         end if
 
-        ! Setting default values for conservative and primitive variables so that in the case that the initial condition is wrongly
-        ! laid out on the grid the simulation component will catch the problem on start- up. The conservative variables do not need
-        ! to be similarly treated since they are computed directly from the primitive variables.
+        ! Initialize q_cons, q_prim with sentinel values to catch IC errors
         do i = 1, sys_size
             q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
             q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)

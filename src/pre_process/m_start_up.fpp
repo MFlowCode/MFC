@@ -271,10 +271,7 @@ contains
             end if
         end if
 
-        ! If only the preexisting grid data files are read in and there will not be any preexisting initial condition data files
-        ! imported, then the directory associated with the rank of the local processor may be cleaned to make room for the new
-        ! pre-process data. In addition, the time-step directory that will contain the new grid and initial condition data are also
-        ! generated.
+        ! Clean processor dir and create time-step dir (unless reading preexisting IC)
         if (old_ic .neqv. .true.) then
             call s_delete_directory(trim(proc_rank_dir))
             call s_create_directory(trim(proc_rank_dir) // '/0')
@@ -630,11 +627,7 @@ contains
         integer                 :: j, k, l
         real(wp)                :: r2
 
-        ! Setting up the grid and the initial condition. If the grid is read in from preexisting grid data files, it is checked for
-        ! consistency. If the grid is not read in, it is generated from scratch according to the inputs provided by the user. The
-        ! initial condition may also be read in. It in turn is not checked for consistency since it WILL further be edited by the
-        ! pre-process and also because it may be incomplete at the time it is read in. Finally, when the grid and initial condition
-        ! are completely setup, they are written to their respective data files.
+        ! Setup grid (validated if read, generated if not) and IC, then write output
 
         ! Setting up grid and initial condition
 
@@ -717,9 +710,7 @@ contains
 
         call s_mpi_initialize()
 
-        ! Rank 0 processor assigns default values to user inputs prior to reading those in from the input file. Next, the user
-        ! inputs are read in and their consistency is checked. The detection of any inconsistencies automatically leads to the
-        ! termination of the pre-process.
+        ! Rank 0: assign defaults, read input file, validate consistency
 
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()

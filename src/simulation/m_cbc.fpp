@@ -356,8 +356,7 @@ contains
     !! @param cbc_loc_in CBC coordinate location
     subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in)
 
-        ! Description: The purpose of this subroutine is to compute the grid dependent FD and PI coefficients, or CBC coefficients,
-        ! provided the CBC coordinate direction and location.
+        ! Compute grid-dependent CBC coefficients for given direction and location
 
         ! CBC coordinate direction and location
         integer, intent(in) :: cbc_dir_in, cbc_loc_in

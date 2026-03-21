@@ -43,11 +43,11 @@ contains
 
     end subroutine s_initialize_viscous_module
 
-    !> The purpose of this subroutine is to compute the viscous
-    ! stress tensor for the cells directly next to the axis in cylindrical coordinates. This is necessary to avoid the 1/r
-    ! singularity that arises at the cell boundary coinciding with the axis, i.e., y_cb(-1) = 0. @param q_prim_vf Cell-average
-    ! primitive variables @param grad_x_vf Cell-average primitive variable derivatives, x-dir @param grad_y_vf Cell-average
-    ! primitive variable derivatives, y-dir @param grad_z_vf Cell-average primitive variable derivatives, z-dir
+    !> Compute viscous stress tensor near cylindrical axis, avoiding 1/r singularity at y_cb(-1)=0
+    !! @param q_prim_vf Cell-average primitive variables
+    !! @param grad_x_vf Cell-average primitive variable derivatives, x-direction
+    !! @param grad_y_vf Cell-average primitive variable derivatives, y-direction
+    !! @param grad_z_vf Cell-average primitive variable derivatives, z-direction
     subroutine s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, tau_Re_vf, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

@@ -185,8 +185,7 @@ contains
         real(wp)                          :: w(1:8) ! Intermediate var for ideal weights: s_cb across overall stencil
         real(wp)                          :: y(1:4) ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
-        ! Determining the number of cells, the cell-boundary locations and the boundary conditions in the coordinate direction
-        ! selected for the WENO reconstruction
+        ! Determine cell count, boundary locations, and BCs for selected WENO direction
 
         if (weno_dir == 1) then
             s = m; s_cb => x_cb; bc_s = bc_x
@@ -1389,9 +1388,7 @@ contains
         integer, intent(in)                          :: weno_dir
         integer                                      :: j, k, l, q
 
-        ! Determining the number of cell-average variables which will be WENO-reconstructed and mapping their indical bounds in the
-        ! x-, y- and z-directions to those in the s1-, s2- and s3-directions as to reshape the inputted data in the coordinate
-        ! direction of the WENO reconstruction
+        ! Determine WENO-reconstructed variables and map coordinate directions
 
         v_size = ubound(v_vf, 1)
         $:GPU_UPDATE(device='[v_size]')

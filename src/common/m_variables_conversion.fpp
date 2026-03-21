@@ -300,9 +300,7 @@ contains
         real(wp)                            :: alpha_K_sum
         integer                             :: i, j !< Generic loop iterators
 #ifdef MFC_SIMULATION
-        ! Constraining the partial densities and the volume fractions within their physical bounds to make sure that any mixture
-        ! variables that are derived from them result within the limits that are set by the fluids physical parameters that make up
-        ! the mixture
+        ! Constrain partial densities and volume fractions within physical bounds
         if (num_fluids == 1 .and. bubbles_euler) then
             rho_K = alpha_rho_K(1)
             gamma_K = gammas(1)

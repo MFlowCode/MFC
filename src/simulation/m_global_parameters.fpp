@@ -294,9 +294,7 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
 
-    ! The WENO average (WA) flag regulates whether the calculation of any cell- average spatial derivatives is carried out in each
-    ! cell by utilizing the arithmetic mean of the left and right, WENO-reconstructed, cell-boundary values or simply, the unaltered
-    ! left and right, WENO-reconstructed, cell- boundary values.
+    ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values
     !> @{
     real(wp) :: wa_flg
     !> @}
@@ -882,9 +880,7 @@ contains
             $:GPU_UPDATE(device='[igr, igr_order, igr_iter_solver]')
         #:endif
 
-        ! Initializing the number of fluids for which viscous effects will be non-negligible, the number of distinctive material
-        ! interfaces for which surface tension will be important and also, the number of fluids for which the physical and geometric
-        ! curvatures of the interfaces will be computed
+        ! Initialize counts: viscous fluids, surface-tension interfaces, curvature interfaces
         Re_size = 0
         Re_size_max = 0
 
@@ -915,9 +911,7 @@ contains
                 E_idx = mom_idx%end + 1
 
                 if (igr) then
-                    ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of
-                    ! (N-1) volume fractions for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1 then adv_idx%end <
-                    ! adv_idx%beg, which skips all loops over the volume fractions since there is no volume fraction to track
+                    ! IGR: volume fractions after energy (N-1 for N fluids; skipped when num_fluids=1)
                     adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
                     adv_idx%end = E_idx + num_fluids - 1
                 else
@@ -1052,8 +1046,7 @@ contains
                 end if
             end if
 
-            ! Determining the number of fluids for which the shear and the volume Reynolds numbers, e.g. viscous effects, are
-            ! important
+            ! Count fluids with non-negligible viscous effects (Re > 0)
             do i = 1, num_fluids
                 if (fluid_pp(i)%Re(1) > 0) Re_size(1) = Re_size(1) + 1
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
@@ -1181,9 +1174,7 @@ contains
             end do
         end if
 
-        ! Configuring the WENO average flag that will be used to regulate whether any spatial derivatives are to computed in each
-        ! cell by using the arithmetic mean of left and right, WENO-reconstructed, cell-boundary values or otherwise, the unaltered
-        ! left and right, WENO-reconstructed, cell-boundary values
+        ! Configure WENO averaging flag (arithmetic mean vs. unaltered values)
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
         $:GPU_UPDATE(device='[wa_flg]')
 

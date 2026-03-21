@@ -145,8 +145,7 @@ contains
         call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
 
-        ! Checking whether the circle covers a particular cell in the domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
+        ! Assign primitive variables if circle covers cell and patch has write permission
 
         $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[encoded_patch_id, center, radius]', collapse=2)
         do j = jl, jr
@@ -522,9 +521,7 @@ contains
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
 
-        ! Checking whether the rectangle covers a particular cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
-        ! this cell.
+        ! Assign primitive variables if rectangle covers cell and patch has write permission
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, &
                             & y_cc]', collapse=2)
         do j = jl, jr

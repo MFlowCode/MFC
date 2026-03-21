@@ -42,16 +42,12 @@ contains
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_derived_variables_module
 
-        ! Allocating the gradient magnitude of the density variable provided that numerical Schlieren function is outputted during
-        ! post-process
+        ! Allocate density gradient magnitude if Schlieren output requested
         if (schlieren_wrt) then
             allocate (gm_rho_sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
         end if
 
-        ! Allocating the variables which will store the coefficients of the centered family of finite-difference schemes. Note that
-        ! sufficient space is allocated so that the coefficients up to any chosen order of accuracy may be bookkept. However, if
-        ! higher than fourth-order accuracy coefficients are wanted, the formulae required to compute these coefficients will have
-        ! to be implemented in the subroutine s_compute_finite_difference_coefficients.
+        ! Allocate FD coefficients (up to 4th order; higher orders need extension)
 
         ! Allocating centered finite-difference coefficients in x-direction
         if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt) then
@@ -68,8 +64,7 @@ contains
             allocate (fd_coeff_z(-fd_number:fd_number, -offset_z%beg:p + offset_z%end))
         end if
 
-        ! Annotating the dimensionality of the dataset undergoing the post- process. A flag value of 1 indicates that the dataset is
-        ! 3D, while a flag value of 0 indicates that it is not.
+        ! Set flg=1 if 3D, else 0
         if (p > 0) then
             flg = 1
         else
@@ -136,8 +131,7 @@ contains
         ! Fluid bulk modulus for alternate sound speed
         real(wp) :: blkmod1, blkmod2
 
-        ! Computing speed of sound values from those of pressure, density, specific heat ratio function and the liquid stiffness
-        ! function
+        ! Compute speed of sound from pressure, density, gamma, liquid stiffness
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
@@ -582,17 +576,13 @@ contains
             end do
         end if
 
-        ! Up until now, only the dot product of the gradient of the density field has been calculated and stored in the gradient
-        ! magnitude of density variable. So now we proceed to take the square-root as to complete the desired calculation.
+        ! Finalize Schlieren: take sqrt of accumulated dot product
         gm_rho_sf = sqrt(gm_rho_sf)
 
-        ! Determining the local maximum of the gradient magnitude of density and bookkeeping the result, along with rank of the
-        ! local processor
+        ! Find local max of density gradient magnitude with processor rank
         gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, wp)/)
 
-        ! Comparing the local maximum gradient magnitude of the density on this processor to the those computed on the remaining
-        ! processors. This allows for the global maximum to be computed and the rank of the processor on which it has occurred to be
-        ! recorded.
+        ! Compute global max density gradient across all processors
         if (num_procs > 1) call s_mpi_reduce_maxloc(gm_rho_max)
 
         ! Computing Numerical Schlieren Function

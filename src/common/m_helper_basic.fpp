@@ -125,8 +125,7 @@ contains
         logical, intent(in)                                :: igr
         logical, intent(in)                                :: ib
 
-        ! Determining the number of cells that are needed in order to store sufficient boundary conditions data as to iterate the
-        ! solution in the physical computational domain from one time-step iteration to the next one
+        ! Determine ghost cell buffer size for boundary conditions
 
         if (igr) then
             buff_size = (igr_order - 1)/2 + 2

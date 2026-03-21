@@ -66,8 +66,7 @@ contains
             allocate (alf_sum%sf(0:m, 0:n, 0:p))
         end if
 
-        ! Depending on multicomponent flow model, the appropriate procedure for assignment of the patch mixture or species primitive
-        ! variables to a cell in the domain is targeted by the procedure pointer
+        ! Select procedure pointer based on multicomponent flow model
 
         if (model_eqns == 1) then ! Gamma/pi_inf model
             s_assign_patch_primitive_variables => s_assign_patch_mixture_primitive_variables
@@ -258,8 +257,7 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Density, the specific heat ratio function and the liquid stiffness function, respectively, obtained from the combination
-        ! of primitive variables of the current and smoothing patches
+        ! Density, gamma, and liquid stiffness from current and smoothing patches
         real(wp)                       :: rho          !< density
         real(wp)                       :: gamma
         real(wp)                       :: lit_gamma    !< specific heat ratio
@@ -621,8 +619,7 @@ contains
     !> @brief Nullifies the patch primitive variable assignment procedure pointer.
     impure subroutine s_finalize_assign_variables_module
 
-        ! Nullifying procedure pointer to the subroutine assigning either the patch mixture or species primitive variables to a cell
-        ! in the computational domain
+        ! Nullify primitive variable assignment procedure pointer
         s_assign_patch_primitive_variables => null()
 
     end subroutine s_finalize_assign_variables_module

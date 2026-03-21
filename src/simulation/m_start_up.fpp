@@ -1032,9 +1032,7 @@ contains
 #endif
 #endif
 
-        ! The rank 0 processor assigns default values to the user inputs prior to reading them in from the input file. Next, the
-        ! user inputs are read and their consistency is checked. The identification of any inconsistencies will result in the
-        ! termination of the simulation.
+        ! Rank 0: assign defaults, read input file, validate (abort on inconsistencies)
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
@@ -1056,8 +1054,7 @@ contains
 #endif
         end if
 
-        ! Broadcasting the user inputs to all of the processors and performing the parallel computational domain decomposition.
-        ! Neither procedure has to be carried out if the simulation is in fact not truly executed in parallel.
+        ! Broadcast user inputs and decompose domain (skipped in serial)
 
         call s_mpi_bcast_user_inputs()
 

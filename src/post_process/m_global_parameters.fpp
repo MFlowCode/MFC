@@ -82,8 +82,7 @@ module m_global_parameters
     integer  :: n_start
     !> @}
 
-    ! NOTE: The variables m_root, x_root_cb and x_root_cc contain the grid data of the defragmented computational domain. They are
-    ! only used in 1D. For serial simulations, they are equal to m, x_cb and x_cc, respectively.
+    ! NOTE: m_root, x_root_cb, x_root_cc = defragmented grid (1D only; equals m, x_cb, x_cc in serial)
 
     !> @name Simulation Algorithm Parameters
     !> @{
@@ -138,8 +137,7 @@ module m_global_parameters
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
-    ! Cell Indices for the entire (local) domain. In simulation, this includes the buffer region. idwbuff and idwint are the same
-    ! otherwise. Stands for "InDices With BUFFer".
+    ! Cell indices (InDices With BUFFer): includes buffer in simulation only
     type(int_bounds_info) :: idwbuff(1:3)
     integer               :: num_bc_patches
     logical               :: bc_io
