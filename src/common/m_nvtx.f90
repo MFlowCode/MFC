@@ -65,7 +65,6 @@ contains
         type(nvtxEventAttributes)                 :: event
 
 #if defined(MFC_GPU) && defined(__PGI)
-
         tempName = trim(name) // c_null_char
 
         if (.not. present(id)) then

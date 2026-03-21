@@ -53,6 +53,7 @@ contains
     impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -171,6 +172,7 @@ contains
     subroutine s_icpp_line_segment(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -236,6 +238,7 @@ contains
     impure subroutine s_icpp_spiral(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -303,6 +306,7 @@ contains
     subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -360,6 +364,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -421,6 +426,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -488,6 +494,7 @@ contains
     subroutine s_icpp_ellipse(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -549,6 +556,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -626,6 +634,7 @@ contains
     subroutine s_icpp_rectangle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -701,6 +710,7 @@ contains
     subroutine s_icpp_sweep_line(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -763,6 +773,7 @@ contains
     subroutine s_icpp_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -839,6 +850,7 @@ contains
 
         ! Patch identifier
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -895,6 +907,7 @@ contains
     subroutine s_icpp_2d_modal(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -949,6 +962,7 @@ contains
     subroutine s_icpp_3d_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -1015,6 +1029,7 @@ contains
     subroutine s_icpp_sphere(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -1089,6 +1104,7 @@ contains
     subroutine s_icpp_cuboid(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -1164,6 +1180,7 @@ contains
     subroutine s_icpp_cylinder(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -1264,6 +1281,7 @@ contains
     subroutine s_icpp_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -1337,6 +1355,7 @@ contains
     subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else

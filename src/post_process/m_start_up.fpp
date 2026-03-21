@@ -801,7 +801,6 @@ contains
         integer                                :: i, j, k, l
 
 #ifdef MFC_MPI
-
         allocate (sendbuf(Nx*Nyloc*Nzloc))
         allocate (recvbuf(Nx*Nyloc*Nzloc))
 
@@ -844,7 +843,6 @@ contains
         integer                                :: j, k, l
 
 #ifdef MFC_MPI
-
         allocate (sendbuf(Ny*Nxloc*Nzloc))
         allocate (recvbuf(Ny*Nxloc*Nzloc))
 
@@ -977,7 +975,6 @@ contains
         integer :: j, k, l
 
 #ifdef MFC_MPI
-
         do l = 1, Nzloc
             do k = 1, Nyloc
                 do j = 1, Nx

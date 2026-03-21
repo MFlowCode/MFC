@@ -520,6 +520,7 @@ contains
         real(wp)                                               :: dpi_inf_dt
         real(wp)                                               :: dqv_dt
         real(wp)                                               :: dpres_ds
+
         #:if USING_AMD
             real(wp), dimension(20) :: L
         #:else

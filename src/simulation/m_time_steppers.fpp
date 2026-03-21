@@ -629,6 +629,7 @@ contains
     impure subroutine s_compute_dt()
 
         real(wp) :: rho !< Cell-avg. density
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: vel   !< Cell-avg. velocity
             real(wp), dimension(3) :: alpha !< Cell-avg. volume fraction
@@ -870,7 +871,6 @@ contains
         integer :: i, j !< Generic loop iterators
         ! Deallocating the cell-average conservative variables
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
-
         do j = 1, sys_size
             @:DEALLOCATE(q_cons_ts(1)%vf(j)%sf)
             if (num_ts == 2) then

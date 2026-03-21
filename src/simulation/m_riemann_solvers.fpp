@@ -125,7 +125,6 @@ contains
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
         #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4), ('lf', 5)]
-
             if (riemann_solver == ${NUM}$) then
                 call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
                                                & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
@@ -178,6 +177,7 @@ contains
         real(wp)                                               :: flux_tau_L, flux_tau_R
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)  :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3)  :: vel_L, vel_R
@@ -862,6 +862,7 @@ contains
         real(wp)                                               :: flux_tau_L, flux_tau_R
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3)    :: vel_L, vel_R
@@ -3362,6 +3363,7 @@ contains
         type(int_bounds_info), intent(in)                            :: ix, iy, iz
 
         ! Local variables:
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
         #:else
@@ -4212,6 +4214,7 @@ contains
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
         ! Local variables
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: avg_v_int       !!< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
             real(wp), dimension(3) :: avg_dvdx_int    !!< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
@@ -4393,6 +4396,7 @@ contains
         integer, intent(in)                                    :: norm_dir
 
         ! Local variables
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3, 3) :: vel_grad_avg         !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
             real(wp), dimension(3, 3) :: current_tau_shear    !< Current shear stress tensor.

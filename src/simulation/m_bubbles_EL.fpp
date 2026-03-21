@@ -503,6 +503,7 @@ contains
         real(wp)                                               :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp)                                               :: myPinf, aux1, aux2, myCson, myRho
         real(wp)                                               :: gamma, pi_inf, qv
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: myalpha_rho, myalpha
         #:else

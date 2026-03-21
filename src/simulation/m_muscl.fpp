@@ -229,7 +229,6 @@ contains
         real(wp)                          :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C, sign, moncon
 
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-
             if (muscl_dir == ${MUSCL_DIR}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, aCL, aC, aCR, aTHINC, moncon, sign, qmin, qmax]')
                 do l = is3_muscl%beg, is3_muscl%end

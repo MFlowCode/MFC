@@ -200,6 +200,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: t_step
         real(wp)                                            :: rho !< Cell-avg. density
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha !< Cell-avg. volume fraction
             real(wp), dimension(3) :: vel   !< Cell-avg. velocity

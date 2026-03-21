@@ -1312,7 +1312,6 @@ contains
 #endif
 
         #:if not MFC_CASE_OPTIMIZATION
-
             num_dims = 1 + min(1, n) + min(1, p)
 
             if (mhd) then

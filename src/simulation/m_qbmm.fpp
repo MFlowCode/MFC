@@ -44,7 +44,6 @@ contains
         integer :: i1, i2, q, i, j
 
         #:if not MFC_CASE_OPTIMIZATION
-
             if (bubble_model == 2) then
                 ! Keller-Miksis without viscosity/surface tension
                 nterms = 32
@@ -746,6 +745,7 @@ contains
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout)  :: rhs_mv
         type(int_bounds_info), intent(in)                                                              :: ix, iy, iz
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(6)    :: moms, msum
             real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht

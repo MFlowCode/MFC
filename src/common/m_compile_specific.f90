@@ -19,7 +19,6 @@ contains
         character(LEN=*), intent(in) :: dir_name
 
 #ifdef _WIN32
-
         call system('mkdir "' // dir_name // '" 2> NUL')
 #else
         call system('mkdir -p "' // dir_name // '"')
@@ -33,7 +32,6 @@ contains
         character(LEN=*), intent(in) :: filepath
 
 #ifdef _WIN32
-
         call system('del "' // filepath // '"')
 #else
         call system('rm "' // filepath // '"')
@@ -47,7 +45,6 @@ contains
         character(LEN=*), intent(in) :: dir_name
 
 #ifdef _WIN32
-
         call system('rmdir "' // dir_name // '" /s /q')
 #else
         call system('rm -r "' // dir_name // '"')
@@ -64,7 +61,6 @@ contains
         logical, intent(inout)       :: dircheck
 
 #ifdef __INTEL_COMPILER
-
         inquire (DIRECTORY=trim(fileloc), EXIST=dircheck) ! Intel
 #else
         inquire (FILE=trim(fileloc), EXIST=dircheck) ! GCC

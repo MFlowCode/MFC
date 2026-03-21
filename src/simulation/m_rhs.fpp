@@ -1668,7 +1668,6 @@ contains
         integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
-
             if (recon_type == ${TYPE}$ .or. dummy) then
                 ! Reconstruction in s1-direction
                 if (norm_dir == 1) then
@@ -1717,7 +1716,6 @@ contains
         ! Reconstruction in s1-direction
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl', 'MUSCL_TYPE')]
-
             if (recon_type == ${TYPE}$ .or. dummy) then
                 if (norm_dir == 1) then
                     is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)

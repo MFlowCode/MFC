@@ -993,6 +993,7 @@ contains
     impure subroutine s_initialize_mpi_domain
 
         integer :: ierr
+
 #ifdef MFC_GPU
         real(wp) :: starttime, endtime
         integer  :: num_devices, local_size, num_nodes, ppn, my_device_num

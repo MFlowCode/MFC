@@ -1151,6 +1151,7 @@ contains
         integer, intent(out), optional :: zp_lower, zp_upper
 
         ! check domain wraps in x, y
+
         #:for X in [('x'), ('y')]
             ! check for periodicity
 

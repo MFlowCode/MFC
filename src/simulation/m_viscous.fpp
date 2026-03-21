@@ -56,6 +56,7 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum !< Mixture variables
         real(wp), dimension(2) :: Re_visc
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
             real(wp), dimension(3, 3) :: tau_Re
@@ -885,7 +886,6 @@ contains
         integer                           :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
-
             if (recon_type == ${TYPE}$ .or. dummy) then
                 ! Reconstruction in s1-direction
 
@@ -981,8 +981,8 @@ contains
         integer, intent(in)                                         :: norm_dir
         integer                                                     :: recon_dir !< Coordinate direction of the WENO reconstruction
         integer                                                     :: i, j, k, l
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
 
+        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
 

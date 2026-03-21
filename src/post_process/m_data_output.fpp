@@ -374,7 +374,6 @@ contains
         integer :: lower_bound, upper_bound
 
         #:for X, M in [('x', 'm'), ('y', 'n'), ('z', 'p')]
-
             if (${M}$ == 0) return ! Early return for y or z if simulation is 1D or 2D
 
             lower_bound = -offset_${X}$%beg

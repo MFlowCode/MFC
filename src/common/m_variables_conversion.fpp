@@ -512,6 +512,7 @@ contains
         type(scalar_field), intent(inout)                      :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: ibounds
+
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
             real(wp), dimension(3) :: nRtmp
@@ -1072,6 +1073,7 @@ contains
 
         ! Partial densities, density, velocity, pressure, energy, advection variables, the specific heat ratio and liquid stiffness
         ! functions, the shear and volume Reynolds numbers and the Weber numbers
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)  :: alpha_rho_K
             real(wp), dimension(3)  :: alpha_K

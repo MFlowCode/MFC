@@ -252,7 +252,6 @@ contains
         integer, allocatable                    :: recounts(:), displs(:)
 
 #ifdef MFC_MPI
-
         allocate (recounts(num_procs))
 
         call MPI_GATHER(counts, 1, MPI_INTEGER, recounts, 1, MPI_INTEGER, root, MPI_COMM_WORLD, ierr)

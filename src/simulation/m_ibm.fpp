@@ -138,6 +138,7 @@ contains
         real(wp) :: pres_IP
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)  :: Gs
             real(wp), dimension(3)  :: alpha_rho_IP, alpha_IP
@@ -915,6 +916,7 @@ contains
              & viscous_stress_div_2 ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp)                 :: cell_volume, dx, dy, dz, dynamic_viscosity
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: dynamic_viscosities
         #:else

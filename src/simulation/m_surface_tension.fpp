@@ -75,6 +75,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in)                                    :: id
         type(int_bounds_info), intent(in)                      :: isx, isy, isz
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3, 3) :: Omega
         #:else
@@ -300,7 +301,6 @@ contains
         integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno', 'WENO_TYPE'),('muscl', 'MUSCL_TYPE')]
-
             if (recon_type == ${TYPE}$ .or. dummy) then
                 ! Reconstruction in s1-direction
 

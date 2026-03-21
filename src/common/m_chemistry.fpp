@@ -117,6 +117,7 @@ contains
         integer                                                :: eqn
         real(wp)                                               :: T
         real(wp)                                               :: rho, omega_m
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(10) :: Ys
             real(wp), dimension(10) :: omega
@@ -162,6 +163,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         type(int_bounds_info), intent(in)                      :: irx, iry, irz
         integer, intent(in)                                    :: idir
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
             real(wp), dimension(10) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2

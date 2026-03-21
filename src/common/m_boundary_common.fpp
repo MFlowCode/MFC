@@ -1858,6 +1858,7 @@ contains
     subroutine s_populate_grid_variables_buffers
 
         integer :: i !< Generic loop iterator
+
 #ifdef MFC_SIMULATION
         ! Required for compatibility between codes
         type(int_bounds_info) :: offset_x, offset_y, offset_z

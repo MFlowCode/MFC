@@ -80,6 +80,7 @@ contains
         real(wp) :: TvF                  !< total volume fraction
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
         #:else
