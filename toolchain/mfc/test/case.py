@@ -20,9 +20,12 @@ from ..state import ARG
 # sizes.  The batch templates all include `ulimit -s unlimited`, but the direct
 # MPI execution path in the test runner bypasses the templates.  Set the soft
 # stack limit to the hard limit so that spawned MPI processes inherit it.
-_soft, _hard = resource.getrlimit(resource.RLIMIT_STACK)
-if _soft != resource.RLIM_INFINITY and _soft < _hard:
-    resource.setrlimit(resource.RLIMIT_STACK, (_hard, _hard))
+try:
+    _soft, _hard = resource.getrlimit(resource.RLIMIT_STACK)
+    if _soft != resource.RLIM_INFINITY and _soft < _hard:
+        resource.setrlimit(resource.RLIMIT_STACK, (_hard, _hard))
+except (ValueError, OSError):
+    pass
 
 
 @dataclasses.dataclass
