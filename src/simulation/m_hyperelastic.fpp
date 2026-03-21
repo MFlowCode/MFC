@@ -8,11 +8,8 @@
 
 module m_hyperelastic
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_variables_conversion !< State variables type conversion procedures
-
     use m_finite_differences
 
     implicit none
@@ -71,6 +68,7 @@ contains
             $:GPU_UPDATE(device='[fd_coeff_z_hyper]')
         end if
     end subroutine s_initialize_hyperelastic_module
+
     !> The following subroutine handles the calculation of the btensor.   The calculation of the btensor takes qprimvf.
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
@@ -105,7 +103,7 @@ contains
 
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha_k, alpha_rho_k, Re, G_local, &
-                                                                    & Gs_hyper)
+                        & Gs_hyper)
                     rho = max(rho, sgm_eps)
                     G_local = max(G_local, sgm_eps)
                     ! if ( G_local <= verysmall ) G_K = 0._wp
@@ -148,7 +146,7 @@ contains
 
                         ! STEP 2b: computing the determinant of the grad_xi tensor
                         tensorb(tensor_size) = tensora(1)*(tensora(5)*tensora(9) - tensora(6)*tensora(8)) - tensora(2)*(tensora(4) &
-                                & *tensora(9) - tensora(6)*tensora(7)) + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
+                            & *tensora(9) - tensora(6)*tensora(7)) + tensora(3)*(tensora(4)*tensora(8) - tensora(5)*tensora(7))
 
                         if (tensorb(tensor_size) > verysmall) then
                             ! STEP 2c: computing the inverse of grad_xi tensor = F
@@ -182,7 +180,7 @@ contains
                             end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) - G_local*q_prim_vf(xiend + 1)%sf(j, k, &
-                                      & l)/gamma
+                                & l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, b_size - 1
@@ -195,6 +193,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_hyperelastic_rmt_stress_update
+
     !> The following subroutine handles the calculation of the btensor.   The calculation of the btensor takes qprimvf.
         !! @param btensor_in Left Cauchy-Green deformation tensor
         !! @param q_prim_vf Primitive variables
@@ -232,6 +231,7 @@ contains
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
     end subroutine s_neoHookean_cauchy_solver
+
     !> The following subroutine handles the calculation of the btensor.   The calculation of the btensor takes qprimvf.
         !! @param btensor_in Left Cauchy-Green deformation tensor
         !! @param q_prim_vf Primitive variables
@@ -271,6 +271,7 @@ contains
         ! compute the invariant without the elastic modulus
         q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
     end subroutine s_Mooney_Rivlin_cauchy_solver
+
     !> @brief Deallocates memory for hyperelastic deformation tensor and finite-difference coefficients.
     impure subroutine s_finalize_hyperelastic_module()
         integer :: i !< iterator

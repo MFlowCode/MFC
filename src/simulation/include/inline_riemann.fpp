@@ -51,7 +51,7 @@
                 ! Case when T_L and T_R are very close
                 Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:))
                 Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:) &
-                             & - gas_constant/molecular_weights_nonparameter(:)))
+                    & - gas_constant/molecular_weights_nonparameter(:)))
             else
                 ! Normal calculation when T_L and T_R are sufficiently different
                 Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
@@ -60,14 +60,14 @@
             gamma_avg = Cp_avg/Cv_avg
 
             Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) &
-                    & + gamma_avg*gas_constant/molecular_weights_nonparameter(:)*T_avg
+                & + gamma_avg*gas_constant/molecular_weights_nonparameter(:)*T_avg
             c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
         #:else
             if (abs(T_L - T_R) < eps) then
                 ! Case when T_L and T_R are very close
                 Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
                 Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
-                             & - gas_constant/molecular_weights(:)))
+                    & - gas_constant/molecular_weights(:)))
             else
                 ! Normal calculation when T_L and T_R are sufficiently different
                 Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
@@ -105,7 +105,7 @@
 
         if (low_Mach == 1) then
             pcorr = rho_L*rho_R*(s_L - vel_L(dir_idx(1)))*(s_R - vel_R(dir_idx(1)))*(vel_R(dir_idx(1)) - vel_L(dir_idx(1))) &
-                                 & /(rho_R*(s_R - vel_R(dir_idx(1))) - rho_L*(s_L - vel_L(dir_idx(1))))*(zcoef - 1._wp)
+                & /(rho_R*(s_R - vel_R(dir_idx(1))) - rho_L*(s_L - vel_L(dir_idx(1))))*(zcoef - 1._wp)
         else if (low_Mach == 2) then
             vel_L_tmp = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
             vel_R_tmp = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + zcoef*(vel_R(dir_idx(1)) - vel_L(dir_idx(1))))

@@ -7,15 +7,10 @@
 !> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
 module m_acoustic_src
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_bubbles              !< Bubble dynamic routines
-
     use m_variables_conversion !< State variables type conversion procedures
-
     use m_helper_basic         !< Functions to compare floating point numbers
-
     use m_constants            !< Definitions of the constants
 
     implicit none
@@ -66,11 +61,12 @@ contains
         integer :: i, j !< generic loop variables
 
         @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), &
-                   & length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), &
-                   & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), &
-                   & aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), &
-                   & element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), &
-                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
+            & length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), &
+            & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), &
+            & npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), &
+            & element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), &
+            & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), &
+            & bb_lowest_freq(1:num_source))
 
         do i = 1, num_source
             do j = 1, 3
@@ -113,15 +109,15 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        $:GPU_UPDATE(device='[loc_acoustic,mag,dipole,support,length, &
-        & height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, &
-            & element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, &
-            & bb_lowest_freq]')
+        $:GPU_UPDATE(device='[loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, &
+        & gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, &
+            & element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq]')
 
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
         @:ALLOCATE(E_src(0:m, 0:n, 0:p))
     end subroutine s_initialize_acoustic_src
+
     !> This subroutine updates the rhs by computing the mass, mom, energy sources
     !! @param q_cons_vf Conservative variables
     !! @param q_prim_vf Primitive variables
@@ -141,13 +137,13 @@ contains
         real(wp)                            :: frequency_local, gauss_sigma_time_local
         real(wp)                            :: mass_src_diff, mom_src_diff
         real(wp)                            :: source_temporal
-        real(wp)                            :: period_BB !< period of each sine wave in broadband source
-        real(wp)                            :: sl_BB !< spectral level at each frequency
-        real(wp)                            :: ffre_BB !< source term corresponding to each frequency
-        real(wp)                            :: sum_BB !< total source term for the broadband wave
-        real(wp), allocatable, dimension(:) :: phi_rn !< random phase shift for each frequency
+        real(wp)                            :: period_BB     !< period of each sine wave in broadband source
+        real(wp)                            :: sl_BB         !< spectral level at each frequency
+        real(wp)                            :: ffre_BB       !< source term corresponding to each frequency
+        real(wp)                            :: sum_BB        !< total source term for the broadband wave
+        real(wp), allocatable, dimension(:) :: phi_rn        !< random phase shift for each frequency
         integer                             :: i, j, k, l, q !< generic loop variables
-        integer                             :: ai !< acoustic source index
+        integer                             :: ai            !< acoustic source index
         integer                             :: num_points
         logical                             :: freq_conv_flag, gauss_conv_flag
         integer, parameter                  :: mass_label = 1, mom_label = 2
@@ -259,7 +255,7 @@ contains
 
                     ! Update momentum source term
                     call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, &
-                                           & sum_BB)
+                        & sum_BB)
                     mom_src_diff = source_temporal*source_spatials(ai)%val(i)
 
                     if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
@@ -296,7 +292,7 @@ contains
                         ! Mass source term must be calculated differently using a correction term for spherical and cylindrical
                         ! support
                         call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, &
-                                               & source_temporal, sum_BB)
+                            & source_temporal, sum_BB)
                         mass_src_diff = source_temporal*source_spatials(ai)%val(i)
                     end if
                     mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
@@ -329,6 +325,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_acoustic_src_calculations
+
     !> This subroutine gives the temporally varying amplitude of the pulse
     !! @param sim_time Simulation time
     !! @param c Sound speed
@@ -374,7 +371,7 @@ contains
 
             if (term_index == mass_label) then
                 source = source/c - foc_length_factor*mag(ai)*sqrt(pi/2)*gauss_sigma_time_local*(erf((sim_time - delay(ai)) &
-                                                          & /(sqrt(2._wp)*gauss_sigma_time_local)) + 1)
+                    & /(sqrt(2._wp)*gauss_sigma_time_local)) + 1)
             end if
         else if (pulse(ai) == 3) then ! Square wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
@@ -391,6 +388,7 @@ contains
             source = sum_BB
         end if
     end subroutine s_source_temporal
+
     !> This subroutine identifies and precalculates the non-zero acoustic spatial sources before time-stepping
     impure subroutine s_precalculate_acoustic_spatial_sources
         integer             :: j, k, l, ai
@@ -472,10 +470,11 @@ contains
 #ifdef MFC_DEBUG
         do ai = 1, num_source
             write (*, '(A,I2,A,I8,A)') 'Acoustic source ', ai, ' has ', source_spatials_num_points(ai), &
-                   & ' grid points with non-zero source term'
+                & ' grid points with non-zero source term'
         end do
 #endif
     end subroutine s_precalculate_acoustic_spatial_sources
+
     !> This subroutine gives the spatial support of the acoustic source
     !! @param j x-index
     !! @param k y-index
@@ -514,6 +513,7 @@ contains
             call s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         end if
     end subroutine s_source_spatial
+
     !> This subroutine calculates the spatial support for planar acoustic sources in 1D, 2D, and 3D
     !! @param ai Acoustic source index
     !! @param sig Sigma value for the Gaussian distribution
@@ -540,6 +540,7 @@ contains
             end if
         end if
     end subroutine s_source_spatial_planar
+
     !> This subroutine calculates the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
     !! @param ai Acoustic source index
     !! @param sig Sigma value for the Gaussian distribution
@@ -581,6 +582,7 @@ contains
             end if
         end if
     end subroutine s_source_spatial_transducer
+
     !> This subroutine calculates the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
     !! @param ai Acoustic source index
     !! @param sig Sigma value for the Gaussian distribution
@@ -660,6 +662,7 @@ contains
             end do
         end if
     end subroutine s_source_spatial_transducer_array
+
     !> This function performs wavelength to frequency conversion
     !! @param freq_conv_flag Determines if frequency is given or wavelength
     !! @param ai Acoustic source index
@@ -678,6 +681,7 @@ contains
             f_frequency_local = frequency(ai)
         end if
     end function f_frequency_local
+
     !> This function performs Gaussian sigma dist to time conversion
     !! @param gauss_conv_flag Determines if sigma_dist is given or sigma_time
     !! @param c Speed of sound

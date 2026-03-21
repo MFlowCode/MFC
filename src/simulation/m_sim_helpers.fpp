@@ -8,9 +8,7 @@
 !> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters
-
     use m_variables_conversion
 
     implicit none
@@ -41,6 +39,7 @@ contains
             fltr_dtheta = 0._wp
         end if
     end function f_compute_filtered_dtheta
+
     !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only)
         !! @param vel directional velocities
         !! @param c mixture speed of sound
@@ -72,6 +71,7 @@ contains
             cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         end if
     end function f_compute_multidim_cfl_terms
+
     !> Computes enthalpy
         !! @param q_prim_vf cell centered primitive variables
         !! @param pres mixture pressure
@@ -151,6 +151,7 @@ contains
 
         H = (E + pres)/rho
     end subroutine s_compute_enthalpy
+
     !> Computes stability criterion for a specified dt
         !! @param vel directional velocities
         !! @param c mixture speed of sound
@@ -190,11 +191,11 @@ contains
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
                         vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), fltr_dtheta)**2._wp
                         Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
-                              & fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
+                            & fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     else
                         vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), dz(l))**2._wp
                         Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
-                              & dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
+                            & dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     end if
                 #:endif
             else if (n > 0) then
@@ -208,6 +209,7 @@ contains
             end if
         end if
     end subroutine s_compute_stability_from_dt
+
     !> Computes dt for a specified CFL number
         !! @param vel directional velocities
         !! @param c Speed of sound

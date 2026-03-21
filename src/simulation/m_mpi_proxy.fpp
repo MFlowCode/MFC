@@ -12,17 +12,11 @@ module m_mpi_proxy
 #endif
 
     use m_helper_basic         !< Functions to compare floating point numbers
-
     use m_helper
-
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_mpi_common
-
     use m_nvtx
-
     use ieee_arithmetic
 
     implicit none
@@ -48,7 +42,7 @@ contains
             if (n > 0) then
                 if (p > 0) then
                     i_halo_size = -1 + buff_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)*(p + 2*buff_size + 1) &
-                                                  & /(cells_bounds%mnp_min + 2*buff_size + 1)
+                        & /(cells_bounds%mnp_min + 2*buff_size + 1)
                 else
                     i_halo_size = -1 + buff_size*(cells_bounds%mn_max + 2*buff_size + 1)
                 end if
@@ -61,6 +55,7 @@ contains
         end if
 #endif
     end subroutine s_initialize_mpi_proxy_module
+
     !> Since only the processor with rank 0 reads and verifies the consistency of user inputs, these are initially not available to
     !! the other processors. Then, the purpose of this subroutine is to distribute the user inputs to the remaining processors in
     !! the communicator.
@@ -243,6 +238,7 @@ contains
         call MPI_BCAST(nv_uvm_pref_gpu, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine s_mpi_bcast_user_inputs
+
     !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in)                            :: num_freq
@@ -253,6 +249,7 @@ contains
         call MPI_BCAST(phi_rn, num_freq, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine s_mpi_send_random_number
+
     !> @brief Deallocates immersed boundary MPI communication buffers.
     subroutine s_finalize_mpi_proxy_module()
 #ifdef MFC_MPI

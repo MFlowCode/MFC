@@ -8,13 +8,9 @@
 
 module m_cbc
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_variables_conversion !< State variables type conversion procedures
-
     use m_compute_cbc
-
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
         & get_mole_fractions, get_species_specific_heats_r
@@ -305,8 +301,7 @@ contains
             end if
         end if
 
-        $:GPU_UPDATE(device='[fd_coef_x,fd_coef_y,fd_coef_z, &
-        & pi_coef_x, pi_coef_y, pi_coef_z]')
+        $:GPU_UPDATE(device='[fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z]')
 
         ! Associating the procedural pointer to the appropriate subroutine
         ! that will be utilized in the conversion to the mixture variables
@@ -361,6 +356,7 @@ contains
         #:endfor
         $:GPU_UPDATE(device='[vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in]')
     end subroutine s_initialize_cbc_module
+
     !> Compute CBC coefficients
     !! @param cbc_dir_in CBC coordinate direction
     !! @param cbc_loc_in CBC coordinate location
@@ -410,34 +406,32 @@ contains
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, &
-                                     & cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) - 1.e1_wp*ds(2) + 1.e1_wp*ds(3) &
-                                     & - 3._wp*ds(4))
+                        & cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) - 1.e1_wp*ds(2) + 1.e1_wp*ds(3) - 3._wp*ds(4))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -48._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
                     fd_coef_${XYZ}$ (2, cbc_loc_in) = 36._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
                     fd_coef_${XYZ}$ (3, cbc_loc_in) = -16._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
                     fd_coef_${XYZ}$ (4, cbc_loc_in) = 3._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/25._wp
 
                     pi_coef_${XYZ}$ (0, 0, &
-                                     & cbc_loc_in) = ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))*(s_cb(1) - s_cb(3)))/((s_cb(1) &
-                                     & - s_cb(4))*(s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(2)))
+                        & cbc_loc_in) = ((s_cb(0) - s_cb(1))*(s_cb(1) - s_cb(2))*(s_cb(1) - s_cb(3)))/((s_cb(1) - s_cb(4)) &
+                        & *(s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(2)))
                     pi_coef_${XYZ}$ (0, 1, &
-                                     & cbc_loc_in) = ((s_cb(1) - s_cb(0))*(s_cb(1) - s_cb(2))*((s_cb(1) - s_cb(3))*(s_cb(1) &
-                                     & - s_cb(3)) - (s_cb(0) - s_cb(4))*((s_cb(3) - s_cb(1)) + (s_cb(4) - s_cb(1)))))/((s_cb(0) &
-                                     & - s_cb(3))*(s_cb(1) - s_cb(3))*(s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
+                        & cbc_loc_in) = ((s_cb(1) - s_cb(0))*(s_cb(1) - s_cb(2))*((s_cb(1) - s_cb(3))*(s_cb(1) - s_cb(3)) &
+                        & - (s_cb(0) - s_cb(4))*((s_cb(3) - s_cb(1)) + (s_cb(4) - s_cb(1)))))/((s_cb(0) - s_cb(3))*(s_cb(1) &
+                        & - s_cb(3))*(s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
                     pi_coef_${XYZ}$ (0, 2, &
-                                     & cbc_loc_in) = (s_cb(1) - s_cb(0))*((s_cb(1) - s_cb(2))*(s_cb(1) - s_cb(3)) + ((s_cb(0) &
-                                     & - s_cb(2)) + (s_cb(1) - s_cb(3)))*(s_cb(0) - s_cb(4)))/((s_cb(2) - s_cb(0))*(s_cb(0) &
-                                     & - s_cb(3))*(s_cb(0) - s_cb(4)))
+                        & cbc_loc_in) = (s_cb(1) - s_cb(0))*((s_cb(1) - s_cb(2))*(s_cb(1) - s_cb(3)) + ((s_cb(0) - s_cb(2)) &
+                        & + (s_cb(1) - s_cb(3)))*(s_cb(0) - s_cb(4)))/((s_cb(2) - s_cb(0))*(s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
                     pi_coef_${XYZ}$ (1, 0, &
-                                     & cbc_loc_in) = ((s_cb(0) - s_cb(2))*(s_cb(2) - s_cb(1))*(s_cb(2) - s_cb(3)))/((s_cb(2) &
-                                     & - s_cb(4))*(s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(1)))
+                        & cbc_loc_in) = ((s_cb(0) - s_cb(2))*(s_cb(2) - s_cb(1))*(s_cb(2) - s_cb(3)))/((s_cb(2) - s_cb(4)) &
+                        & *(s_cb(4) - s_cb(0))*(s_cb(4) - s_cb(1)))
                     pi_coef_${XYZ}$ (1, 1, &
-                                     & cbc_loc_in) = ((s_cb(0) - s_cb(2))*(s_cb(1) - s_cb(2))*((s_cb(1) - s_cb(3))*(s_cb(2) &
-                                     & - s_cb(3)) + (s_cb(0) - s_cb(4))*((s_cb(1) - s_cb(3)) + (s_cb(2) - s_cb(4)))))/((s_cb(0) &
-                                     & - s_cb(3))*(s_cb(1) - s_cb(3))*(s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
+                        & cbc_loc_in) = ((s_cb(0) - s_cb(2))*(s_cb(1) - s_cb(2))*((s_cb(1) - s_cb(3))*(s_cb(2) - s_cb(3)) &
+                        & + (s_cb(0) - s_cb(4))*((s_cb(1) - s_cb(3)) + (s_cb(2) - s_cb(4)))))/((s_cb(0) - s_cb(3))*(s_cb(1) &
+                        & - s_cb(3))*(s_cb(0) - s_cb(4))*(s_cb(1) - s_cb(4)))
                     pi_coef_${XYZ}$ (1, 2, &
-                                     & cbc_loc_in) = ((s_cb(1) - s_cb(2))*(s_cb(2) - s_cb(3))*(s_cb(2) - s_cb(4)))/((s_cb(0) &
-                                     & - s_cb(2))*(s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
+                        & cbc_loc_in) = ((s_cb(1) - s_cb(2))*(s_cb(2) - s_cb(3))*(s_cb(2) - s_cb(4)))/((s_cb(0) - s_cb(2)) &
+                        & *(s_cb(0) - s_cb(3))*(s_cb(0) - s_cb(4)))
                 end if
             end if
         #:endfor
@@ -446,6 +440,7 @@ contains
 
         ! Nullifying CBC coefficients
     end subroutine s_compute_cbc_coefficients
+
     !> @brief Associates finite-difference and polynomial-interpolation CBC coefficients with targets based on coordinate direction
     !! and boundary location. The goal of the procedure is to associate the FD and PI coefficients, or CBC coefficients, with the
     !! appropriate targets, based on the coordinate direction and location of the CBC.
@@ -501,6 +496,7 @@ contains
 
         $:GPU_UPDATE(device='[ds]')
     end subroutine s_associate_cbc_coefficients_pointers
+
     !> The following is the implementation of the CBC based on the work of Thompson (1987, 1990) on hyperbolic systems. The CBC is
     !! indirectly applied in the computation of the right-hand-side (RHS) near the relevant domain boundary through the modification
     !! of the fluxes.
@@ -547,13 +543,13 @@ contains
         #:endif
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(3) :: lambda
-        real(wp)               :: rho         !< Cell averaged density
-        real(wp)               :: pres        !< Cell averaged pressure
-        real(wp)               :: E           !< Cell averaged energy
-        real(wp)               :: H           !< Cell averaged enthalpy
-        real(wp)               :: gamma       !< Cell averaged specific heat ratio
-        real(wp)               :: pi_inf      !< Cell averaged liquid stiffness
-        real(wp)               :: qv          !< Cell averaged fluid reference energy
+        real(wp)               :: rho        !< Cell averaged density
+        real(wp)               :: pres       !< Cell averaged pressure
+        real(wp)               :: E          !< Cell averaged energy
+        real(wp)               :: H          !< Cell averaged enthalpy
+        real(wp)               :: gamma      !< Cell averaged specific heat ratio
+        real(wp)               :: pi_inf     !< Cell averaged liquid stiffness
+        real(wp)               :: qv         !< Cell averaged fluid reference energy
         real(wp)               :: c
         real(wp)               :: Ma
         real(wp)               :: T, sum_Enthalpies
@@ -579,14 +575,14 @@ contains
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
-                                                               & is3, idwbuff(2)%beg, idwbuff(3)%beg)
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     $:GPU_PARALLEL_LOOP(private='[i, r, k]', collapse=3)
                     do i = 1, flux_cbc_index
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 flux_rs${XYZ}$_vf_l(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) + pi_coef_${XYZ}$ (0, 0, &
-                                                    & cbc_loc)*(F_rs${XYZ}$_vf(1, k, r, i) - F_rs${XYZ}$_vf(0, k, r, i))
+                                    & cbc_loc)*(F_rs${XYZ}$_vf(1, k, r, i) - F_rs${XYZ}$_vf(0, k, r, i))
                             end do
                         end do
                     end do
@@ -597,7 +593,7 @@ contains
                         do r = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 flux_src_rs${XYZ}$_vf_l(0, k, r, i) = F_src_rs${XYZ}$_vf(0, k, r, i) + (F_src_rs${XYZ}$_vf(1, k, &
-                                                        & r, i) - F_src_rs${XYZ}$_vf(0, k, r, i))*pi_coef_${XYZ}$ (0, 0, cbc_loc)
+                                    & r, i) - F_src_rs${XYZ}$_vf(0, k, r, i))*pi_coef_${XYZ}$ (0, 0, cbc_loc)
                             end do
                         end do
                     end do
@@ -607,7 +603,7 @@ contains
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
                 if (weno_order == 5 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
-                                                               & is3, idwbuff(2)%beg, idwbuff(3)%beg)
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     $:GPU_PARALLEL_LOOP(private='[i, j, r, k]', collapse=4)
                     do i = 1, flux_cbc_index
@@ -615,10 +611,10 @@ contains
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
                                     flux_rs${XYZ}$_vf_l(j, k, r, i) = F_rs${XYZ}$_vf(j, k, r, i) + pi_coef_${XYZ}$ (j, 0, &
-                                                        & cbc_loc)*(F_rs${XYZ}$_vf(3, k, r, i) - F_rs${XYZ}$_vf(2, k, r, &
-                                                        & i)) + pi_coef_${XYZ}$ (j, 1, cbc_loc)*(F_rs${XYZ}$_vf(2, k, r, &
-                                                        & i) - F_rs${XYZ}$_vf(1, k, r, i)) + pi_coef_${XYZ}$ (j, 2, &
-                                                        & cbc_loc)*(F_rs${XYZ}$_vf(1, k, r, i) - F_rs${XYZ}$_vf(0, k, r, i))
+                                        & cbc_loc)*(F_rs${XYZ}$_vf(3, k, r, i) - F_rs${XYZ}$_vf(2, k, r, &
+                                        & i)) + pi_coef_${XYZ}$ (j, 1, cbc_loc)*(F_rs${XYZ}$_vf(2, k, r, i) - F_rs${XYZ}$_vf(1, &
+                                        & k, r, i)) + pi_coef_${XYZ}$ (j, 2, cbc_loc)*(F_rs${XYZ}$_vf(1, k, r, &
+                                        & i) - F_rs${XYZ}$_vf(0, k, r, i))
                                 end do
                             end do
                         end do
@@ -631,11 +627,10 @@ contains
                             do r = is3%beg, is3%end
                                 do k = is2%beg, is2%end
                                     flux_src_rs${XYZ}$_vf_l(j, k, r, i) = F_src_rs${XYZ}$_vf(j, k, r, i) + (F_src_rs${XYZ}$_vf(3, &
-                                                            & k, r, i) - F_src_rs${XYZ}$_vf(2, k, r, i))*pi_coef_${XYZ}$ (j, 0, &
-                                                            & cbc_loc) + (F_src_rs${XYZ}$_vf(2, k, r, i) - F_src_rs${XYZ}$_vf(1, &
-                                                            & k, r, i))*pi_coef_${XYZ}$ (j, 1, cbc_loc) + (F_src_rs${XYZ}$_vf(1, &
-                                                            & k, r, i) - F_src_rs${XYZ}$_vf(0, k, r, i))*pi_coef_${XYZ}$ (j, 2, &
-                                                            & cbc_loc)
+                                        & k, r, i) - F_src_rs${XYZ}$_vf(2, k, r, i))*pi_coef_${XYZ}$ (j, 0, &
+                                        & cbc_loc) + (F_src_rs${XYZ}$_vf(2, k, r, i) - F_src_rs${XYZ}$_vf(1, k, r, &
+                                        & i))*pi_coef_${XYZ}$ (j, 1, cbc_loc) + (F_src_rs${XYZ}$_vf(1, k, r, &
+                                        & i) - F_src_rs${XYZ}$_vf(0, k, r, i))*pi_coef_${XYZ}$ (j, 2, cbc_loc)
                                 end do
                             end do
                         end do
@@ -759,7 +754,7 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_species
                                     dYs_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, chemxb - 1 + i)*fd_coef_${XYZ}$ (j, &
-                                           & cbc_loc) + dYs_ds(i)
+                                        & cbc_loc) + dYs_ds(i)
                                 end do
                             end if
                         end do
@@ -775,18 +770,18 @@ contains
                             & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SLIP_WALL)) then
                             call s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) &
-                                 & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
+                            & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                                                           & dvel_ds, dadv_ds, dYs_ds)
+                                & dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
+                            & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 2, momxb
                                     L(i) = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, &
-                                      & ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                        & ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
                                     L(momxb + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, dir_idx(2)))/Del_in(${CBC_DIR}$)
@@ -797,15 +792,16 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = E_idx, advxe - 1
                                     L(i) = c*Ma*(adv_local(i + 1 - E_idx) - alpha_in(i + 1 - E_idx, &
-                                      & ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                        & ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, &
-                                  & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                    & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$)) &
+                                    & /Del_in(${CBC_DIR}$)
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
+                            & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                                                            & dvel_ds, dadv_ds, dYs_ds)
+                                & dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
                                 L(advxe) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
@@ -813,24 +809,24 @@ contains
                                 ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
                                     L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, &
-                                      & dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
+                                        & dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
+                            & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, &
-                                                                         & dadv_ds)
+                                & dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_CP_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
+                            & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                                                                & dvel_ds, dadv_ds)
+                                & dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_INFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
+                            & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
                             call s_compute_supersonic_inflow_L(L)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
+                            & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_OUTFLOW)) then
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, &
-                                                                & dYs_ds)
+                                & dYs_ds)
                         end if
 
                         ! Be careful about the cylindrical coordinate!
@@ -848,7 +844,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_dims
                             dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))*(L(1) - L(advxe))/(2._wp*rho*c) + (dir_flg(dir_idx(i)) &
-                                    & - 1._wp)*L(momxb + i - 1)
+                                & - 1._wp)*L(momxb + i - 1)
                         end do
 
                         vel_dv_dt_sum = 0._wp
@@ -904,7 +900,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = momxb, momxe
                             flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                & i) + ds(0)*(vel(i - contxe)*drho_dt + rho*dvel_dt(i - contxe))
+                                & i) + ds(0)*(vel(i - contxe)*drho_dt + rho*dvel_dt(i - contxe))
                         end do
 
                         if (chemistry) then
@@ -917,24 +913,23 @@ contains
                                 #:if USING_AMD
                                     h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights_nonparameter(i) &
-                                                                       & *Cp/R_gas)*dYs_dt(i)
+                                        & *Cp/R_gas)*dYs_dt(i)
                                 #:else
                                     h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                                 #:endif
                             end do
                             flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                & E_idx) + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) &
-                                                & + sum_Enthalpies)
+                                & E_idx) + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i - 1 + chemxb) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                    & chemxb + i - 1) + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
+                                    & chemxb + i - 1) + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
                             end do
                         else
                             flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                & E_idx) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt + dqv_dt &
-                                                & + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
+                                & E_idx) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt + dqv_dt + rho*vel_dv_dt_sum &
+                                & + 5.e-1_wp*drho_dt*vel_K_sum)
                         end if
 
                         if (riemann_solver == 1) then
@@ -946,9 +941,8 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
                                 flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = 1._wp/max(abs(vel(dir_idx(1))), sgm_eps)*sign(1._wp, &
-                                                        & vel(dir_idx(1)))*(flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                        & i) + vel(dir_idx(1))*flux_src_rs${XYZ}$_vf_l(0, k, r, &
-                                                        & i) + ds(0)*dadv_dt(i - E_idx))
+                                    & vel(dir_idx(1)))*(flux_rs${XYZ}$_vf_l(0, k, r, &
+                                    & i) + vel(dir_idx(1))*flux_src_rs${XYZ}$_vf_l(0, k, r, i) + ds(0)*dadv_dt(i - E_idx))
                             end do
                         else
 
@@ -976,6 +970,7 @@ contains
         ! CBC coordinate direction.
         call s_finalize_cbc(flux_vf, flux_src_vf)
     end subroutine s_cbc
+
     !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
     !! procedures that are required for the setup of the selected CBC.
     !! @param q_prim_vf Cell-average primitive variables
@@ -1075,7 +1070,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_rsx_vf_l(j, k, r, advxb) = flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r)*sign(1._wp, &
-                                              & -1._wp*cbc_loc)
+                                & -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1103,7 +1098,7 @@ contains
                 do k = is2%beg, is2%end
                     do j = 0, buff_size
                         q_prim_rsy_vf(j, k, r, momxb + 1) = q_prim_vf(momxb + 1)%sf(k, dj*(n - 2*j) + j, r)*sign(1._wp, &
-                                      & -1._wp*cbc_loc)
+                            & -1._wp*cbc_loc)
                     end do
                 end do
             end do
@@ -1149,7 +1144,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_rsy_vf_l(j, k, r, advxb) = flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r)*sign(1._wp, &
-                                              & -1._wp*cbc_loc)
+                                & -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1223,7 +1218,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_rsz_vf_l(j, k, r, advxb) = flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j)*sign(1._wp, &
-                                              & -1._wp*cbc_loc)
+                                & -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1235,6 +1230,7 @@ contains
         ! Association of the procedural pointer to the appropriate procedure
         ! that will be utilized in the evaluation of L variables for the CBC
     end subroutine s_initialize_cbc
+
     !> Deallocation and/or the disassociation procedures that      are necessary in order to finalize the CBC application
     !! @param flux_vf Cell-boundary-average fluxes
     !! @param flux_src_vf Cell-boundary-average flux sources
@@ -1287,7 +1283,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, advxb)*sign(1._wp, &
-                                        & -1._wp*cbc_loc)
+                                & -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1337,7 +1333,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, advxb)*sign(1._wp, &
-                                        & -1._wp*cbc_loc)
+                                & -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1389,7 +1385,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
                             flux_src_vf(advxb)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, advxb)*sign(1._wp, &
-                                        & -1._wp*cbc_loc)
+                                & -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1398,6 +1394,7 @@ contains
         end if
         ! END: Reshaping Outputted Data in z-direction
     end subroutine s_finalize_cbc
+
     !> @brief Detects whether any domain boundary uses characteristic boundary conditions.
     elemental subroutine s_any_cbc_boundaries(toggle)
         logical, intent(inout) :: toggle
@@ -1410,6 +1407,7 @@ contains
             end if
         #:endfor
     end subroutine s_any_cbc_boundaries
+
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_cbc_module
         logical :: is_cbc

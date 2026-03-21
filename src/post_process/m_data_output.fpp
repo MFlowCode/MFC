@@ -5,17 +5,11 @@
 !> @brief Writes post-processed grid and flow-variable data to Silo-HDF5 or binary database files
 module m_data_output
     use m_derived_types ! Definitions of the derived types
-
     use m_global_parameters ! Global parameters
-
     use m_derived_variables     !< Procedures used to compute quantities derived
-
     use m_mpi_proxy ! Message passing interface (MPI) module proxy
-
     use m_compile_specific
-
     use m_helper
-
     use m_variables_conversion
 
     implicit none
@@ -121,7 +115,7 @@ contains
             allocate (q_sf_s(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
             if (grid_geometry == 3) then
                 allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, &
-                          & -offset_x%beg:m + offset_x%end))
+                    & -offset_x%beg:m + offset_x%end))
             end if
         end if
 
@@ -176,10 +170,10 @@ contains
 
                 if (grid_geometry == 3) then
                     dims(:) = (/n + offset_y%beg + offset_y%end + 2, p + offset_z%beg + offset_z%end + 2, &
-                         & m + offset_x%beg + offset_x%end + 2/)
+                        & m + offset_x%beg + offset_x%end + 2/)
                 else
                     dims(:) = (/m + offset_x%beg + offset_x%end + 2, n + offset_y%beg + offset_y%end + 2, &
-                         & p + offset_z%beg + offset_z%end + 2/)
+                        & p + offset_z%beg + offset_z%end + 2/)
                 end if
             else if (n > 0) then
                 lo_offset(:) = (/offset_x%beg, offset_y%beg/)
@@ -386,6 +380,7 @@ contains
 
         ! END: Querying Number of Flow Variable(s) in Binary Output
     end subroutine s_initialize_data_output_module
+
     !> @brief Compute the cell-index bounds for the user-specified partial output domain in each coordinate direction.
     impure subroutine s_define_output_region
         integer :: i
@@ -418,6 +413,7 @@ contains
             end if
         #:endfor
     end subroutine s_define_output_region
+
     !> @brief Open (or create) the Silo-HDF5 or Binary formatted database slave and master files for a given time step.
     impure subroutine s_open_formatted_database_file(t_step)
         ! Description: This subroutine opens a new formatted database file, or
@@ -468,7 +464,7 @@ contains
 
                 if (dbroot == -1) then
                     call s_mpi_abort('Unable to create Silo-HDF5 database ' // 'master file ' // trim(file_loc) // '. ' &
-                                     & // 'Exiting.')
+                        & // 'Exiting.')
                 end if
             end if
 
@@ -497,7 +493,7 @@ contains
             ! eventually be stored in it
             if (output_partial_domain) then
                 write (dbfile) x_output_idx%end - x_output_idx%beg, y_output_idx%end - y_output_idx%beg, &
-                       & z_output_idx%end - z_output_idx%beg, dbvars
+                    & z_output_idx%end - z_output_idx%beg, dbvars
             else
                 write (dbfile) m, n, p, dbvars
             end if
@@ -523,6 +519,7 @@ contains
             end if
         end if
     end subroutine s_open_formatted_database_file
+
     !> @brief Open the interface data file for appending extracted interface coordinates.
     impure subroutine s_open_intf_data_file()
         character(LEN=path_len + 3*name_len) :: file_path !<
@@ -534,6 +531,7 @@ contains
         ! Opening the simulation data file
         open (211, FILE=trim(file_path), form='formatted', POSITION='append', STATUS='unknown')
     end subroutine s_open_intf_data_file
+
     !> @brief Open the energy data file for appending volume-integrated energy budget quantities.
     impure subroutine s_open_energy_data_file()
         character(LEN=path_len + 3*name_len) :: file_path !<
@@ -545,6 +543,7 @@ contains
         ! Opening the simulation data file
         open (251, FILE=trim(file_path), form='formatted', POSITION='append', STATUS='unknown')
     end subroutine s_open_energy_data_file
+
     !> @brief Write the computational grid (cell-boundary coordinates) to the formatted database slave and master files.
     impure subroutine s_write_grid_to_formatted_database_file(t_step)
         ! Description: The general objective of this subroutine is to write the
@@ -616,7 +615,7 @@ contains
                 err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, size(spatial_extents, 1))
                 err = DBADDDOPT(optlist, DBOPT_EXTENTS, spatial_extents)
                 err = DBPUTMMESH(dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, optlist, &
-                                 & ierr)
+                    & ierr)
                 err = DBFREEOPTLIST(optlist)
             end if
 
@@ -630,10 +629,10 @@ contains
                 err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
                 if (grid_geometry == 3) then
                     err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, dims, 3, DB_DOUBLE, &
-                                  & DB_COLLINEAR, optlist, ierr)
+                        & DB_COLLINEAR, optlist, ierr)
                 else
                     err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, dims, 3, DB_DOUBLE, &
-                                  & DB_COLLINEAR, optlist, ierr)
+                        & DB_COLLINEAR, optlist, ierr)
                 end if
                 err = DBFREEOPTLIST(optlist)
             else if (n > 0) then
@@ -641,14 +640,14 @@ contains
                 err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
                 err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
                 err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, DB_F77NULL, dims, 2, DB_DOUBLE, &
-                              & DB_COLLINEAR, optlist, ierr)
+                    & DB_COLLINEAR, optlist, ierr)
                 err = DBFREEOPTLIST(optlist)
             else
                 err = DBMKOPTLIST(2, optlist)
                 err = DBADDIOPT(optlist, DBOPT_LO_OFFSET, lo_offset)
                 err = DBADDIOPT(optlist, DBOPT_HI_OFFSET, hi_offset)
                 err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, DB_F77NULL, DB_F77NULL, dims, 1, &
-                              & DB_DOUBLE, DB_COLLINEAR, optlist, ierr)
+                    & DB_DOUBLE, DB_COLLINEAR, optlist, ierr)
                 err = DBFREEOPTLIST(optlist)
             end if
             ! END: Silo-HDF5 Database Format
@@ -664,7 +663,7 @@ contains
                 else
                     if (output_partial_domain) then
                         write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), y_cb(y_output_idx%beg - 1:y_output_idx%end), &
-                               & z_cb(z_output_idx%beg - 1:z_output_idx%end)
+                            & z_cb(z_output_idx%beg - 1:z_output_idx%end)
                     else
                         write (dbfile) x_cb, y_cb, z_cb
                     end if
@@ -715,6 +714,7 @@ contains
             end if
         end if
     end subroutine s_write_grid_to_formatted_database_file
+
     !> @brief Write a single flow variable field to the formatted database slave and master files for a given time step.
     impure subroutine s_write_variable_to_formatted_database_file(varname, t_step)
         ! Description: The goal of this subroutine is to write to the formatted
@@ -776,7 +776,7 @@ contains
                 err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, 2)
                 err = DBADDDOPT(optlist, DBOPT_EXTENTS, data_extents)
                 err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
-                                & optlist, ierr)
+                    & optlist, ierr)
                 err = DBFREEOPTLIST(optlist)
             end if
 
@@ -836,17 +836,17 @@ contains
                     if (p > 0) then
                         if (grid_geometry == 3) then
                             err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, cyl_q_sf${SFX}$, &
-                                           & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                                & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
                         else
                             err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, &
-                                           & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                                & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
                         end if
                     else if (n > 0) then
                         err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, dims - 1, &
-                                       & 2, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                            & 2, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
                     else
                         err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, dims - 1, &
-                                       & 1, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                            & 1, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
                     end if
                 end if
             #:endfor
@@ -884,6 +884,7 @@ contains
             end if
         end if
     end subroutine s_write_variable_to_formatted_database_file
+
     !> Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
     !! @param t_step Current time step
     impure subroutine s_write_lag_bubbles_results_to_text(t_step)
@@ -965,7 +966,7 @@ contains
         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
         disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
-                   & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_null, ierr)
 
         allocate (MPI_IO_DATA_lg_bubbles(file_tot_part, 1:lag_io_vars))
@@ -1034,6 +1035,7 @@ contains
         call MPI_FILE_CLOSE(ifile, ierr)
 #endif
     end subroutine s_write_lag_bubbles_results_to_text
+
     !> @brief Read Lagrangian bubble restart data and write bubble positions and scalar fields to the Silo database.
     impure subroutine s_write_lag_bubbles_to_formatted_database_file(t_step)
         integer, intent(in)                            :: t_step
@@ -1140,7 +1142,7 @@ contains
 
             ! Skip extended header
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
-                       & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+                & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
 
             call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, lag_io_vars*nBub, mpi_p, status, ierr)
@@ -1191,7 +1193,7 @@ contains
             if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
 
             deallocate (bub_id, px, py, pz, ppx, ppy, ppz, vx, vy, vz, radius, rvel, rnot, rmax, rmin, dphidt, pressure, mv, mg, &
-                        & betaT, betaC)
+                & betaT, betaC)
             deallocate (MPI_IO_DATA_lg_bubbles)
         else
             call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
@@ -1201,7 +1203,7 @@ contains
 
             ! Skip extended header
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
-                       & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+                & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
 
             call MPI_FILE_READ_ALL(ifile, dummy, 0, mpi_p, status, ierr)
@@ -1241,6 +1243,7 @@ contains
         end if
 #endif
     end subroutine s_write_lag_bubbles_to_formatted_database_file
+
     !> @brief Write a single Lagrangian bubble point-variable to the Silo database slave and master files.
     subroutine s_write_lag_variable_to_formatted_database_file(varname, t_step, data, nBubs)
         character(len=*), intent(in)                  :: varname
@@ -1263,7 +1266,7 @@ contains
                 end do
                 err = DBSET2DSTRLEN(len(var_names(1)))
                 err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), num_procs, var_names, len_trim(var_names), var_types, &
-                                & DB_F77NULL, ierr)
+                    & DB_F77NULL, ierr)
             end if
 
             err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, ierr)
@@ -1276,13 +1279,14 @@ contains
                 err = DBSET2DSTRLEN(len(var_names(1)))
                 err = DBSETEMPTYOK(1)
                 err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), num_procs, var_names, len_trim(var_names), var_types, &
-                                & DB_F77NULL, ierr)
+                    & DB_F77NULL, ierr)
             end if
 
             err = DBSETEMPTYOK(1)
             err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
         end if
     end subroutine s_write_lag_variable_to_formatted_database_file
+
     impure subroutine s_write_ib_state_files()
         character(len=len_trim(case_dir) + 4*name_len) :: in_file, out_file, file_loc
         integer                                        :: iu_in, ios, i, rec_id
@@ -1308,19 +1312,19 @@ contains
                 call s_mpi_abort('Cannot open IB state output file: ' // trim(out_file))
             end if
             write (iu_out(i), &
-                   & '(A)') 'mytime fx fy fz Tau_x Tau_y Tau_z vx vy vz omega_x omega_y omega_z angle_x angle_y angle_z x_c y_c z_c'
+                & '(A)') 'mytime fx fy fz Tau_x Tau_y Tau_z vx vy vz omega_x omega_y omega_z angle_x angle_y angle_z x_c y_c z_c'
         end do
 
         do
             read (iu_in, iostat=ios) rec_time, rec_id, rec_force, rec_torque, rec_vel, rec_angular_vel, rec_angles, &
-                  & rec_centroid(1), rec_centroid(2), rec_centroid(3)
+                & rec_centroid(1), rec_centroid(2), rec_centroid(3)
             if (ios /= 0) exit
 
             if (rec_id >= 1 .and. rec_id <= num_ibs) then
                 write (iu_out(rec_id), '(19(ES24.16E3,1X))') rec_time, rec_force(1), rec_force(2), rec_force(3), rec_torque(1), &
-                       & rec_torque(2), rec_torque(3), rec_vel(1), rec_vel(2), rec_vel(3), rec_angular_vel(1), &
-                       & rec_angular_vel(2), rec_angular_vel(3), rec_angles(1), rec_angles(2), rec_angles(3), rec_centroid(1), &
-                       & rec_centroid(2), rec_centroid(3)
+                    & rec_torque(2), rec_torque(3), rec_vel(1), rec_vel(2), rec_vel(3), rec_angular_vel(1), rec_angular_vel(2), &
+                    & rec_angular_vel(3), rec_angles(1), rec_angles(2), rec_angles(3), rec_centroid(1), rec_centroid(2), &
+                    & rec_centroid(3)
             end if
         end do
 
@@ -1330,6 +1334,7 @@ contains
         end do
         deallocate (iu_out)
     end subroutine s_write_ib_state_files
+
     !> @brief Extract the volume-fraction interface contour from primitive fields and write the coordinates to the interface data
     !! file.
     impure subroutine s_write_intf_data_file(q_prim_vf)
@@ -1414,6 +1419,7 @@ contains
             end do
         end if
     end subroutine s_write_intf_data_file
+
     !> @brief Compute volume-integrated kinetic, potential, and internal energies and write the energy budget to the energy data
     !! file.
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
@@ -1504,6 +1510,7 @@ contains
             write (251, '(10X, 8F24.8)') Elp, Egint, Elk, Egk, Et, Vb, Vl, MaxMa_glb
         end if
     end subroutine s_write_energy_data_file
+
     !> @brief Close the formatted database slave file and, for the root process, the master file.
     impure subroutine s_close_formatted_database_file()
         ! Description: The purpose of this subroutine is to close any formatted
@@ -1531,14 +1538,17 @@ contains
             if (n == 0 .and. proc_rank == 0) close (dbroot)
         end if
     end subroutine s_close_formatted_database_file
+
     !> @brief Close the interface data file.
     impure subroutine s_close_intf_data_file()
         close (211)
     end subroutine s_close_intf_data_file
+
     !> @brief Close the energy data file.
     impure subroutine s_close_energy_data_file()
         close (251)
     end subroutine s_close_energy_data_file
+
     !> @brief Deallocate module arrays and release all data-output resources.
     impure subroutine s_finalize_data_output_module()
         ! Description: Deallocation procedures for the module

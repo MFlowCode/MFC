@@ -12,7 +12,7 @@ program p_main
 
     implicit none
 
-    integer                 :: t_step !< Iterator for the main time-stepping loop
+    integer                 :: t_step  !< Iterator for the main time-stepping loop
     character(LEN=name_len) :: varname !<
     !! Generic storage for the name(s) of the flow variable(s) that will be added
     !! to the formatted database file(s)

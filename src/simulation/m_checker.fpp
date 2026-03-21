@@ -8,11 +8,8 @@
 !> @brief Validates simulation input parameters for consistency and supported configurations
 module m_checker
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
     use m_helper
-
     use m_helper_basic         !< Functions to compare floating point numbers
 
     implicit none
@@ -38,12 +35,14 @@ contains
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
     end subroutine s_check_inputs
+
     !> Checks constraints on compiler options
     impure subroutine s_check_inputs_compilers
 #if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
         @:PROHIBIT(rdma_mpi, "Unsupported value of rdma_mpi for the current compiler")
 #endif
     end subroutine s_check_inputs_compilers
+
     !> Checks constraints on WENO scheme parameters
     impure subroutine s_check_inputs_weno
         character(len=5) :: numStr !< for int to string conversion
@@ -53,6 +52,7 @@ contains
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*weno_order, "For 2D simulation, n must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*weno_order, "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
     end subroutine s_check_inputs_weno
+
     !> @brief Validates that the grid resolution is sufficient for the MUSCL reconstruction order.
     impure subroutine s_check_inputs_muscl
         character(len=5) :: numStr !< for int to string conversion
@@ -62,12 +62,14 @@ contains
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*muscl_order, "For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
     end subroutine s_check_inputs_muscl
+
     !> Checks constraints on time stepping parameters
     impure subroutine s_check_inputs_time_stepping
         if (.not. cfl_dt) then
             @:PROHIBIT(dt <= 0)
         end if
     end subroutine s_check_inputs_time_stepping
+
     impure subroutine s_check_inputs_nvidia_uvm
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
         @:PROHIBIT(nv_uvm_igr_temps_on_gpu > 3 .or. nv_uvm_igr_temps_on_gpu < 0, "nv_uvm_igr_temps_on_gpu must be in the range [0, 3]")

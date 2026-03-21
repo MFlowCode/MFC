@@ -19,7 +19,7 @@ module m_chemistry
 
     #:if USING_AMD
         real(wp) :: molecular_weights_nonparameter(10) = (/2.016, 1.008, 15.999, 31.998, 17.007, 18.015, 33.006, 34.014, 39.95, &
-             & 28.014/)
+            & 28.014/)
         $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
     #:endif
 
@@ -41,6 +41,7 @@ contains
         Re_L = 1.0_wp/Re_L
         Re_R = 1.0_wp/Re_R
     end subroutine compute_viscosity_and_inversion
+
     !> @brief Initializes the temperature field from conservative variables by inverting the energy equation.
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
         ! Initialize the temperature field at the start of the simulation to
@@ -77,6 +78,7 @@ contains
             end do
         end do
     end subroutine s_compute_q_T_sf
+
     !> @brief Computes the temperature field from primitive variables using the ideal gas law and mixture molecular weight.
     subroutine s_compute_T_from_primitives(q_T_sf, q_prim_vf, bounds)
         type(scalar_field), intent(inout)                   :: q_T_sf
@@ -99,6 +101,7 @@ contains
             end do
         end do
     end subroutine s_compute_T_from_primitives
+
     !> @brief Adds chemical reaction source terms to the species transport RHS using net production rates.
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
@@ -145,6 +148,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_compute_chemistry_reaction_flux
+
     !> @brief Computes species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
     subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz)
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp
@@ -263,7 +267,7 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = chemxb, chemxe
                                 mass_diffusivities_mixavg_Cell(i - chemxb + 1) = (mass_diffusivities_mixavg2(i - chemxb + 1) &
-                                                               & + mass_diffusivities_mixavg1(i - chemxb + 1))/2.0_wp
+                                    & + mass_diffusivities_mixavg1(i - chemxb + 1))/2.0_wp
                             end do
 
                             lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
@@ -276,11 +280,10 @@ contains
                             do eqn = chemxb, chemxe
                                 #:if USING_AMD
                                     Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1) &
-                                                    & *molecular_weights_nonparameter(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn &
-                                                    & - chemxb + 1)
+                                        & *molecular_weights_nonparameter(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
                                 #:else
                                     Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1) &
-                                                    & *molecular_weights(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
+                                        & *molecular_weights(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
                                 #:endif
                                 rho_Vic = rho_Vic + Mass_Diffu_Flux(eqn - chemxb + 1)
                                 Mass_Diffu_Energy = Mass_Diffu_Energy + h_k(eqn - chemxb + 1)*Mass_Diffu_Flux(eqn - chemxb + 1)
@@ -291,7 +294,7 @@ contains
                             do eqn = chemxb, chemxe
                                 Mass_Diffu_Energy = Mass_Diffu_Energy - h_k(eqn - chemxb + 1)*Ys_cell(eqn - chemxb + 1)*rho_Vic
                                 Mass_Diffu_Flux(eqn - chemxb + 1) = Mass_Diffu_Flux(eqn - chemxb + 1) - rho_Vic*Ys_cell(eqn &
-                                                & - chemxb + 1)
+                                    & - chemxb + 1)
                             end do
 
                             ! Add thermal conduction contribution

@@ -7,9 +7,7 @@
 !> @brief MUSCL reconstruction with interface sharpening for contact-preserving advection
 module m_muscl
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_variables_conversion !< State variables type conversion procedures
 
 #ifdef MFC_OpenACC
@@ -17,7 +15,6 @@ module m_muscl
 #endif
 
     use m_mpi_proxy
-
     use m_helper
 
     private; public :: s_initialize_muscl_module, s_muscl, s_finalize_muscl_module, s_interface_compression
@@ -85,13 +82,14 @@ contains
 
         @:ALLOCATE(v_rs_ws_z_muscl(is3_muscl%beg:is3_muscl%end, is2_muscl%beg:is2_muscl%end, is1_muscl%beg:is1_muscl%end, 1:sys_size))
     end subroutine s_initialize_muscl_module
+
     !> @brief Performs MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables.
     subroutine s_muscl(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, is1_muscl_d, &
-                       & is2_muscl_d, is3_muscl_d)
+        & is2_muscl_d, is3_muscl_d)
 
         type(scalar_field), dimension(1:), intent(in)                                             :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
-             & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+            & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in)               :: muscl_dir
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
         integer                           :: j, k, l, i
@@ -185,7 +183,7 @@ contains
                                     else if (muscl_lim == 5) then ! SUPERBEE
                                         if (slopeL*slopeR > 1e-6_wp) then
                                             slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
-                                                               & 2._wp*abs(slopeR)))
+                                                & 2._wp*abs(slopeR)))
                                         end if
                                     end if
 
@@ -205,15 +203,16 @@ contains
 
         if (int_comp) then
             call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, &
-                                         & is1_muscl_d, is2_muscl_d, is3_muscl_d)
+                & is1_muscl_d, is2_muscl_d, is3_muscl_d)
         end if
     end subroutine s_muscl
+
     !> @brief Applies THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces.
     subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, &
-                                       & is1_muscl_d, is2_muscl_d, is3_muscl_d)
+        & is1_muscl_d, is2_muscl_d, is3_muscl_d)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
-             & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+            & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in)               :: muscl_dir
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
         integer                           :: j, k, l
@@ -251,9 +250,9 @@ contains
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
                                 vL_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, &
-                                                  & l, advxb)*aTHINC
+                                    & l, advxb)*aTHINC
                                 vL_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
+                                    & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
                                 vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                 vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
 
@@ -262,9 +261,9 @@ contains
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
                                 vR_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, &
-                                                  & l, advxb)*aTHINC
+                                    & l, advxb)*aTHINC
                                 vR_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
+                                    & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
                                 vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                 vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
                             end if
@@ -275,6 +274,7 @@ contains
             end if
         #:endfor
     end subroutine s_interface_compression
+
     !> @brief Reshapes cell-averaged variable data into direction-local work arrays for MUSCL reconstruction.
     subroutine s_initialize_muscl(v_vf, muscl_dir)
         type(scalar_field), dimension(:), intent(in) :: v_vf
@@ -336,6 +336,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
     end subroutine s_initialize_muscl
+
     !> @brief Deallocates the MUSCL direction-local work arrays.
     subroutine s_finalize_muscl_module()
         @:DEALLOCATE(v_rs_ws_x_muscl)

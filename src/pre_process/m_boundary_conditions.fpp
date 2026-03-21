@@ -5,15 +5,12 @@
 !> @brief Applies spatially varying boundary condition patches along domain edges and faces
 module m_boundary_conditions
     use m_derived_types
-
     use m_global_parameters
 #ifdef MFC_MPI
     use mpi
 #endif
     use m_delay_file_access
-
     use m_compile_specific
-
     use m_boundary_common
 
     implicit none
@@ -71,6 +68,7 @@ contains
             #:endfor
         end if
     end subroutine s_line_segment_bc
+
     !> @brief Applies a circular boundary condition patch on a domain face in 3D.
     impure subroutine s_circle_bc(patch_id, bc_type)
         type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
@@ -127,6 +125,7 @@ contains
             #:endfor
         end if
     end subroutine s_circle_bc
+
     !> @brief Applies a rectangular boundary condition patch on a domain face in 3D.
     impure subroutine s_rectangle_bc(patch_id, bc_type)
         type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
@@ -207,6 +206,7 @@ contains
             #:endfor
         end if
     end subroutine s_rectangle_bc
+
     !> @brief Iterates over all boundary condition patches and dispatches them by geometry type.
     impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
         type(scalar_field), dimension(sys_size)         :: q_prim_vf

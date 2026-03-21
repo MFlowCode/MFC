@@ -11,11 +11,8 @@
 module m_check_patches
     ! Dependencies
     use m_derived_types          !< Definitions of the derived types
-
     use m_global_parameters      !< Global parameters for the code
-
     use m_mpi_proxy              !< Message passing interface (MPI) module proxy
-
     use m_data_output            !< Procedures to write the grid data and the
                                  !! conservative variables to files
 
@@ -24,9 +21,7 @@ module m_check_patches
 #endif
 
     use m_compile_specific
-
     use m_helper_basic           !< Functions to compare floating point numbers
-
     use m_helper
 
     implicit none
@@ -83,7 +78,7 @@ contains
                     call s_check_model_geometry(i)
                 else
                     call s_prohibit_abort("Invalid patch geometry number", &
-                                          & "patch_icpp(" // trim(iStr) // ")%geometry " // "must be between 1 and 21")
+                        & "patch_icpp(" // trim(iStr) // ")%geometry " // "must be between 1 and 21")
                 end if
             else
                 @:PROHIBIT(patch_icpp(i)%geometry /= dflt_int, "Inactive patch defined. "// "patch_icpp("//trim(iStr)//")%geometry not be set for inactive patches. "// "Patch "//trim(iStr)//" is inactive as the number of patches is "//trim(num_patches_str))
@@ -121,6 +116,7 @@ contains
             end if
         end do
     end subroutine s_check_patches
+
     !> This subroutine checks the line segment patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_line_segment_patch_geometry(patch_id)
@@ -132,6 +128,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Line segment patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(cyl_coord, "Line segment patch "//trim(iStr)//": cyl_coord is not supported")
     end subroutine s_check_line_segment_patch_geometry
+
     !> This subroutine checks the circle patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_circle_patch_geometry(patch_id)
@@ -144,6 +141,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Circle patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Circle patch "//trim(iStr)//": y_centroid must be set")
     end subroutine s_check_circle_patch_geometry
+
     !> This subroutine checks the rectangle patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_rectangle_patch_geometry(patch_id)
@@ -157,6 +155,7 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "Rectangle patch "//trim(iStr)//": length_x must be greater than zero")
         @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Rectangle patch "//trim(iStr)//": length_y must be greater than zero")
     end subroutine s_check_rectangle_patch_geometry
+
     !> This subroutine checks the line sweep patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_line_sweep_patch_geometry(patch_id)
@@ -171,6 +170,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%normal(2)), "Line sweep patch "//trim(iStr)//": normal(2) must be set")
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%normal(3)), "Line sweep patch "//trim(iStr)//": normal(3) must not be set")
     end subroutine s_check_line_sweep_patch_geometry
+
     !> This subroutine checks the ellipse patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_ellipse_patch_geometry(patch_id)
@@ -185,6 +185,7 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%radii(2) <= 0._wp, "Ellipse patch "//trim(iStr)//": radii(2) must be greater than zero")
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%radii(3)), "Ellipse patch "//trim(iStr)//": radii(3) must not be set")
     end subroutine s_check_ellipse_patch_geometry
+
     !> This subroutine checks the model patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_2D_TaylorGreen_vortex_patch_geometry(patch_id)
@@ -199,6 +200,7 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Taylor Green vortex patch "//trim(iStr)//": length_y must be greater than zero")
         @:PROHIBIT(patch_icpp(patch_id)%vel(2) <= 0._wp, "Taylor Green vortex patch "//trim(iStr)//": vel(2) must be greater than zero")
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry
+
     !> This subroutine checks the model patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_sphere_patch_geometry(patch_id)
@@ -211,6 +213,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Sphere patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Sphere patch "//trim(iStr)//": z_centroid must be set")
     end subroutine s_check_sphere_patch_geometry
+
     impure subroutine s_check_2d_modal_patch_geometry(patch_id)
         integer, intent(in) :: patch_id
 
@@ -222,6 +225,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "2D modal patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "2D modal patch "//trim(iStr)//": y_centroid must be set")
     end subroutine s_check_2d_modal_patch_geometry
+
     impure subroutine s_check_3d_spherical_harmonic_patch_geometry(patch_id)
         integer, intent(in) :: patch_id
 
@@ -233,6 +237,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Spherical harmonic patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Spherical harmonic patch "//trim(iStr)//": z_centroid must be set")
     end subroutine s_check_3d_spherical_harmonic_patch_geometry
+
     !> This subroutine checks the model patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_cuboid_patch_geometry(patch_id)
@@ -248,6 +253,7 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Cuboid patch "//trim(iStr)//": length_y must be greater than zero")
         @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0._wp, "Cuboid patch "//trim(iStr)//": length_z must be greater than zero")
     end subroutine s_check_cuboid_patch_geometry
+
     !> This subroutine checks the model patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_cylinder_patch_geometry(patch_id)
@@ -267,6 +273,7 @@ contains
         ! Ensure the defined length is positive
         @:PROHIBIT( (.not. f_is_default(patch_icpp(patch_id)%length_x) .and. patch_icpp(patch_id)%length_x <= 0._wp) .or. (.not. f_is_default(patch_icpp(patch_id)%length_y) .and. patch_icpp(patch_id)%length_y <= 0._wp) .or. (.not. f_is_default(patch_icpp(patch_id)%length_z) .and. patch_icpp(patch_id)%length_z <= 0._wp), "Cylinder patch "//trim(iStr)//": The defined length_{} must be greater than zero")
     end subroutine s_check_cylinder_patch_geometry
+
     !> This subroutine checks the model patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_plane_sweep_patch_geometry(patch_id)
@@ -282,6 +289,7 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%normal(2)), "Plane sweep patch "//trim(iStr)//": normal(2) must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%normal(3)), "Plane sweep patch "//trim(iStr)//": normal(3) must be set")
     end subroutine s_check_plane_sweep_patch_geometry
+
     !> This subroutine checks the model patch input
     !! @param patch_id Patch identifier
     impure subroutine s_check_ellipsoid_patch_geometry(patch_id)
@@ -296,6 +304,7 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%radii(2) <= 0._wp, "Ellipsoid patch "//trim(iStr)//": radii(2) must be greater than zero")
         @:PROHIBIT(patch_icpp(patch_id)%radii(3) <= 0._wp, "Ellipsoid patch "//trim(iStr)//": radii(3) must be greater than zero")
     end subroutine s_check_ellipsoid_patch_geometry
+
     !!>  This subroutine verifies that the geometric parameters of
         !!      the inactive patch remain unaltered by the user inputs.
         !!  @param patch_id Patch identifier
@@ -319,6 +328,7 @@ contains
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%radii(2)), "Inactive patch "//trim(iStr)//": radii(2) must not be set")
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%radii(3)), "Inactive patch "//trim(iStr)//": radii(3) must not be set")
     end subroutine s_check_inactive_patch_geometry
+
     !> This subroutine verifies the active patch's right to overwrite the preceding patches
     !! @param patch_id Patch identifier
     impure subroutine s_check_active_patch_alteration_rights(patch_id)
@@ -328,6 +338,7 @@ contains
         @:PROHIBIT(.not. patch_icpp(patch_id)%alter_patch(0), "Patch "//trim(iStr)//": alter_patch(0) must be true")
         @:PROHIBIT(any(patch_icpp(patch_id)%alter_patch(patch_id:)), "Patch "//trim(iStr)// ":alter_patch(i) must be false for i >= "//trim(iStr)//". Only preceding patches can be altered")
     end subroutine s_check_active_patch_alteration_rights
+
     !> This subroutine verifies that inactive patches cannot overwrite other patches
     !! @param patch_id Patch identifier
     impure subroutine s_check_inactive_patch_alteration_rights(patch_id)
@@ -338,6 +349,7 @@ contains
         @:PROHIBIT(.not. patch_icpp(patch_id)%alter_patch(0), "Inactive patch "//trim(iStr)//": cannot have alter_patch(0) altered")
         @:PROHIBIT(any(patch_icpp(patch_id)%alter_patch(1:)), "Inactive patch "//trim(iStr)//": cannot have any alter_patch(i) enabled")
     end subroutine s_check_inactive_patch_alteration_rights
+
     !> This subroutine checks the smoothing parameters
     !! @param patch_id Patch identifier
     impure subroutine s_check_supported_patch_smoothing(patch_id)
@@ -353,6 +365,7 @@ contains
             @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%smooth_coeff), "Smoothen disabled. Patch "//trim(iStr)//": smooth_coeff must not be set")
         end if
     end subroutine s_check_supported_patch_smoothing
+
     !> This subroutine verifies that inactive patches cannot be smoothed
     !! @param patch_id Patch identifier
     impure subroutine s_check_unsupported_patch_smoothing(patch_id)
@@ -364,6 +377,7 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%smooth_patch_id /= patch_id, "Inactive patch "//trim(iStr)//": smooth_patch_id must be equal to patch_id")
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%smooth_coeff), "Inactive patch "//trim(iStr)//": smooth_coeff must not be set")
     end subroutine s_check_unsupported_patch_smoothing
+
     !> This subroutine checks the primitive variables
     !! @param patch_id Patch identifier
     impure subroutine s_check_active_patch_primitive_variables(patch_id)
@@ -404,6 +418,7 @@ contains
             !@:ASSERT(any(patch_icpp(patch_id)%Y(1:num_species) >  verysmall), "Patch " // trim(iStr) // ".")
         end if
     end subroutine s_check_active_patch_primitive_variables
+
     !> This subroutine verifies that the primitive variables associated with the given inactive patch remain unaltered by the user
     !! inputs.
     !! @param patch_id Patch identifier
@@ -419,6 +434,7 @@ contains
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%gamma), "Inactive patch "//trim(iStr)//": gamma must not be set")
         @:PROHIBIT(.not. f_is_default(patch_icpp(patch_id)%pi_inf), "Inactive patch "//trim(iStr)//": pi_inf must not be set")
     end subroutine s_check_inactive_patch_primitive_variables
+
     !> @brief Verifies that the model file referenced by the given patch exists on disk.
     impure subroutine s_check_model_geometry(patch_id)
         integer, intent(in) :: patch_id

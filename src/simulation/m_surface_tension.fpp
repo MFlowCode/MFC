@@ -9,20 +9,14 @@
 !> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
     use m_variables_conversion
-
     use m_weno
-
     use m_muscl                !< Monotonic Upstream-centered (MUSCL)
                                !! schemes for conservation laws
 
     use m_helper
-
     use m_boundary_common
 
     implicit none
@@ -67,6 +61,7 @@ contains
             @:ALLOCATE(gR_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
         end if
     end subroutine s_initialize_surface_tension_module
+
     !> @brief Computes the capillary (surface-tension) source flux from reconstructed color-gradient fields.
     subroutine s_compute_capillary_source_flux(vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, flux_src_vf, id, isx, isy, isz)
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in)       :: vSrc_rsx_vf
@@ -114,11 +109,11 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + Omega(1, i)*vSrc_rsx_vf(j, k, &
-                                            & l, i)
+                                    & l, i)
                             end do
 
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + sigma*c_divs(num_dims + 1)%sf(j, k, &
-                                        & l)*vSrc_rsx_vf(j, k, l, 1)
+                                & l)*vSrc_rsx_vf(j, k, l, 1)
                         end if
                     end do
                 end do
@@ -155,11 +150,11 @@ contains
                                     flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
 
                                     flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + Omega(2, i)*vSrc_rsy_vf(k, &
-                                                & j, l, i)
+                                        & j, l, i)
                                 end do
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, &
-                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
+                                    & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
                             end if
                         end do
                     end do
@@ -197,11 +192,11 @@ contains
                                     flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3, i)
 
                                     flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + Omega(3, i)*vSrc_rsz_vf(l, &
-                                                & k, j, i)
+                                        & k, j, i)
                                 end do
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, &
-                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
+                                    & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
                             end if
                         end do
                     end do
@@ -210,6 +205,7 @@ contains
             #:endif
         end if
     end subroutine s_compute_capillary_source_flux
+
     !> @brief Computes color-function gradients and their norms, then reconstructs them at cell boundaries.
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
         type(scalar_field), dimension(sys_size), intent(in)         :: q_prim_vf
@@ -229,7 +225,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))*(q_prim_vf(c_idx)%sf(j + 1, k, &
-                           & l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
+                        & l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
                 end do
             end do
         end do
@@ -240,7 +236,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(c_idx)%sf(j, k + 1, &
-                           & l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
+                        & l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
                 end do
             end do
         end do
@@ -252,7 +248,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(c_idx)%sf(j, k, &
-                               & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
+                            & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                     end do
                 end do
             end do
@@ -285,6 +281,7 @@ contains
             call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
     end subroutine s_get_capillary
+
     !> @brief Reconstructs left and right cell-boundary values of capillary (color-gradient) variables using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                     :: v_vf
@@ -357,6 +354,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
     end subroutine s_reconstruct_cell_boundary_values_capillary
+
     !> @brief Deallocates the color-gradient divergence and reconstructed boundary arrays for surface tension.
     impure subroutine s_finalize_surface_tension_module
         integer :: j

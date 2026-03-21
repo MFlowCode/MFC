@@ -12,15 +12,10 @@
 !> @brief Immersed boundary patch geometry constructors for 2D and 3D shapes
 module m_ib_patches
     use m_model ! Subroutine(s) related to STL files
-
     use m_derived_types ! Definitions of the derived types
-
     use m_global_parameters     !< Definitions of the global parameters
-
     use m_helper_basic          !< Functions to compare floating point numbers
-
     use m_helper
-
     use m_mpi_common
 
     implicit none
@@ -114,6 +109,7 @@ contains
             !> @}
         end if
     end subroutine s_apply_ib_patches
+
     !> The circular patch is a 2D geometry that may be used, for example, in creating a bubble or a droplet. The geometry of the
     !! patch is well-defined when its centroid and radius are provided. Note that the circular patch DOES allow for the smoothing of
     !! its boundary.
@@ -122,7 +118,7 @@ contains
         !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_circle(patch_id, ib_markers, xp, yp)
         integer, intent(in)                :: patch_id
-        integer, intent(in)                :: xp, yp !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
         type(integer_field), intent(inout) :: ib_markers
         real(wp), dimension(1:2)           :: center
         real(wp)                           :: radius
@@ -161,20 +157,21 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_circle
+
     !> @brief Marks cells inside a 2D NACA 4-digit airfoil immersed boundary using upper and lower surface grids.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
     subroutine s_ib_airfoil(patch_id, ib_markers, xp, yp)
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp           !< integers containing the periodicity projection information
         real(wp)                           :: f, ca_in, pa, ma, ta
         real(wp)                           :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer                            :: i, j, k, il, ir, jl, jr
         integer                            :: Np1, Np2
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xy_local, offset !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2)           :: center !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2)           :: center           !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
@@ -319,6 +316,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_airfoil
+
     !> @brief Marks cells inside a 3D extruded NACA 4-digit airfoil immersed boundary with finite span.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
@@ -429,7 +427,7 @@ contains
             do j = jl, jr
                 do i = il, ir
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), &
-                                      & z_cc(l) - center(3)] ! get coordinate frame centered on IB
+                        & z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
                     xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
 
@@ -478,6 +476,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_3D_airfoil
+
     !> The rectangular patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-/post- shock
     !! region, in alignment with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x- and y- coordinate directions are provided. Please note that the rectangular patch DOES NOT
@@ -488,12 +487,12 @@ contains
     subroutine s_ib_rectangle(patch_id, ib_markers, xp, yp)
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
         integer                            :: i, j, il, ir, jl, jr !< generic loop iterators
         integer                            :: encoded_patch_id
-        real(wp)                           :: corner_distance !< Equation of state parameters
-        real(wp), dimension(1:3)           :: xy_local !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2)           :: length, center !< x and y coordinates in local IB frame
+        real(wp)                           :: corner_distance      !< Equation of state parameters
+        real(wp), dimension(1:3)           :: xy_local             !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2)           :: length, center       !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
@@ -535,6 +534,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_rectangle
+
     !> The spherical patch is a 3D geometry that may be used, for example, in creating a bubble or a droplet. The patch geometry is
     !! well-defined when its centroid and radius are provided. Please note that the spherical patch DOES allow for the smoothing of
     !! its boundary.
@@ -601,6 +601,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_sphere
+
     !> The cuboidal patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-/post-shock region,
     !! which is aligned with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x-, y- and z-coordinate directions are provided. Please notice that the cuboidal patch DOES NOT
@@ -671,6 +672,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_cuboid
+
     !> The cylindrical patch is a 3D geometry that may be used, for example, in setting up a cylindrical solid boundary confinement,
     !! like a blood vessel. The geometry of this patch is well-defined when the centroid, the radius and the length along the
     !! cylinder's axis, parallel to the x-, y- or z-coordinate direction, are provided. Please note that the cylindrical patch DOES
@@ -745,16 +747,17 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_cylinder
+
     !> @brief Marks cells inside a 2D elliptical immersed boundary defined by semi-axis lengths and rotation.
     subroutine s_ib_ellipse(patch_id, ib_markers, xp, yp)
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
         integer                            :: i, j, il, ir, jl, jr !< Generic loop iterators
         integer                            :: encoded_patch_id
-        real(wp), dimension(1:3)           :: xy_local !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2)           :: ellipse_coeffs !< a and b in the ellipse coefficients
-        real(wp), dimension(1:2)           :: center !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)           :: xy_local             !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2)           :: ellipse_coeffs       !< a and b in the ellipse coefficients
+        real(wp), dimension(1:2)           :: center               !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         ! Transferring the ellipse's centroid and length information
@@ -794,14 +797,15 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_ellipse
+
     !> The STL patch is a 2D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
     subroutine s_ib_model(patch_id, ib_markers, xp, yp)
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp !< integers containing the periodicity projection information
-        integer                            :: i, j, k, il, ir, jl, jr  !< Generic loop iterators
+        integer, intent(in)                :: xp, yp                  !< integers containing the periodicity projection information
+        integer                            :: i, j, k, il, ir, jl, jr !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
         integer                            :: cx, cy
         real(wp)                           :: lx(2), ly(2)
@@ -871,6 +875,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_model
+
     !> The STL patch is a 3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
@@ -958,6 +963,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_ib_3d_model
+
     !> Subroutine that computes a rotation matrix for converting to the rotating frame of the boundary
     subroutine s_update_ib_rotation_matrix(patch_id)
         integer, intent(in)          :: patch_id
@@ -993,13 +999,14 @@ contains
             ! apply the z rotation to the xy rotation in 3D
             patch_ib(patch_id)%rotation_matrix(:,:) = matmul(patch_ib(patch_id)%rotation_matrix(:,:), rotation(3,:,:))
             patch_ib(patch_id)%rotation_matrix_inverse(:,:) = matmul(transpose(rotation(3,:,:)), &
-                     & patch_ib(patch_id)%rotation_matrix_inverse(:,:))
+                & patch_ib(patch_id)%rotation_matrix_inverse(:,:))
         else
             ! write out only the z rotation in 2D
             patch_ib(patch_id)%rotation_matrix(:,:) = rotation(3,:,:)
             patch_ib(patch_id)%rotation_matrix_inverse(:,:) = transpose(rotation(3,:,:))
         end if
     end subroutine s_update_ib_rotation_matrix
+
     !> @brief Converts cylindrical (r, theta) coordinates to Cartesian (y, z) and stores in module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1009,6 +1016,7 @@ contains
         cart_y = cyl_y*sin(cyl_z)
         cart_z = cyl_y*cos(cyl_z)
     end subroutine s_convert_cylindrical_to_cartesian_coord
+
     !> @brief Converts a 3D cylindrical coordinate vector (x, r, theta) to Cartesian (x, y, z).
     pure function f_convert_cyl_to_cart(cyl) result(cart)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1018,6 +1026,7 @@ contains
 
         cart = (/cyl(1), cyl(2)*sin(cyl(3)), cyl(2)*cos(cyl(3))/)
     end function f_convert_cyl_to_cart
+
     !> @brief Converts cylindrical coordinates (x, r) to the spherical azimuthal angle phi and stores in a module variable.
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1026,6 +1035,7 @@ contains
 
         sph_phi = atan(cyl_y/cyl_x)
     end subroutine s_convert_cylindrical_to_spherical_coord
+
     subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
         real(wp), intent(in)                         :: left_bound, right_bound
         integer, intent(inout)                       :: left_index, right_index
@@ -1062,6 +1072,7 @@ contains
         end do
         right_index = itr_right
     end subroutine get_bounding_indices
+
     !> @brief encodes the patch id with a unique offset that contains information on how the IB marker wraps periodically
     subroutine s_encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
         integer, intent(in)  :: patch_id, x_periodicity, y_periodicity, z_periodicity
@@ -1077,6 +1088,7 @@ contains
         offset = (num_ibs + 1)*temp_x_per + 3*(num_ibs + 1)*temp_y_per + 9*(num_ibs + 1)*temp_z_per
         encoded_patch_id = patch_id + offset
     end subroutine s_encode_patch_periodicity
+
     !> @brief decodes the encoded id to get out the original id and the way in which it is periodic
     subroutine s_decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1100,6 +1112,7 @@ contains
         y_periodicity = yp; if (yp == 2) y_periodicity = -1
         z_periodicity = zp; if (zp == 2) z_periodicity = -1
     end subroutine s_decode_patch_periodicity
+
     !> @brief Determines if we should wrap periodically
     subroutine s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
         integer, intent(out)           :: xp_lower, xp_upper, yp_lower, yp_upper
@@ -1129,6 +1142,7 @@ contains
             end if
         end if
     end subroutine s_get_periodicities
+
     !> Archimedes spiral function
     !! @param myth Angle
     !! @param offset Thickness

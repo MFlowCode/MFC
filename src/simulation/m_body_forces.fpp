@@ -7,11 +7,8 @@
 !> @brief Computes gravitational and user-defined body force source terms for the momentum equations
 module m_body_forces
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_variables_conversion
-
     use m_nvtx
 
     ! $:USE_GPU_MODULE()
@@ -41,6 +38,7 @@ contains
             @:ALLOCATE(rhoM(-buff_size:buff_size + m, 0:0, 0:0))
         end if
     end subroutine s_initialize_body_forces_module
+
     !> This subroutine computes the acceleration at time t
     subroutine s_compute_acceleration(t)
         real(wp), intent(in) :: t
@@ -53,6 +51,7 @@ contains
 
         $:GPU_UPDATE(device='[accel_bf]')
     end subroutine s_compute_acceleration
+
     !> This subroutine calculates the mixture density at each cell center
     !! @param q_cons_vf Conservative variables
     subroutine s_compute_mixture_density(q_cons_vf)
@@ -72,6 +71,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_compute_mixture_density
+
     !> This subroutine calculates the source term due to body forces so the system can be advanced in time
     !! @param q_cons_vf Conservative variables
     !! @param q_prim_vf Primitive variables
@@ -139,6 +139,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
     end subroutine s_compute_body_forces_rhs
+
     !> @brief Deallocates module variables used for body force computations.
     impure subroutine s_finalize_body_forces_module
         @:DEALLOCATE(rhoM)

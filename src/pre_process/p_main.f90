@@ -5,7 +5,6 @@
 !> @brief This program takes care of setting up the initial condition and              grid data for the multicomponent flow code.
 program p_main
     use m_global_parameters     !< Global parameters for the code
-
     use m_start_up
 
     implicit none

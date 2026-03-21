@@ -24,10 +24,10 @@ contains
                 do z = iz_s%beg, iz_s%end
                     if (x == ix_s%beg) then
                         divergence = (-3._wp*fields(1)%sf(x, y, z) + 4._wp*fields(1)%sf(x + 1, y, z) - fields(1)%sf(x + 2, y, &
-                                      & z))/(x_cc(x + 2) - x_cc(x))
+                            & z))/(x_cc(x + 2) - x_cc(x))
                     else if (x == ix_s%end) then
                         divergence = (+3._wp*fields(1)%sf(x, y, z) - 4._wp*fields(1)%sf(x - 1, y, z) + fields(1)%sf(x - 2, y, &
-                                      & z))/(x_cc(x) - x_cc(x - 2))
+                            & z))/(x_cc(x) - x_cc(x - 2))
                     else
                         divergence = (fields(1)%sf(x + 1, y, z) - fields(1)%sf(x - 1, y, z))/(x_cc(x + 1) - x_cc(x - 1))
                     end if
@@ -35,26 +35,26 @@ contains
                     if (n > 0) then
                         if (y == iy_s%beg) then
                             divergence = divergence + (-3._wp*fields(2)%sf(x, y, z) + 4._wp*fields(2)%sf(x, y + 1, &
-                                                       & z) - fields(2)%sf(x, y + 2, z))/(y_cc(y + 2) - y_cc(y))
+                                & z) - fields(2)%sf(x, y + 2, z))/(y_cc(y + 2) - y_cc(y))
                         else if (y == iy_s%end) then
                             divergence = divergence + (+3._wp*fields(2)%sf(x, y, z) - 4._wp*fields(2)%sf(x, y - 1, &
-                                                       & z) + fields(2)%sf(x, y - 2, z))/(y_cc(y) - y_cc(y - 2))
+                                & z) + fields(2)%sf(x, y - 2, z))/(y_cc(y) - y_cc(y - 2))
                         else
                             divergence = divergence + (fields(2)%sf(x, y + 1, z) - fields(2)%sf(x, y - 1, &
-                                                       & z))/(y_cc(y + 1) - y_cc(y - 1))
+                                & z))/(y_cc(y + 1) - y_cc(y - 1))
                         end if
                     end if
 
                     if (p > 0) then
                         if (z == iz_s%beg) then
                             divergence = divergence + (-3._wp*fields(3)%sf(x, y, z) + 4._wp*fields(3)%sf(x, y, &
-                                                       & z + 1) - fields(3)%sf(x, y, z + 2))/(z_cc(z + 2) - z_cc(z))
+                                & z + 1) - fields(3)%sf(x, y, z + 2))/(z_cc(z + 2) - z_cc(z))
                         else if (z == iz_s%end) then
                             divergence = divergence + (+3._wp*fields(3)%sf(x, y, z) - 4._wp*fields(3)%sf(x, y, &
-                                                       & z - 1) + fields(3)%sf(x, y, z - 2))/(z_cc(z) - z_cc(z - 2))
+                                & z - 1) + fields(3)%sf(x, y, z - 2))/(z_cc(z) - z_cc(z - 2))
                         else
                             divergence = divergence + (fields(3)%sf(x, y, z + 1) - fields(3)%sf(x, y, &
-                                                       & z - 1))/(z_cc(z + 1) - z_cc(z - 1))
+                                & z - 1))/(z_cc(z + 1) - z_cc(z - 1))
                         end if
                     end if
 
@@ -64,6 +64,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_compute_fd_divergence
+
     !> The purpose of this subroutine is to compute the finite- difference coefficients for the centered schemes utilized in
     !! computations of first order spatial derivatives in the s-coordinate direction. The s-coordinate direction refers to the x-,
     !! y- or z-coordinate direction, depending on the subroutine's inputs. Note that coefficients of up to 4th order accuracy are
@@ -82,7 +83,7 @@ contains
         type(int_bounds_info), optional, intent(in)                           :: offset_s
         real(wp), allocatable, dimension(:,:), intent(inout)                  :: fd_coeff_s
         real(wp), dimension(-local_buff_size:q + local_buff_size), intent(in) :: s_cc
-        integer                                                               :: i !< Generic loop iterator
+        integer                                                               :: i      !< Generic loop iterator
 
         if (present(offset_s)) then
             lB = -offset_s%beg

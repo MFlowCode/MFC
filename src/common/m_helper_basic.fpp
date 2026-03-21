@@ -40,6 +40,7 @@ contains
             res = (abs(a - b)/min(abs(a) + abs(b), huge(a)) < tol)
         end if
     end function f_approx_equal
+
     !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
     !! @param a First number.
     !! @param b Array that contains several point numbers.
@@ -68,6 +69,7 @@ contains
             end if
         end do
     end function f_approx_in_array
+
     !> Checks if a real(wp) variable is of default value.
     !! @param var Variable to check.
     logical elemental function f_is_default(var) result(res)
@@ -76,6 +78,7 @@ contains
 
         res = f_approx_equal(var, dflt_real)
     end function f_is_default
+
     !> Checks if ALL elements of a real(wp) array are of default value.
     !! @param var_array Array to check.
     logical function f_all_default(var_array) result(res)
@@ -92,6 +95,7 @@ contains
 
         ! res = all(res_array)
     end function f_all_default
+
     !> Checks if a real(wp) variable is an integer.
     !! @param var Variable to check.
     logical elemental function f_is_integer(var) result(res)
@@ -100,8 +104,9 @@ contains
 
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
+
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                             & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+        & bubbles_lagrange, m, n, p, num_dims, igr, ib)
 
         integer, intent(in)                                :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in)                                :: m, n, p, num_dims, igr_order
@@ -148,6 +153,7 @@ contains
         idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
         idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
     end subroutine s_configure_coordinate_bounds
+
     !> Updates the min and max number of cells in each set of axes
     !! @param bounds Min ans max values to update
     !! @param m Number of cells in x-axis

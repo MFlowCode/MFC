@@ -6,13 +6,9 @@
 
 module m_derived_variables
     use m_derived_types         !< Definitions of the derived types
-
     use m_global_parameters     !< Global parameters for the code
-
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-
     use m_helper_basic         !< Functions to compare floating point numbers
-
     use m_variables_conversion
 
     implicit none
@@ -85,12 +81,13 @@ contains
             flg = 0
         end if
     end subroutine s_initialize_derived_variables_module
+
     !> This subroutine receives as input the specific heat ratio function, gamma_sf, and derives from it the specific heat ratio.
     !! The latter is stored in the derived flow quantity storage variable, q_sf.
     !! @param q_sf Specific heat ratio
     subroutine s_derive_specific_heat_ratio(q_sf)
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
+            & intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -103,13 +100,14 @@ contains
             end do
         end do
     end subroutine s_derive_specific_heat_ratio
+
     !> This subroutine admits as inputs the specific heat ratio function and the liquid stiffness function, gamma_sf and pi_inf_sf,
     !! respectively. These are used to calculate the values of the liquid stiffness, which are stored in the derived flow quantity
     !! storage variable, q_sf.
     !! @param q_sf Liquid stiffness
     subroutine s_derive_liquid_stiffness(q_sf)
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
+            & intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -123,6 +121,7 @@ contains
             end do
         end do
     end subroutine s_derive_liquid_stiffness
+
     !> This subroutine admits as inputs the primitive variables, the density, the specific heat ratio function and liquid stiffness
     !! function. It then computes from those variables the values of the speed of sound, which are stored in the derived flow
     !! quantity storage variable, q_sf.
@@ -132,7 +131,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
+            & intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -147,12 +146,12 @@ contains
                     ! Compute mixture sound speed
                     if (alt_soundspeed .neqv. .true.) then
                         q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_inf_sf(i, j, &
-                             & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
+                            & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
                     else
                         blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_infs(1))/gammas(1)
                         blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_infs(2))/gammas(2)
                         q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, &
-                             & k)/blkmod1 + (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
+                            & k)/blkmod1 + (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
                     end if
 
                     if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
@@ -164,6 +163,7 @@ contains
             end do
         end do
     end subroutine s_derive_sound_speed
+
     !> This subroutine derives the flux_limiter at cell boundary i+1/2. This is an approximation because the velocity used to
     !! determine the upwind direction is the velocity at the cell center i instead of the contact velocity at the cell boundary from
     !! the Riemann solver.
@@ -175,10 +175,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
+            & intent(inout) :: q_sf
 
         real(wp) :: top, bottom, slope !< Flux limiter calcs
-        integer  :: j, k, l !< Generic loop iterators
+        integer  :: j, k, l            !< Generic loop iterators
 
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
@@ -242,6 +242,7 @@ contains
             end do
         end do
     end subroutine s_derive_flux_limiter
+
     !> Computes the solution to the linear system Ax=b w/ sol = x
     !! @param A Input matrix
     !! @param b right-hane-side
@@ -285,6 +286,7 @@ contains
             end do
         end do
     end subroutine s_solve_linear_system
+
     !> This subroutine receives as inputs the indicator of the component of the vorticity that should be outputted and the primitive
     !! variables. From those inputs, it proceeds to calculate values of the desired vorticity component, which are subsequently
     !! stored in derived flow quantity storage variable, q_sf.
@@ -296,7 +298,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
+            & intent(inout) :: q_sf
 
         integer :: j, k, l, r !< Generic loop iterators
 
@@ -310,11 +312,11 @@ contains
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
                                 q_sf(j, k, l) = q_sf(j, k, l) + 1._wp/y_cc(k)*(fd_coeff_y(r, &
-                                     & k)*y_cc(r + k)*q_prim_vf(mom_idx%end)%sf(j, r + k, l) - fd_coeff_z(r, &
-                                     & l)*q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l))
+                                    & k)*y_cc(r + k)*q_prim_vf(mom_idx%end)%sf(j, r + k, l) - fd_coeff_z(r, &
+                                    & l)*q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l))
                             else
                                 q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_y(r, k)*q_prim_vf(mom_idx%end)%sf(j, r + k, &
-                                     & l) - fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l)
+                                    & l) - fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l)
                             end if
                         end do
                     end do
@@ -331,10 +333,10 @@ contains
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
                                 q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)/y_cc(k)*q_prim_vf(mom_idx%beg)%sf(j, k, &
-                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(mom_idx%end)%sf(r + j, k, l)
+                                    & r + l) - fd_coeff_x(r, j)*q_prim_vf(mom_idx%end)%sf(r + j, k, l)
                             else
                                 q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg)%sf(j, k, &
-                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(mom_idx%end)%sf(r + j, k, l)
+                                    & r + l) - fd_coeff_x(r, j)*q_prim_vf(mom_idx%end)%sf(r + j, k, l)
                             end if
                         end do
                     end do
@@ -350,13 +352,14 @@ contains
 
                         do r = -fd_number, fd_number
                             q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_x(r, j)*q_prim_vf(mom_idx%beg + 1)%sf(r + j, k, &
-                                 & l) - fd_coeff_y(r, k)*q_prim_vf(mom_idx%beg)%sf(j, r + k, l)
+                                & l) - fd_coeff_y(r, k)*q_prim_vf(mom_idx%beg)%sf(j, r + k, l)
                         end do
                     end do
                 end do
             end do
         end if
     end subroutine s_derive_vorticity_component
+
     !> This subroutine gets as inputs the primitive variables. From those inputs, it proceeds to calculate the value of the Q_M
     !! function, which are subsequently stored in the derived flow quantity storage variable, q_sf.
     !! @param q_prim_vf Primitive variables
@@ -365,7 +368,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
+            & intent(inout) :: q_sf
 
         real(wp), dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
         real(wp)                      :: trS, Q, IIS
@@ -381,13 +384,13 @@ contains
                         do jj = 1, 3
                             ! d()/dx
                             q_jacobian_sf(jj, 1) = q_jacobian_sf(jj, 1) + fd_coeff_x(r, &
-                                          & j)*q_prim_vf(mom_idx%beg + jj - 1)%sf(r + j, k, l)
+                                & j)*q_prim_vf(mom_idx%beg + jj - 1)%sf(r + j, k, l)
                             ! d()/dy
                             q_jacobian_sf(jj, 2) = q_jacobian_sf(jj, 2) + fd_coeff_y(r, k)*q_prim_vf(mom_idx%beg + jj - 1)%sf(j, &
-                                          & r + k, l)
+                                & r + k, l)
                             ! d()/dz
                             q_jacobian_sf(jj, 3) = q_jacobian_sf(jj, 3) + fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg + jj - 1)%sf(j, &
-                                          & k, r + l)
+                                & k, r + l)
                         end do
                     end do
 
@@ -416,6 +419,7 @@ contains
             end do
         end do
     end subroutine s_derive_qm
+
     !> This subroutine gets as inputs the primitive variables. From those inputs, it proceeds to calculate the Liutex vector and its
     !! magnitude based on Xu et al. (2019).
     !! @param q_prim_vf Primitive variables
@@ -424,23 +428,23 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(out) :: liutex_mag !< Liutex magnitude
+            & intent(out) :: liutex_mag !< Liutex magnitude
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, nm), &
-             & intent(out) :: liutex_axis !< Liutex rigid rotation axis
+            & intent(out) :: liutex_axis !< Liutex rigid rotation axis
 
-        character, parameter        :: ivl = 'N' !< compute left eigenvectors
-        character, parameter        :: ivr = 'V' !< compute right eigenvectors
-        real(wp), dimension(nm, nm) :: vgt !< velocity gradient tensor
-        real(wp), dimension(nm)     :: lr, li !< real and imaginary parts of eigenvalues
-        real(wp), dimension(nm, nm) :: vl, vr !< left and right eigenvectors
-        integer, parameter          :: lwork = 4*nm !< size of work array (4*nm recommended)
-        real(wp), dimension(lwork)  :: work !< work array
+        character, parameter        :: ivl = 'N'     !< compute left eigenvectors
+        character, parameter        :: ivr = 'V'     !< compute right eigenvectors
+        real(wp), dimension(nm, nm) :: vgt           !< velocity gradient tensor
+        real(wp), dimension(nm)     :: lr, li        !< real and imaginary parts of eigenvalues
+        real(wp), dimension(nm, nm) :: vl, vr        !< left and right eigenvectors
+        integer, parameter          :: lwork = 4*nm  !< size of work array (4*nm recommended)
+        real(wp), dimension(lwork)  :: work          !< work array
         integer                     :: info
-        real(wp), dimension(nm)     :: eigvec !< real eigenvector
-        real(wp)                    :: eigvec_mag !< magnitude of real eigenvector
-        real(wp)                    :: omega_proj !< projection of vorticity on real eigenvector
-        real(wp)                    :: lci !< imaginary part of complex eigenvalue
+        real(wp), dimension(nm)     :: eigvec        !< real eigenvector
+        real(wp)                    :: eigvec_mag    !< magnitude of real eigenvector
+        real(wp)                    :: omega_proj    !< projection of vorticity on real eigenvector
+        real(wp)                    :: lci           !< imaginary part of complex eigenvalue
         real(wp)                    :: alpha
         integer                     :: j, k, l, r, i !< Generic loop iterators
         integer                     :: idx
@@ -488,7 +492,7 @@ contains
 
                     ! Compute vorticity projected on the eigenvector
                     omega_proj = (vgt(3, 2) - vgt(2, 3))*eigvec(1) + (vgt(1, 3) - vgt(3, 1))*eigvec(2) + (vgt(2, 1) - vgt(1, &
-                                  & 2))*eigvec(3)
+                        & 2))*eigvec(3)
 
                     ! As eigenvector can have +/- signs, we can choose the sign
                     ! so that omega_proj is positive
@@ -516,6 +520,7 @@ contains
             end do
         end do
     end subroutine s_derive_liutex
+
     !> This subroutine gets as inputs the conservative variables and density. From those inputs, it proceeds to calculate the values
     !! of the numerical Schlieren function, which are subsequently stored in the derived flow quantity storage variable, q_sf.
     !! @param q_cons_vf Conservative variables
@@ -524,7 +529,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
+            & intent(inout) :: q_sf
 
         real(wp) :: drho_dx, drho_dy, drho_dz !<
             !! Spatial derivatives of the density in the x-, y- and z-directions
@@ -613,7 +618,7 @@ contains
 
                         do i = 1, adv_idx%end - E_idx
                             q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + E_idx)%sf(j, k, l)*gm_rho_sf(j, k, &
-                                 & l)/gm_rho_max(1)
+                                & l)/gm_rho_max(1)
                         end do
                     end do
                 end do
@@ -625,6 +630,7 @@ contains
         ! the computation, the exponential of the inside quantity is taken.
         q_sf = exp(q_sf)
     end subroutine s_derive_numerical_schlieren_function
+
     !> Deallocation procedures for the module
     impure subroutine s_finalize_derived_variables_module
         ! Deallocating the variable containing the gradient magnitude of the

@@ -5,24 +5,16 @@
 !> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
     use m_derived_types ! Definitions of the derived types
-
     use m_global_parameters ! Global parameters for the code
-
     use m_mpi_proxy              !< Message passing interface (MPI) module proxy
-
     use m_helper
-
     use m_variables_conversion ! Subroutines to change the state variables from
     ! one form to another
 
     use m_icpp_patches
-
     use m_assign_variables
-
     use m_perturbation ! Subroutines to perturb initial flow fields
-
     use m_chemistry
-
     use m_boundary_conditions
 
     implicit none
@@ -33,8 +25,8 @@ module m_initial_condition
     ! a cell in the computational domain.
     type(scalar_field), allocatable, dimension(:)    :: q_prim_vf !< primitive variables
     type(scalar_field), allocatable, dimension(:)    :: q_cons_vf !< conservative variables
-    type(scalar_field)                               :: q_T_sf !< Temperature field
-    type(integer_field), dimension(:,:), allocatable :: bc_type !< bc_type fields
+    type(scalar_field)                               :: q_T_sf    !< Temperature field
+    type(integer_field), dimension(:,:), allocatable :: bc_type   !< bc_type fields
 
     !> @cond
 #ifdef MFC_MIXED_PRECISION
@@ -139,6 +131,7 @@ contains
         ! when it is being applied in the domain.
         patch_id_fp = 0
     end subroutine s_initialize_initial_condition_module
+
     !> This subroutine peruses the patches and depending on the type of geometry associated with a particular patch, it calls the
     !! related subroutine to setup the said geometry on the grid using the primitive variables included with the patch parameters.
     !! The subroutine is complete once the primitive variables are converted to conservative ones.
@@ -172,6 +165,7 @@ contains
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
     end subroutine s_generate_initial_condition
+
     !> Deallocation procedures for the module
     impure subroutine s_finalize_initial_condition_module
         integer :: i !< Generic loop iterator

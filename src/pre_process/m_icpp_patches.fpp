@@ -12,23 +12,14 @@
 !> @brief Constructs initial condition patch geometries (lines, circles, rectangles, spheres, etc.) on the grid
 module m_icpp_patches
     use m_model ! Subroutine(s) related to STL files
-
     use m_derived_types ! Definitions of the derived types
-
     use m_global_parameters     !< Definitions of the global parameters
-
     use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
-
     use m_helper_basic          !< Functions to compare floating point numbers
-
     use m_helper
-
     use m_mpi_common
-
     use m_assign_variables
-
     use m_mpi_common
-
     use m_variables_conversion
 
     implicit none
@@ -135,7 +126,7 @@ contains
                     ! Unimplemented patch (formerly isentropic vortex)
                 else if (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, ' &
-                                     & // 'which no longer exists. See Examples. Exiting.')
+                        & // 'which no longer exists. See Examples. Exiting.')
                     ! 2D modal (Fourier) patch
                 else if (patch_icpp(i)%geometry == 13) then
                     call s_icpp_2d_modal(i, patch_id_fp, q_prim_vf)
@@ -173,6 +164,7 @@ contains
             end do
         end if
     end subroutine s_apply_icpp_patches
+
     !> The line segment patch is a 1D geometry that may be used, for example, in creating a Riemann problem. The geometry of the
     !! patch is well-defined when its centroid and length in the x-coordinate direction are provided. Note that the line segment
     !! patch DOES NOT allow for the smearing of its boundaries.
@@ -239,6 +231,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_line_segment
+
     !> The spiral patch is a 2D geometry that may be used, The geometry of the patch is well-defined when its centroid and radius
     !! are provided. Note that the circular patch DOES allow for the smoothing of its boundary.
         !! @param patch_id patch identifier
@@ -302,6 +295,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_spiral
+
     !> The circular patch is a 2D geometry that may be used, for example, in creating a bubble or a droplet. The geometry of the
     !! patch is well-defined when its centroid and radius are provided. Note that the circular patch DOES allow for the smoothing of
     !! its boundary.
@@ -344,7 +338,7 @@ contains
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = tanh(smooth_coeff/min(dx, &
-                               & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
+                        & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                 end if
 
                 if (((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2 <= radius**2 .and. patch_icpp(patch_id) &
@@ -360,6 +354,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_circle
+
     !> The varcircle patch is a 2D geometry that may be used             . It  generatres an annulus
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
@@ -415,12 +410,13 @@ contains
                     if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                     q_prim_vf(alf_idx)%sf(i, j, &
-                              & 0) = patch_icpp(patch_id)%alpha(1)*exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
+                        & 0) = patch_icpp(patch_id)%alpha(1)*exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
                 end if
             end do
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_varcircle
+
     !> @brief Initializes a 3D variable-thickness circular annulus patch extruded along the z-axis.
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
@@ -481,13 +477,14 @@ contains
                         if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
 
                         q_prim_vf(alf_idx)%sf(i, j, &
-                                  & k) = patch_icpp(patch_id)%alpha(1)*exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
+                            & k) = patch_icpp(patch_id)%alpha(1)*exp(-0.5_wp*((myr - radius)**2._wp)/(thickness/3._wp)**2._wp)
                     end if
                 end do
             end do
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_3dvarcircle
+
     !> The elliptical patch is a 2D geometry. The geometry of the patch is well-defined when its centroid and radii are provided.
     !! Note that the elliptical patch DOES allow for the smoothing of its boundary
         !! @param patch_id is the patch identifier
@@ -529,8 +526,7 @@ contains
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = tanh(smooth_coeff/min(dx, &
-                               & dy)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2) - 1._wp))*(-0.5_wp) &
-                               & + 0.5_wp
+                        & dy)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
                 end if
 
                 if ((((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2 <= 1._wp .and. patch_icpp(patch_id) &
@@ -549,6 +545,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_ellipse
+
     !> The ellipsoidal patch is a 3D geometry. The geometry of the patch is well-defined when its centroid and radii are provided.
     !! Note that the ellipsoidal patch DOES allow for the smoothing of its boundary
         !! @param patch_id is the patch identifier
@@ -603,8 +600,8 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = tanh(smooth_coeff/min(dx, dy, &
-                                   & dz)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z &
-                                   & - z_centroid)/c)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
+                            & dz)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c) &
+                            & **2) - 1._wp))*(-0.5_wp) + 0.5_wp
                     end if
 
                     if ((((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c) &
@@ -625,6 +622,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_ellipsoid
+
     !> The rectangular patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-/post- shock
     !! region, in alignment with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x- and y- coordinate directions are provided. Please note that the rectangular patch DOES NOT
@@ -640,7 +638,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< generic loop iterators
+        integer                                                  :: i, j, k                  !< generic loop iterators
         real(wp)                                                 :: pi_inf, gamma, lit_gamma !< Equation of state parameters
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -688,8 +686,7 @@ contains
                         if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                             ! zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i, j, 0) = (((q_prim_vf(E_idx)%sf(i, j, &
-                                      & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp - q_prim_vf(alf_idx) &
-                                      & %sf(i, j, 0))
+                                & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp - q_prim_vf(alf_idx) %sf(i, j, 0))
                         end if
 
                         ! Updating the patch identities bookkeeping variable
@@ -700,6 +697,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_rectangle
+
     !> The swept line patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-/post- shock
     !! region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-defined
     !! when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep line patch DOES allow
@@ -762,6 +760,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_sweep_line
+
     !> The Taylor Green vortex is 2D decaying vortex that may be used, for example, to verify the effects of viscous attenuation.
     !! Geometry of the patch is well-defined when its centroid are provided.
         !! @param patch_id is the patch identifier
@@ -775,9 +774,9 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< generic loop iterators
+        integer                                                  :: i, j, k                  !< generic loop iterators
         real(wp)                                                 :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        real(wp)                                                 :: L0, U0 !< Taylor Green Vortex parameters
+        real(wp)                                                 :: L0, U0                   !< Taylor Green Vortex parameters
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
@@ -830,13 +829,14 @@ contains
                     q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
                     q_prim_vf(mom_idx%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
                     q_prim_vf(E_idx)%sf(i, j, &
-                              & 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + cos(2*y_cc(j))/L0)*(q_prim_vf(1)%sf(i, j, &
-                              & 0)*U0*U0)/16
+                        & 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + cos(2*y_cc(j))/L0)*(q_prim_vf(1)%sf(i, j, &
+                        & 0)*U0*U0)/16
                 end if
             end do
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_2D_TaylorGreen_Vortex
+
     !> @brief Initializes a 1D bubble-pulse patch with analytical primitive variable profiles.
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
@@ -897,6 +897,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_1D_bubble_pulse
+
     !> 2D modal (Fourier) patch. theta = atan2(y - y_centroid, x - x_centroid). Additive (modal_use_exp_form false): R = radius +
     !! sum_n [fourier_cos*cos(n*theta)+fourier_sin*sin(n*theta)]; coefficients are absolute (same units as radius). R is clipped to
     !! max(R,0). If modal_clip_r_to_min, R = max(R, modal_r_min). Exponential (modal_use_exp_form true): R = radius*exp(sum);
@@ -929,7 +930,7 @@ contains
                 sum_series = 0._wp
                 do nn = 1, max_2d_fourier_modes
                     sum_series = sum_series + patch_icpp(patch_id)%fourier_cos(nn)*cos(real(nn, &
-                                                         & wp)*theta) + patch_icpp(patch_id)%fourier_sin(nn)*sin(real(nn, wp)*theta)
+                        & wp)*theta) + patch_icpp(patch_id)%fourier_sin(nn)*sin(real(nn, wp)*theta)
                 end do
                 if (patch_icpp(patch_id)%modal_use_exp_form) then
                     R_boundary = patch_icpp(patch_id)%radius*exp(sum_series)
@@ -950,6 +951,7 @@ contains
             end do
         end do
     end subroutine s_icpp_2d_modal
+
     !> 3D spherical harmonic patch. Surface r = radius + sum_lm sph_har_coeff(l,m)*Y_lm(theta,phi). theta = acos(z/r), phi =
     !! atan2(y,x) relative to centroid.
     subroutine s_icpp_3d_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
@@ -1009,6 +1011,7 @@ contains
             end do
         end do
     end subroutine s_icpp_3d_spherical_harmonic
+
     !> The spherical patch is a 3D geometry that may be used, for example, in creating a bubble or a droplet. The patch geometry is
     !! well-defined when its centroid and radius are provided. Please note that the spherical patch DOES allow for the smoothing of
     !! its boundary.
@@ -1063,8 +1066,8 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = tanh(smooth_coeff/min(dx, dy, &
-                                   & dz)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) &
-                                   & - radius))*(-0.5_wp) + 0.5_wp
+                            & dz)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius) &
+                            & )*(-0.5_wp) + 0.5_wp
                     end if
 
                     if ((((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2 <= radius**2) &
@@ -1082,6 +1085,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_sphere
+
     !> The cuboidal patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-/post-shock region,
     !! which is aligned with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x-, y- and z-coordinate directions are provided. Please notice that the cuboidal patch DOES NOT
@@ -1157,6 +1161,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_cuboid
+
     !> The cylindrical patch is a 3D geometry that may be used, for example, in setting up a cylindrical solid boundary confinement,
     !! like a blood vessel. The geometry of this patch is well-defined when the centroid, the radius and the length along the
     !! cylinder's axis, parallel to the x-, y- or z-coordinate direction, are provided. Please note that the cylindrical patch DOES
@@ -1220,16 +1225,13 @@ contains
                     if (patch_icpp(patch_id)%smoothen) then
                         if (.not. f_is_default(length_x)) then
                             eta = tanh(smooth_coeff/min(dy, &
-                                       & dz)*(sqrt((cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                                & dz)*(sqrt((cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                         else if (.not. f_is_default(length_y)) then
                             eta = tanh(smooth_coeff/min(dx, &
-                                       & dz)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                                & dz)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                         else
                             eta = tanh(smooth_coeff/min(dx, &
-                                       & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                                & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                         end if
                     end if
 
@@ -1256,6 +1258,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_cylinder
+
     !> The swept plane patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-/post- shock
     !! region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-defined
     !! when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep plane patch DOES allow
@@ -1310,7 +1313,7 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy, &
-                                                       & dz)*(a*x_cc(i) + b*cart_y + c*cart_z + d)/sqrt(a**2 + b**2 + c**2))
+                            & dz)*(a*x_cc(i) + b*cart_y + c*cart_z + d)/sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &
@@ -1330,6 +1333,7 @@ contains
         end do
         @:HardcodedDellacation()
     end subroutine s_icpp_sweep_plane
+
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
@@ -1459,6 +1463,7 @@ contains
 
         call s_model_free(model)
     end subroutine s_icpp_model
+
     !> @brief Converts cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1468,6 +1473,7 @@ contains
         cart_y = cyl_y*sin(cyl_z)
         cart_z = cyl_y*cos(cyl_z)
     end subroutine s_convert_cylindrical_to_cartesian_coord
+
     !> @brief Returns a 3D Cartesian coordinate vector from a cylindrical (x, r, theta) input vector.
     function f_convert_cyl_to_cart(cyl) result(cart)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1477,6 +1483,7 @@ contains
 
         cart = (/cyl(1), cyl(2)*sin(cyl(3)), cyl(2)*cos(cyl(3))/)
     end function f_convert_cyl_to_cart
+
     !> @brief Computes the spherical azimuthal angle from cylindrical (x, r) coordinates.
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1485,6 +1492,7 @@ contains
 
         sph_phi = atan(cyl_y/cyl_x)
     end subroutine s_convert_cylindrical_to_spherical_coord
+
     !> Archimedes spiral function
     !! @param myth Angle
     !! @param offset Thickness

@@ -9,7 +9,7 @@ module m_nvtx
     implicit none
 
     integer, private :: col(7) = [int(Z'0000ff00'), int(Z'000000ff'), int(Z'00ffff00'), int(Z'00ff00ff'), int(Z'0000ffff'), &
-                            & int(Z'00ff0000'), int(Z'00ffffff')]
+        & int(Z'00ff0000'), int(Z'00ffffff')]
 
     character(len=256), private :: tempName
 
@@ -70,6 +70,7 @@ contains
         end if
 #endif
     end subroutine nvtxStartRange
+
     !> @brief Pops the current NVTX range to end the GPU profiling region.
     subroutine nvtxEndRange
 #if defined(MFC_GPU) && defined(__PGI)

@@ -9,17 +9,11 @@ module m_data_input
 #endif
 
     use m_derived_types         !< Definitions of the derived types
-
     use m_global_parameters     !< Global parameters for the code
-
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-
     use m_mpi_common
-
     use m_compile_specific
-
     use m_boundary_common
-
     use m_helper
 
     implicit none
@@ -93,6 +87,7 @@ contains
         ! Computing the cell-center locations
         cc_array(0:size_dim) = cb_array(-1:size_dim - 1) + d_array(0:size_dim)/2._wp
     end subroutine s_read_grid_data_direction
+
 #ifdef MFC_MPI
     !> Helper subroutine to setup MPI data I/O parameters
     !! @param data_size Local array size (output)
@@ -122,6 +117,7 @@ contains
         str_MOK = int(name_len, MPI_OFFSET_KIND)
         NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
     end subroutine s_setup_mpi_io_params
+
 #endif
 
     !> Helper subroutine to read IB data files
@@ -182,6 +178,7 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
     end subroutine s_read_ib_data_files
+
     !> Helper subroutine to allocate field arrays for given dimensionality
     !! @param local_start_idx Starting index for allocation
     !! @param end_x End index for x dimension
@@ -204,6 +201,7 @@ contains
             allocate (q_T_sf%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end if
     end subroutine s_allocate_field_arrays
+
     !> This subroutine is called at each time-step that has to be post-processed in order to read the raw data files present in the
     !! corresponding time-step directory and to populate the associated grid and conservative variables.
     !! @param t_step Current time-step
@@ -285,6 +283,7 @@ contains
         ! Reading IB data using helper subroutine
         call s_read_ib_data_files(t_step_dir)
     end subroutine s_read_serial_data_files
+
     !> This subroutine is called at each time-step that has to be post-processed in order to parallel-read the raw data files
     !! present in the corresponding time-step directory and to populate the associated grid and conservative variables.
     !! @param t_step Current time-step
@@ -414,6 +413,7 @@ contains
         end if
 #endif
     end subroutine s_read_parallel_data_files
+
 #ifdef MFC_MPI
     !> Helper subroutine to read parallel conservative variable data
     !! @param t_step Current time-step
@@ -526,6 +526,7 @@ contains
             end if
         end if
     end subroutine s_read_parallel_conservative_data
+
 #endif
 
     !> Computation of parameters, allocation procedures, and/or      any other tasks needed to properly setup the module
@@ -582,6 +583,7 @@ contains
             s_read_data_files => s_read_parallel_data_files
         end if
     end subroutine s_initialize_data_input_module
+
     !> Deallocation procedures for the module
     impure subroutine s_finalize_data_input_module
         integer :: i !< Generic loop iterator

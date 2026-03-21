@@ -8,13 +8,9 @@
 !> @brief Assigns initial primitive variables to computational cells based on patch geometry
 module m_assign_variables
     use m_derived_types ! Definitions of the derived types
-
     use m_global_parameters ! Global parameters for the code
-
     use m_variables_conversion ! Subroutines to change the state variables from
-
     use m_helper_basic          !< Functions to compare floating point numbers
-
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
 
     implicit none
@@ -75,6 +71,7 @@ contains
             s_assign_patch_primitive_variables => s_assign_patch_species_primitive_variables
         end if
     end subroutine s_initialize_assign_variables_module
+
     !> This subroutine assigns the mixture primitive variables of the patch designated by the patch_id, to the cell that is
     !! designated by the indexes (j,k,l). In addition, the variable bookkeeping the patch identities in the entire domain is updated
     !! with the new assignment. Note that if the smoothing of the patch's boundaries is employed, the ensuing primitive variables in
@@ -115,8 +112,8 @@ contains
         ! Velocity
         do i = 1, E_idx - mom_idx%beg
             q_prim_vf(i + 1)%sf(j, k, l) = 1._wp/q_prim_vf(1)%sf(j, k, &
-                      & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*patch_icpp(smooth_patch_id) &
-                      & %rho*patch_icpp(smooth_patch_id)%vel(i))
+                & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*patch_icpp(smooth_patch_id) &
+                & %rho*patch_icpp(smooth_patch_id)%vel(i))
         end do
 
         ! Specific heat ratio function
@@ -124,8 +121,8 @@ contains
 
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = 1._wp/q_prim_vf(gamma_idx)%sf(j, k, &
-                  & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta)*patch_icpp(smooth_patch_id) &
-                  & %gamma*patch_icpp(smooth_patch_id)%pres)
+            & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta)*patch_icpp(smooth_patch_id) &
+            & %gamma*patch_icpp(smooth_patch_id)%pres)
 
         ! Liquid stiffness function
         q_prim_vf(pi_inf_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%pi_inf + (1._wp - eta)*patch_icpp(smooth_patch_id)%pi_inf
@@ -156,6 +153,7 @@ contains
         ! Updating the patch identities bookkeeping variable
         if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
     end subroutine s_assign_patch_mixture_primitive_variables
+
     !> @brief Applies a stable pressure perturbation following Ando's method for bubble-laden flows.
     !! @param j the x-dir node index
     !! @param k the y-dir node index
@@ -181,7 +179,7 @@ contains
         if (qbmm) then
             do i = 1, nb
                 q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, &
-                          & l)*((p0 - bub_pp%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - bub_pp%pv))**(1._wp/3._wp)
+                    & l)*((p0 - bub_pp%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - bub_pp%pv))**(1._wp/3._wp)
             end do
         end if
 
@@ -228,6 +226,7 @@ contains
 
         q_prim_vf(alf_idx)%sf(j, k, l) = vfH
     end subroutine s_perturb_primitive
+
     !> This subroutine assigns the species primitive variables. This follows s_assign_patch_species_primitive_variables with
     !! adaptation for ensemble-averaged bubble modeling
         !! @param patch_id the patch identifier
@@ -253,11 +252,11 @@ contains
         ! Density, the specific heat ratio function and the liquid stiffness
         ! function, respectively, obtained from the combination of primitive
         ! variables of the current and smoothing patches
-        real(wp)                       :: rho         !< density
+        real(wp)                       :: rho          !< density
         real(wp)                       :: gamma
-        real(wp)                       :: lit_gamma   !< specific heat ratio
-        real(wp)                       :: pi_inf      !< stiffness from SEOS
-        real(wp)                       :: qv          !< reference energy from SEOS
+        real(wp)                       :: lit_gamma    !< specific heat ratio
+        real(wp)                       :: pi_inf       !< stiffness from SEOS
+        real(wp)                       :: qv           !< reference energy from SEOS
         real(wp)                       :: orig_rho
         real(wp)                       :: orig_gamma
         real(wp)                       :: orig_pi_inf
@@ -328,7 +327,7 @@ contains
         ! Density and the specific heat ratio and liquid stiffness functions
         ! call s_convert_species_to_mixture_variables( &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, patch_icpp(patch_id)%rho, patch_icpp(patch_id)%gamma, &
-                                            & patch_icpp(patch_id)%pi_inf, patch_icpp(patch_id)%qv)
+            & patch_icpp(patch_id)%pi_inf, patch_icpp(patch_id)%qv)
 
         ! Computing Mixture Variables of Smoothing Patch
 
@@ -403,8 +402,7 @@ contains
         ! Density and the specific heat ratio and liquid stiffness functions
         ! call s_convert_species_to_mixture_variables( &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, patch_icpp(smooth_patch_id)%rho, &
-                                            & patch_icpp(smooth_patch_id)%gamma, patch_icpp(smooth_patch_id)%pi_inf, &
-                                            & patch_icpp(smooth_patch_id)%qv)
+            & patch_icpp(smooth_patch_id)%gamma, patch_icpp(smooth_patch_id)%pi_inf, patch_icpp(smooth_patch_id)%qv)
 
         ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = (eta*patch_icpp(patch_id)%pres + (1._wp - eta)*orig_prim_vf(E_idx))
@@ -431,7 +429,7 @@ contains
         if (elasticity) then
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
                 q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, &
-                          & l) = (eta*patch_icpp(patch_id)%tau_e(i) + (1._wp - eta)*orig_prim_vf(i + stress_idx%beg - 1))
+                    & l) = (eta*patch_icpp(patch_id)%tau_e(i) + (1._wp - eta)*orig_prim_vf(i + stress_idx%beg - 1))
             end do
         end if
 
@@ -484,7 +482,7 @@ contains
 
             ! \rho = (( p_l + pi_inf)/( p_ref + pi_inf))**(1/little_gam) * rhoref(1-alf)
             q_prim_vf(1)%sf(j, k, l) = (((q_prim_vf(E_idx)%sf(j, k, &
-                      & l) + pi_inf)/(pref + pi_inf))**(1/lit_gamma))*rhoref*(1 - q_prim_vf(alf_idx)%sf(j, k, l))
+                & l) + pi_inf)/(pref + pi_inf))**(1/lit_gamma))*rhoref*(1 - q_prim_vf(alf_idx)%sf(j, k, l))
         end if
 
         ! Density and the specific heat ratio and liquid stiffness functions
@@ -494,7 +492,7 @@ contains
         ! Velocity
         do i = 1, E_idx - mom_idx%beg
             q_prim_vf(i + cont_idx%end)%sf(j, k, &
-                      & l) = (eta*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*orig_prim_vf(i + cont_idx%end))
+                & l) = (eta*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
         ! Species Concentrations
@@ -525,8 +523,8 @@ contains
         ! Set streamwise velocity to hyperbolic tangent function of y
         if (mixlayer_vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, &
-                      & l) = (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)*mixlayer_vel_coef) + (1._wp - eta)*orig_prim_vf(1 &
-                      & + cont_idx%end))
+                & l) = (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)*mixlayer_vel_coef) + (1._wp - eta)*orig_prim_vf(1 &
+                & + cont_idx%end))
         end if
 
         ! Set partial pressures to mixture pressure for the 6-eqn model
@@ -619,6 +617,7 @@ contains
         !     print *, (bub_idx%fullmom(i, 1, 0), i = 1, nb)
         ! end if
     end subroutine s_assign_patch_species_primitive_variables
+
     !> @brief Nullifies the patch primitive variable assignment procedure pointer.
     impure subroutine s_finalize_assign_variables_module
         ! Nullifying procedure pointer to the subroutine assigning either

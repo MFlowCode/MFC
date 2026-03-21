@@ -8,15 +8,10 @@
 !> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
     use m_mpi_common
-
     use m_variables_conversion !< State variables type conversion procedures
-
     use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
                                !! schemes for spatial reconstruction of variables
 
@@ -24,61 +19,36 @@ module m_start_up
                                !! schemes for convservation laws
 
     use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
-
     use m_cbc                  !< Characteristic boundary conditions (CBC)
-
     use m_boundary_common
-
     use m_acoustic_src      !< Acoustic source calculations
-
     use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
-
     use m_chemistry            !< Chemistry module
-
     use m_data_output          !< Run-time info & solution data output procedures
-
     use m_time_steppers        !< Time-stepping algorithms
-
     use m_qbmm                 !< Quadrature MOM
-
     use m_derived_variables     !< Procedures used to compute quantities derived
                                 !! from the conservative and primitive variables
     use m_hypoelastic
-
     use m_hyperelastic
-
     use m_phase_change          !< Phase-change module
-
     use m_viscous
-
     use m_bubbles_EE            !< Ensemble-averaged bubble dynamics routines
-
     use m_bubbles_EL            !< Lagrange bubble dynamics routines
-
     use ieee_arithmetic
-
     use m_helper_basic          !< Functions to compare floating point numbers
-
     use m_helper
 
     $:USE_GPU_MODULE()
 
     use m_nvtx
-
     use m_ibm
-
     use m_compile_specific
-
     use m_checker_common
-
     use m_checker
-
     use m_surface_tension
-
     use m_body_forces
-
     use m_sim_helpers
-
     use m_igr
 
     implicit none
@@ -102,6 +72,7 @@ contains
             call s_read_parallel_data_files(q_cons_vf)
         end if
     end subroutine s_read_data_files
+
     !> The purpose of this procedure is to first verify that an input file has been made available by the user. Provided that this
     !! is so, the input file is then read in.
     impure subroutine s_read_input_file
@@ -184,6 +155,7 @@ contains
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
     end subroutine s_read_input_file
+
     !> The goal of this procedure is to verify that each of the user provided inputs is valid and that their combination constitutes
     !! a meaningful configuration for the simulation.
     impure subroutine s_check_input_file
@@ -205,6 +177,7 @@ contains
         call s_check_inputs_common()
         call s_check_inputs()
     end subroutine s_check_input_file
+
     !> @brief Reads serial initial condition and grid data files and computes cell-width distributions.
         !! @param q_cons_vf Cell-averaged conservative variables
     impure subroutine s_read_serial_data_files(q_cons_vf)
@@ -260,7 +233,7 @@ contains
             do i = 1, num_ibs
                 if (patch_ib(i)%c > 0) then
                     Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
+                        & *20) + 1
                 end if
             end do
         end if
@@ -340,6 +313,7 @@ contains
             end if
         end if
     end subroutine s_read_serial_data_files
+
     !> @brief Reads parallel initial condition and grid data files via MPI I/O.
         !! @param q_cons_vf Conservative variables
     impure subroutine s_read_parallel_data_files(q_cons_vf)
@@ -403,7 +377,7 @@ contains
             do i = 1, num_ibs
                 if (patch_ib(i)%c > 0) then
                     Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
+                        & *20) + 1
                     allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
                 end if
             end do
@@ -622,6 +596,7 @@ contains
         end if
 #endif
     end subroutine s_read_parallel_data_files
+
     !> The purpose of this procedure is to initialize the values of the internal-energy equations of each phase from the mass of
     !! each phase, the mixture momentum and mixture-total-energy equations.
         !! @param v_vf conservative variables
@@ -663,21 +638,22 @@ contains
                             pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, l)**2)
                         else
                             pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, &
-                                               & l)**2 + v_vf(B_idx%beg + 2)%sf(j, k, l)**2)
+                                & l)**2 + v_vf(B_idx%beg + 2)%sf(j, k, l)**2)
                         end if
                     end if
 
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._stp, dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                            & pres_mag=pres_mag)
+                        & pres_mag=pres_mag)
 
                     do i = 1, num_fluids
                         v_vf(i + intxb - 1)%sf(j, k, l) = v_vf(i + advxb - 1)%sf(j, k, &
-                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
+                            & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
                     end do
                 end do
             end do
         end do
     end subroutine s_initialize_internal_energy_equations
+
     !> @brief Advances the simulation by one time step, handling CFL-based dt and time-stepper dispatch.
     impure subroutine s_perform_time_step(t_step, time_avg)
         integer, intent(inout)  :: t_step
@@ -738,9 +714,10 @@ contains
         ! Time-stepping loop controls
         t_step = t_step + 1
     end subroutine s_perform_time_step
+
     !> @brief Collects per-process wall-clock times and writes aggregate performance metrics to file.
     impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
-                                                 & file_exists)
+        & file_exists)
 
         real(wp), intent(inout)               :: time_avg, time_final
         real(wp), intent(inout)               :: io_time_avg, io_time_final
@@ -769,7 +746,7 @@ contains
             end if
 
             grind_time = time_final*1.0e9_wp/(real(sys_size, wp)*real(maxval((/1, m_glb/)), wp)*real(maxval((/1, n_glb/)), &
-                                              & wp)*real(maxval((/1, p_glb/)), wp))
+                & wp)*real(maxval((/1, p_glb/)), wp))
 
             print *, "Performance:", grind_time, "ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
@@ -796,6 +773,7 @@ contains
             close (1)
         end if
     end subroutine s_save_performance_metrics
+
     !> @brief Saves conservative variable data to disk at the current time step.
     impure subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
         integer, intent(inout)  :: t_step
@@ -856,8 +834,8 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, &
-            & intfc_vel, bub_R0, Rmax_stats, Rmin_stats, bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
+            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
+            & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
             do i = 1, nBubs
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
@@ -887,6 +865,7 @@ contains
             io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
         end if
     end subroutine s_save_data
+
     !> @brief Initializes all simulation sub-modules in the required dependency order.
     impure subroutine s_initialize_modules
         integer  :: m_ds, n_ds, p_ds
@@ -994,6 +973,7 @@ contains
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
     end subroutine s_initialize_modules
+
     !> @brief Sets up the MPI execution environment, binds GPUs, and decomposes the computational domain.
     impure subroutine s_initialize_mpi_domain
         integer :: ierr
@@ -1071,6 +1051,7 @@ contains
 
         call s_mpi_decompose_computational_domain()
     end subroutine s_initialize_mpi_domain
+
     !> @brief Transfers initial conservative variable and model parameter data to the GPU device.
     subroutine s_initialize_gpu_vars
         integer :: i
@@ -1090,16 +1071,15 @@ contains
 
         $:GPU_UPDATE(device='[chem_params]')
 
-        $:GPU_UPDATE(device='[R0ref,p0ref,rho0ref,ss,pv,vd,mu_l,mu_v,mu_g, &
-        & gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, &
-            & omegaN, bubbles_euler, polytropic, polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, &
-            & adap_dt_tol, adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
+        $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
+        & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, polytropic, &
+            & polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, n_idx, &
+            & pi_fac, low_Mach]')
 
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight, R0]')
             if (.not. polytropic) then
-                $:GPU_UPDATE(device='[pb0,Pe_T,k_g,k_v,mass_g0,mass_v0, &
-                & Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c]')
+                $:GPU_UPDATE(device='[pb0, Pe_T, k_g, k_v, mass_g0, mass_v0, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c]')
             else if (qbmm) then
                 $:GPU_UPDATE(device='[pb0]')
             end if
@@ -1139,6 +1119,7 @@ contains
             end block
         #:endif
     end subroutine s_initialize_gpu_vars
+
     !> @brief Finalizes and deallocates all simulation sub-modules in reverse initialization order.
     impure subroutine s_finalize_modules
         call s_finalize_time_steppers_module()

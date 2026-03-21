@@ -8,11 +8,8 @@
 !> @brief Shared input validation checks for grid dimensions and AMD GPU compiler limits
 module m_checker_common
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
     use m_helper_basic         !< Functions to compare floating point numbers
-
     use m_helper
 
     implicit none
@@ -29,6 +26,7 @@ contains
             call s_check_amd
         #:endif
     end subroutine s_check_inputs_common
+
 #ifndef MFC_SIMULATION
 
     !> @brief Verifies that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.
@@ -41,6 +39,7 @@ contains
 
         @:PROHIBIT(nGlobal < min_cells, "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // "which is currently "//trim(numStr))
     end subroutine s_check_total_cells
+
 #endif
 
     !> @brief Checks that simulation parameters stay within AMD GPU compiler limits when case optimization is disabled.
@@ -51,6 +50,7 @@ contains
             @:PROHIBIT(chemistry .and. num_species /= 10, "num_species = 10 for AMDFLang when Case optimization is off")
         #:endif
     end subroutine s_check_amd
+
 #ifndef MFC_POST_PROCESS
 #endif
 end module m_checker_common

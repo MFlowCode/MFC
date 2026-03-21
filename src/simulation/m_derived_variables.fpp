@@ -8,17 +8,11 @@
 
 module m_derived_variables
     use m_derived_types         !< Definitions of the derived types
-
     use m_global_parameters     !< Global parameters for the code
-
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-
     use m_data_output           !< Data output module
-
     use m_compile_specific
-
     use m_helper
-
     use m_finite_differences
 
     implicit none
@@ -75,6 +69,7 @@ contains
             end if
         end if
     end subroutine s_initialize_derived_variables_module
+
     !> Allocate and open derived variables. Computing FD coefficients.
     impure subroutine s_initialize_derived_variables
         if (probe_wrt) then
@@ -97,6 +92,7 @@ contains
             end if
         end if
     end subroutine s_initialize_derived_variables
+
     !> Writes coherent body information, communication files, and probes.
     !! @param t_step Current time-step
     !! @param q_cons_vf Conservative variables
@@ -112,11 +108,11 @@ contains
             call s_derive_acceleration_component(1, q_prim_ts1(1)%vf, q_prim_ts1(2)%vf, q_prim_ts2(1)%vf, q_prim_ts2(2)%vf, x_accel)
             if (n > 0) then
                 call s_derive_acceleration_component(2, q_prim_ts1(1)%vf, q_prim_ts1(2)%vf, q_prim_ts2(1)%vf, q_prim_ts2(2)%vf, &
-                                                     & y_accel)
+                    & y_accel)
             end if
             if (p > 0) then
                 call s_derive_acceleration_component(3, q_prim_ts1(1)%vf, q_prim_ts1(2)%vf, q_prim_ts2(1)%vf, q_prim_ts2(2)%vf, &
-                                                     & z_accel)
+                    & z_accel)
             end if
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
@@ -144,6 +140,7 @@ contains
             call s_write_com_files(t_step, c_mass)
         end if
     end subroutine s_compute_derived_variables
+
     !> This subroutine receives as inputs the indicator of the component of the acceleration that should be outputted and the
     !! primitive variables. From those inputs, it proceeds to calculate values of the desired acceleration component, which are
     !! subsequently stored in derived flow quantity storage variable, q_sf.
@@ -169,7 +166,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_sf(j, k, l) = (11._wp*q_prim_vf0(momxb)%sf(j, k, l) - 18._wp*q_prim_vf1(momxb)%sf(j, k, &
-                             & l) + 9._wp*q_prim_vf2(momxb)%sf(j, k, l) - 2._wp*q_prim_vf3(momxb)%sf(j, k, l))/(6._wp*dt)
+                            & l) + 9._wp*q_prim_vf2(momxb)%sf(j, k, l) - 2._wp*q_prim_vf3(momxb)%sf(j, k, l))/(6._wp*dt)
                     end do
                 end do
             end do
@@ -182,7 +179,7 @@ contains
                         do j = 0, m
                             do r = -fd_number, fd_number
                                 q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                     & j)*q_prim_vf0(momxb)%sf(r + j, k, l)
+                                    & j)*q_prim_vf0(momxb)%sf(r + j, k, l)
                             end do
                         end do
                     end do
@@ -195,8 +192,8 @@ contains
                         do j = 0, m
                             do r = -fd_number, fd_number
                                 q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                     & j)*q_prim_vf0(momxb)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
-                                     & k)*q_prim_vf0(momxb)%sf(j, r + k, l)
+                                    & j)*q_prim_vf0(momxb)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
+                                    & k)*q_prim_vf0(momxb)%sf(j, r + k, l)
                             end do
                         end do
                     end do
@@ -210,9 +207,9 @@ contains
                             do j = 0, m
                                 do r = -fd_number, fd_number
                                     q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                         & j)*q_prim_vf0(momxb)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
-                                         & k)*q_prim_vf0(momxb)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
-                                         & l)*q_prim_vf0(momxb)%sf(j, k, r + l)/y_cc(k)
+                                        & j)*q_prim_vf0(momxb)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
+                                        & k)*q_prim_vf0(momxb)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
+                                        & l)*q_prim_vf0(momxb)%sf(j, k, r + l)/y_cc(k)
                                 end do
                             end do
                         end do
@@ -225,9 +222,9 @@ contains
                             do j = 0, m
                                 do r = -fd_number, fd_number
                                     q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                         & j)*q_prim_vf0(momxb)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
-                                         & k)*q_prim_vf0(momxb)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
-                                         & l)*q_prim_vf0(momxb)%sf(j, k, r + l)
+                                        & j)*q_prim_vf0(momxb)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
+                                        & k)*q_prim_vf0(momxb)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
+                                        & l)*q_prim_vf0(momxb)%sf(j, k, r + l)
                                 end do
                             end do
                         end do
@@ -242,7 +239,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_sf(j, k, l) = (11._wp*q_prim_vf0(momxb + 1)%sf(j, k, l) - 18._wp*q_prim_vf1(momxb + 1)%sf(j, k, &
-                             & l) + 9._wp*q_prim_vf2(momxb + 1)%sf(j, k, l) - 2._wp*q_prim_vf3(momxb + 1)%sf(j, k, l))/(6._wp*dt)
+                            & l) + 9._wp*q_prim_vf2(momxb + 1)%sf(j, k, l) - 2._wp*q_prim_vf3(momxb + 1)%sf(j, k, l))/(6._wp*dt)
                     end do
                 end do
             end do
@@ -255,8 +252,8 @@ contains
                         do j = 0, m
                             do r = -fd_number, fd_number
                                 q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                     & j)*q_prim_vf0(momxb + 1)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
-                                     & k)*q_prim_vf0(momxb + 1)%sf(j, r + k, l)
+                                    & j)*q_prim_vf0(momxb + 1)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
+                                    & k)*q_prim_vf0(momxb + 1)%sf(j, r + k, l)
                             end do
                         end do
                     end do
@@ -270,10 +267,10 @@ contains
                             do j = 0, m
                                 do r = -fd_number, fd_number
                                     q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                         & j)*q_prim_vf0(momxb + 1)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, &
-                                         & l)*fd_coeff_y(r, k)*q_prim_vf0(momxb + 1)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, &
-                                         & l)*fd_coeff_z(r, l)*q_prim_vf0(momxb + 1)%sf(j, k, &
-                                         & r + l)/y_cc(k) - (q_prim_vf0(momxe)%sf(j, k, l)**2._wp)/y_cc(k)
+                                        & j)*q_prim_vf0(momxb + 1)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, &
+                                        & l)*fd_coeff_y(r, k)*q_prim_vf0(momxb + 1)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, &
+                                        & l)*fd_coeff_z(r, l)*q_prim_vf0(momxb + 1)%sf(j, k, &
+                                        & r + l)/y_cc(k) - (q_prim_vf0(momxe)%sf(j, k, l)**2._wp)/y_cc(k)
                                 end do
                             end do
                         end do
@@ -286,9 +283,9 @@ contains
                             do j = 0, m
                                 do r = -fd_number, fd_number
                                     q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                         & j)*q_prim_vf0(momxb + 1)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, &
-                                         & l)*fd_coeff_y(r, k)*q_prim_vf0(momxb + 1)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, &
-                                         & l)*fd_coeff_z(r, l)*q_prim_vf0(momxb + 1)%sf(j, k, r + l)
+                                        & j)*q_prim_vf0(momxb + 1)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, &
+                                        & l)*fd_coeff_y(r, k)*q_prim_vf0(momxb + 1)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, &
+                                        & l)*fd_coeff_z(r, l)*q_prim_vf0(momxb + 1)%sf(j, k, r + l)
                                 end do
                             end do
                         end do
@@ -303,7 +300,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_sf(j, k, l) = (11._wp*q_prim_vf0(momxe)%sf(j, k, l) - 18._wp*q_prim_vf1(momxe)%sf(j, k, &
-                             & l) + 9._wp*q_prim_vf2(momxe)%sf(j, k, l) - 2._wp*q_prim_vf3(momxe)%sf(j, k, l))/(6._wp*dt)
+                            & l) + 9._wp*q_prim_vf2(momxe)%sf(j, k, l) - 2._wp*q_prim_vf3(momxe)%sf(j, k, l))/(6._wp*dt)
                     end do
                 end do
             end do
@@ -316,10 +313,10 @@ contains
                         do j = 0, m
                             do r = -fd_number, fd_number
                                 q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                     & j)*q_prim_vf0(momxe)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
-                                     & k)*q_prim_vf0(momxe)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
-                                     & l)*q_prim_vf0(momxe)%sf(j, k, r + l)/y_cc(k) + (q_prim_vf0(momxe)%sf(j, k, &
-                                     & l)*q_prim_vf0(momxb + 1)%sf(j, k, l))/y_cc(k)
+                                    & j)*q_prim_vf0(momxe)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
+                                    & k)*q_prim_vf0(momxe)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
+                                    & l)*q_prim_vf0(momxe)%sf(j, k, r + l)/y_cc(k) + (q_prim_vf0(momxe)%sf(j, k, &
+                                    & l)*q_prim_vf0(momxb + 1)%sf(j, k, l))/y_cc(k)
                             end do
                         end do
                     end do
@@ -332,9 +329,9 @@ contains
                         do j = 0, m
                             do r = -fd_number, fd_number
                                 q_sf(j, k, l) = q_sf(j, k, l) + q_prim_vf0(momxb)%sf(j, k, l)*fd_coeff_x(r, &
-                                     & j)*q_prim_vf0(momxe)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
-                                     & k)*q_prim_vf0(momxe)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
-                                     & l)*q_prim_vf0(momxe)%sf(j, k, r + l)
+                                    & j)*q_prim_vf0(momxe)%sf(r + j, k, l) + q_prim_vf0(momxb + 1)%sf(j, k, l)*fd_coeff_y(r, &
+                                    & k)*q_prim_vf0(momxe)%sf(j, r + k, l) + q_prim_vf0(momxe)%sf(j, k, l)*fd_coeff_z(r, &
+                                    & l)*q_prim_vf0(momxe)%sf(j, k, r + l)
                             end do
                         end do
                     end do
@@ -343,6 +340,7 @@ contains
             end if
         end if
     end subroutine s_derive_acceleration_component
+
     !> This subroutine is used together with the volume fraction model and when called upon, it computes the location of of the
     !! center of mass for each fluid from the inputted primitive variables, q_prim_vf. The computed location is then written to a
     !! formatted data file by the root process.
@@ -503,6 +501,7 @@ contains
             end do
         end if
     end subroutine s_derive_center_of_mass
+
     !> Deallocation procedures for the module
     impure subroutine s_finalize_derived_variables_module
         ! Closing CoM and flow probe files

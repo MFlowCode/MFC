@@ -10,15 +10,10 @@ module m_phase_change
 #ifndef MFC_POST_PROCESS
 
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
     use m_variables_conversion !< State variables type conversion procedures
-
     use ieee_arithmetic
-
     use m_helper_basic         !< Functions to compare floating point numbers
 
     implicit none
@@ -28,12 +23,12 @@ module m_phase_change
 
     !> @name Parameters for the first order transition phase change
     !> @{
-    integer, parameter  :: max_iter = 1e8_wp        !< max # of iterations
-    real(wp), parameter :: pCr = 4.94e7_wp   !< Critical water pressure
-    real(wp), parameter :: TCr = 385.05_wp + 273.15_wp  !< Critical water temperature
-    real(wp), parameter :: mixM = 1.0e-8_wp !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
-    integer, parameter  :: lp = 1    !< index for the liquid phase of the reacting fluid
-    integer, parameter  :: vp = 2    !< index for the vapor phase of the reacting fluid
+    integer, parameter  :: max_iter = 1e8_wp           !< max # of iterations
+    real(wp), parameter :: pCr = 4.94e7_wp             !< Critical water pressure
+    real(wp), parameter :: TCr = 385.05_wp + 273.15_wp !< Critical water temperature
+    real(wp), parameter :: mixM = 1.0e-8_wp            !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
+    integer, parameter  :: lp = 1                      !< index for the liquid phase of the reacting fluid
+    integer, parameter  :: vp = 2                      !< index for the vapor phase of the reacting fluid
     !> @}
 
     !> @name Gibbs free energy phase change parameters
@@ -52,6 +47,7 @@ contains
         ! was never assigned
         @:ASSERT(.false., "s_relaxation_solver called but it currently does nothing")
     end subroutine s_relaxation_solver
+
     !> The purpose of this subroutine is to initialize the phase change module by setting the parameters needed for phase change and
     !! selecting the phase change module that will be used (pT- or pTg-equilibrium)
     impure subroutine s_initialize_phasechange_module
@@ -64,6 +60,7 @@ contains
 
         D = ((gs_min(lp) - 1.0_wp)*cvs(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
     end subroutine s_initialize_phasechange_module
+
     !> This subroutine is created to activate either the pT- (N fluids) or the pTg-equilibrium (2 fluids for g-equilibrium) model,
     !! also considering mass depletion, depending on the incoming state conditions.
     !! @param q_cons_vf Cell-average conservative variables
@@ -71,10 +68,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp)                                               :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
         real(wp)                                               :: TS, TSOV, TSSL, TSatOV, &
-             & TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
-        real(wp) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
+            & TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
+        real(wp) :: rhoe, dynE, rhos     !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
-        real(wp) :: TvF !< total volume fraction
+        real(wp) :: TvF                  !< total volume fraction
 
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
@@ -258,6 +255,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
     end subroutine s_infinite_relaxation_k
+
     !> This auxiliary subroutine is created to activate the pT-equilibrium for N fluids
     !! @param j generic loop iterator for x direction
     !! @param k generic loop iterator for y direction
@@ -280,7 +278,7 @@ contains
         real(wp), intent(out)                               :: TS
         real(wp)                                            :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
         real(wp)                                            :: p_infpT_sum
-        integer                                             :: i, ns !< generic loop iterators
+        integer                                             :: i, ns                    !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0_wp; mQ = 0.0_wp; p_infpT_sum = 0._wp
@@ -347,7 +345,7 @@ contains
                 gp = gp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + contxb - 1)%sf(j, k, l)*cvs(i)*(rhoe + pS - mQ)/(mCP*(pS + p_infpT(i)))
 
                 gpp = gpp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + contxb - 1)%sf(j, k, &
-                             & l)*cvs(i)*(p_infpT(i) - rhoe + mQ)/(mCP*(pS + p_infpT(i))**2)
+                    & l)*cvs(i)*(p_infpT(i) - rhoe + mQ)/(mCP*(pS + p_infpT(i))**2)
             end do
 
             hp = 1.0_wp/(rhoe + pS - mQ) + 1.0_wp/(pS + minval(p_infpT))
@@ -359,6 +357,7 @@ contains
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
     end subroutine s_infinite_pt_relaxation_k
+
     !> This auxiliary subroutine is created to activate the pTg-equilibrium for N fluids under pT and 2 fluids under
     !! pTg-equilibrium. There is a final common p and T during relaxation
     !! @param j generic loop iterator for x direction
@@ -384,7 +383,7 @@ contains
             real(wp), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
         #:endif
         real(wp), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
-        real(wp), dimension(2)    :: R2D, DeltamP !< residual and correction array
+        real(wp), dimension(2)    :: R2D, DeltamP      !< residual and correction array
         real(wp)                  :: Om ! underrelaxation factor
         real(wp)                  :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD ! auxiliary variables for the pTg-solver
         real(wp)                  :: ml, mT, dFdT, dTdm, dTdp
@@ -415,7 +414,7 @@ contains
         R2D(1) = 0.0_wp; R2D(2) = 0.0_wp
         DeltamP(1) = 0.0_wp; DeltamP(2) = 0.0_wp
         do while (((sqrt(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) .and. ((sqrt(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1.e6_wp) &
-                  & )) .or. (ns == 0))
+            & )) .or. (ns == 0))
 
             ! Updating counter for the iterative procedure
             ns = ns + 1
@@ -455,15 +454,15 @@ contains
             mT = q_cons_vf(lp + contxb - 1)%sf(j, k, l) + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
             TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp) &
-                    & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
+                & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
 
             dFdT = -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TS) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) - 1)*log(pS &
-                     & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))
+                & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))
 
             dTdm = -(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))*TS**2
 
             dTdp = (mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2 + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp))**2 - cvs(vp) &
-                    & *(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) + mCVGP2)*TS**2
+                & *(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) + mCVGP2)*TS**2
 
             ! F = (F1,F2) is the function whose roots we are looking for
             ! x = (m1, p) are the independent variables. m1 = mass of the first participant fluid, p = pressure
@@ -529,7 +528,7 @@ contains
             mT = q_cons_vf(lp + contxb - 1)%sf(j, k, l) + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
             TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp) &
-                    & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
+                & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
 
             ! Gibbs Free Energy Equality condition (DG)
             R2D(1) = TS*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*(1 - log(TS)) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) &
@@ -544,6 +543,7 @@ contains
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
     end subroutine s_infinite_ptg_relaxation_k
+
     !> This auxiliary subroutine corrects the partial densities of the REACTING fluids in case one of them is negative but their sum
     !! is positive. Inert phases are not corrected at this moment
     !! @param MCT partial density correction parameter
@@ -588,6 +588,7 @@ contains
             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = MCT*rM
         end if
     end subroutine s_correct_partial_densities
+
     !> This auxiliary subroutine finds the Saturation temperature for a given      saturation pressure through a newton solver
     !! @param pSat Saturation Pressure
     !! @param TSat Saturation Temperature
@@ -629,11 +630,11 @@ contains
 
                 ! calculating residual
                 FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*(1 - log(TSat)) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) &
-                           & - 1)*log(pSat + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))) + qvs(lp) - qvs(vp)
+                    & - 1)*log(pSat + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))) + qvs(lp) - qvs(vp)
 
                 ! calculating the jacobian
                 dFdT = -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TSat) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) - 1) &
-                         & *log(pSat + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))
+                    & *log(pSat + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))
 
                 ! updating saturation temperature
                 TSat = TSat - Om*FT/dFdT
@@ -642,8 +643,10 @@ contains
             end do
         end if
     end subroutine s_TSat
+
     !> This subroutine finalizes the phase change module
     impure subroutine s_finalize_relaxation_solver_module
     end subroutine s_finalize_relaxation_solver_module
+
 #endif
 end module m_phase_change

@@ -9,11 +9,8 @@ module m_mpi_proxy
 #endif
 
     use m_derived_types         !< Definitions of the derived types
-
     use m_global_parameters     !< Global parameters for the code
-
     use m_mpi_common
-
     use ieee_arithmetic
 
     implicit none
@@ -30,7 +27,7 @@ contains
     impure subroutine s_initialize_mpi_proxy_module
 #ifdef MFC_MPI
 
-        integer :: i !< Generic loop iterator
+        integer :: i    !< Generic loop iterator
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Allocating and configuring the receive counts and the displacement
@@ -57,11 +54,12 @@ contains
         end if
 #endif
     end subroutine s_initialize_mpi_proxy_module
+
     !> Since only processor with rank 0 is in charge of reading and checking the consistency of the user provided inputs, these are
     !! not available to the remaining processors. This subroutine is then in charge of broadcasting the required information.
     impure subroutine s_mpi_bcast_user_inputs
 #ifdef MFC_MPI
-        integer :: i !< Generic loop iterator
+        integer :: i    !< Generic loop iterator
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         ! Logistics
@@ -135,6 +133,7 @@ contains
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine s_mpi_bcast_user_inputs
+
     !> This subroutine gathers the Silo database metadata for the spatial extents in order to boost the performance of the
     !! multidimensional visualization.
     ! ! @param spatial_extents Spatial extents for each processor's sub-domain. First dimension corresponds to the minimum and
@@ -151,51 +150,51 @@ contains
             if (grid_geometry == 3) then
                 ! Minimum spatial extent in the r-direction
                 call MPI_GATHERV(minval(y_cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Minimum spatial extent in the theta-direction
                 call MPI_GATHERV(minval(z_cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Minimum spatial extent in the z-direction
                 call MPI_GATHERV(minval(x_cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Maximum spatial extent in the r-direction
                 call MPI_GATHERV(maxval(y_cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Maximum spatial extent in the theta-direction
                 call MPI_GATHERV(maxval(z_cb), 1, mpi_p, spatial_extents(5, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Maximum spatial extent in the z-direction
                 call MPI_GATHERV(maxval(x_cb), 1, mpi_p, spatial_extents(6, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
             else
                 ! Minimum spatial extent in the x-direction
                 call MPI_GATHERV(minval(x_cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Minimum spatial extent in the y-direction
                 call MPI_GATHERV(minval(y_cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Minimum spatial extent in the z-direction
                 call MPI_GATHERV(minval(z_cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Maximum spatial extent in the x-direction
                 call MPI_GATHERV(maxval(x_cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Maximum spatial extent in the y-direction
                 call MPI_GATHERV(maxval(y_cb), 1, mpi_p, spatial_extents(5, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
 
                 ! Maximum spatial extent in the z-direction
                 call MPI_GATHERV(maxval(z_cb), 1, mpi_p, spatial_extents(6, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
-                                 & ierr)
+                    & ierr)
             end if
             ! Simulation is 2D
         else if (n > 0) then
@@ -226,6 +225,7 @@ contains
         end if
 #endif
     end subroutine s_mpi_gather_spatial_extents
+
     !> This subroutine collects the sub-domain cell-boundary or cell-center locations data from all of the processors and puts back
     !! together the grid of the entire computational domain on the rank 0 processor. This is only done for 1D simulations.
     impure subroutine s_mpi_defragment_1d_grid_variable
@@ -245,6 +245,7 @@ contains
         end if
 #endif
     end subroutine s_mpi_defragment_1d_grid_variable
+
     !> This subroutine gathers the Silo database metadata for the flow variable's extents as to boost performance of the
     !! multidimensional visualization.
     !! @param q_sf Flow variable defined on a single computational sub-domain
@@ -279,6 +280,7 @@ contains
         end if
 #endif
     end subroutine s_mpi_gather_data_extents
+
     !> This subroutine gathers the sub-domain flow variable data from all of the processors and puts it back together for the entire
     !! computational domain on the rank 0 processor. This is only done for 1D simulations.
     !! @param q_sf Flow variable defined on a single computational sub-domain
@@ -296,6 +298,7 @@ contains
         call MPI_GATHERV(q_sf(0), m + 1, mpi_p, q_root_sf(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine s_mpi_defragment_1d_flow_variable
+
     !> Deallocation procedures for the module
     impure subroutine s_finalize_mpi_proxy_module
 #ifdef MFC_MPI

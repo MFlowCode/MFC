@@ -10,11 +10,8 @@
 !! fraction model.
 program p_main
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_start_up
-
     use m_time_steppers
-
     use m_nvtx
 
     implicit none
@@ -71,13 +68,13 @@ program p_main
         if (cfl_dt) then
             if (mytime >= t_stop) then
                 call s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
-                                                & file_exists)
+                    & file_exists)
                 exit
             end if
         else
             if (t_step == t_step_stop) then
                 call s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
-                                                & file_exists)
+                    & file_exists)
                 exit
             end if
         end if

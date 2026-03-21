@@ -11,17 +11,15 @@ module m_global_parameters
 #endif
 
     use m_derived_types         !< Definitions of the derived types
-
     use m_helper_basic          !< Functions to compare floating point numbers
-
     use m_thermochem, only: num_species, species_names
 
     implicit none
 
     !> @name Logistics
     !> @{
-    integer                 :: num_procs            !< Number of processors
-    character(LEN=path_len) :: case_dir             !< Case folder location
+    integer                 :: num_procs !< Number of processors
+    character(LEN=path_len) :: case_dir  !< Case folder location
     !> @}
 
     ! Computational Domain Parameters
@@ -74,9 +72,9 @@ module m_global_parameters
     !! region, this region is used to store information outside the computational
     !! domain based on the boundary conditions.
 
-    integer :: t_step_start  !< First time-step directory
-    integer :: t_step_stop   !< Last time-step directory
-    integer :: t_step_save   !< Interval between consecutive time-step directory
+    integer :: t_step_start !< First time-step directory
+    integer :: t_step_stop  !< Last time-step directory
+    integer :: t_step_save  !< Interval between consecutive time-step directory
 
     !> @name IO options for adaptive time-stepping
     !> @{
@@ -94,28 +92,28 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    integer            :: model_eqns      !< Multicomponent flow model
-    integer            :: num_fluids      !< Number of different fluids present in the flow
-    logical            :: relax           !< phase change
-    integer            :: relax_model     !< Phase change relaxation model
-    logical            :: mpp_lim         !< Maximum volume fraction limiter
-    integer            :: sys_size        !< Number of unknowns in the system of equations
-    integer            :: recon_type      !< Which type of reconstruction to use
-    integer            :: weno_order      !< Order of accuracy for the WENO reconstruction
-    integer            :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
-    logical            :: mixture_err     !< Mixture error limiter
-    logical            :: alt_soundspeed  !< Alternate sound speed
-    logical            :: mhd             !< Magnetohydrodynamics
-    logical            :: relativity      !< Relativity for RMHD
-    logical            :: hypoelasticity  !< Turn hypoelasticity on
-    logical            :: hyperelasticity !< Turn hyperelasticity on
-    logical            :: elasticity      !< elasticity modeling, true for hyper or hypo
-    integer            :: b_size          !< Number of components in the b tensor
-    integer            :: tensor_size     !< Number of components in the nonsymmetric tensor
-    logical            :: cont_damage     !< Continuum damage modeling
-    logical            :: hyper_cleaning  !< Hyperbolic cleaning for MHD
-    logical            :: igr             !< enable IGR
-    integer            :: igr_order       !< IGR reconstruction order
+    integer            :: model_eqns                  !< Multicomponent flow model
+    integer            :: num_fluids                  !< Number of different fluids present in the flow
+    logical            :: relax                       !< phase change
+    integer            :: relax_model                 !< Phase change relaxation model
+    logical            :: mpp_lim                     !< Maximum volume fraction limiter
+    integer            :: sys_size                    !< Number of unknowns in the system of equations
+    integer            :: recon_type                  !< Which type of reconstruction to use
+    integer            :: weno_order                  !< Order of accuracy for the WENO reconstruction
+    integer            :: muscl_order                 !< Order of accuracy for the MUSCL reconstruction
+    logical            :: mixture_err                 !< Mixture error limiter
+    logical            :: alt_soundspeed              !< Alternate sound speed
+    logical            :: mhd                         !< Magnetohydrodynamics
+    logical            :: relativity                  !< Relativity for RMHD
+    logical            :: hypoelasticity              !< Turn hypoelasticity on
+    logical            :: hyperelasticity             !< Turn hyperelasticity on
+    logical            :: elasticity                  !< elasticity modeling, true for hyper or hypo
+    integer            :: b_size                      !< Number of components in the b tensor
+    integer            :: tensor_size                 !< Number of components in the nonsymmetric tensor
+    logical            :: cont_damage                 !< Continuum damage modeling
+    logical            :: hyper_cleaning              !< Hyperbolic cleaning for MHD
+    logical            :: igr                         !< enable IGR
+    integer            :: igr_order                   !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
@@ -123,24 +121,24 @@ module m_global_parameters
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
-    type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
-    type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
-    integer               :: E_idx                               !< Index of energy equation
-    integer               :: n_idx                               !< Index of number density
-    integer               :: beta_idx                            !< Index of lagrange bubbles beta
-    type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
-    type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
-    type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer               :: gamma_idx                           !< Index of specific heat ratio func. eqn.
-    integer               :: alf_idx                             !< Index of specific heat ratio func. eqn.
-    integer               :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
-    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
-    type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
-    type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
-    integer               :: c_idx                               !< Index of color function
-    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
-    integer               :: damage_idx                          !< Index of damage state variable (D) for continuum damage model
-    integer               :: psi_idx                                 !< Index of hyperbolic cleaning state variable for MHD
+    type(int_bounds_info) :: cont_idx             !< Indexes of first & last continuity eqns.
+    type(int_bounds_info) :: mom_idx              !< Indexes of first & last momentum eqns.
+    integer               :: E_idx                !< Index of energy equation
+    integer               :: n_idx                !< Index of number density
+    integer               :: beta_idx             !< Index of lagrange bubbles beta
+    type(int_bounds_info) :: adv_idx              !< Indexes of first & last advection eqns.
+    type(int_bounds_info) :: internalEnergies_idx !< Indexes of first & last internal energy eqns.
+    type(bub_bounds_info) :: bub_idx              !< Indexes of first & last bubble variable eqns.
+    integer               :: gamma_idx            !< Index of specific heat ratio func. eqn.
+    integer               :: alf_idx              !< Index of specific heat ratio func. eqn.
+    integer               :: pi_inf_idx           !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                !< Indexes of first and last magnetic field eqns.
+    type(int_bounds_info) :: stress_idx           !< Indices of elastic stresses
+    type(int_bounds_info) :: xi_idx               !< Indexes of first and last reference map eqns.
+    integer               :: c_idx                !< Index of color function
+    type(int_bounds_info) :: species_idx          !< Indexes of first & last concentration eqns.
+    integer               :: damage_idx           !< Index of damage state variable (D) for continuum damage model
+    integer               :: psi_idx              !< Index of hyperbolic cleaning state variable for MHD
     !> @}
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
@@ -167,10 +165,10 @@ module m_global_parameters
     !! Indices of shear stress components to reflect for boundary conditions.
     !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
 
-    logical                            :: parallel_io    !< Format of the data files
+    logical                            :: parallel_io      !< Format of the data files
     logical                            :: sim_data
     logical                            :: file_per_process !< output format
-    integer, allocatable, dimension(:) :: proc_coords !<
+    integer, allocatable, dimension(:) :: proc_coords      !<
     !! Processor coordinates in MPI_CART_COMM
 
     integer, allocatable, dimension(:) :: start_idx !<
@@ -204,11 +202,11 @@ module m_global_parameters
 
     ! Formatted Database File(s) Structure Parameters
 
-    integer               :: format !< Format of the database file(s)
-    integer               :: precision !< Floating point precision of the database file(s)
-    logical               :: down_sample !< down sampling of the database file(s)
-    logical               :: output_partial_domain !< Specify portion of domain to output for post-processing
-    type(bounds_info)     :: x_output, y_output, z_output !< Portion of domain to output for post-processing
+    integer               :: format                                   !< Format of the database file(s)
+    integer               :: precision                                !< Floating point precision of the database file(s)
+    logical               :: down_sample                              !< down sampling of the database file(s)
+    logical               :: output_partial_domain                    !< Specify portion of domain to output for post-processing
+    type(bounds_info)     :: x_output, y_output, z_output             !< Portion of domain to output for post-processing
     type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx !< Indices of domain to output for post-processing
 
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions. The definition of the ghost zone layers is only
@@ -338,7 +336,7 @@ module m_global_parameters
     logical :: bubbles_lagrange
     !> @}
 
-    real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+    real(wp) :: Bx0                      !< Constant magnetic field in the x-direction (1D)
     real(wp) :: wall_time, wall_time_avg !< Wall time measurements
 contains
 
@@ -535,6 +533,7 @@ contains
         ! MHD
         Bx0 = dflt_real
     end subroutine s_assign_default_values_to_user_inputs
+
     !> Computation of parameters, allocation procedures, and/or      any other tasks needed to properly setup the module
     impure subroutine s_initialize_global_parameters_module
         integer :: i, j, fac
@@ -945,6 +944,7 @@ contains
             grid_geometry = 3
         end if
     end subroutine s_initialize_global_parameters_module
+
     !> Subroutine to initialize parallel infrastructure
     impure subroutine s_initialize_parallel_io
 #ifdef MFC_MPI
@@ -979,6 +979,7 @@ contains
         allocate (start_idx(1:num_dims))
 #endif
     end subroutine s_initialize_parallel_io
+
     !> Deallocation procedures for the module
     impure subroutine s_finalize_global_parameters_module
         integer :: i

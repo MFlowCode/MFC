@@ -7,33 +7,22 @@
 !> @brief Reads and validates user inputs, loads existing grid/IC data, and initializes pre-process modules
 module m_start_up
     use m_derived_types         !< Definitions of the derived types
-
     use m_global_parameters     !< Global parameters for the code
-
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-
     use m_mpi_common
-
     use m_variables_conversion  !< Subroutines to change the state variables from
                                 !! one form to another
 
     use m_grid                  !< Procedures to generate (non-)uniform grids
-
     use m_initial_condition     !< Procedures to generate initial condition
-
     use m_data_output           !< Procedures to write the grid data and the
                                 !! conservative variables to files
 
     use m_compile_specific      !< Compile-specific procedures
-
     use m_icpp_patches
-
     use m_assign_variables
-
     use m_phase_change          !< Phase-change module
-
     use m_helper_basic          !< Functions to compare floating point numbers
-
     use m_helper
 
 #ifdef MFC_MPI
@@ -41,17 +30,11 @@ module m_start_up
 #endif
 
     use m_check_patches
-
     use m_check_ib_patches
-
     use m_helper
-
     use m_checker_common
-
     use m_checker
-
     use m_boundary_common
-
     use m_boundary_conditions
 
     implicit none
@@ -149,6 +132,7 @@ contains
             call s_mpi_abort('File pre_process.inp is missing. Exiting.')
         end if
     end subroutine s_read_input_file
+
     !> Checking that the user inputs make sense, i.e. that the individual choices are compatible with the code's options and that
     !! the combination of these choices results into a valid configuration for the pre-process
     impure subroutine s_check_input_file
@@ -179,6 +163,7 @@ contains
 
         if (ib) call s_check_ib_patches()
     end subroutine s_check_input_file
+
     !> The goal of this subroutine is to read in any preexisting grid data as well as based on the imported grid, complete the
     !! necessary global computational domain parameters.
     impure subroutine s_read_serial_grid_data_files
@@ -300,6 +285,7 @@ contains
             call s_create_directory(trim(proc_rank_dir) // '/0')
         end if
     end subroutine s_read_serial_grid_data_files
+
     !> Cell-boundary data are checked for consistency by looking at the (non-)uniform cell-width distributions for all the active
     !! coordinate directions and making sure that all of the cell-widths are positively valued
     impure subroutine s_check_grid_data_files
@@ -325,6 +311,7 @@ contains
             end if
         end if
     end subroutine s_check_grid_data_files
+
     !> The goal of this subroutine is to read in any preexisting initial condition data files so that they may be used by the
     !! pre-process as a starting point in the creation of an all new initial condition.
         !! @param q_cons_vf_in Conservative variables
@@ -410,6 +397,7 @@ contains
         call s_delete_directory(trim(proc_rank_dir))
         call s_create_directory(trim(proc_rank_dir) // '/0')
     end subroutine s_read_serial_ic_data_files
+
     !> Cell-boundary data are checked for consistency by looking at the (non-)uniform cell-width distributions for all the active
     !! coordinate directions and making sure that all of the cell-widths are positively valued
     impure subroutine s_read_parallel_grid_data_files
@@ -504,6 +492,7 @@ contains
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 #endif
     end subroutine s_read_parallel_grid_data_files
+
     !> The goal of this subroutine is to read in any preexisting initial condition data files so that they may be used by the
     !! pre-process as a starting point in the creation of an all new initial condition.
         !! @param q_cons_vf_in Conservative variables
@@ -582,6 +571,7 @@ contains
         call s_mpi_barrier()
 #endif
     end subroutine s_read_parallel_ic_data_files
+
     !> @brief Initializes all pre-process modules, allocates data structures, and sets I/O procedure pointers.
     impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
@@ -617,6 +607,7 @@ contains
             s_write_data_files => s_write_parallel_data_files
         end if
     end subroutine s_initialize_modules
+
     !> @brief Reads an existing grid from data files or generates a new grid from user inputs.
     impure subroutine s_read_grid()
         if (old_grid) then
@@ -633,6 +624,7 @@ contains
             end if
         end if
     end subroutine s_read_grid
+
     !> @brief Generates or reads the initial condition, applies relaxation if needed, and writes output data files.
     impure subroutine s_apply_initial_condition(start, finish)
         real(wp), intent(inout) :: start, finish
@@ -673,8 +665,7 @@ contains
 
         if (relax) then
             if (proc_rank == 0) then
-                print *, 'initial condition might have been altered due to enforcement of &
-                & pTg - equilibrium (relax="T" activated)'
+                print *, 'initial condition might have been altered due to enforcement of pTg-equilibrium (relax = "T" activated)'
             end if
 
             call s_infinite_relaxation_k(q_cons_vf)
@@ -684,6 +675,7 @@ contains
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition
+
     !> @brief Gathers processor timing data and writes elapsed wall-clock time to a summary file.
     impure subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
         real(wp), dimension(:), intent(inout) :: proc_time
@@ -717,6 +709,7 @@ contains
             end if
         end if
     end subroutine s_save_data
+
     !> @brief Initializes MPI, reads and validates user inputs on rank 0, and decomposes the computational domain.
     impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
@@ -743,6 +736,7 @@ contains
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
     end subroutine s_initialize_mpi_domain
+
     !> @brief Finalizes all pre-process modules, deallocates resources, and shuts down MPI.
     impure subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O

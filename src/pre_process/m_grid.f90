@@ -5,11 +5,8 @@
 !> @brief Generates uniform or stretched rectilinear grids with hyperbolic-tangent spacing
 module m_grid
     use m_derived_types ! Definitions of the derived types
-
     use m_global_parameters ! Global parameters for the code
-
     use m_mpi_proxy ! Message passing interface (MPI) module proxy
-
     use m_helper_basic         !< Functions to compare floating point numbers
 
 #ifdef MFC_MPI
@@ -36,8 +33,8 @@ contains
     !! cell-boundaries.
     impure subroutine s_generate_serial_grid
         ! Generic loop iterator
-        integer  :: i, j             !< generic loop operators
-        real(wp) :: length   !< domain lengths
+        integer  :: i, j   !< generic loop operators
+        real(wp) :: length !< domain lengths
 
         ! Grid Generation in the x-direction
         dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
@@ -58,7 +55,7 @@ contains
             do j = 1, loops_x
                 do i = -1, m
                     x_cb(i) = x_cb(i)/a_x*(a_x + log(cosh(a_x*(x_cb(i) - x_a))) + log(cosh(a_x*(x_cb(i) - x_b))) &
-                         & - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
+                        & - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
                 end do
             end do
             x_cb = x_cb*length
@@ -105,7 +102,7 @@ contains
             do j = 1, loops_y
                 do i = -1, n
                     y_cb(i) = y_cb(i)/a_y*(a_y + log(cosh(a_y*(y_cb(i) - y_a))) + log(cosh(a_y*(y_cb(i) - y_b))) &
-                         & - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
+                        & - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
                 end do
             end do
 
@@ -138,7 +135,7 @@ contains
             do j = 1, loops_z
                 do i = -1, p
                     z_cb(i) = z_cb(i)/a_z*(a_z + log(cosh(a_z*(z_cb(i) - z_a))) + log(cosh(a_z*(z_cb(i) - z_b))) &
-                         & - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
+                        & - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
                 end do
             end do
 
@@ -150,6 +147,7 @@ contains
             if (num_procs > 1) call s_mpi_reduce_min(dz)
         end if
     end subroutine s_generate_serial_grid
+
     !> The following subroutine generates either a uniform or non-uniform rectilinear grid in parallel, defined by the parameters
     !! inputted by the user. The grid information is stored in the grid variables containing coordinates of the cell- centers and
     !! cell-boundaries.
@@ -190,7 +188,7 @@ contains
             do j = 1, loops_x
                 do i = -1, m_glb
                     x_cb_glb(i) = x_cb_glb(i)/a_x*(a_x + log(cosh(a_x*(x_cb_glb(i) - x_a))) + log(cosh(a_x*(x_cb_glb(i) - x_b))) &
-                             & - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
+                        & - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
                 end do
             end do
 
@@ -223,7 +221,7 @@ contains
                 do j = 1, loops_y
                     do i = -1, n_glb
                         y_cb_glb(i) = y_cb_glb(i)/a_y*(a_y + log(cosh(a_y*(y_cb_glb(i) - y_a))) + log(cosh(a_y*(y_cb_glb(i) - y_b) &
-                                 & )) - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
+                            & )) - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
                     end do
                 end do
 
@@ -247,7 +245,7 @@ contains
                     do j = 1, loops_z
                         do i = -1, p_glb
                             z_cb_glb(i) = z_cb_glb(i)/a_z*(a_z + log(cosh(a_z*(z_cb_glb(i) - z_a))) + log(cosh(a_z*(z_cb_glb(i) &
-                                     & - z_b))) - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
+                                & - z_b))) - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
                         end do
                     end do
 
@@ -282,6 +280,7 @@ contains
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 #endif
     end subroutine s_generate_parallel_grid
+
     !> Computation of parameters, allocation procedures, and/or              any other tasks needed to properly setup the module
     impure subroutine s_initialize_grid_module
         if (parallel_io .neqv. .true.) then
@@ -290,6 +289,7 @@ contains
             s_generate_grid => s_generate_parallel_grid
         end if
     end subroutine s_initialize_grid_module
+
     !> Deallocation procedures for the module
     impure subroutine s_finalize_grid_module
         s_generate_grid => null()

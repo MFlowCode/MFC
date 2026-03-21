@@ -157,7 +157,7 @@
 #:def ASSERT(predicate, message = None)
     if (.not. (${predicate}$)) then
         call s_mpi_abort("${_FILE_.split('/')[-1]}$:${_LINE_}$: " // "Assertion failed: ${predicate}$. " &
-                         & // ${message or '"No error description."'}$)
+            & // ${message or '"No error description."'}$)
     end if
 #:enddef
 ! New line at end of file is required for FYPP

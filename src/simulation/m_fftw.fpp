@@ -9,9 +9,7 @@ module m_fftw
     use, intrinsic :: iso_c_binding
 
     use m_derived_types        !< Definitions of the derived types
-
     use m_global_parameters    !< Definitions of the global parameters
-
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
 #if defined(MFC_GPU) && defined(__PGI)
@@ -33,7 +31,7 @@ module m_fftw
     type(c_ptr)                        :: fwd_plan, bwd_plan
     type(c_ptr)                        :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
     integer                            :: real_size, cmplx_size, x_size, batch_size, Nfq
-    real(c_double), pointer            :: data_real(:) !< Real data
+    real(c_double), pointer            :: data_real(:)  !< Real data
     complex(c_double_complex), pointer :: data_cmplx(:) !<
     !! Complex data in Fourier space
 
@@ -108,24 +106,25 @@ contains
 
 #if defined(__PGI)
         ierr = cufftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, &
-                             & CUFFT_D2Z, batch_size)
+            & CUFFT_D2Z, batch_size)
         ierr = cufftPlanMany(bwd_plan_gpu, rank, gpu_fft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, &
-                             & CUFFT_Z2D, batch_size)
+            & CUFFT_Z2D, batch_size)
 #else
         ierr = hipfftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, &
-                              & HIPFFT_D2Z, batch_size)
+            & HIPFFT_D2Z, batch_size)
         ierr = hipfftPlanMany(bwd_plan_gpu, rank, gpu_fft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, &
-                              & HIPFFT_Z2D, batch_size)
+            & HIPFFT_Z2D, batch_size)
 #endif
 #endif
     end subroutine s_initialize_fftw_module
+
     !> The purpose of this subroutine is to apply a Fourier low- pass filter to the flow variables in the azimuthal direction to
     !! remove the high-frequency content. This alleviates the restrictive CFL condition arising from cells near the axis.
         !! @param q_cons_vf Conservative variables
     impure subroutine s_apply_fourier_filter(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer                                                :: i, j, k, l !< Generic loop iterators
-        integer                                                :: ierr !< Generic flag used to identify and report GPU errors
+        integer                                                :: ierr       !< Generic flag used to identify and report GPU errors
 
         ! Restrict filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
@@ -167,7 +166,7 @@ contains
             do j = 0, m
                 do l = 1, Nfq
                     data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1) &
-                                        & *cmplx_size*x_size)
+                        & *cmplx_size*x_size)
                 end do
             end do
         end do
@@ -187,7 +186,7 @@ contains
             do j = 0, m
                 do l = 0, p
                     data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1) &
-                                  & *real_size*x_size)/real(real_size, dp)
+                        & *real_size*x_size)/real(real_size, dp)
                     q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                 end do
             end do
@@ -232,7 +231,7 @@ contains
                 do j = 0, m
                     do l = 1, Nfq
                         data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k &
-                                            & - 1)*cmplx_size*x_size)
+                            & - 1)*cmplx_size*x_size)
                     end do
                 end do
             end do
@@ -252,7 +251,7 @@ contains
                 do j = 0, m
                     do l = 0, p
                         data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k &
-                                      & - 1)*real_size*x_size)/real(real_size, dp)
+                            & - 1)*real_size*x_size)/real(real_size, dp)
                         q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                     end do
                 end do
@@ -290,6 +289,7 @@ contains
         end do
 #endif
     end subroutine s_apply_fourier_filter
+
     !> The purpose of this subroutine is to destroy the fftw plan that will be used in the forward and backward DFTs when applying
     !! the Fourier filter in the azimuthal direction.
     impure subroutine s_finalize_fftw_module

@@ -7,7 +7,6 @@
 !> @brief Shared derived types for field data, patch geometry, bubble dynamics, and MPI I/O structures
 module m_derived_types
     use m_constants  !< Constants
-
     use m_precision_select
     use m_thermochem, only: num_species
 
@@ -132,7 +131,7 @@ module m_derived_types
         integer, dimension(:), allocatable     :: vs
         integer, dimension(:), allocatable     :: ps
         integer, dimension(:), allocatable     :: ms
-        integer, dimension(:,:), allocatable   :: moms !< Moment indices for qbmm
+        integer, dimension(:,:), allocatable   :: moms    !< Moment indices for qbmm
         integer, dimension(:,:,:), allocatable :: fullmom !< Moment indices for qbmm
     end type bub_bounds_info
 
@@ -198,14 +197,14 @@ module m_derived_types
     !! patch geometry.
     type ic_patch_parameters
 
-        integer  :: geometry !< Type of geometry for the patch
+        integer  :: geometry                           !< Type of geometry for the patch
         real(wp) :: x_centroid, y_centroid, z_centroid !<
         !! Location of the geometric center, i.e. the centroid, of the patch. It
         !! is specified through its x-, y- and z-coordinates, respectively.
 
         real(wp)               :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
-        real(wp)               :: radius !< Dimensions of the patch. radius.
-        real(wp), dimension(3) :: radii !<
+        real(wp)               :: radius                       !< Dimensions of the patch. radius.
+        real(wp), dimension(3) :: radii                        !<
         !! Vector indicating the various radii for the elliptical and ellipsoidal
         !! patch geometries. It is specified through its x-, y-, and z-components
         !! respectively.
@@ -222,8 +221,8 @@ module m_derived_types
         ! Geometry 13 (2D modal Fourier): fourier_cos(n), fourier_sin(n) for mode n
         real(wp), dimension(1:max_2d_fourier_modes) :: fourier_cos, fourier_sin
         logical                                     :: modal_clip_r_to_min !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
-        real(wp)                                    :: modal_r_min        !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
-        logical                                     :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
+        real(wp)                                    :: modal_r_min !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
+        logical                                     :: modal_use_exp_form !< When true, boundary = radius*exp(Fourier series)
 
         ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
         real(wp), dimension(0:max_sph_harm_degree, -max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
@@ -255,9 +254,9 @@ module m_derived_types
         real(wp), dimension(num_fluids_max) :: alpha
         real(wp)                            :: gamma
         real(wp)                            :: pi_inf !<
-        real(wp)                            :: cv !<
-        real(wp)                            :: qv !<
-        real(wp)                            :: qvp !<
+        real(wp)                            :: cv     !<
+        real(wp)                            :: qv     !<
+        real(wp)                            :: qvp    !<
 
         !! Primitive variables associated with the patch. In order, these include
         !! the partial densities, density, velocity, pressure, volume fractions,
@@ -301,7 +300,7 @@ module m_derived_types
 
     type ib_patch_parameters
 
-        integer  :: geometry !< Type of geometry for the patch
+        integer  :: geometry                           !< Type of geometry for the patch
         real(wp) :: x_centroid, y_centroid, z_centroid !<
         !! Location of the geometric center, i.e. the centroid, of the patch. It
         !! is specified through its x-, y- and z-coordinates, respectively.
@@ -312,11 +311,11 @@ module m_derived_types
         real(wp), dimension(1:3)      :: step_angles
         real(wp), dimension(1:3, 1:3) :: rotation_matrix !< matrix that converts from IB reference frame to fluid reference frame
         real(wp), dimension(1:3, &
-             & 1:3) :: rotation_matrix_inverse !< matrix that converts from fluid reference frame to IB reference frame
+            & 1:3) :: rotation_matrix_inverse !< matrix that converts from fluid reference frame to IB reference frame
 
         real(wp) :: c, p, t, m
         real(wp) :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
-        real(wp) :: radius !< Dimensions of the patch. radius.
+        real(wp) :: radius                       !< Dimensions of the patch. radius.
         real(wp) :: theta
         logical  :: slip
 
@@ -353,37 +352,37 @@ module m_derived_types
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
     type physical_parameters
-        real(wp)               :: gamma   !< Sp. heat ratio
-        real(wp)               :: pi_inf  !< Liquid stiffness
-        real(wp), dimension(2) :: Re  !< Reynolds number
-        real(wp)               :: cv      !< heat capacity
-        real(wp)               :: qv      !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
-        real(wp)               :: qvp     !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
+        real(wp)               :: gamma  !< Sp. heat ratio
+        real(wp)               :: pi_inf !< Liquid stiffness
+        real(wp), dimension(2) :: Re     !< Reynolds number
+        real(wp)               :: cv     !< heat capacity
+        real(wp)               :: qv     !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
+        real(wp)               :: qvp    !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp)               :: G
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models
     type subgrid_bubble_physical_parameters
-        real(wp) :: R0ref !< reference bubble radius
-        real(wp) :: p0ref !< reference pressure
+        real(wp) :: R0ref   !< reference bubble radius
+        real(wp) :: p0ref   !< reference pressure
         real(wp) :: rho0ref !< reference density
-        real(wp) :: T0ref !< reference temperature
-        real(wp) :: ss    !< surface tension between host and gas (bubble)
-        real(wp) :: pv    !< vapor pressure of host
-        real(wp) :: vd    !< vapor diffusivity in gas (bubble)
-        real(wp) :: mu_l  !< viscosity of host in liquid state
-        real(wp) :: mu_v  !< viscosity of host in vapor state
-        real(wp) :: mu_g  !< viscosity of gas (bubble)
-        real(wp) :: gam_v !< specific heat ratio of host in vapor state
-        real(wp) :: gam_g !< specific heat ratio of gas (bubble)
-        real(wp) :: M_v   !< Molecular weight of host
-        real(wp) :: M_g   !< Molecular weight of gas (bubble)
-        real(wp) :: k_v   !< thermal conductivity of host in vapor state
-        real(wp) :: k_g   !< thermal conductivity of gas (bubble)
-        real(wp) :: cp_v  !< specific heat capacity in constant pressure of host in vapor state
-        real(wp) :: cp_g  !< specific heat capacity in constant pressure of gas (bubble)
-        real(wp) :: R_v   !< gas constant of host in vapor state
-        real(wp) :: R_g   !< gas constant of gas (bubble)
+        real(wp) :: T0ref   !< reference temperature
+        real(wp) :: ss      !< surface tension between host and gas (bubble)
+        real(wp) :: pv      !< vapor pressure of host
+        real(wp) :: vd      !< vapor diffusivity in gas (bubble)
+        real(wp) :: mu_l    !< viscosity of host in liquid state
+        real(wp) :: mu_v    !< viscosity of host in vapor state
+        real(wp) :: mu_g    !< viscosity of gas (bubble)
+        real(wp) :: gam_v   !< specific heat ratio of host in vapor state
+        real(wp) :: gam_g   !< specific heat ratio of gas (bubble)
+        real(wp) :: M_v     !< Molecular weight of host
+        real(wp) :: M_g     !< Molecular weight of gas (bubble)
+        real(wp) :: k_v     !< thermal conductivity of host in vapor state
+        real(wp) :: k_g     !< thermal conductivity of gas (bubble)
+        real(wp) :: cp_v    !< specific heat capacity in constant pressure of host in vapor state
+        real(wp) :: cp_g    !< specific heat capacity in constant pressure of gas (bubble)
+        real(wp) :: R_v     !< gas constant of host in vapor state
+        real(wp) :: R_g     !< gas constant of gas (bubble)
     end type subgrid_bubble_physical_parameters
 
     type mpi_io_airfoil_ib_var
@@ -403,31 +402,31 @@ module m_derived_types
 
     !> Acoustic source parameters
     type acoustic_parameters
-        integer                :: pulse !< Type of pulse
-        integer                :: support !< Type of support
-        logical                :: dipole !< Whether the source is a dipole or monopole
-        real(wp), dimension(3) :: loc !< Physical location of acoustic source
-        real(wp)               :: mag !< Acoustic pulse magnitude
-        real(wp)               :: length !< Length of planar source (2D/3D)
-        real(wp)               :: height !< Height of planar source (3D)
-        real(wp)               :: wavelength !< Wave length of pulse
-        real(wp)               :: frequency !< Frequency of pulse
-        real(wp)               :: gauss_sigma_dist !< sigma of Gaussian pulse multiplied by speed of sound
-        real(wp)               :: gauss_sigma_time !< sigma of Gaussian pulse
-        real(wp)               :: npulse !< Number of cycles of pulse
-        real(wp)               :: dir !< Direction of pulse
-        real(wp)               :: delay !< Time-delay of pulse start
+        integer                :: pulse                 !< Type of pulse
+        integer                :: support               !< Type of support
+        logical                :: dipole                !< Whether the source is a dipole or monopole
+        real(wp), dimension(3) :: loc                   !< Physical location of acoustic source
+        real(wp)               :: mag                   !< Acoustic pulse magnitude
+        real(wp)               :: length                !< Length of planar source (2D/3D)
+        real(wp)               :: height                !< Height of planar source (3D)
+        real(wp)               :: wavelength            !< Wave length of pulse
+        real(wp)               :: frequency             !< Frequency of pulse
+        real(wp)               :: gauss_sigma_dist      !< sigma of Gaussian pulse multiplied by speed of sound
+        real(wp)               :: gauss_sigma_time      !< sigma of Gaussian pulse
+        real(wp)               :: npulse                !< Number of cycles of pulse
+        real(wp)               :: dir                   !< Direction of pulse
+        real(wp)               :: delay                 !< Time-delay of pulse start
         real(wp)               :: foc_length ! < Focal length of transducer
         real(wp)               :: aperture ! < Aperture diameter of transducer
         real(wp)               :: element_spacing_angle !< Spacing between aperture elements in 2D acoustic array
         real(wp) &
-             & :: element_polygon_ratio !< Ratio of aperture element diameter to side length of polygon connecting their centers, in 3D acoustic array
-        real(wp) :: rotate_angle !< Angle of rotation of the entire circular 3D acoustic array
-        real(wp) :: bb_bandwidth !< Bandwidth of each frequency in broadband wave
+            & :: element_polygon_ratio !< Ratio of aperture element diameter to side length of polygon connecting their centers, in 3D acoustic array
+        real(wp) :: rotate_angle   !< Angle of rotation of the entire circular 3D acoustic array
+        real(wp) :: bb_bandwidth   !< Bandwidth of each frequency in broadband wave
         real(wp) :: bb_lowest_freq !< The lower frequency bound of broadband wave
-        integer  :: num_elements !< Number of elements in the acoustic array
-        integer  :: element_on !< Element in the acoustic array to turn on
-        integer  :: bb_num_freq !< Number of frequencies in the broadband wave
+        integer  :: num_elements   !< Number of elements in the acoustic array
+        integer  :: element_on     !< Element in the acoustic array to turn on
+        integer  :: bb_num_freq    !< Number of frequencies in the broadband wave
     end type acoustic_parameters
 
     !> Acoustic source source_spatial pre-calculated values
@@ -440,11 +439,11 @@ module m_derived_types
 
     !> Ghost Point for Immersed Boundaries
     type ghost_point
-        integer, dimension(3)        :: loc !< Physical location of the ghost point
-        real(wp), dimension(3)       :: ip_loc !< Physical location of the image point
-        integer, dimension(3)        :: ip_grid !< Top left grid point of IP
+        integer, dimension(3)        :: loc           !< Physical location of the ghost point
+        real(wp), dimension(3)       :: ip_loc        !< Physical location of the image point
+        integer, dimension(3)        :: ip_grid       !< Top left grid point of IP
         real(wp), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
-        integer                      :: ib_patch_id !< ID of the IB Patch the ghost point is part of
+        integer                      :: ib_patch_id   !< ID of the IB Patch the ghost point is part of
         real(wp)                     :: levelset
         real(wp), dimension(1:3)     :: levelset_norm
         logical                      :: slip
@@ -473,18 +472,18 @@ module m_derived_types
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
 
-        integer  :: solver_approach          !< 1: One-way coupling, 2: two-way coupling
-        integer  :: cluster_type             !< Cluster model to find p_inf
-        logical  :: pressure_corrector       !< Cell pressure correction term
-        integer  :: smooth_type              !< Smoothing function. 1: Gaussian, 2:Delta 3x3
-        logical  :: heatTransfer_model       !< Activate HEAT transfer model at the bubble-liquid interface
-        logical  :: massTransfer_model       !< Activate MASS transfer model at the bubble-liquid interface
-        logical  :: write_bubbles            !< Write files to track the bubble evolution each time step
-        logical  :: write_bubbles_stats      !< Write the maximum and minimum radius of each bubble
-        integer  :: nBubs_glb                !< Global number of bubbles
-        real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
-        real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
-        real(wp) :: valmaxvoid       !< Maximum void fraction permitted
+        integer  :: solver_approach     !< 1: One-way coupling, 2: two-way coupling
+        integer  :: cluster_type        !< Cluster model to find p_inf
+        logical  :: pressure_corrector  !< Cell pressure correction term
+        integer  :: smooth_type         !< Smoothing function. 1: Gaussian, 2:Delta 3x3
+        logical  :: heatTransfer_model  !< Activate HEAT transfer model at the bubble-liquid interface
+        logical  :: massTransfer_model  !< Activate MASS transfer model at the bubble-liquid interface
+        logical  :: write_bubbles       !< Write files to track the bubble evolution each time step
+        logical  :: write_bubbles_stats !< Write the maximum and minimum radius of each bubble
+        integer  :: nBubs_glb           !< Global number of bubbles
+        real(wp) :: epsilonb            !< Standard deviation scaling for the gaussian function
+        real(wp) :: charwidth           !< Domain virtual depth (z direction, for 2D simulations)
+        real(wp) :: valmaxvoid          !< Maximum void fraction permitted
     end type bubbles_lagrange_parameters
 
     !> Max and min number of cells in a direction of each combination of x-,y-, and z-
