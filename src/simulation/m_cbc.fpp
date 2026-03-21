@@ -398,7 +398,6 @@ contains
 
                     ! Computing CBC4 Coefficients
                 else
-
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, &
                                      & cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) - 1.e1_wp*ds(2) + 1.e1_wp*ds(3) &
@@ -479,7 +478,6 @@ contains
 
             ! Associating CBC Coefficients in z-direction
         else
-
             ! fd_coef => fd_coef_z; if (weno_order > 1) pi_coef => pi_coef_z
 
             if (cbc_loc_in == -1) then
@@ -948,7 +946,6 @@ contains
                                                         & i) + ds(0)*dadv_dt(i - E_idx))
                             end do
                         else
-
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + ds(0)*dadv_dt(i - E_idx)
@@ -1158,7 +1155,6 @@ contains
 
             ! Reshaping Inputted Data in z-direction
         else
-
             $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
             do i = 1, sys_size
                 do r = is3%beg, is3%end
@@ -1349,7 +1345,6 @@ contains
 
             ! Reshaping Outputted Data in z-direction
         else
-
             $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
             do i = 1, flux_cbc_index
                 do r = is3%beg, is3%end

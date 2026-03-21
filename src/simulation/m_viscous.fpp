@@ -544,7 +544,6 @@ contains
                 end if
             end do
         else ! Compute velocity gradient at cell centers using finite differences
-
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
             $:GPU_UPDATE(device='[iv]')
 
@@ -854,14 +853,12 @@ contains
                         end do
                     #:endif
                 else
-
                     do i = iv%beg, iv%end
                         call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dy_qp(1)%vf(i), &
                                                    & dq_prim_dy_qp(1)%vf(i))
                     end do
                 end if
             else
-
                 do i = iv%beg, iv%end
                     call s_compute_fd_gradient(q_prim_qp%vf(i), dq_prim_dx_qp(1)%vf(i), dq_prim_dx_qp(1)%vf(i), &
                                                & dq_prim_dx_qp(1)%vf(i))
@@ -1011,7 +1008,6 @@ contains
                                            & recon_dir, is1_viscous, is2_viscous, is3_viscous)
                     end if
                 else
-
                     call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
                                        & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1_viscous, is2_viscous, &
                                        & is3_viscous)
@@ -1144,7 +1140,6 @@ contains
 
             ! First-Order Spatial Derivatives in z-direction
         else
-
             ! A general application of the scalar divergence theorem that utilizes the left and right cell-boundary
             ! integral-averages, inside each cell, or an arithmetic mean of these two at the cell-boundaries, to calculate the
             ! cell-averaged first-order spatial derivatives inside the cell.

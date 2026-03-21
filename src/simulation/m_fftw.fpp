@@ -74,7 +74,6 @@ contains
 
 #if defined(MFC_GPU)
         rank = 1; istride = 1; ostride = 1
-
         allocate (gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
         gpu_fft_size(1) = real_size;

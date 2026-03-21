@@ -204,7 +204,6 @@ contains
 
             ! Generating Binary Directory Tree
         else
-
             ! Creating the directory associated with the local process
             dbdir = trim(case_dir) // '/binary'
 
@@ -451,7 +450,6 @@ contains
 
             ! Binary Database Format
         else
-
             ! Generating the relative path to the formatted database slave file, that is to be opened for the current time-step,
             ! t_step
             write (file_loc, '(A,I0,A)') '/', t_step, '.dat'
@@ -645,7 +643,6 @@ contains
                 ! One-dimensional local grid data is written to the formatted database slave file. In addition, the local grid data
                 ! is put together by the root process and written to the master file.
             else
-
                 if (precision == 1) then
                     write (dbfile) real(x_cb, sp)
                 else
@@ -805,7 +802,6 @@ contains
 
             ! Binary Database Format
         else
-
             ! Writing the name of the flow variable and its data, associated with the local processor, to the formatted database
             ! slave file
             if (precision == 1) then

@@ -152,7 +152,6 @@ contains
                 pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
             end if
         #:else
-
             Y_rs(:) = rhoYks(:)/rho
             e_Per_Kg = energy/rho
             Pdyn_Per_Kg = dyn_p/rho
@@ -418,7 +417,6 @@ contains
 
                 ! Simulation is 2D
             else
-
                 allocate (rho_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
                 allocate (gamma_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
                 allocate (pi_inf_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
@@ -427,7 +425,6 @@ contains
 
             ! Simulation is 1D
         else
-
             allocate (rho_sf(-buff_size:m + buff_size, 0:0, 0:0))
             allocate (gamma_sf(-buff_size:m + buff_size, 0:0, 0:0))
             allocate (pi_inf_sf(-buff_size:m + buff_size, 0:0, 0:0))

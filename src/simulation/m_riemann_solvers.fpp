@@ -2624,7 +2624,6 @@ contains
                                         R3V2Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 3)
                                         R3V2Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 3)
                                     else
-
                                         PbwR3Lbar = 0._wp
                                         PbwR3Rbar = 0._wp
 
@@ -3940,7 +3939,6 @@ contains
 
             ! Population of Buffers in z-direction
         else
-
             if (bc_z%beg == BC_RIEMANN_EXTRAP) then ! Riemann state extrap. BC at beginning
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
@@ -4137,7 +4135,6 @@ contains
 
             ! Reshaping Inputted Data in z-direction
         else
-
             if (viscous .or. (surface_tension) .or. dummy) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = momxb, E_idx

@@ -360,7 +360,6 @@ contains
                         end if
                     end if
                 else ! WENO7
-
                     if (.not. teno) then
                         do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
                             ! Reference: Shu (1997) "Essentially Non-Oscillatory and Weighted Essentially Non-Oscillatory Schemes

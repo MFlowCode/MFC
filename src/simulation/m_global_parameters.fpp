@@ -905,7 +905,6 @@ contains
 
             ! Volume Fraction Model
         else
-
             ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
             ! of spatial dimensions and the volume fraction model
             if (model_eqns == 2) then

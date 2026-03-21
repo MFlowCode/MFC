@@ -1449,7 +1449,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         else if (idir == 2) then ! y-direction
-
             if (surface_tension) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
@@ -1504,7 +1503,6 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             else
-
                 if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
@@ -1567,7 +1565,6 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 else
-
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
@@ -1584,7 +1581,6 @@ contains
                 end if
             end if
         else if (idir == 3) then ! z-direction
-
             if (surface_tension) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
@@ -1695,7 +1691,6 @@ contains
                                            & recon_dir, is1, is2, is3)
                     end if
                 else
-
                     call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
                                        & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1, is2, is3)
                 end if

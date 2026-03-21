@@ -892,7 +892,6 @@ contains
             ! Allocating the grid variables, only used for the 1D simulations, and containing the defragmented computational domain
             ! grid data
         else
-
             allocate (x_root_cb(-1:m_root))
             allocate (x_root_cc(0:m_root))
 

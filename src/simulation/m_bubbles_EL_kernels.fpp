@@ -230,7 +230,6 @@ contains
                                                       & **(3._wp*(strength_idx + 1._wp))
                 end do
             else
-
                 !> 2D cartesian function:
                 ! We smear particles considering a virtual depth (lag_params%charwidth)
                 theta = 0._wp

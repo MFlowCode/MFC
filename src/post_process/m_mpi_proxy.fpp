@@ -217,7 +217,6 @@ contains
             call MPI_GATHERV(maxval(y_cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
             ! Simulation is 1D
         else
-
             ! For 1D, recvcounts/displs are sized for grid defragmentation (m+1 per rank), not for scalar gathers. Use MPI_GATHER
             ! instead.
 
@@ -246,7 +245,6 @@ contains
 
             ! Binary database format
         else
-
             call MPI_GATHERV(x_cb(0), m + 1, mpi_p, x_root_cb(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             if (proc_rank == 0) x_root_cb(-1) = x_cb(-1)

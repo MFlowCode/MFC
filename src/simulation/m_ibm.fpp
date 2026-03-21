@@ -698,7 +698,6 @@ contains
                         interp_coeffs(:,:, 1) = eta(:,:, 1)/buf
                     end if
                 else
-
                     if (ib_markers%sf(i, j, k + 1) /= 0) alpha(1, 1, 2) = 0._wp
                     if (ib_markers%sf(i + 1, j, k + 1) /= 0) alpha(2, 1, 2) = 0._wp
                     if (ib_markers%sf(i, j + 1, k + 1) /= 0) alpha(1, 2, 2) = 0._wp

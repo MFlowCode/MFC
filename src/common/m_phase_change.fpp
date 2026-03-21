@@ -203,7 +203,6 @@ contains
                             ! correcting the vapor partial density
                             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
                         else
-
                             ! returning partial pressures to what they were from the homogeneous solver liquid
                             q_cons_vf(lp + contxb - 1)%sf(j, k, l) = m1
 
@@ -604,7 +603,6 @@ contains
             ! assigning Saturation temperature
             TSat = 0.0_wp
         else
-
             ! calculating initial estimate for temperature in the TSat procedure. I will also use this variable to iterate over the
             ! Newton's solver
             TSat = TSIn

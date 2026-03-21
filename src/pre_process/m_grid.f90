@@ -85,7 +85,6 @@ contains
                 y_cb(i - 1) = y_domain%beg + dy*real(2*i - 1, wp)
             end do
         else
-
             dy = (y_domain%end - y_domain%beg)/real(n + 1, wp)
 
             do i = 0, n

@@ -140,7 +140,6 @@
 
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
     case (303) ! 3D Multijet
-
         eps_smooth = 3.0_wp
         ux_th = 10*sqrt(1.4*0.4)
         ux_am = 2.5*sqrt(1.4*0.4)

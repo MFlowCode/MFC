@@ -145,7 +145,6 @@ contains
 
             ! 1D Patch Geometries
         else
-
             do i = 1, num_patches
                 if (proc_rank == 0) then
                     print *, 'Processing patch', i

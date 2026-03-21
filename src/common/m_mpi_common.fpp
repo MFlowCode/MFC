@@ -334,7 +334,6 @@ contains
             call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
         end if
 #else
-
         icfl_max_glb = icfl_max_loc
 
         if (viscous) then
@@ -1046,7 +1045,6 @@ contains
                         end if
                     end do
                 else
-
                     if (cyl_coord .and. p > 0) then
                         ! Implement pencil processor blocking if using cylindrical coordinates so that all cells in azimuthal
                         ! direction are stored on a single processor. This is necessary for efficient application of Fourier filter
@@ -1080,7 +1078,6 @@ contains
                             end if
                         end do
                     else
-
                         ! Initial estimate of optimal processor topology
                         num_procs_x = 1
                         num_procs_y = 1
@@ -1206,7 +1203,6 @@ contains
 
                 ! 2D Cartesian Processor Topology
             else
-
                 ! Initial estimate of optimal processor topology
                 num_procs_x = 1
                 num_procs_y = num_procs
@@ -1320,7 +1316,6 @@ contains
 
             ! 1D Cartesian Processor Topology
         else
-
             ! Optimal processor topology
             num_procs_x = num_procs
 
@@ -1428,20 +1423,17 @@ contains
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
                                       & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
-
                     ! Send/receive buffer to/from bc_x%beg/bc_x%beg
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
-
                 if (bc_x%beg >= 0) then ! PBC at the end and beginning
 
                     ! Send/receive buffer to/from bc_x%beg/bc_x%end
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
-
                     ! Send/receive buffer to/from bc_x%end/bc_x%end
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
                                       & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -1459,20 +1451,17 @@ contains
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
                                       & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
-
                     ! Send/receive buffer to/from bc_y%beg/bc_y%beg
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
-
                 if (bc_y%beg >= 0) then ! PBC at the end and beginning
 
                     ! Send/receive buffer to/from bc_y%beg/bc_y%end
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
-
                     ! Send/receive buffer to/from bc_y%end/bc_y%end
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
                                       & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -1482,7 +1471,6 @@ contains
 
             ! MPI Communication in z-direction
         else
-
             if (pbc_loc == -1) then ! PBC at the beginning
 
                 if (bc_z%end >= 0) then ! PBC at the beginning and end
@@ -1491,20 +1479,17 @@ contains
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
                                       & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
-
                     ! Send/receive buffer to/from bc_z%beg/bc_z%beg
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
-
                 if (bc_z%beg >= 0) then ! PBC at the end and beginning
 
                     ! Send/receive buffer to/from bc_z%beg/bc_z%end
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
-
                     ! Send/receive buffer to/from bc_z%end/bc_z%end
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
                                       & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)

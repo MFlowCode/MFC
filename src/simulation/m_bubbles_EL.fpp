@@ -586,7 +586,6 @@ contains
                 gas_p(k, 1) = myPb
                 gas_mv(k, 1) = myMass_v
             else
-
                 ! Radial acceleration from bubble models
                 intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, dmntait, dmBtait, &
                              & dm_bub_adv_src, dm_divu, myCson)
