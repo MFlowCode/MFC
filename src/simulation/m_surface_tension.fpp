@@ -8,12 +8,13 @@
 
 !> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
-    use m_derived_types !< Definitions of the derived types
+
+    use m_derived_types     !< Definitions of the derived types
     use m_global_parameters !< Definitions of the global parameters
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
     use m_variables_conversion
     use m_weno
-    use m_muscl !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
+    use m_muscl             !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
     use m_helper
     use m_boundary_common
 
@@ -36,9 +37,11 @@ module m_surface_tension
 
     type(int_bounds_info) :: is1, is2, is3, iv
     $:GPU_DECLARE(create='[is1, is2, is3, iv]')
+
 contains
 
     impure subroutine s_initialize_surface_tension_module
+
         integer :: j
 
         @:ALLOCATE(c_divs(1:num_dims + 1))
@@ -56,14 +59,16 @@ contains
 
         if (p > 0) then
             @:ALLOCATE(gL_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, &
-                & num_dims + 1))
+                       & num_dims + 1))
             @:ALLOCATE(gR_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, &
-                & num_dims + 1))
+                       & num_dims + 1))
         end if
+
     end subroutine s_initialize_surface_tension_module
 
     !> @brief Computes the capillary (surface-tension) source flux from reconstructed color-gradient fields.
     subroutine s_compute_capillary_source_flux(vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, flux_src_vf, id, isx, isy, isz)
+
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in)       :: vSrc_rsx_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in)       :: vSrc_rsy_vf
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in)       :: vSrc_rsz_vf
@@ -109,11 +114,11 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + Omega(1, i)*vSrc_rsx_vf(j, k, &
-                                    & l, i)
+                                            & l, i)
                             end do
 
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + sigma*c_divs(num_dims + 1)%sf(j, k, &
-                                & l)*vSrc_rsx_vf(j, k, l, 1)
+                                        & l)*vSrc_rsx_vf(j, k, l, 1)
                         end if
                     end do
                 end do
@@ -150,11 +155,11 @@ contains
                                     flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
 
                                     flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + Omega(2, i)*vSrc_rsy_vf(k, &
-                                        & j, l, i)
+                                                & j, l, i)
                                 end do
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, &
-                                    & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
+                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
                             end if
                         end do
                     end do
@@ -192,11 +197,11 @@ contains
                                     flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3, i)
 
                                     flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + Omega(3, i)*vSrc_rsz_vf(l, &
-                                        & k, j, i)
+                                                & k, j, i)
                                 end do
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, &
-                                    & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
+                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
                             end if
                         end do
                     end do
@@ -204,10 +209,12 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             #:endif
         end if
+
     end subroutine s_compute_capillary_source_flux
 
     !> @brief Computes color-function gradients and their norms, then reconstructs them at cell boundaries.
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
+
         type(scalar_field), dimension(sys_size), intent(in)         :: q_prim_vf
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         type(int_bounds_info)                                       :: isx, isy, isz
@@ -225,7 +232,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))*(q_prim_vf(c_idx)%sf(j + 1, k, &
-                        & l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
+                           & l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
                 end do
             end do
         end do
@@ -236,7 +243,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(c_idx)%sf(j, k + 1, &
-                        & l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
+                           & l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
                 end do
             end do
         end do
@@ -248,7 +255,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(c_idx)%sf(j, k, &
-                            & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
+                               & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                     end do
                 end do
             end do
@@ -264,8 +271,7 @@ contains
                     do i = 1, num_dims
                         c_divs(num_dims + 1)%sf(j, k, l) = c_divs(num_dims + 1)%sf(j, k, l) + c_divs(i)%sf(j, k, l)**2._wp
                     end do
-                    ! c_divs(num_dims + 1)%sf(j, k, l) = &
-                    ! sqrt(c_divs(num_dims + 1)%sf(j, k, l))
+                    ! c_divs(num_dims + 1)%sf(j, k, l) = & sqrt(c_divs(num_dims + 1)%sf(j, k, l))
                     c_divs(num_dims + 1)%sf(j, k, l) = sqrt(real(c_divs(num_dims + 1)%sf(j, k, l), kind=wp))
                 end do
             end do
@@ -280,18 +286,21 @@ contains
         do i = 1, num_dims
             call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
+
     end subroutine s_get_capillary
 
     !> @brief Reconstructs left and right cell-boundary values of capillary (color-gradient) variables using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir)
-        type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                     :: v_vf
+
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
-        integer, intent(in)                                                                          :: norm_dir
-        integer                                                                                      :: recon_dir !< Coordinate direction of the reconstruction
-        integer                                                                                      :: i, j, k, l
+        integer, intent(in) :: norm_dir
+        integer :: recon_dir !< Coordinate direction of the reconstruction
+        integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno', 'WENO_TYPE'),('muscl', 'MUSCL_TYPE')]
+
             if (recon_type == ${TYPE}$ .or. dummy) then
                 ! Reconstruction in s1-direction
 
@@ -353,10 +362,12 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
+
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
     !> @brief Deallocates the color-gradient divergence and reconstructed boundary arrays for surface tension.
     impure subroutine s_finalize_surface_tension_module
+
         integer :: j
 
         do j = 1, num_dims
@@ -371,5 +382,7 @@ contains
         if (p > 0) then
             @:DEALLOCATE(gL_z, gR_z)
         end if
+
     end subroutine s_finalize_surface_tension_module
+
 end module m_surface_tension

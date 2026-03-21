@@ -4,6 +4,7 @@
 
 !> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
+
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters ! Global parameters for the code
     use m_mpi_proxy !< Message passing interface (MPI) module proxy
@@ -19,10 +20,9 @@ module m_initial_condition
 
     implicit none
 
-    ! NOTE: The abstract interface allows for the declaration of a pointer to
-    ! a procedure such that the choice of the model equations does not have to
-    ! be queried every time the patch primitive variables are to be assigned in
-    ! a cell in the computational domain.
+    ! NOTE: The abstract interface allows for the declaration of a pointer to a procedure such that the choice of the model
+    ! equations does not have to be queried every time the patch primitive variables are to be assigned in a cell in the
+    ! computational domain.
     type(scalar_field), allocatable, dimension(:)    :: q_prim_vf !< primitive variables
     type(scalar_field), allocatable, dimension(:)    :: q_cons_vf !< conservative variables
     type(scalar_field)                               :: q_T_sf    !< Temperature field
@@ -36,12 +36,15 @@ module m_initial_condition
     !> @cond
 #endif
     !> @endcond
+
 contains
 
-    !> Computation of parameters, allocation procedures, and/or              any other tasks needed to properly setup the module
+    !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_initial_condition_module
+
         integer :: i, j, k, l !< generic loop iterators
         ! Allocating the primitive and conservative variables
+
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
 
@@ -63,11 +66,9 @@ contains
             allocate (mv%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
         end if
 
-        ! Setting default values for conservative and primitive variables so
-        ! that in the case that the initial condition is wrongly laid out on
-        ! the grid the simulation component will catch the problem on start-
-        ! up. The conservative variables do not need to be similarly treated
-        ! since they are computed directly from the primitive variables.
+        ! Setting default values for conservative and primitive variables so that in the case that the initial condition is wrongly
+        ! laid out on the grid the simulation component will catch the problem on start- up. The conservative variables do not need
+        ! to be similarly treated since they are computed directly from the primitive variables.
         do i = 1, sys_size
             q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
             q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)
@@ -116,28 +117,29 @@ contains
             q_prim_vf(damage_idx)%sf = 0._wp
         end if
 
-        ! Initial hyper_cleaning state is always zero
-        ! TODO more general
+        ! Initial hyper_cleaning state is always zero TODO more general
         if (hyper_cleaning) then
             q_cons_vf(psi_idx)%sf = 0._wp
             q_prim_vf(psi_idx)%sf = 0._wp
         end if
 
-        ! Setting default values for patch identities bookkeeping variable.
-        ! This is necessary to avoid any confusion in the assessment of the
-        ! extent of application that the overwrite permissions give a patch
-        ! when it is being applied in the domain.
+        ! Setting default values for patch identities bookkeeping variable. This is necessary to avoid any confusion in the
+        ! assessment of the extent of application that the overwrite permissions give a patch when it is being applied in the
+        ! domain.
         patch_id_fp = 0
+
     end subroutine s_initialize_initial_condition_module
 
     !> This subroutine peruses the patches and depending on the type of geometry associated with a particular patch, it calls the
     !! related subroutine to setup the said geometry on the grid using the primitive variables included with the patch parameters.
     !! The subroutine is complete once the primitive variables are converted to conservative ones.
     impure subroutine s_generate_initial_condition
+
         integer :: i
 
-        ! Converting the conservative variables to the primitive ones given
-        ! preexisting initial condition data files were read in on start-up
+        ! Converting the conservative variables to the primitive ones given preexisting initial condition data files were read in on
+        ! start-up
+
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
         end if
@@ -162,12 +164,15 @@ contains
             call s_initialize_mv(q_cons_vf, mv%sf)
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
+
     end subroutine s_generate_initial_condition
 
     !> Deallocation procedures for the module
     impure subroutine s_finalize_initial_condition_module
+
         integer :: i !< Generic loop iterator
         ! Dellocating the primitive and conservative variables
+
         do i = 1, sys_size
             deallocate (q_prim_vf(i)%sf)
             deallocate (q_cons_vf(i)%sf)
@@ -197,5 +202,7 @@ contains
         end if
 
         deallocate (bc_type)
+
     end subroutine s_finalize_initial_condition_module
+
 end module m_initial_condition

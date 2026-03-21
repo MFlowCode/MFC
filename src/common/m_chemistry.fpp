@@ -8,6 +8,7 @@
 
 !> @brief Multi-species chemistry interface for thermodynamic properties, reaction rates, and transport coefficients
 module m_chemistry
+
     use m_thermochem, only: num_species, molecular_weights, get_temperature, get_net_production_rates, get_mole_fractions, &
         & get_species_binary_mass_diffusivities, get_species_mass_diffusivities_mixavg, gas_constant, &
         & get_mixture_molecular_weight, get_mixture_energy_mass, get_mixture_thermal_conductivity_mixavg, &
@@ -19,7 +20,7 @@ module m_chemistry
 
     #:if USING_AMD
         real(wp) :: molecular_weights_nonparameter(10) = (/2.016, 1.008, 15.999, 31.998, 17.007, 18.015, 33.006, 34.014, 39.95, &
-            & 28.014/)
+             & 28.014/)
         $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
     #:endif
 
@@ -27,10 +28,12 @@ module m_chemistry
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
     integer, dimension(3) :: offsets
     $:GPU_DECLARE(create='[offsets]')
+
 contains
 
     !> @brief Computes mixture viscosities for left and right states and inverts them for use as reciprocal Reynolds numbers.
     subroutine compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L, Re_R)
+
         $:GPU_ROUTINE(function_name='compute_viscosity_and_inversion',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(inout)                         :: T_L, T_R, Re_L, Re_R
@@ -40,13 +43,14 @@ contains
         call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R)
         Re_L = 1.0_wp/Re_L
         Re_R = 1.0_wp/Re_R
+
     end subroutine compute_viscosity_and_inversion
 
     !> @brief Initializes the temperature field from conservative variables by inverting the energy equation.
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
-        ! Initialize the temperature field at the start of the simulation to
-        ! reasonable values. Temperature is computed the regular way using the
-        ! conservative variables.
+
+        ! Initialize the temperature field at the start of the simulation to reasonable values. Temperature is computed the regular
+        ! way using the conservative variables.
 
         type(scalar_field), intent(inout)                   :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -62,10 +66,7 @@ contains
                         Ys(eqn - chemxb + 1) = q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
                     end do
 
-                    ! e = E - 1/2*|u|^2
-                    ! cons. E_idx     = \rho E
-                    ! cons. contxb    = \rho         (1-fluid model)
-                    ! cons. momxb + i = \rho u_i
+                    ! e = E - 1/2*|u|^2 cons. E_idx = \rho E cons. contxb = \rho (1-fluid model) cons. momxb + i = \rho u_i
                     energy = q_cons_vf(E_idx)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
                     do eqn = momxb, momxe
                         energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
@@ -77,10 +78,12 @@ contains
                 end do
             end do
         end do
+
     end subroutine s_compute_q_T_sf
 
     !> @brief Computes the temperature field from primitive variables using the ideal gas law and mixture molecular weight.
     subroutine s_compute_T_from_primitives(q_T_sf, q_prim_vf, bounds)
+
         type(scalar_field), intent(inout)                   :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)   :: bounds
@@ -100,10 +103,12 @@ contains
                 end do
             end do
         end do
+
     end subroutine s_compute_T_from_primitives
 
     !> @brief Adds chemical reaction source terms to the species transport RHS using net production rates.
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
+
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), intent(inout)                      :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_qp, q_prim_qp
@@ -147,10 +152,12 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_compute_chemistry_reaction_flux
 
     !> @brief Computes species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
     subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz)
+
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         type(int_bounds_info), intent(in)                      :: irx, iry, irz
@@ -188,9 +195,11 @@ contains
             if (chem_params%transport_model == 1) then
                 ! Note: Added 'i' and 'eqn' to private list.
                 $:GPU_PARALLEL_LOOP(collapse=3,  private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, &
-                & mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, &
-                    & dXk_dxi, Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, &
-                    & rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing]', copyin='[offsets]')
+                                    & mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, &
+                                    & h_r, Xs_cell, h_k, dXk_dxi, Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, Rgas_L, &
+                                    & Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, &
+                                        & lambda_Cell, &
+                                    & dT_dxi, grid_spacing]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
                         do x = isc1%beg, isc1%end
@@ -267,7 +276,7 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = chemxb, chemxe
                                 mass_diffusivities_mixavg_Cell(i - chemxb + 1) = (mass_diffusivities_mixavg2(i - chemxb + 1) &
-                                    & + mass_diffusivities_mixavg1(i - chemxb + 1))/2.0_wp
+                                                               & + mass_diffusivities_mixavg1(i - chemxb + 1))/2.0_wp
                             end do
 
                             lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
@@ -280,10 +289,11 @@ contains
                             do eqn = chemxb, chemxe
                                 #:if USING_AMD
                                     Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1) &
-                                        & *molecular_weights_nonparameter(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
+                                                    & *molecular_weights_nonparameter(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn &
+                                                    & - chemxb + 1)
                                 #:else
                                     Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1) &
-                                        & *molecular_weights(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
+                                                    & *molecular_weights(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
                                 #:endif
                                 rho_Vic = rho_Vic + Mass_Diffu_Flux(eqn - chemxb + 1)
                                 Mass_Diffu_Energy = Mass_Diffu_Energy + h_k(eqn - chemxb + 1)*Mass_Diffu_Flux(eqn - chemxb + 1)
@@ -294,7 +304,7 @@ contains
                             do eqn = chemxb, chemxe
                                 Mass_Diffu_Energy = Mass_Diffu_Energy - h_k(eqn - chemxb + 1)*Ys_cell(eqn - chemxb + 1)*rho_Vic
                                 Mass_Diffu_Flux(eqn - chemxb + 1) = Mass_Diffu_Flux(eqn - chemxb + 1) - rho_Vic*Ys_cell(eqn &
-                                    & - chemxb + 1)
+                                                & - chemxb + 1)
                             end do
 
                             ! Add thermal conduction contribution
@@ -316,9 +326,9 @@ contains
             else if (chem_params%transport_model == 2) then
                 ! Note: Added ALL scalars and 'i'/'eqn' to private list to prevent race conditions.
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, dYk_dxi, Mass_Diffu_Flux, &
-                & grid_spacing, MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, Cp_R, &
-                    & hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, diffusivity_R, diffusivity_cell, &
-                    & Mass_Diffu_Energy]', copyin='[offsets]')
+                                    & grid_spacing, MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, P_L, P_R, rho_L, rho_R, rho_cell, T_L, &
+                                    & T_R, Cp_L, Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, &
+                                    & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
                         do x = isc1%beg, isc1%end
@@ -405,5 +415,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         end if
+
     end subroutine s_compute_chemistry_diffusion_flux
+
 end module m_chemistry

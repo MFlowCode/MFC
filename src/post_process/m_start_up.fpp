@@ -7,19 +7,20 @@
 !> @brief Reads and validates user inputs, allocates variables, and configures MPI decomposition and I/O for post-processing
 
 module m_start_up
+
     ! Dependencies
 
     use, intrinsic :: iso_c_binding
 
-    use m_derived_types !< Definitions of the derived types
-    use m_global_parameters !< Global parameters for the code
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
-    use m_mpi_common !< Common MPI subroutines
-    use m_boundary_common !< Common boundary conditions subroutines
+    use m_derived_types        !< Definitions of the derived types
+    use m_global_parameters    !< Global parameters for the code
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_mpi_common           !< Common MPI subroutines
+    use m_boundary_common      !< Common boundary conditions subroutines
     use m_variables_conversion !< Subroutines to change the state variables from one form to another
-    use m_data_input !< Procedures reading raw simulation data to fill the conservative, primitive and grid variables
-    use m_data_output !< Procedures that write the grid and chosen flow variable(s) to the formatted database file(s)
-    use m_derived_variables !< Procedures used to compute quantities derived from the conservative and primitive variables
+    use m_data_input           !< Procedures reading raw simulation data to fill the conservative, primitive and grid variables
+    use m_data_output          !< Procedures that write the grid and chosen flow variable(s) to the formatted database file(s)
+    use m_derived_variables    !< Procedures used to compute quantities derived from the conservative and primitive variables
     use m_helper
     use m_compile_specific
     use m_checker_common
@@ -48,20 +49,23 @@ module m_start_up
     integer, dimension(3)                   :: cart3d_coords
     integer, dimension(2)                   :: cart2d12_coords, cart2d13_coords
     integer                                 :: proc_rank12, proc_rank13
+
 contains
 
     !> Reads the configuration file post_process.inp, in order to populate parameters in module m_global_parameters.f90 with the
     !! user provided inputs
     impure subroutine s_read_input_file
+
         character(LEN=name_len) :: file_loc !< Generic string used to store the address of a particular file
         !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
         logical :: file_check
         integer :: iostatus
-            !! Integer to check iostat of file read
+        !! Integer to check iostat of file read
 
         character(len=1000) :: line
 
         ! Namelist for all of the parameters to be inputted by the user
+
         namelist /user_inputs/ case_dir, m, n, p, t_step_start, t_step_stop, t_step_save, model_eqns, num_fluids, mpp_lim, &
             & weno_order, bc_x, bc_y, bc_z, fluid_pp, bub_pp, format, precision, output_partial_domain, x_output, y_output, &
             & z_output, hypoelasticity, G, mhd, chem_wrt_Y, chem_wrt_T, avg_state, alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
@@ -79,8 +83,7 @@ contains
         file_loc = 'post_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)
 
-        ! Checking whether the input file is there. If it is, the input file
-        ! is read. If not, the program is terminated.
+        ! Checking whether the input file is there. If it is, the input file is read. If not, the program is terminated.
         if (file_check) then
             open (1, FILE=trim(file_loc), form='formatted', STATUS='old', ACTION='read')
             read (1, NML=user_inputs, iostat=iostatus)
@@ -117,14 +120,17 @@ contains
         else
             call s_mpi_abort('File post_process.inp is missing. Exiting.')
         end if
+
     end subroutine s_read_input_file
 
     !> Checking that the user inputs make sense, i.e. that the individual choices are compatible with the code's options and that
     !! the combination of these choices results into a valid configuration for the post-process
     impure subroutine s_check_input_file
+
         character(LEN=len_trim(case_dir)) :: file_loc  !< Generic string used to store the address of a particular file
         logical                           :: dir_check !< Logical variable used to test the existence of folders
         ! Checking the existence of the case folder
+
         case_dir = adjustl(case_dir)
 
         file_loc = trim(case_dir) // '/.'
@@ -138,15 +144,18 @@ contains
 
         call s_check_inputs_common()
         call s_check_inputs()
+
     end subroutine s_check_input_file
 
     !> @brief Load grid and conservative data for a time step, fill ghost-cell buffers, and convert to primitive variables.
     impure subroutine s_perform_time_step(t_step)
+
         integer, intent(inout) :: t_step
+
         if (proc_rank == 0) then
             if (cfl_dt) then
                 print '(" [", I3, "%]  Saving ", I8, " of ", I0, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
-                    & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time
+                        & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time
             else
                 print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I8, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), (t_step - t_step_start)/t_step_save + 1, (t_step_stop - t_step_start)/t_step_save + 1, t_step, wall_time_avg, wall_time
             end if
@@ -166,18 +175,21 @@ contains
 
         ! Converting the conservative variables to the primitive ones
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
+
     end subroutine s_perform_time_step
 
     !> @brief Derive requested flow quantities from primitive variables and write them to the formatted database files.
     impure subroutine s_save_data(t_step, varname, pres, c, H)
+
         integer, intent(inout)                 :: t_step
         character(LEN=name_len), intent(inout) :: varname
         real(wp), intent(inout)                :: pres, c, H
         real(wp)                               :: theta1, theta2
+
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, &
-            & -offset_z%beg:p + offset_z%end) :: liutex_mag
+             & -offset_z%beg:p + offset_z%end) :: liutex_mag
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, &
-            & 3) :: liutex_axis
+             & 3) :: liutex_axis
         integer       :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
         real(wp)      :: En_tot
         character(50) :: filename, dirname
@@ -267,8 +279,7 @@ contains
         end if
 
         if (relativity .and. (rho_wrt .or. cons_vars_wrt)) then
-            ! For relativistic flow, conservative and primitive densities are different
-            ! Hard-coded single-component for now
+            ! For relativistic flow, conservative and primitive densities are different Hard-coded single-component for now
             q_sf(:,:,:) = q_cons_vf(1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'D'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -371,7 +382,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg + 1)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), &
-                            & 0._wp)
+                                   & 0._wp)
                     end do
                 end do
             end do
@@ -384,7 +395,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         data_cmplx(j + 1, k + 1, l + 1) = cmplx(q_cons_vf(mom_idx%beg + 2)%sf(j, k, l)/q_cons_vf(1)%sf(j, k, l), &
-                            & 0._wp)
+                                   & 0._wp)
                     end do
                 end do
             end do
@@ -621,7 +632,7 @@ contains
                         H = ((gamma_sf(i, j, k) + 1._wp)*pres + pi_inf_sf(i, j, k) + qv_sf(i, j, k))/rho_sf(i, j, k)
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, k), H, adv, &
-                            & 0._wp, 0._wp, c, qv_sf(i, j, k))
+                                                      & 0._wp, 0._wp, c, qv_sf(i, j, k))
 
                         q_sf(i, j, k) = c
                     end do
@@ -648,7 +659,7 @@ contains
 
         if (ib) then
             q_sf(:,:,:) = real(ib_markers%sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, &
-                & -offset_z%beg:p + offset_z%end))
+                 & -offset_z%beg:p + offset_z%end))
             varname = 'ib_markers'
             call s_write_variable_to_formatted_database_file(varname, t_step)
         end if
@@ -763,7 +774,7 @@ contains
         if (bubbles_lagrange) then
             !! Void fraction field
             q_sf(:,:,:) = 1._wp - q_cons_vf(beta_idx)%sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, &
-                & -offset_z%beg:p + offset_z%end)
+                 & -offset_z%beg:p + offset_z%end)
             write (varname, '(A)') 'voidFraction'
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
@@ -779,10 +790,12 @@ contains
 
         ! Closing the formatted database file
         call s_close_formatted_database_file()
+
     end subroutine s_save_data
 
     !> @brief Transpose 3-D complex data from x-pencil to y-pencil layout via MPI_Alltoall.
     subroutine s_mpi_transpose_x2y
+
         complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
         integer                                :: dest_rank, src_rank
         integer                                :: i, j, k, l
@@ -797,21 +810,21 @@ contains
                 do k = 1, Nyloc
                     do j = 1, Nxloc
                         sendbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + dest_rank*Nxloc*Nyloc*Nzloc) = data_cmplx(j &
-                            & + dest_rank*Nxloc, k, l)
+                                & + dest_rank*Nxloc, k, l)
                     end do
                 end do
             end do
         end do
 
         call MPI_Alltoall(sendbuf, Nxloc*Nyloc*Nzloc, MPI_C_DOUBLE_COMPLEX, recvbuf, Nxloc*Nyloc*Nzloc, MPI_C_DOUBLE_COMPLEX, &
-            & MPI_COMM_CART12, ierr)
+                          & MPI_COMM_CART12, ierr)
 
         do src_rank = 0, num_procs_y - 1
             do l = 1, Nzloc
                 do k = 1, Nyloc
                     do j = 1, Nxloc
                         data_cmplx_y(j, k + src_rank*Nyloc, &
-                            & l) = recvbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + src_rank*Nxloc*Nyloc*Nzloc)
+                                     & l) = recvbuf(j + (k - 1)*Nxloc + (l - 1)*Nxloc*Nyloc + src_rank*Nxloc*Nyloc*Nzloc)
                     end do
                 end do
             end do
@@ -820,10 +833,12 @@ contains
         deallocate (sendbuf)
         deallocate (recvbuf)
 #endif
+
     end subroutine s_mpi_transpose_x2y
 
     !> @brief Transpose 3-D complex data from y-pencil to z-pencil layout via MPI_Alltoall.
     subroutine s_mpi_transpose_y2z
+
         complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
         integer                                :: dest_rank, src_rank
         integer                                :: j, k, l
@@ -838,22 +853,22 @@ contains
                 do j = 1, Nxloc
                     do k = 1, Nyloc2
                         sendbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) + dest_rank*Nyloc2*Nxloc*Nzloc) = data_cmplx_y(j, &
-                            & k + dest_rank*Nyloc2, l)
+                                & k + dest_rank*Nyloc2, l)
                     end do
                 end do
             end do
         end do
 
         call MPI_Alltoall(sendbuf, Nyloc2*Nxloc*Nzloc, MPI_C_DOUBLE_COMPLEX, recvbuf, Nyloc2*Nxloc*Nzloc, MPI_C_DOUBLE_COMPLEX, &
-            & MPI_COMM_CART13, ierr)
+                          & MPI_COMM_CART13, ierr)
 
         do src_rank = 0, num_procs_z - 1
             do l = 1, Nzloc
                 do j = 1, Nxloc
                     do k = 1, Nyloc2
                         data_cmplx_z(j, k, &
-                            & l + src_rank*Nzloc) = recvbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) &
-                            & + src_rank*Nyloc2*Nxloc*Nzloc)
+                                     & l + src_rank*Nzloc) = recvbuf(k + (j - 1)*Nyloc2 + (l - 1)*(Nyloc2*Nxloc) &
+                                     & + src_rank*Nyloc2*Nxloc*Nzloc)
                     end do
                 end do
             end do
@@ -862,12 +877,13 @@ contains
         deallocate (sendbuf)
         deallocate (recvbuf)
 #endif
+
     end subroutine s_mpi_transpose_y2z
 
     !> @brief Initialize all post-process sub-modules, set up I/O pointers, and prepare FFTW plans and MPI communicators.
     impure subroutine s_initialize_modules
-        ! Computation of parameters, allocation procedures, and/or any other tasks
-        ! needed to properly setup the modules
+
+        ! Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the modules
         integer :: size_n(1), inembed(1), onembed(1)
 
         call s_initialize_global_parameters_module()
@@ -923,24 +939,24 @@ contains
             onembed(1) = Nx
 
             fwd_plan_x = fftw_plan_many_dft(1, size_n, Nyloc*Nzloc, data_in, inembed, 1, Nx, data_out, onembed, 1, Nx, &
-                & FFTW_FORWARD, FFTW_MEASURE)
+                                            & FFTW_FORWARD, FFTW_MEASURE)
 
             size_n(1) = Ny
             inembed(1) = Ny
             onembed(1) = Ny
 
             fwd_plan_y = fftw_plan_many_dft(1, size_n, Nxloc*Nzloc, data_out, inembed, 1, Ny, data_in, onembed, 1, Ny, &
-                & FFTW_FORWARD, FFTW_MEASURE)
+                                            & FFTW_FORWARD, FFTW_MEASURE)
 
             size_n(1) = Nz
             inembed(1) = Nz
             onembed(1) = Nz
 
             fwd_plan_z = fftw_plan_many_dft(1, size_n, Nxloc*Nyloc2, data_in, inembed, 1, Nz, data_out, onembed, 1, Nz, &
-                & FFTW_FORWARD, FFTW_MEASURE)
+                                            & FFTW_FORWARD, FFTW_MEASURE)
 
             call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, num_procs_y, num_procs_z/), (/.true., .true., .true./), &
-                & .false., MPI_COMM_CART, ierr)
+                                 & .false., MPI_COMM_CART, ierr)
             call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, cart3d_coords, ierr)
 
             call MPI_Cart_SUB(MPI_COMM_CART, (/.true., .true., .false./), MPI_COMM_CART12, ierr)
@@ -952,10 +968,12 @@ contains
             call MPI_CART_COORDS(MPI_COMM_CART13, proc_rank13, 2, cart2d13_coords, ierr)
         end if
 #endif
+
     end subroutine s_initialize_modules
 
     !> @brief Perform a distributed forward 3-D FFT using pencil decomposition with FFTW and MPI transposes.
     subroutine s_mpi_FFT_fwd
+
         integer :: j, k, l
 
 #ifdef MFC_MPI
@@ -1018,19 +1036,20 @@ contains
             end do
         end do
 #endif
+
     end subroutine s_mpi_FFT_fwd
 
     !> @brief Set up the MPI environment, read and broadcast user inputs, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
+
         num_dims = 1 + min(1, n) + min(1, p)
 
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
-        ! Processor with rank 0 assigns default user input values prior to reading
-        ! those in from the input file. Next, the user inputs are read in and their
-        ! consistency is checked. The detection of any inconsistencies automatically
-        ! leads to the termination of the post-process.
+        ! Processor with rank 0 assigns default user input values prior to reading those in from the input file. Next, the user
+        ! inputs are read in and their consistency is checked. The detection of any inconsistencies automatically leads to the
+        ! termination of the post-process.
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
@@ -1039,24 +1058,22 @@ contains
             print '(" Post-processing a ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s)")', m, n, p, num_procs
         end if
 
-        ! Broadcasting the user inputs to all of the processors and performing the
-        ! parallel computational domain decomposition. Neither procedure has to be
-        ! carried out if the post-process is in fact not truly executed in parallel.
+        ! Broadcasting the user inputs to all of the processors and performing the parallel computational domain decomposition.
+        ! Neither procedure has to be carried out if the post-process is in fact not truly executed in parallel.
         call s_mpi_bcast_user_inputs()
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
         call s_check_inputs_fft()
+
     end subroutine s_initialize_mpi_domain
 
     !> @brief Destroy FFTW plans, free MPI communicators, and finalize all post-process sub-modules.
     impure subroutine s_finalize_modules
+
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
 
-        !        if (sim_data .and. proc_rank == 0) then
-        !            call s_close_intf_data_file()
-        !            call s_close_energy_data_file()
-        !        end if
+        ! if (sim_data .and. proc_rank == 0) then call s_close_intf_data_file() call s_close_energy_data_file() end if
 
         if (fft_wrt) then
             if (c_associated(fwd_plan_x)) call fftw_destroy_plan(fwd_plan_x)
@@ -1093,5 +1110,7 @@ contains
 
         ! Finalizing the MPI environment
         call s_mpi_finalize()
+
     end subroutine s_finalize_modules
+
 end module m_start_up

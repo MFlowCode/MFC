@@ -8,7 +8,8 @@
 !> @brief Pressure relaxation for the six-equation multi-component model via Newton--Raphson equilibration and volume-fraction
 !! correction
 module m_pressure_relaxation
-    use m_derived_types !< Definitions of the derived types
+
+    use m_derived_types     !< Definitions of the derived types
     use m_global_parameters !< Definitions of the global parameters
     implicit none
 
@@ -17,10 +18,12 @@ module m_pressure_relaxation
 
     real(wp), allocatable, dimension(:,:) :: Res_pr
     $:GPU_DECLARE(create='[Res_pr]')
+
 contains
 
     !> Initialize the pressure relaxation module
     impure subroutine s_initialize_pressure_relaxation_module
+
         integer :: i, j
 
         if (viscous) then
@@ -32,18 +35,22 @@ contains
             end do
             $:GPU_UPDATE(device='[Res_pr, Re_idx, Re_size]')
         end if
+
     end subroutine s_initialize_pressure_relaxation_module
 
     !> Finalize the pressure relaxation module
     impure subroutine s_finalize_pressure_relaxation_module
+
         if (viscous) then
             @:DEALLOCATE(Res_pr)
         end if
+
     end subroutine s_finalize_pressure_relaxation_module
 
     !> The main pressure relaxation procedure
     !! @param q_cons_vf Cell-average conservative variables
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer                                                :: j, k, l
 
@@ -56,10 +63,12 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_pressure_relaxation_procedure
 
     !> Process pressure relaxation for a single cell
     subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -75,10 +84,12 @@ contains
 
         ! Internal energy correction
         call s_correct_internal_energies(q_cons_vf, j, k, l)
+
     end subroutine s_relax_cell_pressure
 
     !> Check if pressure relaxation is needed for this cell
     logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -92,10 +103,12 @@ contains
                 s_needs_pressure_relaxation = .false.
             end if
         end do
+
     end function s_needs_pressure_relaxation
 
     !> Correct volume fractions to physical bounds
     subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -119,10 +132,12 @@ contains
         do i = 1, num_fluids
             q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)/sum_alpha
         end do
+
     end subroutine s_correct_volume_fractions
 
     !> Main pressure equilibration using Newton-Raphson
     subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -172,7 +187,7 @@ contains
                 do i = 1, num_fluids
                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/max(q_cons_vf(i + advxb - 1)%sf(j, k, l), &
-                            & sgm_eps)*((pres_relax + ps_inf(i))/(pres_K_init(i) + ps_inf(i)))**(1._wp/gs_min(i))
+                                & sgm_eps)*((pres_relax + ps_inf(i))/(pres_K_init(i) + ps_inf(i)))**(1._wp/gs_min(i))
                         f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
                         df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l)/(gs_min(i)*rho_K_s(i)*(pres_relax + ps_inf(i)))
                     end if
@@ -186,10 +201,12 @@ contains
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + advxb - 1)%sf(j, k, &
                 & l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
         end do
+
     end subroutine s_equilibrate_pressure
 
     !> Correct internal energies using equilibrated pressure
     subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -280,5 +297,7 @@ contains
         do i = 1, num_fluids
             q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)*(gammas(i)*pres_relax + pi_infs(i))
         end do
+
     end subroutine s_correct_internal_energies
+
 end module m_pressure_relaxation

@@ -7,6 +7,7 @@
 !! of the primitive and conservative variables, as well as quantities that can be derived from those such as the unadvected volume
 !! fraction, specific heat ratio, liquid stiffness, speed of sound, vorticity and the numerical Schlieren function.
 program p_main
+
     use m_global_parameters !< Global parameters for the code
     use m_start_up
 
@@ -34,11 +35,9 @@ program p_main
 
     ! Time-Marching Loop
     do
-        ! If all time-steps are not ready to be post-processed and one rank is
-        ! faster than another, the slower rank processing the last available
-        ! step might be killed when the faster rank attempts to process the
-        ! first missing step, before the slower rank finishes writing the last
-        ! available step. To avoid this, we force synchronization here.
+        ! If all time-steps are not ready to be post-processed and one rank is faster than another, the slower rank processing the
+        ! last available step might be killed when the faster rank attempts to process the first missing step, before the slower
+        ! rank finishes writing the last available step. To avoid this, we force synchronization here.
         call s_mpi_barrier()
 
         call cpu_time(start)
@@ -62,11 +61,9 @@ program p_main
                 exit
             end if
         else
-            ! Modifies the time-step iterator so that it may reach the final time-
-            ! step to be post-processed, in the case that this one is not originally
-            ! attainable through constant incrementation from the first time-step.
-            ! This modification is performed upon reaching the final time-step. In
-            ! case that it is not needed, the post-processor is done and may exit.
+            ! Modifies the time-step iterator so that it may reach the final time- step to be post-processed, in the case that this
+            ! one is not originally attainable through constant incrementation from the first time-step. This modification is
+            ! performed upon reaching the final time-step. In case that it is not needed, the post-processor is done and may exit.
             if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
                 t_step = t_step_stop - t_step_save
             else if (t_step == t_step_stop) then

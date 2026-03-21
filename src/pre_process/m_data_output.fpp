@@ -4,10 +4,11 @@
 
 !> @brief Writes grid and initial condition data to serial or parallel output files
 module m_data_output
-    use m_derived_types !< Definitions of the derived types
+
+    use m_derived_types     !< Definitions of the derived types
     use m_global_parameters !< Global parameters for the code
     use m_helper
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
 #ifdef MFC_MPI
     use mpi !< Message passing interface (MPI) module
 #endif
@@ -34,11 +35,13 @@ module m_data_output
         !> Interface for the conservative data
         !! @param q_cons_vf Conservative variables
         impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type)
+
             import :: scalar_field, integer_field, sys_size, m, n, p, pres_field, num_dims
 
             ! Conservative variables
             type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
             type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+
         end subroutine s_write_abstract_data_files
     end interface
 
@@ -46,13 +49,15 @@ module m_data_output
     character(LEN=path_len + 2*name_len), private :: t_step_dir
     character(LEN=path_len + 2*name_len), public  :: restart_dir !< Restart data folder
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
+
 contains
 
-    !> Writes grid and initial condition data files to the "0"  time-step directory in the local processor rank folder
-        !! @param q_cons_vf Conservative variables
-        !! @param q_prim_vf Primitive variables
-        !! @param bc_type Boundary condition types
+    !> Writes grid and initial condition data files to the "0" time-step directory in the local processor rank folder
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
+    !! @param bc_type Boundary condition types
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type)
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_prim_vf
 
         ! BC types
@@ -62,16 +67,16 @@ contains
         character(LEN=3)                                             :: status
         !> Used to store the number, in character form, of the currently manipulated conservative variable data file
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-        character(LEN=len_trim(t_step_dir) + name_len)           :: file_loc !< Generic string used to store the address of a particular file
-        integer                                                  :: i, j, k, l, r, c                                !< Generic loop iterator
-        integer                                                  :: t_step
-        real(wp), dimension(nb)                                  :: nRtmp                           !< Temporary bubble concentration
-        real(wp)                                                 :: nbub                                           !< Temporary bubble number density
-        real(wp)                                                 :: gamma, lit_gamma, pi_inf, qv                   !< Temporary EOS params
-        real(wp)                                                 :: rho                                            !< Temporary density
-        real(wp)                                                 :: pres, T                                        !< Temporary pressure
-        real(wp)                                                 :: rhoYks(1:num_species)                          !< Temporary species mass fractions
-        real(wp)                                                 :: pres_mag
+        character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !< Generic string used to store the address of a particular file
+        integer :: i, j, k, l, r, c                                !< Generic loop iterator
+        integer :: t_step
+        real(wp), dimension(nb) :: nRtmp                           !< Temporary bubble concentration
+        real(wp) :: nbub                                           !< Temporary bubble number density
+        real(wp) :: gamma, lit_gamma, pi_inf, qv                   !< Temporary EOS params
+        real(wp) :: rho                                            !< Temporary density
+        real(wp) :: pres, T                                        !< Temporary pressure
+        real(wp) :: rhoYks(1:num_species)                          !< Temporary species mass fractions
+        real(wp) :: pres_mag
 
         pres_mag = 0._wp
 
@@ -191,7 +196,7 @@ contains
                         if ((i >= chemxb) .and. (i <= chemxe)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
                         else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) .or. ((i >= adv_idx%beg) .and. (i <= adv_idx%end) &
-                            & ) .or. ((i >= chemxb) .and. (i <= chemxe))) then
+                                 & ) .or. ((i >= chemxb) .and. (i <= chemxe))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == mom_idx%beg) then ! u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
@@ -200,12 +205,12 @@ contains
                         else if (i == E_idx) then ! p
                             if (mhd) then
                                 pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, &
-                                    & 0, 0)**2)
+                                                   & 0, 0)**2)
                             end if
 
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j, 0, 0), q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                & 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, rho, qv, rhoYks, pres, &
-                                & T, pres_mag=pres_mag)
+                                                    & 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, rho, &
+                                                    & qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
                             if (i == mom_idx%beg + 1) then ! v
@@ -256,7 +261,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -268,7 +273,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -304,7 +309,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -318,7 +323,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -359,7 +364,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -375,7 +380,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_loc, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
@@ -390,13 +395,15 @@ contains
                 end do
             end if
         end if
+
     end subroutine s_write_serial_data_files
 
-    !> Writes grid and initial condition data files in parallel to the "0"  time-step directory in the local processor rank folder
-        !! @param q_cons_vf Conservative variables
-        !! @param q_prim_vf Primitive variables
-        !! @param bc_type Boundary condition types
+    !> Writes grid and initial condition data files in parallel to the "0" time-step directory in the local processor rank folder
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
+    !! @param bc_type Boundary condition types
     impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type)
+
         ! Conservative variables
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
@@ -601,10 +608,12 @@ contains
                 call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
             end if
         end if
+
     end subroutine s_write_parallel_data_files
 
-    !> Computation of parameters, allocation procedures, and/or              any other tasks needed to properly setup the module
+    !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_output_module
+
         ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         character(len=15)                              :: temp
@@ -614,16 +623,15 @@ contains
         logical :: dir_check
         integer :: i
         integer :: m_ds, n_ds, p_ds !< down sample dimensions
+
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
             write (t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'
             t_step_dir = trim(case_dir) // trim(t_step_dir)
 
-            ! Checking the existence of the time-step directory, removing it, if
-            ! it exists, and creating a new copy. Note that if preexisting grid
-            ! and/or initial condition data are to be read in from the very same
-            ! location, then the above described steps are not executed here but
-            ! rather in the module m_start_up.f90.
+            ! Checking the existence of the time-step directory, removing it, if it exists, and creating a new copy. Note that if
+            ! preexisting grid and/or initial condition data are to be read in from the very same location, then the above described
+            ! steps are not executed here but rather in the module m_start_up.f90.
             if (old_grid .neqv. .true.) then
                 file_loc = trim(t_step_dir) // '/'
 
@@ -662,7 +670,7 @@ contains
         do i = contxb, contxe
             write (temp, '(I0)') i - contxb + 1
             write (1, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "} \rho_{" // trim(temp) // "}", &
-                & "\alpha_{" // trim(temp) // "} \rho"
+                   & "\alpha_{" // trim(temp) // "} \rho"
         end do
         do i = momxb, momxe
             write (1, '(I3,A20,A20)') i, "\rho u_" // coord(i - momxb + 1), "u_" // coord(i - momxb + 1)
@@ -677,7 +685,7 @@ contains
         if (chemistry) then
             do i = 1, num_species
                 write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{" // trim(species_names(i)) // "} \rho", &
-                    & "Y_{" // trim(species_names(i)) // "}"
+                       & "Y_{" // trim(species_names(i)) // "}"
             end do
         end if
 
@@ -703,10 +711,12 @@ contains
                 allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
+
     end subroutine s_initialize_data_output_module
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module
+
         integer :: i
 
         s_write_data_files => null()
@@ -717,5 +727,7 @@ contains
             end do
             deallocate (q_cons_temp)
         end if
+
     end subroutine s_finalize_data_output_module
+
 end module m_data_output

@@ -4,12 +4,13 @@
 
 !> @brief NVIDIA NVTX profiling API bindings for GPU performance instrumentation
 module m_nvtx
+
     use iso_c_binding
 
     implicit none
 
     integer, private :: col(7) = [int(Z'0000ff00'), int(Z'000000ff'), int(Z'00ffff00'), int(Z'00ff00ff'), int(Z'0000ffff'), &
-        & int(Z'00ff0000'), int(Z'00ffffff')]
+                            & int(Z'00ff0000'), int(Z'00ffffff')]
 
     character(len=256), private :: tempName
 
@@ -31,28 +32,35 @@ module m_nvtx
     interface nvtxRangePush
         ! push range with custom label and standard color
         subroutine nvtxRangePushA(name) bind(C, name='nvtxRangePushA')
+
             use iso_c_binding
 
             character(kind=c_char, len=*), intent(in) :: name
+
         end subroutine nvtxRangePushA
         ! push range with custom label and custom color
         subroutine nvtxRangePushEx(event) bind(C, name='nvtxRangePushEx')
+
             use iso_c_binding
 
             import :: nvtxEventAttributes
             type(nvtxEventAttributes), intent(in) :: event
+
         end subroutine nvtxRangePushEx
     end interface nvtxRangePush
 
     interface nvtxRangePop
         subroutine nvtxRangePop() bind(C, name='nvtxRangePop')
+
         end subroutine nvtxRangePop
     end interface nvtxRangePop
 #endif
+
 contains
 
     !> @brief Pushes a named NVTX range for GPU profiling, optionally with a color based on the given identifier.
     subroutine nvtxStartRange(name, id)
+
         character(kind=c_char, len=*), intent(in) :: name
         integer, intent(in), optional             :: id
         type(nvtxEventAttributes)                 :: event
@@ -69,12 +77,16 @@ contains
             call nvtxRangePushEx(event)
         end if
 #endif
+
     end subroutine nvtxStartRange
 
     !> @brief Pops the current NVTX range to end the GPU profiling region.
     subroutine nvtxEndRange
+
 #if defined(MFC_GPU) && defined(__PGI)
         call nvtxRangePop
 #endif
+
     end subroutine nvtxEndRange
+
 end module m_nvtx

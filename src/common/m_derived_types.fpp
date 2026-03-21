@@ -6,6 +6,7 @@
 
 !> @brief Shared derived types for field data, patch geometry, bubble dynamics, and MPI I/O structures
 module m_derived_types
+
     use m_constants !< Constants
     use m_precision_select
     use m_thermochem, only: num_species
@@ -193,16 +194,16 @@ module m_derived_types
         real(wp) :: radius                       !< Dimensions of the patch. radius.
         !> Vector indicating the various radii for the elliptical and ellipsoidal patch geometries. It is specified through its x-,
         !! y-, and z-components respectively.
-        real(wp), dimension(3)   :: radii
-        real(wp)                 :: epsilon, beta !< The isentropic vortex parameters for the amplitude of the disturbance and domain of influence.
+        real(wp), dimension(3) :: radii
+        real(wp) :: epsilon, beta !< The isentropic vortex parameters for the amplitude of the disturbance and domain of influence.
         real(wp), dimension(2:9) :: a !< Used by hardcoded IC and as temporary variables.
-        logical                  :: non_axis_sym
+        logical :: non_axis_sym
 
         ! Geometry 13 (2D modal Fourier): fourier_cos(n), fourier_sin(n) for mode n
         real(wp), dimension(1:max_2d_fourier_modes) :: fourier_cos, fourier_sin
-        logical                                     :: modal_clip_r_to_min !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
-        real(wp)                                    :: modal_r_min        !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
-        logical                                     :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
+        logical :: modal_clip_r_to_min !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
+        real(wp) :: modal_r_min        !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
+        logical :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
         ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
         real(wp), dimension(0:max_sph_harm_degree, -max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
         !> Normal vector indicating the orientation of the patch. It is specified through its x-, y- and z-components, respectively.
@@ -243,11 +244,11 @@ module m_derived_types
 
         !! STL or OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale !< Scale factor for the STL object.
-        real(wp), dimension(1:3)   :: model_rotate !< Angle to rotate the STL object along each cartesian coordinate axis, in radians.
-        integer                    :: model_spc !< Number of samples per cell to use when discretizing the STL object.
-        real(wp)                   :: model_threshold !< Threshold to turn on smoothen STL patch.
+        real(wp), dimension(1:3) :: model_translate !< Translation of the STL object.
+        real(wp), dimension(1:3) :: model_scale !< Scale factor for the STL object.
+        real(wp), dimension(1:3) :: model_rotate !< Angle to rotate the STL object along each cartesian coordinate axis, in radians.
+        integer :: model_spc !< Number of samples per cell to use when discretizing the STL object.
+        real(wp) :: model_threshold !< Threshold to turn on smoothen STL patch.
     end type ic_patch_parameters
 
     type ib_patch_parameters
@@ -272,18 +273,18 @@ module m_derived_types
 
         !! STL or OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale !< Scale factor for the STL object.
-        real(wp), dimension(1:3)   :: model_rotate !< Angle to rotate the STL object along each cartesian coordinate axis, in radians.
-        integer                    :: model_spc !< Number of samples per cell to use when discretizing the STL object.
-        real(wp)                   :: model_threshold !< Threshold to turn on smoothen STL patch. Patch conditions for moving imersed boundaries
-        integer                    :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
-        real(wp)                   :: mass, moment ! mass and moment of inertia of object used to compute forces in 2-way coupling
-        real(wp), dimension(1:3)   :: force, torque ! vectors for the computed force and torque values applied to an IB
-        real(wp), dimension(1:3)   :: vel
-        real(wp), dimension(1:3)   :: step_vel ! velocity array used to store intermediate steps in the time_stepper module
-        real(wp), dimension(1:3)   :: angular_vel
-        real(wp), dimension(1:3)   :: step_angular_vel ! velocity array used to store intermediate steps in the time_stepper module
+        real(wp), dimension(1:3) :: model_translate !< Translation of the STL object.
+        real(wp), dimension(1:3) :: model_scale !< Scale factor for the STL object.
+        real(wp), dimension(1:3) :: model_rotate !< Angle to rotate the STL object along each cartesian coordinate axis, in radians.
+        integer :: model_spc !< Number of samples per cell to use when discretizing the STL object.
+        real(wp) :: model_threshold !< Threshold to turn on smoothen STL patch. Patch conditions for moving imersed boundaries
+        integer :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
+        real(wp) :: mass, moment ! mass and moment of inertia of object used to compute forces in 2-way coupling
+        real(wp), dimension(1:3) :: force, torque ! vectors for the computed force and torque values applied to an IB
+        real(wp), dimension(1:3) :: vel
+        real(wp), dimension(1:3) :: step_vel ! velocity array used to store intermediate steps in the time_stepper module
+        real(wp), dimension(1:3) :: angular_vel
+        real(wp), dimension(1:3) :: step_angular_vel ! velocity array used to store intermediate steps in the time_stepper module
     end type ib_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid

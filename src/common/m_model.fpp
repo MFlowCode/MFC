@@ -7,6 +7,7 @@
 
 !> @brief Binary STL file reader and processor for immersed boundary geometry
 module m_model
+
     use m_helper
     use m_mpi_proxy
     use m_derived_types
@@ -38,12 +39,14 @@ module m_model
     integer, allocatable                      :: gpu_total_vertices(:)
     real(wp), allocatable                     :: stl_bounding_boxes(:,:,:)
     $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count, gpu_total_vertices]')
+
 contains
 
     !> This procedure reads a binary STL file.
     !! @param filepath Path to the STL file.
     !! @param model The binary of the STL file.
     impure subroutine s_read_stl_binary(filepath, model)
+
         character(LEN=*), intent(in)   :: filepath
         type(t_model), intent(out)     :: model
         integer                        :: i, iunit, iostat
@@ -82,12 +85,14 @@ contains
         end do
 
         close (iunit)
+
     end subroutine s_read_stl_binary
 
     !> This procedure reads an ASCII STL file.
     !! @param filepath Path to the STL file.
     !! @param model the STL file.
     impure subroutine s_read_stl_ascii(filepath, model)
+
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out)   :: model
         integer                      :: i, j, iunit, iostat
@@ -190,12 +195,14 @@ contains
 
             i = i + 1
         end do
+
     end subroutine s_read_stl_ascii
 
     !> This procedure reads an STL file.
     !! @param filepath Path to the STL file.
     !! @param model the STL file.
     impure subroutine s_read_stl(filepath, model)
+
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out)   :: model
         integer                      :: iunit, iostat
@@ -218,12 +225,14 @@ contains
         else
             call s_read_stl_binary(filepath, model)
         end if
+
     end subroutine s_read_stl
 
     !> This procedure reads an OBJ file.
     !! @param filepath Path to the obj file.
     !! @param model The obj file.
     impure subroutine s_read_obj(filepath, model)
+
         character(LEN=*), intent(in)          :: filepath
         type(t_model), intent(out)            :: model
         integer                               :: i, j, k, l, iv3, iunit, iostat, nVertices
@@ -287,12 +296,14 @@ contains
         deallocate (vertices)
 
         close (iunit)
+
     end subroutine s_read_obj
 
     !> This procedure reads a mesh from a file.
     !! @param filepath Path to the file to read.
     !! @return The model read from the file.
     impure function f_model_read(filepath) result(model)
+
         character(LEN=*), intent(in) :: filepath
         type(t_model)                :: model
 
@@ -306,12 +317,14 @@ contains
 
             call s_mpi_abort()
         end select
+
     end function f_model_read
 
     !> This procedure writes a binary STL file.
     !! @param filepath Path to the STL file.
     !! @param model STL to write
     impure subroutine s_write_stl(filepath, model)
+
         character(LEN=*), intent(in)              :: filepath
         type(t_model), intent(in)                 :: model
         integer                                   :: i, j, iunit, iostat
@@ -351,12 +364,14 @@ contains
         end do
 
         close (iunit)
+
     end subroutine s_write_stl
 
     !> This procedure writes an OBJ file.
     !! @param filepath Path to the obj file.
     !! @param model obj to write.
     impure subroutine s_write_obj(filepath, model)
+
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in)    :: model
         integer                      :: iunit, iostat
@@ -375,19 +390,21 @@ contains
         do i = 1, model%ntrs
             do j = 1, 3
                 write (iunit, '(A, " ", (f30.20), " ", (f30.20), " ", (f30.20))') "v", model%trs(i)%v(j, 1), model%trs(i)%v(j, &
-                    & 2), model%trs(i)%v(j, 3)
+                       & 2), model%trs(i)%v(j, 3)
             end do
 
             write (iunit, '(A, " ", I0, " ", I0, " ", I0)') "f", i*3 - 2, i*3 - 1, i*3
         end do
 
         close (iunit)
+
     end subroutine s_write_obj
 
     !> This procedure writes a binary STL file.
     !! @param filepath  Path to the file to write.
     !! @param model Model to write.
     impure subroutine s_model_write(filepath, model)
+
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(in)    :: model
 
@@ -401,16 +418,20 @@ contains
 
             call s_mpi_abort()
         end select
+
     end subroutine s_model_write
 
     !> This procedure frees the memory allocated for an STL mesh.
     subroutine s_model_free(model)
+
         type(t_model), intent(inout) :: model
 
         deallocate (model%trs)
+
     end subroutine s_model_free
 
     impure function f_read_line(iunit, line) result(bIsLine)
+
         integer, intent(in)        :: iunit
         character(80), intent(out) :: line
         logical                    :: bIsLine
@@ -434,10 +455,12 @@ contains
 
             exit
         end do
+
     end function f_read_line
 
     !> @brief Reads the next non-comment line from a model file, using a buffered look-ahead mechanism.
     impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
+
         integer, intent(in)          :: iunit
         character(80), intent(inout) :: buffered_line
         logical, intent(inout)       :: is_buffered
@@ -452,11 +475,13 @@ contains
 
         buffered_line = line
         is_buffered = .true.
+
     end subroutine s_skip_ignored_lines
 
     !> This function is used to replace the fortran random number generator because the native generator is not compatible being
     !! called from GPU routines/functions
     function f_model_random_number(seed) result(rval)
+
         ! $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(inout) :: seed
@@ -467,6 +492,7 @@ contains
         seed = ieor(seed, ishft(seed, 5))
 
         rval = abs(real(seed, wp))/real(huge(seed), wp)
+
     end function f_model_random_number
 
     !> This procedure, recursively, finds whether a point is inside an octree.
@@ -476,6 +502,7 @@ contains
     !! @param spc      Number of samples per cell.
     !! @return True if the point is inside the octree, false otherwise.
     impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
+
         ! $:GPU_ROUTINE(parallelism='[seq]')
 
         type(t_model), intent(in)            :: model
@@ -517,12 +544,12 @@ contains
                 end if
             end do
 
-            ! if the ray hits an odd number of triangles on its way out, then
-            ! it must be on the inside of the model
+            ! if the ray hits an odd number of triangles on its way out, then it must be on the inside of the model
             nInOrOut = nInOrOut + mod(nHits, 2)
         end do
 
         fraction = real(nInOrOut)/real(spc)
+
     end function f_model_is_inside
 
     !> This procedure determines if a point is inside a surface using the generalized winding number (Jacobson et al., SIGGRAPH
@@ -534,6 +561,7 @@ contains
     !! @param point    Point to test.
     !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
     function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in)                  :: ntrs
@@ -549,8 +577,7 @@ contains
         fraction = 0.0_wp
 
         if (p == 0) then
-            ! 2D winding number: sum signed angles subtended by
-            ! each boundary edge at the query point.
+            ! 2D winding number: sum signed angles subtended by each boundary edge at the query point.
             do q = 1, gpu_boundary_edge_count(pid)
                 d1(1) = gpu_boundary_v(q, 1, 1, pid) - point(1)
                 d1(2) = gpu_boundary_v(q, 1, 2, pid) - point(2)
@@ -564,8 +591,7 @@ contains
             ! 2D winding number = total angle / (2*pi)
             fraction = fraction/(2.0_wp*acos(-1.0_wp))
         else
-            ! 3D winding number: sum solid angles via Van
-            ! Oosterom-Strackee formula.
+            ! 3D winding number: sum solid angles via Van Oosterom-Strackee formula.
             do q = 1, ntrs
                 r1 = gpu_trs_v(1,:, q, pid) - point
                 r2 = gpu_trs_v(2,:, q, pid) - point
@@ -575,25 +601,23 @@ contains
                 r2_mag = sqrt(dot_product(r2, r2))
                 r3_mag = sqrt(dot_product(r3, r3))
 
-                ! Skip if query point is coincident with a vertex
-                ! (magnitudes are zero/subnormal).
+                ! Skip if query point is coincident with a vertex (magnitudes are zero/subnormal).
                 if (r1_mag*r2_mag*r3_mag < tiny(1.0_wp)) cycle
 
-                ! tan(Omega/2) = numerator / denominator
-                ! numerator = scalar triple product r1 . (r2 x r3)
+                ! tan(Omega/2) = numerator / denominator numerator = scalar triple product r1 . (r2 x r3)
                 numerator = r1(1)*(r2(2)*r3(3) - r2(3)*r3(2)) + r1(2)*(r2(3)*r3(1) - r2(1)*r3(3)) + r1(3)*(r2(1)*r3(2) - r2(2) &
-                    & *r3(1))
+                               & *r3(1))
 
                 denominator = r1_mag*r2_mag*r3_mag + dot_product(r1, r2)*r3_mag + dot_product(r2, r3)*r1_mag + dot_product(r3, &
-                    & r1)*r2_mag
+                                                                 & r1)*r2_mag
 
                 fraction = fraction + atan2(numerator, denominator)
             end do
 
-            ! Each atan2 returns Omega/2 per triangle; divide
-            ! by 2*pi to get winding number = sum(Omega)/(4*pi).
+            ! Each atan2 returns Omega/2 per triangle; divide by 2*pi to get winding number = sum(Omega)/(4*pi).
             fraction = fraction/(2.0_wp*acos(-1.0_wp))
         end if
+
     end function f_model_is_inside_flat
 
     !> This procedure checks if a ray intersects a triangle using the Moller-Trumbore algorithm (barycentric coordinates). Unlike
@@ -602,6 +626,7 @@ contains
     !! @param triangle Triangle.
     !! @return         1 if the ray intersects the triangle, 0 otherwise.
     function f_intersects_triangle(ray, triangle) result(intersects)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(t_ray), intent(in)      :: ray
@@ -617,8 +642,7 @@ contains
         h = f_cross(ray%d, edge2)
         a = dot_product(edge1, h)
 
-        ! Ray nearly parallel to triangle plane. In single precision
-        ! builds epsilon(1.0) ~ 1.2e-7, so use 10*epsilon as a floor.
+        ! Ray nearly parallel to triangle plane. In single precision builds epsilon(1.0) ~ 1.2e-7, so use 10*epsilon as a floor.
         if (abs(a) < max(1e-7_wp, 10.0_wp*epsilon(1.0_wp))) return
 
         f = 1.0_wp/a
@@ -635,23 +659,26 @@ contains
         t = f*dot_product(edge2, q)
 
         if (t > 0.0_wp) intersects = 1
+
     end function f_intersects_triangle
 
     !> This procedure checks and labels edges shared by two or more triangles facets of the 2D STL model.
     !! @param model                      Model to search in.
     !! @param boundary_vertex_count      Output total boundary vertex count
     subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
-        type(t_model), intent(in)                            :: model
+
+        type(t_model), intent(in) :: model
         real(wp), allocatable, intent(out), dimension(:,:,:) :: boundary_v !< Output boundary vertices/normals
-        integer, intent(out)                                 :: boundary_vertex_count, boundary_edge_count !< Output boundary vertex/edge count
-        integer                                              :: i, j                                                    !< Model index iterator
-        integer                                              :: edge_count, edge_index, store_index                     !< Boundary edge index iterator
-        real(wp), dimension(1:2, 1:2)                        :: edge                              !< Edge end points buffer
-        real(wp), dimension(1:2)                             :: boundary_edge                          !< Boundary edge end points buffer
-        real(wp), dimension(1:(3*model%ntrs), 1:2, 1:2)      :: temp_boundary_v !< Temporary boundary vertex buffer
-        integer, dimension(1:(3*model%ntrs))                 :: edge_occurrence            !< The manifoldness of the edges
-        real(wp)                                             :: edgetan, initial, v_norm, xnormal, ynormal             !< The manifoldness of the edges
+        integer, intent(out) :: boundary_vertex_count, boundary_edge_count !< Output boundary vertex/edge count
+        integer :: i, j                                                    !< Model index iterator
+        integer :: edge_count, edge_index, store_index                     !< Boundary edge index iterator
+        real(wp), dimension(1:2, 1:2) :: edge                              !< Edge end points buffer
+        real(wp), dimension(1:2) :: boundary_edge                          !< Boundary edge end points buffer
+        real(wp), dimension(1:(3*model%ntrs), 1:2, 1:2) :: temp_boundary_v !< Temporary boundary vertex buffer
+        integer, dimension(1:(3*model%ntrs)) :: edge_occurrence            !< The manifoldness of the edges
+        real(wp) :: edgetan, initial, v_norm, xnormal, ynormal             !< The manifoldness of the edges
         ! Total number of edges in 2D STL
+
         edge_count = 3*model%ntrs
 
         ! Initialize edge_occurrence array to zero
@@ -746,18 +773,22 @@ contains
             boundary_v(i, 3, 1) = xnormal/v_norm
             boundary_v(i, 3, 2) = ynormal/v_norm
         end do
+
     end subroutine s_check_boundary
 
     !> This procedure appends the edge end vertices to a temporary buffer.
     subroutine s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+
         integer, intent(inout)                                     :: edge_index      !< Edge index iterator
         integer, intent(inout)                                     :: edge_count      !< Total number of edges
         real(wp), intent(in), dimension(1:2, 1:2)                  :: edge            !< Edges end points to be registered
         real(wp), dimension(1:edge_count, 1:2, 1:2), intent(inout) :: temp_boundary_v !< Temporary edge end vertex buffer
         ! Increment edge index and store the edge
+
         edge_index = edge_index + 1
         temp_boundary_v(edge_index, 1, 1:2) = edge(1, 1:2)
         temp_boundary_v(edge_index, 2, 1:2) = edge(2, 1:2)
+
     end subroutine s_register_edge
 
     !> This procedure determines the levelset distance and normals of 3D models by computing the exact closest point via projection
@@ -770,6 +801,7 @@ contains
     !! @param normals               Output levelset normals
     !! @param distance              Output levelset distance
     subroutine s_distance_normals_3D(ntrs, pid, point, normals, distance)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in)                   :: ntrs
@@ -878,7 +910,7 @@ contains
                         end if
                     else
                         dist_v = sqrt((point(1) - verts(1, mod(j, 3) + 1))**2 + (point(2) - verts(2, mod(j, &
-                            & 3) + 1))**2 + (point(3) - verts(3, mod(j, 3) + 1))**2)
+                                      & 3) + 1))**2 + (point(3) - verts(3, mod(j, 3) + 1))**2)
 
                         if (dist_v < dist_min) then
                             dist_min = dist_v
@@ -893,6 +925,7 @@ contains
         end do
 
         distance = dist_min
+
     end subroutine s_distance_normals_3D
 
     !> This procedure determines the levelset distance and normals of 2D models by computing the exact closest point via projection
@@ -904,6 +937,7 @@ contains
     !! @param normals               Output levelset normals
     !! @param distance              Output levelset distance
     subroutine s_distance_normals_2D(pid, boundary_edge_count, point, normals, distance)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in)                   :: pid
@@ -966,11 +1000,13 @@ contains
         end do
 
         distance = dist_min
+
     end subroutine s_distance_normals_2D
 
 #ifdef MFC_SIMULATION
 
     subroutine s_instantiate_STL_models()
+
         ! Variables for IBM+STL
         real(wp)                                :: normals(1:3) !< Boundary normal buffer
         integer                                 :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
@@ -1117,7 +1153,7 @@ contains
                     end if
                     if (allocated(models(pid)%boundary_v) .and. p == 0) then
                         gpu_boundary_v(1:size(models(pid)%boundary_v, 1), 1:size(models(pid)%boundary_v, 2), &
-                            & 1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v
+                                       & 1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v
                     end if
                 end do
 
@@ -1127,11 +1163,12 @@ contains
                 end if
             end if
         end block
-    end subroutine s_instantiate_STL_models
 
+    end subroutine s_instantiate_STL_models
 #endif
 
     subroutine s_pack_model_for_gpu(ma)
+
         type(t_model_array), intent(inout) :: ma
         integer                            :: i
 
@@ -1143,5 +1180,7 @@ contains
             ma%trs_v(:,:, i) = ma%model%trs(i)%v(:,:)
             ma%trs_n(:, i) = ma%model%trs(i)%n(:)
         end do
+
     end subroutine s_pack_model_for_gpu
+
 end module m_model

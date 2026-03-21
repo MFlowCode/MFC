@@ -4,13 +4,14 @@
 
 !> @brief Reads raw simulation grid and conservative-variable data for a given time-step and fills buffer regions
 module m_data_input
+
 #ifdef MFC_MPI
     use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types !< Definitions of the derived types
+    use m_derived_types     !< Definitions of the derived types
     use m_global_parameters !< Global parameters for the code
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
     use m_mpi_common
     use m_compile_specific
     use m_boundary_common
@@ -26,9 +27,11 @@ module m_data_input
         !> Subroutine for reading data files
         !! @param t_step Current time-step to input
         impure subroutine s_read_abstract_data_files(t_step)
+
             implicit none
 
             integer, intent(in) :: t_step
+
         end subroutine s_read_abstract_data_files
     end interface
 
@@ -41,6 +44,7 @@ module m_data_input
     type(integer_field), public :: ib_markers
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
+
 contains
 
     !> Helper subroutine to read grid data files for a given direction
@@ -51,6 +55,7 @@ contains
     !! @param cc_array Cell center array to populate
     !! @param size_dim Size of the dimension
     impure subroutine s_read_grid_data_direction(t_step_dir, direction, cb_array, d_array, cc_array, size_dim)
+
         character(len=*), intent(in)             :: t_step_dir
         character(len=1), intent(in)             :: direction
         real(wp), dimension(-1:), intent(out)    :: cb_array
@@ -61,6 +66,7 @@ contains
         logical                                  :: file_check
 
         ! Checking whether direction_cb.dat exists
+
         file_loc = trim(t_step_dir) // '/' // direction // '_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_check)
 
@@ -78,6 +84,7 @@ contains
 
         ! Computing the cell-center locations
         cc_array(0:size_dim) = cb_array(-1:size_dim - 1) + d_array(0:size_dim)/2._wp
+
     end subroutine s_read_grid_data_direction
 
 #ifdef MFC_MPI
@@ -86,11 +93,13 @@ contains
     !! @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions (output)
     !! @param WP_MOK, MOK, str_MOK, NVARS_MOK Other MPI offset kinds (output)
     impure subroutine s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+
         integer, intent(out)                       :: data_size
         integer(KIND=MPI_OFFSET_KIND), intent(out) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND), intent(out) :: WP_MOK, MOK, str_MOK, NVARS_MOK
 
         ! Initialize MPI data I/O
+
         if (ib) then
             call s_initialize_mpi_data(q_cons_vf, ib_markers)
         else
@@ -108,14 +117,15 @@ contains
         MOK = int(1._wp, MPI_OFFSET_KIND)
         str_MOK = int(name_len, MPI_OFFSET_KIND)
         NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
-    end subroutine s_setup_mpi_io_params
 
+    end subroutine s_setup_mpi_io_params
 #endif
 
     !> Helper subroutine to read IB data files
     !! @param file_loc_base Base file location for IB data
     !! @param t_step Time step index
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
+
         character(len=*), intent(in)                :: file_loc_base
         integer, intent(in), optional               :: t_step
         character(LEN=len_trim(file_loc_base) + 20) :: file_loc
@@ -127,6 +137,7 @@ contains
         integer(KIND=MPI_OFFSET_KIND)       :: disp
         integer                             :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, save_index
 #endif
+
         if (.not. ib) return
 
         if (parallel_io) then
@@ -169,6 +180,7 @@ contains
         else
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
+
     end subroutine s_read_ib_data_files
 
     !> Helper subroutine to allocate field arrays for given dimensionality
@@ -177,6 +189,7 @@ contains
     !! @param end_y End index for y dimension
     !! @param end_z End index for z dimension
     impure subroutine s_allocate_field_arrays(local_start_idx, end_x, end_y, end_z)
+
         integer, intent(in) :: local_start_idx, end_x, end_y, end_z
         integer             :: i
 
@@ -192,12 +205,14 @@ contains
         if (chemistry) then
             allocate (q_T_sf%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end if
+
     end subroutine s_allocate_field_arrays
 
     !> This subroutine is called at each time-step that has to be post-processed in order to read the raw data files present in the
     !! corresponding time-step directory and to populate the associated grid and conservative variables.
     !! @param t_step Current time-step
     impure subroutine s_read_serial_data_files(t_step)
+
         integer, intent(in)                            :: t_step
         character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir !< Location of the time-step directory associated with t_step
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !< Generic string used to store the location of a particular file
@@ -205,10 +220,11 @@ contains
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
         !> Location of the time-step directory associated with t_step
         character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir
-        logical                                        :: dir_check  !< Generic logical used to test the existence of a particular folder
-        logical                                        :: file_check !< Generic logical used to test the existence of a particular file
-        integer                                        :: i          !< Generic loop iterator
+        logical :: dir_check  !< Generic logical used to test the existence of a particular folder
+        logical :: file_check !< Generic logical used to test the existence of a particular file
+        integer :: i          !< Generic loop iterator
         ! Setting location of time-step folder based on current time-step
+
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir) // trim(t_step_dir)
 
@@ -240,8 +256,8 @@ contains
 
         ! Reading the Conservative Variables Data Files
         do i = 1, sys_size
-            ! Checking whether the data file associated with the variable
-            ! position of currently manipulated conservative variable exists
+            ! Checking whether the data file associated with the variable position of currently manipulated conservative variable
+            ! exists
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir) // '/q_cons_vf' // trim(file_num) // '.dat'
             inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -252,8 +268,7 @@ contains
                 read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
                 close (1)
             else if (bubbles_lagrange .and. i == beta_idx) then
-                ! beta (Lagrangian void fraction) is not written by pre_process
-                ! for t_step_start; initialize to zero.
+                ! beta (Lagrangian void fraction) is not written by pre_process for t_step_start; initialize to zero.
                 q_cons_vf(i)%sf(0:m, 0:n, 0:p) = 0._wp
             else
                 call s_mpi_abort('File q_cons_vf' // trim(file_num) // '.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
@@ -262,12 +277,14 @@ contains
 
         ! Reading IB data using helper subroutine
         call s_read_ib_data_files(t_step_dir)
+
     end subroutine s_read_serial_data_files
 
     !> This subroutine is called at each time-step that has to be post-processed in order to parallel-read the raw data files
     !! present in the corresponding time-step directory and to populate the associated grid and conservative variables.
     !! @param t_step Current time-step
     impure subroutine s_read_parallel_data_files(t_step)
+
         integer, intent(in) :: t_step
 
 #ifdef MFC_MPI
@@ -392,6 +409,7 @@ contains
             call s_assign_default_bc_type(bc_type)
         end if
 #endif
+
     end subroutine s_read_parallel_data_files
 
 #ifdef MFC_MPI
@@ -400,6 +418,7 @@ contains
     !! @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions
     !! @param WP_MOK, MOK, str_MOK, NVARS_MOK Other MPI offset kinds
     impure subroutine s_read_parallel_conservative_data(t_step, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+
         integer, intent(in)                          :: t_step
         integer(KIND=MPI_OFFSET_KIND), intent(inout) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND), intent(inout) :: WP_MOK, MOK, str_MOK, NVARS_MOK
@@ -505,23 +524,23 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
         end if
-    end subroutine s_read_parallel_conservative_data
 
+    end subroutine s_read_parallel_conservative_data
 #endif
 
-    !> Computation of parameters, allocation procedures, and/or      any other tasks needed to properly setup the module
+    !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_input_module
+
         integer :: i !< Generic loop iterator
-        ! Allocating the parts of the conservative and primitive variables
-        ! that do not require the direct knowledge of the dimensionality of
-        ! the simulation
+        ! Allocating the parts of the conservative and primitive variables that do not require the direct knowledge of the
+        ! dimensionality of the simulation
+
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_temp(1:sys_size))
 
-        ! Allocating the parts of the conservative and primitive variables
-        ! that do require the direct knowledge of the dimensionality of
-        ! the simulation using helper subroutine
+        ! Allocating the parts of the conservative and primitive variables that do require the direct knowledge of the
+        ! dimensionality of the simulation using helper subroutine
 
         ! Simulation is at least 2D
         if (n > 0) then
@@ -561,12 +580,15 @@ contains
         else
             s_read_data_files => s_read_parallel_data_files
         end if
+
     end subroutine s_initialize_data_input_module
 
     !> Deallocation procedures for the module
     impure subroutine s_finalize_data_input_module
+
         integer :: i !< Generic loop iterator
         ! Deallocating the conservative and primitive variables
+
         do i = 1, sys_size
             deallocate (q_cons_vf(i)%sf)
             deallocate (q_prim_vf(i)%sf)
@@ -598,5 +620,7 @@ contains
         deallocate (bc_type)
 
         s_read_data_files => null()
+
     end subroutine s_finalize_data_input_module
+
 end module m_data_input

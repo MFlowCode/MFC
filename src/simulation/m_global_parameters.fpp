@@ -7,12 +7,13 @@
 
 !> @brief Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
 module m_global_parameters
+
 #ifdef MFC_MPI
     use mpi !< Message passing interface (MPI) module
 #endif
 
     use m_derived_types !< Definitions of the derived types
-    use m_helper_basic !< Functions to compare floating point numbers
+    use m_helper_basic  !< Functions to compare floating point numbers
     ! $:USE_GPU_MODULE()
 
     implicit none
@@ -49,20 +50,17 @@ module m_global_parameters
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
-
     real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
-
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
     ! type(bounds_info) :: x_domain, y_domain, z_domain !<
     !! Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
-
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
@@ -146,9 +144,8 @@ module m_global_parameters
     !> @{
     logical :: nv_uvm_out_of_core ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
     integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
-    ! 1 => jac on GPU, jac_rhs and jac_old on CPU
-    ! 2 => jac and jac_rhs on GPU, jac_old on CPU
-    ! 3 => jac, jac_rhs, and jac_old on GPU (default)
+    ! 1 => jac on GPU, jac_rhs and jac_old on CPU 2 => jac and jac_rhs on GPU, jac_old on CPU 3 => jac, jac_rhs, and jac_old on GPU
+    ! (default)
     logical :: nv_uvm_pref_gpu ! Enable explicit gpu memory hints (default FALSE)
     !> @}
 
@@ -181,7 +178,7 @@ module m_global_parameters
     real(wp)           :: alf_factor                  !< alpha factor for IGR
     logical            :: bodyForces
     logical            :: bf_x, bf_y, bf_z            !< body force toggle in three directions
-    !< amplitude, frequency, and phase shift sinusoid in each direction
+    !> amplitude, frequency, and phase shift sinusoid in each direction
     #:for dir in {'x', 'y', 'z'}
         #:for param in {'k','w','p','g'}
             real(wp) :: ${param}$_${dir}$
@@ -278,14 +275,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[pi_inf_idx, B_idx, stress_idx, xi_idx, b_size]')
     $:GPU_DECLARE(create='[tensor_size, species_idx, c_idx]')
 
-    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
-    ! Stands for "InDices With INTerior".
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With INTerior".
     type(int_bounds_info) :: idwint(1:3)
     $:GPU_DECLARE(create='[idwint]')
 
-    ! Cell Indices for the entire (local) domain. In simulation and post_process,
-    ! this includes the buffer region. idwbuff and idwint are the same otherwise.
-    ! Stands for "InDices With BUFFer".
+    ! Cell Indices for the entire (local) domain. In simulation and post_process, this includes the buffer region. idwbuff and
+    ! idwint are the same otherwise. Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
     $:GPU_DECLARE(create='[idwbuff]')
 
@@ -299,11 +294,9 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
 
-    ! The WENO average (WA) flag regulates whether the calculation of any cell-
-    ! average spatial derivatives is carried out in each cell by utilizing the
-    ! arithmetic mean of the left and right, WENO-reconstructed, cell-boundary
-    ! values or simply, the unaltered left and right, WENO-reconstructed, cell-
-    ! boundary values.
+    ! The WENO average (WA) flag regulates whether the calculation of any cell- average spatial derivatives is carried out in each
+    ! cell by utilizing the arithmetic mean of the left and right, WENO-reconstructed, cell-boundary values or simply, the unaltered
+    ! left and right, WENO-reconstructed, cell- boundary values.
     !> @{
     real(wp) :: wa_flg
     !> @}
@@ -372,10 +365,9 @@ module m_global_parameters
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
     integer                                               :: Np
-    !! Database of the immersed boundary patch parameters for each of the
-    !! patches employed in the configuration of the initial condition. Note that
-    !! the maximum allowable number of patches, num_patches_max, may be changed
-    !! in the module m_derived_types.f90.
+    !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
+    !! condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
+    !! m_derived_types.f90.
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
     !> @}
@@ -399,7 +391,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[weight, R0]')
 
     logical :: bubbles_euler !< Bubbles euler on/off
-    logical :: polytropic    !< Polytropic  switch
+    logical :: polytropic    !< Polytropic switch
     logical :: polydisperse  !< Polydisperse bubbles
     $:GPU_DECLARE(create='[bubbles_euler, polytropic, polydisperse]')
 
@@ -431,7 +423,6 @@ module m_global_parameters
     type(scalar_field), allocatable, dimension(:)     :: mom_sp
     type(scalar_field), allocatable, dimension(:,:,:) :: mom_3d
     $:GPU_DECLARE(create='[mom_sp, mom_3d]')
-
     !> @}
 
     type(chemistry_parameters) :: chem_params
@@ -464,7 +455,6 @@ module m_global_parameters
 
     !> @name Surface tension parameters
     !> @{
-
     real(wp) :: sigma
     logical  :: surface_tension
     $:GPU_DECLARE(create='[sigma, surface_tension]')
@@ -522,13 +512,16 @@ module m_global_parameters
     real(wp) :: hyper_cleaning_tau   !< Hyperbolic cleaning tau
     $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
     !> @}
+
 contains
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
+
         integer :: i, j !< Generic loop iterator
         ! Logistics
+
         case_dir = '.'
         run_time_info = .false.
         t_step_old = dflt_int
@@ -722,7 +715,7 @@ contains
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
-        !< amplitude, frequency, and phase shift sinusoid in each direction
+        !> amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in {'x', 'y', 'z'}
             #:for param in {'k','w','p','g'}
                 ${param}$_${dir}$ = dflt_real
@@ -859,16 +852,19 @@ contains
             patch_ib(i)%rotation_matrix(3, 3) = 1._wp
             patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
         end do
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
     !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_global_parameters_module
+
         integer :: i, j, k
         integer :: fac
 
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
+
             if (recon_type == WENO_TYPE) then
                 weno_polyn = (weno_order - 1)/2
                 if (teno) then
@@ -886,19 +882,16 @@ contains
             $:GPU_UPDATE(device='[igr, igr_order, igr_iter_solver]')
         #:endif
 
-        ! Initializing the number of fluids for which viscous effects will
-        ! be non-negligible, the number of distinctive material interfaces
-        ! for which surface tension will be important and also, the number
-        ! of fluids for which the physical and geometric curvatures of the
-        ! interfaces will be computed
+        ! Initializing the number of fluids for which viscous effects will be non-negligible, the number of distinctive material
+        ! interfaces for which surface tension will be important and also, the number of fluids for which the physical and geometric
+        ! curvatures of the interfaces will be computed
         Re_size = 0
         Re_size_max = 0
 
         ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
-            ! Annotating structure of the state and flux vectors belonging
-            ! to the system of equations defined by the selected number of
-            ! spatial dimensions and the gamma/pi_inf model
+            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
+            ! of spatial dimensions and the gamma/pi_inf model
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
@@ -913,9 +906,8 @@ contains
             ! Volume Fraction Model
         else
 
-            ! Annotating structure of the state and flux vectors belonging
-            ! to the system of equations defined by the selected number of
-            ! spatial dimensions and the volume fraction model
+            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
+            ! of spatial dimensions and the volume fraction model
             if (model_eqns == 2) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
@@ -924,17 +916,14 @@ contains
                 E_idx = mom_idx%end + 1
 
                 if (igr) then
-                    ! Volume fractions are stored in the indices immediately following
-                    ! the energy equation. IGR tracks a total of (N-1) volume fractions
-                    ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
-                    ! then adv_idx%end < adv_idx%beg, which skips all loops over the
-                    ! volume fractions since there is no volume fraction to track
+                    ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of
+                    ! (N-1) volume fractions for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1 then adv_idx%end <
+                    ! adv_idx%beg, which skips all loops over the volume fractions since there is no volume fraction to track
                     adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
                     adv_idx%end = E_idx + num_fluids - 1
                 else
-                    ! Volume fractions are stored in the indices immediately following
-                    ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
-                    ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                    ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann
+                    ! tracks a total of (N) volume fractions for N fluids, hence the lack of "-1" in adv_idx%end
                     adv_idx%beg = E_idx + 1
                     adv_idx%end = E_idx + num_fluids
                 end if
@@ -1064,8 +1053,8 @@ contains
                 end if
             end if
 
-            ! Determining the number of fluids for which the shear and the
-            ! volume Reynolds numbers, e.g. viscous effects, are important
+            ! Determining the number of fluids for which the shear and the volume Reynolds numbers, e.g. viscous effects, are
+            ! important
             do i = 1, num_fluids
                 if (fluid_pp(i)%Re(1) > 0) Re_size(1) = Re_size(1) + 1
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
@@ -1078,8 +1067,8 @@ contains
 
             $:GPU_UPDATE(device='[Re_size, Re_size_max, shear_stress, bulk_stress]')
 
-            ! Bookkeeping the indexes of any viscous fluids and any pairs of
-            ! fluids whose interface will support effects of surface tension
+            ! Bookkeeping the indexes of any viscous fluids and any pairs of fluids whose interface will support effects of surface
+            ! tension
             if (viscous) then
                 @:ALLOCATE(Re_idx(1:2, 1:Re_size_max))
 
@@ -1124,9 +1113,7 @@ contains
                     shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
                     shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
                     shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
-                    ! x-dir: flip tau_xy and tau_xz
-                    ! y-dir: flip tau_xy and tau_yz
-                    ! z-dir: flip tau_xz and tau_yz
+                    ! x-dir: flip tau_xy and tau_xz y-dir: flip tau_xy and tau_yz z-dir: flip tau_xz and tau_yz
                 end if
                 $:GPU_UPDATE(device='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
             end if
@@ -1195,11 +1182,9 @@ contains
             end do
         end if
 
-        ! Configuring the WENO average flag that will be used to regulate
-        ! whether any spatial derivatives are to computed in each cell by
-        ! using the arithmetic mean of left and right, WENO-reconstructed,
-        ! cell-boundary values or otherwise, the unaltered left and right,
-        ! WENO-reconstructed, cell-boundary values
+        ! Configuring the WENO average flag that will be used to regulate whether any spatial derivatives are to computed in each
+        ! cell by using the arithmetic mean of left and right, WENO-reconstructed, cell-boundary values or otherwise, the unaltered
+        ! left and right, WENO-reconstructed, cell-boundary values
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
         $:GPU_UPDATE(device='[wa_flg]')
 
@@ -1224,7 +1209,7 @@ contains
         end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-            & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1260,7 +1245,8 @@ contains
         chemxe = species_idx%end
 
         $:GPU_UPDATE(device='[momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, &
-        & alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, c_idx, adap_dt_tol, adap_dt_max_iters]')
+                     & alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, c_idx, adap_dt_tol, &
+                         & adap_dt_max_iters]')
         $:GPU_UPDATE(device='[b_size, xibeg, xiend, tensor_size]')
 
         $:GPU_UPDATE(device='[species_idx]')
@@ -1268,8 +1254,9 @@ contains
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, &
-        & bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, &
-            & weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach]')
+                     & bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, &
+                         & cyl_coord, &
+                     & mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach]')
 
         $:GPU_UPDATE(device='[Bx0]')
 
@@ -1315,15 +1302,18 @@ contains
         @:PREFER_GPU(z_cb)
         @:PREFER_GPU(z_cc)
         @:PREFER_GPU(dz)
+
     end subroutine s_initialize_global_parameters_module
 
     !> Initializes parallel infrastructure
     impure subroutine s_initialize_parallel_io
+
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 #endif
 
         #:if not MFC_CASE_OPTIMIZATION
+
             num_dims = 1 + min(1, n) + min(1, p)
 
             if (mhd) then
@@ -1346,22 +1336,22 @@ contains
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
-        ! Option for UNIX file system (Hooke/Thomson)
-        ! WRITE(mpiiofs, '(A)') '/ufs_'
-        ! mpiiofs = TRIM(mpiiofs)
-        ! mpi_info_int = MPI_INFO_NULL
+        ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
+        ! MPI_INFO_NULL
 
         allocate (start_idx(1:num_dims))
 #endif
+
     end subroutine s_initialize_parallel_io
 
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_global_parameters_module
+
         integer :: i
 
-        ! Deallocating the variables bookkeeping the indexes of any viscous
-        ! fluids and any pairs of fluids whose interfaces supported effects
-        ! of surface tension
+        ! Deallocating the variables bookkeeping the indexes of any viscous fluids and any pairs of fluids whose interfaces
+        ! supported effects of surface tension
+
         if (viscous) then
             @:DEALLOCATE(Re_idx)
         end if
@@ -1394,5 +1384,7 @@ contains
 
         if (p == 0) return;
         @:DEALLOCATE(z_cb, z_cc, dz)
+
     end subroutine s_finalize_global_parameters_module
+
 end module m_global_parameters

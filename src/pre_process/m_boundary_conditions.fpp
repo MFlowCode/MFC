@@ -4,6 +4,7 @@
 
 !> @brief Applies spatially varying boundary condition patches along domain edges and faces
 module m_boundary_conditions
+
     use m_derived_types
     use m_global_parameters
 #ifdef MFC_MPI
@@ -20,14 +21,17 @@ module m_boundary_conditions
     real(wp)          :: radius
     type(bounds_info) :: x_boundary, y_boundary, z_boundary
     private; public :: s_apply_boundary_patches
+
 contains
     !> @brief Applies a line-segment boundary condition patch along a domain edge in 2D.
     impure subroutine s_line_segment_bc(patch_id, bc_type)
+
         type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
         integer, intent(in)                                            :: patch_id
         integer                                                        :: j
 
         ! Patch is a vertical line at x_beg or x_end
+
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             length_y = patch_bc(patch_id)%length(2)
@@ -66,13 +70,16 @@ contains
                 end if
             #:endfor
         end if
+
     end subroutine s_line_segment_bc
 
     !> @brief Applies a circular boundary condition patch on a domain face in 3D.
     impure subroutine s_circle_bc(patch_id, bc_type)
+
         type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
         integer, intent(in)                                            :: patch_id
         integer                                                        :: j, k
+
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -123,13 +130,16 @@ contains
                 end if
             #:endfor
         end if
+
     end subroutine s_circle_bc
 
     !> @brief Applies a rectangular boundary condition patch on a domain face in 3D.
     impure subroutine s_rectangle_bc(patch_id, bc_type)
+
         type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
         integer, intent(in)                                            :: patch_id
         integer                                                        :: j, k
+
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -204,15 +214,18 @@ contains
                 end if
             #:endfor
         end if
+
     end subroutine s_rectangle_bc
 
     !> @brief Iterates over all boundary condition patches and dispatches them by geometry type.
     impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
+
         type(scalar_field), dimension(sys_size)         :: q_prim_vf
         type(integer_field), dimension(1:num_dims, 1:2) :: bc_type
         integer                                         :: i
 
-        !< Apply 2D patches to 3D domain
+        !> Apply 2D patches to 3D domain
+
         if (p > 0) then
             do i = 1, num_bc_patches
                 if (proc_rank == 0) then
@@ -225,7 +238,7 @@ contains
                     call s_rectangle_bc(i, bc_type)
                 end if
             end do
-            !< Apply 1D patches to 2D domain
+            !> Apply 1D patches to 2D domain
         else if (n > 0) then
             do i = 1, num_bc_patches
                 if (proc_rank == 0) then
@@ -237,5 +250,7 @@ contains
                 end if
             end do
         end if
+
     end subroutine s_apply_boundary_patches
+
 end module m_boundary_conditions

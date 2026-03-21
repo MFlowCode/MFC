@@ -11,10 +11,11 @@
 
 !> @brief Immersed boundary patch geometry constructors for 2D and 3D shapes
 module m_ib_patches
+
     use m_model ! Subroutine(s) related to STL files
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters !< Definitions of the global parameters
-    use m_helper_basic !< Functions to compare floating point numbers
+    use m_helper_basic      !< Functions to compare floating point numbers
     use m_helper
     use m_mpi_common
 
@@ -31,34 +32,34 @@ module m_ib_patches
     integer  :: smooth_patch_id
     real(wp) :: smooth_coeff
     $:GPU_DECLARE(create='[smooth_patch_id, smooth_coeff]')
-    !! These variables are analogous in both meaning and use to the similarly
-    !! named components in the ic_patch_parameters type (see m_derived_types.f90
-    !! for additional details). They are employed as a means to more concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
+    !! These variables are analogous in both meaning and use to the similarly named components in the ic_patch_parameters type (see
+    !! m_derived_types.f90 for additional details). They are employed as a means to more concisely perform the actions necessary to
+    !! lay out a particular patch on the grid.
 
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi
     $:GPU_DECLARE(create='[cart_x, cart_y, cart_z, sph_phi]')
-    !! Variables to be used to hold cell locations in Cartesian coordinates if
-    !! 3D simulation is using cylindrical coordinates
+    !! Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
 
     type(bounds_info) :: x_boundary, y_boundary, z_boundary
     $:GPU_DECLARE(create='[x_boundary, y_boundary, z_boundary]')
-    !! These variables combine the centroid and length parameters associated with
-    !! a particular patch to yield the locations of the patch boundaries in the
-    !! x-, y- and z-coordinate directions. They are used as a means to concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
+    !! These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the
+    !! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
+    !! necessary to lay out a particular patch on the grid.
 
     character(len=5) :: istr ! string to store int to string result for error checking
+
 contains
 
     !> @brief Applies all immersed boundary patch geometries to mark interior cells in the IB marker array.
     impure subroutine s_apply_ib_patches(ib_markers)
+
         type(integer_field), intent(inout) :: ib_markers
         integer                            :: i, xp, yp, zp ! iterators
         integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper ! periodic bounds
 
         !  3D Patch Geometries
+
         if (p > 0) then
             !> IB Patches
             !> @{
@@ -108,15 +109,17 @@ contains
             end do
             !> @}
         end if
+
     end subroutine s_apply_ib_patches
 
     !> The circular patch is a 2D geometry that may be used, for example, in creating a bubble or a droplet. The geometry of the
     !! patch is well-defined when its centroid and radius are provided. Note that the circular patch DOES allow for the smoothing of
     !! its boundary.
-        !! @param patch_id is the patch identifier
-        !! @param ib_markers Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
+    !! @param patch_id is the patch identifier
+    !! @param ib_markers Array to track patch ids
+    !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_circle(patch_id, ib_markers, xp, yp)
+
         integer, intent(in)                :: patch_id
         integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
         type(integer_field), intent(inout) :: ib_markers
@@ -125,8 +128,8 @@ contains
         integer                            :: i, j, il, ir, jl, jr !< Generic loop iterators
         integer                            :: encoded_patch_id
 
-        ! Transferring the circular patch's radius, centroid, smearing patch
-        ! identity and smearing coefficient information
+        ! Transferring the circular patch's radius, centroid, smearing patch identity and smearing coefficient information
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         radius = patch_ib(patch_id)%radius
@@ -142,10 +145,8 @@ contains
         call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
 
-        ! Checking whether the circle covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! that cell. If both queries check out, the primitive variables of
-        ! the current patch are assigned to this cell.
+        ! Checking whether the circle covers a particular cell in the domain and verifying whether the current patch has permission
+        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
 
         $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[encoded_patch_id, center, radius]', collapse=2)
         do j = jl, jr
@@ -156,12 +157,14 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_circle
 
     !> @brief Marks cells inside a 2D NACA 4-digit airfoil immersed boundary using upper and lower surface grids.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
     subroutine s_ib_airfoil(patch_id, ib_markers, xp, yp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp           !< integers containing the periodicity projection information
@@ -259,7 +262,7 @@ contains
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, ma, &
-        & ca_in, airfoil_grid_u, airfoil_grid_l]', collapse=2)
+                            & ca_in, airfoil_grid_u, airfoil_grid_l]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
@@ -315,6 +318,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_airfoil
 
     !> @brief Marks cells inside a 3D extruded NACA 4-digit airfoil immersed boundary with finite span.
@@ -322,15 +326,16 @@ contains
     !! @param ib_markers Array to track patch ids
     !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_3D_airfoil(patch_id, ib_markers, xp, yp, zp)
-        integer, intent(in)                :: patch_id
+
+        integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp, zp                     !< integers containing the periodicity projection information
-        real(wp)                           :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer                            :: i, j, k, l, il, ir, jl, jr, ll, lr
-        integer                            :: Np1, Np2
-        integer                            :: encoded_patch_id
-        real(wp), dimension(1:3)           :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation
+        integer, intent(in) :: xp, yp, zp                     !< integers containing the periodicity projection information
+        real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        integer :: i, j, k, l, il, ir, jl, jr, ll, lr
+        integer :: Np1, Np2
+        integer :: encoded_patch_id
+        real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -422,12 +427,12 @@ contains
         call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, ma, &
-        & ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
+                            & ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
         do l = ll, lr
             do j = jl, jr
                 do i = il, ir
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), &
-                        & z_cc(l) - center(3)] ! get coordinate frame centered on IB
+                                      & z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
                     xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
 
@@ -475,16 +480,18 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_3D_airfoil
 
     !> The rectangular patch is a 2D geometry that may be used, for example, in creating a solid boundary, or pre-/post- shock
     !! region, in alignment with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x- and y- coordinate directions are provided. Please note that the rectangular patch DOES NOT
     !! allow for the smoothing of its boundaries.
-        !! @param patch_id is the patch identifier
-        !! @param ib_markers Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
+    !! @param patch_id is the patch identifier
+    !! @param ib_markers Array to track patch ids
+    !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_rectangle(patch_id, ib_markers, xp, yp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
@@ -496,6 +503,7 @@ contains
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         length(1) = patch_ib(patch_id)%length_x
@@ -514,12 +522,11 @@ contains
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
 
-        ! Checking whether the rectangle covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! Checking whether the rectangle covers a particular cell in the domain and verifying whether the current patch has the
+        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
+        ! this cell.
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', &
-            & copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, y_cc]', collapse=2)
+                            & copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, y_cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
@@ -534,15 +541,17 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_rectangle
 
     !> The spherical patch is a 3D geometry that may be used, for example, in creating a bubble or a droplet. The patch geometry is
     !! well-defined when its centroid and radius are provided. Please note that the spherical patch DOES allow for the smoothing of
     !! its boundary.
-        !! @param patch_id is the patch identifier
-        !! @param ib_markers Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
+    !! @param patch_id is the patch identifier
+    !! @param ib_markers Array to track patch ids
+    !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_sphere(patch_id, ib_markers, xp, yp, zp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
@@ -553,11 +562,11 @@ contains
         real(wp)                 :: radius
         real(wp), dimension(1:3) :: center
 
-        !! Variables to initialize the pressure field that corresponds to the
-            !! bubble-collapse test case found in Tiwari et al. (2013)
+        !! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al.
+        !! (2013)
 
-        ! Transferring spherical patch's radius, centroid, smoothing patch
-        ! identity and smoothing coefficient information
+        ! Transferring spherical patch's radius, centroid, smoothing patch identity and smoothing coefficient information
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
@@ -577,10 +586,8 @@ contains
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
         call get_bounding_indices(center(3) - radius, center(3) + radius, z_cc, kl, kr)
 
-        ! Checking whether the sphere covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! that cell. If both queries check out, the primitive variables of
-        ! the current patch are assigned to this cell.
+        ! Checking whether the sphere covers a particular cell in the domain and verifying whether the current patch has permission
+        ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, cart_y, cart_z]', copyin='[encoded_patch_id, center, radius]', collapse=3)
         do k = kl, kr
             do j = jl, jr
@@ -600,15 +607,17 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_sphere
 
     !> The cuboidal patch is a 3D geometry that may be used, for example, in creating a solid boundary, or pre-/post-shock region,
     !! which is aligned with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x-, y- and z-coordinate directions are provided. Please notice that the cuboidal patch DOES NOT
     !! allow for the smearing of its boundaries.
-        !! @param patch_id is the patch identifier
-        !! @param ib_markers Array to track patch ids
+    !! @param patch_id is the patch identifier
+    !! @param ib_markers Array to track patch ids
     subroutine s_ib_cuboid(patch_id, ib_markers, xp, yp, zp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
@@ -619,6 +628,7 @@ contains
         real(wp)                           :: corner_distance
 
         ! Transferring the cuboid's centroid and length information
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
@@ -642,12 +652,11 @@ contains
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
 
-        ! Checking whether the cuboid covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! to that cell. If both queries check out, the primitive variables
-        ! of the current patch are assigned to this cell.
+        ! Checking whether the cuboid covers a particular cell in the domain and verifying whether the current patch has permission
+        ! to write to to that cell. If both queries check out, the primitive variables of the current patch are assigned to this
+        ! cell.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, cart_y, cart_z]', copyin='[encoded_patch_id, center, length, &
-        & inverse_rotation]', collapse=3)
+                            & inverse_rotation]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
@@ -671,16 +680,18 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_cuboid
 
     !> The cylindrical patch is a 3D geometry that may be used, for example, in setting up a cylindrical solid boundary confinement,
     !! like a blood vessel. The geometry of this patch is well-defined when the centroid, the radius and the length along the
     !! cylinder's axis, parallel to the x-, y- or z-coordinate direction, are provided. Please note that the cylindrical patch DOES
     !! allow for the smoothing of its lateral boundary.
-        !! @param patch_id is the patch identifier
-        !! @param ib_markers Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
+    !! @param patch_id is the patch identifier
+    !! @param ib_markers Array to track patch ids
+    !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_cylinder(patch_id, ib_markers, xp, yp, zp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
@@ -692,6 +703,7 @@ contains
         real(wp)                           :: corner_distance
 
         ! Transferring the cylindrical patch's centroid, length, radius,
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
@@ -715,12 +727,11 @@ contains
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
 
-        ! Checking whether the cylinder covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! Checking whether the cylinder covers a particular cell in the domain and verifying whether the current patch has the
+        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
+        ! this cell.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, cart_y, cart_z]', copyin='[encoded_patch_id, center, length, radius, &
-        & inverse_rotation]', collapse=3)
+                            & inverse_rotation]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
@@ -746,10 +757,12 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_cylinder
 
     !> @brief Marks cells inside a 2D elliptical immersed boundary defined by semi-axis lengths and rotation.
     subroutine s_ib_ellipse(patch_id, ib_markers, xp, yp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
@@ -761,6 +774,7 @@ contains
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         ! Transferring the ellipse's centroid and length information
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         ellipse_coeffs(1) = 0.5_wp*patch_ib(patch_id)%length_x
@@ -778,10 +792,9 @@ contains
         call get_bounding_indices(center(1) - maxval(ellipse_coeffs)*2._wp, center(1) + maxval(ellipse_coeffs)*2._wp, x_cc, il, ir)
         call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y_cc, jl, jr)
 
-        ! Checking whether the ellipse covers a particular cell in the
-        ! domain
+        ! Checking whether the ellipse covers a particular cell in the domain
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, ellipse_coeffs, inverse_rotation, x_cc, &
-        & y_cc]', collapse=2)
+                            & y_cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
@@ -796,12 +809,14 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_ellipse
 
     !> The STL patch is a 2D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
     subroutine s_ib_model(patch_id, ib_markers, xp, yp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp                  !< integers containing the periodicity projection information
@@ -841,8 +856,7 @@ contains
 
         bbox_min = 1e12
         bbox_max = -1e12
-        ! Enumerate all 8 corners of the local bounding box,
-        ! rotate to world space, track world-space AABB
+        ! Enumerate all 8 corners of the local bounding box, rotate to world space, track world-space AABB
         do cx = 1, 2
             do cy = 1, 2
                 local_corner = [lx(cx), ly(cy), 0._wp]
@@ -858,8 +872,8 @@ contains
         call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', &
-            & copyin='[patch_id, encoded_patch_id, center, inverse_rotation, offset, &
-        & spc, threshold]', collapse=2)
+                            & copyin='[patch_id, encoded_patch_id, center, inverse_rotation, offset, &
+                            & spc, threshold]', collapse=2)
         do i = il, ir
             do j = jl, jr
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
@@ -875,12 +889,14 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_model
 
     !> The STL patch is a 3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
     subroutine s_ib_3d_model(patch_id, ib_markers, xp, yp, zp)
+
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
@@ -924,8 +940,7 @@ contains
 
         bbox_min = 1e12
         bbox_max = -1e12
-        ! Enumerate all 8 corners of the local bounding box,
-        ! rotate to world space, track world-space AABB
+        ! Enumerate all 8 corners of the local bounding box, rotate to world space, track world-space AABB
         do cx = 1, 2
             do cy = 1, 2
                 do cz = 1, 2
@@ -946,7 +961,7 @@ contains
         call get_bounding_indices(bbox_min(3), bbox_max(3), z_cc, kl, kr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, eta]', copyin='[patch_id, encoded_patch_id, center, inverse_rotation, &
-        & offset, spc, threshold]', collapse=3)
+                            & offset, spc, threshold]', collapse=3)
         do i = il, ir
             do j = jl, jr
                 do k = kl, kr
@@ -963,16 +978,19 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_ib_3d_model
 
     !> Subroutine that computes a rotation matrix for converting to the rotating frame of the boundary
     subroutine s_update_ib_rotation_matrix(patch_id)
+
         integer, intent(in)          :: patch_id
         integer                      :: i
         real(wp), dimension(3, 3, 3) :: rotation
         real(wp)                     :: angle
 
         ! construct the x, y, and z rotation matrices
+
         if (num_dims == 3) then
             ! also compute the x and y axes in 3D
             angle = patch_ib(patch_id)%angles(1)
@@ -1000,44 +1018,52 @@ contains
             ! apply the z rotation to the xy rotation in 3D
             patch_ib(patch_id)%rotation_matrix(:,:) = matmul(patch_ib(patch_id)%rotation_matrix(:,:), rotation(3,:,:))
             patch_ib(patch_id)%rotation_matrix_inverse(:,:) = matmul(transpose(rotation(3,:,:)), &
-                & patch_ib(patch_id)%rotation_matrix_inverse(:,:))
+                     & patch_ib(patch_id)%rotation_matrix_inverse(:,:))
         else
             ! write out only the z rotation in 2D
             patch_ib(patch_id)%rotation_matrix(:,:) = rotation(3,:,:)
             patch_ib(patch_id)%rotation_matrix_inverse(:,:) = transpose(rotation(3,:,:))
         end if
+
     end subroutine s_update_ib_rotation_matrix
 
     !> @brief Converts cylindrical (r, theta) coordinates to Cartesian (y, z) and stores in module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(in) :: cyl_y, cyl_z
 
         cart_y = cyl_y*sin(cyl_z)
         cart_z = cyl_y*cos(cyl_z)
+
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
     !> @brief Converts a 3D cylindrical coordinate vector (x, r, theta) to Cartesian (x, y, z).
     pure function f_convert_cyl_to_cart(cyl) result(cart)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(1:3), intent(in) :: cyl
         real(wp), dimension(1:3)             :: cart
 
         cart = (/cyl(1), cyl(2)*sin(cyl(3)), cyl(2)*cos(cyl(3))/)
+
     end function f_convert_cyl_to_cart
 
     !> @brief Converts cylindrical coordinates (x, r) to the spherical azimuthal angle phi and stores in a module variable.
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(in) :: cyl_x, cyl_y
 
         sph_phi = atan(cyl_y/cyl_x)
+
     end subroutine s_convert_cylindrical_to_spherical_coord
 
     subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
+
         real(wp), intent(in)                         :: left_bound, right_bound
         integer, intent(inout)                       :: left_index, right_index
         real(wp), dimension(-buff_size:), intent(in) :: cell_centers
@@ -1072,10 +1098,12 @@ contains
             end if
         end do
         right_index = itr_right
+
     end subroutine get_bounding_indices
 
     !> @brief encodes the patch id with a unique offset that contains information on how the IB marker wraps periodically
     subroutine s_encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
+
         integer, intent(in)  :: patch_id, x_periodicity, y_periodicity, z_periodicity
         integer, intent(out) :: encoded_patch_id
         integer              :: temp_x_per, temp_y_per, temp_z_per, offset
@@ -1088,10 +1116,12 @@ contains
 
         offset = (num_ibs + 1)*temp_x_per + 3*(num_ibs + 1)*temp_y_per + 9*(num_ibs + 1)*temp_z_per
         encoded_patch_id = patch_id + offset
+
     end subroutine s_encode_patch_periodicity
 
     !> @brief decodes the encoded id to get out the original id and the way in which it is periodic
     subroutine s_decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in)  :: encoded_patch_id
@@ -1112,16 +1142,19 @@ contains
         x_periodicity = xp; if (xp == 2) x_periodicity = -1
         y_periodicity = yp; if (yp == 2) y_periodicity = -1
         z_periodicity = zp; if (zp == 2) z_periodicity = -1
+
     end subroutine s_decode_patch_periodicity
 
     !> @brief Determines if we should wrap periodically
     subroutine s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
+
         integer, intent(out)           :: xp_lower, xp_upper, yp_lower, yp_upper
         integer, intent(out), optional :: zp_lower, zp_upper
 
         ! check domain wraps in x, y
         #:for X in [('x'), ('y')]
             ! check for periodicity
+
             if (bc_${X}$%beg == BC_PERIODIC) then
                 ${X}$p_lower = -1
                 ${X}$p_upper = 1
@@ -1142,6 +1175,7 @@ contains
                 zp_upper = 0
             end if
         end if
+
     end subroutine s_get_periodicities
 
     !> Archimedes spiral function
@@ -1149,6 +1183,7 @@ contains
     !! @param offset Thickness
     !! @param a Starting position
     pure elemental function f_r(myth, offset, a)
+
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: myth, offset, a
         real(wp)             :: b
@@ -1158,5 +1193,7 @@ contains
 
         b = 2._wp*a/(2._wp*pi)
         f_r = a + b*myth + offset
+
     end function f_r
+
 end module m_ib_patches

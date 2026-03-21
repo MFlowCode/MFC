@@ -7,16 +7,17 @@
 
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
-    use m_derived_types !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use m_rhs !< Right-hane-side (RHS) evaluation procedures
+
+    use m_derived_types       !< Definitions of the derived types
+    use m_global_parameters   !< Definitions of the global parameters
+    use m_rhs                 !< Right-hane-side (RHS) evaluation procedures
     use m_pressure_relaxation !< Pressure relaxation procedures
-    use m_data_output !< Run-time info & solution data output procedures
-    use m_bubbles_EE !< Ensemble-averaged bubble dynamics routines
-    use m_bubbles_EL !< Lagrange bubble dynamics routines
+    use m_data_output         !< Run-time info & solution data output procedures
+    use m_bubbles_EE          !< Ensemble-averaged bubble dynamics routines
+    use m_bubbles_EL          !< Lagrange bubble dynamics routines
     use m_ibm
     use m_hyperelastic
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy           !< Message passing interface (MPI) module proxy
     use m_boundary_common
     use m_helper
     use m_sim_helpers
@@ -55,11 +56,13 @@ module m_time_steppers
     type(c_ptr)                                        :: cptr_host, cptr_device
 #endif
     !> @endcond
+
 contains
 
     !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
     !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_time_steppers_module
+
 #ifdef FRONTIER_UNIFIED
         use hipfort
         use hipfort_hipmalloc
@@ -70,6 +73,7 @@ contains
 #endif
         integer :: i, j !< Generic loop iterators
         ! Setting number of time-stages for selected time-stepping scheme
+
         if (time_stepper == 1) then
             num_ts = 1
         else if (any(time_stepper == (/2, 3/))) then
@@ -94,22 +98,22 @@ contains
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
             ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
             allocate (q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                & idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+                      & idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
         end if
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
             @:ALLOCATE(q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                & idwbuff(3)%beg:idwbuff(3)%end))
+                       & idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
             if (num_ts == 2) then
                 if (nv_uvm_out_of_core) then
                     ! q_cons_ts(2) lives on the host
                     q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:, j)
+                              & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:, j)
                 else
                     @:ALLOCATE(q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:PREFER_GPU(q_cons_ts(2)%vf(j)%sf)
                 end if
             end if
@@ -119,8 +123,7 @@ contains
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
 #elif defined(FRONTIER_UNIFIED)
-        ! Allocate to memory regions using hip calls
-        ! that we will attach pointers to
+        ! Allocate to memory regions using hip calls that we will attach pointers to
         do i = 1, 3
             pool_dims(i) = idwbuff(i)%end - idwbuff(i)%beg + 1
             pool_starts(i) = idwbuff(i)%beg
@@ -129,7 +132,7 @@ contains
         pool_starts(4) = 1
 #ifdef MFC_MIXED_PRECISION
         pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end - idwbuff(3) &
-            & %beg + 1)*sys_size
+                         & %beg + 1)*sys_size
         call hipCheck(hipMalloc_(cptr_device, pool_size*2_8))
         call c_f_pointer(cptr_device, q_cons_ts_pool_device, shape=pool_dims)
         q_cons_ts_pool_device(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:) => q_cons_ts_pool_device
@@ -144,14 +147,14 @@ contains
 #if defined(MFC_OpenACC)
         call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
 #endif
-        ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
-        ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
-        ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
+        ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1 NOTE: WE CANNOT
+        ! DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here Otherwise leaving this as fine-grained will
+        ! actually help performance since it can't be cached in GPU L2
         if (num_ts == 2) then
             call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
 #if defined(MFC_OpenMP)
             call hipCheck(hipMemAdvise(c_loc(q_cons_ts_pool_host), c_sizeof(q_cons_ts_pool_host), &
-                & hipMemAdviseSetPreferredLocation, -1))
+                          & hipMemAdviseSetPreferredLocation, -1))
 #endif
         end if
 #endif
@@ -159,11 +162,11 @@ contains
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
             q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:, j)
+                      & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:, j)
             if (num_ts == 2) then
                 ! q_cons_ts(2) lives on the host
                 q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                    & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:, j)
+                          & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:, j)
             end if
         end do
 
@@ -178,7 +181,7 @@ contains
         do i = 1, num_ts
             do j = 1, sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                    & idwbuff(3)%beg:idwbuff(3)%end))
+                           & idwbuff(3)%beg:idwbuff(3)%end))
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
@@ -197,7 +200,7 @@ contains
             do i = 1, num_probe_ts
                 do j = 1, sys_size
                     @:ALLOCATE(q_prim_ts1(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                 end do
                 @:ACC_SETUP_VFs(q_prim_ts1(i))
             end do
@@ -211,7 +214,7 @@ contains
             do i = 1, num_probe_ts
                 do j = 1, sys_size
                     @:ALLOCATE(q_prim_ts2(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                 end do
                 @:ACC_SETUP_VFs(q_prim_ts2(i))
             end do
@@ -223,19 +226,19 @@ contains
         if (.not. igr) then
             do i = 1, adv_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                    & idwbuff(3)%beg:idwbuff(3)%end))
+                           & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
 
             if (bubbles_euler) then
                 do i = bub_idx%beg, bub_idx%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
                 if (adv_n) then
                     @:ALLOCATE(q_prim_vf(n_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(n_idx))
                 end if
             end if
@@ -243,7 +246,7 @@ contains
             if (mhd) then
                 do i = B_idx%beg, B_idx%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
             end if
@@ -251,7 +254,7 @@ contains
             if (elasticity) then
                 do i = stress_idx%beg, stress_idx%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
             end if
@@ -259,41 +262,41 @@ contains
             if (hyperelasticity) then
                 do i = xibeg, xiend + 1
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
             end if
 
             if (cont_damage) then
                 @:ALLOCATE(q_prim_vf(damage_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                    & idwbuff(3)%beg:idwbuff(3)%end))
+                           & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(damage_idx))
             end if
 
             if (hyper_cleaning) then
                 @:ALLOCATE(q_prim_vf(psi_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                    & idwbuff(3)%beg:idwbuff(3)%end))
+                           & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(psi_idx))
             end if
 
             if (model_eqns == 3) then
                 do i = internalEnergies_idx%beg, internalEnergies_idx%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
             end if
 
             if (surface_tension) then
                 @:ALLOCATE(q_prim_vf(c_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                    & idwbuff(3)%beg:idwbuff(3)%end))
+                           & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(c_idx))
             end if
 
             if (chemistry) then
                 do i = chemxb, chemxe
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end))
+                               & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
 
@@ -306,26 +309,26 @@ contains
         ! Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                & 1:nnode, 1:nb))
+                       & 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(1))
 
             @:ALLOCATE(pb_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                & 1:nnode, 1:nb))
+                       & 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(2))
 
             @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                & 1:nnode, 1:nb))
+                       & 1:nnode, 1:nb))
         else if (qbmm .and. polytropic) then
             @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+                       & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(1))
 
             @:ALLOCATE(pb_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+                       & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(pb_ts(2))
 
             @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+                       & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
         else
             @:ALLOCATE(pb_ts(1)%sf(0,0,0,0,0))
             @:ACC_SETUP_SFs(pb_ts(1))
@@ -340,26 +343,26 @@ contains
 
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                & 1:nnode, 1:nb))
+                       & 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(1))
 
             @:ALLOCATE(mv_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                & 1:nnode, 1:nb))
+                       & 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(2))
 
             @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                & 1:nnode, 1:nb))
+                       & 1:nnode, 1:nb))
         else if (qbmm .and. polytropic) then
             @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+                       & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(1))
 
             @:ALLOCATE(mv_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+                       & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
             @:ACC_SETUP_SFs(mv_ts(2))
 
             @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+                       & idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
         else
             @:ALLOCATE(mv_ts(1)%sf(0,0,0,0,0))
             @:ACC_SETUP_SFs(mv_ts(1))
@@ -447,10 +450,12 @@ contains
             end if
             $:GPU_UPDATE(device='[rk_coef, stor]')
         end if
+
     end subroutine s_initialize_time_steppers_module
 
     !> @brief Advances the solution one full step using a TVD Runge-Kutta time integrator.
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
+
 #ifdef _CRAYFTN
         ! DIR$ OPTIMIZE (-haggress)
 #endif
@@ -469,7 +474,7 @@ contains
 
         do s = 1, nstage
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                & t_step, time_avg, s)
+                               & t_step, time_avg, s)
 
             if (s == 1) then
                 if (run_time_info) then
@@ -504,10 +509,12 @@ contains
                             end if
                             if (igr) then
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                    & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
+                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
+                                          & l))/rk_coef(s, 4)
                             else
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                    & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
+                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, &
+                                          & l))/rk_coef(s, 4)
                             end if
                         end do
                     end do
@@ -527,9 +534,9 @@ contains
                                         mv_ts(stor)%sf(j, k, l, q, i) = mv_ts(1)%sf(j, k, l, q, i)
                                     end if
                                     pb_ts(1)%sf(j, k, l, q, i) = (rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) + rk_coef(s, &
-                                        & 2)*pb_ts(stor)%sf(j, k, l, q, i) + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
+                                          & 2)*pb_ts(stor)%sf(j, k, l, q, i) + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
                                     mv_ts(1)%sf(j, k, l, q, i) = (rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) + rk_coef(s, &
-                                        & 2)*mv_ts(stor)%sf(j, k, l, q, i) + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
+                                          & 2)*mv_ts(stor)%sf(j, k, l, q, i) + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
                                 end do
                             end do
                         end do
@@ -586,11 +593,13 @@ contains
         else
             wall_time_avg = 0._wp
         end if
+
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param stage Current time-stage
+    !! @param stage Current time-stage
     impure subroutine s_adaptive_dt_bubble(stage)
+
         integer, intent(in) :: stage
         type(vector_field)  :: gm_alpha_qp
 
@@ -613,10 +622,12 @@ contains
                 call s_write_void_evol(mytime)
             end if
         end if
+
     end subroutine s_adaptive_dt_bubble
 
     !> @brief Computes the global time step size from CFL stability constraints across all cells.
     impure subroutine s_compute_dt()
+
         real(wp) :: rho !< Cell-avg. density
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: vel   !< Cell-avg. velocity
@@ -636,6 +647,7 @@ contains
         type(vector_field)     :: gm_alpha_qp
         real(wp)               :: dt_local
         integer                :: j, k, l !< Generic loop iterators
+
         if (.not. igr .or. dummy) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
@@ -670,13 +682,15 @@ contains
         end if
 
         $:GPU_UPDATE(device='[dt]')
+
     end subroutine s_compute_dt
 
     !> This subroutine applies the body forces source term at each Runge-Kutta stage
-        !! @param q_cons_vf Conservative variables
-        !! @param q_prim_vf_in Primitive variables
-        !! @param rhs_vf_in Right-hand side variables
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf_in Primitive variables
+    !! @param rhs_vf_in Right-hand side variables
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
+
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
@@ -699,10 +713,12 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         call nvtxEndRange
+
     end subroutine s_apply_bodyforces
 
     !> @brief Updates immersed boundary positions and velocities at the current Runge-Kutta stage.
     subroutine s_propagate_immersed_boundaries(s)
+
         integer, intent(in) :: s
         integer             :: i
         logical             :: forces_computed
@@ -724,7 +740,7 @@ contains
             if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
-                    & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
+                         & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
 
                 if (patch_ib(i)%moving_ibm == 1) then
                     ! plug in analytic velocities for 1-way coupling, if it exists
@@ -741,38 +757,41 @@ contains
 
                     ! update the angular velocity with the torque value
                     patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, &
-                        & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
+                             & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
                     call s_compute_moment_of_inertia(i, &
-                        & patch_ib(i)%angular_vel) &
-                        & ! update the moment of inertia to be based on the direction of the angular momentum
+                                                     & patch_ib(i)%angular_vel) &
+                                                     & ! update the moment of inertia to be based on the direction of the angular momentum
                     patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i) &
-                        & %moment ! convert back to angular velocity with the new moment of inertia
+                             & %moment ! convert back to angular velocity with the new moment of inertia
                 end if
 
                 ! Update the angle of the IB
                 patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, &
-                    & 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
+                         & 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
 
                 ! Update the position of the IB
                 patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, &
-                    & 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
+                         & 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
                 patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, &
-                    & 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
+                         & 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
                 patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, &
-                    & 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
+                         & 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
             end if
         end do
 
         call s_update_mib(num_ibs)
 
         call nvtxEndRange
+
     end subroutine s_propagate_immersed_boundaries
 
-    !> This subroutine saves the temporary q_prim_vf vector      into the q_prim_ts vector that is then used in p_main
-        !! @param t_step current time-step
+    !> This subroutine saves the temporary q_prim_vf vector into the q_prim_ts vector that is then used in p_main
+    !! @param t_step current time-step
     subroutine s_time_step_cycling(t_step)
+
         integer, intent(in) :: t_step
         integer             :: i, j, k, l !< Generic loop iterator
+
         if (t_step == t_step_start) then
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
@@ -837,10 +856,12 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
+
     end subroutine s_time_step_cycling
 
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_time_steppers_module
+
 #ifdef FRONTIER_UNIFIED
         use hipfort
         use hipfort_hipmalloc
@@ -849,6 +870,7 @@ contains
         integer :: i, j !< Generic loop iterators
         ! Deallocating the cell-average conservative variables
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+
         do j = 1, sys_size
             @:DEALLOCATE(q_cons_ts(1)%vf(j)%sf)
             if (num_ts == 2) then
@@ -964,5 +986,7 @@ contains
         if (proc_rank == 0 .and. ib_state_wrt) then
             call s_close_ib_state_file()
         end if
+
     end subroutine s_finalize_time_steppers_module
+
 end module m_time_steppers

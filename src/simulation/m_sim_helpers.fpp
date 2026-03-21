@@ -7,6 +7,7 @@
 
 !> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
+
     use m_derived_types !< Definitions of the derived types
     use m_global_parameters
     use m_variables_conversion
@@ -14,13 +15,15 @@ module m_sim_helpers
     implicit none
 
     private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl
+
 contains
 
     !> Computes the modified dtheta for Fourier filtering in azimuthal direction
-        !! @param k y coordinate index
-        !! @param l z coordinate index
-        !! @return fltr_dtheta Modified dtheta value for cylindrical coordinates
+    !! @param k y coordinate index
+    !! @param l z coordinate index
+    !! @return fltr_dtheta Modified dtheta value for cylindrical coordinates
     function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
+
         $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: k, l
         real(wp)            :: fltr_dtheta
@@ -38,16 +41,18 @@ contains
         else
             fltr_dtheta = 0._wp
         end if
+
     end function f_compute_filtered_dtheta
 
     !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only)
-        !! @param vel directional velocities
-        !! @param c mixture speed of sound
-        !! @param j x coordinate index
-        !! @param k y coordinate index
-        !! @param l z coordinate index
-        !! @return cfl_terms computed CFL terms for 2D/3D cases
+    !! @param vel directional velocities
+    !! @param c mixture speed of sound
+    !! @param j x coordinate index
+    !! @param k y coordinate index
+    !! @param l z coordinate index
+    !! @return cfl_terms computed CFL terms for 2D/3D cases
     function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
+
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in)                      :: c
@@ -70,24 +75,26 @@ contains
             ! 2D
             cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         end if
+
     end function f_compute_multidim_cfl_terms
 
     !> Computes enthalpy
-        !! @param q_prim_vf cell centered primitive variables
-        !! @param pres mixture pressure
-        !! @param rho mixture density
-        !! @param gamma mixture gamma
-        !! @param pi_inf mixture pi_inf
-        !! @param Re mixture reynolds number
-        !! @param H mixture enthalpy
-        !! @param alpha component alphas
-        !! @param vel directional velocities
-        !! @param vel_sum squard sum of velocity components
-        !! @param qv Fluid reference energy
-        !! @param j x index
-        !! @param k y index
-        !! @param l z index
+    !! @param q_prim_vf cell centered primitive variables
+    !! @param pres mixture pressure
+    !! @param rho mixture density
+    !! @param gamma mixture gamma
+    !! @param pi_inf mixture pi_inf
+    !! @param Re mixture reynolds number
+    !! @param H mixture enthalpy
+    !! @param alpha component alphas
+    !! @param vel directional velocities
+    !! @param vel_sum squard sum of velocity components
+    !! @param qv Fluid reference energy
+    !! @param j x index
+    !! @param k y index
+    !! @param l z index
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
@@ -150,20 +157,22 @@ contains
         end if
 
         H = (E + pres)/rho
+
     end subroutine s_compute_enthalpy
 
     !> Computes stability criterion for a specified dt
-        !! @param vel directional velocities
-        !! @param c mixture speed of sound
-        !! @param rho Density
-        !! @param Re_l mixture Reynolds number
-        !! @param j x index
-        !! @param k y index
-        !! @param l z index
-        !! @param icfl_sf cell-centered inviscid cfl number
-        !! @param vcfl_sf (optional) cell-centered viscous CFL number
-        !! @param Rc_sf (optional) cell centered Rc
+    !! @param vel directional velocities
+    !! @param c mixture speed of sound
+    !! @param rho Density
+    !! @param Re_l mixture Reynolds number
+    !! @param j x index
+    !! @param k y index
+    !! @param l z index
+    !! @param icfl_sf cell-centered inviscid cfl number
+    !! @param vcfl_sf (optional) cell-centered viscous CFL number
+    !! @param Rc_sf (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels)                   :: vel
         real(wp), intent(in)                                        :: c, rho
@@ -191,11 +200,11 @@ contains
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
                         vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), fltr_dtheta)**2._wp
                         Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
-                            & fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
+                              & fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     else
                         vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), dz(l))**2._wp
                         Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
-                            & dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
+                              & dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     end if
                 #:endif
             else if (n > 0) then
@@ -208,18 +217,20 @@ contains
                 Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
+
     end subroutine s_compute_stability_from_dt
 
     !> Computes dt for a specified CFL number
-        !! @param vel directional velocities
-        !! @param c Speed of sound
-        !! @param max_dt cell centered maximum dt
-        !! @param rho cell centered density
-        !! @param Re_l cell centered Reynolds number
-        !! @param j x coordinate
-        !! @param k y coordinate
-        !! @param l z coordinate
+    !! @param vel directional velocities
+    !! @param c Speed of sound
+    !! @param max_dt cell centered maximum dt
+    !! @param rho cell centered density
+    !! @param Re_l cell centered Reynolds number
+    !! @param j x coordinate
+    !! @param k y coordinate
+    !! @param l z coordinate
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in)         :: vel
         real(wp), intent(in)                              :: c, rho
@@ -262,5 +273,7 @@ contains
         else
             max_dt(j, k, l) = icfl_dt
         end if
+
     end subroutine s_compute_dt_from_cfl
+
 end module m_sim_helpers

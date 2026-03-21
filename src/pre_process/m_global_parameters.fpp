@@ -6,6 +6,7 @@
 
 !> @brief Defines global parameters for the computational domain, simulation algorithm, and initial conditions
 module m_global_parameters
+
 #ifdef MFC_MPI
     use mpi ! Message passing interface (MPI) module
 #endif
@@ -44,13 +45,12 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    real(wp)                            :: dx, dy, dz                            !< Minimum cell-widths in the x-, y- and z-coordinate directions
-    type(bounds_info)                   :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
-    logical                             :: stretch_x, stretch_y, stretch_z        !< Grid stretching flags for the x-, y- and z-coordinate directions
-    ! Parameters of the grid stretching function for the x-, y- and z-coordinate
-    ! directions. The "a" parameters are a measure of the rate at which the grid
-    ! is stretched while the remaining parameters are indicative of the location
-    ! on the grid at which the stretching begins.
+    real(wp) :: dx, dy, dz                            !< Minimum cell-widths in the x-, y- and z-coordinate directions
+    type(bounds_info) :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
+    logical :: stretch_x, stretch_y, stretch_z        !< Grid stretching flags for the x-, y- and z-coordinate directions
+    ! Parameters of the grid stretching function for the x-, y- and z-coordinate directions. The "a" parameters are a measure of the
+    ! rate at which the grid is stretched while the remaining parameters are indicative of the location on the grid at which the
+    ! stretching begins.
     real(wp) :: a_x, a_y, a_z
     integer  :: loops_x, loops_y, loops_z
     real(wp) :: x_a, y_a, z_a
@@ -101,13 +101,11 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx          !< Indexes of first & last concentration eqns.
     integer               :: damage_idx           !< Index of damage state variable (D) for continuum damage model
     integer               :: psi_idx              !< Index of hyperbolic cleaning state variable for MHD
-    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
-    ! Stands for "InDices With BUFFer".
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
-    ! Cell Indices for the entire (local) domain. In simulation and post_process,
-    ! this includes the buffer region. idwbuff and idwint are the same otherwise.
-    ! Stands for "InDices With BUFFer".
+    ! Cell Indices for the entire (local) domain. In simulation and post_process, this includes the buffer region. idwbuff and
+    ! idwint are the same otherwise. Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
     integer               :: shear_num !! Number of shear stress components
@@ -160,8 +158,8 @@ module m_global_parameters
     integer                                                  :: num_bc_patches !< Number of boundary condition patches
     logical                                                  :: bc_io          !< whether or not to save BC data
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
-    !! Database of the boundary condition patch parameters for each of the patches
-    !! employed in the configuration of the boundary conditions
+    !! Database of the boundary condition patch parameters for each of the patches employed in the configuration of the boundary
+    !! conditions
 
     ! Fluids Physical Parameters
     !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
@@ -190,26 +188,23 @@ module m_global_parameters
     integer                                               :: Np
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
-    !! Database of the immersed boundary patch parameters for each of the
-    !! patches employed in the configuration of the initial condition. Note that
-    !! the maximum allowable number of patches, num_patches_max, may be changed
-    !! in the module m_derived_types.f90.
-
+    !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
+    !! condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
+    !! m_derived_types.f90.
     !> @}
 
     !> @name Non-polytropic bubble gas compression
     !> @{
-    logical                             :: polytropic
-    logical                             :: polydisperse
-    real(wp)                            :: poly_sigma
-    integer                             :: dist_type ! 1 = binormal, 2 = lognormal-normal
-    integer                             :: thermal ! 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(wp)                            :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
-    real(wp)                            :: gam_m
+    logical :: polytropic
+    logical :: polydisperse
+    real(wp) :: poly_sigma
+    integer :: dist_type ! 1 = binormal, 2 = lognormal-normal
+    integer :: thermal ! 1 = adiabatic, 2 = isotherm, 3 = transfer
+    real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
+    real(wp) :: gam_m
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(wp)                            :: R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
-
+    real(wp) :: R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
     !> @}
 
     !> @name Surface Tension Modeling
@@ -241,13 +236,16 @@ module m_global_parameters
     !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
     !! is false
     logical :: dummy
+
 contains
 
     !> Assigns default values to user inputs prior to reading them in. This allows for an easier consistency check of these
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
+
         integer :: i !< Generic loop operator
         ! Logistics
+
         case_dir = '.'
         old_grid = .false.
         old_ic = .false.
@@ -563,10 +561,12 @@ contains
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_global_parameters_module
+
         integer :: i, j, fac
 
         if (recon_type == WENO_TYPE) then
@@ -575,18 +575,16 @@ contains
             muscl_polyn = muscl_order
         end if
 
-        ! Determining the layout of the state vectors and overall size of
-        ! the system of equations, given the dimensionality and choice of
-        ! the equations of motion
+        ! Determining the layout of the state vectors and overall size of the system of equations, given the dimensionality and
+        ! choice of the equations of motion
 
         ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
             ! Setting number of fluids
             num_fluids = 1
 
-            ! Annotating structure of the state and flux vectors belonging
-            ! to the system of equations defined by the selected number of
-            ! spatial dimensions and the gamma/pi_inf model
+            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
+            ! of spatial dimensions and the gamma/pi_inf model
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
@@ -600,9 +598,8 @@ contains
 
             ! Volume Fraction Model (5-equation model)
         else if (model_eqns == 2) then
-            ! Annotating structure of the state and flux vectors belonging
-            ! to the system of equations defined by the selected number of
-            ! spatial dimensions and the volume fraction model
+            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
+            ! of spatial dimensions and the volume fraction model
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
@@ -610,17 +607,14 @@ contains
             E_idx = mom_idx%end + 1
 
             if (igr) then
-                ! Volume fractions are stored in the indices immediately following
-                ! the energy equation. IGR tracks a total of (N-1) volume fractions
-                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
-                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
-                ! volume fractions since there is no volume fraction to track
+                ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of (N-1)
+                ! volume fractions for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1 then adv_idx%end < adv_idx%beg,
+                ! which skips all loops over the volume fractions since there is no volume fraction to track
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids - 1
             else
-                ! Volume fractions are stored in the indices immediately following
-                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
-                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann tracks
+                ! a total of (N) volume fractions for N fluids, hence the lack of "-1" in adv_idx%end
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
             end if
@@ -704,9 +698,8 @@ contains
 
             ! Volume Fraction Model (6-equation model)
         else if (model_eqns == 3) then
-            ! Annotating structure of the state and flux vectors belonging
-            ! to the system of equations defined by the selected number of
-            ! spatial dimensions and the volume fraction model
+            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
+            ! of spatial dimensions and the volume fraction model
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
@@ -796,9 +789,7 @@ contains
                     shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
                     shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
                     shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
-                    ! x-dir: flip tau_xy and tau_xz
-                    ! y-dir: flip tau_xy and tau_yz
-                    ! z-dir: flip tau_xz and tau_yz
+                    ! x-dir: flip tau_xy and tau_xz y-dir: flip tau_xy and tau_yz z-dir: flip tau_xz and tau_yz
                 end if
             end if
 
@@ -852,7 +843,7 @@ contains
         chemxe = species_idx%end
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-            & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib)
 
 #ifdef MFC_MPI
 
@@ -899,10 +890,12 @@ contains
         if (.not. igr) then
             allocate (logic_grid(0:m, 0:n, 0:p))
         end if
+
     end subroutine s_initialize_global_parameters_module
 
     !> @brief Configures MPI parallel I/O settings and allocates processor coordinate arrays.
     impure subroutine s_initialize_parallel_io
+
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 #endif
@@ -927,20 +920,21 @@ contains
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
-        ! Option for UNIX file system (Hooke/Thomson)
-        ! WRITE(mpiiofs, '(A)') '/ufs_'
-        ! mpiiofs = TRIM(mpiiofs)
-        ! mpi_info_int = MPI_INFO_NULL
+        ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
+        ! MPI_INFO_NULL
 
         allocate (start_idx(1:num_dims))
 #endif
+
     end subroutine s_initialize_parallel_io
 
     !> @brief Deallocates all global grid, index, and equation-of-state parameter arrays.
     impure subroutine s_finalize_global_parameters_module
+
         integer :: i
 
         ! Deallocating grid variables for the x-direction
+
         deallocate (x_cc, x_cb)
         ! Deallocating grid variables for the y- and z-directions
         if (n > 0) then
@@ -964,5 +958,7 @@ contains
             deallocate (MPI_IO_DATA%view)
         end if
 #endif
+
     end subroutine s_finalize_global_parameters_module
+
 end module m_global_parameters

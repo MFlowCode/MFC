@@ -4,6 +4,7 @@
 
 !> @brief Compile-time constant parameters: default values, tolerances, and physical constants
 module m_constants
+
     use m_precision_select
 
     character, parameter :: dflt_char = ' '            !< Default string value
@@ -66,8 +67,7 @@ module m_constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp  !< Default tolerance for adaptive step size
     integer, parameter  :: dflt_adap_dt_max_iters = 100 !< Default max iteration for adaptive step size
     ! Constants of the algorithm described by Heirer, E. Hairer, S. P.Norsett, G. Wanner, Solving Ordinary Differential Equations I,
-    ! Chapter II.4
-    ! to choose the initial time step size for the adaptive time stepping routine
+    ! Chapter II.4 to choose the initial time step size for the adaptive time stepping routine
     real(wp), parameter :: threshold_first_guess = 1.e-5_wp
     real(wp), parameter :: threshold_second_guess = 1.e-15_wp
     real(wp), parameter :: scale_first_guess = 1.e-3_wp
@@ -87,14 +87,8 @@ module m_constants
     ! System constants
     integer, parameter :: CASE_FILE_ERROR_CODE = 22
 
-    ! Boundary condition enumeration
-    ! Abbreviations
-    !  CHAR - Characteristic
-    !  NR   -  Non-reflecting
-    !  SUB  - subsonic
-    !  SUP  - supersonic
-    !  FF   - Force-free
-    !  CP   - Constant pressure
+    ! Boundary condition enumeration Abbreviations CHAR - Characteristic NR - Non-reflecting SUB - subsonic SUP - supersonic FF -
+    ! Force-free CP - Constant pressure
     integer, parameter :: BC_PERIODIC = -1
     integer, parameter :: BC_REFLECTIVE = -2
     integer, parameter :: BC_GHOST_EXTRAP = -3

@@ -18,14 +18,14 @@
         ! SDtoolbox)
         @: HardcodedReadValues()
     case (180)
-        ! This is patch is hard-coded for test suite optimization used in the
-        ! 1D_shuoser cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.2*sin(5*x)"
+        ! This is patch is hard-coded for test suite optimization used in the 1D_shuoser cases: "patch_icpp(2)%alpha_rho(1)": "1 +
+        ! 0.2*sin(5*x)"
         if (patch_id == 2) then
             q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
         end if
     case (181)
-        ! This is patch is hard-coded for test suite optimization used in the
-        ! 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.1*sin(20*x*pi)"
+        ! This is patch is hard-coded for test suite optimization used in the 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)":
+        ! "1 + 0.1*sin(20*x*pi)"
         q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*pi)
     case (182)
         ! This patch is a hard-coded for test suite optimization (multiple component diffusion)

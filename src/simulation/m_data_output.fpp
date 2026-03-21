@@ -7,13 +7,14 @@
 
 !> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
 module m_data_output
-    use m_derived_types !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+
+    use m_derived_types        !< Definitions of the derived types
+    use m_global_parameters    !< Definitions of the global parameters
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
     use m_variables_conversion !< State variables type conversion procedures
     use m_compile_specific
     use m_helper
-    use m_helper_basic !< Functions to compare floating point numbers
+    use m_helper_basic         !< Functions to compare floating point numbers
     use m_sim_helpers
     use m_delay_file_access
     use m_ibm
@@ -39,7 +40,7 @@ module m_data_output
     real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
     real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
     real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
-    real(wp) :: Rc_min_loc, Rc_min_glb     !< Rc   stability extrema on local and global grids
+    real(wp) :: Rc_min_loc, Rc_min_glb     !< Rc stability extrema on local and global grids
     $:GPU_DECLARE(create='[icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb]')
     $:GPU_DECLARE(create='[ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb]')
 
@@ -52,16 +53,18 @@ module m_data_output
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
+
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
-        !! @param q_cons_vf Conservative variables
-        !! @param q_T_sf Temperature scalar field
-        !! @param q_prim_vf Primitive variables
-        !! @param t_step Current time step
-        !! @param bc_type Boundary condition type
-        !! @param beta Eulerian void fraction from lagrangian bubbles
+    !! @param q_cons_vf Conservative variables
+    !! @param q_T_sf Temperature scalar field
+    !! @param q_prim_vf Primitive variables
+    !! @param t_step Current time step
+    !! @param bc_type Boundary condition type
+    !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf
         type(scalar_field), intent(inout)                            :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_prim_vf
@@ -74,16 +77,19 @@ contains
         else
             call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
         end if
+
     end subroutine s_write_data_files
 
     !> The purpose of this subroutine is to open a new or pre- existing run-time information file and append to it the basic header
     !! information relevant to current simulation. In general, this requires generating a table header for those stability criteria
     !! which will be written at every time-step.
     impure subroutine s_open_run_time_information_file
+
         character(LEN=name_len), parameter :: file_name = 'run_time.inf' !< Name of the run-time information file
         character(LEN=path_len + name_len) :: file_path                  !< Relative path to a file in the case directory
         character(LEN=8)                   :: file_date                  !< Creation date of the run-time information file
         ! Opening the run-time information file
+
         file_path = trim(case_dir) // '/' // trim(file_name)
 
         open (3, FILE=trim(file_path), form='formatted', STATUS='replace')
@@ -109,35 +115,39 @@ contains
         end if
 
         write (3, *) ! new line
+
     end subroutine s_open_run_time_information_file
 
-    !> This opens a formatted data file where the root processor      can write out the CoM information
+    !> This opens a formatted data file where the root processor can write out the CoM information
     impure subroutine s_open_com_files()
+
         character(len=path_len + 3*name_len) :: file_path !< Relative path to the CoM file in the case directory
         integer                              :: i         !< Generic loop iterator
+
         do i = 1, num_fluids
             ! Generating the relative path to the CoM data file
             write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
             file_path = trim(case_dir) // trim(file_path)
-            ! Creating the formatted data file and setting up its
-            ! structure
+            ! Creating the formatted data file and setting up its structure
             open (i + 120, file=trim(file_path), form='formatted', position='append', status='unknown')
             if (n == 0) then
                 write (i + 120, '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    Total Volume    '
             else if (p == 0) then
                 write (i + 120, &
-                    & '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    y-loc ' &
-                    & // '    Total Volume    '
+                       & '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    y-loc ' &
+                       & // '    Total Volume    '
             else
                 write (i + 120, &
-                    & '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    y-loc ' // '    z-loc ' &
-                    & // '    Total Volume    '
+                       & '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    y-loc ' // '    z-loc ' &
+                       & // '    Total Volume    '
             end if
         end do
+
     end subroutine s_open_com_files
 
-    !> This opens a formatted data file where the root processor      can write out flow probe information
+    !> This opens a formatted data file where the root processor can write out flow probe information
     impure subroutine s_open_probe_files
+
         character(LEN=path_len + 3*name_len) :: file_path !< Relative path to the probe data file in the case directory
         integer                              :: i         !< Generic loop iterator
         logical                              :: file_exist
@@ -147,8 +157,7 @@ contains
             write (file_path, '(A,I0,A)') '/D/probe', i, '_prim.dat'
             file_path = trim(case_dir) // trim(file_path)
 
-            ! Creating the formatted data file and setting up its
-            ! structure
+            ! Creating the formatted data file and setting up its structure
             inquire (file=trim(file_path), exist=file_exist)
 
             if (file_exist) then
@@ -166,9 +175,11 @@ contains
                 open (i + 70, FILE=trim(file_path), form='formatted', POSITION='append', STATUS='unknown')
             end do
         end if
+
     end subroutine s_open_probe_files
 
     impure subroutine s_open_ib_state_file
+
         character(len=path_len + 2*name_len) :: file_loc
         integer                              :: ios
 
@@ -176,6 +187,7 @@ contains
         file_loc = trim(case_dir) // '/D/' // trim(file_loc)
         open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
+
     end subroutine s_open_ib_state_file
 
     !> The goal of the procedure is to output to the run-time information file the stability criteria extrema in the entire
@@ -184,6 +196,7 @@ contains
     !! @param q_prim_vf Cell-average primitive variables
     !! @param t_step Current time step
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: t_step
         real(wp)                                            :: rho !< Cell-avg. density
@@ -205,6 +218,7 @@ contains
         integer                :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
+
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
         do l = 0, p
             do k = 0, n
@@ -255,7 +269,7 @@ contains
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
-                & Rc_min_glb)
+                                                         & Rc_min_glb)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
@@ -298,9 +312,10 @@ contains
         end if
 
         call s_mpi_barrier()
+
     end subroutine s_write_run_time_information
 
-    !> The goal of this subroutine is to output the grid and      conservative variables data files for given time-step.
+    !> The goal of this subroutine is to output the grid and conservative variables data files for given time-step.
     !! @param q_cons_vf Cell-average conservative variables
     !! @param q_T_sf Temperature scalar field
     !! @param q_prim_vf Cell-average primitive variables
@@ -308,19 +323,21 @@ contains
     !! @param bc_type Boundary condition type
     !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
-        type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf
-        type(scalar_field), intent(inout)                            :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout)       :: q_prim_vf
-        integer, intent(in)                                          :: t_step
-        type(scalar_field), intent(inout), optional                  :: beta
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in) :: t_step
+        type(scalar_field), intent(inout), optional :: beta
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        character(LEN=path_len + 2*name_len)                         :: t_step_dir !< Relative path to the current time-step directory
-        character(LEN=path_len + 3*name_len)                         :: file_path  !< Relative path to the grid and conservative variables data files
-        logical                                                      :: file_exist                              !< Logical used to check existence of current time-step directory
-        character(LEN=15)                                            :: FMT
-        integer                                                      :: i, j, k, l, r
-        real(wp)                                                     :: gamma, lit_gamma, pi_inf, qv           !< Temporary EOS params
+        character(LEN=path_len + 2*name_len) :: t_step_dir !< Relative path to the current time-step directory
+        character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the grid and conservative variables data files
+        logical :: file_exist                              !< Logical used to check existence of current time-step directory
+        character(LEN=15) :: FMT
+        integer :: i, j, k, l, r
+        real(wp) :: gamma, lit_gamma, pi_inf, qv           !< Temporary EOS params
         ! Creating or overwriting the time-step root directory
+
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
 
         ! Creating or overwriting the current time-step directory
@@ -361,8 +378,8 @@ contains
             write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
-        ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to
-        ! match the parallel I/O path and allow post_process to read it.
+        ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to match the parallel I/O path and allow post_process to
+        ! read it.
         if (bubbles_lagrange) then
             write (file_path, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', sys_size + 1, '.dat'
 
@@ -398,9 +415,7 @@ contains
             call s_write_serial_ib_data(t_step)
             ! write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
 
-            ! open (2, FILE=trim(file_path), &
-            !       FORM='unformatted', &
-            !       STATUS='new')
+            ! open (2, FILE=trim(file_path), & FORM='unformatted', & STATUS='new')
 
             ! write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
         end if
@@ -468,7 +483,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -480,7 +495,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -528,7 +543,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -542,7 +557,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -619,7 +634,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/pres.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -635,7 +650,7 @@ contains
                 do i = 1, nb
                     do r = 1, nnode
                         write (file_path, '(A,I0,A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/mv.', i, '.', r, '.', proc_rank, &
-                            & '.', t_step, '.dat'
+                               & '.', t_step, '.dat'
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
@@ -674,14 +689,16 @@ contains
                 end do
             end if
         end if
+
     end subroutine s_write_serial_data_files
 
-    !> The goal of this subroutine is to output the grid and      conservative variables data files for given time-step.
+    !> The goal of this subroutine is to output the grid and conservative variables data files for given time-step.
     !! @param q_cons_vf Cell-average conservative variables
     !! @param t_step Current time-step
     !! @param bc_type Boundary condition type
     !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf
         integer, intent(in)                                          :: t_step
         type(scalar_field), intent(inout), optional                  :: beta
@@ -890,31 +907,30 @@ contains
             ! Write ib data
             if (ib) then
                 call s_write_parallel_ib_data(t_step)
-                ! write (file_loc, '(A)') 'ib.dat'
-                ! file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                ! call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                !                    mpi_info_int, ifile, ierr)
+                ! write (file_loc, '(A)') 'ib.dat' file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc) call
+                ! MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), & mpi_info_int, ifile, ierr)
 
-                ! var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-                ! disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(t_step/t_step_save))
+                ! var_MOK = int(sys_size + 1, MPI_OFFSET_KIND) disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 +
+                ! int(t_step/t_step_save))
 
-                ! call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                !                        'native', mpi_info_int, ierr)
-                ! call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                !                         MPI_INTEGER, status, ierr)
-                ! call MPI_FILE_CLOSE(ifile, ierr)
+                ! call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, & 'native', mpi_info_int, ierr) call
+                ! MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, & MPI_INTEGER, status, ierr) call
+                ! MPI_FILE_CLOSE(ifile, ierr)
             end if
         end if
 #endif
+
     end subroutine s_write_parallel_data_files
 
     !> @brief Writes immersed boundary marker data to a serial (per-processor) unformatted file.
     subroutine s_write_serial_ib_data(time_step)
+
         integer, intent(in)                  :: time_step
         character(LEN=path_len + 2*name_len) :: file_path
         character(LEN=path_len + 2*name_len) :: t_step_dir
 
         ! Creating or overwriting the time-step root directory
+
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', time_step
         write (file_path, '(A,I0,A)') trim(t_step_dir) // '/ib_data.dat'
@@ -923,10 +939,12 @@ contains
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
         write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+
     end subroutine s_write_serial_ib_data
 
     !> @brief Writes immersed boundary marker data in parallel using MPI I/O.
     subroutine s_write_parallel_ib_data(time_step)
+
         integer, intent(in) :: time_step
 
 #ifdef MFC_MPI
@@ -960,10 +978,12 @@ contains
         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, MPI_INTEGER, status, ierr)
         call MPI_FILE_CLOSE(ifile, ierr)
 #endif
+
     end subroutine s_write_parallel_ib_data
 
     !> @brief Dispatches immersed boundary data output to the serial or parallel writer.
     subroutine s_write_ib_data_file(time_step)
+
         integer, intent(in) :: time_step
 
         if (parallel_io) then
@@ -971,27 +991,32 @@ contains
         else
             call s_write_serial_ib_data(time_step)
         end if
+
     end subroutine s_write_ib_data_file
 
     !> @brief Writes IB state records to D/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file()
+
         integer :: i
 
         do i = 1, num_ibs
             write (ib_state_unit) mytime, i, patch_ib(i)%force, patch_ib(i)%torque, patch_ib(i)%vel, patch_ib(i)%angular_vel, &
-                & patch_ib(i)%angles, patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid
+                   & patch_ib(i)%angles, patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid
         end do
+
     end subroutine s_write_ib_state_file
 
-    !> This writes a formatted data file where the root processor      can write out the CoM information
+    !> This writes a formatted data file where the root processor can write out the CoM information
     !! @param t_step Current time-step
     !! @param c_mass_in Center of mass information
     impure subroutine s_write_com_files(t_step, c_mass_in)
+
         integer, intent(in)                            :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
         integer                                        :: i           !< Generic loop iterator
         real(wp)                                       :: nondim_time !< Non-dimensional time
         ! Non-dimensional time calculation
+
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, wp)*dt
         else
@@ -1010,10 +1035,11 @@ contains
             else ! 3D simulation
                 do i = 1, num_fluids ! Loop through fluids
                     write (i + 120, '(6X,6F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 3), c_mass_in(i, &
-                        & 4), c_mass_in(i, 5)
+                           & 4), c_mass_in(i, 5)
                 end do
             end if
         end if
+
     end subroutine s_write_com_files
 
     !> This writes a formatted data file for the flow probe information
@@ -1021,6 +1047,7 @@ contains
     !! @param q_cons_vf Conservative variables
     !! @param accel_mag Acceleration magnitude information
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
+
         integer, intent(in)                                 :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(0:m, 0:n, 0:p), intent(in)      :: accel_mag
@@ -1028,9 +1055,8 @@ contains
         real(wp), dimension(-1:n)                           :: disty
         real(wp), dimension(-1:p)                           :: distz
 
-        ! The cell-averaged partial densities, density, velocity, pressure,
-        ! volume fractions, specific heat ratio function, liquid stiffness
-        ! function, and sound speed.
+        ! The cell-averaged partial densities, density, velocity, pressure, volume fractions, specific heat ratio function, liquid
+        ! stiffness function, and sound speed.
         real(wp)                        :: lit_gamma, nbub
         real(wp)                        :: rho
         real(wp), dimension(num_vels)   :: vel
@@ -1105,8 +1131,7 @@ contains
             end do
             damage_state = 0._wp
 
-            ! Find probe location in terms of indices on a
-            ! specific processor
+            ! Find probe location in terms of indices on a specific processor
             if (n == 0) then ! 1D simulation
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     do s = -1, m
@@ -1127,7 +1152,7 @@ contains
                     ! Computing/Sharing necessary state variables
                     if (elasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, rho, gamma, pi_inf, qv, Re, G_local, &
-                            & fluid_pp(:)%G)
+                                                            & fluid_pp(:)%G)
                     else
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, rho, gamma, pi_inf, qv)
                     end if
@@ -1144,11 +1169,11 @@ contains
                         end if
 
                         call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), q_cons_vf(alf_idx)%sf(j - 2, k, l), dyn_p, pi_inf, &
-                            & gamma, rho, qv, rhoYks(:), pres, T, q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                            & q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G_local)
+                                                & gamma, rho, qv, rhoYks(:), pres, T, q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
+                                                & q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G_local)
                     else
                         call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k, l), q_cons_vf(alf_idx)%sf(j - 2, k, l), dyn_p, &
-                            & pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                                & pi_inf, gamma, rho, qv, rhoYks, pres, T)
                     end if
 
                     if (model_eqns == 4) then
@@ -1206,7 +1231,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, &
-                        & 0._wp, c, qv)
+                                                  & 0._wp, c, qv)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1235,7 +1260,7 @@ contains
 
                         ! Computing/Sharing necessary state variables
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, rho, gamma, pi_inf, qv, Re, G_local, &
-                            & fluid_pp(:)%G)
+                                                            & fluid_pp(:)%G)
                         do s = 1, num_vels
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
@@ -1249,11 +1274,12 @@ contains
                             end if
 
                             call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
-                                & q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G_local)
+                                                    & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                                                    & q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
+                                                    & q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G_local)
                         else
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                                    & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                         end if
 
                         if (model_eqns == 4) then
@@ -1287,7 +1313,7 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                            & 0._wp, 0._wp, c, qv)
+                                                      & 0._wp, 0._wp, c, qv)
                     end if
                 end if
             else ! 3D
@@ -1315,7 +1341,7 @@ contains
 
                             ! Computing/Sharing necessary state variables
                             call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, rho, gamma, pi_inf, qv, Re, &
-                                & G_local, fluid_pp(:)%G)
+                                                                & G_local, fluid_pp(:)%G)
                             do s = 1, num_vels
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
@@ -1335,16 +1361,17 @@ contains
                                 end if
 
                                 call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l - 2), q_cons_vf(alf_idx)%sf(j - 2, k - 2, &
-                                    & l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, q_cons_vf(stress_idx%beg)%sf(j - 2, &
-                                    & k - 2, l - 2), q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                                                        & l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                                                        & q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G_local)
                             else
                                 call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), q_cons_vf(alf_idx)%sf(j - 2, &
-                                    & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                                        & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                             end if
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                                & 0._wp, 0._wp, c, qv)
+                                                          & 0._wp, 0._wp, c, qv)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1393,23 +1420,22 @@ contains
                     if (bubbles_euler .and. (num_fluids <= 2)) then
                         if (qbmm) then
                             write (i + 30, '(6x,f12.6,14f28.16)') nondim_time, rho, vel(1), pres, alf, R(1), Rdot(1), nR(1), &
-                                & nRdot(1), varR, varV, M10, M01, M20, M02
+                                   & nRdot(1), varR, varV, M10, M01, M20, M02
                         else
                             write (i + 30, '(6x,f12.6,8f24.8)') nondim_time, rho, vel(1), pres, alf, R(1), Rdot(1), nR(1), nRdot(1)
-                            ! ptilde, &
-                            ! ptot
+                            ! ptilde, & ptot
                         end if
                     else if (bubbles_euler .and. (num_fluids == 3)) then
                         write (i + 30, &
-                            & '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,' // 'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') nondim_time, &
-                            & rho, vel(1), pres, alf, alfgr, nR(1), nRdot(1), R(1), Rdot(1), ptilde, ptot
+                               & '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,f24.8,' // 'f24.8,f24.8,f24.8,f24.8,f24.8, f24.8)') &
+                               & nondim_time, rho, vel(1), pres, alf, alfgr, nR(1), nRdot(1), R(1), Rdot(1), ptilde, ptot
                     else if (bubbles_euler .and. num_fluids == 4) then
                         write (i + 30, &
-                            & '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,' // 'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
-                            & nondim_time, q_cons_vf(1)%sf(j - 2, 0, 0), q_cons_vf(2)%sf(j - 2, 0, 0), q_cons_vf(3)%sf(j - 2, 0, &
-                            & 0), q_cons_vf(4)%sf(j - 2, 0, 0), q_cons_vf(5)%sf(j - 2, 0, 0), q_cons_vf(6)%sf(j - 2, 0, 0), &
-                            & q_cons_vf(7)%sf(j - 2, 0, 0), q_cons_vf(8)%sf(j - 2, 0, 0), q_cons_vf(9)%sf(j - 2, 0, 0), &
-                            & q_cons_vf(10)%sf(j - 2, 0, 0), nbub, R(1), Rdot(1)
+                               & '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,' // 'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
+                               & nondim_time, q_cons_vf(1)%sf(j - 2, 0, 0), q_cons_vf(2)%sf(j - 2, 0, 0), q_cons_vf(3)%sf(j - 2, &
+                               & 0, 0), q_cons_vf(4)%sf(j - 2, 0, 0), q_cons_vf(5)%sf(j - 2, 0, 0), q_cons_vf(6)%sf(j - 2, 0, 0), &
+                               & q_cons_vf(7)%sf(j - 2, 0, 0), q_cons_vf(8)%sf(j - 2, 0, 0), q_cons_vf(9)%sf(j - 2, 0, 0), &
+                               & q_cons_vf(10)%sf(j - 2, 0, 0), nbub, R(1), Rdot(1)
                     else
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), pres
                     end if
@@ -1417,12 +1443,12 @@ contains
                     if (bubbles_euler) then
                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                             write (i + 30, '(6X,10F24.8)') nondim_time, rho, vel(1), vel(2), pres, alf, nR(1), nRdot(1), R(1), &
-                                & Rdot(1)
+                                   & Rdot(1)
                         #:endif
                     else if (elasticity) then
                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                             write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8)') nondim_time, rho, &
-                                & vel(1), vel(2), pres, tau_e(1), tau_e(2), tau_e(3)
+                                   & vel(1), vel(2), pres, tau_e(1), tau_e(2), tau_e(3)
                         #:endif
                     else
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), pres
@@ -1431,8 +1457,8 @@ contains
                 else
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                         write (i + 30, &
-                            & '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8,F24.8,F24.8,' // 'F24.8)') nondim_time, &
-                            & rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, qv, c, accel
+                               & '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8,F24.8,F24.8,' // 'F24.8)') &
+                               & nondim_time, rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, qv, c, accel
                     #:endif
                 end if
             end if
@@ -1464,7 +1490,7 @@ contains
                             end do
 
                             pres = ((q_cons_vf(E_idx)%sf(j, k, l) - 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, k, &
-                                & l)**2._wp)/rho)/(1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf - qv)/gamma
+                                    & l)**2._wp)/rho)/(1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf - qv)/gamma
                             int_pres = int_pres + (pres - 1._wp)**2._wp
                         end if
                     end do
@@ -1527,7 +1553,7 @@ contains
                                 end do
 
                                 pres = ((q_cons_vf(E_idx)%sf(j, k, l) - 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, k, &
-                                    & l)**2._wp)/rho)/(1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf - qv)/gamma
+                                        & l)**2._wp)/rho)/(1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf - qv)/gamma
                                 int_pres = int_pres + abs(pres - 1._wp)
                                 max_pres = max(max_pres, abs(pres - 1._wp))
                             end if
@@ -1556,14 +1582,17 @@ contains
                 end do
             end if
         end if
+
     end subroutine s_write_probe_files
 
     !> The goal of this subroutine is to write to the run-time information file basic footer information applicable to the current
     !! computation and to close the file when done. The footer contains the stability criteria extrema over all of the time-steps
     !! and the simulation run-time.
     impure subroutine s_close_run_time_information_file
+
         real(wp) :: run_time !< Run-time of the simulation
         ! Writing the footer of and closing the run-time information file
+
         write (3, '(A)') '    '
         write (3, '(A)') ''
 
@@ -1577,34 +1606,45 @@ contains
         write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'
         write (3, '(A)') '    '
         close (3)
+
     end subroutine s_close_run_time_information_file
 
     !> Closes communication files
     impure subroutine s_close_com_files()
+
         integer :: i !< Generic loop iterator
+
         do i = 1, num_fluids
             close (i + 120)
         end do
+
     end subroutine s_close_com_files
 
     !> Closes probe files
     impure subroutine s_close_probe_files
+
         integer :: i !< Generic loop iterator
+
         do i = 1, num_probes
             close (i + 30)
         end do
+
     end subroutine s_close_probe_files
 
     impure subroutine s_close_ib_state_file
+
         close (ib_state_unit)
+
     end subroutine s_close_ib_state_file
 
     !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
     !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_data_output_module
+
         integer :: i, m_ds, n_ds, p_ds
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
+
         if (run_time_info) then
             @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
             icfl_max = 0._wp
@@ -1632,10 +1672,12 @@ contains
                 allocate (q_cons_temp_ds(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
+
     end subroutine s_initialize_data_output_module
 
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_data_output_module
+
         integer :: i
 
         if (probe_wrt) then
@@ -1656,5 +1698,7 @@ contains
             end do
             deallocate (q_cons_temp_ds)
         end if
+
     end subroutine s_finalize_data_output_module
+
 end module m_data_output

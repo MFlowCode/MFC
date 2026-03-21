@@ -7,11 +7,12 @@
 
 !> @brief MPI communication layer: domain decomposition, halo exchange, reductions, and parallel I/O setup
 module m_mpi_common
+
 #ifdef MFC_MPI
     use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types !< Definitions of the derived types
+    use m_derived_types     !< Definitions of the derived types
     use m_global_parameters !< Definitions of the global parameters
     use m_helper
     use ieee_arithmetic
@@ -35,15 +36,16 @@ module m_mpi_common
 
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
+
 contains
 
     !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
     !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_mpi_common_module
+
 #ifdef MFC_MPI
-        ! Allocating buff_send/recv and. Please note that for the sake of
-        ! simplicity, both variables are provided sufficient storage to hold
-        ! the largest buffer in the computational domain.
+        ! Allocating buff_send/recv and. Please note that for the sake of simplicity, both variables are provided sufficient storage
+        ! to hold the largest buffer in the computational domain.
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
@@ -54,7 +56,7 @@ contains
         if (n > 0) then
             if (p > 0) then
                 halo_size = nint(-1._wp + 1._wp*buff_size*(v_size)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)*(p + 2*buff_size &
-                    & + 1)/(cells_bounds%mnp_min + 2*buff_size + 1))
+                                 & + 1)/(cells_bounds%mnp_min + 2*buff_size + 1))
             else
                 halo_size = -1 + buff_size*(v_size)*(cells_bounds%mn_max + 2*buff_size + 1)
             end if
@@ -72,14 +74,17 @@ contains
         $:GPU_ENTER_DATA(create='[capture:buff_recv]')
 #endif
 #endif
+
     end subroutine s_initialize_mpi_common_module
 
     !> The subroutine initializes the MPI execution environment and queries both the number of processors which will be available
     !! for the job and the local processor rank.
     impure subroutine s_mpi_initialize
+
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Initializing the MPI environment
+
         call MPI_INIT(ierr)
 
         ! Checking whether the MPI environment has been properly initialized
@@ -99,12 +104,14 @@ contains
         ! Local processor rank is 0
         proc_rank = 0
 #endif
+
     end subroutine s_mpi_initialize
 
     !! @param q_cons_vf Conservative variables
     !! @param ib_markers track if a cell is within the immersed boundary
     !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in)           :: ib_markers
         type(scalar_field), intent(in), optional            :: beta
@@ -160,7 +167,7 @@ contains
         ! Define the view for each variable
         do i = 1, alt_sys
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, mpi_p, &
-                & MPI_IO_DATA%view(i), ierr)
+                                          & MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
@@ -168,7 +175,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
                 call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, mpi_p, &
-                    & MPI_IO_DATA%view(i), ierr)
+                                              & MPI_IO_DATA%view(i), ierr)
                 call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
             end do
         end if
@@ -179,15 +186,17 @@ contains
             MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
 
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, MPI_INTEGER, &
-                & MPI_IO_IB_DATA%view, ierr)
+                                          & MPI_IO_IB_DATA%view, ierr)
             call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
         end if
 #endif
 #endif
+
     end subroutine s_initialize_mpi_data
 
     !! @param q_cons_vf Conservative variables
     subroutine s_initialize_mpi_data_ds(q_cons_vf)
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, dimension(num_dims)                        :: sizes_glb, sizes_loc
         integer, dimension(3)                               :: sf_start_idx
@@ -226,14 +235,16 @@ contains
         ! Define the view for each variable
         do i = 1, sys_size
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, sf_start_idx, MPI_ORDER_FORTRAN, mpi_p, &
-                & MPI_IO_DATA%view(i), ierr)
+                                          & MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 #endif
+
     end subroutine s_initialize_mpi_data_ds
 
     !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
+
         integer, intent(in)                     :: counts ! Array of vector lengths for each process
         real(wp), intent(in), dimension(counts) :: my_vector ! Input vector on each process
         integer, intent(in)                     :: root ! Rank of the root process
@@ -259,21 +270,26 @@ contains
         allocate (gathered_vector(sum(recounts)))
         call MPI_GATHERV(my_vector, counts, mpi_p, gathered_vector, recounts, displs, mpi_p, root, MPI_COMM_WORLD, ierr)
 #endif
+
     end subroutine s_mpi_gather_data
 
     !> @brief Gathers per-rank time step wall-clock times onto rank 0 for performance reporting.
     impure subroutine mpi_bcast_time_step_values(proc_time, time_avg)
+
         real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
         real(wp), intent(inout)                             :: time_avg
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
+
         call MPI_GATHER(time_avg, 1, mpi_p, proc_time(0), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
+
     end subroutine mpi_bcast_time_step_values
 
     !> @brief Prints a case file error with the prohibited condition and message, then aborts execution.
     impure subroutine s_prohibit_abort(condition, message)
+
         character(len=*), intent(in) :: condition, message
 
         print *, ""
@@ -284,6 +300,7 @@ contains
         end if
         print *, ""
         call s_mpi_abort(code=CASE_FILE_ERROR_CODE)
+
     end subroutine s_prohibit_abort
 
     !> The goal of this subroutine is to determine the global extrema of the stability criteria in the computational domain. This is
@@ -297,6 +314,7 @@ contains
     !! @param vcfl_max_glb Global maximum VCFL stability criterion
     !! @param Rc_min_glb Global minimum Rc stability criterion
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
+
         & Rc_min_glb)
 
         real(wp), intent(in)  :: icfl_max_loc
@@ -309,8 +327,9 @@ contains
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
-        ! global extrema and bookkeeping the results on the rank 0 processor
+        ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their global extrema and bookkeeping the results on the rank
+        ! 0 processor
+
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
 
         if (viscous) then
@@ -327,6 +346,7 @@ contains
         end if
 #endif
 #endif
+
     end subroutine s_mpi_reduce_stability_criteria_extrema
 
     !> The following subroutine takes the input local variable from all processors and reduces to the sum of all values. The reduced
@@ -335,19 +355,23 @@ contains
     ! communicator.
     !! @param var_glb The globally reduced value
     impure subroutine s_mpi_allreduce_sum(var_loc, var_glb)
+
         real(wp), intent(in)  :: var_loc
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Performing the reduction procedure
+
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
+
     end subroutine s_mpi_allreduce_sum
 
     !> This subroutine follows the behavior of the s_mpi_allreduce_sum subroutine
     !> with the additional feature that it reduces an array of vectors.
     impure subroutine s_mpi_allreduce_vectors_sum(var_loc, var_glb, num_vectors, vector_length)
+
         integer, intent(in)                   :: num_vectors, vector_length
         real(wp), dimension(:,:), intent(in)  :: var_loc
         real(wp), dimension(:,:), intent(out) :: var_glb
@@ -355,6 +379,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Performing the reduction procedure
+
         if (loc(var_loc) == loc(var_glb)) then
             call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
         else
@@ -363,6 +388,7 @@ contains
 #else
         var_glb(1:num_vectors, 1:vector_length) = var_loc(1:num_vectors, 1:vector_length)
 #endif
+
     end subroutine s_mpi_allreduce_vectors_sum
 
     !> The following subroutine takes the input local variable from all processors and reduces to the sum of all values. The reduced
@@ -371,16 +397,19 @@ contains
     ! communicator.
     !! @param var_glb The globally reduced value
     impure subroutine s_mpi_allreduce_integer_sum(var_loc, var_glb)
+
         integer, intent(in)  :: var_loc
         integer, intent(out) :: var_glb
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Performing the reduction procedure
+
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
         var_glb = var_loc
 #endif
+
     end subroutine s_mpi_allreduce_integer_sum
 
     !> The following subroutine takes the input local variable from all processors and reduces to the minimum of all values. The
@@ -389,14 +418,17 @@ contains
     ! communicator.
     !! @param var_glb The globally reduced value
     impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
+
         real(wp), intent(in)  :: var_loc
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Performing the reduction procedure
+
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
 #endif
+
     end subroutine s_mpi_allreduce_min
 
     !> The following subroutine takes the input local variable from all processors and reduces to the maximum of all values. The
@@ -405,14 +437,17 @@ contains
     ! communicator.
     !! @param var_glb The globally reduced value
     impure subroutine s_mpi_allreduce_max(var_loc, var_glb)
+
         real(wp), intent(in)  :: var_loc
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Performing the reduction procedure
+
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
 #endif
+
     end subroutine s_mpi_allreduce_max
 
     !> The following subroutine takes the inputted variable and determines its minimum value on the entire computational domain. The
@@ -420,6 +455,7 @@ contains
     ! ! @param var_loc holds the local value to be reduced among all the processors in communicator. On output, the variable holds
     ! the minimum value, reduced amongst all of the local values.
     impure subroutine s_mpi_reduce_min(var_loc)
+
         real(wp), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
@@ -427,14 +463,16 @@ contains
         ! Temporary storage variable that holds the reduced minimum value
         real(wp) :: var_glb
 
-        ! Performing reduction procedure and eventually storing its result
-        ! into the variable that was initially inputted into the subroutine
+        ! Performing reduction procedure and eventually storing its result into the variable that was initially inputted into the
+        ! subroutine
+
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
 
         call MPI_BCAST(var_glb, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
         var_loc = var_glb
 #endif
+
     end subroutine s_mpi_reduce_min
 
     !> The following subroutine takes the first element of the 2-element inputted variable and determines its maximum value on the
@@ -444,6 +482,7 @@ contains
     ! processors in communicator. On output, this variable holds the maximum value, reduced amongst all of the local values, and the
     ! process rank to which the value belongs.
     impure subroutine s_mpi_reduce_maxloc(var_loc)
+
         real(wp), dimension(2), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
@@ -451,20 +490,23 @@ contains
         !> Temporary storage variable that holds the reduced maximum value and the rank of the processor with which the value is
         !! associated
         real(wp), dimension(2) :: var_glb
-        ! Performing reduction procedure and eventually storing its result
-        ! into the variable that was initially inputted into the subroutine
+        ! Performing reduction procedure and eventually storing its result into the variable that was initially inputted into the
+        ! subroutine
+
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_2p, MPI_MAXLOC, 0, MPI_COMM_WORLD, ierr)
 
         call MPI_BCAST(var_glb, 1, mpi_2p, 0, MPI_COMM_WORLD, ierr)
 
         var_loc = var_glb
 #endif
+
     end subroutine s_mpi_reduce_maxloc
 
     !> The subroutine terminates the MPI execution environment.
-        !! @param prnt error message to be printed
-        !! @param code optional exit code
+    !! @param prnt error message to be printed
+    !! @param code optional exit code
     impure subroutine s_mpi_abort(prnt, code)
+
         character(len=*), intent(in), optional :: prnt
         integer, intent(in), optional          :: code
 
@@ -491,24 +533,31 @@ contains
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end if
 #endif
+
     end subroutine s_mpi_abort
 
     !> Halts all processes until all have reached barrier.
     impure subroutine s_mpi_barrier
+
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Calling MPI_BARRIER
+
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 #endif
+
     end subroutine s_mpi_barrier
 
     !> The subroutine finalizes the MPI execution environment.
     impure subroutine s_mpi_finalize
+
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! Finalizing the MPI environment
+
         call MPI_FINALIZE(ierr)
 #endif
+
     end subroutine s_mpi_finalize
 
     !> The goal of this procedure is to populate the buffers of the cell-average conservative variables by communicating with the
@@ -520,19 +569,21 @@ contains
     !! @param pb_in Optional internal bubble pressure
     !! @param mv_in Optional bubble mass velocity
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, mpi_dir, pbc_loc, nVar, pb_in, mv_in)
-        type(scalar_field), dimension(1:), intent(inout)                                                         :: q_comm
+
+        type(scalar_field), dimension(1:), intent(inout) :: q_comm
         real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                                      :: mpi_dir, pbc_loc, nVar
-        integer                                                                                                  :: i, j, k, l, r, q !< Generic loop iterators
-        integer                                                                                                  :: buffer_counts(1:3), buffer_count
-        type(int_bounds_info)                                                                                    :: boundary_conditions(1:3)
-        integer                                                                                                  :: beg_end(1:2), grid_dims(1:3)
-        integer                                                                                                  :: dst_proc, src_proc, recv_tag, send_tag
-        logical                                                                                                  :: beg_end_geq_0, qbmm_comm
-        integer                                                                                                  :: pack_offset, unpack_offset
+        integer, intent(in) :: mpi_dir, pbc_loc, nVar
+        integer :: i, j, k, l, r, q !< Generic loop iterators
+        integer :: buffer_counts(1:3), buffer_count
+        type(int_bounds_info) :: boundary_conditions(1:3)
+        integer :: beg_end(1:2), grid_dims(1:3)
+        integer :: dst_proc, src_proc, recv_tag, send_tag
+        logical :: beg_end_geq_0, qbmm_comm
+        integer :: pack_offset, unpack_offset
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
+
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
         qbmm_comm = .false.
@@ -541,11 +592,11 @@ contains
             qbmm_comm = .true.
             v_size = nVar + 2*nb*nnode
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
-                & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
+                             & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         else
             v_size = nVar
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
-                & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
+                             & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         end if
 
         $:GPU_UPDATE(device='[v_size]')
@@ -555,12 +606,9 @@ contains
         beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
         beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
 
-        ! Implements:
-        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
-        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
-        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
-        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
-        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
+        ! Implements: pbc_loc bc_x >= 0 -> [send/recv]_tag [dst/src]_proc -1 (=0) 0 -> [1,0] [0,0] | 0 0 [1,0] [beg,beg] -1 (=0) 1
+        ! -> [0,0] [1,0] | 0 1 [0,0] [end,beg] +1 (=1) 0 -> [0,1] [1,1] | 1 0 [0,1] [end,end] +1 (=1) 1 -> [1,1] [0,1] | 1 1 [1,1]
+        ! [beg,end]
 
         send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
         recv_tag = f_logical_to_int(pbc_loc == 1)
@@ -650,7 +698,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*(k &
-                                                & + buff_size*l))
+                                                 & + buff_size*l))
                                             buff_send(r) = real(pb_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
                                         end do
                                     end do
@@ -666,7 +714,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
-                                                & + 1)*(k + buff_size*l))
+                                                 & + 1)*(k + buff_size*l))
                                             buff_send(r) = real(mv_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
                                         end do
                                     end do
@@ -682,7 +730,7 @@ contains
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
-                                        & + 2*buff_size + 1)*l))
+                                         & + 2*buff_size + 1)*l))
                                     buff_send(r) = real(q_comm(i)%sf(j, k, l + pack_offset), kind=wp)
                                 end do
                             end do
@@ -698,7 +746,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
-                                                & + buff_size) + (n + 2*buff_size + 1)*l))
+                                                 & + buff_size) + (n + 2*buff_size + 1)*l))
                                             buff_send(r) = real(pb_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
                                         end do
                                     end do
@@ -714,7 +762,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
-                                                & + 1)*((k + buff_size) + (n + 2*buff_size + 1)*l))
+                                                 & + 1)*((k + buff_size) + (n + 2*buff_size + 1)*l))
                                             buff_send(r) = real(mv_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
                                         end do
                                     end do
@@ -737,7 +785,7 @@ contains
                         call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
 
                         call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
-                            & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                          & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                         call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
                     #:endcall GPU_HOST_DATA
@@ -749,7 +797,7 @@ contains
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
 
                     call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
-                        & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
@@ -761,7 +809,7 @@ contains
         #:endfor
 #else
         call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-            & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                          & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
 
         ! Unpack Received Buffer
@@ -847,7 +895,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
-                                                & + buff_size) + buff_size*l))
+                                                 & + buff_size) + buff_size*l))
                                             pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                         end do
                                     end do
@@ -863,7 +911,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
-                                                & + 1)*((k + buff_size) + buff_size*l))
+                                                 & + 1)*((k + buff_size) + buff_size*l))
                                             mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                         end do
                                     end do
@@ -880,7 +928,7 @@ contains
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
-                                        & + 2*buff_size + 1)*(l + buff_size)))
+                                         & + 2*buff_size + 1)*(l + buff_size)))
                                     q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_comm(i)%sf(j, k, l + unpack_offset))) then
@@ -902,7 +950,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
-                                                & + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
+                                                 & + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
                                             pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
                                         end do
                                     end do
@@ -918,7 +966,7 @@ contains
                                     do j = -buff_size, m + buff_size
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
-                                                & + 1)*((k + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
+                                                 & + 1)*((k + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
                                             mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
                                         end do
                                     end do
@@ -932,12 +980,14 @@ contains
         #:endfor
         call nvtxEndRange
 #endif
+
     end subroutine s_mpi_sendrecv_variables_buffers
 
     !> The purpose of this procedure is to optimally decompose the computational domain among the available processors. This is
     !! performed by attempting to award each processor, in each of the coordinate directions, approximately the same number of
     !! cells, and then recomputing the affected global parameters.
     subroutine s_mpi_decompose_computational_domain
+
 #ifdef MFC_MPI
 
         integer :: num_procs_x, num_procs_y, num_procs_z !< Optimal number of processors in the x-, y- and z-directions
@@ -951,6 +1001,7 @@ contains
         integer :: recon_order !< WENO or MUSCL reconstruction order
         integer :: i, j        !< Generic loop iterators
         integer :: ierr        !< Generic flag used to identify and report MPI errors
+
         if (recon_type == WENO_TYPE) then
             recon_order = weno_order
         else
@@ -1001,9 +1052,9 @@ contains
                 else
 
                     if (cyl_coord .and. p > 0) then
-                        ! Implement pencil processor blocking if using cylindrical coordinates so
-                        ! that all cells in azimuthal direction are stored on a single processor.
-                        ! This is necessary for efficient application of Fourier filter near axis.
+                        ! Implement pencil processor blocking if using cylindrical coordinates so that all cells in azimuthal
+                        ! direction are stored on a single processor. This is necessary for efficient application of Fourier filter
+                        ! near axis.
 
                         ! Initial values of the processor factorization optimization
                         num_procs_x = 1
@@ -1045,7 +1096,7 @@ contains
                         tmp_num_procs_y = num_procs_y
                         tmp_num_procs_z = num_procs_z
                         fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + 10._wp*abs((n + 1) &
-                            & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
+                                             & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
 
                         ! Optimization of the initial processor topology
                         do i = 1, num_procs
@@ -1063,7 +1114,7 @@ contains
                                             num_procs_y = j
                                             num_procs_z = num_procs/(i*j)
                                             fct_min = abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + abs((n + 1) &
-                                                & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
+                                                          & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
                                             ierr = 0
                                         end if
                                     end if
@@ -1073,16 +1124,16 @@ contains
                     end if
                 end if
 
-                ! Verifying that a valid decomposition of the computational
-                ! domain has been established. If not, the simulation exits.
+                ! Verifying that a valid decomposition of the computational domain has been established. If not, the simulation
+                ! exits.
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values ' // 'of num_procs, m, n, p and ' &
-                        & // 'weno/muscl/igr_order. Exiting.')
+                                     & // 'weno/muscl/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology
                 call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, num_procs_y, num_procs_z/), (/.true., .true., .true./), &
-                    & .false., MPI_COMM_CART, ierr)
+                                     & .false., MPI_COMM_CART, ierr)
 
                 ! Finding the Cartesian coordinates of the local process
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, proc_coords, ierr)
@@ -1148,7 +1199,7 @@ contains
                         if (proc_coords(3) < rem_cells) then
                             z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3))
                             z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1) - (num_procs_z &
-                                & - rem_cells))
+                                                                  & - rem_cells))
                         else
                             z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3) + rem_cells)
                             z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1))
@@ -1186,16 +1237,16 @@ contains
                     end if
                 end do
 
-                ! Verifying that a valid decomposition of the computational
-                ! domain has been established. If not, the simulation exits.
+                ! Verifying that a valid decomposition of the computational domain has been established. If not, the simulation
+                ! exits.
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values ' // 'of num_procs, m, n and ' &
-                        & // 'weno/muscl/igr_order. Exiting.')
+                                     & // 'weno/muscl/igr_order. Exiting.')
                 end if
 
                 ! Creating new communicator using the Cartesian topology
                 call MPI_CART_CREATE(MPI_COMM_WORLD, 2, (/num_procs_x, num_procs_y/), (/.true., .true./), .false., MPI_COMM_CART, &
-                    & ierr)
+                                     & ierr)
 
                 ! Finding the Cartesian coordinates of the local process
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, proc_coords, ierr)
@@ -1262,7 +1313,7 @@ contains
                     if (proc_coords(2) < rem_cells) then
                         y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2))
                         y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1) - (num_procs_y &
-                            & - rem_cells))
+                                                              & - rem_cells))
                     else
                         y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2) + rem_cells)
                         y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1))
@@ -1354,6 +1405,7 @@ contains
 #endif
         end if
 #endif
+
     end subroutine s_mpi_decompose_computational_domain
 
     !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
@@ -1363,12 +1415,14 @@ contains
     !! @param pbc_loc Processor boundary condition (PBC) location
 #ifndef MFC_PRE_PROCESS
     subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
+
         integer, intent(in) :: mpi_dir
         integer, intent(in) :: pbc_loc
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
         ! MPI Communication in x-direction
+
         if (mpi_dir == 1) then
             if (pbc_loc == -1) then ! PBC at the beginning
 
@@ -1376,12 +1430,12 @@ contains
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
-                        & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
 
                     ! Send/receive buffer to/from bc_x%beg/bc_x%beg
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
-                        & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
 
@@ -1389,12 +1443,12 @@ contains
 
                     ! Send/receive buffer to/from bc_x%beg/bc_x%end
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
-                        & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
 
                     ! Send/receive buffer to/from bc_x%end/bc_x%end
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
-                        & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
             ! END: MPI Communication in x-direction
@@ -1407,12 +1461,12 @@ contains
 
                     ! Send/receive buffer to/from bc_y%end/bc_y%beg
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
-                        & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
 
                     ! Send/receive buffer to/from bc_y%beg/bc_y%beg
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
-                        & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
 
@@ -1420,12 +1474,12 @@ contains
 
                     ! Send/receive buffer to/from bc_y%beg/bc_y%end
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
-                        & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
 
                     ! Send/receive buffer to/from bc_y%end/bc_y%end
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
-                        & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
             ! END: MPI Communication in y-direction
@@ -1439,12 +1493,12 @@ contains
 
                     ! Send/receive buffer to/from bc_z%end/bc_z%beg
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
-                        & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
 
                     ! Send/receive buffer to/from bc_z%beg/bc_z%beg
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
-                        & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
 
@@ -1452,25 +1506,28 @@ contains
 
                     ! Send/receive buffer to/from bc_z%beg/bc_z%end
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
-                        & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
 
                     ! Send/receive buffer to/from bc_z%end/bc_z%end
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
-                        & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                                      & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
         end if
         ! END: MPI Communication in z-direction
 #endif
-    end subroutine s_mpi_sendrecv_grid_variables_buffers
 
+    end subroutine s_mpi_sendrecv_grid_variables_buffers
 #endif
 
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_mpi_common_module
+
 #ifdef MFC_MPI
         deallocate (buff_send, buff_recv)
 #endif
+
     end subroutine s_finalize_mpi_common_module
+
 end module m_mpi_common

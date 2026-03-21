@@ -6,11 +6,12 @@
 
 !> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE
-    use m_derived_types !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+
+    use m_derived_types        !< Definitions of the derived types
+    use m_global_parameters    !< Definitions of the global parameters
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
     use m_variables_conversion !< State variables type conversion procedures
-    use m_bubbles !< General bubble dynamics procedures
+    use m_bubbles              !< General bubble dynamics procedures
     implicit none
 
     real(wp), allocatable, dimension(:,:,:)   :: bub_adv_src
@@ -22,10 +23,12 @@ module m_bubbles_EE
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
     $:GPU_DECLARE(create='[rs, vs, ms, ps]')
+
 contains
 
     !> @brief Allocates and initializes arrays for the Euler-Euler bubble model.
     impure subroutine s_initialize_bubbles_EE_module
+
         integer :: l
 
         @:ALLOCATE(rs(1:nb))
@@ -58,11 +61,13 @@ contains
         @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
+
     end subroutine s_initialize_bubbles_EE_module
 
     !> @brief Computes the bubble volume fraction alpha from the bubble number density.
-        !! @param q_cons_vf is the conservative variable
+    !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp)                                               :: nR3bar
         integer(wp)                                            :: i, j, k, l
@@ -81,12 +86,14 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
     end subroutine s_comp_alpha_from_n
 
     !> Compute the right-hand side for Euler-Euler bubble transport
-        !! @param idir Direction index
-        !! @param q_prim_vf Primitive variables
+    !! @param idir Direction index
+    !! @param q_prim_vf Primitive variables
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
+
         integer, intent(in)                                 :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), intent(inout)                   :: divu_in !< matrix for div(u)
@@ -100,7 +107,7 @@ contains
                         do j = 0, m
                             divu_in%sf(j, k, l) = 0._wp
                             divu_in%sf(j, k, l) = 5.e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, &
-                                & l) - q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+                                       & l) - q_prim_vf(contxe + idir)%sf(j - 1, k, l))
                         end do
                     end do
                 end do
@@ -112,7 +119,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, &
-                            & l) - q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+                                   & l) - q_prim_vf(contxe + idir)%sf(j, k - 1, l))
                     end do
                 end do
             end do
@@ -123,19 +130,21 @@ contains
                 do k = 0, n
                     do j = 0, m
                         divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, &
-                            & l + 1) - q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                                   & l + 1) - q_prim_vf(contxe + idir)%sf(j, k, l - 1))
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
+
     end subroutine s_compute_bubbles_EE_rhs
 
-    !> The purpose of this procedure is to compute the source terms      that are needed for the bubble modeling
+    !> The purpose of this procedure is to compute the source terms that are needed for the bubble modeling
     !! @param q_prim_vf Primitive variables
     !! @param q_cons_vf Conservative variables
     !! @param rhs_vf Right-hand side variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
@@ -178,8 +187,8 @@ contains
 
         adap_dt_stop_max = 0
         $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
-        & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu]', collapse=3, &
-        & reduction = '[[adap_dt_stop_max]]', reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
+                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu]', collapse=3, &
+                            & reduction = '[[adap_dt_stop_max]]', reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -272,8 +281,8 @@ contains
                                 adap_dt_stop = 0
 
                                 call s_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, &
-                                    & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
-                                    & dmBeta_t, dmCson, adap_dt_stop)
+                                                    & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, dmMass_n, &
+                                                    & dmBeta_c, dmBeta_t, dmCson, adap_dt_stop)
 
                                 q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                                 q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
@@ -281,7 +290,7 @@ contains
                                 adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
                             else
                                 rddot = f_rddot(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, bub_adv_src(j, &
-                                    & k, l), divu_in%sf(j, k, l), dmCson)
+                                                & k, l), divu_in%sf(j, k, l), dmCson)
                                 bub_v_src(j, k, l, q) = nbub*rddot
                                 bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                             end if
@@ -315,5 +324,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
+
     end subroutine s_compute_bubble_EE_source
+
 end module m_bubbles_EE

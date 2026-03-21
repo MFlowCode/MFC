@@ -4,20 +4,23 @@
 
 !> @brief Broadcasts user inputs and decomposes the domain across MPI ranks for pre-processing
 module m_mpi_proxy
+
 #ifdef MFC_MPI
     use mpi !< Message passing interface (MPI) module
 #endif
 
     use m_helper
-    use m_derived_types !< Definitions of the derived types
+    use m_derived_types     !< Definitions of the derived types
     use m_global_parameters !< Global parameters for the code
     use m_mpi_common
 
     implicit none
+
 contains
     !> Since only processor with rank 0 is in charge of reading and checking the consistency of the user provided inputs, these are
     !! not available to the remaining processors. This subroutine is then in charge of broadcasting the required information.
     impure subroutine s_mpi_bcast_user_inputs
+
 #ifdef MFC_MPI
 
         ! Generic loop iterator
@@ -26,6 +29,7 @@ contains
         integer :: ierr
 
         ! Logistics
+
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['t_step_old', 't_step_start', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
@@ -113,8 +117,8 @@ contains
             if (chemistry) then
                 call MPI_BCAST(patch_icpp(i)%Y, size(patch_icpp(i)%Y), mpi_p, 0, MPI_COMM_WORLD, ierr)
             end if
-            ! Broadcast IB variables: patch_ib is indexed 1:num_patches_max,
-            ! not 1:num_bc_patches_max, so these must live in the num_patches_max loop.
+            ! Broadcast IB variables: patch_ib is indexed 1:num_patches_max, not 1:num_bc_patches_max, so these must live in the
+            ! num_patches_max loop.
             #:for VAR in ['vel', 'angular_vel', 'angles']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
@@ -168,5 +172,7 @@ contains
             end do
         end do
 #endif
+
     end subroutine s_mpi_bcast_user_inputs
+
 end module m_mpi_proxy

@@ -3,8 +3,7 @@
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph, Mach
     real(wp) :: eps
 
-    ! IGR Jets
-    ! Arrays to stor position and radii of jets from input file
+    ! IGR Jets Arrays to stor position and radii of jets from input file
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
     ! Variables to describe initial condition of jet
     real(wp)                      :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
@@ -171,13 +170,12 @@
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
     case (380)
-        ! This is patch is hard-coded for test suite optimization used in the
-        ! 3D_TaylorGreenVortex case:
-        ! This analytic patch used geometry 9
+        ! This is patch is hard-coded for test suite optimization used in the 3D_TaylorGreenVortex case: This analytic patch used
+        ! geometry 9
         Mach = 0.1
         if (patch_id == 1) then
             q_prim_vf(E_idx)%sf(i, j, &
-                & k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
+                      & k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
             q_prim_vf(momxb + 0)%sf(i, j, k) = Mach*376.636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
             q_prim_vf(momxb + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
         end if
