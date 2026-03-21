@@ -6,8 +6,8 @@
 
 !> @brief Computes gravitational and user-defined body force source terms for the momentum equations
 module m_body_forces
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_variables_conversion
     use m_nvtx
 
@@ -57,7 +57,6 @@ contains
     subroutine s_compute_mixture_density(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer                                             :: i, j, k, l !< standard iterators
-
         $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
         do l = 0, p
             do k = 0, n
@@ -81,7 +80,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer                                                :: i, j, k, l !< Loop variables
-
         call s_compute_acceleration(mytime)
         call s_compute_mixture_density(q_cons_vf)
 

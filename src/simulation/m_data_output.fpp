@@ -7,13 +7,13 @@
 
 !> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
 module m_data_output
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_variables_conversion !< State variables type conversion procedures
     use m_compile_specific
     use m_helper
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_sim_helpers
     use m_delay_file_access
     use m_ibm
@@ -80,22 +80,16 @@ contains
     !! information relevant to current simulation. In general, this requires generating a table header for those stability criteria
     !! which will be written at every time-step.
     impure subroutine s_open_run_time_information_file
-        character(LEN=name_len), parameter :: file_name = 'run_time.inf' !<
-            !! Name of the run-time information file
-
-        character(LEN=path_len + name_len) :: file_path !<
-            !! Relative path to a file in the case directory
-
-        character(LEN=8) :: file_date !<
-            !! Creation date of the run-time information file
-
+        character(LEN=name_len), parameter :: file_name = 'run_time.inf' !< Name of the run-time information file
+        character(LEN=path_len + name_len) :: file_path                  !< Relative path to a file in the case directory
+        character(LEN=8)                   :: file_date                  !< Creation date of the run-time information file
         ! Opening the run-time information file
         file_path = trim(case_dir) // '/' // trim(file_name)
 
         open (3, FILE=trim(file_path), form='formatted', STATUS='replace')
 
         write (3, '(A)') 'Description: Stability information at ' // 'each time-step of the simulation. This'
-        write (3, '(13X,A)') 'data is composed of the inviscid ' // 'CourantâFriedrichsâLewy (ICFL)'
+        write (3, '(13X,A)') 'data is composed of the inviscid ' // 'CourantÃ¢ÂÂFriedrichsÃ¢ÂÂLewy (ICFL)'
         write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, ' // 'the capillary CFL (CCFL)'
         write (3, '(13X,A)') 'number and the cell Reynolds (Rc) ' // 'number. Please note that only'
         write (3, '(13X,A)') 'those stability conditions pertinent ' // 'to the physics included in'
@@ -119,10 +113,8 @@ contains
 
     !> This opens a formatted data file where the root processor      can write out the CoM information
     impure subroutine s_open_com_files()
-        character(len=path_len + 3*name_len) :: file_path !<
-            !! Relative path to the CoM file in the case directory
-        integer :: i !< Generic loop iterator
-
+        character(len=path_len + 3*name_len) :: file_path !< Relative path to the CoM file in the case directory
+        integer                              :: i         !< Generic loop iterator
         do i = 1, num_fluids
             ! Generating the relative path to the CoM data file
             write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
@@ -146,11 +138,9 @@ contains
 
     !> This opens a formatted data file where the root processor      can write out flow probe information
     impure subroutine s_open_probe_files
-        character(LEN=path_len + 3*name_len) :: file_path !<
-            !! Relative path to the probe data file in the case directory
-
-        integer :: i !< Generic loop iterator
-        logical :: file_exist
+        character(LEN=path_len + 3*name_len) :: file_path !< Relative path to the probe data file in the case directory
+        integer                              :: i         !< Generic loop iterator
+        logical                              :: file_exist
 
         do i = 1, num_probes
             ! Generating the relative path to the data file
@@ -196,7 +186,7 @@ contains
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: t_step
-        real(wp)                                            :: rho        !< Cell-avg. density
+        real(wp)                                            :: rho !< Cell-avg. density
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha !< Cell-avg. volume fraction
             real(wp), dimension(3) :: vel   !< Cell-avg. velocity
@@ -324,19 +314,12 @@ contains
         integer, intent(in)                                          :: t_step
         type(scalar_field), intent(inout), optional                  :: beta
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        character(LEN=path_len + 2*name_len)                         :: t_step_dir !<
-            !! Relative path to the current time-step directory
-
-        character(LEN=path_len + 3*name_len) :: file_path !<
-            !! Relative path to the grid and conservative variables data files
-
-        logical :: file_exist !<
-            !! Logical used to check existence of current time-step directory
-
-        character(LEN=15) :: FMT
-        integer           :: i, j, k, l, r
-        real(wp)          :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-
+        character(LEN=path_len + 2*name_len)                         :: t_step_dir !< Relative path to the current time-step directory
+        character(LEN=path_len + 3*name_len)                         :: file_path  !< Relative path to the grid and conservative variables data files
+        logical                                                      :: file_exist                              !< Logical used to check existence of current time-step directory
+        character(LEN=15)                                            :: FMT
+        integer                                                      :: i, j, k, l, r
+        real(wp)                                                     :: gamma, lit_gamma, pi_inf, qv           !< Temporary EOS params
         ! Creating or overwriting the time-step root directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
 
@@ -718,7 +701,6 @@ contains
         character(len=10)                    :: t_step_string
         integer                              :: i       !< Generic loop iterator
         integer                              :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
-
         ! Down sampling variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
@@ -1009,7 +991,6 @@ contains
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
         integer                                        :: i           !< Generic loop iterator
         real(wp)                                       :: nondim_time !< Non-dimensional time
-
         ! Non-dimensional time calculation
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, wp)*dt
@@ -1077,13 +1058,11 @@ contains
         real(wp)                        :: damage_state
         integer                         :: i, j, k, l, s, d !< Generic loop iterator
         real(wp)                        :: nondim_time      !< Non-dimensional time
-        real(wp)                        :: tmp              !<
-            !! Temporary variable to store quantity for mpi_allreduce
-
-        integer  :: npts           !< Number of included integral points
-        real(wp) :: rad, thickness !< For integral quantities
-        logical  :: trigger        !< For integral quantities
-        real(wp) :: rhoYks(1:num_species)
+        real(wp)                        :: tmp              !< Temporary variable to store quantity for mpi_allreduce
+        integer                         :: npts             !< Number of included integral points
+        real(wp)                        :: rad, thickness   !< For integral quantities
+        logical                         :: trigger          !< For integral quantities
+        real(wp)                        :: rhoYks(1:num_species)
 
         T = dflt_T_guess
 
@@ -1584,7 +1563,6 @@ contains
     !! and the simulation run-time.
     impure subroutine s_close_run_time_information_file
         real(wp) :: run_time !< Run-time of the simulation
-
         ! Writing the footer of and closing the run-time information file
         write (3, '(A)') '    '
         write (3, '(A)') ''
@@ -1612,7 +1590,6 @@ contains
     !> Closes probe files
     impure subroutine s_close_probe_files
         integer :: i !< Generic loop iterator
-
         do i = 1, num_probes
             close (i + 30)
         end do

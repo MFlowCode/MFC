@@ -27,36 +27,26 @@ module m_global_parameters
 
     ! Computational Domain Parameters
 
-    integer :: proc_rank !< Rank of the local processor
-
-    !! Number of cells in the x-, y- and z-coordinate directions
+    integer :: proc_rank !< Rank of the local processor Number of cells in the x-, y- and z-coordinate directions
     integer :: m
     integer :: n
     integer :: p
 
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
-    type(cell_num_bounds)               :: cells_bounds
-    integer(kind=8)                     :: nGlobal             !< Global number of cells in the domain
-    integer                             :: m_glb, n_glb, p_glb !< Global number of cells in each direction
-    integer                             :: num_dims            !< Number of spatial dimensions
-    integer                             :: num_vels            !< Number of velocity components (different from num_dims for mhd)
-    logical                             :: cyl_coord
-    integer                             :: grid_geometry       !< Cylindrical coordinates (either axisymmetric or full 3D)
-    real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc    !<
-    !! Locations of cell-centers (cc) in x-, y- and z-directions, respectively
-
-    real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
-    !! Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
-
-    real(wp) :: dx, dy, dz !<
-    !! Minimum cell-widths in the x-, y- and z-coordinate directions
-
-    type(bounds_info) :: x_domain, y_domain, z_domain !<
-    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
-
-    logical :: stretch_x, stretch_y, stretch_z !<
-    !! Grid stretching flags for the x-, y- and z-coordinate directions
-
+    type(cell_num_bounds) :: cells_bounds
+    integer(kind=8)       :: nGlobal             !< Global number of cells in the domain
+    integer               :: m_glb, n_glb, p_glb !< Global number of cells in each direction
+    integer               :: num_dims            !< Number of spatial dimensions
+    integer               :: num_vels            !< Number of velocity components (different from num_dims for mhd)
+    logical               :: cyl_coord
+    integer               :: grid_geometry       !< Cylindrical coordinates (either axisymmetric or full 3D)
+    !> Locations of cell-centers (cc) in x-, y- and z-directions, respectively
+    real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
+    !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
+    real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
+    real(wp)                            :: dx, dy, dz                            !< Minimum cell-widths in the x-, y- and z-coordinate directions
+    type(bounds_info)                   :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
+    logical                             :: stretch_x, stretch_y, stretch_z        !< Grid stretching flags for the x-, y- and z-coordinate directions
     ! Parameters of the grid stretching function for the x-, y- and z-coordinate
     ! directions. The "a" parameters are a measure of the rate at which the grid
     ! is stretched while the remaining parameters are indicative of the location
@@ -93,7 +83,6 @@ module m_global_parameters
     logical            :: igr                         !< Use information geometric regularization
     integer            :: igr_order                   !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
-
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx             !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx              !< Indexes of first & last momentum eqns.
@@ -112,7 +101,6 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx          !< Indexes of first & last concentration eqns.
     integer               :: damage_idx           !< Index of damage state variable (D) for continuum damage model
     integer               :: psi_idx              !< Index of hyperbolic cleaning state variable for MHD
-
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
@@ -121,29 +109,24 @@ module m_global_parameters
     ! this includes the buffer region. idwbuff and idwint are the same otherwise.
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
-    type(int_bounds_info) :: bc_x, bc_y, bc_z !<
-    !! Boundary conditions in the x-, y- and z-coordinate directions
-
+    type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
     integer               :: shear_num !! Number of shear stress components
-    integer, dimension(3) :: shear_indices !<
-    !! Indices of the stress components that represent shear stress
-    integer :: shear_BC_flip_num !<
-    !! Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2) :: shear_BC_flip_indices !<
-    !! Indices of shear stress components to reflect for boundary conditions.
-    !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
-
-    logical  :: parallel_io          !< Format of the data files
-    logical  :: file_per_process     !< type of data output
-    integer  :: precision            !< Precision of output files
-    logical  :: down_sample          !< Down-sample the output data
-    logical  :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
-    real(wp) :: mixlayer_vel_coef    !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    logical  :: mixlayer_perturb     !< Superimpose instability waves to surrounding fluid flow
-    integer  :: mixlayer_perturb_nk  !< Number of Fourier modes for perturbation with mixlayer_perturb flag
-    real(wp) :: mixlayer_perturb_k0  !< Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag
-                                     !! Default value (k0 = 0.4446) is most unstable mode obtained from linear stability analysis
-                                     !! See Michalke (1964, JFM) for details
+    integer, dimension(3) :: shear_indices     !< Indices of the stress components that represent shear stress
+    integer               :: shear_BC_flip_num !< Number of shear stress components to reflect for boundary conditions
+    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
+    !! [indices])
+    integer, dimension(3, 2) :: shear_BC_flip_indices
+    logical                  :: parallel_io          !< Format of the data files
+    logical                  :: file_per_process     !< type of data output
+    integer                  :: precision            !< Precision of output files
+    logical                  :: down_sample          !< Down-sample the output data
+    logical                  :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
+    real(wp)                 :: mixlayer_vel_coef    !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    logical                  :: mixlayer_perturb     !< Superimpose instability waves to surrounding fluid flow
+    integer                  :: mixlayer_perturb_nk  !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    !> Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag Default value (k0 = 0.4446) is most unstable mode
+    !! obtained from linear stability analysis See Michalke (1964, JFM) for details
+    real(wp)                   :: mixlayer_perturb_k0
     logical                    :: simplex_perturb
     type(simplex_noise_params) :: simplex_params
     real(wp)                   :: pi_fac !< Factor for artificial pi_inf
@@ -159,28 +142,21 @@ module m_global_parameters
     real(wp), dimension(num_fluids_max) :: fluid_rho
     logical                             :: elliptic_smoothing
     integer                             :: elliptic_smoothing_iters
-    integer, allocatable, dimension(:)  :: proc_coords        !<
-    !! Processor coordinates in MPI_CART_COMM
-
-    integer, allocatable, dimension(:) :: start_idx !<
-    !! Starting cell-center index of local processor in global grid
-
+    integer, allocatable, dimension(:)  :: proc_coords        !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:)  :: start_idx          !< Starting cell-center index of local processor in global grid
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
     character(LEN=name_len)  :: mpiiofs
-    integer                  :: mpi_info_int !<
-    !! MPI info for parallel IO with Lustre file systems
+    integer                  :: mpi_info_int !< MPI info for parallel IO with Lustre file systems
 #endif
 
     ! Initial Condition Parameters
-    integer                                               :: num_patches !< Number of patches composing initial condition
-    type(ic_patch_parameters), dimension(num_patches_max) :: patch_icpp  !<
-    !! Database of the initial condition patch parameters (icpp) for each of the
-    !! patches employed in the configuration of the initial condition. Note that
-    !! the maximum allowable number of patches, num_patches_max, may be changed
-    !! in the module m_derived_types.f90.
-
+    integer :: num_patches !< Number of patches composing initial condition
+    !> Database of the initial condition patch parameters (icpp) for each of the patches employed in the configuration of the
+    !! initial condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
+    !! m_derived_types.f90.
+    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp
     integer                                                  :: num_bc_patches !< Number of boundary condition patches
     logical                                                  :: bc_io          !< whether or not to save BC data
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
@@ -188,11 +164,9 @@ module m_global_parameters
     !! employed in the configuration of the boundary conditions
 
     ! Fluids Physical Parameters
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
-    !! Database of the physical parameters of each of the fluids that is present
-    !! in the flow. These include the stiffened gas equation of state parameters,
-    !! and the Reynolds numbers.
-
+    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
+    !! equation of state parameters, and the Reynolds numbers.
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     real(wp)                                 :: rhoref, pref !< Reference parameters for Tait EOS
@@ -259,21 +233,20 @@ module m_global_parameters
     integer, allocatable, dimension(:,:,:) :: logic_grid
     type(pres_field)                       :: pb
     type(pres_field)                       :: mv
-    real(wp)                               :: Bx0       !< Constant magnetic field in the x-direction (1D)
-    integer                                :: buff_size !<
-    !! The number of cells that are necessary to be able to store enough boundary
-    !! conditions data to march the solution in the physical computational domain
-    !! to the next time-step.
-
+    real(wp)                               :: Bx0 !< Constant magnetic field in the x-direction (1D)
+    !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
+    !! physical computational domain to the next time-step.
+    integer :: buff_size
     logical :: fft_wrt
-    logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
+    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
+    !! is false
+    logical :: dummy
 contains
 
     !> Assigns default values to user inputs prior to reading them in. This allows for an easier consistency check of these
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
         integer :: i !< Generic loop operator
-
         ! Logistics
         case_dir = '.'
         old_grid = .false.

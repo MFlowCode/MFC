@@ -6,7 +6,7 @@
 module m_perturbation
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters ! Global parameters for the code
-    use m_mpi_proxy              !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_boundary_common ! Boundary conditions module
     use m_helper
     use m_simplex_noise
@@ -55,7 +55,7 @@ contains
     !> @brief Adds random noise to the velocity and void fraction of the surrounding flow field.
     impure subroutine s_perturb_surrounding_flow(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer                                                :: i, j, k !<  generic loop iterators
+        integer                                                :: i, j, k !< generic loop iterators
         real(wp)                                               :: perturb_alpha
         real(wp)                                               :: rand_real
         call random_seed()

@@ -7,8 +7,7 @@ module m_grid
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters ! Global parameters for the code
     use m_mpi_proxy ! Message passing interface (MPI) module proxy
-    use m_helper_basic         !< Functions to compare floating point numbers
-
+    use m_helper_basic !< Functions to compare floating point numbers
 #ifdef MFC_MPI
     use mpi ! Message passing interface (MPI) module
 #endif
@@ -35,7 +34,6 @@ contains
         ! Generic loop iterator
         integer  :: i, j   !< generic loop operators
         real(wp) :: length !< domain lengths
-
         ! Grid Generation in the x-direction
         dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
 
@@ -154,19 +152,13 @@ contains
     impure subroutine s_generate_parallel_grid
 #ifdef MFC_MPI
 
-        real(wp) :: length   !< domain lengths
-
+        real(wp) :: length !< domain lengths
         ! Locations of cell boundaries
-        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb !<
-            !! Locations of cell boundaries
-
-        character(LEN=path_len + name_len) :: file_loc !<
-            !! Generic string used to store the address of a file
-
+        real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb !< Locations of cell boundaries
+        character(LEN=path_len + name_len)  :: file_loc                     !< Generic string used to store the address of a file
         integer                             :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
-        integer                             :: i, j !< Generic loop integers
-
+        integer                             :: i, j                         !< Generic loop integers
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))

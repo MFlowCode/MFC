@@ -6,13 +6,12 @@
 
 !> @brief Computes signed-distance level-set fields and surface normals for immersed-boundary patch geometries
 module m_compute_levelset
-    use m_ib_patches           !< The IB patch parameters
-    use m_model                !< Subroutine(s) related to STL files
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_helper_basic         !< Functions to compare floating point numbers
-
+    use m_ib_patches !< The IB patch parameters
+    use m_model !< Subroutine(s) related to STL files
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_helper_basic !< Functions to compare floating point numbers
     implicit none
 
     private; public :: s_apply_levelset
@@ -77,7 +76,6 @@ contains
         real(wp), dimension(2)           :: center
         real(wp), dimension(3)           :: dist_vec
         integer                          :: i, j, ib_patch_id !< Loop index variables
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -109,7 +107,6 @@ contains
         real(wp), dimension(1:2)         :: center
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
         integer                          :: i, j, k, ib_patch_id !< Loop index variables
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -189,7 +186,6 @@ contains
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
         real(wp)                         :: length_z
         integer                          :: i, j, k, l, ib_patch_id           !< Loop index variables
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -288,7 +284,6 @@ contains
         integer                          :: i, j, k            !< Loop index variables
         integer                          :: idx                !< Shortest path direction indicator
         integer                          :: ib_patch_id        !< patch ID
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -355,7 +350,6 @@ contains
         integer                          :: i, j, k                 !< Loop index variables
         integer                          :: idx                     !< Shortest path direction indicator
         integer                          :: ib_patch_id             !< patch ID
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -404,7 +398,6 @@ contains
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
         integer                          :: i, j, k             !< Loop index variables
         integer                          :: ib_patch_id         !< patch ID
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -484,7 +477,6 @@ contains
         real(wp)                         :: radius, dist
         real(wp), dimension(3)           :: dist_vec, center, periodicity
         integer                          :: i, j, k, ib_patch_id !< Loop index variables
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)

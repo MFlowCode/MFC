@@ -644,14 +644,13 @@ contains
         type(t_model), intent(in)                            :: model
         real(wp), allocatable, intent(out), dimension(:,:,:) :: boundary_v !< Output boundary vertices/normals
         integer, intent(out)                                 :: boundary_vertex_count, boundary_edge_count !< Output boundary vertex/edge count
-        integer                                              :: i, j !< Model index iterator
-        integer                                              :: edge_count, edge_index, store_index !< Boundary edge index iterator
-        real(wp), dimension(1:2, 1:2)                        :: edge !< Edge end points buffer
-        real(wp), dimension(1:2)                             :: boundary_edge !< Boundary edge end points buffer
+        integer                                              :: i, j                                                    !< Model index iterator
+        integer                                              :: edge_count, edge_index, store_index                     !< Boundary edge index iterator
+        real(wp), dimension(1:2, 1:2)                        :: edge                              !< Edge end points buffer
+        real(wp), dimension(1:2)                             :: boundary_edge                          !< Boundary edge end points buffer
         real(wp), dimension(1:(3*model%ntrs), 1:2, 1:2)      :: temp_boundary_v !< Temporary boundary vertex buffer
-        integer, dimension(1:(3*model%ntrs))                 :: edge_occurrence !< The manifoldness of the edges
-        real(wp)                                             :: edgetan, initial, v_norm, xnormal, ynormal !< The manifoldness of the edges
-
+        integer, dimension(1:(3*model%ntrs))                 :: edge_occurrence            !< The manifoldness of the edges
+        real(wp)                                             :: edgetan, initial, v_norm, xnormal, ynormal             !< The manifoldness of the edges
         ! Total number of edges in 2D STL
         edge_count = 3*model%ntrs
 
@@ -755,7 +754,6 @@ contains
         integer, intent(inout)                                     :: edge_count      !< Total number of edges
         real(wp), intent(in), dimension(1:2, 1:2)                  :: edge            !< Edges end points to be registered
         real(wp), dimension(1:edge_count, 1:2, 1:2), intent(inout) :: temp_boundary_v !< Temporary edge end vertex buffer
-
         ! Increment edge index and store the edge
         edge_index = edge_index + 1
         temp_boundary_v(edge_index, 1, 1:2) = edge(1, 1:2)

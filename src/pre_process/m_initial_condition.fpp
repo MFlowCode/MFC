@@ -6,7 +6,7 @@
 module m_initial_condition
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters ! Global parameters for the code
-    use m_mpi_proxy              !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_helper
     use m_variables_conversion ! Subroutines to change the state variables from
     ! one form to another
@@ -27,7 +27,6 @@ module m_initial_condition
     type(scalar_field), allocatable, dimension(:)    :: q_cons_vf !< conservative variables
     type(scalar_field)                               :: q_T_sf    !< Temperature field
     type(integer_field), dimension(:,:), allocatable :: bc_type   !< bc_type fields
-
     !> @cond
 #ifdef MFC_MIXED_PRECISION
     integer(kind=1), allocatable, dimension(:,:,:) :: patch_id_fp
@@ -42,7 +41,6 @@ contains
     !> Computation of parameters, allocation procedures, and/or              any other tasks needed to properly setup the module
     impure subroutine s_initialize_initial_condition_module
         integer :: i, j, k, l !< generic loop iterators
-
         ! Allocating the primitive and conservative variables
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
@@ -169,7 +167,6 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_initial_condition_module
         integer :: i !< Generic loop iterator
-
         ! Dellocating the primitive and conservative variables
         do i = 1, sys_size
             deallocate (q_prim_vf(i)%sf)

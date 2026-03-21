@@ -13,9 +13,8 @@ module m_constants
     real(wp), parameter  :: small_alf = 1.e-11_wp      !< Small alf tolerance
     real(wp), parameter  :: pi = 3.141592653589793_wp  !< Pi
     real(wp), parameter  :: verysmall = 1.e-12_wp      !< Very small number
-    real(wp), &
-        & parameter :: small_radius = 1.e-32_wp           !< Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
-
+    !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
+    real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5                  !< Minimum # of stencils
     integer, parameter  :: path_len = 400                     !< Maximum path length
     integer, parameter  :: name_len = 50                      !< Maximum name length
@@ -33,25 +32,22 @@ module m_constants
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50 !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp           !< scaling factor for IGR alpha
     integer, parameter  :: gp_layers = 3                      !< Number of ghost point layers for IBM
-    real(wp), &
-        & parameter :: capillary_cutoff = 1.e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
-    real(wp), &
-        & parameter :: acoustic_spatial_support_width = 2.5_wp !< Spatial support width of acoustic source, used in s_source_spatial
+    !> color function gradient magnitude at which to apply the surface tension fluxes
+    real(wp), parameter :: capillary_cutoff = 1.e-6
+    !> Spatial support width of acoustic source, used in s_source_spatial
+    real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp
     real(wp), parameter :: dflt_vcfl_dt = 100._wp !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
-    real(wp), &
-        & parameter :: broadband_spectral_level_constant = 20._wp !< The constant to scale the spectral level at the lower frequency bound
-    real(wp), &
-        & parameter :: broadband_spectral_level_growth_rate = 10._wp !< The spectral level constant to correct the magnitude at each frequency to ensure the source is overall broadband
-
+    !> The constant to scale the spectral level at the lower frequency bound
+    real(wp), parameter :: broadband_spectral_level_constant = 20._wp
+    !> The spectral level constant to correct the magnitude at each frequency to ensure the source is overall broadband
+    real(wp), parameter :: broadband_spectral_level_growth_rate = 10._wp
     ! Reconstruction Types
     integer, parameter :: WENO_TYPE = 1  !< Using WENO for reconstruction type
     integer, parameter :: MUSCL_TYPE = 2 !< Using MUSCL for reconstruction type
-
     ! Interface Compression
     real(wp), parameter :: dflt_ic_eps = 1e-4_wp   !< Ensure compression is only applied to surface cells in THINC
     real(wp), parameter :: dflt_ic_beta = 1.6_wp   !< Sharpness parameter's default value used in THINC
     real(wp), parameter :: moncon_cutoff = 1e-8_wp !< Monotonicity constraint's limiter to prevent extremas in THINC
-
     ! Chemistry
     real(wp), parameter :: dflt_T_guess = 1200._wp ! Default guess for temperature (when a previous value is not available)
 
@@ -61,7 +57,6 @@ module m_constants
     real(wp), parameter :: threshold_vector_zero = 1.e-10_wp  !< Threshold to treat the component of a vector to be zero
     real(wp), parameter :: threshold_edge_zero = 1.e-10_wp    !< Threshold to treat two edges to be overlapped
     real(wp), parameter :: initial_distance_buffer = 1.e12_wp !< Initialized levelset distance for the shortest path pair algorithm
-
     ! Lagrange bubbles constants
     integer, parameter  :: mapCells = 3     !< Number of cells around the bubble where the smoothening function will have effect
     real(wp), parameter :: R_uni = 8314._wp !< Universal gas constant - J/kmol/K
@@ -70,7 +65,6 @@ module m_constants
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp  !< Default tolerance for adaptive step size
     integer, parameter  :: dflt_adap_dt_max_iters = 100 !< Default max iteration for adaptive step size
-
     ! Constants of the algorithm described by Heirer, E. Hairer, S. P.Norsett, G. Wanner, Solving Ordinary Differential Equations I,
     ! Chapter II.4
     ! to choose the initial time step size for the adaptive time stepping routine

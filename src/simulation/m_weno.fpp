@@ -6,15 +6,13 @@
 
 !> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
 module m_weno
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_variables_conversion !< State variables type conversion procedures
-
     ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
     use m_muscl !< For Interface Compression
-
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they are stored in v_vf. However, they are
@@ -111,7 +109,8 @@ contains
         @:ALLOCATE(d_cbL_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
         @:ALLOCATE(d_cbR_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn*(weno_polyn + 1)/2 - 1))
+        @:ALLOCATE(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+            & 0:weno_polyn*(weno_polyn + 1)/2 - 1))
         ! Number of cross terms for dvd = (k-1)(k-1+1)/2, where weno_polyn = k-1
         ! Note: k-1 not k because we are using value differences (dvd) not the values themselves
 
@@ -139,7 +138,8 @@ contains
         @:ALLOCATE(d_cbL_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
         @:ALLOCATE(d_cbR_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn*(weno_polyn + 1)/2 - 1))
+        @:ALLOCATE(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+            & 0:weno_polyn*(weno_polyn + 1)/2 - 1))
 
         call s_compute_weno_coefficients(2, is2_weno)
 
@@ -158,7 +158,8 @@ contains
         @:ALLOCATE(d_cbL_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
         @:ALLOCATE(d_cbR_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn*(weno_polyn + 1)/2 - 1))
+        @:ALLOCATE(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+            & 0:weno_polyn*(weno_polyn + 1)/2 - 1))
 
         call s_compute_weno_coefficients(3, is3_weno)
 
@@ -173,13 +174,11 @@ contains
         integer, intent(in)               :: weno_dir
         type(int_bounds_info), intent(in) :: is
         integer                           :: s
-        real(wp), pointer, dimension(:)   :: s_cb => null() !<
-            !! Cell-boundary locations in the s-direction
-
-        type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
-        integer               :: i    !< Generic loop iterator
-        real(wp)              :: w(1:8) ! Intermediate var for ideal weights: s_cb across overall stencil
-        real(wp)              :: y(1:4) ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
+        real(wp), pointer, dimension(:)   :: s_cb => null() !< Cell-boundary locations in the s-direction
+        type(int_bounds_info)             :: bc_s           !< Boundary conditions (BC) in the s-direction
+        integer                           :: i              !< Generic loop iterator
+        real(wp)                          :: w(1:8) ! Intermediate var for ideal weights: s_cb across overall stencil
+        real(wp)                          :: y(1:4) ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
         ! Determining the number of cells, the cell-boundary locations and
         ! the boundary conditions in the coordinate direction selected for
@@ -1196,10 +1195,14 @@ contains
                                                     & + v(1)*(11003._wp*v(1) - 17246._wp*v(2) + 4642._wp*v(3)) + v(2) &
                                                     & *(7043._wp*v(2) - 3882._wp*v(3)) + v(3)*(547._wp*v(3)))/240._wp + weno_eps !&
 
-                                                beta(4) = ( v(-3)*(547._wp*v(-3) - 3882._wp*v(-2) +  4642._wp*v(-1) - 1854._wp*v( 0)) & !&
-                                                          + v(-2)*(              7043._wp*v(-2) - 17246._wp*v(-1) + 7042._wp*v( 0)) & !&
-                                                          + v(-1)*(                             11003._wp*v(-1) - 9402._wp*v( 0)) & !&
-                                                          + v( 0)*(                                             2107._wp*v( 0)) ) / 240._wp & !&
+                                                beta(4) = ( v(-3)*(547._wp*v(-3) - 3882._wp*v(-2) +  4642._wp*v(-1) &
+                                                     & - 1854._wp*v( 0)) & !&
+                                                          + v(-2)*(              7043._wp*v(-2) - 17246._wp*v(-1) + 7042._wp*v( 0) &
+                                                              & ) & !&
+                                                          + v(-1)*(                             11003._wp*v(-1) - 9402._wp*v( 0)) &
+                                                              & & !&
+                                                          + v( 0)*(                                             2107._wp*v( 0)) ) &
+                                                              & / 240._wp & !&
                                                           + weno_eps !&
                                             #:endif
                                         end if
@@ -1408,9 +1411,7 @@ contains
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf, vR_rs_vf
         integer                                                                                   :: i, j, k, l
         real(wp), dimension(-1:1)                                                                 :: d !< Curvature measures at the zone centers
-        real(wp)                                                                                  :: d_MD, d_LC !<
-            !! Median (md) curvature and large curvature (LC) measures
-
+        real(wp)                                                                                  :: d_MD, d_LC         !< Median (md) curvature and large curvature (LC) measures
         ! The left and right upper bounds (UL), medians, large curvatures,
         ! minima, and maxima of the WENO-reconstructed values of the cell-
         ! average variables.
@@ -1425,10 +1426,9 @@ contains
             !! number less than 1/(1+alpha) is necessary. The default value for
             !! alpha is 2.
 
-        real(wp), parameter :: beta = 4._wp/3._wp !<
-            !! Determines the amount of freedom available from utilizing a large
-            !! value for the local curvature. The default value for beta is 4/3.
-
+        !> Determines the amount of freedom available from utilizing a large value for the local curvature. The default value for
+        !! beta is 4/3.
+        real(wp), parameter :: beta = 4._wp/3._wp
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
 

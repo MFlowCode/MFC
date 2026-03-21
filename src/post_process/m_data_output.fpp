@@ -6,7 +6,7 @@
 module m_data_output
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters ! Global parameters
-    use m_derived_variables     !< Procedures used to compute quantities derived
+    use m_derived_variables !< Procedures used to compute quantities derived
     use m_mpi_proxy ! Message passing interface (MPI) module proxy
     use m_compile_specific
     use m_helper
@@ -433,7 +433,6 @@ contains
         ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
         integer                                        :: ierr !< Generic flag used to identify and report database errors
-
         ! Silo-HDF5 Database Format
 
         if (format == 1) then
@@ -522,9 +521,7 @@ contains
 
     !> @brief Open the interface data file for appending extracted interface coordinates.
     impure subroutine s_open_intf_data_file()
-        character(LEN=path_len + 3*name_len) :: file_path !<
-              !! Relative path to a file in the case directory
-
+        character(LEN=path_len + 3*name_len) :: file_path !< Relative path to a file in the case directory
         write (file_path, '(A)') '/intf_data.dat'
         file_path = trim(case_dir) // trim(file_path)
 
@@ -534,9 +531,7 @@ contains
 
     !> @brief Open the energy data file for appending volume-integrated energy budget quantities.
     impure subroutine s_open_energy_data_file()
-        character(LEN=path_len + 3*name_len) :: file_path !<
-              !! Relative path to a file in the case directory
-
+        character(LEN=path_len + 3*name_len) :: file_path !< Relative path to a file in the case directory
         write (file_path, '(A)') '/eng_data.dat'
         file_path = trim(case_dir) // trim(file_path)
 
@@ -577,7 +572,6 @@ contains
         ! Generic loop iterator
         integer :: i
         integer :: ierr !< Generic flag used to identify and report database errors
-
         ! Silo-HDF5 Database Format
 
         if (format == 1) then
@@ -750,7 +744,6 @@ contains
         ! Generic loop iterator
         integer :: i, j, k
         integer :: ierr !< Generic flag used to identify and report database errors
-
         ! Silo-HDF5 Database Format
 
         if (format == 1) then
@@ -1340,7 +1333,7 @@ contains
     impure subroutine s_write_intf_data_file(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer                                             :: i, j, k, l, cent !< Generic loop iterators
-        integer                                             :: counter, root !< number of data points extracted to fit shape to SH perturbations
+        integer                                             :: counter, root    !< number of data points extracted to fit shape to SH perturbations
         real(wp), allocatable                               :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
         real(wp)                                            :: axp, axm, ayp, aym, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 
@@ -1526,7 +1519,6 @@ contains
         !              not generated.
 
         integer :: ierr !< Generic flag used to identify and report database errors
-
         ! Silo-HDF5 database format
         if (format == 1) then
             ierr = DBCLOSE(dbfile)

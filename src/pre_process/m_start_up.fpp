@@ -6,27 +6,23 @@
 
 !> @brief Reads and validates user inputs, loads existing grid/IC data, and initializes pre-process modules
 module m_start_up
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Global parameters for the code
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_mpi_common
-    use m_variables_conversion  !< Subroutines to change the state variables from
-                                !! one form to another
-
-    use m_grid                  !< Procedures to generate (non-)uniform grids
-    use m_initial_condition     !< Procedures to generate initial condition
-    use m_data_output           !< Procedures to write the grid data and the
-                                !! conservative variables to files
-
-    use m_compile_specific      !< Compile-specific procedures
+    use m_variables_conversion !< Subroutines to change the state variables from one form to another
+    use m_grid !< Procedures to generate (non-)uniform grids
+    use m_initial_condition !< Procedures to generate initial condition
+    use m_data_output !< Procedures to write the grid data and the conservative variables to files
+    use m_compile_specific !< Compile-specific procedures
     use m_icpp_patches
     use m_assign_variables
-    use m_phase_change          !< Phase-change module
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_phase_change !< Phase-change module
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_helper
 
 #ifdef MFC_MPI
-    use mpi                     !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
     use m_check_patches
@@ -58,13 +54,10 @@ module m_start_up
         end subroutine s_read_abstract_ic_data_files
     end interface
 
-    character(LEN=path_len + name_len) :: proc_rank_dir !<
-    !! Location of the folder associated with the rank of the local processor
-
-    character(LEN=path_len + 2*name_len), private :: t_step_dir !<
-    !! Possible location of time-step folder containing preexisting grid and/or
-    !! conservative variables data to be used as starting point for pre-process
-
+    character(LEN=path_len + name_len) :: proc_rank_dir !< Location of the folder associated with the rank of the local processor
+    !> Possible location of time-step folder containing preexisting grid and/or conservative variables data to be used as starting
+    !! point for pre-process
+    character(LEN=path_len + 2*name_len), private :: t_step_dir
     procedure(s_read_abstract_grid_data_files), pointer :: s_read_grid_data_files => null()
     procedure(s_read_abstract_ic_data_files), pointer :: s_read_ic_data_files => null()
 contains
@@ -72,13 +65,9 @@ contains
     !> Reads the configuration file pre_process.inp, in order to populate the parameters in module m_global_parameters.f90 with the
     !! user provided inputs
     impure subroutine s_read_input_file
-        character(LEN=name_len) :: file_loc  !<
-            !! Generic string used to store the address of a particular file
-
-        logical :: file_check !<
-            !! Generic logical used for the purpose of asserting whether a file
-            !! is or is not present in the designated location
-
+        character(LEN=name_len) :: file_loc !< Generic string used to store the address of a particular file
+        !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
+        logical :: file_check
         integer :: iostatus
             !! Integer to check iostat of file read
 
@@ -136,12 +125,8 @@ contains
     !> Checking that the user inputs make sense, i.e. that the individual choices are compatible with the code's options and that
     !! the combination of these choices results into a valid configuration for the pre-process
     impure subroutine s_check_input_file
-        character(LEN=len_trim(case_dir)) :: file_loc !<
-            !! Generic string used to store the address of a particular file
-
-        logical :: dir_check !<
-            !! Logical variable used to test the existence of folders
-
+        character(LEN=len_trim(case_dir)) :: file_loc  !< Generic string used to store the address of a particular file
+        logical                           :: dir_check !< Logical variable used to test the existence of folders
         ! Checking the existence of the case folder
         case_dir = adjustl(case_dir)
 
@@ -317,19 +302,14 @@ contains
         !! @param q_cons_vf_in Conservative variables
     impure subroutine s_read_serial_ic_data_files(q_cons_vf_in)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf_in
-        character(LEN=len_trim(case_dir) + 3*name_len)         :: file_loc !<
+        character(LEN=len_trim(case_dir) + 3*name_len)         :: file_loc
         ! Generic string used to store the address of a particular file
 
-        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
-            !! Used to store the variable position, in character form, of the
-            !! currently manipulated conservative variable file
-
-        logical :: file_check !<
-            !! Generic logical used for the purpose of asserting whether a file
-            !! is or is not present in the designated location
-
+        !> Used to store the variable position, in character form, of the currently manipulated conservative variable file
+        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
+        !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
+        logical :: file_check
         integer :: i, r !< Generic loop iterator
-
         ! Reading the Conservative Variables Data Files
         do i = 1, sys_size
             ! Checking whether data file associated with variable position

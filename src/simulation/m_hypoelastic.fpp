@@ -6,8 +6,8 @@
 
 !> @brief Computes hypoelastic stress-rate source terms and damage-state evolution
 module m_hypoelastic
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_finite_differences
     use m_helper
 
@@ -85,7 +85,6 @@ contains
         real(wp)                                               :: rho_K, G_K
         integer                                                :: i, k, l, q, r !< Loop variables
         integer                                                :: ndirs         !< Number of coordinate directions
-
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
         if (idir == 1) then

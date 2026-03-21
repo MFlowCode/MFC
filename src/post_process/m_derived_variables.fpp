@@ -5,10 +5,10 @@
 !> @brief Computes derived flow quantities (sound speed, vorticity, Schlieren, etc.) from conservative and primitive variables
 
 module m_derived_variables
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Global parameters for the code
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_variables_conversion
 
     implicit none
@@ -17,11 +17,9 @@ module m_derived_variables
         & s_derive_sound_speed, s_derive_flux_limiter, s_derive_vorticity_component, s_derive_qm, s_derive_liutex, &
         & s_derive_numerical_schlieren_function, s_compute_speed_of_sound, s_finalize_derived_variables_module
 
-    real(wp), allocatable, dimension(:,:,:) :: gm_rho_sf !<
-    !! Gradient magnitude (gm) of the density for each cell of the computational
-    !! sub-domain. This variable is employed in the calculation of the numerical
-    !! Schlieren function.
-
+    !> Gradient magnitude (gm) of the density for each cell of the computational sub-domain. This variable is employed in the
+    !! calculation of the numerical Schlieren function.
+    real(wp), allocatable, dimension(:,:,:) :: gm_rho_sf
     !> @name Finite-difference (fd) coefficients in x-, y- and z-coordinate directions. Note that because sufficient boundary
     !! information is available for all the active coordinate directions, the centered family of the finite-difference schemes is
     !! used.
@@ -31,14 +29,12 @@ module m_derived_variables
     real(wp), allocatable, dimension(:,:), public :: fd_coeff_z
     !> @}
 
-    integer, private :: flg  !<
-    !! Flagging (flg) variable used to annotate the dimensionality of the dataset
-    !! that is undergoing the post-process. A flag value of 1 indicates that the
-    !! dataset is 3D, while a flag value of 0 indicates that it is not. This flg
-    !! variable is necessary to avoid cycling through the third dimension of the
-    !! flow variable(s) when the simulation is not 3D and the size of the buffer
-    !! is non-zero. Note that a similar procedure does not have to be applied to
-    !! the second dimension since in 1D, the buffer size is always zero.
+    !> Flagging (flg) variable used to annotate the dimensionality of the dataset that is undergoing the post-process. A flag value
+    !! of 1 indicates that the dataset is 3D, while a flag value of 0 indicates that it is not. This flg variable is necessary to
+    !! avoid cycling through the third dimension of the flow variable(s) when the simulation is not 3D and the size of the buffer is
+    !! non-zero. Note that a similar procedure does not have to be applied to the second dimension since in 1D, the buffer size is
+    !! always zero.
+    integer, private :: flg
 contains
 
     !> Computation of parameters, allocation procedures, and/or      any other tasks needed to properly setup the module
@@ -90,7 +86,6 @@ contains
             & intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
-
         ! Computing specific heat ratio from specific heat ratio function
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
@@ -110,7 +105,6 @@ contains
             & intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
-
         ! Calculating the values of the liquid stiffness from those of the
         ! specific heat ratio function and the liquid stiffness function
         do k = -offset_z%beg, p + offset_z%end
@@ -134,7 +128,6 @@ contains
             & intent(inout) :: q_sf
 
         integer :: i, j, k !< Generic loop iterators
-
         ! Fluid bulk modulus for alternate sound speed
         real(wp) :: blkmod1, blkmod2
 
@@ -179,7 +172,6 @@ contains
 
         real(wp) :: top, bottom, slope !< Flux limiter calcs
         integer  :: j, k, l            !< Generic loop iterators
-
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
@@ -301,7 +293,6 @@ contains
             & intent(inout) :: q_sf
 
         integer :: j, k, l, r !< Generic loop iterators
-
         ! Computing the vorticity component in the x-coordinate direction
         if (i == 1) then
             do l = -offset_z%beg, p + offset_z%end
@@ -373,7 +364,6 @@ contains
         real(wp), dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
         real(wp)                      :: trS, Q, IIS
         integer                       :: j, k, l, r, jj, kk !< Generic loop iterators
-
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
@@ -427,12 +417,12 @@ contains
         integer, parameter                                  :: nm = 3
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
+        !> Liutex magnitude
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
-            & intent(out) :: liutex_mag !< Liutex magnitude
-
+            & intent(out) :: liutex_mag
+        !> Liutex rigid rotation axis
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, nm), &
-            & intent(out) :: liutex_axis !< Liutex rigid rotation axis
-
+            & intent(out) :: liutex_axis
         character, parameter        :: ivl = 'N'     !< compute left eigenvectors
         character, parameter        :: ivr = 'V'     !< compute right eigenvectors
         real(wp), dimension(nm, nm) :: vgt           !< velocity gradient tensor
@@ -531,17 +521,12 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
             & intent(inout) :: q_sf
 
-        real(wp) :: drho_dx, drho_dy, drho_dz !<
-            !! Spatial derivatives of the density in the x-, y- and z-directions
-
-        real(wp), dimension(2) :: gm_rho_max !<
-            !! Maximum value of the gradient magnitude (gm) of the density field
-            !! in entire computational domain and not just the local sub-domain.
-            !! The first position in the variable contains the maximum value and
-            !! the second contains the rank of the processor on which it occurred.
-
-        integer :: i, j, k, l !< Generic loop iterators
-
+        real(wp) :: drho_dx, drho_dy, drho_dz !< Spatial derivatives of the density in the x-, y- and z-directions
+        !> Maximum value of the gradient magnitude (gm) of the density field in entire computational domain and not just the local
+        !! sub-domain. The first position in the variable contains the maximum value and the second contains the rank of the
+        !! processor on which it occurred.
+        real(wp), dimension(2) :: gm_rho_max
+        integer                :: i, j, k, l !< Generic loop iterators
         ! Computing Gradient Magnitude of Density
 
         ! Contributions from the x- and y-coordinate directions

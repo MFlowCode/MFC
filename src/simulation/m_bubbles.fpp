@@ -7,12 +7,11 @@
 !> @brief Shared bubble-dynamics procedures (radial acceleration, wall pressure, sound speed) for ensemble- and volume-averaged
 !! models
 module m_bubbles
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_variables_conversion !< State variables type conversion procedures
-    use m_helper_basic         !< Functions to compare floating point numbers
-
+    use m_helper_basic !< Functions to compare floating point numbers
     implicit none
 
     real(wp) :: chi_vw !< Bubble wall properties (Ando 2010)
@@ -435,8 +434,8 @@ contains
         real(wp), dimension(5)  :: err   !< Error estimates for adaptive time stepping
         real(wp)                :: t_new !< Updated time step size
         real(wp)                :: h0, h !< Time step size
-        real(wp), dimension(4)  :: myR_tmp1, myV_tmp1, myR_tmp2, &
-            & myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
+        !> Bubble radius, radial velocity, and radial acceleration for the inner loop
+        real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
         real(wp)               :: fR2, fV2, fpb2, fmass_v2
         integer                :: iter_count
@@ -554,7 +553,6 @@ contains
         real(wp), dimension(2) :: h_size                    !< Time step size (h0, h1)
         real(wp), dimension(3) :: d_norms                   !< norms (d_0, d_1, d_2)
         real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
-
         ! Determine the starting time step
         ! Evaluate f(x0,y0)
         myR_tmp(1) = fR

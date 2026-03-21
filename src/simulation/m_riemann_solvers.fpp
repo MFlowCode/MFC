@@ -9,14 +9,14 @@
 #:include 'inline_riemann.fpp'
 
 module m_riemann_solvers
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_variables_conversion !< State variables type conversion procedures
-    use m_bubbles              !< To get the bubble wall pressure function
+    use m_bubbles !< To get the bubble wall pressure function
     use m_bubbles_EE
-    use m_surface_tension      !< To get the capillary fluxes
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_surface_tension !< To get the capillary fluxes
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_chemistry
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
         & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass
@@ -45,9 +45,9 @@ module m_riemann_solvers
     !! the left and right states given in qK_prim_rs_vf. Currently 2D axisymmetric for inviscid only.
     !> @{
 
-    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsx_vf !<
-    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsy_vf !<
-    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsz_vf !<
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsx_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsy_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsz_vf
     $:GPU_DECLARE(create='[flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf]')
     !> @}
 
@@ -226,7 +226,6 @@ contains
         type(riemann_states_vec3) :: b4 ! 4-magnetic field components (spatial: b4x, b4y, b4z)
         type(riemann_states_vec3) :: cm ! Conservative momentum variables
         integer                   :: i, j, k, l, q !< Generic loop iterators
-
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
@@ -869,16 +868,16 @@ contains
             real(wp), dimension(10)   :: Ys_L, Ys_R
             real(wp), dimension(10)   :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
             real(wp), dimension(10)   :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
-            real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R       !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+            real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
         #:else
-            real(wp), dimension(num_fluids)         :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(num_vels)           :: vel_L, vel_R
-            real(wp), dimension(num_fluids)         :: alpha_L, alpha_R
-            real(wp), dimension(num_species)        :: Ys_L, Ys_R
-            real(wp), dimension(num_species)        :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
-            real(wp), dimension(num_species)        :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
-            real(wp), dimension(num_dims, num_dims) :: vel_grad_L, &
-                & vel_grad_R       !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+            real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
+            real(wp), dimension(num_vels)    :: vel_L, vel_R
+            real(wp), dimension(num_fluids)  :: alpha_L, alpha_R
+            real(wp), dimension(num_species) :: Ys_L, Ys_R
+            real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+            !> Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+            real(wp), dimension(num_dims, num_dims) :: vel_grad_L, vel_grad_R
         #:endif
         real(wp)                  :: rho_L, rho_R
         real(wp)                  :: pres_L, pres_R
@@ -920,7 +919,6 @@ contains
         type(riemann_states_vec3) :: cm ! Conservative momentum variables
         integer                   :: i, j, k, l, q  !< Generic loop iterators
         integer, dimension(3)     :: idx_right_phys !< Physical (j,k,l) indices for right state.
-
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
@@ -1813,7 +1811,6 @@ contains
         real(wp) :: flux_ene_e
         real(wp) :: zcoef, pcorr          !< low Mach number correction
         integer  :: Re_max, i, j, k, l, q !< Generic loop iterators
-
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
 
@@ -2453,7 +2450,8 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else if (model_eqns == 2 .and. bubbles_euler) then
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
+                    $:GPU_PARALLEL_LOOP(collapse=3, &
+                        & private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
                     & rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, Re_L, Re_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, &
                         & E_R, H_L, H_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, &
                         & vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, &
@@ -3682,7 +3680,6 @@ contains
         integer, intent(in)               :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
         integer                           :: i, j, k, l !< Generic loop iterator
-
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
             dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
@@ -4364,10 +4361,9 @@ contains
             real(wp), dimension(3, 3) :: current_tau_bulk     !< Current bulk stress tensor.
             real(wp), dimension(3)    :: vel_src_at_interface !< Interface velocities (u,v,w) for viscous work.
         #:else
-            real(wp), dimension(num_dims, &
-                & num_dims) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_shear    !< Current shear stress tensor.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_bulk     !< Current bulk stress tensor.
+            real(wp), dimension(num_dims, num_dims) :: vel_grad_avg !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+            real(wp), dimension(num_dims, num_dims) :: current_tau_shear !< Current shear stress tensor.
+            real(wp), dimension(num_dims, num_dims) :: current_tau_bulk !< Current bulk stress tensor.
             real(wp), dimension(num_dims)           :: vel_src_at_interface !< Interface velocities (u,v,w) for viscous work.
         #:endif
         integer, dimension(3) :: idx_right_phys !< Physical (j,k,l) indices for right state.
@@ -4379,7 +4375,6 @@ contains
         integer               :: i_dim          !< Generic dimension/component iterator.
         integer               :: vel_comp_idx   !< Velocity component iterator (1=u, 2=v, 3=w).
         real(wp)              :: divergence_v   !< Velocity divergence at interface.
-
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
         & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx]')
         do l_loop = isz%beg, isz%end
@@ -4489,7 +4484,6 @@ contains
         ! Local variables
         integer :: i_dim !< Loop iterator for face normal.
         integer :: j_dim !< Loop iterator for force component direction.
-
         tau_shear_out = 0.0_wp
 
         do i_dim = 1, num_dims
@@ -4520,7 +4514,6 @@ contains
 
         ! Local variables
         integer :: i_dim !< Loop iterator for diagonal components.
-
         tau_bulk_out = 0.0_wp
 
         do i_dim = 1, num_dims
@@ -4537,7 +4530,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
         integer, intent(in)                                    :: norm_dir
         integer                                                :: i, j, k, l !< Generic loop iterators
-
         ! Reshaping Outputted Data in y-direction
         if (norm_dir == 2) then
             $:GPU_PARALLEL_LOOP(collapse=4)

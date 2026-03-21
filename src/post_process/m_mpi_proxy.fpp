@@ -5,11 +5,11 @@
 !> @brief MPI gather and scatter operations for distributing post-process grid and flow-variable data
 module m_mpi_proxy
 #ifdef MFC_MPI
-    use mpi                     !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Global parameters for the code
     use m_mpi_common
     use ieee_arithmetic
 
@@ -29,7 +29,6 @@ contains
 
         integer :: i    !< Generic loop iterator
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Allocating and configuring the receive counts and the displacement
         ! vector variables used in variable-gather communication procedures.
         ! Note that these are only needed for either multidimensional runs
@@ -61,7 +60,6 @@ contains
 #ifdef MFC_MPI
         integer :: i    !< Generic loop iterator
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
@@ -231,7 +229,6 @@ contains
     impure subroutine s_mpi_defragment_1d_grid_variable
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Silo-HDF5 database format
         if (format == 1) then
             call MPI_GATHERV(x_cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -291,7 +288,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Gathering the sub-domain flow variable data from all the processes
         ! and putting it back together for the entire computational domain
         ! on the process with rank 0

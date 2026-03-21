@@ -7,10 +7,10 @@
 
 !> @brief Conservative-to-primitive variable conversion, mixture property evaluation, and pressure computation
 module m_variables_conversion
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_helper
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
@@ -117,7 +117,6 @@ contains
         real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
         real(wp)                                       :: T_guess
         integer                                        :: s !< Generic loop iterator
-
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure
             ! for computing pressure is targeted by the procedure pointer
@@ -217,10 +216,9 @@ contains
         real(wp), intent(out), target                         :: qv
         real(wp), optional, dimension(2), intent(out)         :: Re_K
         real(wp), optional, intent(out)                       :: G_K
-        real(wp), dimension(num_fluids)                       :: alpha_rho_K, alpha_K !<
+        real(wp), dimension(num_fluids)                       :: alpha_rho_K, alpha_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
-        integer                                               :: i, j                 !< Generic loop iterator
-
+        integer                                               :: i, j !< Generic loop iterator
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
         call s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
@@ -282,17 +280,16 @@ contains
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(inout)        :: alpha_rho_K, alpha_K !<
+            real(wp), dimension(3), intent(inout)        :: alpha_rho_K, alpha_K
             real(wp), optional, dimension(3), intent(in) :: G
         #:else
-            real(wp), dimension(num_fluids), intent(inout)        :: alpha_rho_K, alpha_K !<
+            real(wp), dimension(num_fluids), intent(inout)        :: alpha_rho_K, alpha_K
             real(wp), optional, dimension(num_fluids), intent(in) :: G
         #:endif
         real(wp), dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out)     :: G_K
         real(wp)                            :: alpha_K_sum
         integer                             :: i, j !< Generic loop iterators
-
 #ifdef MFC_SIMULATION
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
@@ -1084,7 +1081,6 @@ contains
         real(wp)               :: G_K
         real(wp)               :: T_K, mix_mol_weight, R_gas
         integer                :: i, j, k, l !< Generic loop iterators
-
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end

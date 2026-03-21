@@ -7,11 +7,11 @@
 !> @brief Global parameters for the post-process: domain geometry, equation of state, and output database settings
 module m_global_parameters
 #ifdef MFC_MPI
-    use mpi                     !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_derived_types !< Definitions of the derived types
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_thermochem, only: num_species, species_names
 
     implicit none
@@ -25,7 +25,6 @@ module m_global_parameters
     ! Computational Domain Parameters
 
     integer :: proc_rank !< Rank of the local processor
-
     !> @name Number of cells in the x-, y- and z-coordinate directions
     !> @{
     integer :: m, m_root
@@ -50,7 +49,6 @@ module m_global_parameters
 
     integer :: num_dims !< Number of spatial dimensions
     integer :: num_vels !< Number of velocity components (different from num_dims for mhd)
-
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
@@ -67,15 +65,12 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    integer :: buff_size !<
-    !! Number of cells in buffer region. For the variables which feature a buffer
-    !! region, this region is used to store information outside the computational
-    !! domain based on the boundary conditions.
-
+    !> Number of cells in buffer region. For the variables which feature a buffer region, this region is used to store information
+    !! outside the computational domain based on the boundary conditions.
+    integer :: buff_size
     integer :: t_step_start !< First time-step directory
     integer :: t_step_stop  !< Last time-step directory
     integer :: t_step_save  !< Interval between consecutive time-step directory
-
     !> @name IO options for adaptive time-stepping
     !> @{
     logical  :: cfl_adap_dt, cfl_const_dt, cfl_dt
@@ -117,8 +112,7 @@ module m_global_parameters
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
     !> @}
 
-    integer :: avg_state       !< Average state evaluation method
-
+    integer :: avg_state !< Average state evaluation method
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
     type(int_bounds_info) :: cont_idx             !< Indexes of first & last continuity eqns.
@@ -157,25 +151,17 @@ module m_global_parameters
     !> @}
 
     integer               :: shear_num !! Number of shear stress components
-    integer, dimension(3) :: shear_indices !<
-    !! Indices of the stress components that represent shear stress
-    integer :: shear_BC_flip_num !<
-    !! Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2) :: shear_BC_flip_indices !<
-    !! Indices of shear stress components to reflect for boundary conditions.
-    !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
-
+    integer, dimension(3) :: shear_indices     !< Indices of the stress components that represent shear stress
+    integer               :: shear_BC_flip_num !< Number of shear stress components to reflect for boundary conditions
+    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
+    !! [indices])
+    integer, dimension(3, 2)           :: shear_BC_flip_indices
     logical                            :: parallel_io      !< Format of the data files
     logical                            :: sim_data
     logical                            :: file_per_process !< output format
-    integer, allocatable, dimension(:) :: proc_coords      !<
-    !! Processor coordinates in MPI_CART_COMM
-
-    integer, allocatable, dimension(:) :: start_idx !<
-    !! Starting cell-center index of local processor in global grid
-
-    integer :: num_ibs  !< Number of immersed boundaries
-
+    integer, allocatable, dimension(:) :: proc_coords      !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:) :: start_idx        !< Starting cell-center index of local processor in global grid
+    integer                            :: num_ibs          !< Number of immersed boundaries
 #ifdef MFC_MPI
 
     type(mpi_io_var), public                      :: MPI_IO_DATA
@@ -191,15 +177,12 @@ module m_global_parameters
     integer                 :: mpi_info_int
     !> @}
 
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
-    !! Database of the physical parameters of each of the fluids that is present
-    !! in the flow. These include the stiffened gas equation of state parameters,
-    !! and the Reynolds numbers.
-
+    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
+    !! equation of state parameters, and the Reynolds numbers.
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     real(wp), allocatable, dimension(:)      :: adv !< Advection variables
-
     ! Formatted Database File(s) Structure Parameters
 
     integer               :: format                                   !< Format of the database file(s)
@@ -208,7 +191,6 @@ module m_global_parameters
     logical               :: output_partial_domain                    !< Specify portion of domain to output for post-processing
     type(bounds_info)     :: x_output, y_output, z_output             !< Portion of domain to output for post-processing
     type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx !< Indices of domain to output for post-processing
-
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions. The definition of the ghost zone layers is only
     !! necessary when using the Silo database file format in multidimensions. These zones provide VisIt with the subdomain
     !! connectivity information that it requires in order to produce smooth plots.
@@ -230,7 +212,9 @@ module m_global_parameters
     logical                            :: E_wrt
     logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
     logical                            :: fft_wrt
-    logical                            :: dummy   !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
+    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
+    !! is false
+    logical                            :: dummy
     logical                            :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
     logical                            :: gamma_wrt
@@ -269,21 +253,16 @@ module m_global_parameters
     logical                            :: lag_betaC_wrt
     !> @}
 
-    real(wp), dimension(num_fluids_max) :: schlieren_alpha    !<
-    !! Amplitude coefficients of the numerical Schlieren function that are used
-    !! to adjust the intensity of numerical Schlieren renderings for individual
-    !! fluids. This enables waves and interfaces of varying strengths and in all
-    !! of the fluids to be made simultaneously visible on a single plot.
-
-    integer :: fd_order !<
-    !! The order of the finite-difference (fd) approximations of the first-order
-    !! derivatives that need to be evaluated when vorticity and/or the numerical
-    !! Schlieren function are to be outputted to the formatted database file(s).
-    integer :: fd_number !<
-    !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
-    !! it is a measure of the half-size of the finite-difference stencil for the
-    !! selected order of accuracy.
-
+    !> Amplitude coefficients of the numerical Schlieren function that are used to adjust the intensity of numerical Schlieren
+    !! renderings for individual fluids. This enables waves and interfaces of varying strengths and in all of the fluids to be made
+    !! simultaneously visible on a single plot.
+    real(wp), dimension(num_fluids_max) :: schlieren_alpha
+    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when
+    !! vorticity and/or the numerical Schlieren function are to be outputted to the formatted database file(s).
+    integer :: fd_order
+    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
+    !! finite-difference stencil for the selected order of accuracy.
+    integer :: fd_number
     !> @name Reference parameters for Tait EOS
     !> @{
     real(wp) :: rhoref, pref
@@ -300,7 +279,7 @@ module m_global_parameters
     logical                             :: polytropic
     logical                             :: polydisperse
     logical                             :: adv_n
-    integer                             :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
+    integer                             :: thermal !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(wp)                            :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
     real(wp)                            :: gam_m
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
@@ -344,7 +323,6 @@ contains
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
         integer :: i !< Generic loop iterator
-
         ! Logistics
         case_dir = '.'
 

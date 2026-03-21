@@ -6,7 +6,7 @@ module m_precision_select
     ! use, intrinsic :: iso_c_binding
 
 #ifdef MFC_MPI
-    use mpi                    !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
     implicit none

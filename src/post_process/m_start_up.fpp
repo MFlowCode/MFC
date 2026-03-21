@@ -11,22 +11,15 @@ module m_start_up
 
     use, intrinsic :: iso_c_binding
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-    use m_mpi_common            !< Common MPI subroutines
-    use m_boundary_common       !< Common boundary conditions subroutines
-    use m_variables_conversion  !< Subroutines to change the state variables from
-                                !! one form to another
-
-    use m_data_input            !< Procedures reading raw simulation data to fill
-                                !! the conservative, primitive and grid variables
-
-    use m_data_output           !< Procedures that write the grid and chosen flow
-                                !! variable(s) to the formatted database file(s)
-
-    use m_derived_variables     !< Procedures used to compute quantities derived
-                                !! from the conservative and primitive variables
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Global parameters for the code
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_mpi_common !< Common MPI subroutines
+    use m_boundary_common !< Common boundary conditions subroutines
+    use m_variables_conversion !< Subroutines to change the state variables from one form to another
+    use m_data_input !< Procedures reading raw simulation data to fill the conservative, primitive and grid variables
+    use m_data_output !< Procedures that write the grid and chosen flow variable(s) to the formatted database file(s)
+    use m_derived_variables !< Procedures used to compute quantities derived from the conservative and primitive variables
     use m_helper
     use m_compile_specific
     use m_checker_common
@@ -36,7 +29,7 @@ module m_start_up
     use m_chemistry
 
 #ifdef MFC_MPI
-    use mpi                    !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
     implicit none
@@ -60,13 +53,9 @@ contains
     !> Reads the configuration file post_process.inp, in order to populate parameters in module m_global_parameters.f90 with the
     !! user provided inputs
     impure subroutine s_read_input_file
-        character(LEN=name_len) :: file_loc !<
-            !! Generic string used to store the address of a particular file
-
-        logical :: file_check !<
-            !! Generic logical used for the purpose of asserting whether a file
-            !! is or is not present in the designated location
-
+        character(LEN=name_len) :: file_loc !< Generic string used to store the address of a particular file
+        !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
+        logical :: file_check
         integer :: iostatus
             !! Integer to check iostat of file read
 
@@ -133,12 +122,8 @@ contains
     !> Checking that the user inputs make sense, i.e. that the individual choices are compatible with the code's options and that
     !! the combination of these choices results into a valid configuration for the post-process
     impure subroutine s_check_input_file
-        character(LEN=len_trim(case_dir)) :: file_loc !<
-            !! Generic string used to store the address of a particular file
-
-        logical :: dir_check !<
-            !! Logical variable used to test the existence of folders
-
+        character(LEN=len_trim(case_dir)) :: file_loc  !< Generic string used to store the address of a particular file
+        logical                           :: dir_check !< Logical variable used to test the existence of folders
         ! Checking the existence of the case folder
         case_dir = adjustl(case_dir)
 

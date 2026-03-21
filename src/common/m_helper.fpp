@@ -7,10 +7,9 @@
 
 !> @brief Utility routines for bubble model setup, coordinate transforms, array sampling, and special functions
 module m_helper
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use ieee_arithmetic        !< For checking NaN
-
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use ieee_arithmetic !< For checking NaN
     implicit none
 
     private;
@@ -161,9 +160,7 @@ contains
     impure subroutine s_initialize_nonpoly()
         integer                 :: ir
         real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN, rhol0
-        real(wp), parameter     :: k_poly = 1._wp !<
-            !! polytropic index used to compute isothermal natural frequency
-
+        real(wp), parameter     :: k_poly = 1._wp !< polytropic index used to compute isothermal natural frequency
         ! phi_vg & phi_gv (phi_gg = phi_vv = 1) (Eq. 2.22 in Ando 2010)
         phi_vg = (1._wp + sqrt(mu_v/mu_g)*(M_g/M_v)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_v/M_g))
         phi_gv = (1._wp + sqrt(mu_g/mu_v)*(M_v/M_g)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_g/M_v))

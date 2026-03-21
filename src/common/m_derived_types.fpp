@@ -6,7 +6,7 @@
 
 !> @brief Shared derived types for field data, patch geometry, bubble dynamics, and MPI I/O structures
 module m_derived_types
-    use m_constants  !< Constants
+    use m_constants !< Constants
     use m_precision_select
     use m_thermochem, only: num_species
 
@@ -137,24 +137,12 @@ module m_derived_types
 
     !> Defines parameters for a Model Patch
     type ic_model_parameters
-        character(LEN=pathlen_max) :: filepath !<
-        !! Path the STL file relative to case_dir.
-
-        real(wp), dimension(1:3) :: translate !<
-        !! Translation of the STL object.
-
-        real(wp), dimension(1:3) :: scale !<
-        !! Scale factor for the STL object.
-
-        real(wp), dimension(1:3) :: rotate !<
-        !! Angle to rotate the STL object along each cartesian coordinate axis,
-        !! in radians.
-
-        integer :: spc !<
-        !! Number of samples per cell to use when discretizing the STL object.
-
-        real(wp) :: threshold !<
-        !! Threshold to turn on smoothen STL patch.
+        character(LEN=pathlen_max) :: filepath  !< Path the STL file relative to case_dir.
+        real(wp), dimension(1:3)   :: translate !< Translation of the STL object.
+        real(wp), dimension(1:3)   :: scale     !< Scale factor for the STL object.
+        real(wp), dimension(1:3)   :: rotate    !< Angle to rotate the STL object along each cartesian coordinate axis, in radians.
+        integer                    :: spc       !< Number of samples per cell to use when discretizing the STL object.
+        real(wp)                   :: threshold !< Threshold to turn on smoothen STL patch.
     end type ic_model_parameters
 
     type :: t_triangle
@@ -197,156 +185,105 @@ module m_derived_types
     !! patch geometry.
     type ic_patch_parameters
 
-        integer  :: geometry                           !< Type of geometry for the patch
-        real(wp) :: x_centroid, y_centroid, z_centroid !<
-        !! Location of the geometric center, i.e. the centroid, of the patch. It
-        !! is specified through its x-, y- and z-coordinates, respectively.
-
-        real(wp)               :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
-        real(wp)               :: radius                       !< Dimensions of the patch. radius.
-        real(wp), dimension(3) :: radii                        !<
-        !! Vector indicating the various radii for the elliptical and ellipsoidal
-        !! patch geometries. It is specified through its x-, y-, and z-components
+        integer :: geometry !< Type of geometry for the patch
+        !> Location of the geometric center, i.e. the centroid, of the patch. It is specified through its x-, y- and z-coordinates,
         !! respectively.
-
-        real(wp) :: epsilon, beta !<
-        !! The isentropic vortex parameters for the amplitude of the disturbance and
-        !! domain of influence.
-
-        real(wp), dimension(2:9) :: a !<
-        !! Used by hardcoded IC and as temporary variables.
-
-        logical :: non_axis_sym
+        real(wp) :: x_centroid, y_centroid, z_centroid
+        real(wp) :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
+        real(wp) :: radius                       !< Dimensions of the patch. radius.
+        !> Vector indicating the various radii for the elliptical and ellipsoidal patch geometries. It is specified through its x-,
+        !! y-, and z-components respectively.
+        real(wp), dimension(3)   :: radii
+        real(wp)                 :: epsilon, beta !< The isentropic vortex parameters for the amplitude of the disturbance and domain of influence.
+        real(wp), dimension(2:9) :: a !< Used by hardcoded IC and as temporary variables.
+        logical                  :: non_axis_sym
 
         ! Geometry 13 (2D modal Fourier): fourier_cos(n), fourier_sin(n) for mode n
         real(wp), dimension(1:max_2d_fourier_modes) :: fourier_cos, fourier_sin
         logical                                     :: modal_clip_r_to_min !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
-        real(wp)                                    :: modal_r_min !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
-        logical                                     :: modal_use_exp_form !< When true, boundary = radius*exp(Fourier series)
-
+        real(wp)                                    :: modal_r_min        !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
+        logical                                     :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
         ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
         real(wp), dimension(0:max_sph_harm_degree, -max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
-        real(wp), dimension(3)                                                               :: normal !<
-        !! Normal vector indicating the orientation of the patch. It is specified
-        !! through its x-, y- and z-components, respectively.
-
-        logical, dimension(0:num_patches_max - 1) :: alter_patch !<
-
-        !! List of permissions that indicate to the current patch which preceding
-        !! patches it is allowed to overwrite when it is in process of being laid
-        !! out in the domain
-
-        logical :: smoothen !<
-        !! Permission indicating to the current patch whether its boundaries will
-        !! be smoothed out across a few cells or whether they are to remain sharp
-
-        integer :: smooth_patch_id !<
-        !! Identity (id) of the patch with which current patch is to get smoothed
-
-        real(wp) :: smooth_coeff !<
-        !! Smoothing coefficient (coeff) for the size of the stencil of
-        !! cells across which boundaries of the current patch will be smeared out
-
+        !> Normal vector indicating the orientation of the patch. It is specified through its x-, y- and z-components, respectively.
+        real(wp), dimension(3) :: normal
+        !> List of permissions that indicate to the current patch which preceding patches it is allowed to overwrite when it is in
+        !! process of being laid out in the domain
+        logical, dimension(0:num_patches_max - 1) :: alter_patch
+        !> Permission indicating to the current patch whether its boundaries will be smoothed out across a few cells or whether they
+        !! are to remain sharp
+        logical :: smoothen
+        integer :: smooth_patch_id !< Identity (id) of the patch with which current patch is to get smoothed
+        !> Smoothing coefficient (coeff) for the size of the stencil of cells across which boundaries of the current patch will be
+        !! smeared out
+        real(wp)                            :: smooth_coeff
         real(wp), dimension(num_fluids_max) :: alpha_rho
         real(wp)                            :: rho
         real(wp), dimension(3)              :: vel
         real(wp)                            :: pres
         real(wp), dimension(num_fluids_max) :: alpha
         real(wp)                            :: gamma
-        real(wp)                            :: pi_inf !<
-        real(wp)                            :: cv     !<
-        real(wp)                            :: qv     !<
-        real(wp)                            :: qvp    !<
-
-        !! Primitive variables associated with the patch. In order, these include
-        !! the partial densities, density, velocity, pressure, volume fractions,
-        !! specific heat ratio function and the liquid stiffness function.
-        real(wp) :: Bx, By, Bz !<
-        !! Magnetic field components; B%x is not used for 1D
-
-        real(wp), dimension(6) :: tau_e !<
-        !! Elastic stresses added to primitive variables if hypoelasticity = True
-
-        real(wp) :: R0 !< Bubble size
-        real(wp) :: V0 !< Bubble velocity
-        real(wp) :: p0 !< Bubble size
-        real(wp) :: m0 !< Bubble velocity
-        integer  :: hcid
+        real(wp)                            :: pi_inf
+        real(wp)                            :: cv
+        real(wp)                            :: qv
+        !> Primitive variables associated with the patch. In order, these include the partial densities, density, velocity,
+        !! pressure, volume fractions, specific heat ratio function and the liquid stiffness function.
+        real(wp)               :: qvp
+        real(wp)               :: Bx, By, Bz !< Magnetic field components; B%x is not used for 1D
+        real(wp), dimension(6) :: tau_e      !< Elastic stresses added to primitive variables if hypoelasticity = True
+        real(wp)               :: R0         !< Bubble size
+        real(wp)               :: V0         !< Bubble velocity
+        real(wp)               :: p0         !< Bubble size
+        real(wp)               :: m0         !< Bubble velocity
+        integer                :: hcid
         !! id for hard coded initial condition
 
         real(wp) :: cf_val !! color function value
         real(wp) :: Y(1:num_species)
 
         !! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath !<
-        !! Path the STL file relative to case_dir.
-
-        real(wp), dimension(1:3) :: model_translate !<
-        !! Translation of the STL object.
-
-        real(wp), dimension(1:3) :: model_scale !<
-        !! Scale factor for the STL object.
-
-        real(wp), dimension(1:3) :: model_rotate !<
-        !! Angle to rotate the STL object along each cartesian coordinate axis,
-        !! in radians.
-
-        integer :: model_spc !<
-        !! Number of samples per cell to use when discretizing the STL object.
-
-        real(wp) :: model_threshold !<
-        !! Threshold to turn on smoothen STL patch.
+        character(LEN=pathlen_max) :: model_filepath !< Path the STL file relative to case_dir.
+        real(wp), dimension(1:3)   :: model_translate !< Translation of the STL object.
+        real(wp), dimension(1:3)   :: model_scale !< Scale factor for the STL object.
+        real(wp), dimension(1:3)   :: model_rotate !< Angle to rotate the STL object along each cartesian coordinate axis, in radians.
+        integer                    :: model_spc !< Number of samples per cell to use when discretizing the STL object.
+        real(wp)                   :: model_threshold !< Threshold to turn on smoothen STL patch.
     end type ic_patch_parameters
 
     type ib_patch_parameters
 
-        integer  :: geometry                           !< Type of geometry for the patch
-        real(wp) :: x_centroid, y_centroid, z_centroid !<
-        !! Location of the geometric center, i.e. the centroid, of the patch. It
-        !! is specified through its x-, y- and z-coordinates, respectively.
-        real(wp) :: step_x_centroid, step_y_centroid, step_z_centroid !<
-        !! Centroid locations of intermediate steps in the time_stepper module
+        integer :: geometry !< Type of geometry for the patch
+        !> Location of the geometric center, i.e. the centroid, of the patch. It is specified through its x-, y- and z-coordinates,
+        !! respectively.
+        real(wp) :: x_centroid, y_centroid, z_centroid
+        !> Centroid locations of intermediate steps in the time_stepper module
+        real(wp)                      :: step_x_centroid, step_y_centroid, step_z_centroid
         real(wp), dimension(1:3)      :: centroid_offset ! offset of center of mass from computed cell center for odd-shaped IBs
         real(wp), dimension(1:3)      :: angles
         real(wp), dimension(1:3)      :: step_angles
         real(wp), dimension(1:3, 1:3) :: rotation_matrix !< matrix that converts from IB reference frame to fluid reference frame
-        real(wp), dimension(1:3, &
-            & 1:3) :: rotation_matrix_inverse !< matrix that converts from fluid reference frame to IB reference frame
-
-        real(wp) :: c, p, t, m
-        real(wp) :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
-        real(wp) :: radius                       !< Dimensions of the patch. radius.
-        real(wp) :: theta
-        logical  :: slip
+        !> matrix that converts from fluid reference frame to IB reference frame
+        real(wp), dimension(1:3, 1:3) :: rotation_matrix_inverse
+        real(wp)                      :: c, p, t, m
+        real(wp)                      :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
+        real(wp)                      :: radius                       !< Dimensions of the patch. radius.
+        real(wp)                      :: theta
+        logical                       :: slip
 
         !! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath !<
-        !! Path the STL file relative to case_dir.
-
-        real(wp), dimension(1:3) :: model_translate !<
-        !! Translation of the STL object.
-
-        real(wp), dimension(1:3) :: model_scale !<
-        !! Scale factor for the STL object.
-
-        real(wp), dimension(1:3) :: model_rotate !<
-        !! Angle to rotate the STL object along each cartesian coordinate axis,
-        !! in radians.
-
-        integer :: model_spc !<
-        !! Number of samples per cell to use when discretizing the STL object.
-
-        real(wp) :: model_threshold !<
-        !! Threshold to turn on smoothen STL patch.
-
-        !! Patch conditions for moving imersed boundaries
-        integer                  :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
-        real(wp)                 :: mass, moment ! mass and moment of inertia of object used to compute forces in 2-way coupling
-        real(wp), dimension(1:3) :: force, torque ! vectors for the computed force and torque values applied to an IB
-        real(wp), dimension(1:3) :: vel
-        real(wp), dimension(1:3) :: step_vel ! velocity array used to store intermediate steps in the time_stepper module
-        real(wp), dimension(1:3) :: angular_vel
-        real(wp), dimension(1:3) :: step_angular_vel ! velocity array used to store intermediate steps in the time_stepper module
+        character(LEN=pathlen_max) :: model_filepath !< Path the STL file relative to case_dir.
+        real(wp), dimension(1:3)   :: model_translate !< Translation of the STL object.
+        real(wp), dimension(1:3)   :: model_scale !< Scale factor for the STL object.
+        real(wp), dimension(1:3)   :: model_rotate !< Angle to rotate the STL object along each cartesian coordinate axis, in radians.
+        integer                    :: model_spc !< Number of samples per cell to use when discretizing the STL object.
+        real(wp)                   :: model_threshold !< Threshold to turn on smoothen STL patch. Patch conditions for moving imersed boundaries
+        integer                    :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
+        real(wp)                   :: mass, moment ! mass and moment of inertia of object used to compute forces in 2-way coupling
+        real(wp), dimension(1:3)   :: force, torque ! vectors for the computed force and torque values applied to an IB
+        real(wp), dimension(1:3)   :: vel
+        real(wp), dimension(1:3)   :: step_vel ! velocity array used to store intermediate steps in the time_stepper module
+        real(wp), dimension(1:3)   :: angular_vel
+        real(wp), dimension(1:3)   :: step_angular_vel ! velocity array used to store intermediate steps in the time_stepper module
     end type ib_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
@@ -419,8 +356,8 @@ module m_derived_types
         real(wp)               :: foc_length ! < Focal length of transducer
         real(wp)               :: aperture ! < Aperture diameter of transducer
         real(wp)               :: element_spacing_angle !< Spacing between aperture elements in 2D acoustic array
-        real(wp) &
-            & :: element_polygon_ratio !< Ratio of aperture element diameter to side length of polygon connecting their centers, in 3D acoustic array
+        !> Ratio of aperture element diameter to side length of polygon connecting their centers, in 3D acoustic array
+        real(wp) :: element_polygon_ratio
         real(wp) :: rotate_angle   !< Angle of rotation of the entire circular 3D acoustic array
         real(wp) :: bb_bandwidth   !< Bandwidth of each frequency in broadband wave
         real(wp) :: bb_lowest_freq !< The lower frequency bound of broadband wave

@@ -7,20 +7,18 @@
 !! of the primitive and conservative variables, as well as quantities that can be derived from those such as the unadvected volume
 !! fraction, specific heat ratio, liquid stiffness, speed of sound, vorticity and the numerical Schlieren function.
 program p_main
-    use m_global_parameters     !< Global parameters for the code
+    use m_global_parameters !< Global parameters for the code
     use m_start_up
 
     implicit none
 
-    integer                 :: t_step  !< Iterator for the main time-stepping loop
-    character(LEN=name_len) :: varname !<
-    !! Generic storage for the name(s) of the flow variable(s) that will be added
-    !! to the formatted database file(s)
-
-    real(wp) :: pres
-    real(wp) :: c
-    real(wp) :: H
-    real(wp) :: start, finish
+    integer :: t_step !< Iterator for the main time-stepping loop
+    !> Generic storage for the name(s) of the flow variable(s) that will be added to the formatted database file(s)
+    character(LEN=name_len) :: varname
+    real(wp)                :: pres
+    real(wp)                :: c
+    real(wp)                :: H
+    real(wp)                :: start, finish
 
     call s_initialize_mpi_domain()
 

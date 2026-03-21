@@ -8,14 +8,12 @@
 
 !> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_variables_conversion
     use m_weno
-    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! schemes for conservation laws
-
+    use m_muscl !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
     use m_helper
     use m_boundary_common
 
@@ -57,8 +55,10 @@ contains
         @:ALLOCATE(gR_y(idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
 
         if (p > 0) then
-            @:ALLOCATE(gL_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
-            @:ALLOCATE(gR_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, num_dims + 1))
+            @:ALLOCATE(gL_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, &
+                & num_dims + 1))
+            @:ALLOCATE(gR_z(idwbuff(3)%beg:idwbuff(3)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, &
+                & num_dims + 1))
         end if
     end subroutine s_initialize_surface_tension_module
 

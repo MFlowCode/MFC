@@ -7,9 +7,9 @@
 
 !> @brief Shared input validation checks for grid dimensions and AMD GPU compiler limits
 module m_checker_common
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_helper
 
     implicit none
@@ -37,7 +37,9 @@ contains
         min_cells = int(2, kind=8)**int(min(1, m) + min(1, n) + min(1, p), kind=8)*int(num_procs, kind=8)
         call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
 
-        @:PROHIBIT(nGlobal < min_cells, "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // "which is currently "//trim(numStr))
+        @:PROHIBIT(nGlobal < min_cells, &
+            & "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // "which is currently " &
+            & // trim(numStr))
     end subroutine s_check_total_cells
 
 #endif

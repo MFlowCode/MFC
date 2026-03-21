@@ -7,36 +7,31 @@
 
 !> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_mpi_common
     use m_variables_conversion !< State variables type conversion procedures
-    use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
-                               !! schemes for spatial reconstruction of variables
-
-    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! schemes for convservation laws
-
-    use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
-    use m_cbc                  !< Characteristic boundary conditions (CBC)
+    use m_weno !< Weighted and essentially non-oscillatory (WENO) schemes for spatial reconstruction of variables
+    use m_muscl !< Monotonic Upstream-centered (MUSCL) schemes for convservation laws
+    use m_riemann_solvers !< Exact and approximate Riemann problem solvers
+    use m_cbc !< Characteristic boundary conditions (CBC)
     use m_boundary_common
-    use m_acoustic_src      !< Acoustic source calculations
-    use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
-    use m_chemistry            !< Chemistry module
-    use m_data_output          !< Run-time info & solution data output procedures
-    use m_time_steppers        !< Time-stepping algorithms
-    use m_qbmm                 !< Quadrature MOM
-    use m_derived_variables     !< Procedures used to compute quantities derived
-                                !! from the conservative and primitive variables
+    use m_acoustic_src !< Acoustic source calculations
+    use m_rhs !< Right-hand-side (RHS) evaluation procedures
+    use m_chemistry !< Chemistry module
+    use m_data_output !< Run-time info & solution data output procedures
+    use m_time_steppers !< Time-stepping algorithms
+    use m_qbmm !< Quadrature MOM
+    use m_derived_variables !< Procedures used to compute quantities derived from the conservative and primitive variables
     use m_hypoelastic
     use m_hyperelastic
-    use m_phase_change          !< Phase-change module
+    use m_phase_change !< Phase-change module
     use m_viscous
-    use m_bubbles_EE            !< Ensemble-averaged bubble dynamics routines
-    use m_bubbles_EL            !< Lagrange bubble dynamics routines
+    use m_bubbles_EE !< Ensemble-averaged bubble dynamics routines
+    use m_bubbles_EL !< Lagrange bubble dynamics routines
     use ieee_arithmetic
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_helper
 
     $:USE_GPU_MODULE()
@@ -78,10 +73,8 @@ contains
     impure subroutine s_read_input_file
         ! Relative path to the input file provided by the user
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
-        logical                            :: file_exist !<
-            !! Logical used to check the existence of the input file
-
-        integer :: iostatus
+        logical                            :: file_exist !< Logical used to check the existence of the input file
+        integer                            :: iostatus
             !! Integer to check iostat of file read
 
         character(len=1000) :: line
@@ -182,17 +175,12 @@ contains
         !! @param q_cons_vf Cell-averaged conservative variables
     impure subroutine s_read_serial_data_files(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        character(LEN=path_len + 2*name_len)                   :: t_step_dir !<
-            !! Relative path to the starting time-step directory
-
-        character(LEN=path_len + 3*name_len) :: file_path !<
-            !! Relative path to the grid and conservative variables data files
-
-        logical :: file_exist !<
+        character(LEN=path_len + 2*name_len)                   :: t_step_dir !< Relative path to the starting time-step directory
+        character(LEN=path_len + 3*name_len)                   :: file_path  !< Relative path to the grid and conservative variables data files
+        logical                                                :: file_exist
         ! Logical used to check the existence of the data files
 
         integer :: i, r !< Generic loop iterator
-
         ! Confirming that the directory from which the initial condition and
         ! the grid data files are to be read in exists and exiting otherwise
         if (cfl_dt) then
@@ -875,8 +863,12 @@ contains
         call s_initialize_global_parameters_module()
         #:if USING_AMD
             #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
-                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$) .and. adv_idx%end > 20 .and. (.not. chemistry), "CBC module with AMD compiler requires adv_idx%end <= 20 when case optimization is turned off")
-                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$) .and. sys_size > 20 .and. (chemistry), "CBC module with AMD compiler and chemistry requires sys_size <= 20 when case optimization is turned off")
+                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
+                    & bc_z%end/) == ${BC}$) .and. adv_idx%end > 20 .and. (.not. chemistry), &
+                    & "CBC module with AMD compiler requires adv_idx%end <= 20 when case optimization is turned off")
+                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
+                    & bc_z%end/) == ${BC}$) .and. sys_size > 20 .and. (chemistry), &
+                    & "CBC module with AMD compiler and chemistry requires sys_size <= 20 when case optimization is turned off")
             #:endfor
         #:endif
         if (bubbles_euler .or. bubbles_lagrange) then

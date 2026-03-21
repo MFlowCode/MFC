@@ -8,11 +8,11 @@
 !> @brief MPI communication layer: domain decomposition, halo exchange, reductions, and parallel I/O setup
 module m_mpi_common
 #ifdef MFC_MPI
-    use mpi                    !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_helper
     use ieee_arithmetic
     use m_nvtx
@@ -23,16 +23,12 @@ module m_mpi_common
     $:GPU_DECLARE(create='[v_size]')
     !! Generic flags used to identify and report MPI errors
 
-    real(wp), private, allocatable, dimension(:) :: buff_send !<
-    !! This variable is utilized to pack and send the buffer of the cell-average
-    !! primitive variables, for a single computational domain boundary at the
-    !! time, to the relevant neighboring processor.
-
-    real(wp), private, allocatable, dimension(:) :: buff_recv !<
-    !! buff_recv is utilized to receive and unpack the buffer of the cell-
-    !! average primitive variables, for a single computational domain boundary
-    !! at the time, from the relevant neighboring processor.
-
+    !> This variable is utilized to pack and send the buffer of the cell-average primitive variables, for a single computational
+    !! domain boundary at the time, to the relevant neighboring processor.
+    real(wp), private, allocatable, dimension(:) :: buff_send
+    !> buff_recv is utilized to receive and unpack the buffer of the cell- average primitive variables, for a single computational
+    !! domain boundary at the time, from the relevant neighboring processor.
+    real(wp), private, allocatable, dimension(:) :: buff_recv
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[buff_send, buff_recv]')
 #endif
@@ -83,7 +79,6 @@ contains
     impure subroutine s_mpi_initialize
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Initializing the MPI environment
         call MPI_INIT(ierr)
 
@@ -121,7 +116,6 @@ contains
         ! Generic loop iterator
         integer :: i, j
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Altered system size for the lagrangian subgrid bubble model
         integer :: alt_sys
 
@@ -274,7 +268,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         call MPI_GATHER(time_avg, 1, mpi_p, proc_time(0), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
     end subroutine mpi_bcast_time_step_values
@@ -316,7 +309,6 @@ contains
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
         ! global extrema and bookkeeping the results on the rank 0 processor
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
@@ -348,7 +340,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
@@ -363,7 +354,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Performing the reduction procedure
         if (loc(var_loc) == loc(var_glb)) then
             call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
@@ -386,7 +376,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
@@ -405,7 +394,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
 #endif
@@ -422,7 +410,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Performing the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
 #endif
@@ -437,7 +424,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Temporary storage variable that holds the reduced minimum value
         real(wp) :: var_glb
 
@@ -461,11 +447,10 @@ contains
         real(wp), dimension(2), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
-        integer                :: ierr    !< Generic flag used to identify and report MPI errors
-        real(wp), dimension(2) :: var_glb !<
-            !! Temporary storage variable that holds the reduced maximum value
-            !! and the rank of the processor with which the value is associated
-
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+        !> Temporary storage variable that holds the reduced maximum value and the rank of the processor with which the value is
+        !! associated
+        real(wp), dimension(2) :: var_glb
         ! Performing reduction procedure and eventually storing its result
         ! into the variable that was initially inputted into the subroutine
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_2p, MPI_MAXLOC, 0, MPI_COMM_WORLD, ierr)
@@ -512,7 +497,6 @@ contains
     impure subroutine s_mpi_barrier
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Calling MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 #endif
@@ -522,7 +506,6 @@ contains
     impure subroutine s_mpi_finalize
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! Finalizing the MPI environment
         call MPI_FINALIZE(ierr)
 #endif
@@ -550,7 +533,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
         qbmm_comm = .false.
@@ -958,28 +940,17 @@ contains
     subroutine s_mpi_decompose_computational_domain
 #ifdef MFC_MPI
 
-        integer :: num_procs_x, num_procs_y, num_procs_z !<
-            !! Optimal number of processors in the x-, y- and z-directions
-
-        real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z !<
-            !! Non-optimal number of processors in the x-, y- and z-directions
-
-        real(wp) :: fct_min !<
-            !! Processor factorization (fct) minimization parameter
-
-        integer :: MPI_COMM_CART !<
-            !! Cartesian processor topology communicator
-
-        integer :: rem_cells !<
-            !! Remaining number of cells, in a particular coordinate direction,
-            !! after the majority is divided up among the available processors
-
-        integer :: recon_order !<
-            !! WENO or MUSCL reconstruction order
-
-        integer :: i, j !< Generic loop iterators
-        integer :: ierr !< Generic flag used to identify and report MPI errors
-
+        integer :: num_procs_x, num_procs_y, num_procs_z !< Optimal number of processors in the x-, y- and z-directions
+        !> Non-optimal number of processors in the x-, y- and z-directions
+        real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
+        real(wp) :: fct_min       !< Processor factorization (fct) minimization parameter
+        integer  :: MPI_COMM_CART !< Cartesian processor topology communicator
+        !> Remaining number of cells, in a particular coordinate direction, after the majority is divided up among the available
+        !! processors
+        integer :: rem_cells
+        integer :: recon_order !< WENO or MUSCL reconstruction order
+        integer :: i, j        !< Generic loop iterators
+        integer :: ierr        !< Generic flag used to identify and report MPI errors
         if (recon_type == WENO_TYPE) then
             recon_order = weno_order
         else
@@ -1397,7 +1368,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         ! MPI Communication in x-direction
         if (mpi_dir == 1) then
             if (pbc_loc == -1) then ! PBC at the beginning

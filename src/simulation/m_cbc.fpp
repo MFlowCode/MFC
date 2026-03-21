@@ -7,8 +7,8 @@
 #:include 'macros.fpp'
 
 module m_cbc
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_variables_conversion !< State variables type conversion procedures
     use m_compute_cbc
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
@@ -34,9 +34,9 @@ module m_cbc
     !! Cell-average fluxes (src - source). These are directly determined from the
     !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
 
-    real(wp), allocatable, dimension(:,:,:,:) :: F_rsx_vf, F_src_rsx_vf !<
-    real(wp), allocatable, dimension(:,:,:,:) :: F_rsy_vf, F_src_rsy_vf !<
-    real(wp), allocatable, dimension(:,:,:,:) :: F_rsz_vf, F_src_rsz_vf !<
+    real(wp), allocatable, dimension(:,:,:,:) :: F_rsx_vf, F_src_rsx_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: F_rsy_vf, F_src_rsy_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: F_rsz_vf, F_src_rsz_vf
     $:GPU_DECLARE(create='[F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf]')
 
     !! There is a CCE bug that is causing some subset of these variables to interfere
@@ -45,29 +45,25 @@ module m_cbc
     !! in `acc declare create` clauses don't have this problem, so we still need to
     !! isolate this bug.
 
-    real(wp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf_l, flux_src_rsx_vf_l
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsz_vf_l, flux_src_rsz_vf_l
     $:GPU_DECLARE(create='[flux_rsx_vf_l, flux_src_rsx_vf_l, flux_rsy_vf_l, flux_src_rsy_vf_l, flux_rsz_vf_l, flux_src_rsz_vf_l]')
 
     real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
-
     ! CBC Coefficients
 
     real(wp), allocatable, dimension(:,:) :: fd_coef_x !< Finite diff. coefficients x-dir
     real(wp), allocatable, dimension(:,:) :: fd_coef_y !< Finite diff. coefficients y-dir
-    real(wp), allocatable, dimension(:,:) :: fd_coef_z !< Finite diff. coefficients z-dir
-
-    !! The first dimension identifies the location of a coefficient in the FD
-    !! formula, while the last dimension denotes the location of the CBC.
-
+    !> Finite diff. coefficients z-dir The first dimension identifies the location of a coefficient in the FD formula, while the
+    !! last dimension denotes the location of the CBC.
+    real(wp), allocatable, dimension(:,:) :: fd_coef_z
     ! Bug with NVHPC when using nullified pointers in a declare create
     !    real(wp), pointer, dimension(:, :) :: fd_coef => null()
 
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
-
     $:GPU_DECLARE(create='[ds, fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z]')
 
     !! The first dimension of the array identifies the polynomial, the
@@ -449,7 +445,6 @@ contains
     subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
         integer             :: i !< Generic loop iterator
-
         ! Associating CBC Coefficients in x-direction
         if (cbc_dir_in == 1) then
             ! fd_coef => fd_coef_x; if (weno_order > 1) pi_coef => pi_coef_x
@@ -556,7 +551,6 @@ contains
         real(wp)               :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)               :: vel_K_sum, vel_dv_dt_sum
         integer                :: i, j, k, r !< Generic loop iterators
-
         ! Reshaping of inputted data and association of the FD and PI
         ! coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
@@ -984,7 +978,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
         type(int_bounds_info), intent(in)                   :: ix, iy, iz
         integer                                             :: i, j, k, r !< Generic loop iterators
-
         ! Configuring the coordinate direction indexes and flags
 
         ! Determining the indicial shift based on CBC location
@@ -1237,7 +1230,6 @@ contains
     subroutine s_finalize_cbc(flux_vf, flux_src_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
         integer                                                :: i, j, k, r !< Generic loop iterators
-
         ! Determining the indicial shift based on CBC location
         dj = max(0, cbc_loc)
         $:GPU_UPDATE(device='[dj]')

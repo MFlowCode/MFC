@@ -18,8 +18,7 @@ module m_boundary_conditions
     real(wp)          :: x_centroid, y_centroid, z_centroid
     real(wp)          :: length_x, length_y, length_z
     real(wp)          :: radius
-    type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
-
+    type(bounds_info) :: x_boundary, y_boundary, z_boundary
     private; public :: s_apply_boundary_patches
 contains
     !> @brief Applies a line-segment boundary condition patch along a domain edge in 2D.

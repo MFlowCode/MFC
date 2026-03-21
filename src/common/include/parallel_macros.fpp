@@ -6,8 +6,10 @@
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
 
-    #:set acc_code = ACC_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_code = OMP_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set acc_code = ACC_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, &
+                                  & copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_code = OMP_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, &
+                                  & copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -23,8 +25,12 @@
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
 
-    #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
+                                            & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
+                                            & extraAccArgs)
+    #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
+                                            & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
+                                            & extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_directive
@@ -44,11 +50,13 @@
 #endif
 #:enddef
 
-#:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, cray_noinline=False, extraAccArgs=None, extraOmpArgs=None)
+#:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, cray_noinline=False, extraAccArgs=None, &
+                  & extraOmpArgs=None)
     #:assert isinstance(cray_inline, bool)
     #:assert isinstance(cray_noinline, bool)
     #:assert not (cray_inline and cray_noinline), "cray_inline and cray_noinline are mutually exclusive"
-    #:set acc_directive = ACC_ROUTINE(function_name=function_name, parallelism=parallelism, nohost=nohost, extraAccArgs=extraAccArgs)
+    #:set acc_directive = ACC_ROUTINE(function_name=function_name, parallelism=parallelism, nohost=nohost, &
+                                      & extraAccArgs=extraAccArgs)
     #:set omp_directive = OMP_ROUTINE(function_name=function_name, nohost=nohost, extraOmpArgs=extraOmpArgs)
 
     #:if cray_noinline == True
@@ -98,8 +106,10 @@
     #:endif
 #:enddef
 
-#:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_DECLARE(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, present=present, deviceptr=deviceptr, link=link, extraAccArgs=None)
+#:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, &
+                  & link=None, extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_DECLARE(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
+                                 & present=present, deviceptr=deviceptr, link=link, extraAccArgs=None)
     #:assert copyout is None
     #:assert present is None
     #:assert deviceptr is None
@@ -113,9 +123,12 @@
 #endif
 #:enddef
 
-#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, reductionOp=reductionOp, private=private, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, reductionOp=reductionOp, private=private, extraOmpArgs=extraOmpArgs)
+#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, &
+               & extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, &
+                              & reductionOp=reductionOp, private=private, extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, &
+                              & reductionOp=reductionOp, private=private, extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -124,9 +137,14 @@
 #endif
 #:enddef
 
-#:def GPU_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, extraOmpArgs=extraOmpArgs)
+#:def GPU_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, &
+               & deviceptr=None, attach=None, default=None, extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
+                              & no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, &
+                              & extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
+                              & no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, &
+                              & extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -153,7 +171,8 @@
         #:set use_device = None
     #:endif
     #:set acc_code = ACC_HOST_DATA(code=code, use_device=use_device, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_HOST_DATA(code=code, use_device_addr=use_device_addr, use_device_ptr=use_device_ptr, extraOmpArgs=extraOmpArgs)
+    #:set omp_code = OMP_HOST_DATA(code=code, use_device_addr=use_device_addr, use_device_ptr=use_device_ptr, &
+                                   & extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -165,8 +184,10 @@
 #:enddef
 
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, extraOmpArgs=extraOmpArgs)
+    #:set acc_code = ACC_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, &
+                                    & extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, &
+                                    & extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code

@@ -4,13 +4,12 @@
 
 !> @brief Writes grid and initial condition data to serial or parallel output files
 module m_data_output
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Global parameters for the code
     use m_helper
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
 #ifdef MFC_MPI
-    use mpi                     !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
     use m_compile_specific
@@ -43,12 +42,9 @@ module m_data_output
         end subroutine s_write_abstract_data_files
     end interface
 
-    character(LEN=path_len + 2*name_len), private :: t_step_dir !<
-    !! Time-step folder into which grid and initial condition data will be placed
-
-    character(LEN=path_len + 2*name_len), public :: restart_dir !<
-    !! Restart data folder
-
+    !> Time-step folder into which grid and initial condition data will be placed
+    character(LEN=path_len + 2*name_len), private :: t_step_dir
+    character(LEN=path_len + 2*name_len), public  :: restart_dir !< Restart data folder
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 contains
 
@@ -64,22 +60,18 @@ contains
         logical                                                      :: file_exist !< checks if file exists
         character(LEN=15)                                            :: FMT
         character(LEN=3)                                             :: status
-        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1)     :: file_num   !< Used to store
-            !! the number, in character form, of the currently
-            !! manipulated conservative variable data file
-
-        character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !<
-            !! Generic string used to store the address of a particular file
-
-        integer                 :: i, j, k, l, r, c             !< Generic loop iterator
-        integer                 :: t_step
-        real(wp), dimension(nb) :: nRtmp                        !< Temporary bubble concentration
-        real(wp)                :: nbub                         !< Temporary bubble number density
-        real(wp)                :: gamma, lit_gamma, pi_inf, qv !< Temporary EOS params
-        real(wp)                :: rho                          !< Temporary density
-        real(wp)                :: pres, T                      !< Temporary pressure
-        real(wp)                :: rhoYks(1:num_species)        !< Temporary species mass fractions
-        real(wp)                :: pres_mag
+        !> Used to store the number, in character form, of the currently manipulated conservative variable data file
+        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
+        character(LEN=len_trim(t_step_dir) + name_len)           :: file_loc !< Generic string used to store the address of a particular file
+        integer                                                  :: i, j, k, l, r, c                                !< Generic loop iterator
+        integer                                                  :: t_step
+        real(wp), dimension(nb)                                  :: nRtmp                           !< Temporary bubble concentration
+        real(wp)                                                 :: nbub                                           !< Temporary bubble number density
+        real(wp)                                                 :: gamma, lit_gamma, pi_inf, qv                   !< Temporary EOS params
+        real(wp)                                                 :: rho                                            !< Temporary density
+        real(wp)                                                 :: pres, T                                        !< Temporary pressure
+        real(wp)                                                 :: rhoYks(1:num_species)                          !< Temporary species mass fractions
+        real(wp)                                                 :: pres_mag
 
         pres_mag = 0._wp
 
@@ -622,7 +614,6 @@ contains
         logical :: dir_check
         integer :: i
         integer :: m_ds, n_ds, p_ds !< down sample dimensions
-
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
             write (t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'

@@ -13,8 +13,8 @@
 module m_ib_patches
     use m_model ! Subroutine(s) related to STL files
     use m_derived_types ! Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_global_parameters !< Definitions of the global parameters
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_helper
     use m_mpi_common
 
@@ -37,7 +37,7 @@ module m_ib_patches
     !! perform the actions necessary to lay out a particular patch on the grid.
 
     real(wp) :: cart_x, cart_y, cart_z
-    real(wp) :: sph_phi !<
+    real(wp) :: sph_phi
     $:GPU_DECLARE(create='[cart_x, cart_y, cart_z, sph_phi]')
     !! Variables to be used to hold cell locations in Cartesian coordinates if
     !! 3D simulation is using cylindrical coordinates
@@ -324,7 +324,7 @@ contains
     subroutine s_ib_3D_airfoil(patch_id, ib_markers, xp, yp, zp)
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp, zp                     !< integers containing the periodicity projection information
         real(wp)                           :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer                            :: i, j, k, l, il, ir, jl, jr, ll, lr
         integer                            :: Np1, Np2
@@ -518,7 +518,8 @@ contains
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, y_cc]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', &
+            & copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, y_cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
@@ -545,7 +546,6 @@ contains
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
-
         ! Generic loop iterators
         integer                  :: i, j, k
         integer                  :: il, ir, jl, jr, kl, kr
@@ -857,7 +857,8 @@ contains
         call get_bounding_indices(bbox_min(1), bbox_max(1), x_cc, il, ir)
         call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', copyin='[patch_id, encoded_patch_id, center, inverse_rotation, offset, &
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', &
+            & copyin='[patch_id, encoded_patch_id, center, inverse_rotation, offset, &
         & spc, threshold]', collapse=2)
         do i = il, ir
             do j = jl, jr

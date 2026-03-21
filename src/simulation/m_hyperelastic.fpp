@@ -7,8 +7,8 @@
 !> @brief Computes the left Cauchy--Green deformation tensor and hyperelastic stress source terms
 
 module m_hyperelastic
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_variables_conversion !< State variables type conversion procedures
     use m_finite_differences
 
@@ -18,7 +18,7 @@ module m_hyperelastic
 
     !! The btensor at the cell-interior Gaussian quadrature points.
     !! These tensor is needed to be calculated once and make the code DRY.
-    type(vector_field) :: btensor !<
+    type(vector_field) :: btensor
     $:GPU_DECLARE(create='[btensor]')
 
     real(wp), allocatable, dimension(:,:) :: fd_coeff_x_hyper
@@ -34,7 +34,6 @@ contains
     !! obtain the btensor, btensor is nxn tensor btensor is symmetric, save the data space
     impure subroutine s_initialize_hyperelastic_module
         integer :: i !< generic iterator
-
         @:ALLOCATE(btensor%vf(1:b_size))
         do i = 1, b_size
             @:ALLOCATE(btensor%vf(i)%sf(0:m, 0:n, 0:p))
@@ -95,7 +94,8 @@ contains
         real(wp)               :: G_local
         integer                :: j, k, l, i, r
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G_local, Re, tensora, tensorb]')
+        $:GPU_PARALLEL_LOOP(collapse=3, &
+            & private='[i, j, k, l, alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G_local, Re, tensora, tensorb]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -214,7 +214,6 @@ contains
         real(wp)                                               :: trace
         real(wp), parameter                                    :: f13 = 1._wp/3._wp
         integer                                                :: i !< Generic loop iterators
-
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
@@ -252,7 +251,6 @@ contains
         real(wp)                                               :: trace
         real(wp), parameter                                    :: f13 = 1._wp/3._wp
         integer                                                :: i !< Generic loop iterators
-
         ! TODO Make this 1D and 2D capable
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
@@ -275,7 +273,6 @@ contains
     !> @brief Deallocates memory for hyperelastic deformation tensor and finite-difference coefficients.
     impure subroutine s_finalize_hyperelastic_module()
         integer :: i !< iterator
-
         ! Deallocating memory
         do i = 1, b_size
             @:DEALLOCATE(btensor%vf(i)%sf)

@@ -7,12 +7,12 @@
 !> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the
 !! flow state
 module m_ibm
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_variables_conversion !< State variables type conversion procedures
     use m_helper
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_constants
     use m_compute_levelset
     use m_ib_patches
@@ -122,9 +122,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout)                                                   :: q_cons_vf !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout)                                                   :: q_prim_vf !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(inout) :: pb_in, mv_in
-        integer                                                                                                  :: i, j, k, l, q, r !< Iterator variables
-        integer                                                                                                  :: patch_id !< Patch ID of ghost point
-        real(wp)                                                                                                 :: rho, gamma, pi_inf, dyn_pres !< Mixture variables
+        integer                                                                                                  :: i, j, k, l, q, r                                         !< Iterator variables
+        integer                                                                                                  :: patch_id                                                 !< Patch ID of ghost point
+        real(wp)                                                                                                 :: rho, gamma, pi_inf, dyn_pres                            !< Mixture variables
         real(wp), dimension(2)                                                                                   :: Re_K
         real(wp)                                                                                                 :: G_K
         real(wp)                                                                                                 :: qv_K

@@ -6,13 +6,12 @@
 
 !> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
 module m_acoustic_src
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_bubbles              !< Bubble dynamic routines
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_bubbles !< Bubble dynamic routines
     use m_variables_conversion !< State variables type conversion procedures
-    use m_helper_basic         !< Functions to compare floating point numbers
-    use m_constants            !< Definitions of the constants
-
+    use m_helper_basic !< Functions to compare floating point numbers
+    use m_constants !< Definitions of the constants
     implicit none
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
@@ -59,7 +58,6 @@ contains
     !> This subroutine initializes the acoustic source module
     impure subroutine s_initialize_acoustic_src
         integer :: i, j !< generic loop variables
-
         @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), &
             & length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), &
             & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), &

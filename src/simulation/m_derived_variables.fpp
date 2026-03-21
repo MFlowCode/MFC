@@ -7,10 +7,10 @@
 #:include 'macros.fpp'
 
 module m_derived_variables
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-    use m_data_output           !< Data output module
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Global parameters for the code
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_data_output !< Data output module
     use m_compile_specific
     use m_helper
     use m_finite_differences
@@ -103,7 +103,6 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf
         type(vector_field), dimension(:), intent(inout) :: q_prim_ts1, q_prim_ts2
         integer                                         :: i, j, k !< Generic loop iterators
-
         if (probe_wrt) then
             call s_derive_acceleration_component(1, q_prim_ts1(1)%vf, q_prim_ts1(2)%vf, q_prim_ts2(1)%vf, q_prim_ts2(2)%vf, x_accel)
             if (n > 0) then
@@ -158,7 +157,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf3
         real(wp), dimension(0:m, 0:n, 0:p), intent(out)     :: q_sf
         integer                                             :: j, k, l, r !< Generic loop iterators
-
         ! Computing the acceleration component in the x-coordinate direction
         if (i == 1) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
@@ -349,10 +347,9 @@ contains
     impure subroutine s_derive_center_of_mass(q_vf, c_m)
         type(scalar_field), dimension(sys_size), intent(in)   :: q_vf
         real(wp), dimension(1:num_fluids, 1:5), intent(inout) :: c_m
-        integer                                               :: i, j, k, l !< Generic loop iterators
+        integer                                               :: i, j, k, l    !< Generic loop iterators
         real(wp)                                              :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
-        real(wp)                                              :: dV !< Discrete cell volume
-
+        real(wp)                                              :: dV           !< Discrete cell volume
         c_m(:,:) = 0.0_wp
 
         $:GPU_UPDATE(device='[c_m]')

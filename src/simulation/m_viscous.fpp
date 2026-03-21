@@ -6,12 +6,10 @@
 
 !> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_weno
-    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! schemes for conservation laws
-
+    use m_muscl !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
     use m_helper
     use m_finite_differences
 
@@ -29,7 +27,6 @@ contains
     !> @brief Allocates and populates the viscous Reynolds number arrays and transfers data to the GPU.
     impure subroutine s_initialize_viscous_module
         integer :: i, j !< generic loop iterators
-
         @:ALLOCATE(Res_viscous(1:2, 1:Re_size_max))
 
         do i = 1, 2
@@ -55,7 +52,7 @@ contains
         type(scalar_field), dimension(num_dims), intent(in)      :: grad_x_vf, grad_y_vf, grad_z_vf
         type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in)                        :: ix, iy, iz
-        real(wp)                                                 :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
+        real(wp)                                                 :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum !< Mixture variables
         real(wp), dimension(2)                                   :: Re_visc
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
@@ -66,7 +63,6 @@ contains
         #:endif
 
         integer :: i, j, k, l, q !< Generic loop iterator
-
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
         $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous]')
@@ -1072,7 +1068,6 @@ contains
         integer, intent(in)                                               :: dim, buff_size_in
         real(wp), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
         integer                                                           :: i, j, k, l !< Generic loop iterators
-
         is1_viscous = ix
         is2_viscous = iy
         is3_viscous = iz
@@ -1166,7 +1161,6 @@ contains
         type(scalar_field), intent(inout) :: grad_z
         type(int_bounds_info)             :: ix, iy, iz
         integer                           :: j, k, l !< Generic loop iterators
-
         ix%beg = 1 - buff_size; ix%end = m + buff_size - 1
         if (n > 0) then
             iy%beg = 1 - buff_size; iy%end = n + buff_size - 1

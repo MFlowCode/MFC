@@ -241,7 +241,8 @@
 #:enddef
 
 #! Not fully implemented yet (ignores most args right now)
-#:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraOmpArgs=None)
+#:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, &
+               & extraOmpArgs=None)
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_directive = '!$omp loop bind(thread)'
     #:elif MFC_COMPILER == CCE_COMPILER_ID or MFC_COMPILER == AMD_COMPILER_ID
@@ -252,7 +253,8 @@
     $:omp_directive
 #:enddef
 
-#:def OMP_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraOmpArgs=None)
+#:def OMP_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, &
+               & deviceptr=None, attach=None, default=None, extraOmpArgs=None)
     #:assert code is not None
     #:assert isinstance(code, str)
     #:if code == '' or code.isspace()

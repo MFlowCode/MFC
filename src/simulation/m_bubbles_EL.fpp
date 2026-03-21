@@ -6,14 +6,14 @@
 
 !> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
-    use m_global_parameters             !< Definitions of the global parameters
-    use m_mpi_proxy                     !< Message passing interface (MPI) module proxy
-    use m_bubbles_EL_kernels            !< Definitions of the kernel functions
-    use m_bubbles                       !< General bubble dynamics procedures
-    use m_variables_conversion          !< State variables type conversion procedures
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_bubbles_EL_kernels !< Definitions of the kernel functions
+    use m_bubbles !< General bubble dynamics procedures
+    use m_variables_conversion !< State variables type conversion procedures
     use m_compile_specific
     use m_boundary_common
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_sim_helpers
     use m_helper
 
@@ -53,16 +53,14 @@ module m_bubbles_EL
     real(wp), allocatable, dimension(:,:,:) :: mtn_dveldt   !< Time derivative of the bubble's velocity
     $:GPU_DECLARE(create='[intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt]')
 
-    integer, private :: lag_num_ts                                  !<  Number of time stages in the time-stepping scheme
-
+    integer, private :: lag_num_ts !< Number of time stages in the time-stepping scheme
     $:GPU_DECLARE(create='[lag_num_ts]')
 
     integer  :: nBubs              !< Number of bubbles in the local domain
     real(wp) :: Rmax_glb, Rmin_glb !< Maximum and minimum bubbe size in the local domain
     !< Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
-    integer                                       :: q_beta_idx                       !< Size of the q_beta vector field
-
+    integer                                       :: q_beta_idx !< Size of the q_beta vector field
     $:GPU_DECLARE(create='[nBubs, Rmax_glb, Rmin_glb, q_beta, q_beta_idx]')
 contains
 
@@ -143,8 +141,7 @@ contains
         integer                                                :: id, bub_id, save_count
         integer                                                :: i, ios
         logical                                                :: file_exist, indomain
-        character(LEN=path_len + 2*name_len)                   :: path_D_dir !<
-
+        character(LEN=path_len + 2*name_len)                   :: path_D_dir
         ! Initialize number of particles
         bub_id = 0
         id = 0
@@ -499,7 +496,7 @@ contains
         #:endif
         real(wp), dimension(2) :: Re
         integer, dimension(3)  :: cell
-        integer                :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
+        integer                :: adap_dt_stop_max, adap_dt_stop                    !< Fail-safe exit if max iteration count reached
         real(wp)               :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
         integer                :: i, k, l
 
@@ -803,7 +800,6 @@ contains
 
         if ((lag_params%cluster_type == 1)) then
             !< Getting p_cell in terms of only the current cell by interpolation
-
             !< Getting the cell volulme as Omega
             if (p > 0) then
                 vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
@@ -1532,7 +1528,8 @@ contains
     subroutine s_calculate_lag_bubble_stats()
         integer :: k
 
-        $:GPU_PARALLEL_LOOP(private='[k]', reduction='[[Rmax_glb], [Rmin_glb]]', reductionOp='[MAX, MIN]', copy='[Rmax_glb, Rmin_glb]')
+        $:GPU_PARALLEL_LOOP(private='[k]', reduction='[[Rmax_glb], [Rmin_glb]]', reductionOp='[MAX, MIN]', &
+            & copy='[Rmax_glb, Rmin_glb]')
         do k = 1, nBubs
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))

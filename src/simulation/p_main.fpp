@@ -9,7 +9,7 @@
 !! found in the work by Perigaud and Saurel (2005). Note that both viscous and capillarity effects are only available in the volume
 !! fraction model.
 program p_main
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_global_parameters !< Definitions of the global parameters
     use m_start_up
     use m_time_steppers
     use m_nvtx

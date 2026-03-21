@@ -70,7 +70,8 @@
         #:set s = a.rstrip()
         #:if s.endswith(')')
             #:set rev = s[::-1]
-            #:set pos = next(i for i, ch, d in ( (j, c, sum(1 if t==')' else -1 if t=='(' else 0 for t in rev[:j+1])) for j, c in enumerate(rev) ) if ch == '(' and d == 0 )
+            #:set pos = next(i for i, ch, d in ( (j, c, sum(1 if t==')' else -1 if t=='(' else 0 for t in rev[:j+1])) for j, &
+                             & c in enumerate(rev) ) if ch == '(' and d == 0 )
             #:set s = s[:len(s)-1-pos]
         #:endif
         $:cleaned.append(s)

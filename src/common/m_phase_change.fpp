@@ -9,13 +9,12 @@
 module m_phase_change
 #ifndef MFC_POST_PROCESS
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_variables_conversion !< State variables type conversion procedures
     use ieee_arithmetic
-    use m_helper_basic         !< Functions to compare floating point numbers
-
+    use m_helper_basic !< Functions to compare floating point numbers
     implicit none
 
     private;
@@ -67,12 +66,12 @@ contains
     subroutine s_infinite_relaxation_k(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp)                                               :: pS, pSOV, pSSL !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
-        real(wp)                                               :: TS, TSOV, TSSL, TSatOV, &
-            & TSatSL !< equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor and subcooled liquid
+        !> equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor
+        !! and subcooled liquid
+        real(wp) :: TS, TSOV, TSSL, TSatOV, TSatSL
         real(wp) :: rhoe, dynE, rhos     !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF                  !< total volume fraction
-
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -279,7 +278,6 @@ contains
         real(wp)                                            :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
         real(wp)                                            :: p_infpT_sum
         integer                                             :: i, ns                    !< generic loop iterators
-
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0_wp; mQ = 0.0_wp; p_infpT_sum = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
@@ -600,7 +598,6 @@ contains
         real(wp), intent(out) :: TSat
         real(wp), intent(in)  :: TSIn
         real(wp)              :: dFdT, FT, Om !< auxiliary variables
-
         ! Generic loop iterators
         integer :: ns
 

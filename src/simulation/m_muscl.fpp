@@ -6,10 +6,9 @@
 
 !> @brief MUSCL reconstruction with interface sharpening for contact-preserving advection
 module m_muscl
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_variables_conversion !< State variables type conversion procedures
-
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -55,7 +54,8 @@ contains
 
         is3_muscl%end = p - is3_muscl%beg
 
-        @:ALLOCATE(v_rs_ws_x_muscl(is1_muscl%beg:is1_muscl%end, is2_muscl%beg:is2_muscl%end, is3_muscl%beg:is3_muscl%end, 1:sys_size))
+        @:ALLOCATE(v_rs_ws_x_muscl(is1_muscl%beg:is1_muscl%end, is2_muscl%beg:is2_muscl%end, is3_muscl%beg:is3_muscl%end, &
+            & 1:sys_size))
 
         if (n == 0) return
 
@@ -71,7 +71,8 @@ contains
 
         is3_muscl%end = p - is3_muscl%beg
 
-        @:ALLOCATE(v_rs_ws_y_muscl(is2_muscl%beg:is2_muscl%end, is1_muscl%beg:is1_muscl%end, is3_muscl%beg:is3_muscl%end, 1:sys_size))
+        @:ALLOCATE(v_rs_ws_y_muscl(is2_muscl%beg:is2_muscl%end, is1_muscl%beg:is1_muscl%end, is3_muscl%beg:is3_muscl%end, &
+            & 1:sys_size))
 
         if (p == 0) return
 
@@ -80,7 +81,8 @@ contains
         is1_muscl%beg = -buff_size; is1_muscl%end = m - is1_muscl%beg
         is3_muscl%beg = -buff_size; is3_muscl%end = p - is3_muscl%beg
 
-        @:ALLOCATE(v_rs_ws_z_muscl(is3_muscl%beg:is3_muscl%end, is2_muscl%beg:is2_muscl%end, is1_muscl%beg:is1_muscl%end, 1:sys_size))
+        @:ALLOCATE(v_rs_ws_z_muscl(is3_muscl%beg:is3_muscl%end, is2_muscl%beg:is2_muscl%end, is1_muscl%beg:is1_muscl%end, &
+            & 1:sys_size))
     end subroutine s_initialize_muscl_module
 
     !> @brief Performs MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables.
@@ -280,7 +282,6 @@ contains
         type(scalar_field), dimension(:), intent(in) :: v_vf
         integer, intent(in)                          :: muscl_dir
         integer                                      :: j, k, l, q !< Generic loop iterators
-
         ! Determining the number of cell-average variables which will be
         ! muscl-reconstructed and mapping their indical bounds in the x-,
         ! y- and z-directions to those in the s1-, s2- and s3-directions

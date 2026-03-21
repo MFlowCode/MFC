@@ -84,7 +84,6 @@ contains
         real(wp), allocatable, dimension(:,:), intent(inout)                  :: fd_coeff_s
         real(wp), dimension(-local_buff_size:q + local_buff_size), intent(in) :: s_cc
         integer                                                               :: i      !< Generic loop iterator
-
         if (present(offset_s)) then
             lB = -offset_s%beg
             lE = q + offset_s%end

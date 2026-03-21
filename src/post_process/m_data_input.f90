@@ -5,12 +5,12 @@
 !> @brief Reads raw simulation grid and conservative-variable data for a given time-step and fills buffer regions
 module m_data_input
 #ifdef MFC_MPI
-    use mpi                     !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Global parameters for the code
+    use m_mpi_proxy !< Message passing interface (MPI) module proxy
     use m_mpi_common
     use m_compile_specific
     use m_boundary_common
@@ -32,19 +32,11 @@ module m_data_input
         end subroutine s_read_abstract_data_files
     end interface
 
-    type(scalar_field), allocatable, dimension(:), public :: q_cons_vf !<
-    !! Conservative variables
-
-    type(scalar_field), allocatable, dimension(:), public :: q_cons_temp
-    type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
-    !! Primitive variables
-
-    type(integer_field), allocatable, dimension(:,:), public :: bc_type !<
-    !! Boundary condition identifiers
-
-    type(scalar_field), public :: q_T_sf !<
-    !! Temperature field
-
+    type(scalar_field), allocatable, dimension(:), public    :: q_cons_vf !< Conservative variables
+    type(scalar_field), allocatable, dimension(:), public    :: q_cons_temp
+    type(scalar_field), allocatable, dimension(:), public    :: q_prim_vf !< Primitive variables
+    type(integer_field), allocatable, dimension(:,:), public :: bc_type   !< Boundary condition identifiers
+    type(scalar_field), public                               :: q_T_sf    !< Temperature field
     ! type(scalar_field), public :: ib_markers !<
     type(integer_field), public :: ib_markers
 
@@ -207,27 +199,15 @@ contains
     !! @param t_step Current time-step
     impure subroutine s_read_serial_data_files(t_step)
         integer, intent(in)                            :: t_step
-        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir !<
-            !! Location of the time-step directory associated with t_step
-
-        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
-            !! Generic string used to store the location of a particular file
-
-        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !<
-            !! Used to store the variable position, in character form, of the
-            !! currently manipulated conservative variable file
-
-        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir !<
-        !! Location of the time-step directory associated with t_step
-
-        logical :: dir_check !<
-            !! Generic logical used to test the existence of a particular folder
-
-        logical :: file_check  !<
-            !! Generic logical used to test the existence of a particular file
-
-        integer :: i !< Generic loop iterator
-
+        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir !< Location of the time-step directory associated with t_step
+        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !< Generic string used to store the location of a particular file
+        !> Used to store the variable position, in character form, of the currently manipulated conservative variable file
+        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
+        !> Location of the time-step directory associated with t_step
+        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir
+        logical                                        :: dir_check  !< Generic logical used to test the existence of a particular folder
+        logical                                        :: file_check !< Generic logical used to test the existence of a particular file
+        integer                                        :: i          !< Generic loop iterator
         ! Setting location of time-step folder based on current time-step
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir) // trim(t_step_dir)
@@ -532,7 +512,6 @@ contains
     !> Computation of parameters, allocation procedures, and/or      any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_input_module
         integer :: i !< Generic loop iterator
-
         ! Allocating the parts of the conservative and primitive variables
         ! that do not require the direct knowledge of the dimensionality of
         ! the simulation
@@ -587,7 +566,6 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_data_input_module
         integer :: i !< Generic loop iterator
-
         ! Deallocating the conservative and primitive variables
         do i = 1, sys_size
             deallocate (q_cons_vf(i)%sf)

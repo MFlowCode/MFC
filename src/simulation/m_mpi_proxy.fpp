@@ -8,30 +8,26 @@
 !> @brief MPI halo exchange, domain decomposition, and buffer packing/unpacking for the simulation solver
 module m_mpi_proxy
 #ifdef MFC_MPI
-    use mpi                    !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_helper
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_mpi_common
     use m_nvtx
     use ieee_arithmetic
 
     implicit none
 
-    integer, private, allocatable, dimension(:) :: ib_buff_send !<
-    !! This variable is utilized to pack and send the buffer of the immersed
-    !! boundary markers, for a single computational domain boundary at the
-    !! time, to the relevant neighboring processor.
-
-    integer, private, allocatable, dimension(:) :: ib_buff_recv !<
-    !! q_cons_buff_recv is utilized to receive and unpack the buffer of the
-    !! immersed boundary markers, for a single computational domain boundary
-    !! at the time, from the relevant neighboring processor.
-
-    integer :: i_halo_size
+    !> This variable is utilized to pack and send the buffer of the immersed boundary markers, for a single computational domain
+    !! boundary at the time, to the relevant neighboring processor.
+    integer, private, allocatable, dimension(:) :: ib_buff_send
+    !> q_cons_buff_recv is utilized to receive and unpack the buffer of the immersed boundary markers, for a single computational
+    !! domain boundary at the time, from the relevant neighboring processor.
+    integer, private, allocatable, dimension(:) :: ib_buff_recv
+    integer                                     :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
 contains
 
@@ -64,7 +60,6 @@ contains
 
         integer :: i, j !< Generic loop iterator
         integer :: ierr !< Generic flag used to identify and report MPI errors
-
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['k_x', 'k_y', 'k_z', 'w_x', 'w_y', 'w_z', 'p_x', 'p_y', &
@@ -184,7 +179,8 @@ contains
         end if
 
         do i = 1, num_fluids_max
-            #:for VAR in ['bc_x%alpha_rho_in','bc_x%alpha_in','bc_y%alpha_rho_in','bc_y%alpha_in','bc_z%alpha_rho_in','bc_z%alpha_in']
+            #:for VAR in ['bc_x%alpha_rho_in','bc_x%alpha_in','bc_y%alpha_rho_in','bc_y%alpha_in','bc_z%alpha_rho_in', &
+                & 'bc_z%alpha_in']
                 call MPI_BCAST(${VAR}$ (i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do

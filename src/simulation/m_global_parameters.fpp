@@ -8,12 +8,11 @@
 !> @brief Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
 module m_global_parameters
 #ifdef MFC_MPI
-    use mpi                    !< Message passing interface (MPI) module
+    use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_helper_basic         !< Functions to compare floating point numbers
-
+    use m_derived_types !< Definitions of the derived types
+    use m_helper_basic !< Functions to compare floating point numbers
     ! $:USE_GPU_MODULE()
 
     implicit none
@@ -26,10 +25,8 @@ module m_global_parameters
     character(LEN=path_len) :: case_dir      !< Case folder location
     logical                 :: run_time_info !< Run-time output flag
     integer                 :: t_step_old    !< Existing IC/grid folder
-
     ! Computational Domain Parameters
     integer :: proc_rank !< Rank of the local processor
-
     !> @name Number of cells in the x-, y- and z-directions, respectively
     !> @{
     integer :: m, n, p
@@ -70,7 +67,6 @@ module m_global_parameters
     !> @}
 
     real(wp) :: dt !< Size of the time-step
-
     $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p]')
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number of time-step iterations between successive
@@ -88,9 +84,8 @@ module m_global_parameters
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     integer :: t_step_print !< Number of time-steps between printouts
-
     ! Simulation Algorithm Parameters
-    integer :: model_eqns     !< Multicomponent flow model
+    integer :: model_eqns !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: num_dims = ${num_dims}$ !< Number of spatial dimensions
         integer, parameter :: num_vels = ${num_vels}$ !< Number of velocity components (different from num_dims for mhd)
@@ -108,8 +103,8 @@ module m_global_parameters
         integer, parameter :: muscl_polyn = ${muscl_polyn}$ !< Degree of the MUSCL polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$   !< Order of the WENO reconstruction
         integer, parameter :: muscl_order = ${muscl_order}$ !< Order of the MUSCL order
-        integer, &
-            & parameter :: weno_num_stencils = ${weno_num_stencils}$ !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
+        !> Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
+        integer, parameter  :: weno_num_stencils = ${weno_num_stencils}$
         integer, parameter  :: muscl_lim = ${muscl_lim}$              !< MUSCL Limiter
         integer, parameter  :: num_fluids = ${num_fluids}$            !< number of fluids in the simulation
         logical, parameter  :: wenojs = (${wenojs}$ /= 0)             !< WENO-JS (default)
@@ -215,7 +210,6 @@ module m_global_parameters
     integer  :: relax_model  !< Relaxation model
     real(wp) :: palpha_eps   !< trigger parameter for the p relaxation procedure, phase change model
     real(wp) :: ptgalpha_eps !< trigger parameter for the pTg relaxation procedure, phase change model
-
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
 
     integer :: num_bc_patches
@@ -241,12 +235,8 @@ module m_global_parameters
     logical  :: down_sample      !< down sample the output files
     $:GPU_DECLARE(create='[down_sample]')
 
-    integer, allocatable, dimension(:) :: proc_coords !<
-    !! Processor coordinates in MPI_CART_COMM
-
-    integer, allocatable, dimension(:) :: start_idx !<
-    !! Starting cell-center index of local processor in global grid
-
+    integer, allocatable, dimension(:)            :: proc_coords !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:)            :: start_idx   !< Starting cell-center index of local processor in global grid
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
     type(mpi_io_airfoil_ib_var), public           :: MPI_IO_airfoil_IB_DATA
@@ -331,44 +321,34 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
 
-    integer :: buff_size !<
-    !! The number of cells that are necessary to be able to store enough boundary
-    !! conditions data to march the solution in the physical computational domain
-    !! to the next time-step.
-
+    !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
+    !! physical computational domain to the next time-step.
+    integer :: buff_size
     $:GPU_DECLARE(create='[buff_size]')
 
     integer               :: shear_num !! Number of shear stress components
-    integer, dimension(3) :: shear_indices !<
-    !! Indices of the stress components that represent shear stress
-    integer :: shear_BC_flip_num !<
-    !! Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2) :: shear_BC_flip_indices !<
-    !! Indices of shear stress components to reflect for boundary conditions.
-    !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
-
+    integer, dimension(3) :: shear_indices     !< Indices of the stress components that represent shear stress
+    integer               :: shear_BC_flip_num !< Number of shear stress components to reflect for boundary conditions
+    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
+    !! [indices])
+    integer, dimension(3, 2) :: shear_BC_flip_indices
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 
     ! END: Simulation Algorithm Parameters
 
     ! Fluids Physical Parameters
 
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
-    !! Database of the physical parameters of each of the fluids that is present
-    !! in the flow. These include the stiffened gas equation of state parameters,
-    !! and the Reynolds numbers.
-
+    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
+    !! equation of state parameters, and the Reynolds numbers.
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
-    integer                                  :: fd_order !<
-    !! The order of the finite-difference (fd) approximations of the first-order
-    !! derivatives that need to be evaluated when the CoM or flow probe data
-    !! files are to be written at each time step
-
-    integer :: fd_number !<
-    !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
-    !! it is a measure of the half-size of the finite-difference stencil for the
-    !! selected order of accuracy.
+    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when the CoM
+    !! or flow probe data files are to be written at each time step
+    integer :: fd_order
+    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
+    !! finite-difference stencil for the selected order of accuracy.
+    integer :: fd_number
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt
@@ -405,7 +385,7 @@ module m_global_parameters
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nb = ${nb}$ !< Number of eq. bubble sizes
     #:else
-        integer :: nb       !< Number of eq. bubble sizes
+        integer :: nb !< Number of eq. bubble sizes
     #:endif
 
     real(wp) :: Eu     !< Euler number
@@ -525,8 +505,9 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
-    logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
-
+    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
+    !! is false
+    logical :: dummy
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star      !< Stress threshold for continuum damage modeling
@@ -547,7 +528,6 @@ contains
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
         integer :: i, j !< Generic loop iterator
-
         ! Logistics
         case_dir = '.'
         run_time_info = .false.

@@ -10,7 +10,7 @@ module m_assign_variables
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters ! Global parameters for the code
     use m_variables_conversion ! Subroutines to change the state variables from
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
 
     implicit none
@@ -19,10 +19,9 @@ module m_assign_variables
 
     type(scalar_field) :: alf_sum
 
-    procedure(s_assign_patch_xxxxx_primitive_variables), pointer :: s_assign_patch_primitive_variables => null() !<
-    !! Depending on the multicomponent flow model, this variable is a pointer to
-    !! either the subroutine s_assign_patch_mixture_primitive_variables, or the
-    !! subroutine s_assign_patch_species_primitive_variables
+    !> Depending on the multicomponent flow model, this variable is a pointer to either the subroutine
+    !! s_assign_patch_mixture_primitive_variables, or the subroutine s_assign_patch_species_primitive_variables
+    procedure(s_assign_patch_xxxxx_primitive_variables), pointer :: s_assign_patch_primitive_variables => null()
     !> Abstract interface to the two subroutines that assign the patch primitive variables, either mixture or species, depending on
     !! the subroutine, to a particular cell in the computational domain
     abstract interface
@@ -100,7 +99,6 @@ contains
         real(wp) :: Ys(1:num_species)
         integer  :: smooth_patch_id
         integer  :: i !< generic loop operator
-
         ! Assigning the mixture primitive variables of a uniform state patch
 
         ! Transferring the identity of the smoothing patch
@@ -266,11 +264,9 @@ contains
         real(wp)                       :: rcoord, theta, phi, xi_sph
         real(wp), dimension(3)         :: xi_cart
         real(wp)                       :: Ys(1:num_species)
-        real(stp), dimension(sys_size) :: orig_prim_vf !<
-            !! Vector to hold original values of cell for smoothing purposes
-
-        integer :: i  !< Generic loop iterator
-        integer :: smooth_patch_id
+        real(stp), dimension(sys_size) :: orig_prim_vf !< Vector to hold original values of cell for smoothing purposes
+        integer                        :: i            !< Generic loop iterator
+        integer                        :: smooth_patch_id
 
         ! Transferring the identity of the smoothing patch
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id

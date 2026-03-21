@@ -7,8 +7,8 @@
 #:include 'macros.fpp'
 
 module m_boundary_common
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
+    use m_derived_types !< Definitions of the derived types
+    use m_global_parameters !< Definitions of the global parameters
     use m_mpi_proxy
     use m_constants
     use m_delay_file_access
@@ -1808,7 +1808,6 @@ contains
     !! locations and cell-width distributions, based on the boundary conditions.
     subroutine s_populate_grid_variables_buffers
         integer :: i !< Generic loop iterator
-
 #ifdef MFC_SIMULATION
         ! Required for compatibility between codes
         type(int_bounds_info) :: offset_x, offset_y, offset_z

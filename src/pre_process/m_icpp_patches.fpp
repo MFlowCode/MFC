@@ -13,9 +13,9 @@
 module m_icpp_patches
     use m_model ! Subroutine(s) related to STL files
     use m_derived_types ! Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
+    use m_global_parameters !< Definitions of the global parameters
     use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_helper_basic !< Functions to compare floating point numbers
     use m_helper
     use m_mpi_common
     use m_assign_variables
@@ -29,30 +29,22 @@ module m_icpp_patches
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
     integer  :: smooth_patch_id
-    real(wp) :: smooth_coeff !<
-    !! These variables are analogous in both meaning and use to the similarly
-    !! named components in the ic_patch_parameters type (see m_derived_types.f90
-    !! for additional details). They are employed as a means to more concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
-
-    real(wp) :: eta !<
-    !! In the case that smoothing of patch boundaries is enabled and the boundary
-    !! between two adjacent patches is to be smeared out, this variable's purpose
-    !! is to act as a pseudo volume fraction to indicate the contribution of each
-    !! patch toward the composition of a cell's fluid state.
-
+    !> These variables are analogous in both meaning and use to the similarly named components in the ic_patch_parameters type (see
+    !! m_derived_types.f90 for additional details). They are employed as a means to more concisely perform the actions necessary to
+    !! lay out a particular patch on the grid.
+    real(wp) :: smooth_coeff
+    !> In the case that smoothing of patch boundaries is enabled and the boundary between two adjacent patches is to be smeared out,
+    !! this variable's purpose is to act as a pseudo volume fraction to indicate the contribution of each patch toward the
+    !! composition of a cell's fluid state.
+    real(wp) :: eta
     real(wp) :: cart_x, cart_y, cart_z
-    real(wp) :: sph_phi !<
-    !! Variables to be used to hold cell locations in Cartesian coordinates if
-    !! 3D simulation is using cylindrical coordinates
-
-    type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
-    !! These variables combine the centroid and length parameters associated with
-    !! a particular patch to yield the locations of the patch boundaries in the
-    !! x-, y- and z-coordinate directions. They are used as a means to concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
-
-    character(len=5) :: istr ! string to store int to string result for error checking
+    !> Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
+    real(wp) :: sph_phi
+    !> These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the
+    !! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
+    !! necessary to lay out a particular patch on the grid.
+    type(bounds_info) :: x_boundary, y_boundary, z_boundary
+    character(len=5)  :: istr ! string to store int to string result for error checking
 contains
 
     !> @brief Dispatches each initial condition patch to its geometry-specific initialization routine.
