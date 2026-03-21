@@ -6,6 +6,7 @@ import hashlib
 import itertools
 import json
 import os
+import resource
 import shutil
 import subprocess
 from typing import Callable, Dict, List, Optional, Set, Union
@@ -14,6 +15,14 @@ from .. import case, common
 from ..build import MFCTarget, get_target
 from ..run import input
 from ..state import ARG
+
+# MFC simulations (especially viscous cylindrical cases) require large stack
+# sizes.  The batch templates all include `ulimit -s unlimited`, but the direct
+# MPI execution path in the test runner bypasses the templates.  Set the soft
+# stack limit to the hard limit so that spawned MPI processes inherit it.
+_soft, _hard = resource.getrlimit(resource.RLIMIT_STACK)
+if _soft != resource.RLIM_INFINITY and _soft < _hard:
+    resource.setrlimit(resource.RLIMIT_STACK, (_hard, _hard))
 
 
 @dataclasses.dataclass
