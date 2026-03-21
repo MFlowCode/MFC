@@ -112,17 +112,20 @@ def _get_mpi_config() -> MPIConfig:
     raise common.MFCException("Could not find an MPI launcher (mpirun, srun, or mpiexec).")
 
 
-def _mpi_cmd(cfg: MPIConfig, ppn: int, exe: str) -> List[str]:
+def _mpi_cmd(cfg: MPIConfig, ppn: int, exe: str, gpu: bool = False) -> List[str]:
     """Build the MPI launch command for a given config."""
     binary = cfg.binary
     if binary == "mpirun":
         return [binary, "-np", str(ppn), *cfg.flags, exe]
     if binary == "srun":
-        return [binary, "--ntasks", str(ppn), *cfg.flags, exe]
+        gpu_flags = ["--gpus-per-task", "1", "--gpu-bind", "closest"] if gpu else []
+        return [binary, "--ntasks", str(ppn), *gpu_flags, *cfg.flags, exe]
     if binary == "jsrun":
-        return [binary, "--nrs", str(ppn), "--cpu_per_rs", "1", "--gpu_per_rs", "0", "--tasks_per_rs", "1", *cfg.flags, exe]
+        gpu_per_rs = "1" if gpu else "0"
+        return [binary, "--nrs", str(ppn), "--cpu_per_rs", "1", "--gpu_per_rs", gpu_per_rs, "--tasks_per_rs", "1", *cfg.flags, exe]
     if binary == "flux":
-        return [binary, *cfg.flags, "--ntasks", str(ppn), exe]
+        gpu_flags = ["--gpus-per-task", "1"] if gpu else []
+        return [binary, *cfg.flags, "--ntasks", str(ppn), *gpu_flags, exe]
     return [binary, "-n", str(ppn), *cfg.flags, exe]
 
 
@@ -314,7 +317,7 @@ class TestCase(case.Case):
         all_output = []
         for target_obj in target_objs:
             bin_path = target_obj.get_install_binpath(slug_case)
-            cmd = _mpi_cmd(cfg, self.ppn, bin_path)
+            cmd = _mpi_cmd(cfg, self.ppn, bin_path, gpu=bool(gpus))
 
             try:
                 result = subprocess.run(

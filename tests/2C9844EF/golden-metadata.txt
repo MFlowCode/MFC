@@ -1,49 +1,16 @@
-This file was created on 2025-09-07 23:22:40.576634.
+This file was created on 2026-03-21 19:19:26.245314.
 
 mfc.sh:
 
-    Invocation: test --gpu --rdma-mpi -f 2C9844EF -t 2C9844EF --generate -- -c frontier
-    Lock:       mpi=Yes & gpu=Yes & debug=No & gcov=No & unified=No & single=No & fastmath=No
-    Git:        b0ea72d0f95e0e04e2c273aa5d277beb8aea39d6 on RDMA-fix (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on login12
-    
-        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
-        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-    
-        Fypp    : /ccs/home/malmahrouqi3/Desktop/RDMA-fix/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
-        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --generate --no-build --rdma-mpi --gpu acc -j 1 -o RDMA MPI
+    Lock:       mpi=Yes & gpu=Acc & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        1ef4c77eeac74cf8c390fed3cf917b9cdb85e910 on threading (dirty)
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.28.3 on login12
+        CMake v3.30.5 on login10
     
         C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
         Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
@@ -57,8 +24,77 @@ syscheck:
     
         MPI     : ON
         OpenACC : ON
+        OpenMP  : OFF
     
-        Fypp    : /ccs/home/malmahrouqi3/Desktop/RDMA-fix/build/venv/bin/fypp
+        Fypp    : /ccs/home/sbryngelson/scratch/MFC-cray-fasttests/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.5 on login10
+    
+        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : ON
+        OpenMP  : OFF
+    
+        Fypp    : /ccs/home/sbryngelson/scratch/MFC-cray-fasttests/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.5 on login10
+    
+        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : ON
+        OpenMP  : OFF
+    
+        Fypp    : /ccs/home/sbryngelson/scratch/MFC-cray-fasttests/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -76,7 +112,7 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.28.3 on login12
+        CMake v3.30.5 on login10
     
         C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
         Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
@@ -90,8 +126,9 @@ simulation:
     
         MPI     : ON
         OpenACC : ON
+        OpenMP  : OFF
     
-        Fypp    : /ccs/home/malmahrouqi3/Desktop/RDMA-fix/build/venv/bin/fypp
+        Fypp    : /ccs/home/sbryngelson/scratch/MFC-cray-fasttests/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -127,7 +164,7 @@ CPU:
     CPU(s) scaling MHz:                   103%
     CPU max MHz:                          2000.0000
     CPU min MHz:                          1500.0000
-    BogoMIPS:                             3992.21
+    BogoMIPS:                             3992.65
     Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm
     Virtualization:                       AMD-V
     L1d cache:                            2 MiB (64 instances)
