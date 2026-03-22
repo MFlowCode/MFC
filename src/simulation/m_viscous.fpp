@@ -166,10 +166,12 @@ contains
                                 end if
                             end if
 
+                            ! Shear stress near cylindrical axis: includes v/r hoop term
                             tau_Re(2, 1) = (grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l))/Re_visc(1)
 
                             tau_Re(2, 2) = (4._wp*grad_y_vf(2)%sf(j, k, l) - 2._wp*grad_x_vf(1)%sf(j, k, &
                                    & l) - 2._wp*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/(3._wp*Re_visc(1))
+                            ! Viscous flux contribution to momentum and energy equations
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, 2
                                 tau_Re_vf(contxe + i)%sf(j, k, l) = tau_Re_vf(contxe + i)%sf(j, k, l) - tau_Re(2, i)
@@ -527,7 +529,7 @@ contains
         end do
 
         if (weno_Re_flux) then
-            ! Compute velocity gradient at cell centers using scalar divergence theorem
+            ! Compute velocity gradients via divergence theorem on cell-boundary reconstructed values
             do i = 1, num_dims
                 if (i == 1) then
                     call s_apply_scalar_divergence_theorem(qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
@@ -543,7 +545,7 @@ contains
                                                            & buff_size)
                 end if
             end do
-        else ! Compute velocity gradient at cell centers using finite differences
+        else ! Compute velocity gradients at cell centers using central finite differences
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
             $:GPU_UPDATE(device='[iv]')
 
@@ -1373,14 +1375,14 @@ contains
             divergence = divergence + velocity_gradient_tensor(l, l)
         end do
 
-        ! set up the shear stress tensor
+        ! Viscous stress tensor: tau_ij = mu * (du_i/dx_j + du_j/dx_i) - 2/3 * mu * div(u) * delta_ij
         do l = 1, num_dims
             do q = 1, num_dims
                 viscous_stress_tensor(l, q) = dynamic_viscosity*(velocity_gradient_tensor(l, q) + velocity_gradient_tensor(q, l))
             end do
         end do
 
-        ! populate the viscous_stress_tensor
+        ! Subtract isotropic bulk viscosity term (Stokes hypothesis)
         do l = 1, num_dims
             viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp*divergence*dynamic_viscosity/3._wp
         end do

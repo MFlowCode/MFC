@@ -561,6 +561,9 @@ contains
         real(wp) :: t_start, t_finish
         integer :: id
         integer(kind=8) :: i, j, k, l, q !< Generic loop iterators
+
+        ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
+
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
@@ -645,7 +648,7 @@ contains
             call nvtxEndRange
         end if
 
-        ! Dimensional Splitting Loop
+        ! Loop over coordinate directions for dimensional splitting
         do id = 1, num_dims
             if (igr .or. dummy) then
                 if (id == 1) then
@@ -785,7 +788,7 @@ contains
                     call nvtxEndRange
                 end if
 
-                ! RHS additions for viscosity
+                ! Viscous stress contribution to RHS
                 if (viscous .or. surface_tension .or. chem_params%diffusion) then
                     call nvtxStartRange("RHS-ADD-PHYSICS")
                     call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
@@ -793,7 +796,7 @@ contains
                     call nvtxEndRange
                 end if
 
-                ! RHS additions for sub-grid bubbles_euler
+                ! Bubble dynamics source terms
                 if (bubbles_euler) then
                     call nvtxStartRange("RHS-BUBBLES-COMPUTE")
                     call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)

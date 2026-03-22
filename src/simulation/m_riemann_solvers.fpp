@@ -158,7 +158,7 @@ contains
 
     end subroutine s_compute_viscous_source_flux
 
-    !> @brief Computes intercell fluxes using the Harten-Lax-van Leer (HLL) approximate Riemann solver.
+    ! HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -519,8 +519,10 @@ contains
                                 end do
                             end if
 
+                            ! Wave speed estimates (wave_speeds=1: direct, wave_speeds=2: pressure-based)
                             if (wave_speeds == 1) then
                                 if (mhd) then
+                                    ! MHD: use fast magnetosonic speed
                                     s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
@@ -578,7 +580,7 @@ contains
                             xi_P = (5.e-1_wp - sign(5.e-1_wp, s_R)) + (5.e-1_wp - sign(5.e-1_wp, s_L))*(5.e-1_wp + sign(5.e-1_wp, &
                                     & s_R))
 
-                            ! Low Mach correction
+                            ! HLL intercell flux: F* = (s_R*F_L - s_L*F_R + s_L*s_R*(U_R - U_L)) / (s_R - s_L) Low Mach correction
                             if (low_Mach == 1) then
                                 @:compute_low_Mach_correction()
                             else
@@ -708,7 +710,7 @@ contains
                                 end do
                             end if
 
-                            ! Advection
+                            ! Advection flux and source: interface velocity for volume fraction transport
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = (qL_prim_rs${XYZ}$_vf(j, k, l, i) - qR_prim_rs${XYZ}$_vf(j + 1, &
@@ -737,6 +739,7 @@ contains
                                 end do
                             end if
 
+                            ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
                                 if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
@@ -833,7 +836,7 @@ contains
 
     end subroutine s_hll_riemann_solver
 
-    !> @brief Computes intercell fluxes using the Lax-Friedrichs (LF) approximate Riemann solver.
+    ! Lax-Friedrichs (Rusanov) approximate Riemann solver
     subroutine s_lf_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -1323,7 +1326,7 @@ contains
                                 end do
                             end if
 
-                            ! Advection
+                            ! Advection flux and source: interface velocity for volume fraction transport
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = (qL_prim_rs${XYZ}$_vf(j, k, l, i) - qR_prim_rs${XYZ}$_vf(j + 1, &
@@ -1352,6 +1355,7 @@ contains
                                 end do
                             end if
 
+                            ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
                                 if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
@@ -1701,9 +1705,7 @@ contains
 
     end subroutine s_lf_riemann_solver
 
-    !> This procedure is the implementation of the Harten, Lax, van Leer, and contact (HLLC) approximate Riemann solver, see Toro
-    !! (1999) and Johnsen (2007). The viscous and the surface tension effects have been included by modifying the exact Riemann
-    !! solver of Perigaud and Saurel (2005).
+    ! HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
     !! @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
     !! @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
     !! @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
@@ -1830,9 +1832,9 @@ contains
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
-                ! 6-EQUATION MODEL WITH HLLC
+                ! 6-EQUATION MODEL WITH HLLC HLLC star-state flux with contact wave speed s_S
                 if (model_eqns == 3) then
-                    ! ME3
+                    ! 6-equation model (model_eqns=3): separate phasic internal energies
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, &
                                         & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, &
                                         & h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, rho_L, &
@@ -1967,7 +1969,7 @@ contains
                                     end do
                                 end if
 
-                                ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                                ! Hyperelastic stress contribution: strain energy added to total energy
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -2144,7 +2146,7 @@ contains
                                                       & i)*s_S + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*s_S
                                 end do
 
-                                ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
+                                ! Advection velocity source: interface velocity for volume fraction transport
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, &
@@ -2187,7 +2189,7 @@ contains
                                     end do
                                 end if
 
-                                ! REFERENCE MAP FLUX.
+                                ! Hyperelastic reference map flux for material deformation tracking
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -2243,7 +2245,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else if (model_eqns == 4) then
-                    ! ME4
+                    ! 4-equation model (model_eqns=4): single pressure, velocity equilibrium
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
                                         & nbub_L, nbub_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, &
                                         & T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, &
@@ -2397,7 +2399,7 @@ contains
                                                       & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! Source for volume fraction advection equation
+                                ! Advection velocity source: interface velocity for volume fraction transport
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = 0._wp
@@ -2462,6 +2464,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else if (model_eqns == 2 .and. bubbles_euler) then
+                    ! 5-equation model with Euler-Euler bubble dynamics
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, &
                                         & vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, Re_L, Re_R, pcorr, zcoef, rho_L, &
                                         & rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, &
@@ -2776,7 +2779,7 @@ contains
                                                       & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! Source for volume fraction advection equation
+                                ! Advection velocity source: interface velocity for volume fraction transport
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, &
@@ -2855,7 +2858,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else
-                    ! 5-EQUATION MODEL WITH HLLC
+                    ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, &
                                         & rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, &
                                         & alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, &
@@ -3038,7 +3041,7 @@ contains
                                     end do
                                 end if
 
-                                ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                                ! Hyperelastic stress contribution: strain energy added to total energy
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -3240,7 +3243,7 @@ contains
                                                       & c_idx)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end if
 
-                                ! REFERENCE MAP FLUX.
+                                ! Hyperelastic reference map flux for material deformation tracking
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -3340,7 +3343,7 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
-    !> HLLD Riemann solver resolves 5 of the 7 waves of MHD equations: 1 entropy wave, 2 Alfven waves, 2 fast magnetosonic waves.
+    ! HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
     subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -3512,13 +3515,13 @@ contains
                             F_R(3:4) = U_R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
                             F_R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
                             F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
-                            ! Compute the star flux using HLL relation
+                            ! HLLD star-state fluxes via HLL jump relation
                             F_starL = F_L + s_L*(U_starL - U_L)
                             F_starR = F_R + s_R*(U_starR - U_R)
-                            ! Compute the rotational (Alfven) speeds
+                            ! Alfven wave speeds bounding the rotational discontinuities
                             s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
                             s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
-                            ! Compute the double-star states [Miyoshi Eqns. (59)-(62)]
+                            ! HLLD double-star (intermediate) states across rotational discontinuities
                             sqrt_rhoL_star = sqrt(rhoL_star); sqrt_rhoR_star = sqrt(rhoR_star)
                             vL_star = vel%L(2); wL_star = vel%L(3)
                             vR_star = vel%R(2); wR_star = vel%R(3)
@@ -3544,7 +3547,7 @@ contains
                             U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, Bz_double, &
                                 & E_double]
 
-                            ! (11) Choose HLLD flux based on wave-speed regions
+                            ! Select HLLD flux from the 5 wave-speed regions: L, *L, **L/**R, *R, R
                             if (0.0_wp <= s_L) then
                                 F_hlld = F_L
                             else if (0.0_wp <= s_starL) then

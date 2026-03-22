@@ -4,7 +4,8 @@
 
 #:include 'macros.fpp'
 
-!> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
+!> @brief One-way acoustic source injection following Maeda and Colonius, JCP 2017. Supports planar, focused transducer, transducer
+!! array, and broadband waveforms.
 module m_acoustic_src
 
     use m_derived_types        !< Definitions of the derived types
@@ -363,6 +364,7 @@ contains
 
         source = 0._wp
 
+        ! Temporal waveform: sine, Gaussian pulse, square wave, or broadband
         if (pulse(ai) == 1) then ! Sine wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
@@ -396,7 +398,7 @@ contains
 
     end subroutine s_source_temporal
 
-    !> This subroutine identifies and precalculates the non-zero acoustic spatial sources before time-stepping
+    !> Pre-compute non-zero spatial source weights before time-stepping
     impure subroutine s_precalculate_acoustic_spatial_sources
 
         integer             :: j, k, l, ai
@@ -540,6 +542,7 @@ contains
 
         source = 0._wp
 
+        ! Gaussian spatial pulse profile: exp(-0.5 * (d / sigma)^2) / (sqrt(2*pi) * sigma)
         if (support(ai) == 1) then ! 1D
             source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(r(1)/(sig/2._wp))**2._wp)
         else if (support(ai) == 2 .or. support(ai) == 3) then ! 2D or 3D

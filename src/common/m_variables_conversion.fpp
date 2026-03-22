@@ -127,17 +127,21 @@ contains
             ! procedure pointer
 
             if (mhd) then
+                ! MHD pressure: subtract magnetic pressure from total energy
                 pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
             else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
+                ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002): p from mixture EOS
                 pres = (energy - dyn_p - pi_inf - qv)/gamma
             else if ((model_eqns /= 4) .and. bubbles_euler) then
+                ! Bubble-augmented pressure with void fraction correction
                 pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
             else
+                ! Four-equation model (Kapila et al. PoF 2001): Tait EOS inversion
                 pres = (pref + pi_inf)*(energy/(rhoref*(1 - alf)))**(1/gamma + 1) - pi_inf
             end if
 
             if (hypoelasticity .and. present(G)) then
-                ! calculate elastic contribution to Energy
+                ! Subtract elastic strain energy before computing pressure (hypoelastic model)
                 E_e = 0._wp
                 do s = stress_idx%beg, stress_idx%end
                     if (G > 0) then
@@ -152,6 +156,7 @@ contains
                 pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
             end if
         #:else
+            ! Reacting mixture pressure from temperature and species
             Y_rs(:) = rhoYks(:)/rho
             e_Per_Kg = energy/rho
             Pdyn_Per_Kg = dyn_p/rho
@@ -496,7 +501,8 @@ contains
 
     end subroutine s_initialize_pb
 
-    !> The following procedure handles the conversion between the conservative variables and the primitive variables.
+    !> Convert conserved variables (rho*alpha, rho*u, E, alpha) to primitives (rho, u, p, alpha). Conversion depends on model_eqns:
+    !! each model has different variable sets and EOS.
     !! @param qK_cons_vf Conservative variables
     !! @param q_T_sf Temperature scalar field
     !! @param qK_prim_vf Primitive variables
@@ -644,6 +650,7 @@ contains
                     end if
 
                     if (chemistry) then
+                        ! Reacting flow: recover density from species partial densities, compute mass fractions Y_k = rhoY_k / rho
                         rho_K = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = chemxb, chemxe
@@ -660,6 +667,7 @@ contains
                             qK_prim_vf(i)%sf(j, k, l) = max(0._wp, qK_cons_vf(i)%sf(j, k, l)/rho_K)
                         end do
                     else
+                        ! Non-reacting: partial densities are directly primitive (alpha_i * rho_i)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, contxe
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
@@ -670,12 +678,14 @@ contains
                     rho_K = max(rho_K, sgm_eps)
 #endif
 
+                    ! Recover velocity from momentum: u = rho*u / rho, and accumulate dynamic pressure 0.5*rho*|u|^2
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = momxb, momxe
                         if (model_eqns /= 4) then
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                             dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l)*qK_prim_vf(i)%sf(j, k, l)
                         else
+                            ! Four-equation model (Kapila et al. PoF 2001): divide by total density q_cons(1)
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/qK_cons_vf(1)%sf(j, k, l)
                         end if
                     end do
@@ -711,6 +721,7 @@ contains
                     end if
 
                     if (bubbles_euler) then
+                        ! Recover bubble primitive variables: divide conserved moments by bubble number density
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, nb
                             nRtmp(i) = qK_cons_vf(bubrs_vc(i))%sf(j, k, l)
@@ -808,7 +819,7 @@ contains
 
     end subroutine s_convert_conservative_to_primitive_variables
 
-    !> The following procedure handles the conversion between the primitive variables and the conservative variables.
+    !> Convert primitives (rho, u, p, alpha) to conserved variables (rho*alpha, rho*u, E, alpha).
     !! @param q_prim_vf Primitive variables
     !! @param q_cons_vf Conservative variables
     impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
@@ -925,6 +936,7 @@ contains
                     end do
 
                     if (chemistry) then
+                        ! Reacting mixture: compute conserved energy from species mass fractions and temperature
                         do i = chemxb, chemxe
                             Ys(i - chemxb + 1) = q_prim_vf(i)%sf(j, k, l)
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
@@ -945,24 +957,24 @@ contains
                                 pres_mag = 0.5_wp*(q_prim_vf(B_idx%beg)%sf(j, k, l)**2 + q_prim_vf(B_idx%beg + 1)%sf(j, k, &
                                                    & l)**2 + q_prim_vf(B_idx%beg + 2)%sf(j, k, l)**2)
                             end if
+                            ! MHD energy includes magnetic pressure contribution
                             q_cons_vf(E_idx)%sf(j, k, l) = gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pres_mag + pi_inf + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
-                            ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
+                            ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
                             q_cons_vf(E_idx)%sf(j, k, l) = gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler)) then
-                            ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
+                            ! Bubble-augmented energy with void fraction correction
                             q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(alf_idx)%sf(j, k, &
                                       & l))*(gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
                         else
-                            ! Tait EOS, no conserved energy variable
+                            ! Four-equation model (Kapila et al. PoF 2001): Tait EOS, no conserved energy variable
                             q_cons_vf(E_idx)%sf(j, k, l) = 0._wp
                         end if
                     end if
 
-                    ! Computing the internal energies from the pressure and continuities
+                    ! Six-equation model (Saurel et al. JCP 2009): compute per-phase internal energies
                     if (model_eqns == 3) then
                         do i = 1, num_fluids
-                            ! internal energy calculation for each of the fluids
                             q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, &
                                       & l)*(gammas(i)*q_prim_vf(E_idx)%sf(j, k, &
                                       & l) + pi_infs(i)) + q_cons_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)

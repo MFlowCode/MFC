@@ -79,7 +79,7 @@ contains
         type(integer_field), dimension(1:num_dims, 1:2), intent(in)                                              :: bc_type
         integer                                                                                                  :: k, l
 
-        ! Population of Buffers in x-direction
+        ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
 
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)

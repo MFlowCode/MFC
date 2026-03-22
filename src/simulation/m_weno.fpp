@@ -176,6 +176,8 @@ contains
     !! @param is Index bounds in the s-direction
     subroutine s_compute_weno_coefficients(weno_dir, is)
 
+        ! Compute WENO coefficients for a given coordinate direction. Shu (1997)
+
         integer, intent(in)               :: weno_dir
         type(int_bounds_info), intent(in) :: is
         integer                           :: s
@@ -200,18 +202,21 @@ contains
             if (weno_dir == ${WENO_DIR}$) then
                 if (weno_order == 3) then
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
+                        ! Polynomial reconstruction coefficients
                         poly_coef_cbR_${XYZ}$ (i + 1, 0, 0) = (s_cb(i) - s_cb(i + 1))/(s_cb(i) - s_cb(i + 2))
                         poly_coef_cbR_${XYZ}$ (i + 1, 1, 0) = (s_cb(i) - s_cb(i + 1))/(s_cb(i - 1) - s_cb(i + 1))
 
                         poly_coef_cbL_${XYZ}$ (i + 1, 0, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 0, 0)
                         poly_coef_cbL_${XYZ}$ (i + 1, 1, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 1, 0)
 
+                        ! Ideal (linear) weights
                         d_cbR_${XYZ}$ (0, i + 1) = (s_cb(i - 1) - s_cb(i + 1))/(s_cb(i - 1) - s_cb(i + 2))
                         d_cbL_${XYZ}$ (0, i + 1) = (s_cb(i - 1) - s_cb(i))/(s_cb(i - 1) - s_cb(i + 2))
 
                         d_cbR_${XYZ}$ (1, i + 1) = 1._wp - d_cbR_${XYZ}$ (0, i + 1)
                         d_cbL_${XYZ}$ (1, i + 1) = 1._wp - d_cbL_${XYZ}$ (0, i + 1)
 
+                        ! Smoothness indicator coefficients
                         beta_coef_${XYZ}$ (i + 1, 0, 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp/(s_cb(i) - s_cb(i + 2))**2._wp
                         beta_coef_${XYZ}$ (i + 1, 1, 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp/(s_cb(i - 1) - s_cb(i + 1))**2._wp
                     end do
@@ -234,6 +239,7 @@ contains
                     ! Computing WENO5 Coefficients
                 else if (weno_order == 5) then
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
+                        ! Polynomial reconstruction coefficients
                         poly_coef_cbR_${XYZ}$ (i + 1, 0, &
                                                & 0) = ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/((s_cb(i) - s_cb(i &
                                                & + 3))*(s_cb(i + 3) - s_cb(i + 1)))
@@ -272,6 +278,7 @@ contains
                                                & 0) = ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/((s_cb(i - 2) &
                                                & - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))*((s_cb(i) - s_cb(i + 1)))
 
+                        ! Ideal (linear) weights
                         d_cbR_${XYZ}$ (0, &
                                        & i + 1) = ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/((s_cb(i - 2) &
                                        & - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
@@ -288,6 +295,7 @@ contains
                         d_cbR_${XYZ}$ (1, i + 1) = 1._wp - d_cbR_${XYZ}$ (0, i + 1) - d_cbR_${XYZ}$ (2, i + 1)
                         d_cbL_${XYZ}$ (1, i + 1) = 1._wp - d_cbL_${XYZ}$ (0, i + 1) - d_cbL_${XYZ}$ (2, i + 1)
 
+                        ! Smoothness indicator coefficients
                         beta_coef_${XYZ}$ (i + 1, 0, &
                                            & 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - s_cb(i))**2._wp &
                                            & + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1)) &
@@ -1484,7 +1492,7 @@ contains
                         d(0) = v_rs_ws(j + 1, k, l, i) + v_rs_ws(j - 1, k, l, i) - v_rs_ws(j, k, l, i)*2._wp
                         d(1) = v_rs_ws(j + 2, k, l, i) + v_rs_ws(j, k, l, i) - v_rs_ws(j + 1, k, l, i)*2._wp
 
-                        ! Median function for oscillation detection Fourth-order curvature limiter (Eq. 2.12 in Suresh & Huynh)
+                        ! Median function for oscillation detection
                         d_MD = (sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, 4._wp*d(0) - d(-1)))*abs((sign(1._wp, &
                                 & 4._wp*d(-1) - d(0)) + sign(1._wp, d(-1)))*(sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, &
                                 & d(0))))*min(abs(4._wp*d(-1) - d(0)), abs(d(-1)), abs(4._wp*d(0) - d(-1)), abs(d(0)))/8._wp
