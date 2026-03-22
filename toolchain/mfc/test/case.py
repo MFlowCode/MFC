@@ -119,7 +119,7 @@ def _mpi_cmd(cfg: MPIConfig, ppn: int, exe: str, gpu: bool = False) -> List[str]
         return [binary, "-np", str(ppn), *cfg.flags, exe]
     if binary == "srun":
         gpu_flags = ["--gpus-per-task", "1", "--gpu-bind", "closest"] if gpu else []
-        return [binary, "--ntasks", str(ppn), *gpu_flags, *cfg.flags, exe]
+        return [binary, "--nodes", "1", "--ntasks-per-node", str(ppn), *gpu_flags, *cfg.flags, exe]
     if binary == "jsrun":
         gpu_per_rs = "1" if gpu else "0"
         return [binary, "--nrs", str(ppn), "--cpu_per_rs", "1", "--gpu_per_rs", gpu_per_rs, "--tasks_per_rs", "1", *cfg.flags, exe]
