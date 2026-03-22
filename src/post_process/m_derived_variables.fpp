@@ -6,10 +6,10 @@
 
 module m_derived_variables
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Global parameters for the code
-    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
-    use m_helper_basic      !< Functions to compare floating point numbers
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_helper_basic
     use m_variables_conversion
 
     implicit none
@@ -49,22 +49,18 @@ contains
 
         ! Allocate FD coefficients (up to 4th order; higher orders need extension)
 
-        ! Allocating centered finite-difference coefficients in x-direction
         if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt) then
             allocate (fd_coeff_x(-fd_number:fd_number, -offset_x%beg:m + offset_x%end))
         end if
 
-        ! Allocating centered finite-difference coefficients in y-direction
         if (omega_wrt(1) .or. omega_wrt(3) .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
             allocate (fd_coeff_y(-fd_number:fd_number, -offset_y%beg:n + offset_y%end))
         end if
 
-        ! Allocating centered finite-difference coefficients in z-direction
         if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
             allocate (fd_coeff_z(-fd_number:fd_number, -offset_z%beg:p + offset_z%end))
         end if
 
-        ! Set flg=1 if 3D, else 0
         if (p > 0) then
             flg = 1
         else
@@ -81,8 +77,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: i, j, k !< Generic loop iterators
-        ! Computing specific heat ratio from specific heat ratio function
+        integer :: i, j, k
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
@@ -102,9 +97,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: i, j, k !< Generic loop iterators
-        ! Calculating the values of the liquid stiffness from those of the specific heat ratio function and the liquid stiffness
-        ! function
+        integer :: i, j, k
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
@@ -127,15 +120,12 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: i, j, k !< Generic loop iterators
-        ! Fluid bulk modulus for alternate sound speed
+        integer  :: i, j, k
         real(wp) :: blkmod1, blkmod2
 
-        ! Compute speed of sound from pressure, density, gamma, liquid stiffness
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
-                    ! Compute mixture sound speed
                     if (alt_soundspeed .neqv. .true.) then
                         q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_inf_sf(i, j, &
                              & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
@@ -171,8 +161,8 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        real(wp) :: top, bottom, slope !< Flux limiter calcs
-        integer  :: j, k, l            !< Generic loop iterators
+        real(wp) :: top, bottom, slope
+        integer  :: j, k, l
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
@@ -213,7 +203,6 @@ contains
                         slope = (top*bottom)/(bottom**2._wp + 1.e-16_wp)
                     end if
 
-                    ! Flux limiter function
                     if (flux_lim == 1) then ! MINMOD (MM)
                         q_sf(j, k, l) = max(0._wp, min(1._wp, slope))
                     else if (flux_lim == 2) then ! MUSCL (MC)
@@ -237,7 +226,7 @@ contains
 
     !> Computes the solution to the linear system Ax=b w/ sol = x
     !! @param A Input matrix
-    !! @param b right-hane-side
+    !! @param b right-hand-side
     !! @param sol Solution
     !! @param ndim Problem size
     subroutine s_solve_linear_system(A, b, sol, ndim)
@@ -251,10 +240,9 @@ contains
 
         integer :: i, j, k
 
-        ! Solve linear system using own linear solver (Thomson/Darter/Comet/Stampede) Forward elimination
+        ! Forward elimination with partial pivoting
 
         do i = 1, ndim
-            ! Pivoting
             j = i - 1 + maxloc(abs(A(i:ndim, i)), 1)
             sol = A(i,:)
             A(i,:) = A(j,:)
@@ -262,7 +250,6 @@ contains
             sol(1) = b(i)
             b(i) = b(j)
             b(j) = sol(1)
-            ! Elimination
             b(i) = b(i)/A(i, i)
             A(i,:) = A(i,:)/A(i, i)
             do k = i + 1, ndim
@@ -271,7 +258,6 @@ contains
             end do
         end do
 
-        ! Backward substitution
         do i = ndim, 1, -1
             sol(i) = b(i)
             do k = i + 1, ndim
@@ -295,8 +281,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: j, k, l, r !< Generic loop iterators
-        ! Computing the vorticity component in the x-coordinate direction
+        integer :: j, k, l, r
         if (i == 1) then
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -316,8 +301,6 @@ contains
                     end do
                 end do
             end do
-
-            ! Computing the vorticity component in the y-coordinate direction
         else if (i == 2) then
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -336,8 +319,6 @@ contains
                     end do
                 end do
             end do
-
-            ! Computing the vorticity component in the z-coordinate direction
         else
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -368,7 +349,7 @@ contains
 
         real(wp), dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
         real(wp)                      :: trS, Q, IIS
-        integer                       :: j, k, l, r, jj, kk !< Generic loop iterators
+        integer                       :: j, k, l, r, jj, kk
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
@@ -397,7 +378,6 @@ contains
                         end do
                     end do
 
-                    ! Compute S2 = S*S'
                     do jj = 1, 3
                         do kk = 1, 3
                             O2(jj, kk) = O(jj, 1)*O(kk, 1) + O(jj, 2)*O(kk, 2) + O(jj, 3)*O(kk, 3)
@@ -405,7 +385,6 @@ contains
                         end do
                     end do
 
-                    ! Compute Q
                     Q = 0.5_wp*((O2(1, 1) + O2(2, 2) + O2(3, 3)) - (S2(1, 1) + S2(2, 2) + S2(3, 3)))
                     trS = S(1, 1) + S(2, 2) + S(3, 3)
                     IIS = 0.5_wp*((S(1, 1) + S(2, 2) + S(3, 3))**2 - (S2(1, 1) + S2(2, 2) + S2(3, 3)))
@@ -431,20 +410,20 @@ contains
         !> Liutex rigid rotation axis
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, nm), &
              & intent(out) :: liutex_axis
-        character, parameter        :: ivl = 'N'     !< compute left eigenvectors
-        character, parameter        :: ivr = 'V'     !< compute right eigenvectors
-        real(wp), dimension(nm, nm) :: vgt           !< velocity gradient tensor
-        real(wp), dimension(nm)     :: lr, li        !< real and imaginary parts of eigenvalues
-        real(wp), dimension(nm, nm) :: vl, vr        !< left and right eigenvectors
-        integer, parameter          :: lwork = 4*nm  !< size of work array (4*nm recommended)
-        real(wp), dimension(lwork)  :: work          !< work array
+        character, parameter        :: ivl = 'N'    !< compute left eigenvectors
+        character, parameter        :: ivr = 'V'    !< compute right eigenvectors
+        real(wp), dimension(nm, nm) :: vgt          !< velocity gradient tensor
+        real(wp), dimension(nm)     :: lr, li       !< real and imaginary parts of eigenvalues
+        real(wp), dimension(nm, nm) :: vl, vr       !< left and right eigenvectors
+        integer, parameter          :: lwork = 4*nm !< size of work array (4*nm recommended)
+        real(wp), dimension(lwork)  :: work         !< work array
         integer                     :: info
-        real(wp), dimension(nm)     :: eigvec        !< real eigenvector
-        real(wp)                    :: eigvec_mag    !< magnitude of real eigenvector
-        real(wp)                    :: omega_proj    !< projection of vorticity on real eigenvector
-        real(wp)                    :: lci           !< imaginary part of complex eigenvalue
+        real(wp), dimension(nm)     :: eigvec       !< real eigenvector
+        real(wp)                    :: eigvec_mag   !< magnitude of real eigenvector
+        real(wp)                    :: omega_proj   !< projection of vorticity on real eigenvector
+        real(wp)                    :: lci          !< imaginary part of complex eigenvalue
         real(wp)                    :: alpha
-        integer                     :: j, k, l, r, i !< Generic loop iterators
+        integer                     :: j, k, l, r, i
         integer                     :: idx
 
         do l = -offset_z%beg, p + offset_z%end
@@ -535,10 +514,8 @@ contains
         !! sub-domain. The first position in the variable contains the maximum value and the second contains the rank of the
         !! processor on which it occurred.
         real(wp), dimension(2) :: gm_rho_max
-        integer                :: i, j, k, l !< Generic loop iterators
-        ! Computing Gradient Magnitude of Density
+        integer                :: i, j, k, l
 
-        ! Contributions from the x- and y-coordinate directions
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
@@ -555,7 +532,6 @@ contains
             end do
         end do
 
-        ! Contribution from the z-coordinate direction
         if (p > 0) then
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -576,16 +552,11 @@ contains
             end do
         end if
 
-        ! Finalize Schlieren: take sqrt of accumulated dot product
         gm_rho_sf = sqrt(gm_rho_sf)
 
-        ! Find local max of density gradient magnitude with processor rank
         gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, wp)/)
 
-        ! Compute global max density gradient across all processors
         if (num_procs > 1) call s_mpi_reduce_maxloc(gm_rho_max)
-
-        ! Computing Numerical Schlieren Function
 
         ! The form of the numerical Schlieren function depends on the choice of the multicomponent flow model. For the gamma/pi_inf
         ! model, the exponential of the negative, normalized, gradient magnitude of the density is computed. For the volume fraction

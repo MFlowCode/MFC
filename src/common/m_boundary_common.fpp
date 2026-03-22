@@ -269,7 +269,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         #:endif
-        ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_variables_buffers
 
@@ -1857,7 +1856,7 @@ contains
     !! locations and cell-width distributions, based on the boundary conditions.
     subroutine s_populate_grid_variables_buffers
 
-        integer :: i !< Generic loop iterator
+        integer :: i
 
 #ifdef MFC_SIMULATION
         ! Required for compatibility between codes
@@ -1922,7 +1921,6 @@ contains
         do i = 1, buff_size
             x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
-        ! END: Population of Buffers in x-direction
 
         ! Population of Buffers in y-direction
 
@@ -1979,7 +1977,6 @@ contains
         do i = 1, buff_size
             y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
         end do
-        ! END: Population of Buffers in y-direction
 
         ! Population of Buffers in z-direction
 
@@ -2036,7 +2033,6 @@ contains
         do i = 1, buff_size
             z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
         end do
-        ! END: Population of Buffers in z-direction
 #endif
 
     end subroutine s_populate_grid_variables_buffers

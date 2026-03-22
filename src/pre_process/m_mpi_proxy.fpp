@@ -6,12 +6,12 @@
 module m_mpi_proxy
 
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi
 #endif
 
     use m_helper
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Global parameters for the code
+    use m_derived_types
+    use m_global_parameters
     use m_mpi_common
 
     implicit none
@@ -22,12 +22,8 @@ contains
     impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
-        ! Generic loop iterator
         integer :: i, j
-        ! Generic flag used to identify and report MPI errors
         integer :: ierr
-
-        ! Logistics
 
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 

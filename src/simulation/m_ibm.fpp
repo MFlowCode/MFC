@@ -241,7 +241,7 @@ contains
                     q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
-                        ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point.
+                        ! Set the pressure inside a moving immersed boundary based upon the pressure of the image point.
                         ! acceleration, and normal vector direction
                         q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, &
                                   & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &

@@ -76,15 +76,12 @@ contains
     !! is so, the input file is then read in.
     impure subroutine s_read_input_file
 
-        ! Relative path to the input file provided by the user
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
         logical                            :: file_exist !< Logical used to check the existence of the input file
         integer                            :: iostatus
         !! Integer to check iostat of file read
 
         character(len=1000) :: line
-
-        ! Namelist of the global parameters which may be specified by user
 
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
@@ -117,8 +114,6 @@ contains
             & hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, alf_factor, num_igr_iters, num_igr_warm_start_iters, &
             & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
 
-        ! Checking that an input file has been provided by the user. If it has, then the input file is read in, otherwise,
-        ! simulation exits.
         inquire (FILE=trim(file_path), EXIST=file_exist)
 
         if (file_exist) then
@@ -138,7 +133,6 @@ contains
                 bodyForces = .true.
             end if
 
-            ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
             p_glb = p
@@ -160,13 +154,8 @@ contains
     !! a meaningful configuration for the simulation.
     impure subroutine s_check_input_file
 
-        ! Relative path to the current directory file in the case directory
         character(LEN=path_len) :: file_path
-
-        ! Logical used to check the existence of the current directory file
-        logical :: file_exist
-
-        ! Logistics
+        logical                 :: file_exist
 
         file_path = trim(case_dir) // '/.'
 
@@ -189,11 +178,7 @@ contains
         character(LEN=path_len + 2*name_len) :: t_step_dir !< Relative path to the starting time-step directory
         character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the grid and conservative variables data files
         logical :: file_exist
-        ! Logical used to check the existence of the data files
-
-        integer :: i, r !< Generic loop iterator
-        ! Confirming that the directory from which the initial condition and the grid data files are to be read in exists and
-        ! exiting otherwise
+        integer :: i, r
 
         if (cfl_dt) then
             write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all/p', proc_rank, '/', n_start
@@ -214,7 +199,6 @@ contains
             call s_assign_default_bc_type(bc_type)
         end if
 
-        ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -238,7 +222,6 @@ contains
             end do
         end if
 
-        ! Cell-boundary Locations in y-direction
         if (n > 0) then
             file_path = trim(t_step_dir) // '/y_cb.dat'
 
@@ -255,7 +238,6 @@ contains
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
         end if
 
-        ! Cell-boundary Locations in z-direction
         if (p > 0) then
             file_path = trim(t_step_dir) // '/z_cb.dat'
 
@@ -344,7 +326,6 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
-        ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -367,11 +348,8 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
-        ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        ! Computing the cell width distribution
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        ! Computing the cell center locations
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (ib) then
@@ -385,7 +363,6 @@ contains
         end if
 
         if (n > 0) then
-            ! Read in cell boundary locations in y-direction
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -398,15 +375,11 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
-            ! Assigning local cell boundary locations
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            ! Computing the cell width distribution
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            ! Computing the cell center locations
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
-                ! Read in cell boundary locations in z-direction
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
                 inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -419,11 +392,8 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // 'is missing. Exiting.')
                 end if
 
-                ! Assigning local cell boundary locations
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                ! Computing the cell width distribution
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                ! Computing the cell center locations
                 z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
             end if
         end if
@@ -442,7 +412,6 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                ! Initialize MPI data I/O
                 if (down_sample) then
                     call s_initialize_mpi_data_ds(q_cons_vf)
                 else
@@ -454,20 +423,17 @@ contains
                 end if
 
                 if (down_sample) then
-                    ! Size of local arrays
                     data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
                     m_glb_read = m_glb_ds + 1
                     n_glb_read = n_glb_ds + 1
                     p_glb_read = p_glb_ds + 1
                 else
-                    ! Size of local arrays
                     data_size = (m + 1)*(n + 1)*(p + 1)
                     m_glb_read = m_glb + 1
                     n_glb_read = n_glb + 1
                     p_glb_read = p_glb + 1
                 end if
 
-                ! Resize some integers so MPI can read even the biggest file
                 m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
@@ -476,7 +442,6 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-                ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size ! adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -514,7 +479,6 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
         else
-            ! Open the file to read conservative variables
             if (cfl_dt) then
                 write (file_loc, '(I0,A)') n_start, '.dat'
             else
@@ -526,18 +490,14 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                ! Initialize MPI data I/O
-
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers)
                 else
                     call s_initialize_mpi_data(q_cons_vf)
                 end if
 
-                ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
 
-                ! Resize some integers so MPI can read even the biggest file
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -546,11 +506,9 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-                ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size ! adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -560,7 +518,6 @@ contains
                     if (qbmm .and. .not. polytropic) then
                         do i = sys_size + 1, sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
-                            ! Initial displacement to skip at beginning of file
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -571,7 +528,6 @@ contains
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -936,7 +892,6 @@ contains
             end do
         end if
 
-        ! Reading in the user provided initial condition and grid data
         if (down_sample) then
             call s_read_data_files(q_cons_temp)
             call s_upsample_data(q_cons_ts(1)%vf, q_cons_temp)
@@ -951,7 +906,6 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
@@ -1005,11 +959,8 @@ contains
 #endif
 #endif
 
-        ! Initializing MPI execution environment
-
         call s_mpi_initialize()
 
-        ! Bind GPUs if OpenACC is enabled
 #ifdef MFC_GPU
 #ifndef MFC_MPI
         local_size = 1
@@ -1032,7 +983,6 @@ contains
 #endif
 #endif
 
-        ! Rank 0: assign defaults, read input file, validate (abort on inconsistencies)
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
@@ -1054,8 +1004,6 @@ contains
 #endif
         end if
 
-        ! Broadcast user inputs and decompose domain (skipped in serial)
-
         call s_mpi_bcast_user_inputs()
 
         call s_initialize_parallel_io()
@@ -1068,7 +1016,6 @@ contains
     subroutine s_initialize_gpu_vars
 
         integer :: i
-        ! Update GPU DATA
 
         if (.not. down_sample) then
             do i = 1, sys_size
@@ -1170,7 +1117,6 @@ contains
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
-        ! Terminating MPI execution environment
         call s_mpi_finalize()
 
     end subroutine s_finalize_modules

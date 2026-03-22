@@ -8,9 +8,9 @@
 !> @brief Assigns initial primitive variables to computational cells based on patch geometry
 module m_assign_variables
 
-    use m_derived_types ! Definitions of the derived types
-    use m_global_parameters ! Global parameters for the code
-    use m_variables_conversion ! Subroutines to change the state variables from
+    use m_derived_types
+    use m_global_parameters
+    use m_variables_conversion
     use m_helper_basic !< Functions to compare floating point numbers
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
 
@@ -104,39 +104,30 @@ contains
 
         real(wp) :: Ys(1:num_species)
         integer  :: smooth_patch_id
-        integer  :: i !< generic loop operator
-        ! Assigning the mixture primitive variables of a uniform state patch
+        integer  :: i
 
-        ! Transferring the identity of the smoothing patch
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
 
-        ! Density
         q_prim_vf(1)%sf(j, k, l) = eta*patch_icpp(patch_id)%rho + (1._wp - eta)*patch_icpp(smooth_patch_id)%rho
 
-        ! Velocity
         do i = 1, E_idx - mom_idx%beg
             q_prim_vf(i + 1)%sf(j, k, l) = 1._wp/q_prim_vf(1)%sf(j, k, &
                       & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*patch_icpp(smooth_patch_id) &
                       & %rho*patch_icpp(smooth_patch_id)%vel(i))
         end do
 
-        ! Specific heat ratio function
         q_prim_vf(gamma_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%gamma + (1._wp - eta)*patch_icpp(smooth_patch_id)%gamma
 
-        ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = 1._wp/q_prim_vf(gamma_idx)%sf(j, k, &
                   & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta)*patch_icpp(smooth_patch_id) &
                   & %gamma*patch_icpp(smooth_patch_id)%pres)
 
-        ! Liquid stiffness function
         q_prim_vf(pi_inf_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%pi_inf + (1._wp - eta)*patch_icpp(smooth_patch_id)%pi_inf
 
-        ! Species Concentrations
         if (chemistry) then
             block
                 real(wp) :: sum, term
 
-                ! Accumulating the species concentrations
                 sum = 0._wp
                 do i = 1, num_species
                     term = eta*patch_icpp(patch_id)%Y(i) + (1._wp - eta)*patch_icpp(smooth_patch_id)%Y(i)
@@ -146,7 +137,6 @@ contains
 
                 sum = max(sum, verysmall)
 
-                ! Normalizing the species concentrations
                 do i = 1, num_species
                     q_prim_vf(chemxb + i - 1)%sf(j, k, l) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)/sum
                     Ys(i) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)
@@ -154,7 +144,6 @@ contains
             end block
         end if
 
-        ! Updating the patch identities bookkeeping variable
         if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_mixture_primitive_variables
@@ -273,13 +262,11 @@ contains
         real(wp), dimension(3)         :: xi_cart
         real(wp)                       :: Ys(1:num_species)
         real(stp), dimension(sys_size) :: orig_prim_vf !< Vector to hold original values of cell for smoothing purposes
-        integer                        :: i            !< Generic loop iterator
+        integer                        :: i
         integer                        :: smooth_patch_id
 
-        ! Transferring the identity of the smoothing patch
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
 
-        ! Transferring original primitive variables
         do i = 1, sys_size
             orig_prim_vf(i) = q_prim_vf(i)%sf(j, k, l)
         end do
@@ -296,13 +283,9 @@ contains
             end do
         end if
 
-        ! Computing Mixture Variables from Original Primitive Variables call s_convert_species_to_mixture_variables( &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, orig_rho, orig_gamma, orig_pi_inf, orig_qv)
 
-        ! Computing Mixture Variables of Current Patch
-
         if (.not. igr .or. num_fluids > 1) then
-            ! Volume fraction(s)
             do i = adv_idx%beg, adv_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
             end do
@@ -320,28 +303,22 @@ contains
             end do
         end if
 
-        ! Partial densities
         if (model_eqns /= 4) then
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
             end do
         end if
 
-        ! Density and the specific heat ratio and liquid stiffness functions call s_convert_species_to_mixture_variables( &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, patch_icpp(patch_id)%rho, patch_icpp(patch_id)%gamma, &
                                             & patch_icpp(patch_id)%pi_inf, patch_icpp(patch_id)%qv)
 
-        ! Computing Mixture Variables of Smoothing Patch
-
         if (model_eqns /= 4) then
-            ! Partial densities
             do i = 1, cont_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
             end do
         end if
 
         if (.not. igr .or. num_fluids > 1) then
-            ! Volume fraction(s)
             do i = adv_idx%beg, adv_idx%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
             end do
@@ -359,7 +336,6 @@ contains
             end do
         end if
 
-        ! Bubbles euler variables
         if (bubbles_euler) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(smooth_patch_id)%r0/R0ref
@@ -401,16 +377,13 @@ contains
             end if
         end if
 
-        ! Density and the specific heat ratio and liquid stiffness functions call s_convert_species_to_mixture_variables( &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, patch_icpp(smooth_patch_id)%rho, &
                                             & patch_icpp(smooth_patch_id)%gamma, patch_icpp(smooth_patch_id)%pi_inf, &
                                             & patch_icpp(smooth_patch_id)%qv)
 
-        ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = (eta*patch_icpp(patch_id)%pres + (1._wp - eta)*orig_prim_vf(E_idx))
 
         if (.not. igr .or. num_fluids > 1) then
-            ! Volume fractions \alpha
             do i = adv_idx%beg, adv_idx%end
                 q_prim_vf(i)%sf(j, k, l) = eta*patch_icpp(patch_id)%alpha(i - E_idx) + (1._wp - eta)*orig_prim_vf(i)
             end do
@@ -427,7 +400,6 @@ contains
             end if
         end if
 
-        ! Elastic Shear Stress
         if (elasticity) then
             do i = 1, (stress_idx%end - stress_idx%beg) + 1
                 q_prim_vf(i + stress_idx%beg - 1)%sf(j, k, &
@@ -435,7 +407,6 @@ contains
             end do
         end if
 
-        ! Elastic Shear Stress
         if (hyperelasticity) then
             if (pre_stress) then ! pre stressed initial condition in spatial domain
                 rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
@@ -470,7 +441,6 @@ contains
             end do
         end if
 
-        ! Partial densities \alpha \rho
         if (model_eqns /= 4) then
             ! mixture density is an input
             do i = 1, cont_idx%end
@@ -487,22 +457,17 @@ contains
                       & l) + pi_inf)/(pref + pi_inf))**(1/lit_gamma))*rhoref*(1 - q_prim_vf(alf_idx)%sf(j, k, l))
         end if
 
-        ! Density and the specific heat ratio and liquid stiffness functions call s_convert_species_to_mixture_variables(q_prim_vf,
-        ! j, k, l, &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, rho, gamma, pi_inf, qv)
 
-        ! Velocity
         do i = 1, E_idx - mom_idx%beg
             q_prim_vf(i + cont_idx%end)%sf(j, k, &
                       & l) = (eta*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*orig_prim_vf(i + cont_idx%end))
         end do
 
-        ! Species Concentrations
         if (chemistry) then
             block
                 real(wp) :: sum, term
 
-                ! Accumulating the species concentrations
                 sum = 0._wp
                 do i = 1, num_species
                     term = eta*patch_icpp(patch_id)%Y(i) + (1._wp - eta)*patch_icpp(smooth_patch_id)%Y(i)
@@ -514,7 +479,6 @@ contains
                     sum = 1._wp
                 end if
 
-                ! Normalizing the species concentrations
                 do i = 1, num_species
                     q_prim_vf(chemxb + i - 1)%sf(j, k, l) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)/sum
                     Ys(i) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)
@@ -536,7 +500,6 @@ contains
             end do
         end if
 
-        ! Smoothed bubble variables
         if (bubbles_euler) then
             do i = 1, nb
                 muR = R0(i)*patch_icpp(patch_id)%r0/R0ref
@@ -607,7 +570,6 @@ contains
             q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + (1._wp - eta)*orig_prim_vf(c_idx)
         end if
 
-        ! Updating the patch identities bookkeeping variable
         if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
         ! if (j == 1) then print *, (q_prim_vf(bub_idx%rs(i))%sf(j, k, l), i = 1, nb) print *, (q_prim_vf(bub_idx%fullmom(i, 1,
@@ -619,7 +581,6 @@ contains
     !> @brief Nullifies the patch primitive variable assignment procedure pointer.
     impure subroutine s_finalize_assign_variables_module
 
-        ! Nullify primitive variable assignment procedure pointer
         s_assign_patch_primitive_variables => null()
 
     end subroutine s_finalize_assign_variables_module

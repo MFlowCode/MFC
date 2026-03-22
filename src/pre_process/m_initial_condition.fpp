@@ -5,16 +5,14 @@
 !> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
 
-    use m_derived_types ! Definitions of the derived types
-    use m_global_parameters ! Global parameters for the code
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
     use m_helper
-    use m_variables_conversion ! Subroutines to change the state variables from
-    ! one form to another
-
+    use m_variables_conversion
     use m_icpp_patches
     use m_assign_variables
-    use m_perturbation ! Subroutines to perturb initial flow fields
+    use m_perturbation
     use m_chemistry
     use m_boundary_conditions
 
@@ -40,8 +38,7 @@ contains
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_initial_condition_module
 
-        integer :: i, j, k, l !< generic loop iterators
-        ! Allocating the primitive and conservative variables
+        integer :: i, j, k, l
 
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
@@ -55,22 +52,18 @@ contains
             allocate (q_T_sf%sf(0:m, 0:n, 0:p))
         end if
 
-        ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         if (qbmm .and. .not. polytropic) then
-            ! Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
             allocate (pb%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
             allocate (mv%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
         end if
 
-        ! Initialize q_cons, q_prim with sentinel values to catch IC errors
         do i = 1, sys_size
             q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
             q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)
         end do
 
-        ! Allocating arrays to store the bc types
         allocate (bc_type(1:num_dims, 1:2))
 
         allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
@@ -133,9 +126,6 @@ contains
 
         integer :: i
 
-        ! Converting the conservative variables to the primitive ones given preexisting initial condition data files were read in on
-        ! start-up
-
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
         end if
@@ -150,13 +140,11 @@ contains
         if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
         if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
-            ! Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
@@ -166,8 +154,7 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_initial_condition_module
 
-        integer :: i !< Generic loop iterator
-        ! Dellocating the primitive and conservative variables
+        integer :: i
 
         do i = 1, sys_size
             deallocate (q_prim_vf(i)%sf)
@@ -181,7 +168,6 @@ contains
             deallocate (q_T_sf%sf)
         end if
 
-        ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
 
         deallocate (bc_type(1, 1)%sf)

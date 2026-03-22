@@ -83,25 +83,19 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Initializing the MPI environment
 
         call MPI_INIT(ierr)
 
-        ! Checking whether the MPI environment has been properly initialized
         if (ierr /= MPI_SUCCESS) then
             print '(A)', 'Unable to initialize MPI environment. Exiting.'
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end if
 
-        ! Querying the number of processors available for the job
         call MPI_COMM_SIZE(MPI_COMM_WORLD, num_procs, ierr)
 
-        ! Querying the rank of the local processor
         call MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
 #else
-        ! Serial run only has 1 processor
         num_procs = 1
-        ! Local processor rank is 0
         proc_rank = 0
 #endif
 
@@ -119,10 +113,8 @@ contains
         integer, dimension(1)                               :: airfoil_glb, airfoil_loc, airfoil_start
 
 #ifdef MFC_MPI
-        ! Generic loop iterator
         integer :: i, j
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Altered system size for the lagrangian subgrid bubble model
         integer :: alt_sys
 
         if (present(beta)) then
@@ -201,7 +193,6 @@ contains
         integer, dimension(3)                               :: sf_start_idx
 
 #ifdef MFC_MPI
-        ! Generic loop iterator
         integer :: i, j, q, k, l, m_ds, n_ds, p_ds, ierr
 
         sf_start_idx = (/0, 0, 0/)
@@ -324,8 +315,6 @@ contains
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their global extrema and bookkeeping the results on the rank
-        ! 0 processor
 
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
 
@@ -357,7 +346,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Performing the reduction procedure
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
@@ -374,7 +362,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Performing the reduction procedure
 
         if (loc(var_loc) == loc(var_glb)) then
             call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
@@ -399,7 +386,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Performing the reduction procedure
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
@@ -420,7 +406,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Performing the reduction procedure
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
 #endif
@@ -439,7 +424,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Performing the reduction procedure
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
 #endif
@@ -455,12 +439,8 @@ contains
         real(wp), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Temporary storage variable that holds the reduced minimum value
+        integer  :: ierr !< Generic flag used to identify and report MPI errors
         real(wp) :: var_glb
-
-        ! Performing reduction procedure and eventually storing its result into the variable that was initially inputted into the
-        ! subroutine
 
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
 
@@ -486,9 +466,6 @@ contains
         !> Temporary storage variable that holds the reduced maximum value and the rank of the processor with which the value is
         !! associated
         real(wp), dimension(2) :: var_glb
-        ! Performing reduction procedure and eventually storing its result into the variable that was initially inputted into the
-        ! subroutine
-
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_2p, MPI_MAXLOC, 0, MPI_COMM_WORLD, ierr)
 
         call MPI_BCAST(var_glb, 1, mpi_2p, 0, MPI_COMM_WORLD, ierr)
@@ -522,7 +499,6 @@ contains
             stop 1
         end if
 #else
-        ! Terminating the MPI environment
         if (present(code)) then
             call MPI_ABORT(MPI_COMM_WORLD, code, ierr)
         else
@@ -537,7 +513,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Calling MPI_BARRIER
 
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 #endif
@@ -549,7 +524,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! Finalizing the MPI environment
 
         call MPI_FINALIZE(ierr)
 #endif
@@ -917,7 +891,6 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:else
-                    ! Unpacking buffer from bc_z%beg
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, nVar
                         do l = -buff_size, -1
@@ -1128,7 +1101,6 @@ contains
 
                 ! Finding the Cartesian coordinates of the local process
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, proc_coords, ierr)
-                ! END: 3D Cartesian Processor Topology
 
                 ! Global Parameters for z-direction
 
@@ -1241,7 +1213,6 @@ contains
                 ! Finding the Cartesian coordinates of the local process
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, proc_coords, ierr)
             end if
-            ! END: 2D Cartesian Processor Topology
 
             ! Global Parameters for y-direction
 
@@ -1410,91 +1381,65 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
-        ! MPI Communication in x-direction
 
         if (mpi_dir == 1) then
             if (pbc_loc == -1) then ! PBC at the beginning
 
                 if (bc_x%end >= 0) then ! PBC at the beginning and end
-
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
                                       & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%beg
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
                 if (bc_x%beg >= 0) then ! PBC at the end and beginning
-
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%end
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
-                    ! Send/receive buffer to/from bc_x%end/bc_x%end
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
                                       & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
-            ! END: MPI Communication in x-direction
-
-            ! MPI Communication in y-direction
         else if (mpi_dir == 2) then
             if (pbc_loc == -1) then ! PBC at the beginning
 
                 if (bc_y%end >= 0) then ! PBC at the beginning and end
-
-                    ! Send/receive buffer to/from bc_y%end/bc_y%beg
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
                                       & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%beg
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
                 if (bc_y%beg >= 0) then ! PBC at the end and beginning
-
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%end
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
-                    ! Send/receive buffer to/from bc_y%end/bc_y%end
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
                                       & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
-            ! END: MPI Communication in y-direction
-
-            ! MPI Communication in z-direction
         else
             if (pbc_loc == -1) then ! PBC at the beginning
 
                 if (bc_z%end >= 0) then ! PBC at the beginning and end
-
-                    ! Send/receive buffer to/from bc_z%end/bc_z%beg
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
                                       & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the beginning only
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%beg
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else ! PBC at the end
                 if (bc_z%beg >= 0) then ! PBC at the end and beginning
-
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%end
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else ! PBC at the end only
-                    ! Send/receive buffer to/from bc_z%end/bc_z%end
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
                                       & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
         end if
-        ! END: MPI Communication in z-direction
 #endif
 
     end subroutine s_mpi_sendrecv_grid_variables_buffers

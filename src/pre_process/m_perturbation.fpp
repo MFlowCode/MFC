@@ -5,10 +5,10 @@
 !> @brief Perturbs initial mean flow fields with random noise, mixing-layer instabilities, or simplex noise
 module m_perturbation
 
-    use m_derived_types ! Definitions of the derived types
-    use m_global_parameters ! Global parameters for the code
-    use m_mpi_proxy !< Message passing interface (MPI) module proxy
-    use m_boundary_common ! Boundary conditions module
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_boundary_common
     use m_helper
     use m_simplex_noise
     use ieee_arithmetic
@@ -32,7 +32,7 @@ contains
     impure subroutine s_perturb_sphere(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer                                                :: i, j, k, l !< generic loop operators
+        integer                                                :: i, j, k, l
         real(wp)                                               :: perturb_alpha
         real(wp)                                               :: rand_real
 
@@ -48,7 +48,6 @@ contains
                     ! Perturb partial density fields to match perturbed volume fraction fields IF ((perturb_alpha >= 25e-2_wp) .AND.
                     ! (perturb_alpha <= 75e-2_wp)) THEN
                     if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
-                        ! Derive new partial densities
                         do l = 1, num_fluids
                             q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
                         end do
@@ -63,13 +62,12 @@ contains
     impure subroutine s_perturb_surrounding_flow(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer                                                :: i, j, k !< generic loop iterators
+        integer                                                :: i, j, k
         real(wp)                                               :: perturb_alpha
         real(wp)                                               :: rand_real
 
         call random_seed()
 
-        ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -242,8 +240,6 @@ contains
         real(wp), dimension(3)                                 :: velfluc, sig_tmp, sig, khat, xi
         real(wp)                                               :: dk, alpha, Eksum, q, uu0, phi
         integer                                                :: i, j, l, r, ierr
-
-        ! Initialize parameters
 
         dk = 1._wp/mixlayer_perturb_nk
 

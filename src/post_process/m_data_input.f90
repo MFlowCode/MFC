@@ -6,12 +6,12 @@
 module m_data_input
 
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi
 #endif
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Global parameters for the code
-    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
     use m_mpi_common
     use m_compile_specific
     use m_boundary_common
@@ -65,12 +65,9 @@ contains
         character(LEN=len_trim(t_step_dir) + 10) :: file_loc
         logical                                  :: file_check
 
-        ! Checking whether direction_cb.dat exists
-
         file_loc = trim(t_step_dir) // '/' // direction // '_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_check)
 
-        ! Reading direction_cb.dat if it exists, exiting otherwise
         if (file_check) then
             open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
             read (1) cb_array(-1:size_dim)
@@ -79,10 +76,7 @@ contains
             call s_mpi_abort('File ' // direction // '_cb.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
         end if
 
-        ! Computing the cell-width distribution
         d_array(0:size_dim) = cb_array(0:size_dim) - cb_array(-1:size_dim - 1)
-
-        ! Computing the cell-center locations
         cc_array(0:size_dim) = cb_array(-1:size_dim - 1) + d_array(0:size_dim)/2._wp
 
     end subroutine s_read_grid_data_direction
@@ -98,18 +92,14 @@ contains
         integer(KIND=MPI_OFFSET_KIND), intent(out) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND), intent(out) :: WP_MOK, MOK, str_MOK, NVARS_MOK
 
-        ! Initialize MPI data I/O
-
         if (ib) then
             call s_initialize_mpi_data(q_cons_vf, ib_markers)
         else
             call s_initialize_mpi_data(q_cons_vf)
         end if
 
-        ! Size of local arrays
         data_size = (m + 1)*(n + 1)*(p + 1)
 
-        ! Resize some integers so MPI can read even the biggest file
         m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
         n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
         p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -213,26 +203,21 @@ contains
     !! @param t_step Current time-step
     impure subroutine s_read_serial_data_files(t_step)
 
-        integer, intent(in)                            :: t_step
-        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir !< Location of the time-step directory associated with t_step
-        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !< Generic string used to store the location of a particular file
-        !> Used to store the variable position, in character form, of the currently manipulated conservative variable file
+        integer, intent(in)                                      :: t_step
+        character(LEN=len_trim(case_dir) + 2*name_len)           :: t_step_dir
+        character(LEN=len_trim(case_dir) + 3*name_len)           :: file_loc
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-        !> Location of the time-step directory associated with t_step
-        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir
-        logical :: dir_check  !< Generic logical used to test the existence of a particular folder
-        logical :: file_check !< Generic logical used to test the existence of a particular file
-        integer :: i          !< Generic loop iterator
-        ! Setting location of time-step folder based on current time-step
+        character(LEN=len_trim(case_dir) + 2*name_len)           :: t_step_ib_dir
+        logical                                                  :: dir_check
+        logical                                                  :: file_check
+        integer                                                  :: i
 
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir) // trim(t_step_dir)
 
-        ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir) // '/.'
         call my_inquire(file_loc, dir_check)
 
-        ! If the time-step directory is missing, the post-process exits.
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder ' // trim(t_step_dir) // ' is missing. Exiting.')
         end if
@@ -243,7 +228,6 @@ contains
             call s_assign_default_bc_type(bc_type)
         end if
 
-        ! Reading the Grid Data Files using helper subroutine
         call s_read_grid_data_direction(t_step_dir, 'x', x_cb, dx, x_cc, m)
 
         if (n > 0) then
@@ -254,15 +238,11 @@ contains
             end if
         end if
 
-        ! Reading the Conservative Variables Data Files
         do i = 1, sys_size
-            ! Checking whether the data file associated with the variable position of currently manipulated conservative variable
-            ! exists
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir) // '/q_cons_vf' // trim(file_num) // '.dat'
             inquire (FILE=trim(file_loc), EXIST=file_check)
 
-            ! Reading the data file if it exists, exiting otherwise
             if (file_check) then
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
                 read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
@@ -275,7 +255,6 @@ contains
             end if
         end do
 
-        ! Reading IB data using helper subroutine
         call s_read_ib_data_files(t_step_dir)
 
     end subroutine s_read_serial_data_files
@@ -313,7 +292,6 @@ contains
             stride = 1
         end if
 
-        ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -333,15 +311,11 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
-        ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        ! Computing the cell width distribution
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        ! Computing the cell center location
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (n > 0) then
-            ! Read in cell boundary locations in y-direction
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -361,15 +335,11 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
-            ! Assigning local cell boundary locations
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            ! Computing the cell width distribution
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            ! Computing the cell center location
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
-                ! Read in cell boundary locations in z-direction
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
                 inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -389,11 +359,8 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
                 end if
 
-                ! Assigning local cell boundary locations
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                ! Computing the cell width distribution
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                ! Computing the cell center location
                 z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
             end if
         end if
@@ -431,7 +398,6 @@ contains
 
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
-            ! Open the file to read conservative variables
             write (file_loc, '(I0,A1,I7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -442,7 +408,6 @@ contains
                 if (down_sample) then
                     call s_initialize_mpi_data_ds(q_cons_temp)
                 else
-                    ! Initialize MPI data I/O
                     if (ib) then
                         call s_initialize_mpi_data(q_cons_vf, ib_markers)
                     else
@@ -451,14 +416,11 @@ contains
                 end if
 
                 if (down_sample) then
-                    ! Size of local arrays
                     data_size = (m + 3)*(n + 3)*(p + 3)
                 else
-                    ! Size of local arrays
                     data_size = (m + 1)*(n + 1)*(p + 1)
                 end if
 
-                ! Resize some integers so MPI can read even the biggest file
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -467,7 +429,6 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-                ! Read the data for each variable
                 if (bubbles_euler .or. elasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -494,7 +455,6 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
         else
-            ! Open the file to read conservative variables
             write (file_loc, '(I0,A)') t_step, '.dat'
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -504,11 +464,9 @@ contains
 
                 call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
-                ! Read the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -530,20 +488,13 @@ contains
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_input_module
 
-        integer :: i !< Generic loop iterator
-        ! Allocating the parts of the conservative and primitive variables that do not require the direct knowledge of the
-        ! dimensionality of the simulation
+        integer :: i
 
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_temp(1:sys_size))
 
-        ! Allocating the parts of the conservative and primitive variables that do require the direct knowledge of the
-        ! dimensionality of the simulation using helper subroutine
-
-        ! Simulation is at least 2D
         if (n > 0) then
-            ! Simulation is 3D
             if (p > 0) then
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
                 if (down_sample) then
@@ -552,15 +503,12 @@ contains
                     end do
                 end if
             else
-                ! Simulation is 2D
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, 0)
             end if
         else
-            ! Simulation is 1D
             call s_allocate_field_arrays(-buff_size, m + buff_size, 0, 0)
         end if
 
-        ! Allocating arrays to store the bc types
         allocate (bc_type(1:num_dims, 1:2))
 
         allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
@@ -585,8 +533,7 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_data_input_module
 
-        integer :: i !< Generic loop iterator
-        ! Deallocating the conservative and primitive variables
+        integer :: i
 
         do i = 1, sys_size
             deallocate (q_cons_vf(i)%sf)

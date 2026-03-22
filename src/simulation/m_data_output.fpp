@@ -88,7 +88,6 @@ contains
         character(LEN=name_len), parameter :: file_name = 'run_time.inf' !< Name of the run-time information file
         character(LEN=path_len + name_len) :: file_path                  !< Relative path to a file in the case directory
         character(LEN=8)                   :: file_date                  !< Creation date of the run-time information file
-        ! Opening the run-time information file
 
         file_path = trim(case_dir) // '/' // trim(file_name)
 
@@ -107,7 +106,6 @@ contains
 
         write (3, '(A)') ''; write (3, '(A)') ''
 
-        ! Generating table header for the stability criteria to be outputted
         write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
 
         if (viscous) then
@@ -125,10 +123,8 @@ contains
         integer                              :: i         !< Generic loop iterator
 
         do i = 1, num_fluids
-            ! Generating the relative path to the CoM data file
             write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
             file_path = trim(case_dir) // trim(file_path)
-            ! Creating the formatted data file and setting up its structure
             open (i + 120, file=trim(file_path), form='formatted', position='append', status='unknown')
             if (n == 0) then
                 write (i + 120, '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    Total Volume    '
@@ -153,11 +149,9 @@ contains
         logical                              :: file_exist
 
         do i = 1, num_probes
-            ! Generating the relative path to the data file
             write (file_path, '(A,I0,A)') '/D/probe', i, '_prim.dat'
             file_path = trim(case_dir) // trim(file_path)
 
-            ! Creating the formatted data file and setting up its structure
             inquire (file=trim(file_path), exist=file_exist)
 
             if (file_exist) then
@@ -238,10 +232,6 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! end: Computing Stability Criteria at Current Time-step
-
-        ! Determining local stability criteria extrema at current time-step
-
 #ifdef _CRAYFTN
         $:GPU_UPDATE(host='[icfl_sf]')
 
@@ -267,7 +257,6 @@ contains
         end if
 #endif
 
-        ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
                                                          & Rc_min_glb)
@@ -277,7 +266,6 @@ contains
             if (viscous) Rc_min_glb = Rc_min_loc
         end if
 
-        ! Determining the stability criteria extrema over all the time-steps
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
         if (viscous) then
@@ -285,7 +273,6 @@ contains
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
         end if
 
-        ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
             write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
 
@@ -337,11 +324,8 @@ contains
         character(LEN=15) :: FMT
         integer :: i, j, k, l, r
         real(wp) :: gamma, lit_gamma, pi_inf, qv           !< Temporary EOS params
-        ! Creating or overwriting the time-step root directory
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
-
-        ! Creating or overwriting the current time-step directory
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step
 
         file_path = trim(t_step_dir) // '/.'
@@ -349,13 +333,11 @@ contains
         if (file_exist) call s_delete_directory(trim(t_step_dir))
         call s_create_directory(trim(t_step_dir))
 
-        ! Writing the grid data file in the x-direction
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
         open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
         write (2) x_cb(-1:m); close (2)
 
-        ! Writing the grid data files in the y- and z-directions
         if (n > 0) then
             file_path = trim(t_step_dir) // '/y_cb.dat'
 
@@ -370,7 +352,6 @@ contains
             end if
         end if
 
-        ! Writing the conservative variables data files
         do i = 1, sys_size
             write (file_path, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', i, '.dat'
 
@@ -432,7 +413,6 @@ contains
             FMT = "(2F40.14)"
         end if
 
-        ! writing an output directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/D'
         file_path = trim(t_step_dir) // '/.'
 
@@ -451,7 +431,6 @@ contains
             end if
         end if
 
-        ! 1D
         if (n == 0 .and. p == 0) then
             if (model_eqns == 2 .and. (.not. igr)) then
                 do i = 1, sys_size
@@ -514,7 +493,6 @@ contains
             FMT = "(3F40.14)"
         end if
 
-        ! 2D
         if ((n > 0) .and. (p == 0)) then
             do i = 1, sys_size
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step, '.dat'
@@ -599,7 +577,6 @@ contains
             FMT = "(4F40.14)"
         end if
 
-        ! 3D
         if (p > 0) then
             do i = 1, sys_size
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step, '.dat'
@@ -736,7 +713,6 @@ contains
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
 
-            ! Initialize MPI data I/O
             if (down_sample) then
                 call s_initialize_mpi_data_ds(q_cons_temp_ds)
             else
@@ -758,10 +734,8 @@ contains
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
 
-            ! Initialize MPI data I/O
             call s_initialize_mpi_data(q_cons_vf)
 
-            ! Open the file to write all flow variables
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -771,20 +745,17 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
             if (down_sample) then
-                ! Size of local arrays
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
                 m_glb_save = m_glb_ds + 1
                 n_glb_save = n_glb_ds + 1
                 p_glb_save = p_glb_ds + 1
             else
-                ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
                 m_glb_save = m_glb + 1
                 n_glb_save = n_glb + 1
                 p_glb_save = p_glb + 1
             end if
 
-            ! Resize some integers so MPI can write even the biggest files
             m_MOK = int(m_glb_save + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb_save + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb_save + 1, MPI_OFFSET_KIND)
@@ -794,13 +765,11 @@ contains
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             if (bubbles_euler) then
-                ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
-                ! Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -826,8 +795,6 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            ! Initialize MPI data I/O
-
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers)
             else if (present(beta)) then
@@ -844,10 +811,8 @@ contains
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
-            ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
 
-            ! Resize some integers so MPI can write even the biggest files
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -857,22 +822,18 @@ contains
             NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
             if (bubbles_euler) then
-                ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
-                ! Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -883,7 +844,6 @@ contains
                 do i = 1, sys_size ! TODO: check if correct (sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -891,11 +851,9 @@ contains
                 end do
             end if
 
-            ! Correction for the lagrangian subgrid bubble model
             if (present(beta)) then
                 var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
 
-                ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                 call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), 'native', mpi_info_int, ierr)
@@ -904,7 +862,6 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
-            ! Write ib data
             if (ib) then
                 call s_write_parallel_ib_data(t_step)
                 ! write (file_loc, '(A)') 'ib.dat' file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc) call
@@ -928,8 +885,6 @@ contains
         integer, intent(in)                  :: time_step
         character(LEN=path_len + 2*name_len) :: file_path
         character(LEN=path_len + 2*name_len) :: t_step_dir
-
-        ! Creating or overwriting the time-step root directory
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', time_step
@@ -957,7 +912,6 @@ contains
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
-        ! Size of local arrays
         data_size = (m + 1)*(n + 1)*(p + 1)
         m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
         n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
@@ -1014,7 +968,6 @@ contains
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
         integer                                        :: i           !< Generic loop iterator
         real(wp)                                       :: nondim_time !< Non-dimensional time
-        ! Non-dimensional time calculation
 
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, wp)*dt
@@ -1023,16 +976,16 @@ contains
         end if
 
         if (proc_rank == 0) then
-            if (n == 0) then ! 1D simulation
-                do i = 1, num_fluids ! Loop through fluids
+            if (n == 0) then
+                do i = 1, num_fluids
                     write (i + 120, '(6X,4F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 5)
                 end do
-            else if (p == 0) then ! 2D simulation
-                do i = 1, num_fluids ! Loop through fluids
+            else if (p == 0) then
+                do i = 1, num_fluids
                     write (i + 120, '(6X,5F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 3), c_mass_in(i, 5)
                 end do
-            else ! 3D simulation
-                do i = 1, num_fluids ! Loop through fluids
+            else
+                do i = 1, num_fluids
                     write (i + 120, '(6X,6F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 3), c_mass_in(i, &
                            & 4), c_mass_in(i, 5)
                 end do
@@ -1091,7 +1044,6 @@ contains
 
         T = dflt_T_guess
 
-        ! Non-dimensional time calculation
         if (time_stepper == 23) then
             nondim_time = mytime
         else
@@ -1103,7 +1055,6 @@ contains
         end if
 
         do i = 1, num_probes
-            ! Zeroing out flow variables for all processors
             rho = 0._wp
             do s = 1, num_vels
                 vel(s) = 0._wp
@@ -1130,8 +1081,7 @@ contains
             end do
             damage_state = 0._wp
 
-            ! Find probe location in terms of indices on a specific processor
-            if (n == 0) then ! 1D simulation
+            if (n == 0) then
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     do s = -1, m
                         distx(s) = x_cb(s) - probe(i)%x
@@ -1234,7 +1184,7 @@ contains
 
                     accel = accel_mag(j - 2, k, l)
                 end if
-            else if (p == 0) then ! 2D simulation
+            else if (p == 0) then
                 if (chemistry) then
                     do d = 1, num_species
                         rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
@@ -1315,7 +1265,7 @@ contains
                                                       & 0._wp, 0._wp, c, qv)
                     end if
                 end if
-            else ! 3D
+            else
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
@@ -1464,7 +1414,7 @@ contains
         end do
 
         if (integral_wrt .and. bubbles_euler) then
-            if (n == 0) then ! 1D simulation
+            if (n == 0) then
                 do i = 1, num_integrals
                     int_pres = 0._wp
                     max_pres = 0._wp
@@ -1590,7 +1540,6 @@ contains
     impure subroutine s_close_run_time_information_file
 
         real(wp) :: run_time !< Run-time of the simulation
-        ! Writing the footer of and closing the run-time information file
 
         write (3, '(A)') '    '
         write (3, '(A)') ''
@@ -1642,8 +1591,6 @@ contains
 
         integer :: i, m_ds, n_ds, p_ds
 
-        ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-
         if (run_time_info) then
             @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
             icfl_max = 0._wp
@@ -1684,7 +1631,6 @@ contains
         end if
 
         if (run_time_info) then
-            ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
             @:DEALLOCATE(icfl_sf)
             if (viscous) then
                 @:DEALLOCATE(vcfl_sf, Rc_sf)

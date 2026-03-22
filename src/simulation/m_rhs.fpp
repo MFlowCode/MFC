@@ -204,7 +204,6 @@ contains
             $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(psi_idx)%sf]')
         end if
 
-        ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
         if (.not. igr) then
             @:ALLOCATE(flux_n(1:num_dims))
             @:ALLOCATE(flux_src_n(1:num_dims))
@@ -276,11 +275,9 @@ contains
                     end do
                 end if
             end do
-            ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
         end if
 
         if ((.not. igr) .or. dummy) then
-            ! Allocation of dq_prim_ds_qp
             @:ALLOCATE(dq_prim_dx_qp(1:1))
             @:ALLOCATE(dq_prim_dy_qp(1:1))
             @:ALLOCATE(dq_prim_dz_qp(1:1))
@@ -288,7 +285,6 @@ contains
             @:ALLOCATE(qL_prim(1:num_dims))
             @:ALLOCATE(qR_prim(1:num_dims))
 
-            ! Allocation/Association of dqK_prim_ds_n
             @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
             @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
             @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
@@ -524,9 +520,6 @@ contains
         if (mpp_lim .and. bubbles_euler) then
             @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
-        ! END: Allocation/Association of qK_cons_n and qK_prim_n
-
-        ! Allocation of gm_alphaK_n
         if (.not. igr) then
             @:ALLOCATE(gm_alphaL_n(1:num_dims))
             @:ALLOCATE(gm_alphaR_n(1:num_dims))

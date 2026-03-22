@@ -27,16 +27,12 @@ contains
     !> This subroutine initializes the module global array of mixture densities in each grid cell
     impure subroutine s_initialize_body_forces_module
 
-        ! Simulation is at least 2D
         if (n > 0) then
-            ! Simulation is 3D
             if (p > 0) then
                 @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
-                ! Simulation is 2D
             else
                 @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
             end if
-            ! Simulation is 1D
         else
             @:ALLOCATE(rhoM(-buff_size:buff_size + m, 0:0, 0:0))
         end if
