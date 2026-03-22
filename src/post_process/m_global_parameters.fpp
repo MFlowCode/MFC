@@ -8,7 +8,7 @@
 module m_global_parameters
 
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi  !< Message passing interface (MPI) module
 #endif
 
     use m_derived_types
@@ -19,13 +19,13 @@ module m_global_parameters
 
     !> @name Logistics
     !> @{
-    integer                 :: num_procs !< Number of processors
-    character(LEN=path_len) :: case_dir  !< Case folder location
+    integer                 :: num_procs  !< Number of processors
+    character(LEN=path_len) :: case_dir   !< Case folder location
     !> @}
 
     ! Computational Domain Parameters
 
-    integer :: proc_rank !< Rank of the local processor
+    integer :: proc_rank  !< Rank of the local processor
     !> @name Number of cells in the x-, y- and z-coordinate directions
     !> @{
     integer :: m, m_root
@@ -35,7 +35,7 @@ module m_global_parameters
 
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
-    integer(kind=8)       :: nGlobal ! Total number of cells in global domain
+    integer(kind=8)       :: nGlobal  ! Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
@@ -48,8 +48,8 @@ module m_global_parameters
     integer :: m_glb, n_glb, p_glb
     !> @}
 
-    integer :: num_dims !< Number of spatial dimensions
-    integer :: num_vels !< Number of velocity components (different from num_dims for mhd)
+    integer :: num_dims  !< Number of spatial dimensions
+    integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
@@ -69,9 +69,9 @@ module m_global_parameters
     !> Number of cells in buffer region. For the variables which feature a buffer region, this region is used to store information
     !! outside the computational domain based on the boundary conditions.
     integer :: buff_size
-    integer :: t_step_start !< First time-step directory
-    integer :: t_step_stop  !< Last time-step directory
-    integer :: t_step_save  !< Interval between consecutive time-step directory
+    integer :: t_step_start  !< First time-step directory
+    integer :: t_step_stop   !< Last time-step directory
+    integer :: t_step_save   !< Interval between consecutive time-step directory
     !> @name IO options for adaptive time-stepping
     !> @{
     logical  :: cfl_adap_dt, cfl_const_dt, cfl_dt
@@ -86,52 +86,52 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    integer            :: model_eqns                  !< Multicomponent flow model
-    integer            :: num_fluids                  !< Number of different fluids present in the flow
-    logical            :: relax                       !< phase change
-    integer            :: relax_model                 !< Phase change relaxation model
-    logical            :: mpp_lim                     !< Maximum volume fraction limiter
-    integer            :: sys_size                    !< Number of unknowns in the system of equations
-    integer            :: recon_type                  !< Which type of reconstruction to use
-    integer            :: weno_order                  !< Order of accuracy for the WENO reconstruction
-    integer            :: muscl_order                 !< Order of accuracy for the MUSCL reconstruction
-    logical            :: mixture_err                 !< Mixture error limiter
-    logical            :: alt_soundspeed              !< Alternate sound speed
-    logical            :: mhd                         !< Magnetohydrodynamics
-    logical            :: relativity                  !< Relativity for RMHD
-    logical            :: hypoelasticity              !< Turn hypoelasticity on
-    logical            :: hyperelasticity             !< Turn hyperelasticity on
-    logical            :: elasticity                  !< elasticity modeling, true for hyper or hypo
-    integer            :: b_size                      !< Number of components in the b tensor
-    integer            :: tensor_size                 !< Number of components in the nonsymmetric tensor
-    logical            :: cont_damage                 !< Continuum damage modeling
-    logical            :: hyper_cleaning              !< Hyperbolic cleaning for MHD
-    logical            :: igr                         !< enable IGR
-    integer            :: igr_order                   !< IGR reconstruction order
-    logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
+    integer            :: model_eqns                   !< Multicomponent flow model
+    integer            :: num_fluids                   !< Number of different fluids present in the flow
+    logical            :: relax                        !< phase change
+    integer            :: relax_model                  !< Phase change relaxation model
+    logical            :: mpp_lim                      !< Maximum volume fraction limiter
+    integer            :: sys_size                     !< Number of unknowns in the system of equations
+    integer            :: recon_type                   !< Which type of reconstruction to use
+    integer            :: weno_order                   !< Order of accuracy for the WENO reconstruction
+    integer            :: muscl_order                  !< Order of accuracy for the MUSCL reconstruction
+    logical            :: mixture_err                  !< Mixture error limiter
+    logical            :: alt_soundspeed               !< Alternate sound speed
+    logical            :: mhd                          !< Magnetohydrodynamics
+    logical            :: relativity                   !< Relativity for RMHD
+    logical            :: hypoelasticity               !< Turn hypoelasticity on
+    logical            :: hyperelasticity              !< Turn hyperelasticity on
+    logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
+    integer            :: b_size                       !< Number of components in the b tensor
+    integer            :: tensor_size                  !< Number of components in the nonsymmetric tensor
+    logical            :: cont_damage                  !< Continuum damage modeling
+    logical            :: hyper_cleaning               !< Hyperbolic cleaning for MHD
+    logical            :: igr                          !< enable IGR
+    integer            :: igr_order                    !< IGR reconstruction order
+    logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
     !> @}
 
-    integer :: avg_state !< Average state evaluation method
+    integer :: avg_state  !< Average state evaluation method
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
-    type(int_bounds_info) :: cont_idx             !< Indexes of first & last continuity eqns.
-    type(int_bounds_info) :: mom_idx              !< Indexes of first & last momentum eqns.
-    integer               :: E_idx                !< Index of energy equation
-    integer               :: n_idx                !< Index of number density
-    integer               :: beta_idx             !< Index of lagrange bubbles beta
-    type(int_bounds_info) :: adv_idx              !< Indexes of first & last advection eqns.
-    type(int_bounds_info) :: internalEnergies_idx !< Indexes of first & last internal energy eqns.
-    type(bub_bounds_info) :: bub_idx              !< Indexes of first & last bubble variable eqns.
-    integer               :: gamma_idx            !< Index of specific heat ratio func. eqn.
-    integer               :: alf_idx              !< Index of specific heat ratio func. eqn.
-    integer               :: pi_inf_idx           !< Index of liquid stiffness func. eqn.
-    type(int_bounds_info) :: B_idx                !< Indexes of first and last magnetic field eqns.
-    type(int_bounds_info) :: stress_idx           !< Indices of elastic stresses
-    type(int_bounds_info) :: xi_idx               !< Indexes of first and last reference map eqns.
-    integer               :: c_idx                !< Index of color function
-    type(int_bounds_info) :: species_idx          !< Indexes of first & last concentration eqns.
-    integer               :: damage_idx           !< Index of damage state variable (D) for continuum damage model
-    integer               :: psi_idx              !< Index of hyperbolic cleaning state variable for MHD
+    type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
+    type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
+    integer               :: E_idx                 !< Index of energy equation
+    integer               :: n_idx                 !< Index of number density
+    integer               :: beta_idx              !< Index of lagrange bubbles beta
+    type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
+    type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
+    type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
+    integer               :: gamma_idx             !< Index of specific heat ratio func. eqn.
+    integer               :: alf_idx               !< Index of specific heat ratio func. eqn.
+    integer               :: pi_inf_idx            !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
+    type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
+    type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
+    integer               :: c_idx                 !< Index of color function
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    integer               :: damage_idx            !< Index of damage state variable (D) for continuum damage model
+    integer               :: psi_idx               !< Index of hyperbolic cleaning state variable for MHD
     !> @}
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
@@ -147,17 +147,17 @@ module m_global_parameters
     !> @}
 
     integer               :: shear_num !! Number of shear stress components
-    integer, dimension(3) :: shear_indices     !< Indices of the stress components that represent shear stress
-    integer               :: shear_BC_flip_num !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
+    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
     !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
     !! [indices])
     integer, dimension(3, 2)           :: shear_BC_flip_indices
-    logical                            :: parallel_io      !< Format of the data files
+    logical                            :: parallel_io       !< Format of the data files
     logical                            :: sim_data
-    logical                            :: file_per_process !< output format
-    integer, allocatable, dimension(:) :: proc_coords      !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:) :: start_idx        !< Starting cell-center index of local processor in global grid
-    integer                            :: num_ibs          !< Number of immersed boundaries
+    logical                            :: file_per_process  !< output format
+    integer, allocatable, dimension(:) :: proc_coords       !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:) :: start_idx         !< Starting cell-center index of local processor in global grid
+    integer                            :: num_ibs           !< Number of immersed boundaries
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
@@ -177,15 +177,15 @@ module m_global_parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
-    real(wp), allocatable, dimension(:)      :: adv !< Advection variables
+    real(wp), allocatable, dimension(:)      :: adv  !< Advection variables
     ! Formatted Database File(s) Structure Parameters
 
-    integer               :: format                                   !< Format of the database file(s)
-    integer               :: precision                                !< Floating point precision of the database file(s)
-    logical               :: down_sample                              !< down sampling of the database file(s)
-    logical               :: output_partial_domain                    !< Specify portion of domain to output for post-processing
-    type(bounds_info)     :: x_output, y_output, z_output             !< Portion of domain to output for post-processing
-    type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx !< Indices of domain to output for post-processing
+    integer               :: format                                    !< Format of the database file(s)
+    integer               :: precision                                 !< Floating point precision of the database file(s)
+    logical               :: down_sample                               !< down sampling of the database file(s)
+    logical               :: output_partial_domain                     !< Specify portion of domain to output for post-processing
+    type(bounds_info)     :: x_output, y_output, z_output              !< Portion of domain to output for post-processing
+    type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx  !< Indices of domain to output for post-processing
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions. The definition of the ghost zone layers is only
     !! necessary when using the Silo database file format in multidimensions. These zones provide VisIt with the subdomain
     !! connectivity information that it requires in order to produce smooth plots.
@@ -274,7 +274,7 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     logical :: adv_n
-    integer :: thermal !< 1 = adiabatic, 2 = isotherm, 3 = transfer
+    integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
     real(wp) :: gam_m
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
@@ -309,8 +309,8 @@ module m_global_parameters
     logical :: bubbles_lagrange
     !> @}
 
-    real(wp) :: Bx0                      !< Constant magnetic field in the x-direction (1D)
-    real(wp) :: wall_time, wall_time_avg !< Wall time measurements
+    real(wp) :: Bx0                       !< Constant magnetic field in the x-direction (1D)
+    real(wp) :: wall_time, wall_time_avg  !< Wall time measurements
 
 contains
 
@@ -318,7 +318,7 @@ contains
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
 
-        integer :: i !< Generic loop iterator
+        integer :: i  !< Generic loop iterator
         ! Logistics
 
         case_dir = '.'
@@ -406,8 +406,8 @@ contains
         bub_pp%gam_g = dflt_real; gam_g = dflt_real
         bub_pp%M_v = dflt_real; M_v = dflt_real
         bub_pp%M_g = dflt_real; M_g = dflt_real
-        bub_pp%k_v = dflt_real;
-        bub_pp%k_g = dflt_real;
+        bub_pp%k_v = dflt_real
+        bub_pp%k_g = dflt_real
         bub_pp%cp_v = dflt_real; cp_v = dflt_real
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
@@ -551,7 +551,7 @@ contains
                 ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of (N-1)
                 ! volume fractions for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1 then adv_idx%end < adv_idx%beg,
                 ! which skips all loops over the volume fractions since there is no volume fraction to track
-                adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
+                adv_idx%beg = E_idx + 1  ! Alpha for fluid 1
                 adv_idx%end = E_idx + num_fluids - 1
             else
                 ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann tracks
@@ -629,9 +629,9 @@ contains
             if (mhd) then
                 B_idx%beg = sys_size + 1
                 if (n == 0) then
-                    B_idx%end = sys_size + 2 ! 1D: By, Bz
+                    B_idx%end = sys_size + 2  ! 1D: By, Bz
                 else
-                    B_idx%end = sys_size + 3 ! 2D/3D: Bx, By, Bz
+                    B_idx%end = sys_size + 3  ! 2D/3D: Bx, By, Bz
                 end if
                 sys_size = B_idx%end
             end if
@@ -650,17 +650,17 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
-            alf_idx = 1 ! dummy, cannot actually have a void fraction
+            alf_idx = 1  ! dummy, cannot actually have a void fraction
         else if (model_eqns == 4) then
-            cont_idx%beg = 1 ! one continuity equation
-            cont_idx%end = 1 ! num_fluids
-            mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each
+            cont_idx%beg = 1  ! one continuity equation
+            cont_idx%end = 1  ! num_fluids
+            mom_idx%beg = cont_idx%end + 1  ! one momentum equation in each
             mom_idx%end = cont_idx%end + num_vels
-            E_idx = mom_idx%end + 1 ! one energy equation
+            E_idx = mom_idx%end + 1  ! one energy equation
             adv_idx%beg = E_idx + 1
-            adv_idx%end = adv_idx%beg ! one volume advection equation
+            adv_idx%end = adv_idx%beg  ! one volume advection equation
             alf_idx = adv_idx%end
-            sys_size = alf_idx ! adv_idx%end
+            sys_size = alf_idx  ! adv_idx%end
 
             if (bubbles_euler) then
                 bub_idx%beg = sys_size + 1
@@ -900,11 +900,11 @@ contains
 
         allocate (adv(num_fluids))
 
-        if (cyl_coord .neqv. .true.) then ! Cartesian grid
+        if (cyl_coord .neqv. .true.) then  ! Cartesian grid
             grid_geometry = 1
-        else if (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
+        else if (cyl_coord .and. p == 0) then  ! Axisymmetric cylindrical grid
             grid_geometry = 2
-        else ! Fully 3D cylindrical grid
+        else  ! Fully 3D cylindrical grid
             grid_geometry = 3
         end if
 
@@ -914,7 +914,7 @@ contains
     impure subroutine s_initialize_parallel_io
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 #endif
 
         num_dims = 1 + min(1, n) + min(1, p)

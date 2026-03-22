@@ -109,7 +109,7 @@ contains
         logical                                                           :: celloutside
         integer                                                           :: smearGrid, smearGridz
 
-        smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the bubble (3+1+3)
+        smearGrid = mapCells - (-mapCells) + 1  ! Include the cell that contains the bubble (3+1+3)
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
@@ -244,7 +244,7 @@ contains
                     Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
                     distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                     func = func + dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv) &
-                                                               & **(3._wp*(strength_idx + 1._wp))
+                        & **(3._wp*(strength_idx + 1._wp))
                 end do
             end if
         end if

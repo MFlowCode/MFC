@@ -53,7 +53,7 @@ module m_assign_variables
         end subroutine s_assign_patch_xxxxx_primitive_variables
     end interface
 
-    private;
+    private
     public :: s_initialize_assign_variables_module, s_assign_patch_primitive_variables, &
         & s_assign_patch_mixture_primitive_variables, s_assign_patch_species_primitive_variables, s_finalize_assign_variables_module
 
@@ -68,9 +68,9 @@ contains
 
         ! Select procedure pointer based on multicomponent flow model
 
-        if (model_eqns == 1) then ! Gamma/pi_inf model
+        if (model_eqns == 1) then  ! Gamma/pi_inf model
             s_assign_patch_primitive_variables => s_assign_patch_mixture_primitive_variables
-        else ! Volume fraction model
+        else  ! Volume fraction model
             s_assign_patch_primitive_variables => s_assign_patch_species_primitive_variables
         end if
 
@@ -247,11 +247,11 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Density, gamma, and liquid stiffness from current and smoothing patches
-        real(wp)                       :: rho          !< density
+        real(wp)                       :: rho           !< density
         real(wp)                       :: gamma
-        real(wp)                       :: lit_gamma    !< specific heat ratio
-        real(wp)                       :: pi_inf       !< stiffness from SEOS
-        real(wp)                       :: qv           !< reference energy from SEOS
+        real(wp)                       :: lit_gamma     !< specific heat ratio
+        real(wp)                       :: pi_inf        !< stiffness from SEOS
+        real(wp)                       :: qv            !< reference energy from SEOS
         real(wp)                       :: orig_rho
         real(wp)                       :: orig_gamma
         real(wp)                       :: orig_pi_inf
@@ -261,7 +261,7 @@ contains
         real(wp)                       :: rcoord, theta, phi, xi_sph
         real(wp), dimension(3)         :: xi_cart
         real(wp)                       :: Ys(1:num_species)
-        real(stp), dimension(sys_size) :: orig_prim_vf !< Vector to hold original values of cell for smoothing purposes
+        real(stp), dimension(sys_size) :: orig_prim_vf  !< Vector to hold original values of cell for smoothing purposes
         integer                        :: i
         integer                        :: smooth_patch_id
 
@@ -390,10 +390,10 @@ contains
         end if
 
         if (mhd) then
-            if (n == 0) then ! 1D: By, Bz
+            if (n == 0) then  ! 1D: By, Bz
                 q_prim_vf(B_idx%beg)%sf(j, k, l) = eta*patch_icpp(patch_id)%By + (1._wp - eta)*orig_prim_vf(B_idx%beg)
                 q_prim_vf(B_idx%beg + 1)%sf(j, k, l) = eta*patch_icpp(patch_id)%Bz + (1._wp - eta)*orig_prim_vf(B_idx%beg + 1)
-            else ! 2D/3D: Bx, By, Bz
+            else  ! 2D/3D: Bx, By, Bz
                 q_prim_vf(B_idx%beg)%sf(j, k, l) = eta*patch_icpp(patch_id)%Bx + (1._wp - eta)*orig_prim_vf(B_idx%beg)
                 q_prim_vf(B_idx%beg + 1)%sf(j, k, l) = eta*patch_icpp(patch_id)%By + (1._wp - eta)*orig_prim_vf(B_idx%beg + 1)
                 q_prim_vf(B_idx%beg + 2)%sf(j, k, l) = eta*patch_icpp(patch_id)%Bz + (1._wp - eta)*orig_prim_vf(B_idx%beg + 2)
@@ -408,7 +408,7 @@ contains
         end if
 
         if (hyperelasticity) then
-            if (pre_stress) then ! pre stressed initial condition in spatial domain
+            if (pre_stress) then  ! pre stressed initial condition in spatial domain
                 rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
                 theta = atan2(y_cc(k), x_cc(j))
                 phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))

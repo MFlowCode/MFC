@@ -35,7 +35,7 @@ contains
     !> @brief Verifies that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.
     impure subroutine s_check_total_cells
 
-        character(len=18) :: numStr !< for int to string conversion
+        character(len=18) :: numStr  !< for int to string conversion
         integer(kind=8)   :: min_cells
 
         min_cells = int(2, kind=8)**int(min(1, m) + min(1, n) + min(1, p), kind=8)*int(num_procs, kind=8)

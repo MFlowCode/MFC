@@ -32,7 +32,7 @@ module m_ibm
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
 
-    integer :: num_gps !< Number of ghost points
+    integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[gp_layers, num_gps]')
 #elif defined(MFC_OpenMP)
@@ -93,7 +93,7 @@ contains
         call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i) ! offsets are computed after IB markers are generated
+            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i)  ! offsets are computed after IB markers are generated
             $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
 
@@ -127,12 +127,12 @@ contains
     !! @param mv_in Mass of vapor in bubble
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !< Primitive Variables
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf !< Primitive Variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(inout) :: pb_in, mv_in
-        integer :: i, j, k, l, q, r                                         !< Iterator variables
-        integer :: patch_id                                                 !< Patch ID of ghost point
-        real(wp) :: rho, gamma, pi_inf, dyn_pres                            !< Mixture variables
+        integer :: i, j, k, l, q, r                                          !< Iterator variables
+        integer :: patch_id                                                  !< Patch ID of ghost point
+        real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
@@ -155,11 +155,11 @@ contains
         #:endif
         !! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
-        real(wp), dimension(3) :: norm              !< Normal vector from GP to IP
-        real(wp), dimension(3) :: physical_loc      !< Physical loc of GP
-        real(wp), dimension(3) :: vel_g             !< Velocity of GP
-        real(wp), dimension(3) :: radial_vector     !< vector from centroid to ghost point
-        real(wp), dimension(3) :: rotation_velocity !< speed of the ghost point due to rotation
+        real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
+        real(wp), dimension(3) :: physical_loc       !< Physical loc of GP
+        real(wp), dimension(3) :: vel_g              !< Velocity of GP
+        real(wp), dimension(3) :: radial_vector      !< vector from centroid to ghost point
+        real(wp), dimension(3) :: rotation_velocity  !< speed of the ghost point due to rotation
         real(wp)               :: nbub
         real(wp)               :: buf
         type(ghost_point)      :: gp
@@ -253,7 +253,7 @@ contains
                     ! If in simulation, use acc mixture subroutines
                     if (elasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
-                                                                        & G_K, Gs)
+                            & G_K, Gs)
                     else
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                     end if
@@ -269,7 +269,7 @@ contains
                     if (patch_ib(patch_id)%moving_ibm /= 0) then
                         ! compute the linear velocity of the ghost point due to rotation
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, &
-                                                                 & patch_ib(patch_id)%z_centroid]
+                            & patch_ib(patch_id)%z_centroid]
                         call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), &
                                              & radial_vector, rotation_velocity)
 
@@ -283,15 +283,15 @@ contains
                     else
                         ! get the vector that points from the centroid to the ghost
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, &
-                                                                 & patch_ib(patch_id)%z_centroid]
+                            & patch_ib(patch_id)%z_centroid]
                         ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear
                         ! velocity
                         call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), &
                                              & radial_vector, rotation_velocity)
                         do q = 1, 3
                             ! if mibm is 1 or 2, then the boundary may be moving
-                            vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
-                            vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
+                            vel_g(q) = patch_ib(patch_id)%vel(q)  ! add the linear velocity
+                            vel_g(q) = vel_g(q) + rotation_velocity(q)  ! add the rotational velocity
                         end do
                     end if
                 end if
@@ -385,9 +385,9 @@ contains
         real(wp), pointer, dimension(:)                      :: s_cc => null()
         integer                                              :: bound
         type(ghost_point)                                    :: gp
-        integer                                              :: q, dim     !< Iterator variables
-        integer                                              :: i, j, k, l !< Location indexes
-        integer                                              :: patch_id   !< IB Patch ID
+        integer                                              :: q, dim      !< Iterator variables
+        integer                                              :: i, j, k, l  !< Location indexes
+        integer                                              :: patch_id    !< IB Patch ID
         integer                                              :: dir
         integer                                              :: index
         logical                                              :: bounds_error
@@ -458,12 +458,11 @@ contains
                             print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
                             if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
                             print *, "Image point is located approximately ", &
-                                                                               & (ghost_points_in(q)%loc(dim) - ghost_points_in(q) &
-                                                                               & %ip_loc(dim))/(s_cc(1) - s_cc(0)), &
-                                                                               & " grid cells away"
+                                & (ghost_points_in(q)%loc(dim) - ghost_points_in(q) %ip_loc(dim))/(s_cc(1) - s_cc(0)), &
+                                & " grid cells away"
                             print *, "Levelset ", dist, " and Norm: ", norm(:)
                             print *, &
-                                                                                                                   & "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
+                                & "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
 #endif
                             bounds_error = .true.
                         end if
@@ -488,8 +487,8 @@ contains
     subroutine s_find_num_ghost_points(num_gps_out)
 
         integer, intent(out) :: num_gps_out
-        integer              :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
-        integer              :: num_gps_local                    !< local copies of the gp count to support GPU compute
+        integer              :: i, j, k, ii, jj, kk, gp_layers_z  !< Iterator variables
+        integer              :: num_gps_local                     !< local copies of the gp count to support GPU compute
         logical              :: is_gp
 
         num_gps_local = 0
@@ -533,8 +532,8 @@ contains
     subroutine s_find_ghost_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
-        integer                                              :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
-        integer                                              :: xp, yp, zp                       !< periodicities
+        integer                                              :: i, j, k, ii, jj, kk, gp_layers_z  !< Iterator variables
+        integer                                              :: xp, yp, zp                        !< periodicities
         integer                                              :: count, count_i, local_idx
         integer                                              :: patch_id, encoded_patch_id
         logical                                              :: is_gp
@@ -624,7 +623,7 @@ contains
         real(wp)                                             :: buf
         real(wp), dimension(2, 2, 2)                         :: eta
         type(ghost_point)                                    :: gp
-        integer                                              :: q, i, j, k, ii, jj, kk !< Grid indexes and iterators
+        integer                                              :: q, i, j, k, ii, jj, kk  !< Grid indexes and iterators
         integer                                              :: patch_id
 
         logical is_cell_center
@@ -638,7 +637,7 @@ contains
             if (p /= 0) then
                 k = gp%ip_grid(3)
             else
-                k = 0;
+                k = 0
             end if
 
             ! get the distance to a cell in each direction
@@ -743,7 +742,7 @@ contains
 
         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf !< Primitive Variables
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Primitive Variables
         real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(in) :: pb_in, mv_in
         type(ghost_point), intent(in) :: gp
         real(wp), intent(inout) :: pres_IP
@@ -757,8 +756,8 @@ contains
         real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(inout) :: nmom_IP
         real(wp), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
-        integer                                         :: i, j, k, l, q          !< Iterator variables
-        integer                                         :: i1, i2, j1, j2, k1, k2 !< Iterator variables
+        integer                                         :: i, j, k, l, q           !< Iterator variables
+        integer                                         :: i1, i2, j1, j2, k1, k2  !< Iterator variables
         real(wp)                                        :: coeff
 
         i1 = gp%ip_grid(1); i2 = i1 + 1
@@ -910,7 +909,7 @@ contains
         integer                                                        :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3)                                :: forces, torques
         real(wp), dimension(1:3, 1:3)                                  :: viscous_stress_div, viscous_stress_div_1, &
-             & viscous_stress_div_2 ! viscous stress tensor with temp vectors to hold divergence calculations
+             & viscous_stress_div_2  ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp)                 :: cell_volume, dx, dy, dz, dynamic_viscosity
 
@@ -961,7 +960,7 @@ contains
                             ! gradient of the pressure and cell volume
                             local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i + 1, &
                                                      & j, k) - q_prim_vf(E_idx + fluid_idx)%sf(i - 1, j, &
-                                                     & k))/(2._wp*dx) ! force is the negative pressure gradient
+                                                     & k))/(2._wp*dx)  ! force is the negative pressure gradient
                             local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(E_idx + fluid_idx)%sf(i, &
                                                      & j + 1, k) - q_prim_vf(E_idx + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
                             cell_volume = abs(dx*dy)
@@ -981,23 +980,23 @@ contains
                             do fluid_idx = 1, num_fluids
                                 ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
                                 dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, &
-                                                                         & k)*dynamic_viscosities(fluid_idx))
+                                    & k)*dynamic_viscosities(fluid_idx))
                             end do
 
                             ! get the linear force components first
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i - 1, j, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i + 1, j, k)
                             viscous_stress_div(1, 1:3) = (viscous_stress_div_2(1, 1:3) - viscous_stress_div_1(1, &
-                                               & 1:3))/(2._wp*dx) ! get x derivative of the first-row of viscous stress tensor
+                                               & 1:3))/(2._wp*dx)  ! get x derivative of the first-row of viscous stress tensor
                             local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, &
-                                                     & 1:3) ! add the x components of the divergence to the force
+                                                     & 1:3)  ! add the x components of the divergence to the force
 
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j - 1, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j + 1, k)
                             viscous_stress_div(2, 1:3) = (viscous_stress_div_2(2, 1:3) - viscous_stress_div_1(2, &
-                                               & 1:3))/(2._wp*dy) ! get y derivative of the second-row of viscous stress tensor
+                                               & 1:3))/(2._wp*dy)  ! get y derivative of the second-row of viscous stress tensor
                             local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, &
-                                                     & 1:3) ! add the y components of the divergence to the force
+                                                     & 1:3)  ! add the y components of the divergence to the force
 
                             if (num_dims == 3) then
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j, &
@@ -1005,9 +1004,9 @@ contains
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j, &
                                                                      & k + 1)
                                 viscous_stress_div(3, 1:3) = (viscous_stress_div_2(3, 1:3) - viscous_stress_div_1(3, &
-                                                   & 1:3))/(2._wp*dz) ! get z derivative of the third-row of viscous stress tensor
+                                                   & 1:3))/(2._wp*dz)  ! get z derivative of the third-row of viscous stress tensor
                                 local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, &
-                                                         & 1:3) ! add the z components of the divergence to the force
+                                                         & 1:3)  ! add the z components of the divergence to the force
                             end if
                         end if
 
@@ -1047,7 +1046,7 @@ contains
         do i = 1, num_ibs
             patch_ib(i)%force(:) = forces(i,:)
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, &
-                     & :)) ! torques must be converted to the local coordinates of the IB
+                     & :))  ! torques must be converted to the local coordinates of the IB
         end do
 
         call nvtxEndRange
@@ -1126,7 +1125,7 @@ contains
     !! @param ib_marker Immersed boundary marker index
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
-        real(wp), dimension(3), intent(in) :: axis !< the axis about which we compute the moment. Only required in 3D.
+        real(wp), dimension(3), intent(in) :: axis  !< the axis about which we compute the moment. Only required in 3D.
         integer, intent(in)                :: ib_marker
         real(wp)                           :: moment, distance_to_axis, cell_volume
         real(wp), dimension(3)             :: position, closest_point_along_axis, vector_to_axis, normal_axis
@@ -1143,17 +1142,17 @@ contains
         end if
 
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
-        if (patch_ib(ib_marker)%geometry == 2) then ! circle
+        if (patch_ib(ib_marker)%geometry == 2) then  ! circle
             patch_ib(ib_marker)%moment = 0.5_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
-        else if (patch_ib(ib_marker)%geometry == 3) then ! rectangle
+        else if (patch_ib(ib_marker)%geometry == 3) then  ! rectangle
             patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
                      & %length_y**2)/6._wp
-        else if (patch_ib(ib_marker)%geometry == 6) then ! ellipse
+        else if (patch_ib(ib_marker)%geometry == 6) then  ! ellipse
             patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
                      & %length_y**2)
-        else if (patch_ib(ib_marker)%geometry == 8) then ! sphere
+        else if (patch_ib(ib_marker)%geometry == 8) then  ! sphere
             patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
-        else ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
+        else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
             moment = 0._wp
             cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
@@ -1169,7 +1168,7 @@ contains
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) == ib_marker) then
                             $:GPU_ATOMIC(atomic='update')
-                            count = count + 1 ! increment the count of total cells in the boundary
+                            count = count + 1  ! increment the count of total cells in the boundary
 
                             ! get the position in local coordinates so that the axis passes through 0, 0, 0
                             if (p == 0) then
@@ -1183,7 +1182,7 @@ contains
                             ! project the position along the axis to find the closest distance to the rotation axis
                             closest_point_along_axis = normal_axis*dot_product(normal_axis, position)
                             vector_to_axis = position - closest_point_along_axis
-                            distance_to_axis = dot_product(vector_to_axis, vector_to_axis) ! saves the distance to the axis squared
+                            distance_to_axis = dot_product(vector_to_axis, vector_to_axis)  ! saves the distance to the axis squared
 
                             ! compute the position component of the moment
                             $:GPU_ATOMIC(atomic='update')

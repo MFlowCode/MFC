@@ -36,7 +36,7 @@ module m_start_up
 
     implicit none
 
-    private;
+    private
     public :: s_read_input_file, s_check_input_file, s_read_grid_data_files, s_read_ic_data_files, s_read_serial_grid_data_files, &
         & s_read_serial_ic_data_files, s_read_parallel_grid_data_files, s_read_parallel_ic_data_files, s_check_grid_data_files, &
         & s_initialize_modules, s_initialize_mpi_domain, s_finalize_modules, s_apply_initial_condition, s_save_data, s_read_grid
@@ -59,7 +59,7 @@ module m_start_up
         end subroutine s_read_abstract_ic_data_files
     end interface
 
-    character(LEN=path_len + name_len) :: proc_rank_dir !< Location of the folder associated with the rank of the local processor
+    character(LEN=path_len + name_len) :: proc_rank_dir  !< Location of the folder associated with the rank of the local processor
     !> Possible location of time-step folder containing preexisting grid and/or conservative variables data to be used as starting
     !! point for pre-process
     character(LEN=path_len + 2*name_len), private :: t_step_dir

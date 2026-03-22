@@ -31,9 +31,9 @@ module m_fftw
     type(c_ptr)                        :: fwd_plan, bwd_plan
     type(c_ptr)                        :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
     integer                            :: real_size, cmplx_size, x_size, batch_size, Nfq
-    real(c_double), pointer            :: data_real(:)       !< Real data
-    complex(c_double_complex), pointer :: data_cmplx(:)      !< Complex data in Fourier space
-    complex(c_double_complex), pointer :: data_fltr_cmplx(:) !< Filtered complex data in Fourier space
+    real(c_double), pointer            :: data_real(:)        !< Real data
+    complex(c_double_complex), pointer :: data_cmplx(:)       !< Complex data in Fourier space
+    complex(c_double_complex), pointer :: data_fltr_cmplx(:)  !< Filtered complex data in Fourier space
 #if defined(MFC_GPU)
     $:GPU_DECLARE(create='[real_size, cmplx_size, x_size, batch_size, Nfq]')
 
@@ -62,7 +62,7 @@ contains
     !! the Fourier filter in the azimuthal direction.
     impure subroutine s_initialize_fftw_module
 
-        integer :: ierr !< Generic flag used to identify and report GPU errors
+        integer :: ierr  !< Generic flag used to identify and report GPU errors
         ! Size of input array going into DFT
 
         real_size = p + 1
@@ -76,7 +76,7 @@ contains
         rank = 1; istride = 1; ostride = 1
         allocate (gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
-        gpu_fft_size(1) = real_size;
+        gpu_fft_size(1) = real_size
         iembed(1) = 0
         oembed(1) = 0
         $:GPU_ENTER_DATA(copyin='[real_size, cmplx_size, x_size, sys_size, batch_size, Nfq]')
@@ -122,8 +122,8 @@ contains
     impure subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: i, j, k, l !< Generic loop iterators
-        integer                                                :: ierr       !< Generic flag used to identify and report GPU errors
+        integer                                                :: i, j, k, l  !< Generic loop iterators
+        integer                                                :: ierr        !< Generic flag used to identify and report GPU errors
         ! Restrict filter to processors that have cells adjacent to axis
 
         if (bc_y%beg >= 0) return
@@ -294,7 +294,7 @@ contains
     impure subroutine s_finalize_fftw_module
 
 #if defined(MFC_GPU)
-        integer :: ierr !< Generic flag used to identify and report GPU errors
+        integer :: ierr  !< Generic flag used to identify and report GPU errors
 
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
 #if defined(__PGI)

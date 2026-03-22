@@ -298,7 +298,7 @@ contains
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vL_x, vL_y, vL_z
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(out) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
-        integer :: recon_dir !< Coordinate direction of the reconstruction
+        integer :: recon_dir  !< Coordinate direction of the reconstruction
         integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno', 'WENO_TYPE'),('muscl', 'MUSCL_TYPE')]

@@ -29,18 +29,18 @@ module m_time_steppers
 
     implicit none
 
-    type(vector_field), allocatable, dimension(:)    :: q_cons_ts !< Cell-average conservative variables at each time-stage (TS)
-    type(scalar_field), allocatable, dimension(:)    :: q_prim_vf !< Cell-average primitive variables at the current time-stage
-    type(scalar_field), allocatable, dimension(:)    :: rhs_vf    !< Cell-average RHS variables at the current time-stage
-    type(integer_field), allocatable, dimension(:,:) :: bc_type   !< Boundary condition identifiers
+    type(vector_field), allocatable, dimension(:)    :: q_cons_ts  !< Cell-average conservative variables at each time-stage (TS)
+    type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< Cell-average primitive variables at the current time-stage
+    type(scalar_field), allocatable, dimension(:)    :: rhs_vf     !< Cell-average RHS variables at the current time-stage
+    type(integer_field), allocatable, dimension(:,:) :: bc_type    !< Boundary condition identifiers
     !> Cell-average primitive variables at consecutive TIMESTEPS
     type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2
     real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_pb
-    type(scalar_field)                            :: q_T_sf !< Cell-average temperature variables at the current time-stage
+    type(scalar_field)                            :: q_T_sf  !< Cell-average temperature variables at the current time-stage
     real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_mv
     real(wp), allocatable, dimension(:,:,:)       :: max_dt
-    integer, private                              :: num_ts !< Number of time stages in the time-stepping scheme
-    integer                                       :: stor   !< storage index
+    integer, private                              :: num_ts  !< Number of time stages in the time-stepping scheme
+    integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
 
@@ -71,7 +71,7 @@ contains
         use openacc
 #endif
 #endif
-        integer :: i, j !< Generic loop iterators
+        integer :: i, j  !< Generic loop iterators
         ! Setting number of time-stages for selected time-stepping scheme
 
         if (time_stepper == 1) then
@@ -462,7 +462,7 @@ contains
         integer, intent(in)     :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
-        integer                 :: i, j, k, l, q, s !< Generic loop iterator
+        integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         real(wp)                :: start, finish
         integer                 :: dest
 
@@ -628,26 +628,26 @@ contains
     !> @brief Computes the global time step size from CFL stability constraints across all cells.
     impure subroutine s_compute_dt()
 
-        real(wp) :: rho !< Cell-avg. density
+        real(wp) :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: vel   !< Cell-avg. velocity
-            real(wp), dimension(3) :: alpha !< Cell-avg. volume fraction
+            real(wp), dimension(3) :: vel    !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha  !< Cell-avg. volume fraction
         #:else
-            real(wp), dimension(num_vels)   :: vel   !< Cell-avg. velocity
-            real(wp), dimension(num_fluids) :: alpha !< Cell-avg. volume fraction
+            real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
         #:endif
-        real(wp)               :: vel_sum !< Cell-avg. velocity sum
-        real(wp)               :: pres    !< Cell-avg. pressure
-        real(wp)               :: gamma   !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf  !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv      !< Cell-avg. fluid reference energy
-        real(wp)               :: c       !< Cell-avg. sound speed
-        real(wp)               :: H       !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re      !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
+        real(wp)               :: pres     !< Cell-avg. pressure
+        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv       !< Cell-avg. fluid reference energy
+        real(wp)               :: c        !< Cell-avg. sound speed
+        real(wp)               :: H        !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
         type(vector_field)     :: gm_alpha_qp
         real(wp)               :: dt_local
-        integer                :: j, k, l !< Generic loop iterators
+        integer                :: j, k, l  !< Generic loop iterators
 
         if (.not. igr .or. dummy) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -695,7 +695,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
-        real(wp), intent(in)                                     :: ldt !< local dt
+        real(wp), intent(in)                                     :: ldt  !< local dt
         integer                                                  :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
@@ -746,7 +746,7 @@ contains
                 if (patch_ib(i)%moving_ibm == 1) then
                     ! plug in analytic velocities for 1-way coupling, if it exists
                     @:mib_analytical()
-                else if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
+                else if (patch_ib(i)%moving_ibm == 2) then  ! if we are using two-way coupling, apply force and torque
                     ! compute the force and torque on the IB from the fluid
                     if (.not. forces_computed) then
                         call s_compute_ib_forces(q_prim_vf, fluid_pp)
@@ -758,11 +758,11 @@ contains
 
                     ! update the angular velocity with the torque value
                     patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, &
-                             & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
+                             & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
                     call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                     ! update the moment of inertia to be based on the direction of the angular momentum
                     patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i) &
-                             & %moment ! convert back to angular velocity with the new moment of inertia
+                             & %moment  ! convert back to angular velocity with the new moment of inertia
                 end if
 
                 ! Update the angle of the IB
@@ -790,7 +790,7 @@ contains
     subroutine s_time_step_cycling(t_step)
 
         integer, intent(in) :: t_step
-        integer             :: i, j, k, l !< Generic loop iterator
+        integer             :: i, j, k, l  !< Generic loop iterator
 
         if (t_step == t_step_start) then
             $:GPU_PARALLEL_LOOP(collapse=4)
@@ -840,7 +840,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-        else ! All other timesteps
+        else  ! All other timesteps
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -867,7 +867,7 @@ contains
         use hipfort_hipmalloc
         use hipfort_check
 #endif
-        integer :: i, j !< Generic loop iterators
+        integer :: i, j  !< Generic loop iterators
         ! Deallocating the cell-average conservative variables
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         do j = 1, sys_size

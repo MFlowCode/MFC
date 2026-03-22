@@ -210,7 +210,7 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) then ! Lagrangian solver
+        if (bubbles_lagrange) then  ! Lagrangian solver
             if (lag_txt_wrt) then
                 dbdir = trim(case_dir) // '/lag_bubbles_post_process'
                 file_loc = trim(dbdir) // '/.'
@@ -321,7 +321,7 @@ contains
         integer :: lower_bound, upper_bound
 
         #:for X, M in [('x', 'm'), ('y', 'n'), ('z', 'p')]
-            if (${M}$ == 0) return ! Early return for y or z if simulation is 1D or 2D
+            if (${M}$ == 0) return  ! Early return for y or z if simulation is 1D or 2D
 
             lower_bound = -offset_${X}$%beg
             upper_bound = ${M}$ + offset_${X}$%end
@@ -1171,7 +1171,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer :: i, j, k, l, cent
-        integer :: counter, root !< number of data points extracted to fit shape to SH perturbations
+        integer :: counter, root  !< number of data points extracted to fit shape to SH perturbations
         real(wp), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
         real(wp) :: axp, axm, ayp, aym, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 
@@ -1261,7 +1261,7 @@ contains
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H, qv
         real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: adv
-        integer :: i, j, k, l, s ! looping indices
+        integer :: i, j, k, l, s  ! looping indices
 
         Egk = 0._wp
         Elp = 0._wp

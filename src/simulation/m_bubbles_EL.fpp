@@ -21,47 +21,47 @@ module m_bubbles_EL
     implicit none
 
     ! (nBub)
-    integer, allocatable, dimension(:,:) :: lag_id     !< Global and local IDs
-    real(wp), allocatable, dimension(:)  :: bub_R0     !< Initial bubble radius
-    real(wp), allocatable, dimension(:)  :: Rmax_stats !< Maximum radius
-    real(wp), allocatable, dimension(:)  :: Rmin_stats !< Minimum radius
+    integer, allocatable, dimension(:,:) :: lag_id      !< Global and local IDs
+    real(wp), allocatable, dimension(:)  :: bub_R0      !< Initial bubble radius
+    real(wp), allocatable, dimension(:)  :: Rmax_stats  !< Maximum radius
+    real(wp), allocatable, dimension(:)  :: Rmin_stats  !< Minimum radius
     $:GPU_DECLARE(create='[lag_id, bub_R0, Rmax_stats, Rmin_stats]')
 
-    real(wp), allocatable, dimension(:) :: gas_mg     !< Bubble's gas mass
-    real(wp), allocatable, dimension(:) :: gas_betaT  !< heatflux model (Preston et al., 2007)
-    real(wp), allocatable, dimension(:) :: gas_betaC  !< massflux model (Preston et al., 2007)
-    real(wp), allocatable, dimension(:) :: bub_dphidt !< subgrid velocity potential (Maeda & Colonius, 2018)
+    real(wp), allocatable, dimension(:) :: gas_mg      !< Bubble's gas mass
+    real(wp), allocatable, dimension(:) :: gas_betaT   !< heatflux model (Preston et al., 2007)
+    real(wp), allocatable, dimension(:) :: gas_betaC   !< massflux model (Preston et al., 2007)
+    real(wp), allocatable, dimension(:) :: bub_dphidt  !< subgrid velocity potential (Maeda & Colonius, 2018)
     $:GPU_DECLARE(create='[gas_mg, gas_betaT, gas_betaC, bub_dphidt]')
 
     ! (nBub, 1 -> actual val or 2 -> temp val)
-    real(wp), allocatable, dimension(:,:) :: gas_p     !< Pressure in the bubble
-    real(wp), allocatable, dimension(:,:) :: gas_mv    !< Vapor mass in the bubble
-    real(wp), allocatable, dimension(:,:) :: intfc_rad !< Bubble radius
-    real(wp), allocatable, dimension(:,:) :: intfc_vel !< Velocity of the bubble interface
+    real(wp), allocatable, dimension(:,:) :: gas_p      !< Pressure in the bubble
+    real(wp), allocatable, dimension(:,:) :: gas_mv     !< Vapor mass in the bubble
+    real(wp), allocatable, dimension(:,:) :: intfc_rad  !< Bubble radius
+    real(wp), allocatable, dimension(:,:) :: intfc_vel  !< Velocity of the bubble interface
     $:GPU_DECLARE(create='[gas_p, gas_mv, intfc_rad, intfc_vel]')
     ! (nBub, 1-> x or 2->y or 3 ->z, 1 -> actual or 2 -> temporal val)
-    real(wp), allocatable, dimension(:,:,:) :: mtn_pos     !< Bubble's position
-    real(wp), allocatable, dimension(:,:,:) :: mtn_posPrev !< Bubble's previous position
-    real(wp), allocatable, dimension(:,:,:) :: mtn_vel     !< Bubble's velocity
-    real(wp), allocatable, dimension(:,:,:) :: mtn_s       !< Bubble's computational cell position in real format
+    real(wp), allocatable, dimension(:,:,:) :: mtn_pos      !< Bubble's position
+    real(wp), allocatable, dimension(:,:,:) :: mtn_posPrev  !< Bubble's previous position
+    real(wp), allocatable, dimension(:,:,:) :: mtn_vel      !< Bubble's velocity
+    real(wp), allocatable, dimension(:,:,:) :: mtn_s        !< Bubble's computational cell position in real format
     $:GPU_DECLARE(create='[mtn_pos, mtn_posPrev, mtn_vel, mtn_s]')
     ! (nBub, 1-> x or 2->y or 3 ->z, time-stage)
-    real(wp), allocatable, dimension(:,:)   :: intfc_draddt !< Time derivative of bubble's radius
-    real(wp), allocatable, dimension(:,:)   :: intfc_dveldt !< Time derivative of bubble's interface velocity
-    real(wp), allocatable, dimension(:,:)   :: gas_dpdt     !< Time derivative of gas pressure
-    real(wp), allocatable, dimension(:,:)   :: gas_dmvdt    !< Time derivative of the vapor mass in the bubble
-    real(wp), allocatable, dimension(:,:,:) :: mtn_dposdt   !< Time derivative of the bubble's position
-    real(wp), allocatable, dimension(:,:,:) :: mtn_dveldt   !< Time derivative of the bubble's velocity
+    real(wp), allocatable, dimension(:,:)   :: intfc_draddt  !< Time derivative of bubble's radius
+    real(wp), allocatable, dimension(:,:)   :: intfc_dveldt  !< Time derivative of bubble's interface velocity
+    real(wp), allocatable, dimension(:,:)   :: gas_dpdt      !< Time derivative of gas pressure
+    real(wp), allocatable, dimension(:,:)   :: gas_dmvdt     !< Time derivative of the vapor mass in the bubble
+    real(wp), allocatable, dimension(:,:,:) :: mtn_dposdt    !< Time derivative of the bubble's position
+    real(wp), allocatable, dimension(:,:,:) :: mtn_dveldt    !< Time derivative of the bubble's velocity
     $:GPU_DECLARE(create='[intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt]')
 
-    integer, private :: lag_num_ts !< Number of time stages in the time-stepping scheme
+    integer, private :: lag_num_ts  !< Number of time stages in the time-stepping scheme
     $:GPU_DECLARE(create='[lag_num_ts]')
 
-    integer  :: nBubs              !< Number of bubbles in the local domain
-    real(wp) :: Rmax_glb, Rmin_glb !< Maximum and minimum bubbe size in the local domain
+    integer  :: nBubs               !< Number of bubbles in the local domain
+    real(wp) :: Rmax_glb, Rmin_glb  !< Maximum and minimum bubbe size in the local domain
     !> Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
-    integer                                       :: q_beta_idx !< Size of the q_beta vector field
+    integer                                       :: q_beta_idx  !< Size of the q_beta vector field
     $:GPU_DECLARE(create='[nBubs, Rmax_glb, Rmin_glb, q_beta, q_beta_idx]')
 
 contains
@@ -178,9 +178,9 @@ contains
                     if (indomain) then
                         bub_id = bub_id + 1
                         call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
-                        lag_id(bub_id, 1) = id ! global ID
-                        lag_id(bub_id, 2) = bub_id ! local ID
-                        nBubs = bub_id ! local number of bubbles
+                        lag_id(bub_id, 1) = id  ! global ID
+                        lag_id(bub_id, 2) = bub_id  ! local ID
+                        nBubs = bub_id  ! local number of bubbles
                     end if
                 end do
                 close (94)
@@ -217,7 +217,7 @@ contains
             write (path_D_dir, '(A,I0,A,I0)') trim(case_dir) // '/D'
             call my_inquire(path_D_dir, file_exist)
             if (.not. file_exist) call s_create_directory(trim(path_D_dir))
-            call s_write_restart_lag_bubbles(save_count) ! Needed for post_processing
+            call s_write_restart_lag_bubbles(save_count)  ! Needed for post_processing
             call s_write_void_evol(qtime)
         end if
 
@@ -300,13 +300,13 @@ contains
         end if
 
         ! Initial particle mass
-        volparticle = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp ! volume
-        gas_mv(bub_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag) ! vapermass
-        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_g*Tw)) ! gasmass
+        volparticle = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp  ! volume
+        gas_mv(bub_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag)  ! vapermass
+        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_g*Tw))  ! gasmass
         if (gas_mg(bub_id) <= 0._wp) then
             call s_mpi_abort("The initial mass of gas inside the bubble is negative. Check the initial conditions.")
         end if
-        totalmass = gas_mg(bub_id) + gas_mv(bub_id, 1) ! totalmass
+        totalmass = gas_mg(bub_id) + gas_mv(bub_id, 1)  ! totalmass
 
         ! Bubble natural frequency
         concvap = gas_mv(bub_id, 1)/(gas_mv(bub_id, 1) + gas_mg(bub_id))
@@ -511,8 +511,8 @@ contains
         #:endif
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
-        integer :: adap_dt_stop_max, adap_dt_stop                    !< Fail-safe exit if max iteration count reached
-        real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
+        integer :: adap_dt_stop_max, adap_dt_stop                     !< Fail-safe exit if max iteration count reached
+        real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu  !< Dummy variables for unified subgrid bubble subroutines
         integer :: i, k, l
 
         call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
@@ -872,12 +872,12 @@ contains
             end if
 
             !> Perform bilinear interpolation
-            if (p == 0) then ! 2D
+            if (p == 0) then  ! 2D
                 f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))
                 f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))
                 f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
                 f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)
-            else ! 3D
+            else  ! 3D
                 f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))*(1._wp - psi(3))
                 f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))*(1._wp - psi(3))
                 f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1._wp - psi(3))
@@ -977,7 +977,7 @@ contains
             term1 = bub_dphidt(bub_id)*intfc_rad(bub_id, 2)**2._wp
             term2 = intfc_vel(bub_id, 2)*intfc_rad(bub_id, 2)**2._wp
 
-            Rbeq = volgas**(1._wp/3._wp) ! surrogate bubble radius
+            Rbeq = volgas**(1._wp/3._wp)  ! surrogate bubble radius
             aux = dc**3._wp - Rbeq**3._wp
             term2 = term2/denom
             term2 = 3._wp/2._wp*term2**2._wp*Rbeq**3._wp*(1._wp - Rbeq/dc)/aux
@@ -1002,7 +1002,7 @@ contains
         integer, intent(in) :: stage
         integer             :: k
 
-        if (time_stepper == 1) then ! 1st order TVD RK
+        if (time_stepper == 1) then  ! 1st order TVD RK
             $:GPU_PARALLEL_LOOP(private='[k]')
             do k = 1, nBubs
                 ! u{1} = u{n} +  dt * RHS{n}
@@ -1023,7 +1023,7 @@ contains
                 $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
                 call s_write_lag_particles(mytime)
             end if
-        else if (time_stepper == 2) then ! 2nd order TVD RK
+        else if (time_stepper == 2) then  ! 2nd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
@@ -1058,7 +1058,7 @@ contains
                     call s_write_lag_particles(mytime)
                 end if
             end if
-        else if (time_stepper == 3) then ! 3rd order TVD RK
+        else if (time_stepper == 3) then  ! 3rd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs

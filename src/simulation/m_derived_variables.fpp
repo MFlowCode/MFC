@@ -106,7 +106,7 @@ contains
         integer, intent(in)                             :: t_step
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf
         type(vector_field), dimension(:), intent(inout) :: q_prim_ts1, q_prim_ts2
-        integer                                         :: i, j, k !< Generic loop iterators
+        integer                                         :: i, j, k  !< Generic loop iterators
 
         if (probe_wrt) then
             call s_derive_acceleration_component(1, q_prim_ts1(1)%vf, q_prim_ts1(2)%vf, q_prim_ts2(1)%vf, q_prim_ts2(2)%vf, x_accel)
@@ -163,7 +163,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf2
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf3
         real(wp), dimension(0:m, 0:n, 0:p), intent(out)     :: q_sf
-        integer                                             :: j, k, l, r !< Generic loop iterators
+        integer                                             :: j, k, l, r  !< Generic loop iterators
         ! Computing the acceleration component in the x-coordinate direction
 
         if (i == 1) then
@@ -357,21 +357,21 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         real(wp), dimension(1:num_fluids, 1:5), intent(inout) :: c_m
-        integer :: i, j, k, l    !< Generic loop iterators
-        real(wp) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
-        real(wp) :: dV           !< Discrete cell volume
+        integer :: i, j, k, l     !< Generic loop iterators
+        real(wp) :: tmp, tmp_out  !< Temporary variable to store quantity for mpi_allreduce
+        real(wp) :: dV            !< Discrete cell volume
 
         c_m(:,:) = 0.0_wp
 
         $:GPU_UPDATE(device='[c_m]')
 
-        if (n == 0) then ! 1D simulation
+        if (n == 0) then  ! 1D simulation
             $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, dV]')
-            do l = 0, p ! Loop over grid
+            do l = 0, p  ! Loop over grid
                 do k = 0, n
                     do j = 0, m
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids ! Loop over individual fluids
+                        do i = 1, num_fluids  ! Loop over individual fluids
                             dV = dx(j)
                             ! Mass
                             $:GPU_ATOMIC(atomic='update')
@@ -387,13 +387,13 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-        else if (p == 0) then ! 2D simulation
+        else if (p == 0) then  ! 2D simulation
             $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, dV]')
-            do l = 0, p ! Loop over grid
+            do l = 0, p  ! Loop over grid
                 do k = 0, n
                     do j = 0, m
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids ! Loop over individual fluids
+                        do i = 1, num_fluids  ! Loop over individual fluids
                             dV = dx(j)*dy(k)
                             ! Mass
                             $:GPU_ATOMIC(atomic='update')
@@ -412,13 +412,13 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-        else ! 3D simulation
+        else  ! 3D simulation
             $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, dV]')
-            do l = 0, p ! Loop over grid
+            do l = 0, p  ! Loop over grid
                 do k = 0, n
                     do j = 0, m
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids ! Loop over individual fluids
+                        do i = 1, num_fluids  ! Loop over individual fluids
                             dV = dx(j)*dy(k)*dz(l)
                             ! Mass
                             $:GPU_ATOMIC(atomic='update')
@@ -444,8 +444,8 @@ contains
 
         $:GPU_UPDATE(host='[c_m]')
 
-        if (n == 0) then ! 1D simulation
-            do i = 1, num_fluids ! Loop over individual fluids
+        if (n == 0) then  ! 1D simulation
+            do i = 1, num_fluids  ! Loop over individual fluids
                 ! Sum all components across all processors using MPI_ALLREDUCE
                 if (num_procs > 1) then
                     tmp = c_m(i, 1)
@@ -461,8 +461,8 @@ contains
                 ! Compute quotients
                 c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
             end do
-        else if (p == 0) then ! 2D simulation
-            do i = 1, num_fluids ! Loop over individual fluids
+        else if (p == 0) then  ! 2D simulation
+            do i = 1, num_fluids  ! Loop over individual fluids
                 ! Sum all components across all processors using MPI_ALLREDUCE
                 if (num_procs > 1) then
                     tmp = c_m(i, 1)
@@ -482,8 +482,8 @@ contains
                 c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
                 c_m(i, 3) = c_m(i, 3)/c_m(i, 1)
             end do
-        else ! 3D simulation
-            do i = 1, num_fluids ! Loop over individual fluids
+        else  ! 3D simulation
+            do i = 1, num_fluids  ! Loop over individual fluids
                 ! Sum all components across all processors using MPI_ALLREDUCE
                 if (num_procs > 1) then
                     tmp = c_m(i, 1)

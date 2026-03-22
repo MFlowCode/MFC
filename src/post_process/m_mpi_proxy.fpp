@@ -6,7 +6,7 @@
 module m_mpi_proxy
 
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi  !< Message passing interface (MPI) module
 #endif
 
     use m_derived_types
@@ -29,8 +29,8 @@ contains
     impure subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
-        integer :: i    !< Generic loop iterator
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: i     !< Generic loop iterator
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Allocating and configuring the receive counts and the displacement vector variables used in variable-gather communication
         ! procedures. Note that these are only needed for either multidimensional runs that utilize the Silo database file format or
         ! for 1D simulations.
@@ -62,8 +62,8 @@ contains
     impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
-        integer :: i    !< Generic loop iterator
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: i     !< Generic loop iterator
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Logistics
 
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
@@ -147,7 +147,7 @@ contains
         real(wp), dimension(1:, 0:), intent(inout) :: spatial_extents
 
 #ifdef MFC_MPI
-        integer  :: ierr !< Generic flag used to identify and report MPI errors
+        integer  :: ierr  !< Generic flag used to identify and report MPI errors
         real(wp) :: ext_temp(0:num_procs - 1)
 
         ! Simulation is 3D
@@ -237,7 +237,7 @@ contains
     impure subroutine s_mpi_defragment_1d_grid_variable
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Silo-HDF5 database format
 
         if (format == 1) then
@@ -264,7 +264,7 @@ contains
         real(wp), dimension(1:2, 0:num_procs - 1), intent(inout) :: data_extents
 
 #ifdef MFC_MPI
-        integer  :: ierr !< Generic flag used to identify and report MPI errors
+        integer  :: ierr  !< Generic flag used to identify and report MPI errors
         real(wp) :: ext_temp(0:num_procs - 1)
 
         if (n > 0) then
@@ -299,7 +299,7 @@ contains
         real(wp), dimension(0:m), intent(inout) :: q_root_sf
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Gathering the sub-domain flow variable data from all the processes and putting it back together for the entire
         ! computational domain on the process with rank 0
 

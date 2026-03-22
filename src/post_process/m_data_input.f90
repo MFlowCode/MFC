@@ -35,11 +35,11 @@ module m_data_input
         end subroutine s_read_abstract_data_files
     end interface
 
-    type(scalar_field), allocatable, dimension(:), public    :: q_cons_vf !< Conservative variables
+    type(scalar_field), allocatable, dimension(:), public    :: q_cons_vf  !< Conservative variables
     type(scalar_field), allocatable, dimension(:), public    :: q_cons_temp
-    type(scalar_field), allocatable, dimension(:), public    :: q_prim_vf !< Primitive variables
-    type(integer_field), allocatable, dimension(:,:), public :: bc_type   !< Boundary condition identifiers
-    type(scalar_field), public                               :: q_T_sf    !< Temperature field
+    type(scalar_field), allocatable, dimension(:), public    :: q_prim_vf  !< Primitive variables
+    type(integer_field), allocatable, dimension(:,:), public :: bc_type    !< Boundary condition identifiers
+    type(scalar_field), public                               :: q_T_sf     !< Temperature field
     ! type(scalar_field), public :: ib_markers !<
     type(integer_field), public :: ib_markers
 
@@ -147,7 +147,7 @@ contains
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
-                save_index = t_step/t_step_save ! get the number of saves done to this point
+                save_index = t_step/t_step_save  ! get the number of saves done to this point
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
                 var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)

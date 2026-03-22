@@ -609,7 +609,7 @@ contains
                                & *r3(1))
 
                 denominator = r1_mag*r2_mag*r3_mag + dot_product(r1, r2)*r3_mag + dot_product(r2, r3)*r1_mag + dot_product(r3, &
-                                                                 & r1)*r2_mag
+                    & r1)*r2_mag
 
                 fraction = fraction + atan2(numerator, denominator)
             end do
@@ -668,15 +668,15 @@ contains
     subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
         type(t_model), intent(in) :: model
-        real(wp), allocatable, intent(out), dimension(:,:,:) :: boundary_v !< Output boundary vertices/normals
-        integer, intent(out) :: boundary_vertex_count, boundary_edge_count !< Output boundary vertex/edge count
-        integer :: i, j                                                    !< Model index iterator
-        integer :: edge_count, edge_index, store_index                     !< Boundary edge index iterator
-        real(wp), dimension(1:2, 1:2) :: edge                              !< Edge end points buffer
-        real(wp), dimension(1:2) :: boundary_edge                          !< Boundary edge end points buffer
-        real(wp), dimension(1:(3*model%ntrs), 1:2, 1:2) :: temp_boundary_v !< Temporary boundary vertex buffer
-        integer, dimension(1:(3*model%ntrs)) :: edge_occurrence            !< The manifoldness of the edges
-        real(wp) :: edgetan, initial, v_norm, xnormal, ynormal             !< The manifoldness of the edges
+        real(wp), allocatable, intent(out), dimension(:,:,:) :: boundary_v  !< Output boundary vertices/normals
+        integer, intent(out) :: boundary_vertex_count, boundary_edge_count  !< Output boundary vertex/edge count
+        integer :: i, j                                                     !< Model index iterator
+        integer :: edge_count, edge_index, store_index                      !< Boundary edge index iterator
+        real(wp), dimension(1:2, 1:2) :: edge                               !< Edge end points buffer
+        real(wp), dimension(1:2) :: boundary_edge                           !< Boundary edge end points buffer
+        real(wp), dimension(1:(3*model%ntrs), 1:2, 1:2) :: temp_boundary_v  !< Temporary boundary vertex buffer
+        integer, dimension(1:(3*model%ntrs)) :: edge_occurrence             !< The manifoldness of the edges
+        real(wp) :: edgetan, initial, v_norm, xnormal, ynormal              !< The manifoldness of the edges
         ! Total number of edges in 2D STL
 
         edge_count = 3*model%ntrs
@@ -779,10 +779,10 @@ contains
     !> This procedure appends the edge end vertices to a temporary buffer.
     subroutine s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
-        integer, intent(inout)                                     :: edge_index      !< Edge index iterator
-        integer, intent(inout)                                     :: edge_count      !< Total number of edges
-        real(wp), intent(in), dimension(1:2, 1:2)                  :: edge            !< Edges end points to be registered
-        real(wp), dimension(1:edge_count, 1:2, 1:2), intent(inout) :: temp_boundary_v !< Temporary edge end vertex buffer
+        integer, intent(inout)                                     :: edge_index       !< Edge index iterator
+        integer, intent(inout)                                     :: edge_count       !< Total number of edges
+        real(wp), intent(in), dimension(1:2, 1:2)                  :: edge             !< Edges end points to be registered
+        real(wp), dimension(1:edge_count, 1:2, 1:2), intent(inout) :: temp_boundary_v  !< Temporary edge end vertex buffer
         ! Increment edge index and store the edge
 
         edge_index = edge_index + 1
@@ -835,7 +835,7 @@ contains
             ! Project point onto triangle plane
             pv(:) = point(:) - v1(:)
             d = dot_product(pv, n)
-            if (abs(d) >= dist_min) cycle ! minimum distance is not small enough, no need to check validity
+            if (abs(d) >= dist_min) cycle  ! minimum distance is not small enough, no need to check validity
             proj(:) = point(:) - d*n(:)
 
             ! Check if projection is inside triangle using barycentric coordinates
@@ -980,12 +980,12 @@ contains
                 dist = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2)
                 norm(1) = gpu_boundary_v(i, 3, 1, pid)
                 norm(2) = gpu_boundary_v(i, 3, 2, pid)
-            else if (t < 0._wp) then ! negative t means that v1 is the closest point on the edge
+            else if (t < 0._wp) then  ! negative t means that v1 is the closest point on the edge
                 dist = sqrt((point(1) - v1(1))**2 + (point(2) - v1(2))**2)
                 norm(1) = v1(1) - point(1)
                 norm(2) = v1(2) - point(2)
                 norm = norm/dist
-            else ! t > 1 means that v2 is the closest point on the line edge
+            else  ! t > 1 means that v2 is the closest point on the line edge
                 dist = sqrt((point(1) - v2(1))**2 + (point(2) - v2(2))**2)
                 norm(1) = v2(1) - point(1)
                 norm(2) = v2(2) - point(2)
@@ -1007,11 +1007,11 @@ contains
     subroutine s_instantiate_STL_models()
 
         ! Variables for IBM+STL
-        real(wp)                                :: normals(1:3) !< Boundary normal buffer
-        integer                                 :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
-        real(wp), allocatable, dimension(:,:,:) :: boundary_v !< Boundary vertex buffer
-        real(wp)                                :: dx_local, dy_local, dz_local !< Levelset distance buffer
-        integer                                 :: i, j, k !< Generic loop iterators
+        real(wp)                                :: normals(1:3)  !< Boundary normal buffer
+        integer                                 :: boundary_vertex_count, boundary_edge_count, total_vertices  !< Boundary vertex
+        real(wp), allocatable, dimension(:,:,:) :: boundary_v  !< Boundary vertex buffer
+        real(wp)                                :: dx_local, dy_local, dz_local  !< Levelset distance buffer
+        integer                                 :: i, j, k  !< Generic loop iterators
         integer                                 :: patch_id
         type(t_bbox)                            :: bbox, bbox_old
         type(t_model)                           :: model

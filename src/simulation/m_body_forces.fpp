@@ -16,7 +16,7 @@ module m_body_forces
 
     implicit none
 
-    private;
+    private
     public :: s_compute_body_forces_rhs, s_initialize_body_forces_module, s_finalize_body_forces_module
 
     real(wp), allocatable, dimension(:,:,:) :: rhoM
@@ -59,7 +59,7 @@ contains
     subroutine s_compute_mixture_density(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer                                             :: i, j, k, l !< standard iterators
+        integer                                             :: i, j, k, l  !< standard iterators
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
         do l = 0, p
@@ -85,7 +85,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: i, j, k, l !< Loop variables
+        integer                                                :: i, j, k, l  !< Loop variables
 
         call s_compute_acceleration(mytime)
         call s_compute_mixture_density(q_cons_vf)
@@ -102,7 +102,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (bf_x) then ! x-direction body forces
+        if (bf_x) then  ! x-direction body forces
 
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
@@ -116,7 +116,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bf_y) then ! y-direction body forces
+        if (bf_y) then  ! y-direction body forces
 
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
@@ -130,7 +130,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bf_z) then ! z-direction body forces
+        if (bf_z) then  ! z-direction body forces
 
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p

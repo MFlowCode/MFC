@@ -68,7 +68,7 @@ module m_weno
 
     ! END: WENO Coefficients
 
-    integer :: v_size !< Number of WENO-reconstructed cell-average variables
+    integer :: v_size  !< Number of WENO-reconstructed cell-average variables
     $:GPU_DECLARE(create='[v_size]')
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
@@ -93,7 +93,7 @@ contains
         if (n == 0) then
             is2_weno%beg = 0
         else
-            is2_weno%beg = -buff_size;
+            is2_weno%beg = -buff_size
         end if
 
         is2_weno%end = n - is2_weno%beg
@@ -181,11 +181,11 @@ contains
         integer, intent(in)               :: weno_dir
         type(int_bounds_info), intent(in) :: is
         integer                           :: s
-        real(wp), pointer, dimension(:)   :: s_cb => null() !< Cell-boundary locations in the s-direction
-        type(int_bounds_info)             :: bc_s           !< Boundary conditions (BC) in the s-direction
-        integer                           :: i              !< Generic loop iterator
-        real(wp)                          :: w(1:8) ! Intermediate var for ideal weights: s_cb across overall stencil
-        real(wp)                          :: y(1:4) ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
+        real(wp), pointer, dimension(:)   :: s_cb => null()  !< Cell-boundary locations in the s-direction
+        type(int_bounds_info)             :: bc_s            !< Boundary conditions (BC) in the s-direction
+        integer                           :: i               !< Generic loop iterator
+        real(wp)                          :: w(1:8)  ! Intermediate var for ideal weights: s_cb across overall stencil
+        real(wp)                          :: y(1:4)  ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
         ! Determine cell count, boundary locations, and BCs for selected WENO direction
 
@@ -366,7 +366,7 @@ contains
                             d_cbL_${XYZ}$ (0:1, s) = 0._wp; d_cbL_${XYZ}$ (2, s) = 1._wp
                         end if
                     end if
-                else ! WENO7
+                else  ! WENO7
                     if (.not. teno) then
                         do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
                             ! Reference: Shu (1997) "Essentially Non-Oscillatory and Weighted Essentially Non-Oscillatory Schemes
@@ -381,7 +381,7 @@ contains
                             ! (dvd) instead of the values themselves. While the polynomial coefficients sum to 1, the derivative of
                             ! 1 is 0, which means it does not create additional cross terms in the smoothness indicators.
 
-                            w = s_cb(i - 3:i + 4) - s_cb(i) ! Offset using s_cb(i) to reduce floating point error
+                            w = s_cb(i - 3:i + 4) - s_cb(i)  ! Offset using s_cb(i) to reduce floating point error
                             d_cbR_${XYZ}$ (0, &
                                            & i + 1) = ((w(5) - w(6))*(w(5) - w(7))*(w(5) - w(8)))/((w(1) - w(6))*(w(1) - w(7)) &
                                            & *(w(1) - w(8)))
@@ -828,7 +828,7 @@ contains
                                                & + 5*y(3)**2*y(4)**2))/(5*(y(1) + y(2))**2*(y(1) + y(2) + y(3))**2*(y(1) + y(2) &
                                                & + y(3) + y(4))**2)
                         end do
-                    else ! TENO (only supports uniform grid)
+                    else  ! TENO (only supports uniform grid)
                         ! (Fu, et al., 2016) Table 2 (for right flux)
                         d_cbL_${XYZ}$ (0,:) = 18._wp/35._wp
                         d_cbL_${XYZ}$ (1,:) = 3._wp/35._wp
@@ -888,7 +888,7 @@ contains
             real(wp), dimension(0:weno_num_stencils)        :: beta
             real(wp), dimension(0:weno_num_stencils)        :: delta
         #:endif
-        real(wp), dimension(-3:3) :: v ! temporary field value array for clarity (WENO7 only)
+        real(wp), dimension(-3:3) :: v  ! temporary field value array for clarity (WENO7 only)
         real(wp)                  :: tau
         integer                   :: i, j, k, l, q
 
@@ -1078,7 +1078,7 @@ contains
                                         else if (wenoz) then
                                             ! Borges, et al. (2008)
 
-                                            tau = abs(beta(2) - beta(0)) ! Equation 25
+                                            tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q)))
@@ -1089,20 +1089,20 @@ contains
                                             tau = abs(beta(2) - beta(0))
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = 1._wp + tau/beta(q) ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                                alpha(q) = 1._wp + tau/beta(q)  ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
                                                 alpha(q) = (alpha(q)**3._wp) &
-                                                      & **2._wp ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                                      & **2._wp  ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
                                             end do
-                                            omega = alpha/sum(alpha) ! Equation 25 (reuse omega as xi)
+                                            omega = alpha/sum(alpha)  ! Equation 25 (reuse omega as xi)
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                if (omega(q) < teno_CT) then ! Equation 26
+                                                if (omega(q) < teno_CT) then  ! Equation 26
                                                     delta(q) = 0._wp
                                                 else
                                                     delta(q) = 1._wp
                                                 end if
-                                                alpha(q) = delta(q)*d_cbL_${XYZ}$ (q, j) ! Equation 27
+                                                alpha(q) = delta(q)*d_cbL_${XYZ}$ (q, j)  ! Equation 27
                                             end do
                                         end if
 
@@ -1176,7 +1176,7 @@ contains
                                         beta(:) = weno_eps
 
                                         if (teno) v = v_rs_ws_${XYZ}$ (j - 3:j + 3, k, l, &
-                                            & i) ! temporary field value array for clarity
+                                            & i)  ! temporary field value array for clarity
 
                                         if (.not. teno) then
                                             dvd(2) = v_rs_ws_${XYZ}$ (j + 3, k, l, i) - v_rs_ws_${XYZ}$ (j + 2, k, l, i)
@@ -1236,7 +1236,7 @@ contains
                                                  & 2)*dvd(-1)*dvd(-3) + beta_coef_${XYZ}$ (j, 3, &
                                                  & 3)*dvd(-2)*dvd(-2) + beta_coef_${XYZ}$ (j, 3, &
                                                  & 4)*dvd(-2)*dvd(-3) + beta_coef_${XYZ}$ (j, 3, 5)*dvd(-3)*dvd(-3) + weno_eps
-                                        else ! TENO
+                                        else  ! TENO
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
                                                 ! High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu
                                                 ! & Tang, 2019) Section 3.2
@@ -1272,27 +1272,27 @@ contains
                                                   & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
                                         else if (wenoz) then
                                             ! Castro, et al. (2010) Don & Borges (2013) also helps
-                                            tau = abs(beta(3) - beta(0)) ! Equation 50
+                                            tau = abs(beta(3) - beta(0))  ! Equation 50
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbL_${XYZ}$ (q, &
-                                                      & j)*(1._wp + (tau/beta(q))**wenoz_q) ! wenoz_q = 2,3,4 for stability
+                                                      & j)*(1._wp + (tau/beta(q))**wenoz_q)  ! wenoz_q = 2,3,4 for stability
                                             end do
                                         else if (teno) then
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
-                                                tau = abs(beta(4) - beta(3)) ! Note the reordering of stencils
+                                                tau = abs(beta(4) - beta(3))  ! Note the reordering of stencils
                                                 alpha = 1._wp + tau/beta
-                                                alpha = (alpha**3._wp)**2._wp ! some CPU compilers cannot optimize x**6.0
+                                                alpha = (alpha**3._wp)**2._wp  ! some CPU compilers cannot optimize x**6.0
                                                 omega = alpha/sum(alpha)
 
                                                 $:GPU_LOOP(parallelism='[seq]')
                                                 do q = 0, weno_num_stencils
-                                                    if (omega(q) < teno_CT) then ! Equation 26
+                                                    if (omega(q) < teno_CT) then  ! Equation 26
                                                         delta(q) = 0._wp
                                                     else
                                                         delta(q) = 1._wp
                                                     end if
-                                                    alpha(q) = delta(q)*d_cbL_${XYZ}$ (q, j) ! Equation 27
+                                                    alpha(q) = delta(q)*d_cbL_${XYZ}$ (q, j)  ! Equation 27
                                                 end do
                                             #:endif
                                         end if
@@ -1349,7 +1349,7 @@ contains
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbR_${XYZ}$ (q, &
-                                                      & j)*(1._wp + (tau/beta(q))**wenoz_q) ! wenoz_q = 2,3,4 for stability
+                                                      & j)*(1._wp + (tau/beta(q))**wenoz_q)  ! wenoz_q = 2,3,4 for stability
                                             end do
                                         else if (teno) then
                                             $:GPU_LOOP(parallelism='[seq]')
@@ -1462,8 +1462,8 @@ contains
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(in) :: v_rs_ws
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf, vR_rs_vf
         integer :: i, j, k, l
-        real(wp), dimension(-1:1) :: d !< Curvature measures at the zone centers
-        real(wp) :: d_MD, d_LC         !< Median (md) curvature and large curvature (LC) measures
+        real(wp), dimension(-1:1) :: d  !< Curvature measures at the zone centers
+        real(wp) :: d_MD, d_LC          !< Median (md) curvature and large curvature (LC) measures
         ! The left and right upper bounds (UL), medians, large curvatures, minima, and maxima of the WENO-reconstructed values of
         ! the cell- average variables.
         real(wp) :: vL_UL, vR_UL
@@ -1562,7 +1562,6 @@ contains
 
         ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
-        ! deallocate(vL_rs_vf_x, vR_rs_vf_x)
         @:DEALLOCATE(v_rs_ws_x)
 
         ! Deallocating WENO coefficients in x-direction
@@ -1573,7 +1572,6 @@ contains
         ! Deallocating WENO coefficients in y-direction
         if (n == 0) return
 
-        ! deallocate(vL_rs_vf_y, vR_rs_vf_y)
         @:DEALLOCATE(v_rs_ws_y)
 
         @:DEALLOCATE(poly_coef_cbL_y, poly_coef_cbR_y)
@@ -1583,7 +1581,6 @@ contains
         ! Deallocating WENO coefficients in z-direction
         if (p == 0) return
 
-        ! deallocate(vL_rs_vf_z, vR_rs_vf_z)
         @:DEALLOCATE(v_rs_ws_z)
 
         @:DEALLOCATE(poly_coef_cbL_z, poly_coef_cbR_z)

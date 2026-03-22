@@ -16,7 +16,7 @@ module m_check_patches
     use m_mpi_proxy
     use m_data_output
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi  !< Message passing interface (MPI) module
 #endif
 
     use m_compile_specific

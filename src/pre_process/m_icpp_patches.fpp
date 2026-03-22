@@ -12,8 +12,8 @@
 !> @brief Constructs initial condition patch geometries (lines, circles, rectangles, spheres, etc.) on the grid
 module m_icpp_patches
 
-    use m_model ! Subroutine(s) related to STL files
-    use m_derived_types ! Definitions of the derived types
+    use m_model  ! Subroutine(s) related to STL files
+    use m_derived_types  ! Definitions of the derived types
     use m_global_parameters
     use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
     use m_helper_basic
@@ -45,7 +45,7 @@ module m_icpp_patches
     !! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
     !! necessary to lay out a particular patch on the grid.
     type(bounds_info) :: x_boundary, y_boundary, z_boundary
-    character(len=5)  :: istr ! string to store int to string result for error checking
+    character(len=5)  :: istr  ! string to store int to string result for error checking
 
 contains
 
@@ -241,7 +241,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< Generic loop iterators
+        integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: th, thickness, nturns, mya
         real(wp)                                                 :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
 
@@ -266,7 +266,7 @@ contains
             spiral_x_max = maxval((/f_r(th, 0.0_wp, mya)*cos(th), f_r(th, thickness, mya)*cos(th)/))
             spiral_y_max = maxval((/f_r(th, 0.0_wp, mya)*sin(th), f_r(th, thickness, mya)*sin(th)/))
 
-            do j = 0, n; do i = 0, m;
+            do j = 0, n; do i = 0, m
                 if ((x_cc(i) > spiral_x_min) .and. (x_cc(i) < spiral_x_max) .and. (y_cc(j) > spiral_y_min) .and. (y_cc(j) &
                     & < spiral_y_max)) then
                     logic_grid(i, j, 0) = 1
@@ -310,7 +310,7 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: radius
-        integer                                                  :: i, j, k !< Generic loop iterators
+        integer                                                  :: i, j, k  !< Generic loop iterators
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -492,7 +492,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< Generic loop operators
+        integer                                                  :: i, j, k  !< Generic loop operators
         real(wp)                                                 :: a, b
 
         @:HardcodedDimensionsExtrusion()
@@ -627,8 +627,8 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k                  !< generic loop iterators
-        real(wp)                                                 :: pi_inf, gamma, lit_gamma !< Equation of state parameters
+        integer                                                  :: i, j, k                   !< generic loop iterators
+        real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< Equation of state parameters
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -700,7 +700,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< Generic loop operators
+        integer                                                  :: i, j, k  !< Generic loop operators
         real(wp)                                                 :: a, b, c
 
         @:HardcodedDimensionsExtrusion()
@@ -760,9 +760,9 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k                  !< generic loop iterators
-        real(wp)                                                 :: pi_inf, gamma, lit_gamma !< equation of state parameters
-        real(wp)                                                 :: L0, U0                   !< Taylor Green Vortex parameters
+        integer                                                  :: i, j, k                   !< generic loop iterators
+        real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< equation of state parameters
+        real(wp)                                                 :: L0, U0                    !< Taylor Green Vortex parameters
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -1083,7 +1083,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< Generic loop iterators
+        integer                                                  :: i, j, k  !< Generic loop iterators
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -1156,7 +1156,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< Generic loop iterators
+        integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: radius
 
         @:HardcodedDimensionsExtrusion()
@@ -1254,7 +1254,7 @@ contains
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k !< Generic loop iterators
+        integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: a, b, c, d
 
         @:HardcodedDimensionsExtrusion()
@@ -1327,12 +1327,12 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Variables for IBM+STL
-        real(wp) :: normals(1:3) !< Boundary normal buffer
-        integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
-        real(wp), allocatable, dimension(:,:,:) :: boundary_v !< Boundary vertex buffer
-        real(wp) :: distance !< Levelset distance buffer
-        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
-        integer :: i, j, k !< Generic loop iterators
+        real(wp) :: normals(1:3)  !< Boundary normal buffer
+        integer :: boundary_vertex_count, boundary_edge_count, total_vertices  !< Boundary vertex
+        real(wp), allocatable, dimension(:,:,:) :: boundary_v  !< Boundary vertex buffer
+        real(wp) :: distance  !< Levelset distance buffer
+        logical :: interpolate  !< Logical variable to determine whether or not the model should be interpolated
+        integer :: i, j, k  !< Generic loop iterators
         type(t_bbox) :: bbox, bbox_old
         type(t_model) :: model
         type(ic_model_parameters) :: params

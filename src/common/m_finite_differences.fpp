@@ -18,7 +18,7 @@ contains
         type(scalar_field), intent(inout) :: div
         type(scalar_field), intent(in)    :: fields(1:3)
         type(int_bounds_info), intent(in) :: ix_s, iy_s, iz_s
-        integer                           :: x, y, z !< Generic loop iterators
+        integer                           :: x, y, z  !< Generic loop iterators
         real(wp)                          :: divergence
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, divergence]')
@@ -82,13 +82,13 @@ contains
     !! @param offset_s Optional offset bounds in the s-coordinate direction
     subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, local_buff_size, fd_number_in, fd_order_in, offset_s)
 
-        integer                                                               :: lB, lE !< loop bounds
+        integer                                                               :: lB, lE  !< loop bounds
         integer, intent(in)                                                   :: q
         integer, intent(in)                                                   :: local_buff_size, fd_number_in, fd_order_in
         type(int_bounds_info), optional, intent(in)                           :: offset_s
         real(wp), allocatable, dimension(:,:), intent(inout)                  :: fd_coeff_s
         real(wp), dimension(-local_buff_size:q + local_buff_size), intent(in) :: s_cc
-        integer                                                               :: i      !< Generic loop iterator
+        integer                                                               :: i       !< Generic loop iterator
 
         if (present(offset_s)) then
             lB = -offset_s%beg

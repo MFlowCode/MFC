@@ -15,9 +15,9 @@ module m_bubbles
     use m_helper_basic
     implicit none
 
-    real(wp) :: chi_vw !< Bubble wall properties (Ando 2010)
-    real(wp) :: k_mw   !< Bubble wall properties (Ando 2010)
-    real(wp) :: rho_mw !< Bubble wall properties (Ando 2010)
+    real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
+    real(wp) :: k_mw    !< Bubble wall properties (Ando 2010)
+    real(wp) :: rho_mw  !< Bubble wall properties (Ando 2010)
     $:GPU_DECLARE(create='[chi_vw, k_mw, rho_mw]')
 
 contains
@@ -301,9 +301,9 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)  :: pb_in
         integer, intent(in)   :: iR0
-        real(wp), intent(out) :: chi_vw_out !< Bubble wall properties (Ando 2010)
-        real(wp), intent(out) :: k_mw_out   !< Bubble wall properties (Ando 2010)
-        real(wp), intent(out) :: rho_mw_out !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: chi_vw_out  !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: k_mw_out    !< Bubble wall properties (Ando 2010)
+        real(wp), intent(out) :: rho_mw_out  !< Bubble wall properties (Ando 2010)
         real(wp)              :: x_vw
 
         ! mass fraction of vapor
@@ -343,7 +343,7 @@ contains
         real(wp)                        :: grad_chi
         real(wp)                        :: conc_v
 
-        if (thermal == 3) then ! transfer
+        if (thermal == 3) then  ! transfer
             ! constant transfer model
             if (bubbles_lagrange) then
                 ! Mixture properties (gas+vapor) in the bubble
@@ -448,12 +448,12 @@ contains
         integer, intent(in)     :: bub_id
         real(wp), intent(in)    :: fmass_g, fbeta_c, fbeta_t, fCson
         integer, intent(inout)  :: adap_dt_stop
-        real(wp), dimension(5)  :: err   !< Error estimates for adaptive time stepping
-        real(wp)                :: t_new !< Updated time step size
-        real(wp)                :: h0, h !< Time step size
+        real(wp), dimension(5)  :: err    !< Error estimates for adaptive time stepping
+        real(wp)                :: t_new  !< Updated time step size
+        real(wp)                :: h0, h  !< Time step size
         !> Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2
-        real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
+        real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2  !< Gas pressure and vapor mass for the inner loop (EL)
         real(wp)               :: fR2, fV2, fpb2, fmass_v2
         integer                :: iter_count
 
@@ -569,9 +569,9 @@ contains
         real(wp), intent(in)   :: fntait, fBtait, f_bub_adv_src, f_divu
         real(wp), intent(in)   :: fCson
         real(wp), intent(out)  :: h
-        real(wp), dimension(2) :: h_size                    !< Time step size (h0, h1)
-        real(wp), dimension(3) :: d_norms                   !< norms (d_0, d_1, d_2)
-        real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp !< Bubble radius, radial velocity, and radial acceleration
+        real(wp), dimension(2) :: h_size                     !< Time step size (h0, h1)
+        real(wp), dimension(3) :: d_norms                    !< norms (d_0, d_1, d_2)
+        real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp  !< Bubble radius, radial velocity, and radial acceleration
         ! Determine the starting time step Evaluate f(x0,y0)
         myR_tmp(1) = fR
         myV_tmp(1) = fV

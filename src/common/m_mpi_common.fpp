@@ -9,7 +9,7 @@
 module m_mpi_common
 
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi  !< Message passing interface (MPI) module
 #endif
 
     use m_derived_types
@@ -82,7 +82,7 @@ contains
     impure subroutine s_mpi_initialize
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_INIT(ierr)
 
@@ -114,7 +114,7 @@ contains
 
 #ifdef MFC_MPI
         integer :: i, j
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
         integer :: alt_sys
 
         if (present(beta)) then
@@ -234,12 +234,12 @@ contains
     !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
-        integer, intent(in)                     :: counts ! Array of vector lengths for each process
-        real(wp), intent(in), dimension(counts) :: my_vector ! Input vector on each process
-        integer, intent(in)                     :: root ! Rank of the root process
-        real(wp), allocatable, intent(out)      :: gathered_vector(:) ! Gathered vector on the root process
+        integer, intent(in)                     :: counts  ! Array of vector lengths for each process
+        real(wp), intent(in), dimension(counts) :: my_vector  ! Input vector on each process
+        integer, intent(in)                     :: root  ! Rank of the root process
+        real(wp), allocatable, intent(out)      :: gathered_vector(:)  ! Gathered vector on the root process
         integer                                 :: i
-        integer                                 :: ierr !< Generic flag used to identify and report MPI errors
+        integer                                 :: ierr  !< Generic flag used to identify and report MPI errors
         integer, allocatable                    :: recounts(:), displs(:)
 
 #ifdef MFC_MPI
@@ -268,7 +268,7 @@ contains
         real(wp), intent(inout)                             :: time_avg
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_GATHER(time_avg, 1, mpi_p, proc_time(0), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
@@ -314,7 +314,7 @@ contains
 
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
 
@@ -345,7 +345,7 @@ contains
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
@@ -361,7 +361,7 @@ contains
         real(wp), dimension(:,:), intent(out) :: var_glb
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         if (loc(var_loc) == loc(var_glb)) then
             call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
@@ -385,7 +385,7 @@ contains
         integer, intent(out) :: var_glb
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
@@ -405,7 +405,7 @@ contains
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
 #endif
@@ -423,7 +423,7 @@ contains
         real(wp), intent(out) :: var_glb
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
 #endif
@@ -439,7 +439,7 @@ contains
         real(wp), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
-        integer  :: ierr !< Generic flag used to identify and report MPI errors
+        integer  :: ierr  !< Generic flag used to identify and report MPI errors
         real(wp) :: var_glb
 
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
@@ -462,7 +462,7 @@ contains
         real(wp), dimension(2), intent(inout) :: var_loc
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
         !> Temporary storage variable that holds the reduced maximum value and the rank of the processor with which the value is
         !! associated
         real(wp), dimension(2) :: var_glb
@@ -484,7 +484,7 @@ contains
         integer, intent(in), optional          :: code
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 #endif
 
         if (present(prnt)) then
@@ -512,7 +512,7 @@ contains
     impure subroutine s_mpi_barrier
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 #endif
@@ -523,7 +523,7 @@ contains
     impure subroutine s_mpi_finalize
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_FINALIZE(ierr)
 #endif
@@ -543,7 +543,7 @@ contains
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
         real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
-        integer :: i, j, k, l, r, q !< Generic loop iterators
+        integer :: i, j, k, l, r, q  !< Generic loop iterators
         integer :: buffer_counts(1:3), buffer_count
         type(int_bounds_info) :: boundary_conditions(1:3)
         integer :: beg_end(1:2), grid_dims(1:3)
@@ -552,7 +552,7 @@ contains
         integer :: pack_offset, unpack_offset
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
@@ -744,7 +744,7 @@ contains
                 #:endif
             end if
         #:endfor
-        call nvtxEndRange ! Packbuf
+        call nvtxEndRange  ! Packbuf
 
         ! Send/Recv
 #ifdef MFC_SIMULATION
@@ -757,7 +757,7 @@ contains
                         call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
                                           & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+                        call nvtxEndRange  ! RHS-MPI-SENDRECV-(NO)-RDMA
                     #:endcall GPU_HOST_DATA
                     $:GPU_WAIT()
                 #:else
@@ -769,7 +769,7 @@ contains
                     call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
                                       & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+                    call nvtxEndRange  ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
                     $:GPU_UPDATE(device='[buff_recv]')
@@ -958,17 +958,17 @@ contains
     subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
-        integer :: num_procs_x, num_procs_y, num_procs_z !< Optimal number of processors in the x-, y- and z-directions
+        integer :: num_procs_x, num_procs_y, num_procs_z  !< Optimal number of processors in the x-, y- and z-directions
         !> Non-optimal number of processors in the x-, y- and z-directions
         real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
-        real(wp) :: fct_min       !< Processor factorization (fct) minimization parameter
-        integer  :: MPI_COMM_CART !< Cartesian processor topology communicator
+        real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
+        integer  :: MPI_COMM_CART  !< Cartesian processor topology communicator
         !> Remaining number of cells, in a particular coordinate direction, after the majority is divided up among the available
         !! processors
         integer :: rem_cells
-        integer :: recon_order !< WENO or MUSCL reconstruction order
-        integer :: i, j        !< Generic loop iterators
-        integer :: ierr        !< Generic flag used to identify and report MPI errors
+        integer :: recon_order  !< WENO or MUSCL reconstruction order
+        integer :: i, j         !< Generic loop iterators
+        integer :: ierr         !< Generic flag used to identify and report MPI errors
 
         if (recon_type == WENO_TYPE) then
             recon_order = weno_order
@@ -1380,61 +1380,61 @@ contains
         integer, intent(in) :: pbc_loc
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         if (mpi_dir == 1) then
-            if (pbc_loc == -1) then ! PBC at the beginning
+            if (pbc_loc == -1) then  ! PBC at the beginning
 
-                if (bc_x%end >= 0) then ! PBC at the beginning and end
+                if (bc_x%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
                                       & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else ! PBC at the beginning only
+                else  ! PBC at the beginning only
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
-            else ! PBC at the end
-                if (bc_x%beg >= 0) then ! PBC at the end and beginning
+            else  ! PBC at the end
+                if (bc_x%beg >= 0) then  ! PBC at the end and beginning
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else ! PBC at the end only
+                else  ! PBC at the end only
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
                                       & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
         else if (mpi_dir == 2) then
-            if (pbc_loc == -1) then ! PBC at the beginning
+            if (pbc_loc == -1) then  ! PBC at the beginning
 
-                if (bc_y%end >= 0) then ! PBC at the beginning and end
+                if (bc_y%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
                                       & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else ! PBC at the beginning only
+                else  ! PBC at the beginning only
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
-            else ! PBC at the end
-                if (bc_y%beg >= 0) then ! PBC at the end and beginning
+            else  ! PBC at the end
+                if (bc_y%beg >= 0) then  ! PBC at the end and beginning
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else ! PBC at the end only
+                else  ! PBC at the end only
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
                                       & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
         else
-            if (pbc_loc == -1) then ! PBC at the beginning
+            if (pbc_loc == -1) then  ! PBC at the beginning
 
-                if (bc_z%end >= 0) then ! PBC at the beginning and end
+                if (bc_z%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
                                       & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else ! PBC at the beginning only
+                else  ! PBC at the beginning only
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
-            else ! PBC at the end
-                if (bc_z%beg >= 0) then ! PBC at the end and beginning
+            else  ! PBC at the end
+                if (bc_z%beg >= 0) then  ! PBC at the end and beginning
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else ! PBC at the end only
+                else  ! PBC at the end only
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
                                       & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if

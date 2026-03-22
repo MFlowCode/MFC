@@ -22,34 +22,34 @@ module m_data_output
 
     implicit none
 
-    private;
+    private
     public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_com_files, s_open_probe_files, &
         & s_open_ib_state_file, s_write_run_time_information, s_write_data_files, s_write_serial_data_files, &
         & s_write_parallel_data_files, s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, &
         & s_close_run_time_information_file, s_close_com_files, s_close_probe_files, s_close_ib_state_file, &
         & s_finalize_data_output_module
 
-    integer                                       :: ib_state_unit = -1 !< I/O unit for IB state binary file
-    real(wp), allocatable, dimension(:,:,:)       :: icfl_sf            !< ICFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: vcfl_sf            !< VCFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: ccfl_sf            !< CCFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: Rc_sf              !< Rc stability criterion
+    integer                                       :: ib_state_unit = -1  !< I/O unit for IB state binary file
+    real(wp), allocatable, dimension(:,:,:)       :: icfl_sf             !< ICFL stability criterion
+    real(wp), allocatable, dimension(:,:,:)       :: vcfl_sf             !< VCFL stability criterion
+    real(wp), allocatable, dimension(:,:,:)       :: ccfl_sf             !< CCFL stability criterion
+    real(wp), allocatable, dimension(:,:,:)       :: Rc_sf               !< Rc stability criterion
     real(wp), public, allocatable, dimension(:,:) :: c_mass
     $:GPU_DECLARE(create='[icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass]')
 
-    real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
-    real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
-    real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
-    real(wp) :: Rc_min_loc, Rc_min_glb     !< Rc stability extrema on local and global grids
+    real(wp) :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
+    real(wp) :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
+    real(wp) :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
+    real(wp) :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
     $:GPU_DECLARE(create='[icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb]')
     $:GPU_DECLARE(create='[ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb]')
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
-    real(wp) :: icfl_max !< ICFL criterion maximum
-    real(wp) :: vcfl_max !< VCFL criterion maximum
-    real(wp) :: ccfl_max !< CCFL criterion maximum
-    real(wp) :: Rc_min   !< Rc criterion maximum
+    real(wp) :: icfl_max  !< ICFL criterion maximum
+    real(wp) :: vcfl_max  !< VCFL criterion maximum
+    real(wp) :: ccfl_max  !< CCFL criterion maximum
+    real(wp) :: Rc_min    !< Rc criterion maximum
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
@@ -85,9 +85,9 @@ contains
     !! which will be written at every time-step.
     impure subroutine s_open_run_time_information_file
 
-        character(LEN=name_len), parameter :: file_name = 'run_time.inf' !< Name of the run-time information file
-        character(LEN=path_len + name_len) :: file_path                  !< Relative path to a file in the case directory
-        character(LEN=8)                   :: file_date                  !< Creation date of the run-time information file
+        character(LEN=name_len), parameter :: file_name = 'run_time.inf'  !< Name of the run-time information file
+        character(LEN=path_len + name_len) :: file_path                   !< Relative path to a file in the case directory
+        character(LEN=8)                   :: file_date                   !< Creation date of the run-time information file
 
         file_path = trim(case_dir) // '/' // trim(file_name)
 
@@ -112,15 +112,15 @@ contains
             write (3, '(13X,A10,13X,A16)', advance="no") trim('VCFL Max'), trim('Rc Min')
         end if
 
-        write (3, *) ! new line
+        write (3, *)  ! new line
 
     end subroutine s_open_run_time_information_file
 
     !> This opens a formatted data file where the root processor can write out the CoM information
     impure subroutine s_open_com_files()
 
-        character(len=path_len + 3*name_len) :: file_path !< Relative path to the CoM file in the case directory
-        integer                              :: i         !< Generic loop iterator
+        character(len=path_len + 3*name_len) :: file_path  !< Relative path to the CoM file in the case directory
+        integer                              :: i          !< Generic loop iterator
 
         do i = 1, num_fluids
             write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
@@ -144,8 +144,8 @@ contains
     !> This opens a formatted data file where the root processor can write out flow probe information
     impure subroutine s_open_probe_files
 
-        character(LEN=path_len + 3*name_len) :: file_path !< Relative path to the probe data file in the case directory
-        integer                              :: i         !< Generic loop iterator
+        character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the probe data file in the case directory
+        integer                              :: i          !< Generic loop iterator
         logical                              :: file_exist
 
         do i = 1, num_probes
@@ -193,23 +193,23 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: t_step
-        real(wp)                                            :: rho !< Cell-avg. density
+        real(wp)                                            :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha !< Cell-avg. volume fraction
-            real(wp), dimension(3) :: vel   !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha  !< Cell-avg. volume fraction
+            real(wp), dimension(3) :: vel    !< Cell-avg. velocity
         #:else
-            real(wp), dimension(num_fluids) :: alpha !< Cell-avg. volume fraction
-            real(wp), dimension(num_vels)   :: vel   !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
+            real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
         #:endif
-        real(wp)               :: vel_sum !< Cell-avg. velocity sum
-        real(wp)               :: pres    !< Cell-avg. pressure
-        real(wp)               :: gamma   !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf  !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv      !< Cell-avg. internal energy reference value
-        real(wp)               :: c       !< Cell-avg. sound speed
-        real(wp)               :: H       !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re      !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
+        real(wp)               :: pres     !< Cell-avg. pressure
+        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv       !< Cell-avg. internal energy reference value
+        real(wp)               :: c        !< Cell-avg. sound speed
+        real(wp)               :: H        !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
@@ -259,7 +259,7 @@ contains
 
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
-                                                         & Rc_min_glb)
+                & Rc_min_glb)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
@@ -280,7 +280,7 @@ contains
                 write (3, '(13X,F10.6,13X,ES16.6)', advance="no") vcfl_max_glb, Rc_min_glb
             end if
 
-            write (3, *) ! new line
+            write (3, *)  ! new line
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
@@ -318,12 +318,12 @@ contains
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        character(LEN=path_len + 2*name_len) :: t_step_dir !< Relative path to the current time-step directory
-        character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the grid and conservative variables data files
-        logical :: file_exist                              !< Logical used to check existence of current time-step directory
+        character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the current time-step directory
+        character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
+        logical :: file_exist                               !< Logical used to check existence of current time-step directory
         character(LEN=15) :: FMT
         integer :: i, j, k, l, r
-        real(wp) :: gamma, lit_gamma, pi_inf, qv           !< Temporary EOS params
+        real(wp) :: gamma, lit_gamma, pi_inf, qv            !< Temporary EOS params
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step
@@ -688,12 +688,12 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist, dir_check
         character(len=10)                    :: t_step_string
-        integer                              :: i       !< Generic loop iterator
-        integer                              :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
+        integer                              :: i        !< Generic loop iterator
+        integer                              :: alt_sys  !< Altered system size for the lagrangian subgrid bubble model
         ! Down sampling variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer :: m_glb_save, n_glb_save, p_glb_save ! Global save size
+        integer :: m_glb_save, n_glb_save, p_glb_save  ! Global save size
 
         if (down_sample) then
             call s_downsample_data(q_cons_vf, q_cons_temp_ds, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
@@ -774,13 +774,13 @@ contains
                 end if
             else
                 if (down_sample) then
-                    do i = 1, sys_size ! TODO: check if correct (sys_size
+                    do i = 1, sys_size  ! TODO: check if sys_size is correct
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, q_cons_temp_ds(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 else
-                    do i = 1, sys_size ! TODO: check if correct (sys_size
+                    do i = 1, sys_size  ! TODO: check if sys_size is correct
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -836,7 +836,7 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size ! TODO: check if correct (sys_size
+                do i = 1, sys_size  ! TODO: check if sys_size is correct
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -952,8 +952,8 @@ contains
 
         integer, intent(in)                            :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
-        integer                                        :: i           !< Generic loop iterator
-        real(wp)                                       :: nondim_time !< Non-dimensional time
+        integer                                        :: i            !< Generic loop iterator
+        real(wp)                                       :: nondim_time  !< Non-dimensional time
 
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, wp)*dt
@@ -1020,12 +1020,12 @@ contains
         real(wp)                        :: G_local
         real(wp)                        :: dyn_p, T
         real(wp)                        :: damage_state
-        integer                         :: i, j, k, l, s, d !< Generic loop iterator
-        real(wp)                        :: nondim_time      !< Non-dimensional time
-        real(wp)                        :: tmp              !< Temporary variable to store quantity for mpi_allreduce
-        integer                         :: npts             !< Number of included integral points
-        real(wp)                        :: rad, thickness   !< For integral quantities
-        logical                         :: trigger          !< For integral quantities
+        integer                         :: i, j, k, l, s, d  !< Generic loop iterator
+        real(wp)                        :: nondim_time       !< Non-dimensional time
+        real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
+        integer                         :: npts              !< Number of included integral points
+        real(wp)                        :: rad, thickness    !< For integral quantities
+        logical                         :: trigger           !< For integral quantities
         real(wp)                        :: rhoYks(1:num_species)
 
         T = dflt_T_guess
@@ -1074,7 +1074,7 @@ contains
                         if (distx(s) < 0._wp) distx(s) = 1000._wp
                     end do
                     j = minloc(distx, 1)
-                    if (j == 1) j = 2 ! Pick first point if probe is at edge
+                    if (j == 1) j = 2  ! Pick first point if probe is at edge
                     k = 0
                     l = 0
 
@@ -1189,8 +1189,8 @@ contains
                         end do
                         j = minloc(distx, 1)
                         k = minloc(disty, 1)
-                        if (j == 1) j = 2 ! Pick first point if probe is at edge
-                        if (k == 1) k = 2 ! Pick first point if probe is at edge
+                        if (j == 1) j = 2  ! Pick first point if probe is at edge
+                        if (k == 1) k = 2  ! Pick first point if probe is at edge
                         l = 0
 
                         ! Computing/Sharing necessary state variables
@@ -1270,9 +1270,9 @@ contains
                             j = minloc(distx, 1)
                             k = minloc(disty, 1)
                             l = minloc(distz, 1)
-                            if (j == 1) j = 2 ! Pick first point if probe is at edge
-                            if (k == 1) k = 2 ! Pick first point if probe is at edge
-                            if (l == 1) l = 2 ! Pick first point if probe is at edge
+                            if (j == 1) j = 2  ! Pick first point if probe is at edge
+                            if (k == 1) k = 2  ! Pick first point if probe is at edge
+                            if (l == 1) l = 2  ! Pick first point if probe is at edge
 
                             ! Computing/Sharing necessary state variables
                             call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, rho, gamma, pi_inf, qv, Re, &
@@ -1525,7 +1525,7 @@ contains
     !! and the simulation run-time.
     impure subroutine s_close_run_time_information_file
 
-        real(wp) :: run_time !< Run-time of the simulation
+        real(wp) :: run_time  !< Run-time of the simulation
 
         write (3, '(A)') '    '
         write (3, '(A)') ''
@@ -1546,7 +1546,7 @@ contains
     !> Closes communication files
     impure subroutine s_close_com_files()
 
-        integer :: i !< Generic loop iterator
+        integer :: i  !< Generic loop iterator
 
         do i = 1, num_fluids
             close (i + 120)
@@ -1557,7 +1557,7 @@ contains
     !> Closes probe files
     impure subroutine s_close_probe_files
 
-        integer :: i !< Generic loop iterator
+        integer :: i  !< Generic loop iterator
 
         do i = 1, num_probes
             close (i + 30)

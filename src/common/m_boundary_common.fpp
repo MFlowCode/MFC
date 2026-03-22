@@ -117,7 +117,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 2)%sf(0, k, l)))
-                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP) ! Ghost-cell extrap. BC at end
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)  ! Ghost-cell extrap. BC at end
                         call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l)
                     case (BC_REFLECTIVE)
                         call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
@@ -281,42 +281,42 @@ contains
         integer, intent(in)                                    :: k, l
         integer                                                :: j, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then ! bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                     end do
                 end do
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
                     end do
                 end do
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                     end do
                 end do
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
@@ -338,8 +338,8 @@ contains
         integer, intent(in)                                                                                      :: k, l
         integer                                                                                                  :: j, q, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then !< bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  !< bc_x%beg
                 do j = 1, buff_size
                     do i = 1, contxe
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
@@ -373,7 +373,7 @@ contains
                         end do
                     end do
                 end if
-            else !< bc_x%end
+            else  !< bc_x%end
                 do j = 1, buff_size
                     do i = 1, contxe
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
@@ -407,8 +407,8 @@ contains
                     end do
                 end if
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do j = 1, buff_size
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l)
@@ -442,7 +442,7 @@ contains
                         end do
                     end do
                 end if
-            else !< bc_y%end
+            else  !< bc_y%end
                 do j = 1, buff_size
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
@@ -477,8 +477,8 @@ contains
                     end do
                 end if
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do j = 1, buff_size
                     do i = 1, momxb + 1
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
@@ -512,7 +512,7 @@ contains
                         end do
                     end do
                 end if
-            else !< bc_z%end
+            else  !< bc_z%end
                 do j = 1, buff_size
                     do i = 1, momxb + 1
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
@@ -561,8 +561,8 @@ contains
         integer, intent(in)                                                                                      :: k, l
         integer                                                                                                  :: j, q, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then !< bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  !< bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
@@ -579,7 +579,7 @@ contains
                         end do
                     end do
                 end if
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
@@ -597,8 +597,8 @@ contains
                     end do
                 end if
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
@@ -615,7 +615,7 @@ contains
                         end do
                     end do
                 end if
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, j - 1, l)
@@ -633,8 +633,8 @@ contains
                     end do
                 end if
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
@@ -651,7 +651,7 @@ contains
                         end do
                     end do
                 end if
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, j - 1)
@@ -733,8 +733,8 @@ contains
         integer, intent(in)                                    :: k, l
         integer                                                :: j, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then !< bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  !< bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -744,7 +744,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -755,8 +755,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb + 1) then
@@ -766,7 +766,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb + 1) then
@@ -777,8 +777,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxe) then
@@ -788,7 +788,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxe) then
@@ -813,8 +813,8 @@ contains
         integer, intent(in)                                    :: k, l
         integer                                                :: j, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then !< bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  !< bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -828,7 +828,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -843,8 +843,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -858,7 +858,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -873,8 +873,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -888,7 +888,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -917,29 +917,29 @@ contains
         integer                                                :: j, i
 
 #ifdef MFC_SIMULATION
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then ! bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
+        else if (bc_dir == 2) then  !< y-direction
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                if (bc_loc == -1) then !< bc_y%beg
+                if (bc_loc == -1) then  !< bc_y%beg
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)
                         end do
                     end do
-                else !< bc_y%end
+                else  !< bc_y%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)
@@ -947,15 +947,15 @@ contains
                     end do
                 end if
             #:endif
-        else if (bc_dir == 3) then !< z-direction
+        else if (bc_dir == 3) then  !< z-direction
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                if (bc_loc == -1) then !< bc_z%beg
+                if (bc_loc == -1) then  !< bc_z%beg
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)
                         end do
                     end do
-                else !< bc_z%end
+                else  !< bc_z%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)
@@ -979,8 +979,8 @@ contains
         integer, intent(in)                                                                                      :: k, l
         integer                                                                                                  :: j, q, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then ! bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -989,7 +989,7 @@ contains
                         end do
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -999,8 +999,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1009,7 +1009,7 @@ contains
                         end do
                     end do
                 end do
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1019,8 +1019,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1029,7 +1029,7 @@ contains
                         end do
                     end do
                 end do
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1187,42 +1187,42 @@ contains
         integer, intent(in)                                        :: k, l
         integer                                                    :: j, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then ! bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(j - 1, k, l)
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, n - (j - 1), l)
                     end do
                 end do
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, j - 1, l)
                     end do
                 end do
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, p - (j - 1))
                     end do
                 end do
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, j - 1)
@@ -1242,8 +1242,8 @@ contains
         integer, intent(in)                                        :: k, l
         integer                                                    :: j, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then ! bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1253,7 +1253,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1264,8 +1264,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1275,7 +1275,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1286,8 +1286,8 @@ contains
                     end do
                 end do
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1297,7 +1297,7 @@ contains
                         end if
                     end do
                 end do
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1321,42 +1321,42 @@ contains
         integer, intent(in)                                        :: k, l
         integer                                                    :: j, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then ! bc_x%beg
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(0, k, l)
                     end do
                 end do
-            else !< bc_x%end
+            else  !< bc_x%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(m, k, l)
                     end do
                 end do
             end if
-        else if (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, 0, l)
                     end do
                 end do
-            else !< bc_y%end
+            else  !< bc_y%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, n, l)
                     end do
                 end do
             end if
-        else if (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, 0)
                     end do
                 end do
-            else !< bc_z%end
+            else  !< bc_z%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, p)

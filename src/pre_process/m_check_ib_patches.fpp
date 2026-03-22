@@ -13,7 +13,7 @@ module m_check_ib_patches
     use m_mpi_proxy
     use m_data_output
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi  !< Message passing interface (MPI) module
 #endif
 
     use m_compile_specific
@@ -22,7 +22,7 @@ module m_check_ib_patches
 
     implicit none
 
-    private;
+    private
     public :: s_check_ib_patches
 
     character(len=10) :: iStr

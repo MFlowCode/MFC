@@ -17,7 +17,7 @@ program p_main
 
     implicit none
 
-    integer                             :: t_step !< Iterator for the time-stepping loop
+    integer                             :: t_step  !< Iterator for the time-stepping loop
     real(wp)                            :: time_avg, time_final
     real(wp)                            :: io_time_avg, io_time_final
     real(wp), allocatable, dimension(:) :: proc_time
@@ -61,7 +61,7 @@ program p_main
         finaltime = t_step_stop*dt
     end if
 
-    call nvtxEndRange ! INIT
+    call nvtxEndRange  ! INIT
 
     call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop
@@ -95,7 +95,7 @@ program p_main
         call system_clock(cpu_end)
     end do
 
-    call nvtxEndRange ! Simulation
+    call nvtxEndRange  ! Simulation
 
     deallocate (proc_time, io_proc_time)
 

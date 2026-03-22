@@ -10,7 +10,7 @@ module m_helper_basic
     use m_derived_types
     implicit none
 
-    private;
+    private
     public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, s_configure_coordinate_bounds, &
         & s_update_cell_bounds
 

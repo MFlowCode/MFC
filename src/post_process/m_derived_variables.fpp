@@ -201,19 +201,19 @@ contains
                         slope = (top*bottom)/(bottom**2._wp + 1.e-16_wp)
                     end if
 
-                    if (flux_lim == 1) then ! MINMOD (MM)
+                    if (flux_lim == 1) then  ! MINMOD (MM)
                         q_sf(j, k, l) = max(0._wp, min(1._wp, slope))
-                    else if (flux_lim == 2) then ! MUSCL (MC)
+                    else if (flux_lim == 2) then  ! MUSCL (MC)
                         q_sf(j, k, l) = max(0._wp, min(2._wp*slope, 5.e-1_wp*(1._wp + slope), 2._wp))
-                    else if (flux_lim == 3) then ! OSPRE (OP)
+                    else if (flux_lim == 3) then  ! OSPRE (OP)
                         q_sf(j, k, l) = (15.e-1_wp*(slope**2._wp + slope))/(slope**2._wp + slope + 1._wp)
-                    else if (flux_lim == 4) then ! SUPERBEE (SB)
+                    else if (flux_lim == 4) then  ! SUPERBEE (SB)
                         q_sf(j, k, l) = max(0._wp, min(1._wp, 2._wp*slope), min(slope, 2._wp))
-                    else if (flux_lim == 5) then ! SWEBY (SW) (beta = 1.5)
+                    else if (flux_lim == 5) then  ! SWEBY (SW) (beta = 1.5)
                         q_sf(j, k, l) = max(0._wp, min(15.e-1_wp*slope, 1._wp), min(slope, 15.e-1_wp))
-                    else if (flux_lim == 6) then ! VAN ALBADA (VA)
+                    else if (flux_lim == 6) then  ! VAN ALBADA (VA)
                         q_sf(j, k, l) = (slope**2._wp + slope)/(slope**2._wp + 1._wp)
-                    else if (flux_lim == 7) then ! VAN LEER (VL)
+                    else if (flux_lim == 7) then  ! VAN LEER (VL)
                         q_sf(j, k, l) = (abs(slope) + slope)/(1._wp + abs(slope))
                     end if
                 end do
@@ -409,18 +409,18 @@ contains
         !> Liutex rigid rotation axis
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, nm), &
              & intent(out) :: liutex_axis
-        character, parameter        :: ivl = 'N'    !< compute left eigenvectors
-        character, parameter        :: ivr = 'V'    !< compute right eigenvectors
-        real(wp), dimension(nm, nm) :: vgt          !< velocity gradient tensor
-        real(wp), dimension(nm)     :: lr, li       !< real and imaginary parts of eigenvalues
-        real(wp), dimension(nm, nm) :: vl, vr       !< left and right eigenvectors
-        integer, parameter          :: lwork = 4*nm !< size of work array (4*nm recommended)
-        real(wp), dimension(lwork)  :: work         !< work array
+        character, parameter        :: ivl = 'N'     !< compute left eigenvectors
+        character, parameter        :: ivr = 'V'     !< compute right eigenvectors
+        real(wp), dimension(nm, nm) :: vgt           !< velocity gradient tensor
+        real(wp), dimension(nm)     :: lr, li        !< real and imaginary parts of eigenvalues
+        real(wp), dimension(nm, nm) :: vl, vr        !< left and right eigenvectors
+        integer, parameter          :: lwork = 4*nm  !< size of work array (4*nm recommended)
+        real(wp), dimension(lwork)  :: work          !< work array
         integer                     :: info
-        real(wp), dimension(nm)     :: eigvec       !< real eigenvector
-        real(wp)                    :: eigvec_mag   !< magnitude of real eigenvector
-        real(wp)                    :: omega_proj   !< projection of vorticity on real eigenvector
-        real(wp)                    :: lci          !< imaginary part of complex eigenvalue
+        real(wp), dimension(nm)     :: eigvec        !< real eigenvector
+        real(wp)                    :: eigvec_mag    !< magnitude of real eigenvector
+        real(wp)                    :: omega_proj    !< projection of vorticity on real eigenvector
+        real(wp)                    :: lci           !< imaginary part of complex eigenvalue
         real(wp)                    :: alpha
         integer                     :: j, k, l, r, i
         integer                     :: idx
@@ -509,7 +509,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        real(wp) :: drho_dx, drho_dy, drho_dz !< Spatial derivatives of the density in the x-, y- and z-directions
+        real(wp) :: drho_dx, drho_dy, drho_dz  !< Spatial derivatives of the density in the x-, y- and z-directions
         !> Maximum value of the gradient magnitude (gm) of the density field in entire computational domain and not just the local
         !! sub-domain. The first position in the variable contains the maximum value and the second contains the rank of the
         !! processor on which it occurred.
@@ -563,9 +563,9 @@ contains
         ! model, the amplitude of the exponential's inside is also modulated with respect to the identity of the fluid in which the
         ! function is evaluated. For more information, refer to Marquina and Mulet (2003).
 
-        if (model_eqns == 1) then ! Gamma/pi_inf model
+        if (model_eqns == 1) then  ! Gamma/pi_inf model
             q_sf = -gm_rho_sf/gm_rho_max(1)
-        else ! Volume fraction model
+        else  ! Volume fraction model
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end

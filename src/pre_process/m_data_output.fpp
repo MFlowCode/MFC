@@ -24,7 +24,7 @@ module m_data_output
 
     implicit none
 
-    private;
+    private
     public :: s_write_serial_data_files, s_write_parallel_data_files, s_write_data_files, s_initialize_data_output_module, &
         & s_finalize_data_output_module
 
@@ -46,7 +46,7 @@ module m_data_output
 
     !> Time-step folder into which grid and initial condition data will be placed
     character(LEN=path_len + 2*name_len), private :: t_step_dir
-    character(LEN=path_len + 2*name_len), public  :: restart_dir !< Restart data folder
+    character(LEN=path_len + 2*name_len), public  :: restart_dir  !< Restart data folder
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
@@ -185,11 +185,11 @@ contains
                         else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) .or. ((i >= adv_idx%beg) .and. (i <= adv_idx%end) &
                                  & ) .or. ((i >= chemxb) .and. (i <= chemxe))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == mom_idx%beg) then ! u
+                        else if (i == mom_idx%beg) then  ! u
                             write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == stress_idx%beg) then ! tau_e
+                        else if (i == stress_idx%beg) then  ! tau_e
                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == E_idx) then ! p
+                        else if (i == E_idx) then  ! p
                             if (mhd) then
                                 pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, &
                                                    & 0, 0)**2)
@@ -200,13 +200,13 @@ contains
                                                     & qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
-                            if (i == mom_idx%beg + 1) then ! v
+                            if (i == mom_idx%beg + 1) then  ! v
                                 write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 1)%sf(j, 0, 0)/rho
-                            else if (i == mom_idx%beg + 2) then ! w
+                            else if (i == mom_idx%beg + 2) then  ! w
                                 write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 2)%sf(j, 0, 0)/rho
-                            else if (i == B_idx%beg) then ! By
+                            else if (i == B_idx%beg) then  ! By
                                 write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg)%sf(j, 0, 0)/rho
-                            else if (i == B_idx%beg + 1) then ! Bz
+                            else if (i == B_idx%beg + 1) then  ! Bz
                                 write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)/rho
                             end if
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
@@ -406,7 +406,7 @@ contains
         real(wp)                             :: loc_violations, glb_violations
         integer                              :: m_ds, n_ds, p_ds
         integer                              :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer                              :: m_glb_save, n_glb_save, p_glb_save ! Size of array being saved
+        integer                              :: m_glb_save, n_glb_save, p_glb_save  ! Size of array being saved
 
         loc_violations = 0._wp
 

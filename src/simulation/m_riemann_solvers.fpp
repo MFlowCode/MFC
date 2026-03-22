@@ -150,10 +150,10 @@ contains
 
         if (grid_geometry == 3) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-                                                           & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
+                & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
-                                                         & dvelR_dz_vf, flux_src_vf, norm_dir)
+                & dvelR_dz_vf, flux_src_vf, norm_dir)
         end if
 
     end subroutine s_compute_viscous_source_flux
@@ -224,20 +224,19 @@ contains
         real(wp)                  :: vel_L_tmp, vel_R_tmp
         real(wp)                  :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp)                  :: alpha_L_sum, alpha_R_sum
-        real(wp)                  :: zcoef, pcorr  !< low Mach number correction
+        real(wp)                  :: zcoef, pcorr   !< low Mach number correction
         type(riemann_states)      :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
-        type(riemann_states)      :: Ga ! Gamma (Lorentz factor)
+        type(riemann_states)      :: Ga  ! Gamma (Lorentz factor)
         type(riemann_states)      :: vdotB, B2
-        type(riemann_states_vec3) :: b4 ! 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm ! Conservative momentum variables
-        integer                   :: i, j, k, l, q !< Generic loop iterators
+        type(riemann_states_vec3) :: b4  ! 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm  ! Conservative momentum variables
+        integer                   :: i, j, k, l, q  !< Generic loop iterators
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                                         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, &
-                                                         & qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, &
-                                                         & norm_dir, ix, iy, iz)
+            & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
+            & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
@@ -281,14 +280,14 @@ contains
                             pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                             if (mhd) then
-                                if (n == 0) then ! 1D: constant Bx; By, Bz as variables
+                                if (n == 0) then  ! 1D: constant Bx; By, Bz as variables
                                     B%L(1) = Bx0
                                     B%R(1) = Bx0
                                     B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
                                     B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
                                     B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
                                     B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
-                                else ! 2D/3D: Bx, By, Bz as variables
+                                else  ! 2D/3D: Bx, By, Bz as variables
                                     B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
                                     B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
                                     B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
@@ -447,10 +446,10 @@ contains
                                 #:endif
                                 E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
                                 E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R &
-                                    & + pres_mag%R ! includes magnetic energy
+                                    & + pres_mag%R  ! includes magnetic energy
                                 H_L = (E_L + pres_L - pres_mag%L)/rho_L
                                 H_R = (E_R + pres_R - pres_mag%R) &
-                                       & /rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                       & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
@@ -702,7 +701,7 @@ contains
 
                             ! Elastic Stresses
                             if (hypoelasticity) then
-                                do i = 1, strxe - strxb + 1 ! TODO: this indexing may be slow
+                                do i = 1, strxe - strxb + 1  ! TODO: this indexing may be slow
                                     flux_rs${XYZ}$_vf(j, k, l, &
                                                       & strxb - 1 + i) = (s_M*(rho_R*vel_R(dir_idx(1))*tau_e_R(i)) &
                                                       & - s_P*(rho_L*vel_L(dir_idx(1))*tau_e_L(i)) + s_M*s_P*(rho_L*tau_e_L(i) &
@@ -741,7 +740,7 @@ contains
 
                             ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
-                                if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
+                                if (n == 0) then  ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 1
@@ -750,7 +749,7 @@ contains
                                                     & - s_P*(vel_L(1)*B%L(2 + i) - vel_L(2 + i)*Bx0) + s_M*s_P*(B%L(2 + i) &
                                                     & - B%R(2 + i)))/(s_M - s_P)
                                     end do
-                                else ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
+                                else  ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
                                     ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$) B_y
                                     ! d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$) B_z d/d${XYZ}$
                                     ! flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
@@ -775,7 +774,7 @@ contains
                                     else
                                         flux_rs${XYZ}$_vf(j, k, l, &
                                                           & B_idx%beg + norm_dir - 1) &
-                                                          & = 0._wp ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
+                                                          & = 0._wp  ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
                                     end if
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
@@ -862,7 +861,7 @@ contains
             real(wp), dimension(10)   :: Ys_L, Ys_R
             real(wp), dimension(10)   :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
             real(wp), dimension(10)   :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
-            real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+            real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R  !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(num_vels)    :: vel_L, vel_R
@@ -904,21 +903,20 @@ contains
         real(wp)                  :: vel_L_tmp, vel_R_tmp
         real(wp)                  :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp)                  :: alpha_L_sum, alpha_R_sum
-        real(wp)                  :: zcoef, pcorr   !< low Mach number correction
+        real(wp)                  :: zcoef, pcorr    !< low Mach number correction
         type(riemann_states)      :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
-        type(riemann_states)      :: Ga ! Gamma (Lorentz factor)
+        type(riemann_states)      :: Ga  ! Gamma (Lorentz factor)
         type(riemann_states)      :: vdotB, B2
-        type(riemann_states_vec3) :: b4 ! 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm ! Conservative momentum variables
-        integer                   :: i, j, k, l, q  !< Generic loop iterators
-        integer, dimension(3)     :: idx_right_phys !< Physical (j,k,l) indices for right state.
+        type(riemann_states_vec3) :: b4  ! 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm  ! Conservative momentum variables
+        integer                   :: i, j, k, l, q   !< Generic loop iterators
+        integer, dimension(3)     :: idx_right_phys  !< Physical (j,k,l) indices for right state.
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                                         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, &
-                                                         & qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, &
-                                                         & norm_dir, ix, iy, iz)
+            & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
+            & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
@@ -962,14 +960,14 @@ contains
                             pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                             if (mhd) then
-                                if (n == 0) then ! 1D: constant Bx; By, Bz as variables
+                                if (n == 0) then  ! 1D: constant Bx; By, Bz as variables
                                     B%L(1) = Bx0
                                     B%R(1) = Bx0
                                     B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
                                     B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
                                     B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
                                     B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
-                                else ! 2D/3D: Bx, By, Bz as variables
+                                else  ! 2D/3D: Bx, By, Bz as variables
                                     B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
                                     B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
                                     B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
@@ -1126,10 +1124,10 @@ contains
                                 pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                                 E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
                                 E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R &
-                                    & + pres_mag%R ! includes magnetic energy
+                                    & + pres_mag%R  ! includes magnetic energy
                                 H_L = (E_L + pres_L - pres_mag%L)/rho_L
                                 H_R = (E_R + pres_R - pres_mag%R) &
-                                       & /rho_R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                       & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
@@ -1318,7 +1316,7 @@ contains
 
                             ! Elastic Stresses
                             if (hypoelasticity) then
-                                do i = 1, strxe - strxb + 1 ! TODO: this indexing may be slow
+                                do i = 1, strxe - strxb + 1  ! TODO: this indexing may be slow
                                     flux_rs${XYZ}$_vf(j, k, l, &
                                                       & strxb - 1 + i) = (s_M*(rho_R*vel_R(dir_idx(1))*tau_e_R(i)) &
                                                       & - s_P*(rho_L*vel_L(dir_idx(1))*tau_e_L(i)) + s_M*s_P*(rho_L*tau_e_L(i) &
@@ -1357,7 +1355,7 @@ contains
 
                             ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
-                                if (n == 0) then ! 1D: d/dx flux only & Bx = Bx0 = const.
+                                if (n == 0) then  ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 1
@@ -1366,7 +1364,7 @@ contains
                                                     & - s_P*(vel_L(1)*B%L(2 + i) - vel_L(2 + i)*Bx0) + s_M*s_P*(B%L(2 + i) &
                                                     & - B%R(2 + i)))/(s_M - s_P)
                                     end do
-                                else ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
+                                else  ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
                                     ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$) B_y
                                     ! d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$) B_z d/d${XYZ}$
                                     ! flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
@@ -1785,7 +1783,7 @@ contains
         real(wp)               :: qv_avg
         real(wp)               :: c_avg
         real(wp)               :: s_L, s_R, s_M, s_P, s_S
-        real(wp)               :: xi_L, xi_R !< Left and right wave speeds functions
+        real(wp)               :: xi_L, xi_R  !< Left and right wave speeds functions
         real(wp)               :: xi_M, xi_P
         real(wp)               :: xi_MP, xi_PP
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -1817,14 +1815,13 @@ contains
         real(wp) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_star
         real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(wp) :: flux_ene_e
-        real(wp) :: zcoef, pcorr          !< low Mach number correction
-        integer  :: Re_max, i, j, k, l, q !< Generic loop iterators
+        real(wp) :: zcoef, pcorr           !< low Mach number correction
+        integer  :: Re_max, i, j, k, l, q  !< Generic loop iterators
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                                         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, &
-                                                         & qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, &
-                                                         & norm_dir, ix, iy, iz)
+            & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
+            & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
 
@@ -1976,7 +1973,7 @@ contains
                                         xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
                                         xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
                                     end do
-                                    G_L = 0._wp; G_R = 0._wp;
+                                    G_L = 0._wp; G_R = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         ! Mixture left and right shear modulus
@@ -2121,7 +2118,7 @@ contains
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
-                                    flux_ene_e = 0._wp;
+                                    flux_ene_e = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
                                         ! MOMENTUM ELASTIC FLUX.
@@ -2392,7 +2389,7 @@ contains
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = 0._wp
 
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = alf_idx, alf_idx ! only advect the void fraction
+                                do i = alf_idx, alf_idx  ! only advect the void fraction
                                     flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
                                                       & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) + xi_P*qR_prim_rs${XYZ}$_vf(j &
                                                       & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
@@ -2533,7 +2530,7 @@ contains
                                 end if
 
                                 if (viscous) then
-                                    if (num_fluids == 1) then ! Need to consider case with num_fluids >= 2
+                                    if (num_fluids == 1) then  ! Need to consider case with num_fluids >= 2
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, 2
                                             Re_L(i) = dflt_real
@@ -3389,9 +3386,8 @@ contains
         integer  :: i, j, k, l
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-                                                         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, &
-                                                         & qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, &
-                                                         & norm_dir, ix, iy, iz)
+            & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
+            & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
 
@@ -3431,12 +3427,12 @@ contains
 
                             ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
                             if (mhd) then
-                                if (n == 0) then ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
+                                if (n == 0) then  ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
                                     B%L = [Bx0, qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg), qL_prim_rs${XYZ}$_vf(j, k, l, &
                                                                      & B_idx%beg + 1)]
                                     B%R = [Bx0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg), qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
                                                                      & B_idx%beg + 1)]
-                                else ! 2D/3D: Bx, By, Bz as variables
+                                else  ! 2D/3D: Bx, By, Bz as variables
                                     B%L = [qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1), qL_prim_rs${XYZ}$_vf(j, k, &
                                                                 & l, B_idx%beg + dir_idx(2) - 1), qL_prim_rs${XYZ}$_vf(j, k, l, &
                                                                 & B_idx%beg + dir_idx(3) - 1)]
@@ -3465,10 +3461,10 @@ contains
                             pres_mag%L = 0.5_wp*sum(B%L**2._wp)
                             pres_mag%R = 0.5_wp*sum(B%R**2._wp)
                             E%L = gamma%L*pres%L + pi_inf%L + 0.5_wp*rho%L*vel_rms%L + qv%L + pres_mag%L
-                            E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R ! includes magnetic energy
+                            E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R  ! includes magnetic energy
                             H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
                             H_no_mag%R = (E%R + pres%R - pres_mag%R) &
-                                          & /rho%R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                          & /rho%R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
 
                             ! (2) Compute fast wave speeds
                             call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, &
@@ -3560,8 +3556,8 @@ contains
                                 F_hlld = F_R
                             end if
 
-                            ! (12) Reorder and write temporary variables to the flux array Mass
-                            flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1) ! TODO multi-component
+                            ! (12) Write HLLD flux to output arrays
+                            flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1)  ! TODO multi-component
                             ! Momentum
                             flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = F_hlld(2)
                             flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(2)) = F_hlld(3)
@@ -3576,10 +3572,10 @@ contains
                             end if
                             ! Energy
                             flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_hlld(7)
-                            ! Partial fraction
+                            ! Volume fractions
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
-                                flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp ! TODO multi-component (zero for now)
+                                flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp  ! TODO multi-component (zero for now)
                             end do
 
                             flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
@@ -3708,7 +3704,7 @@ contains
 
         integer, intent(in)               :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        integer                           :: i, j, k, l !< Generic loop iterator
+        integer                           :: i, j, k, l  !< Generic loop iterator
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
@@ -3741,7 +3737,7 @@ contains
 
         ! Population of Buffers in x-direction
         if (norm_dir == 1) then
-            if (bc_x%beg == BC_RIEMANN_EXTRAP) then ! Riemann state extrap. BC at beginning
+            if (bc_x%beg == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at beginning
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -3789,7 +3785,7 @@ contains
                 end if
             end if
 
-            if (bc_x%end == BC_RIEMANN_EXTRAP) then ! Riemann state extrap. BC at end
+            if (bc_x%end == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at end
 
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
@@ -3841,7 +3837,7 @@ contains
 
             ! Population of Buffers in y-direction
         else if (norm_dir == 2) then
-            if (bc_y%beg == BC_RIEMANN_EXTRAP) then ! Riemann state extrap. BC at beginning
+            if (bc_y%beg == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at beginning
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -3887,7 +3883,7 @@ contains
                 end if
             end if
 
-            if (bc_y%end == BC_RIEMANN_EXTRAP) then ! Riemann state extrap. BC at end
+            if (bc_y%end == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at end
 
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
@@ -3937,7 +3933,7 @@ contains
 
             ! Population of Buffers in z-direction
         else
-            if (bc_z%beg == BC_RIEMANN_EXTRAP) then ! Riemann state extrap. BC at beginning
+            if (bc_z%beg == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at beginning
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -3979,7 +3975,7 @@ contains
                 end if
             end if
 
-            if (bc_z%end == BC_RIEMANN_EXTRAP) then ! Riemann state extrap. BC at end
+            if (bc_z%end == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at end
 
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
@@ -4036,7 +4032,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in)                                    :: norm_dir
-        integer                                                :: i, j, k, l ! Generic loop iterators
+        integer                                                :: i, j, k, l  ! Generic loop iterators
 
         ! Reshaping Inputted Data in x-direction
 
@@ -4274,17 +4270,17 @@ contains
 
                     ! Get Re numbers and interface velocity for viscous work
                     select case (norm_dir)
-                    case (1) ! x-face (axial face in z_cyl direction)
+                    case (1)  ! x-face (axial face in z_cyl direction)
                         Re_s = Re_avg_rsx_vf(j, k, l, 1)
                         Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         vel_src_int = vel_src_rsx_vf(j, k, l, 1:num_dims)
                         r_eff = y_cc(k)
-                    case (2) ! y-face (radial face in r_cyl direction)
+                    case (2)  ! y-face (radial face in r_cyl direction)
                         Re_s = Re_avg_rsy_vf(k, j, l, 1)
                         Re_b = Re_avg_rsy_vf(k, j, l, 2)
                         vel_src_int = vel_src_rsy_vf(k, j, l, 1:num_dims)
                         r_eff = y_cb(k)
-                    case (3) ! z-face (azimuthal face in theta_cyl direction)
+                    case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         Re_s = Re_avg_rsz_vf(l, k, j, 1)
                         Re_b = Re_avg_rsz_vf(l, k, j, 2)
                         vel_src_int = vel_src_rsz_vf(l, k, j, 1:num_dims)
@@ -4308,7 +4304,7 @@ contains
                         div_v_term_const = -(2.0_wp/3.0_wp)*divergence_cyl/Re_s
 
                         select case (norm_dir)
-                        case (1) ! X-face (axial normal, z_cyl)
+                        case (1)  ! X-face (axial normal, z_cyl)
                             stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
                             if (num_dims > 1) then
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
@@ -4320,7 +4316,7 @@ contains
                                     stress_vector_shear(3) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
                                 #:endif
                             end if
-                        case (2) ! Y-face (radial normal, r_cyl)
+                        case (2)  ! Y-face (radial normal, r_cyl)
                             if (num_dims > 1) then
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
@@ -4335,7 +4331,7 @@ contains
                             else
                                 stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
                             end if
-                        case (3) ! Z-face (azimuthal normal, theta_cyl)
+                        case (3)  ! Z-face (azimuthal normal, theta_cyl)
                             if (num_dims > 2) then
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     stress_vector_shear(1) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
@@ -4393,25 +4389,25 @@ contains
         ! Local variables
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3, 3) :: vel_grad_avg         !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
-            real(wp), dimension(3, 3) :: current_tau_shear    !< Current shear stress tensor.
-            real(wp), dimension(3, 3) :: current_tau_bulk     !< Current bulk stress tensor.
-            real(wp), dimension(3)    :: vel_src_at_interface !< Interface velocities (u,v,w) for viscous work.
+            real(wp), dimension(3, 3) :: vel_grad_avg          !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+            real(wp), dimension(3, 3) :: current_tau_shear     !< Current shear stress tensor.
+            real(wp), dimension(3, 3) :: current_tau_bulk      !< Current bulk stress tensor.
+            real(wp), dimension(3)    :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
         #:else
-            real(wp), dimension(num_dims, num_dims) :: vel_grad_avg !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_shear !< Current shear stress tensor.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_bulk !< Current bulk stress tensor.
-            real(wp), dimension(num_dims)           :: vel_src_at_interface !< Interface velocities (u,v,w) for viscous work.
+            real(wp), dimension(num_dims, num_dims) :: vel_grad_avg  !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+            real(wp), dimension(num_dims, num_dims) :: current_tau_shear  !< Current shear stress tensor.
+            real(wp), dimension(num_dims, num_dims) :: current_tau_bulk  !< Current bulk stress tensor.
+            real(wp), dimension(num_dims)           :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
         #:endif
-        integer, dimension(3) :: idx_right_phys !< Physical (j,k,l) indices for right state.
-        real(wp)              :: Re_shear       !< Interface shear Reynolds number.
-        real(wp)              :: Re_bulk        !< Interface bulk Reynolds number.
-        integer               :: j_loop         !< Physical x-index loop iterator.
-        integer               :: k_loop         !< Physical y-index loop iterator.
-        integer               :: l_loop         !< Physical z-index loop iterator.
-        integer               :: i_dim          !< Generic dimension/component iterator.
-        integer               :: vel_comp_idx   !< Velocity component iterator (1=u, 2=v, 3=w).
-        real(wp)              :: divergence_v   !< Velocity divergence at interface.
+        integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+        real(wp)              :: Re_shear        !< Interface shear Reynolds number.
+        real(wp)              :: Re_bulk         !< Interface bulk Reynolds number.
+        integer               :: j_loop          !< Physical x-index loop iterator.
+        integer               :: k_loop          !< Physical y-index loop iterator.
+        integer               :: l_loop          !< Physical z-index loop iterator.
+        integer               :: i_dim           !< Generic dimension/component iterator.
+        integer               :: vel_comp_idx    !< Velocity component iterator (1=u, 2=v, 3=w).
+        real(wp)              :: divergence_v    !< Velocity divergence at interface.
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
                             & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx]')
@@ -4523,8 +4519,8 @@ contains
         real(wp), intent(in) :: divergence_v
 
         ! Local variables
-        integer :: i_dim !< Loop iterator for face normal.
-        integer :: j_dim !< Loop iterator for force component direction.
+        integer :: i_dim  !< Loop iterator for face normal.
+        integer :: j_dim  !< Loop iterator for force component direction.
         tau_shear_out = 0.0_wp
 
         do i_dim = 1, num_dims
@@ -4556,7 +4552,7 @@ contains
         #:endif
 
         ! Local variables
-        integer :: i_dim !< Loop iterator for diagonal components.
+        integer :: i_dim  !< Loop iterator for diagonal components.
         tau_bulk_out = 0.0_wp
 
         do i_dim = 1, num_dims
@@ -4574,7 +4570,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
         integer, intent(in)                                    :: norm_dir
-        integer                                                :: i, j, k, l !< Generic loop iterators
+        integer                                                :: i, j, k, l  !< Generic loop iterators
         ! Reshaping Outputted Data in y-direction
 
         if (norm_dir == 2) then

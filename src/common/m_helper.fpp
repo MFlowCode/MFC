@@ -10,10 +10,10 @@ module m_helper
 
     use m_derived_types
     use m_global_parameters
-    use ieee_arithmetic !< For checking NaN
+    use ieee_arithmetic  !< For checking NaN
     implicit none
 
-    private;
+    private
     public :: s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, s_simpson, s_transcoeff, &
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
@@ -119,7 +119,7 @@ contains
     impure subroutine s_initialize_bubble_vars()
 
         R0ref = bub_pp%R0ref; p0ref = bub_pp%p0ref
-        rho0ref = bub_pp%rho0ref;
+        rho0ref = bub_pp%rho0ref
         ss = bub_pp%ss; pv = bub_pp%pv; vd = bub_pp%vd
         mu_l = bub_pp%mu_l; mu_v = bub_pp%mu_v; mu_g = bub_pp%mu_g
         gam_v = bub_pp%gam_v; gam_g = bub_pp%gam_g
@@ -173,7 +173,7 @@ contains
 
         integer                 :: ir
         real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN, rhol0
-        real(wp), parameter     :: k_poly = 1._wp !< polytropic index used to compute isothermal natural frequency
+        real(wp), parameter     :: k_poly = 1._wp  !< polytropic index used to compute isothermal natural frequency
         ! Chapman-Enskog transport coefficients for vapor-gas mixture, Ando JAS (2010)
 
         phi_vg = (1._wp + sqrt(mu_v/mu_g)*(M_g/M_v)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_v/M_g))
@@ -231,8 +231,8 @@ contains
 
         c1 = imag*omega*peclet
         c2 = sqrt(c1)
-        c3 = (exp(c2) - exp(-c2))/(exp(c2) + exp(-c2)) ! TANH(c2)
-        trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1) ! transfer function
+        c3 = (exp(c2) - exp(-c2))/(exp(c2) + exp(-c2))  ! TANH(c2)
+        trans = ((c2/c3 - 1._wp)**(-1) - 3._wp/c1)**(-1)  ! transfer function
 
         Re_trans = trans
         Im_trans = aimag(trans)
@@ -539,7 +539,7 @@ contains
     elemental function double_factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 
@@ -553,7 +553,7 @@ contains
     elemental function factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18) ! 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  ! 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 

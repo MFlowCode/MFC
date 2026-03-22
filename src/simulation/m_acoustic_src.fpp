@@ -49,10 +49,10 @@ module m_acoustic_src
     !> @}
     $:GPU_DECLARE(create='[mass_src, e_src, mom_src]')
 
-    integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
+    integer, dimension(:), allocatable :: source_spatials_num_points  !< Number of non-zero source grid points for each source
     $:GPU_DECLARE(create='[source_spatials_num_points]')
 
-    type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
+    type(source_spatial_type), dimension(:), allocatable :: source_spatials  !< Data of non-zero source grid points for each source
     $:GPU_DECLARE(create='[source_spatials]')
 
 contains
@@ -60,7 +60,7 @@ contains
     !> This subroutine initializes the acoustic source module
     impure subroutine s_initialize_acoustic_src
 
-        integer :: i, j !< generic loop variables
+        integer :: i, j  !< generic loop variables
 
         @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), &
                    & length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), &
@@ -105,8 +105,8 @@ contains
             else
                 rotate_angle(i) = acoustic(i)%rotate_angle
             end if
-            if (f_is_default(acoustic(i)%delay)) then ! m_checker guarantees acoustic(i)%delay is set for pulse = 2 (Gaussian)
-                delay(i) = 0._wp ! Defaults to zero for sine and square waves
+            if (f_is_default(acoustic(i)%delay)) then  ! m_checker guarantees acoustic(i)%delay is set for pulse = 2 (Gaussian)
+                delay(i) = 0._wp  ! Defaults to zero for sine and square waves
             else
                 delay(i) = acoustic(i)%delay
             end if
@@ -127,8 +127,8 @@ contains
     !! @param rhs_vf rhs variables
     impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !< Conservative variables
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf !< Primitive variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Conservative variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive variables
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -141,18 +141,18 @@ contains
         real(wp)                            :: frequency_local, gauss_sigma_time_local
         real(wp)                            :: mass_src_diff, mom_src_diff
         real(wp)                            :: source_temporal
-        real(wp)                            :: period_BB     !< period of each sine wave in broadband source
-        real(wp)                            :: sl_BB         !< spectral level at each frequency
-        real(wp)                            :: ffre_BB       !< source term corresponding to each frequency
-        real(wp)                            :: sum_BB        !< total source term for the broadband wave
-        real(wp), allocatable, dimension(:) :: phi_rn        !< random phase shift for each frequency
-        integer                             :: i, j, k, l, q !< generic loop variables
-        integer                             :: ai            !< acoustic source index
+        real(wp)                            :: period_BB      !< period of each sine wave in broadband source
+        real(wp)                            :: sl_BB          !< spectral level at each frequency
+        real(wp)                            :: ffre_BB        !< source term corresponding to each frequency
+        real(wp)                            :: sum_BB         !< total source term for the broadband wave
+        real(wp), allocatable, dimension(:) :: phi_rn         !< random phase shift for each frequency
+        integer                             :: i, j, k, l, q  !< generic loop variables
+        integer                             :: ai             !< acoustic source index
         integer                             :: num_points
         logical                             :: freq_conv_flag, gauss_conv_flag
         integer, parameter                  :: mass_label = 1, mom_label = 2
 
-        sim_time = mytime ! Accumulated time, correct under adaptive dt
+        sim_time = mytime  ! Accumulated time, correct under adaptive dt
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
         do l = 0, p
@@ -176,7 +176,7 @@ contains
                 freq_conv_flag = f_is_default(frequency(ai))
                 gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
-                num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
+                num_points = source_spatials_num_points(ai)  ! Use scalar to force firstprivate to prevent GPU bug
 
                 ! Calculate the broadband source
                 period_BB = 0._wp
@@ -262,24 +262,24 @@ contains
                                            & sum_BB)
                     mom_src_diff = source_temporal*source_spatials(ai)%val(i)
 
-                    if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
+                    if (dipole(ai)) then  ! Double amplitude & No momentum source term (only works for Planar)
                         mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
                         if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
                         cycle
                     end if
 
-                    if (n == 0) then ! 1D
-                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai)) ! Left or right-going wave
-                    else if (p == 0) then ! 2D
-                        if (support(ai) < 5) then ! Planar
+                    if (n == 0) then  ! 1D
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai))  ! Left or right-going wave
+                    else if (p == 0) then  ! 2D
+                        if (support(ai) < 5) then  ! Planar
                             mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
                             mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
                         else
                             mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(source_spatials(ai)%angle(i))
                             mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(source_spatials(ai)%angle(i))
                         end if
-                    else ! 3D
-                        if (support(ai) < 5) then ! Planar
+                    else  ! 3D
+                        if (support(ai) < 5) then  ! Planar
                             mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
                             mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
                         else
@@ -290,9 +290,9 @@ contains
                     end if
 
                     ! Update mass source term
-                    if (support(ai) < 5) then ! Planar
+                    if (support(ai) < 5) then  ! Planar
                         mass_src_diff = mom_src_diff/c
-                    else ! Spherical or cylindrical support
+                    else  ! Spherical or cylindrical support
                         ! Mass source term must be calculated differently using a correction term for spherical and cylindrical
                         ! support
                         call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, &
@@ -347,24 +347,24 @@ contains
         real(wp), intent(in)  :: sim_time, c, sum_BB
         real(wp), intent(in)  :: frequency_local, gauss_sigma_time_local
         real(wp), intent(out) :: source
-        real(wp)              :: omega ! angular frequency
-        real(wp)              :: sine_wave ! sine function for square wave
-        real(wp)              :: foc_length_factor ! Scale amplitude with radius for spherical support
+        real(wp)              :: omega  ! angular frequency
+        real(wp)              :: sine_wave  ! sine function for square wave
+        real(wp)              :: foc_length_factor  ! Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
 
         if (n == 0) then
             foc_length_factor = 1._wp
-        else if (p == 0 .and. (.not. cyl_coord)) then ! 2D axisymmetric case is physically 3D
-            foc_length_factor = foc_length(ai)**(-0.85_wp); ! Empirical correction
+        else if (p == 0 .and. (.not. cyl_coord)) then  ! 2D axisymmetric case is physically 3D
+            foc_length_factor = foc_length(ai)**(-0.85_wp)  ! Empirical correction
         else
-            foc_length_factor = 1/foc_length(ai);
+            foc_length_factor = 1/foc_length(ai)
         end if
 
         source = 0._wp
 
         ! Temporal waveform: sine, Gaussian pulse, square wave, or broadband
-        if (pulse(ai) == 1) then ! Sine wave
+        if (pulse(ai) == 1) then  ! Sine wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
             omega = 2._wp*pi*frequency_local
@@ -373,14 +373,14 @@ contains
             if (term_index == mass_label) then
                 source = source/c + foc_length_factor*mag(ai)*(cos((sim_time - delay(ai))*omega) - 1._wp)/omega
             end if
-        else if (pulse(ai) == 2) then ! Gaussian pulse
+        else if (pulse(ai) == 2) then  ! Gaussian pulse
             source = mag(ai)*exp(-0.5_wp*((sim_time - delay(ai))**2._wp)/(gauss_sigma_time_local**2._wp))
 
             if (term_index == mass_label) then
                 source = source/c - foc_length_factor*mag(ai)*sqrt(pi/2)*gauss_sigma_time_local*(erf((sim_time - delay(ai)) &
-                                                          & /(sqrt(2._wp)*gauss_sigma_time_local)) + 1)
+                    & /(sqrt(2._wp)*gauss_sigma_time_local)) + 1)
             end if
-        else if (pulse(ai) == 3) then ! Square wave
+        else if (pulse(ai) == 3) then  ! Square wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
             omega = 2._wp*pi*frequency_local
@@ -391,7 +391,7 @@ contains
             if (abs(sine_wave) < 1.e-2_wp) then
                 source = mag(ai)*sine_wave*1.e2_wp
             end if
-        else if (pulse(ai) == 4) then ! Broadband wave
+        else if (pulse(ai) == 4) then  ! Broadband wave
             source = sum_BB
         end if
 
@@ -441,7 +441,7 @@ contains
             @:ACC_SETUP_source_spatials(source_spatials(ai))
 
             ! Second pass: Store the values
-            count = 0 ! Reset counter
+            count = 0  ! Reset counter
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -542,14 +542,14 @@ contains
         source = 0._wp
 
         ! Gaussian spatial pulse profile: exp(-0.5 * (d / sigma)^2) / (sqrt(2*pi) * sigma)
-        if (support(ai) == 1) then ! 1D
+        if (support(ai) == 1) then  ! 1D
             source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(r(1)/(sig/2._wp))**2._wp)
-        else if (support(ai) == 2 .or. support(ai) == 3) then ! 2D or 3D
+        else if (support(ai) == 2 .or. support(ai) == 3) then  ! 2D or 3D
             ! If we let unit vector e = (cos(dir), sin(dir)),
-            dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai)) ! dot(r,e)
+            dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai))  ! dot(r,e)
             if ((r(1) - dist*cos(dir(ai)))**2._wp + (r(2) - dist*sin(dir(ai)))**2._wp < 0.25_wp*length(ai)**2._wp) &
-                & then ! |r - dist*e| < length/2
-                if (support(ai) /= 3 .or. abs(r(3)) < 0.25_wp*height(ai)) then ! additional height constraint for 3D
+                & then  ! |r - dist*e| < length/2
+                if (support(ai) /= 3 .or. abs(r(3)) < 0.25_wp*height(ai)) then  ! additional height constraint for 3D
                     source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
                 end if
             end if
@@ -571,11 +571,11 @@ contains
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
         real(wp)              :: current_angle, angle_half_aperture, dist, norm
 
-        source = 0._wp ! If not affected by transducer
+        source = 0._wp  ! If not affected by transducer
         angle = 0._wp
         xyz_to_r_ratios = 0._wp
 
-        if (support(ai) == 5 .or. support(ai) == 6) then ! 2D or 2D axisymmetric
+        if (support(ai) == 5 .or. support(ai) == 6) then  ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
 
@@ -584,7 +584,7 @@ contains
                 source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
                 angle = -atan(r(2)/(foc_length(ai) - r(1)))
             end if
-        else if (support(ai) == 7) then ! 3D
+        else if (support(ai) == 7) then  ! 3D
             current_angle = -atan(sqrt(r(2)**2 + r(3)**2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
 
@@ -619,19 +619,19 @@ contains
         real(wp)              :: poly_side_length, aperture_element_3D, angle_elem
         real(wp)              :: x2, y2, z2, x3, y3, z3, C, f, half_apert, dist_interp_to_elem_center
 
-        if (element_on(ai) == 0) then ! Full transducer
+        if (element_on(ai) == 0) then  ! Full transducer
             elem_min = 1
             elem_max = num_elements(ai)
-        else ! Transducer element specified
+        else  ! Transducer element specified
             elem_min = element_on(ai)
             elem_max = element_on(ai)
         end if
 
-        source = 0._wp ! If not affected by any transducer element
+        source = 0._wp  ! If not affected by any transducer element
         angle = 0._wp
         xyz_to_r_ratios = 0._wp
 
-        if (support(ai) == 9 .or. support(ai) == 10) then ! 2D or 2D axisymmetric
+        if (support(ai) == 9 .or. support(ai) == 10) then  ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
             angle_per_elem = (2._wp*angle_half_aperture - (num_elements(ai) - 1._wp)*element_spacing_angle(ai))/num_elements(ai)
@@ -644,10 +644,10 @@ contains
                 if (current_angle > angle_min .and. current_angle < angle_max .and. r(1) < foc_length(ai)) then
                     source = exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)/(sqrt(2._wp*pi)*sig/2._wp)
                     angle = current_angle
-                    exit ! Assume elements don't overlap
+                    exit  ! Assume elements don't overlap
                 end if
             end do
-        else if (support(ai) == 11) then ! 3D
+        else if (support(ai) == 11) then  ! 3D
             poly_side_length = aperture(ai)*sin(pi/num_elements(ai))
             aperture_element_3D = poly_side_length*element_polygon_ratio(ai)
             f = foc_length(ai)
@@ -663,7 +663,7 @@ contains
 
                 ! Construct a plane normal to the line from the focal point to the elem center, Point 3 is the intercept of the
                 ! plane and the line from the focal point to the current location
-                C = f**2._wp/((r(1) - f)*(x2 - f) + r(2)*y2 + r(3)*z2) ! Constant for intermediate step
+                C = f**2._wp/((r(1) - f)*(x2 - f) + r(2)*y2 + r(3)*z2)  ! Constant for intermediate step
                 x3 = C*(r(1) - f) + f
                 y3 = C*r(2)
                 z3 = C*r(3)

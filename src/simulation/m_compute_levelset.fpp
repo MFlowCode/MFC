@@ -81,7 +81,7 @@ contains
         real(wp)                         :: radius, dist
         real(wp), dimension(2)           :: center
         real(wp), dimension(3)           :: dist_vec
-        integer                          :: i, j, ib_patch_id !< Loop index variables
+        integer                          :: i, j, ib_patch_id  !< Loop index variables
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -111,10 +111,10 @@ contains
         real(wp)                         :: dist, global_dist
         integer                          :: global_id
         real(wp), dimension(3)           :: dist_vec
-        real(wp), dimension(1:3)         :: xy_local, offset     !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)         :: xy_local, offset      !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)         :: center
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
-        integer                          :: i, j, k, ib_patch_id !< Loop index variables
+        integer                          :: i, j, k, ib_patch_id  !< Loop index variables
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -125,9 +125,9 @@ contains
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
-        xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
-        xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinate
-        xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
+        xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
+        xy_local = matmul(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinate
+        xy_local = xy_local - offset  ! airfoils are a patch that require a centroid offset
 
         if (xy_local(2) >= 0._wp) then
             ! finds the location on the airfoil grid with the minimum distance (closest)
@@ -176,7 +176,7 @@ contains
         if (f_approx_equal(dist, 0._wp)) then
             gp%levelset_norm = 0._wp
         else
-            gp%levelset_norm = matmul(rotation, dist_vec(:))/dist ! convert the normal vector back to global grid coordinates
+            gp%levelset_norm = matmul(rotation, dist_vec(:))/dist  ! convert the normal vector back to global grid coordinates
         end if
 
     end subroutine s_airfoil_levelset
@@ -192,10 +192,10 @@ contains
         integer                          :: global_id
         real(wp)                         :: lz, z_max, z_min
         real(wp), dimension(3)           :: dist_vec
-        real(wp), dimension(1:3)         :: xyz_local, center, offset, normal !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3)         :: xyz_local, center, offset, normal  !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
         real(wp)                         :: length_z
-        integer                          :: i, j, k, l, ib_patch_id           !< Loop index variables
+        integer                          :: i, j, k, l, ib_patch_id            !< Loop index variables
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -213,8 +213,8 @@ contains
         z_min = -lz/2
 
         xyz_local = [x_cc(i), y_cc(j), z_cc(l)] - center
-        xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
-        xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
+        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+        xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
         if (xyz_local(2) >= 0._wp) then
             do k = 1, Np
@@ -290,12 +290,12 @@ contains
         real(wp)                         :: min_dist
         real(wp)                         :: side_dists(4)
         real(wp)                         :: length_x, length_y
-        real(wp), dimension(1:3)         :: xy_local, dist_vec !< x and y coordinates in local IB frame
-        real(wp), dimension(2)           :: center             !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)         :: xy_local, dist_vec  !< x and y coordinates in local IB frame
+        real(wp), dimension(2)           :: center              !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
-        integer                          :: i, j, k            !< Loop index variables
-        integer                          :: idx                !< Shortest path direction indicator
-        integer                          :: ib_patch_id        !< patch ID
+        integer                          :: i, j, k             !< Loop index variables
+        integer                          :: idx                 !< Shortest path direction indicator
+        integer                          :: ib_patch_id         !< patch ID
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -355,15 +355,15 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-        real(wp)                         :: ellipse_coeffs(2) ! a and b in the ellipse equation
-        real(wp)                         :: quadratic_coeffs(3) ! A, B, C in the quadratic equation to compute levelset
+        real(wp)                         :: ellipse_coeffs(2)  ! a and b in the ellipse equation
+        real(wp)                         :: quadratic_coeffs(3)  ! A, B, C in the quadratic equation to compute levelset
         real(wp)                         :: length_x, length_y
-        real(wp), dimension(1:3)         :: xy_local, normal_vector !< x and y coordinates in local IB frame
-        real(wp), dimension(2)           :: center                  !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)         :: xy_local, normal_vector  !< x and y coordinates in local IB frame
+        real(wp), dimension(2)           :: center                   !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
-        integer                          :: i, j, k                 !< Loop index variables
-        integer                          :: idx                     !< Shortest path direction indicator
-        integer                          :: ib_patch_id             !< patch ID
+        integer                          :: i, j, k                  !< Loop index variables
+        integer                          :: idx                      !< Shortest path direction indicator
+        integer                          :: ib_patch_id              !< patch ID
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -383,9 +383,9 @@ contains
 
         normal_vector = xy_local
         normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2)) &
-                      & **2._wp ! get the normal direction via the coordinate transformation method
-        normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
-        gp%levelset_norm = matmul(rotation, normal_vector) ! save after rotating the vector to the global frame
+                      & **2._wp  ! get the normal direction via the coordinate transformation method
+        normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector))  ! normalize the vector
+        gp%levelset_norm = matmul(rotation, normal_vector)  ! save after rotating the vector to the global frame
 
         ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
         quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
@@ -410,10 +410,10 @@ contains
         real(wp)                         :: dist_left, dist_right, dist_bottom, dist_top, dist_back, dist_front
         real(wp), dimension(3)           :: center
         real(wp)                         :: length_x, length_y, length_z
-        real(wp), dimension(1:3)         :: xyz_local, dist_vec !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)         :: xyz_local, dist_vec  !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
-        integer                          :: i, j, k             !< Loop index variables
-        integer                          :: ib_patch_id         !< patch ID
+        integer                          :: i, j, k              !< Loop index variables
+        integer                          :: ib_patch_id          !< patch ID
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -437,8 +437,8 @@ contains
         Front = length_z/2
         Back = -length_z/2
 
-        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
-        xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinate
+        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinate
 
         dist_left = Left - xyz_local(1)
         dist_right = xyz_local(1) - Right
@@ -494,7 +494,7 @@ contains
         type(ghost_point), intent(inout) :: gp
         real(wp)                         :: radius, dist
         real(wp), dimension(3)           :: dist_vec, center, periodicity
-        integer                          :: i, j, k, ib_patch_id !< Loop index variables
+        integer                          :: i, j, k, ib_patch_id  !< Loop index variables
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -533,9 +533,9 @@ contains
         real(wp), dimension(3)           :: dist_sides_vec, dist_surface_vec, length
         real(wp), dimension(2)           :: boundary
         real(wp)                         :: dist_side, dist_surface, side_pos
-        integer                          :: i, j, k           !< Loop index variables
-        integer                          :: ib_patch_id       !< patch ID
-        real(wp), dimension(1:3)         :: xyz_local, center !< x and y coordinates in local IB frame
+        integer                          :: i, j, k            !< Loop index variables
+        integer                          :: ib_patch_id        !< patch ID
+        real(wp), dimension(1:3)         :: xyz_local, center  !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
 
         ib_patch_id = gp%ib_patch_id
@@ -571,8 +571,8 @@ contains
             dist_surface_vec = (/1, 1, 0/)
         end if
 
-        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
-        xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
+        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
         ! get distance to flat edge of cylinder
         side_pos = dot_product(xyz_local, dist_sides_vec)
@@ -606,7 +606,7 @@ contains
         type(ghost_point), intent(inout) :: gp
         integer                          :: i, j, k, patch_id, boundary_edge_count, total_vertices
         real(wp), dimension(1:3)         :: center, xyz_local
-        real(wp)                         :: normals(1:3) !< Boundary normal buffer
+        real(wp)                         :: normals(1:3)  !< Boundary normal buffer
         real(wp)                         :: distance
         real(wp), dimension(1:3, 1:3)    :: inverse_rotation, rotation
 

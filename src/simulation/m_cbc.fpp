@@ -48,25 +48,25 @@ module m_cbc
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsz_vf_l, flux_src_rsz_vf_l
     $:GPU_DECLARE(create='[flux_rsx_vf_l, flux_src_rsx_vf_l, flux_rsy_vf_l, flux_src_rsy_vf_l, flux_rsz_vf_l, flux_src_rsz_vf_l]')
 
-    real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
+    real(wp), allocatable, dimension(:) :: ds  !< Cell-width distribution in the s-direction
     ! CBC Coefficients
 
-    real(wp), allocatable, dimension(:,:) :: fd_coef_x !< Finite diff. coefficients x-dir
-    real(wp), allocatable, dimension(:,:) :: fd_coef_y !< Finite diff. coefficients y-dir
+    real(wp), allocatable, dimension(:,:) :: fd_coef_x  !< Finite diff. coefficients x-dir
+    real(wp), allocatable, dimension(:,:) :: fd_coef_y  !< Finite diff. coefficients y-dir
     !> Finite diff. coefficients z-dir The first dimension identifies the location of a coefficient in the FD formula, while the
     !! last dimension denotes the location of the CBC.
     real(wp), allocatable, dimension(:,:) :: fd_coef_z
     ! Bug with NVHPC when using nullified pointers in a declare create real(wp), pointer, dimension(:, :) :: fd_coef => null()
 
-    real(wp), allocatable, dimension(:,:,:) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
-    real(wp), allocatable, dimension(:,:,:) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
-    real(wp), allocatable, dimension(:,:,:) :: pi_coef_z !< Polynomial interpolant coefficients in z-dir
+    real(wp), allocatable, dimension(:,:,:) :: pi_coef_x  !< Polynomial interpolant coefficients in x-dir
+    real(wp), allocatable, dimension(:,:,:) :: pi_coef_y  !< Polynomial interpolant coefficients in y-dir
+    real(wp), allocatable, dimension(:,:,:) :: pi_coef_z  !< Polynomial interpolant coefficients in z-dir
     $:GPU_DECLARE(create='[ds, fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z]')
 
     !! The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients
     !! and the last dimension denotes the location of the CBC.
 
-    type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
+    type(int_bounds_info) :: is1, is2, is3  !< Indical bounds in the s1-, s2- and s3-directions
     $:GPU_DECLARE(create='[is1, is2, is3]')
 
     integer :: dj
@@ -445,7 +445,7 @@ contains
     subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
-        integer             :: i !< Generic loop iterator
+        integer             :: i  !< Generic loop iterator
         ! Associating CBC Coefficients in x-direction
 
         if (cbc_dir_in == 1) then
@@ -542,19 +542,19 @@ contains
         #:endif
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(3) :: lambda
-        real(wp)               :: rho        !< Cell averaged density
-        real(wp)               :: pres       !< Cell averaged pressure
-        real(wp)               :: E          !< Cell averaged energy
-        real(wp)               :: H          !< Cell averaged enthalpy
-        real(wp)               :: gamma      !< Cell averaged specific heat ratio
-        real(wp)               :: pi_inf     !< Cell averaged liquid stiffness
-        real(wp)               :: qv         !< Cell averaged fluid reference energy
+        real(wp)               :: rho         !< Cell averaged density
+        real(wp)               :: pres        !< Cell averaged pressure
+        real(wp)               :: E           !< Cell averaged energy
+        real(wp)               :: H           !< Cell averaged enthalpy
+        real(wp)               :: gamma       !< Cell averaged specific heat ratio
+        real(wp)               :: pi_inf      !< Cell averaged liquid stiffness
+        real(wp)               :: qv          !< Cell averaged fluid reference energy
         real(wp)               :: c
         real(wp)               :: Ma
         real(wp)               :: T, sum_Enthalpies
         real(wp)               :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)               :: vel_K_sum, vel_dv_dt_sum
-        integer                :: i, j, k, r !< Generic loop iterators
+        integer                :: i, j, k, r  !< Generic loop iterators
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 
@@ -572,7 +572,7 @@ contains
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
-                                                               & is3, idwbuff(2)%beg, idwbuff(3)%beg)
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     $:GPU_PARALLEL_LOOP(private='[i, r, k]', collapse=3)
                     do i = 1, flux_cbc_index
@@ -600,7 +600,7 @@ contains
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
                 if (weno_order == 5 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
-                                                               & is3, idwbuff(2)%beg, idwbuff(3)%beg)
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
                     $:GPU_PARALLEL_LOOP(private='[i, j, r, k]', collapse=4)
                     do i = 1, flux_cbc_index
@@ -771,7 +771,7 @@ contains
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_BUFFER) &
                                  & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_BUFFER)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                                                           & dvel_ds, dadv_ds, dYs_ds)
+                                & dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) &
                                  & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
@@ -799,7 +799,7 @@ contains
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) &
                                  & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                                                            & dvel_ds, dadv_ds, dYs_ds)
+                                & dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
                                 L(advxe) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
@@ -813,11 +813,11 @@ contains
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_FF_SUB_OUTFLOW) &
                                  & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, &
-                                                                         & dadv_ds)
+                                & dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_CP_SUB_OUTFLOW) &
                                  & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                                                                & dvel_ds, dadv_ds)
+                                & dvel_ds, dadv_ds)
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_SUP_INFLOW) &
                                  & .or. (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_SUP_INFLOW)) then
                             call s_compute_supersonic_inflow_L(L)
@@ -862,7 +862,7 @@ contains
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, advxe - E_idx
-                                dadv_dt(i) = -L(momxe + i) ! + adv_local(i) * vel(dir_idx(1))/y_cc(n)
+                                dadv_dt(i) = -L(momxe + i)  ! + adv_local(i) * vel(dir_idx(1))/y_cc(n)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')
@@ -983,7 +983,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
         type(int_bounds_info), intent(in)                   :: ix, iy, iz
-        integer                                             :: i, j, k, r !< Generic loop iterators
+        integer                                             :: i, j, k, r  !< Generic loop iterators
         ! Configuring the coordinate direction indexes and flags
 
         ! Determining the indicial shift based on CBC location
@@ -1236,7 +1236,7 @@ contains
     subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
-        integer                                                :: i, j, k, r !< Generic loop iterators
+        integer                                                :: i, j, k, r  !< Generic loop iterators
         ! Determining the indicial shift based on CBC location
 
         dj = max(0, cbc_loc)

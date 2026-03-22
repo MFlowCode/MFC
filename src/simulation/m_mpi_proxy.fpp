@@ -9,7 +9,7 @@
 module m_mpi_proxy
 
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi  !< Message passing interface (MPI) module
 #endif
 
     use m_helper_basic
@@ -62,8 +62,8 @@ contains
     impure subroutine s_mpi_bcast_user_inputs()
 
 #ifdef MFC_MPI
-        integer :: i, j !< Generic loop iterator
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: i, j  !< Generic loop iterator
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
@@ -248,7 +248,7 @@ contains
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_BCAST(phi_rn, num_freq, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif

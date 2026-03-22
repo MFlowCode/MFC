@@ -12,8 +12,8 @@
 !> @brief Immersed boundary patch geometry constructors for 2D and 3D shapes
 module m_ib_patches
 
-    use m_model ! Subroutine(s) related to STL files
-    use m_derived_types ! Definitions of the derived types
+    use m_model  ! Subroutine(s) related to STL files
+    use m_derived_types  ! Definitions of the derived types
     use m_global_parameters
     use m_helper_basic
     use m_helper
@@ -47,7 +47,7 @@ module m_ib_patches
     !! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
     !! necessary to lay out a particular patch on the grid.
 
-    character(len=5) :: istr ! string to store int to string result for error checking
+    character(len=5) :: istr  ! string to store int to string result for error checking
 
 contains
 
@@ -55,8 +55,8 @@ contains
     impure subroutine s_apply_ib_patches(ib_markers)
 
         type(integer_field), intent(inout) :: ib_markers
-        integer                            :: i, xp, yp, zp ! iterators
-        integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper ! periodic bounds
+        integer                            :: i, xp, yp, zp  ! iterators
+        integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper  ! periodic bounds
 
         !  3D Patch Geometries
 
@@ -121,11 +121,11 @@ contains
     subroutine s_ib_circle(patch_id, ib_markers, xp, yp)
 
         integer, intent(in)                :: patch_id
-        integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
         type(integer_field), intent(inout) :: ib_markers
         real(wp), dimension(1:2)           :: center
         real(wp)                           :: radius
-        integer                            :: i, j, il, ir, jl, jr !< Generic loop iterators
+        integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: encoded_patch_id
 
         ! Transferring the circular patch's radius, centroid, smearing patch identity and smearing coefficient information
@@ -166,14 +166,14 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp           !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp            !< integers containing the periodicity projection information
         real(wp)                           :: f, ca_in, pa, ma, ta
         real(wp)                           :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer                            :: i, j, k, il, ir, jl, jr
         integer                            :: Np1, Np2
         integer                            :: encoded_patch_id
-        real(wp), dimension(1:3)           :: xy_local, offset !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2)           :: center           !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)           :: xy_local, offset  !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2)           :: center            !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
@@ -194,7 +194,7 @@ contains
             @:ALLOCATE(airfoil_grid_u(1:Np))
             @:ALLOCATE(airfoil_grid_l(1:Np))
 
-            ! TODO :: The below instantiations are already handles by the loop below
+            ! TODO :: The below instantiations are already handled by the loop below
             airfoil_grid_u(1)%x = 0._wp
             airfoil_grid_u(1)%y = 0._wp
 
@@ -202,7 +202,7 @@ contains
             airfoil_grid_l(1)%y = 0._wp
 
             do i = 1, Np1 + Np2 - 1
-                ! TODO :: This allocated the upper and lower airfoil arrays, and does not need to be performed each time the IB
+                ! TODO :: This allocates the upper and lower airfoil arrays, and does not need to be performed each time the IB
                 ! markers are updated. Place this as a separate subroutine.
                 if (i <= Np1) then
                     xc = i*(pa*ca_in/Np1)
@@ -264,9 +264,9 @@ contains
                             & ca_in, airfoil_grid_u, airfoil_grid_l]', collapse=2)
         do j = jl, jr
             do i = il, ir
-                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
-                xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinates
-                xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
+                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
+                xy_local = matmul(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinates
+                xy_local = xy_local - offset  ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(1) >= 0._wp .and. xy_local(1) <= ca_in) then
                     xa = xy_local(1)/ca_in
@@ -328,12 +328,12 @@ contains
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in) :: xp, yp, zp                     !< integers containing the periodicity projection information
+        integer, intent(in) :: xp, yp, zp                      !< integers containing the periodicity projection information
         real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l, il, ir, jl, jr, ll, lr
         integer :: Np1, Np2
         integer :: encoded_patch_id
-        real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, center, offset  !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
@@ -431,9 +431,9 @@ contains
             do j = jl, jr
                 do i = il, ir
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), &
-                                      & z_cc(l) - center(3)] ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
-                    xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
+                                      & z_cc(l) - center(3)]  ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+                    xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
                     if (xyz_local(3) >= z_min .and. xyz_local(3) <= z_max) then
                         if (xyz_local(1) >= 0._wp .and. xyz_local(1) <= ca_in) then
@@ -493,12 +493,12 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
-        integer                            :: i, j, il, ir, jl, jr !< generic loop iterators
+        integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
+        integer                            :: i, j, il, ir, jl, jr  !< generic loop iterators
         integer                            :: encoded_patch_id
-        real(wp)                           :: corner_distance      !< Equation of state parameters
-        real(wp), dimension(1:3)           :: xy_local             !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2)           :: length, center       !< x and y coordinates in local IB frame
+        real(wp)                           :: corner_distance       !< Equation of state parameters
+        real(wp), dimension(1:3)           :: xy_local              !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2)           :: length, center        !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
@@ -517,7 +517,7 @@ contains
         jl = -gp_layers - 1
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
-        corner_distance = sqrt(dot_product(length, length))/2._wp ! maximum distance any marker can be from the center
+        corner_distance = sqrt(dot_product(length, length))/2._wp  ! maximum distance any marker can be from the center
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
 
@@ -551,7 +551,7 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
+        integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
         ! Generic loop iterators
         integer                  :: i, j, k
         integer                  :: il, ir, jl, jr, kl, kr
@@ -616,10 +616,10 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
-        integer                            :: i, j, k, ir, il, jr, jl, kr, kl !< Generic loop iterators
+        integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
+        integer                            :: i, j, k, ir, il, jr, jl, kr, kl  !< Generic loop iterators
         integer                            :: encoded_patch_id
-        real(wp), dimension(1:3)           :: xyz_local, center, length !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)           :: xyz_local, center, length  !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
         real(wp)                           :: corner_distance
 
@@ -643,7 +643,7 @@ contains
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
-        corner_distance = sqrt(dot_product(length, length))/2._wp ! maximum distance any marker can be from the center
+        corner_distance = sqrt(dot_product(length, length))/2._wp  ! maximum distance any marker can be from the center
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
@@ -663,8 +663,8 @@ contains
                         cart_y = y_cc(j)
                         cart_z = z_cc(k)
                     end if
-                    xyz_local = [x_cc(i), cart_y, cart_z] - center ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
+                    xyz_local = [x_cc(i), cart_y, cart_z] - center  ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
                     if (-0.5*length(1) <= xyz_local(1) .and. 0.5*length(1) >= xyz_local(1) .and. -0.5*length(2) <= xyz_local(2) &
                         & .and. 0.5*length(2) >= xyz_local(2) .and. -0.5*length(3) <= xyz_local(3) .and. 0.5*length(3) &
@@ -690,11 +690,11 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
-        integer                            :: i, j, k, il, ir, jl, jr, kl, kr !< Generic loop iterators
+        integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
+        integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
         integer                            :: encoded_patch_id
         real(wp)                           :: radius
-        real(wp), dimension(1:3)           :: xyz_local, center, length !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)           :: xyz_local, center, length  !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
         real(wp)                           :: corner_distance
 
@@ -718,7 +718,7 @@ contains
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
-        corner_distance = sqrt(radius**2 + maxval(length)**2) ! distance to rim of cylinder
+        corner_distance = sqrt(radius**2 + maxval(length)**2)  ! distance to rim of cylinder
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
@@ -737,8 +737,8 @@ contains
                         cart_y = y_cc(j)
                         cart_z = z_cc(k)
                     end if
-                    xyz_local = [x_cc(i), cart_y, cart_z] - center ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
+                    xyz_local = [x_cc(i), cart_y, cart_z] - center  ! get coordinate frame centered on IB
+                    xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
                     if (((.not. f_is_default(length(1)) .and. xyz_local(2)**2 + xyz_local(3)**2 <= radius**2 .and. &
                         & -0.5_wp*length(1) <= xyz_local(1) .and. 0.5_wp*length(1) >= xyz_local(1)) &
@@ -761,12 +761,12 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp               !< integers containing the periodicity projection information
-        integer                            :: i, j, il, ir, jl, jr !< Generic loop iterators
+        integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
+        integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: encoded_patch_id
-        real(wp), dimension(1:3)           :: xy_local             !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2)           :: ellipse_coeffs       !< a and b in the ellipse coefficients
-        real(wp), dimension(1:2)           :: center               !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3)           :: xy_local              !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2)           :: ellipse_coeffs        !< a and b in the ellipse coefficients
+        real(wp), dimension(1:2)           :: center                !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3)      :: inverse_rotation
 
         ! Transferring the ellipse's centroid and length information
@@ -815,8 +815,8 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp                  !< integers containing the periodicity projection information
-        integer                            :: i, j, k, il, ir, jl, jr !< Generic loop iterators
+        integer, intent(in)                :: xp, yp                   !< integers containing the periodicity projection information
+        integer                            :: i, j, k, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
         integer                            :: cx, cy
         real(wp)                           :: lx(2), ly(2)
@@ -894,8 +894,8 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp, zp !< integers containing the periodicity projection information
-        integer                            :: i, j, k, il, ir, jl, jr, kl, kr !< Generic loop iterators
+        integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
+        integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
         real(wp)                           :: eta, threshold, corner_distance
         real(wp), dimension(1:3)           :: point, local_point, offset

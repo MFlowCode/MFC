@@ -5,7 +5,7 @@
 
 #:def Hardcoded1D()
     select case (patch_icpp(patch_id)%hcid)
-    case (150) ! 1D Smooth Alfven Case for MHD
+    case (150)  ! 1D Smooth Alfven Case for MHD
         ! velocity
         q_prim_vf(momxb + 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
         q_prim_vf(momxb + 2)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))

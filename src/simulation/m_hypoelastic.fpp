@@ -88,8 +88,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp)                                               :: rho_K, G_K
-        integer                                                :: i, k, l, q, r !< Loop variables
-        integer                                                :: ndirs         !< Number of coordinate directions
+        integer                                                :: i, k, l, q, r  !< Loop variables
+        integer                                                :: ndirs          !< Number of coordinate directions
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
@@ -153,8 +153,8 @@ contains
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dz_hypo(k, l, q) = 0._wp; dv_dz_hypo(k, l, q) = 0._wp; dw_dx_hypo(k, l, q) = 0._wp;
-                                dw_dy_hypo(k, l, q) = 0._wp; dw_dz_hypo(k, l, q) = 0._wp;
+                                du_dz_hypo(k, l, q) = 0._wp; dv_dz_hypo(k, l, q) = 0._wp; dw_dx_hypo(k, l, q) = 0._wp
+                                dw_dy_hypo(k, l, q) = 0._wp; dw_dz_hypo(k, l, q) = 0._wp
                             end do
                         end do
                     end do
@@ -190,8 +190,8 @@ contains
                     do k = 0, m
                         rho_K = 0._wp; G_K = 0._wp
                         do i = 1, num_fluids
-                            rho_K = rho_K + q_prim_vf(i)%sf(k, l, q) ! alpha_rho_K(1)
-                            G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs_hypo(i) ! alpha_K(1) * Gs_hypo(1)
+                            rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)  ! alpha_rho_K(1)
+                            G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs_hypo(i)  ! alpha_K(1) * Gs_hypo(1)
                         end do
 
                         ! Continuum damage: (1-D) scales effective stiffness, D in [0,1]
@@ -306,16 +306,16 @@ contains
                     do k = 0, m
                         ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
                         rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, &
-                               & l, q)/y_cc(l)*(q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_xx + 2/3*G
+                               & l, q)/y_cc(l)*(q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))  ! tau_xx + 2/3*G
 
                         ! S_xr -= rho * v/r * tau_xr
                         rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - rho_K_field(k, l, &
-                               & q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)*q_prim_vf(strxb + 1)%sf(k, l, q) ! tau_xx
+                               & q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)*q_prim_vf(strxb + 1)%sf(k, l, q)  ! tau_xx
 
                         ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
                         rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - rho_K_field(k, l, &
                                & q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)*(q_prim_vf(strxb + 2)%sf(k, l, &
-                               & q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_rr + 2/3*G
+                               & q) + (2._wp/3._wp)*G_K_field(k, l, q))  ! tau_rr + 2/3*G
 
                         ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
                         rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K_field(k, l, &
@@ -354,7 +354,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp)                                               :: tau_p ! principal stress
+        real(wp)                                               :: tau_p  ! principal stress
         real(wp)                                               :: tau_xx, tau_xy, tau_yy, tau_zz, tau_yz, tau_xz
         real(wp)                                               :: I1, I2, I3, argument, phi, sqrt_term_1, sqrt_term_2, temp
         integer                                                :: q, l, k
@@ -403,7 +403,7 @@ contains
                         ! Maximum principal stress
                         temp = I1**2.0_wp - 3.0_wp*I2
                         sqrt_term_1 = sqrt(max(temp, 0.0_wp))
-                        if (sqrt_term_1 > verysmall) then ! Avoid 0/0
+                        if (sqrt_term_1 > verysmall) then  ! Avoid 0/0
                             argument = (2.0_wp*I1*I1*I1 - 9.0_wp*I1*I2 + 27.0_wp*I3)/(2.0_wp*sqrt_term_1*sqrt_term_1*sqrt_term_1)
                             if (argument > 1.0_wp) argument = 1.0_wp
                             if (argument < -1.0_wp) argument = -1.0_wp

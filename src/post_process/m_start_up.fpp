@@ -143,9 +143,12 @@ contains
         if (proc_rank == 0) then
             if (cfl_dt) then
                 print '(" [", I3, "%]  Saving ", I8, " of ", I0, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
-                        & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time
+                    & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time
             else
-                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I8, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), (t_step - t_step_start)/t_step_save + 1, (t_step_stop - t_step_start)/t_step_save + 1, t_step, wall_time_avg, wall_time
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I8, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
+                    & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    & (t_step - t_step_start)/t_step_save + 1, (t_step_stop - t_step_start)/t_step_save + 1, t_step, &
+                    & wall_time_avg, wall_time
             end if
         end if
 
@@ -729,8 +732,8 @@ contains
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
 
-            if (lag_txt_wrt) call s_write_lag_bubbles_results_to_text(t_step) ! text output
-            if (lag_db_wrt) call s_write_lag_bubbles_to_formatted_database_file(t_step) ! silo file output
+            if (lag_txt_wrt) call s_write_lag_bubbles_results_to_text(t_step)  ! text output
+            if (lag_db_wrt) call s_write_lag_bubbles_to_formatted_database_file(t_step)  ! silo file output
         end if
 
         if (sim_data .and. proc_rank == 0) then

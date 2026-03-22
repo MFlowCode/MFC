@@ -61,9 +61,9 @@ contains
         logical, intent(inout)       :: dircheck
 
 #ifdef __INTEL_COMPILER
-        inquire (DIRECTORY=trim(fileloc), EXIST=dircheck) ! Intel
+        inquire (DIRECTORY=trim(fileloc), EXIST=dircheck)  ! Intel
 #else
-        inquire (FILE=trim(fileloc), EXIST=dircheck) ! GCC
+        inquire (FILE=trim(fileloc), EXIST=dircheck)  ! GCC
 #endif
 
     end subroutine my_inquire

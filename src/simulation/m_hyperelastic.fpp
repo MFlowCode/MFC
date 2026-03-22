@@ -36,7 +36,7 @@ contains
     !! obtain the btensor, btensor is nxn tensor btensor is symmetric, save the data space
     impure subroutine s_initialize_hyperelastic_module
 
-        integer :: i !< generic iterator
+        integer :: i  !< generic iterator
 
         @:ALLOCATE(btensor%vf(1:b_size))
         do i = 1, b_size
@@ -108,7 +108,7 @@ contains
 
                     ! If in simulation, use acc mixture subroutines
                     call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha_k, alpha_rho_k, Re, G_local, &
-                                                                    & Gs_hyper)
+                        & Gs_hyper)
                     rho = max(rho, sgm_eps)
                     G_local = max(G_local, sgm_eps)
 
@@ -213,7 +213,7 @@ contains
         integer, intent(in)                                    :: j, k, l
         real(wp)                                               :: trace
         real(wp), parameter                                    :: f13 = 1._wp/3._wp
-        integer                                                :: i !< Generic loop iterators
+        integer                                                :: i  !< Generic loop iterators
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
@@ -249,8 +249,8 @@ contains
         integer, intent(in)                                    :: j, k, l
         real(wp)                                               :: trace
         real(wp), parameter                                    :: f13 = 1._wp/3._wp
-        integer                                                :: i !< Generic loop iterators
-        ! TODO Make this 1D and 2D capable tensor is the symmetric tensor & calculate the trace of the tensor
+        integer                                                :: i  !< Generic loop iterators
+        ! TODO: Make 1D and 2D capable
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
         ! Deviatoric left Cauchy-Green tensor: dev(b) = b - (tr(b)/3)*I
@@ -271,7 +271,7 @@ contains
     !> @brief Deallocates memory for hyperelastic deformation tensor and finite-difference coefficients.
     impure subroutine s_finalize_hyperelastic_module()
 
-        integer :: i !< iterator
+        integer :: i  !< iterator
         ! Deallocating memory
 
         do i = 1, b_size

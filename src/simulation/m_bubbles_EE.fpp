@@ -18,7 +18,7 @@ module m_bubbles_EE
     real(wp), allocatable, dimension(:,:,:,:) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
     $:GPU_DECLARE(create='[bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src]')
 
-    type(scalar_field) :: divu !< matrix for div(u)
+    type(scalar_field) :: divu  !< matrix for div(u)
     $:GPU_DECLARE(create='[divu]')
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
@@ -96,7 +96,7 @@ contains
 
         integer, intent(in)                                 :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), intent(inout)                   :: divu_in !< matrix for div(u)
+        type(scalar_field), intent(inout)                   :: divu_in  !< matrix for div(u)
         integer                                             :: j, k, l
 
         if (idir == 1) then
@@ -148,7 +148,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), intent(in)                         :: divu_in !< matrix for div(u)
+        type(scalar_field), intent(in)                         :: divu_in  !< matrix for div(u)
         real(wp)                                               :: rddot
         real(wp)                                               :: pb_local, mv_local, vflux, pbdot
         real(wp)                                               :: n_tait, B_tait
@@ -161,11 +161,11 @@ contains
             real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         #:endif
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
-        real(wp) :: nbub                           !< Bubble number density
+        real(wp) :: nbub                            !< Bubble number density
         real(wp) :: my_divu
-        integer  :: i, j, k, l, q, ii              !< Loop variables
-        integer  :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
-        integer  :: dmBub_id                       !< Dummy variables for unified subgrid bubble subroutines
+        integer  :: i, j, k, l, q, ii               !< Loop variables
+        integer  :: adap_dt_stop_max, adap_dt_stop  !< Fail-safe exit if max iteration count reached
+        integer  :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l, q]', collapse=3)
@@ -248,8 +248,8 @@ contains
                             end do
                         end if
 
-                        n_tait = 1._wp/n_tait + 1._wp ! make this the usual little 'gamma'
-                        B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
+                        n_tait = 1._wp/n_tait + 1._wp  ! make this the usual little 'gamma'
+                        B_tait = B_tait*(n_tait - 1)/n_tait  ! make this the usual pi_inf
 
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)

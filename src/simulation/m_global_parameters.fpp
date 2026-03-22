@@ -9,7 +9,7 @@
 module m_global_parameters
 
 #ifdef MFC_MPI
-    use mpi !< Message passing interface (MPI) module
+    use mpi  !< Message passing interface (MPI) module
 #endif
 
     use m_derived_types
@@ -22,12 +22,12 @@ module m_global_parameters
     real(wp) :: wall_time_avg = 0
 
     ! Logistics
-    integer                 :: num_procs     !< Number of processors
-    character(LEN=path_len) :: case_dir      !< Case folder location
-    logical                 :: run_time_info !< Run-time output flag
-    integer                 :: t_step_old    !< Existing IC/grid folder
+    integer                 :: num_procs      !< Number of processors
+    character(LEN=path_len) :: case_dir       !< Case folder location
+    logical                 :: run_time_info  !< Run-time output flag
+    integer                 :: t_step_old     !< Existing IC/grid folder
     ! Computational Domain Parameters
-    integer :: proc_rank !< Rank of the local processor
+    integer :: proc_rank  !< Rank of the local processor
     !> @name Number of cells in the x-, y- and z-directions, respectively
     !> @{
     integer :: m, n, p
@@ -64,7 +64,7 @@ module m_global_parameters
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    real(wp) :: dt !< Size of the time-step
+    real(wp) :: dt  !< Size of the time-step
     $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p]')
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number of time-step iterations between successive
@@ -81,103 +81,103 @@ module m_global_parameters
     $:GPU_DECLARE(create='[cfl_target]')
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
-    integer :: t_step_print !< Number of time-steps between printouts
+    integer :: t_step_print  !< Number of time-steps between printouts
     ! Simulation Algorithm Parameters
-    integer :: model_eqns !< Multicomponent flow model
+    integer :: model_eqns  !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: num_dims = ${num_dims}$ !< Number of spatial dimensions
-        integer, parameter :: num_vels = ${num_vels}$ !< Number of velocity components (different from num_dims for mhd)
+        integer, parameter :: num_dims = ${num_dims}$  !< Number of spatial dimensions
+        integer, parameter :: num_vels = ${num_vels}$  !< Number of velocity components (different from num_dims for mhd)
     #:else
-        integer :: num_dims !< Number of spatial dimensions
-        integer :: num_vels !< Number of velocity components (different from num_dims for mhd)
+        integer :: num_dims  !< Number of spatial dimensions
+        integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
     #:endif
-    logical :: mpp_lim      !< Mixture physical parameters (MPP) limits
-    integer :: time_stepper !< Time-stepper algorithm
+    logical :: mpp_lim       !< Mixture physical parameters (MPP) limits
+    integer :: time_stepper  !< Time-stepper algorithm
     logical :: prim_vars_wrt
 
     #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: recon_type = ${recon_type}$   !< Reconstruction type
-        integer, parameter :: weno_polyn = ${weno_polyn}$   !< Degree of the WENO polynomials (polyn)
-        integer, parameter :: muscl_polyn = ${muscl_polyn}$ !< Degree of the MUSCL polynomials (polyn)
-        integer, parameter :: weno_order = ${weno_order}$   !< Order of the WENO reconstruction
-        integer, parameter :: muscl_order = ${muscl_order}$ !< Order of the MUSCL order
+        integer, parameter :: recon_type = ${recon_type}$    !< Reconstruction type
+        integer, parameter :: weno_polyn = ${weno_polyn}$    !< Degree of the WENO polynomials (polyn)
+        integer, parameter :: muscl_polyn = ${muscl_polyn}$  !< Degree of the MUSCL polynomials (polyn)
+        integer, parameter :: weno_order = ${weno_order}$    !< Order of the WENO reconstruction
+        integer, parameter :: muscl_order = ${muscl_order}$  !< Order of the MUSCL order
         !> Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
         integer, parameter  :: weno_num_stencils = ${weno_num_stencils}$
-        integer, parameter  :: muscl_lim = ${muscl_lim}$              !< MUSCL Limiter
-        integer, parameter  :: num_fluids = ${num_fluids}$            !< number of fluids in the simulation
-        logical, parameter  :: wenojs = (${wenojs}$ /= 0)             !< WENO-JS (default)
-        logical, parameter  :: mapped_weno = (${mapped_weno}$ /= 0)   !< WENO-M (WENO with mapping of nonlinear weights)
-        logical, parameter  :: wenoz = (${wenoz}$ /= 0)               !< WENO-Z
-        logical, parameter  :: teno = (${teno}$ /= 0)                 !< TENO (Targeted ENO)
-        real(wp), parameter :: wenoz_q = ${wenoz_q}$                  !< Power constant for WENO-Z
-        logical, parameter  :: mhd = (${mhd}$ /= 0)                   !< Magnetohydrodynamics
-        logical, parameter  :: relativity = (${relativity}$ /= 0)     !< Relativity (only for MHD)
-        integer, parameter  :: igr_iter_solver = ${igr_iter_solver}$  !< IGR elliptic solver
-        integer, parameter  :: igr_order = ${igr_order}$              !< Reconstruction order for IGR
-        logical, parameter  :: igr = (${igr}$ /= 0)                   !< use information geometric regularization
-        logical, parameter  :: igr_pres_lim = (${igr_pres_lim}$ /= 0) !< Limit to positive pressures for IGR
-        logical, parameter  :: viscous = (${viscous}$ /= 0)           !< Viscous effects
+        integer, parameter  :: muscl_lim = ${muscl_lim}$               !< MUSCL Limiter
+        integer, parameter  :: num_fluids = ${num_fluids}$             !< number of fluids in the simulation
+        logical, parameter  :: wenojs = (${wenojs}$ /= 0)              !< WENO-JS (default)
+        logical, parameter  :: mapped_weno = (${mapped_weno}$ /= 0)    !< WENO-M (WENO with mapping of nonlinear weights)
+        logical, parameter  :: wenoz = (${wenoz}$ /= 0)                !< WENO-Z
+        logical, parameter  :: teno = (${teno}$ /= 0)                  !< TENO (Targeted ENO)
+        real(wp), parameter :: wenoz_q = ${wenoz_q}$                   !< Power constant for WENO-Z
+        logical, parameter  :: mhd = (${mhd}$ /= 0)                    !< Magnetohydrodynamics
+        logical, parameter  :: relativity = (${relativity}$ /= 0)      !< Relativity (only for MHD)
+        integer, parameter  :: igr_iter_solver = ${igr_iter_solver}$   !< IGR elliptic solver
+        integer, parameter  :: igr_order = ${igr_order}$               !< Reconstruction order for IGR
+        logical, parameter  :: igr = (${igr}$ /= 0)                    !< use information geometric regularization
+        logical, parameter  :: igr_pres_lim = (${igr_pres_lim}$ /= 0)  !< Limit to positive pressures for IGR
+        logical, parameter  :: viscous = (${viscous}$ /= 0)            !< Viscous effects
     #:else
-        integer  :: recon_type        !< Reconstruction Type
-        integer  :: weno_polyn        !< Degree of the WENO polynomials (polyn)
-        integer  :: muscl_polyn       !< Degree of the MUSCL polynomials (polyn)i
-        integer  :: weno_order        !< Order of the WENO reconstruction
-        integer  :: muscl_order       !< Order of the MUSCL reconstruction
-        integer  :: weno_num_stencils !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
-        integer  :: muscl_lim         !< MUSCL Limiter
-        integer  :: num_fluids        !< number of fluids in the simulation
-        logical  :: wenojs            !< WENO-JS (default)
-        logical  :: mapped_weno       !< WENO-M (WENO with mapping of nonlinear weights)
-        logical  :: wenoz             !< WENO-Z
-        logical  :: teno              !< TENO (Targeted ENO)
-        real(wp) :: wenoz_q           !< Power constant for WENO-Z
-        logical  :: mhd               !< Magnetohydrodynamics
-        logical  :: relativity        !< Relativity (only for MHD)
-        integer  :: igr_iter_solver   !< IGR elliptic solver
-        integer  :: igr_order         !< Reconstruction order for IGR
-        logical  :: igr               !< Use information geometric regularization
-        logical  :: igr_pres_lim      !< Limit to positive pressures for IGR
-        logical  :: viscous           !< Viscous effects
+        integer  :: recon_type         !< Reconstruction Type
+        integer  :: weno_polyn         !< Degree of the WENO polynomials (polyn)
+        integer  :: muscl_polyn        !< Degree of the MUSCL polynomials (polyn)i
+        integer  :: weno_order         !< Order of the WENO reconstruction
+        integer  :: muscl_order        !< Order of the MUSCL reconstruction
+        integer  :: weno_num_stencils  !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
+        integer  :: muscl_lim          !< MUSCL Limiter
+        integer  :: num_fluids         !< number of fluids in the simulation
+        logical  :: wenojs             !< WENO-JS (default)
+        logical  :: mapped_weno        !< WENO-M (WENO with mapping of nonlinear weights)
+        logical  :: wenoz              !< WENO-Z
+        logical  :: teno               !< TENO (Targeted ENO)
+        real(wp) :: wenoz_q            !< Power constant for WENO-Z
+        logical  :: mhd                !< Magnetohydrodynamics
+        logical  :: relativity         !< Relativity (only for MHD)
+        integer  :: igr_iter_solver    !< IGR elliptic solver
+        integer  :: igr_order          !< Reconstruction order for IGR
+        logical  :: igr                !< Use information geometric regularization
+        logical  :: igr_pres_lim       !< Limit to positive pressures for IGR
+        logical  :: viscous            !< Viscous effects
     #:endif
 
     !> @name Variables for our of core IGR computation on NVIDIA
     !> @{
-    logical :: nv_uvm_out_of_core ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
-    integer :: nv_uvm_igr_temps_on_gpu ! 0 => jac, jac_rhs, and jac_old on CPU
+    logical :: nv_uvm_out_of_core  ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
+    integer :: nv_uvm_igr_temps_on_gpu  ! 0 => jac, jac_rhs, and jac_old on CPU
     ! 1 => jac on GPU, jac_rhs and jac_old on CPU 2 => jac and jac_rhs on GPU, jac_old on CPU 3 => jac, jac_rhs, and jac_old on GPU
     ! (default)
-    logical :: nv_uvm_pref_gpu ! Enable explicit gpu memory hints (default FALSE)
+    logical :: nv_uvm_pref_gpu  ! Enable explicit gpu memory hints (default FALSE)
     !> @}
 
-    real(wp)           :: weno_eps                    !< Binding for the WENO nonlinear weights
-    real(wp)           :: teno_CT                     !< Smoothness threshold for TENO
-    logical            :: mp_weno                     !< Monotonicity preserving (MP) WENO
-    logical            :: weno_avg ! Average left/right cell-boundary states
-    logical            :: weno_Re_flux                !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer            :: riemann_solver              !< Riemann solver algorithm
-    integer            :: low_Mach                    !< Low Mach number fix to HLLC Riemann solver
-    integer            :: wave_speeds                 !< Wave speeds estimation method
-    integer            :: avg_state                   !< Average state evaluation method
-    logical            :: alt_soundspeed              !< Alternate mixture sound speed
-    logical            :: null_weights                !< Null undesired WENO weights
-    logical            :: mixture_err                 !< Mixture properties correction
-    logical            :: hypoelasticity              !< hypoelasticity modeling
-    logical            :: hyperelasticity             !< hyperelasticity modeling
-    logical            :: int_comp                    !< THINC interface compression
-    real(wp)           :: ic_eps                      !< THINC Epsilon to compress on surface cells
-    real(wp)           :: ic_beta                     !< THINC Sharpness Parameter
-    integer            :: hyper_model                 !< hyperelasticity solver algorithm
-    logical            :: elasticity                  !< elasticity modeling, true for hyper or hypo
-    logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
-    logical            :: shear_stress                !< Shear stresses
-    logical            :: bulk_stress                 !< Bulk stresses
-    logical            :: cont_damage                 !< Continuum damage modeling
-    logical            :: hyper_cleaning              !< Hyperbolic cleaning for MHD for divB=0
-    integer            :: num_igr_iters               !< number of iterations for elliptic solve
-    integer            :: num_igr_warm_start_iters    !< number of warm start iterations for elliptic solve
-    real(wp)           :: alf_factor                  !< alpha factor for IGR
+    real(wp)           :: weno_eps                     !< Binding for the WENO nonlinear weights
+    real(wp)           :: teno_CT                      !< Smoothness threshold for TENO
+    logical            :: mp_weno                      !< Monotonicity preserving (MP) WENO
+    logical            :: weno_avg  ! Average left/right cell-boundary states
+    logical            :: weno_Re_flux                 !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer            :: riemann_solver               !< Riemann solver algorithm
+    integer            :: low_Mach                     !< Low Mach number fix to HLLC Riemann solver
+    integer            :: wave_speeds                  !< Wave speeds estimation method
+    integer            :: avg_state                    !< Average state evaluation method
+    logical            :: alt_soundspeed               !< Alternate mixture sound speed
+    logical            :: null_weights                 !< Null undesired WENO weights
+    logical            :: mixture_err                  !< Mixture properties correction
+    logical            :: hypoelasticity               !< hypoelasticity modeling
+    logical            :: hyperelasticity              !< hyperelasticity modeling
+    logical            :: int_comp                     !< THINC interface compression
+    real(wp)           :: ic_eps                       !< THINC Epsilon to compress on surface cells
+    real(wp)           :: ic_beta                      !< THINC Sharpness Parameter
+    integer            :: hyper_model                  !< hyperelasticity solver algorithm
+    logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
+    logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
+    logical            :: shear_stress                 !< Shear stresses
+    logical            :: bulk_stress                  !< Bulk stresses
+    logical            :: cont_damage                  !< Continuum damage modeling
+    logical            :: hyper_cleaning               !< Hyperbolic cleaning for MHD for divB=0
+    integer            :: num_igr_iters                !< number of iterations for elliptic solve
+    integer            :: num_igr_warm_start_iters     !< number of warm start iterations for elliptic solve
+    real(wp)           :: alf_factor                   !< alpha factor for IGR
     logical            :: bodyForces
-    logical            :: bf_x, bf_y, bf_z            !< body force toggle in three directions
+    logical            :: bf_x, bf_y, bf_z             !< body force toggle in three directions
     !> amplitude, frequency, and phase shift sinusoid in each direction
     #:for dir in {'x', 'y', 'z'}
         #:for param in {'k','w','p','g'}
@@ -203,10 +203,10 @@ module m_global_parameters
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress, cont_damage, hyper_cleaning]')
 
-    logical  :: relax        !< activate phase change
-    integer  :: relax_model  !< Relaxation model
-    real(wp) :: palpha_eps   !< trigger parameter for the p relaxation procedure, phase change model
-    real(wp) :: ptgalpha_eps !< trigger parameter for the pTg relaxation procedure, phase change model
+    logical  :: relax         !< activate phase change
+    integer  :: relax_model   !< Relaxation model
+    real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
+    real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
 
     integer :: num_bc_patches
@@ -226,14 +226,14 @@ module m_global_parameters
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
-    logical  :: parallel_io      !< Format of the data files
-    logical  :: file_per_process !< shared file or not when using parallel io
-    integer  :: precision        !< Precision of output files
-    logical  :: down_sample      !< down sample the output files
+    logical  :: parallel_io       !< Format of the data files
+    logical  :: file_per_process  !< shared file or not when using parallel io
+    integer  :: precision         !< Precision of output files
+    logical  :: down_sample       !< down sample the output files
     $:GPU_DECLARE(create='[down_sample]')
 
-    integer, allocatable, dimension(:)            :: proc_coords !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:)            :: start_idx   !< Starting cell-center index of local processor in global grid
+    integer, allocatable, dimension(:)            :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:)            :: start_idx    !< Starting cell-center index of local processor in global grid
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
     type(mpi_io_airfoil_ib_var), public           :: MPI_IO_airfoil_IB_DATA
@@ -250,26 +250,26 @@ module m_global_parameters
     !> @name Annotations of the structure of the state and flux vectors in terms of the size and the configuration of the system of
     !! equations to which they belong
     !> @{
-    integer               :: sys_size             !< Number of unknowns in system of eqns.
-    type(int_bounds_info) :: cont_idx             !< Indexes of first & last continuity eqns.
-    type(int_bounds_info) :: mom_idx              !< Indexes of first & last momentum eqns.
-    integer               :: E_idx                !< Index of energy equation
-    integer               :: n_idx                !< Index of number density
-    type(int_bounds_info) :: adv_idx              !< Indexes of first & last advection eqns.
-    type(int_bounds_info) :: internalEnergies_idx !< Indexes of first & last internal energy eqns.
-    type(bub_bounds_info) :: bub_idx              !< Indexes of first & last bubble variable eqns.
-    integer               :: alf_idx              !< Index of void fraction
-    integer               :: gamma_idx            !< Index of specific heat ratio func. eqn.
-    integer               :: pi_inf_idx           !< Index of liquid stiffness func. eqn.
-    type(int_bounds_info) :: B_idx                !< Indexes of first and last magnetic field eqns.
-    type(int_bounds_info) :: stress_idx           !< Indexes of first and last shear stress eqns.
-    type(int_bounds_info) :: xi_idx               !< Indexes of first and last reference map eqns.
-    integer               :: b_size               !< Number of elements in the symmetric b tensor, plus one
-    integer               :: tensor_size          !< Number of elements in the full tensor plus one
-    type(int_bounds_info) :: species_idx          !< Indexes of first & last concentration eqns.
-    integer               :: c_idx                !< Index of color function
-    integer               :: damage_idx           !< Index of damage state variable (D) for continuum damage model
-    integer               :: psi_idx              !< Index of hyperbolic cleaning state variable for MHD
+    integer               :: sys_size              !< Number of unknowns in system of eqns.
+    type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
+    type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
+    integer               :: E_idx                 !< Index of energy equation
+    integer               :: n_idx                 !< Index of number density
+    type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
+    type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
+    type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
+    integer               :: alf_idx               !< Index of void fraction
+    integer               :: gamma_idx             !< Index of specific heat ratio func. eqn.
+    integer               :: pi_inf_idx            !< Index of liquid stiffness func. eqn.
+    type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
+    type(int_bounds_info) :: stress_idx            !< Indexes of first and last shear stress eqns.
+    type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
+    integer               :: b_size                !< Number of elements in the symmetric b tensor, plus one
+    integer               :: tensor_size           !< Number of elements in the full tensor plus one
+    type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
+    integer               :: c_idx                 !< Index of color function
+    integer               :: damage_idx            !< Index of damage state variable (D) for continuum damage model
+    integer               :: psi_idx               !< Index of hyperbolic cleaning state variable for MHD
     !> @}
     $:GPU_DECLARE(create='[sys_size, E_idx, n_idx, bub_idx, alf_idx, gamma_idx]')
     $:GPU_DECLARE(create='[pi_inf_idx, B_idx, stress_idx, xi_idx, b_size]')
@@ -318,8 +318,8 @@ module m_global_parameters
     $:GPU_DECLARE(create='[buff_size]')
 
     integer               :: shear_num !! Number of shear stress components
-    integer, dimension(3) :: shear_indices     !< Indices of the stress components that represent shear stress
-    integer               :: shear_BC_flip_num !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
+    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
     !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
     !! [indices])
     integer, dimension(3, 2) :: shear_BC_flip_indices
@@ -373,45 +373,45 @@ module m_global_parameters
     !> @name Bubble modeling
     !> @{
     #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: nb = ${nb}$ !< Number of eq. bubble sizes
+        integer, parameter :: nb = ${nb}$  !< Number of eq. bubble sizes
     #:else
-        integer :: nb !< Number of eq. bubble sizes
+        integer :: nb  !< Number of eq. bubble sizes
     #:endif
 
-    real(wp) :: Eu     !< Euler number
-    real(wp) :: Ca     !< Cavitation number
-    real(wp) :: Web    !< Weber number
-    real(wp) :: Re_inv !< Inverse Reynolds number
+    real(wp) :: Eu      !< Euler number
+    real(wp) :: Ca      !< Cavitation number
+    real(wp) :: Web     !< Weber number
+    real(wp) :: Re_inv  !< Inverse Reynolds number
     $:GPU_DECLARE(create='[Eu, Ca, Web, Re_inv]')
 
-    real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
-    real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
+    real(wp), dimension(:), allocatable :: weight  !< Simpson quadrature weights
+    real(wp), dimension(:), allocatable :: R0      !< Bubble sizes
     $:GPU_DECLARE(create='[weight, R0]')
 
-    logical :: bubbles_euler !< Bubbles euler on/off
-    logical :: polytropic    !< Polytropic switch
-    logical :: polydisperse  !< Polydisperse bubbles
+    logical :: bubbles_euler  !< Bubbles euler on/off
+    logical :: polytropic     !< Polytropic switch
+    logical :: polydisperse   !< Polydisperse bubbles
     $:GPU_DECLARE(create='[bubbles_euler, polytropic, polydisperse]')
 
-    logical  :: adv_n             !< Solve the number density equation and compute alpha from number density
-    logical  :: adap_dt           !< Adaptive step size control
-    real(wp) :: adap_dt_tol       !< Tolerance to control adaptive step size
-    integer  :: adap_dt_max_iters !< Maximum number of iterations
+    logical  :: adv_n              !< Solve the number density equation and compute alpha from number density
+    logical  :: adap_dt            !< Adaptive step size control
+    real(wp) :: adap_dt_tol        !< Tolerance to control adaptive step size
+    integer  :: adap_dt_max_iters  !< Maximum number of iterations
     $:GPU_DECLARE(create='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters]')
 
-    integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
-    integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
+    integer :: bubble_model  !< Gilmore or Keller--Miksis bubble model
+    integer :: thermal       !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
     $:GPU_DECLARE(create='[bubble_model, thermal]')
 
-    real(wp), allocatable, dimension(:,:,:) :: ptil       !< Pressure modification
-    real(wp)                                :: poly_sigma !< log normal sigma for polydisperse PDF
+    real(wp), allocatable, dimension(:,:,:) :: ptil        !< Pressure modification
+    real(wp)                                :: poly_sigma  !< log normal sigma for polydisperse PDF
     $:GPU_DECLARE(create='[ptil, poly_sigma]')
 
-    logical            :: qbmm     !< Quadrature moment method
-    integer, parameter :: nmom = 6 !< Number of carried moments per R0 location
-    integer            :: nmomsp   !< Number of moments required by ensemble-averaging
-    integer            :: nmomtot  !< Total number of carried moments moments/transport equations
-    real(wp)           :: pi_fac   !< Factor for artificial pi_inf
+    logical            :: qbmm      !< Quadrature moment method
+    integer, parameter :: nmom = 6  !< Number of carried moments per R0 location
+    integer            :: nmomsp    !< Number of moments required by ensemble-averaging
+    integer            :: nmomtot   !< Total number of carried moments moments/transport equations
+    real(wp)           :: pi_fac    !< Factor for artificial pi_inf
     $:GPU_DECLARE(create='[qbmm, nmomsp, nmomtot, pi_fac]')
 
     #:if not MFC_CASE_OPTIMIZATION
@@ -445,9 +445,9 @@ module m_global_parameters
 
     !> @name Acoustic acoustic_source parameters
     !> @{
-    logical                                              :: acoustic_source !< Acoustic source switch
-    type(acoustic_parameters), dimension(num_probes_max) :: acoustic        !< Acoustic source parameters
-    integer                                              :: num_source      !< Number of acoustic sources
+    logical                                              :: acoustic_source  !< Acoustic source switch
+    type(acoustic_parameters), dimension(num_probes_max) :: acoustic         !< Acoustic source parameters
+    integer                                              :: num_source       !< Number of acoustic sources
     !> @}
     $:GPU_DECLARE(create='[acoustic_source, acoustic, num_source]')
 
@@ -474,8 +474,8 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
 
-    real(wp)                                    :: mytime    !< Current simulation time
-    real(wp)                                    :: finaltime !< Final simulation time
+    real(wp)                                    :: mytime     !< Current simulation time
+    real(wp)                                    :: finaltime  !< Final simulation time
     logical                                     :: rdma_mpi
     type(pres_field), allocatable, dimension(:) :: pb_ts
     type(pres_field), allocatable, dimension(:) :: mv_ts
@@ -484,12 +484,12 @@ module m_global_parameters
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
-    logical                           :: bubbles_lagrange !< Lagrangian subgrid bubble model switch
-    type(bubbles_lagrange_parameters) :: lag_params       !< Lagrange bubbles' parameters
+    logical                           :: bubbles_lagrange  !< Lagrangian subgrid bubble model switch
+    type(bubbles_lagrange_parameters) :: lag_params        !< Lagrange bubbles' parameters
     $:GPU_DECLARE(create='[bubbles_lagrange, lag_params]')
     !> @}
 
-    real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
+    real(wp) :: Bx0  !< Constant magnetic field in the x-direction (1D)
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
@@ -498,16 +498,16 @@ module m_global_parameters
     logical :: dummy
     !> @name Continuum damage model parameters
     !> @{!
-    real(wp) :: tau_star      !< Stress threshold for continuum damage modeling
-    real(wp) :: cont_damage_s !< Exponent s for continuum damage modeling
-    real(wp) :: alpha_bar     !< Damage rate factor for continuum damage modeling
+    real(wp) :: tau_star       !< Stress threshold for continuum damage modeling
+    real(wp) :: cont_damage_s  !< Exponent s for continuum damage modeling
+    real(wp) :: alpha_bar      !< Damage rate factor for continuum damage modeling
     $:GPU_DECLARE(create='[tau_star, cont_damage_s, alpha_bar]')
     !> @}
 
     !> @name MHD Hyperbolic cleaning parameters
     !> @{!
-    real(wp) :: hyper_cleaning_speed !< Hyperbolic cleaning wave speed (c_h)
-    real(wp) :: hyper_cleaning_tau   !< Hyperbolic cleaning tau
+    real(wp) :: hyper_cleaning_speed  !< Hyperbolic cleaning wave speed (c_h)
+    real(wp) :: hyper_cleaning_tau    !< Hyperbolic cleaning tau
     $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
     !> @}
 
@@ -517,7 +517,7 @@ contains
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
 
-        integer :: i, j !< Generic loop iterator
+        integer :: i, j  !< Generic loop iterator
         ! Logistics
 
         case_dir = '.'
@@ -548,7 +548,7 @@ contains
 
         ! NVIDIA UVM options
         nv_uvm_out_of_core = .false.
-        nv_uvm_igr_temps_on_gpu = 3 ! => jac, jac_rhs, and jac_old on GPU (default)
+        nv_uvm_igr_temps_on_gpu = 3  ! => jac, jac_rhs, and jac_old on GPU (default)
         nv_uvm_pref_gpu = .false.
 
         ! Simulation algorithm parameters
@@ -654,8 +654,8 @@ contains
         bub_pp%gam_g = dflt_real; gam_g = dflt_real
         bub_pp%M_v = dflt_real; M_v = dflt_real
         bub_pp%M_g = dflt_real; M_g = dflt_real
-        bub_pp%k_v = dflt_real;
-        bub_pp%k_g = dflt_real;
+        bub_pp%k_v = dflt_real
+        bub_pp%k_g = dflt_real
         bub_pp%cp_v = dflt_real; cp_v = dflt_real
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
@@ -912,7 +912,7 @@ contains
 
                 if (igr) then
                     ! IGR: volume fractions after energy (N-1 for N fluids; skipped when num_fluids=1)
-                    adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
+                    adv_idx%beg = E_idx + 1  ! Alpha for fluid 1
                     adv_idx%end = E_idx + num_fluids - 1
                 else
                     ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann
@@ -932,7 +932,7 @@ contains
                 if (bubbles_euler) then
                     bub_idx%beg = sys_size + 1
                     if (qbmm) then
-                        nmomsp = 4 ! number of special moments
+                        nmomsp = 4  ! number of special moments
                         if (nnode == 4) then
                             ! nmom = 6 : It is already a parameter
                             nmomtot = nmom*nb
@@ -988,9 +988,9 @@ contains
                 if (mhd) then
                     B_idx%beg = sys_size + 1
                     if (n == 0) then
-                        B_idx%end = sys_size + 2 ! 1D: By, Bz
+                        B_idx%end = sys_size + 2  ! 1D: By, Bz
                     else
-                        B_idx%end = sys_size + 3 ! 2D/3D: Bx, By, Bz
+                        B_idx%end = sys_size + 3  ! 2D/3D: Bx, By, Bz
                     end if
                     sys_size = B_idx%end
                 end if
@@ -1007,13 +1007,13 @@ contains
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
             else if (model_eqns == 4) then
-                cont_idx%beg = 1 ! one continuity equation
-                cont_idx%end = 1 ! num_fluids
-                mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each direction
+                cont_idx%beg = 1  ! one continuity equation
+                cont_idx%end = 1  ! num_fluids
+                mom_idx%beg = cont_idx%end + 1  ! one momentum equation in each direction
                 mom_idx%end = cont_idx%end + num_vels
-                E_idx = mom_idx%end + 1 ! one energy equation
+                E_idx = mom_idx%end + 1  ! one energy equation
                 adv_idx%beg = E_idx + 1
-                adv_idx%end = adv_idx%beg ! one volume advection equation
+                adv_idx%end = adv_idx%beg  ! one volume advection equation
                 alf_idx = adv_idx%end
                 sys_size = adv_idx%end
 
@@ -1190,7 +1190,7 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
-        if (mhd) then ! TODO merge with above; waiting for hyperelasticity PR
+        if (mhd) then  ! TODO merge with above; waiting for hyperelasticity PR
             fd_number = max(1, fd_order/2)
         end if
 
@@ -1209,11 +1209,11 @@ contains
 
         $:GPU_UPDATE(device='[fd_order, fd_number]')
 
-        if (cyl_coord .neqv. .true.) then ! Cartesian grid
+        if (cyl_coord .neqv. .true.) then  ! Cartesian grid
             grid_geometry = 1
-        else if (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
+        else if (cyl_coord .and. p == 0) then  ! Axisymmetric cylindrical grid
             grid_geometry = 2
-        else ! Fully 3D cylindrical grid
+        else  ! Fully 3D cylindrical grid
             grid_geometry = 3
         end if
 
@@ -1276,7 +1276,7 @@ contains
         @:PREFER_GPU(x_cc)
         @:PREFER_GPU(dx)
 
-        if (n == 0) return;
+        if (n == 0) return
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
@@ -1284,7 +1284,7 @@ contains
         @:PREFER_GPU(y_cc)
         @:PREFER_GPU(dy)
 
-        if (p == 0) return;
+        if (p == 0) return
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -1298,7 +1298,7 @@ contains
     impure subroutine s_initialize_parallel_io
 
 #ifdef MFC_MPI
-        integer :: ierr !< Generic flag used to identify and report MPI errors
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
 #endif
 
         #:if not MFC_CASE_OPTIMIZATION
@@ -1366,10 +1366,10 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
-        if (n == 0) return;
+        if (n == 0) return
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return;
+        if (p == 0) return
         @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module

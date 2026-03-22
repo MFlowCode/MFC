@@ -410,7 +410,7 @@ contains
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), &
-             & intent(inout) :: rhs_pb ! TODO :: I think that this should be stp as well.
+             & intent(inout) :: rhs_pb  ! TODO :: I think that this should be stp as well.
 
         integer  :: i, j, k, l, q
         real(wp) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
@@ -1020,8 +1020,8 @@ contains
             bu = fmom(2)/fmom(1)
             d2 = fmom(3)/fmom(1)
             c2 = d2 - bu**2._wp
-            frho(1) = fmom(1)/2._wp;
-            frho(2) = fmom(1)/2._wp;
+            frho(1) = fmom(1)/2._wp
+            frho(2) = fmom(1)/2._wp
             c2 = maxval((/c2, sgm_eps/))
             fup(1) = bu - sqrt(c2)
             fup(2) = bu + sqrt(c2)

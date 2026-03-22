@@ -18,7 +18,7 @@ module m_variables_conversion
 
     implicit none
 
-    private;
+    private
     public :: s_initialize_variables_conversion_module, &
               s_initialize_pb, &
               s_initialize_mv, &
@@ -51,10 +51,10 @@ module m_variables_conversion
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     $:GPU_DECLARE(create='[is1b, is2b, is3b, is1e, is2e, is3e]')
 
-    real(wp), allocatable, dimension(:,:,:), public :: rho_sf    !< Scalar density function
-    real(wp), allocatable, dimension(:,:,:), public :: gamma_sf  !< Scalar sp. heat ratio function
-    real(wp), allocatable, dimension(:,:,:), public :: pi_inf_sf !< Scalar liquid stiffness function
-    real(wp), allocatable, dimension(:,:,:), public :: qv_sf     !< Scalar liquid energy reference function
+    real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
+    real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
+    real(wp), allocatable, dimension(:,:,:), public :: pi_inf_sf  !< Scalar liquid stiffness function
+    real(wp), allocatable, dimension(:,:,:), public :: qv_sf      !< Scalar liquid energy reference function
 
 contains
 
@@ -80,9 +80,9 @@ contains
         real(wp), optional, intent(out)                       :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
 
-        if (model_eqns == 1) then ! Gamma/pi_inf model
+        if (model_eqns == 1) then  ! Gamma/pi_inf model
             call s_convert_mixture_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv)
-        else ! Volume fraction model
+        else  ! Volume fraction model
             call s_convert_species_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv, Re_K, G_K, G)
         end if
 
@@ -121,7 +121,7 @@ contains
         real(wp)                                       :: E_e
         real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
         real(wp)                                       :: T_guess
-        integer                                        :: s !< Generic loop iterator
+        integer                                        :: s  !< Generic loop iterator
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
             ! procedure pointer
@@ -193,7 +193,7 @@ contains
         rho = q_vf(1)%sf(i, j, k)
         gamma = q_vf(gamma_idx)%sf(i, j, k)
         pi_inf = q_vf(pi_inf_idx)%sf(i, j, k)
-        qv = 0._wp ! keep this value nil for now. For future adjustment
+        qv = 0._wp  ! keep this value nil for now. For future adjustment
 
         ! Post process requires rho_sf/gamma_sf/pi_inf_sf/qv_sf to also be updated
 #ifdef MFC_POST_PROCESS
@@ -231,7 +231,7 @@ contains
         real(wp), optional, intent(out)                       :: G_K
         real(wp), dimension(num_fluids)                       :: alpha_rho_K, alpha_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
-        integer                                               :: i, j !< Generic loop iterator
+        integer                                               :: i, j  !< Generic loop iterator
         ! Computing the density, the specific heat ratio function and the liquid stiffness function, respectively
 
         call s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
@@ -303,7 +303,7 @@ contains
         real(wp), dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out)     :: G_K
         real(wp)                            :: alpha_K_sum
-        integer                             :: i, j !< Generic loop iterators
+        integer                             :: i, j  !< Generic loop iterators
 #ifdef MFC_SIMULATION
         ! Constrain partial densities and volume fractions within physical bounds
         if (num_fluids == 1 .and. bubbles_euler) then
@@ -333,7 +333,7 @@ contains
         if (present(G_K)) then
             G_K = 0._wp
             do i = 1, num_fluids
-                ! TODO: change to use Gs_vc directly here? TODO: Make this changes as well for GPUs
+                ! TODO: change to use Gs_vc directly here? TODO: Make this change as well for GPUs
                 G_K = G_K + alpha_K(i)*G(i)
             end do
             G_K = max(0._wp, G_K)
@@ -528,18 +528,18 @@ contains
         real(wp)               :: vftmp, nbub_sc
         real(wp)               :: G_K
         real(wp)               :: pres
-        integer                :: i, j, k, l !< Generic loop iterators
+        integer                :: i, j, k, l  !< Generic loop iterators
         real(wp)               :: T
         real(wp)               :: pres_mag
-        real(wp)               :: Ga ! Lorentz factor (gamma in relativity)
-        real(wp)               :: B2 ! Magnetic field magnitude squared
-        real(wp)               :: B(3) ! Magnetic field components
-        real(wp)               :: m2 ! Relativistic momentum magnitude squared
-        real(wp)               :: S ! Dot product of the magnetic field and the relativistic momentum
-        real(wp)               :: W, dW ! W := rho*v*Ga**2; f = f(W) in Newton-Raphson
-        real(wp)               :: E, D ! Prim/Cons variables within Newton-Raphson iteration
-        real(wp)               :: f, dGa_dW, dp_dW, df_dW ! Functions within Newton-Raphson iteration
-        integer                :: iter ! Newton-Raphson iteration counter
+        real(wp)               :: Ga  ! Lorentz factor (gamma in relativity)
+        real(wp)               :: B2  ! Magnetic field magnitude squared
+        real(wp)               :: B(3)  ! Magnetic field components
+        real(wp)               :: m2  ! Relativistic momentum magnitude squared
+        real(wp)               :: S  ! Dot product of the magnetic field and the relativistic momentum
+        real(wp)               :: W, dW  ! W := rho*v*Ga**2; f = f(W) in Newton-Raphson
+        real(wp)               :: E, D  ! Prim/Cons variables within Newton-Raphson iteration
+        real(wp)               :: f, dGa_dW, dp_dW, df_dW  ! Functions within Newton-Raphson iteration
+        integer                :: iter  ! Newton-Raphson iteration counter
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
@@ -556,10 +556,10 @@ contains
                         ! If in simulation, use acc mixture subroutines
                         if (elasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                                                                            & Re_K, G_K, Gs_vc)
+                                & Re_K, G_K, Gs_vc)
                         else
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                                                                            & Re_K)
+                                & Re_K)
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
@@ -619,14 +619,14 @@ contains
                             ! cancel with the 2* in other terms This corrected version is not used as the second equation
                             ! empirically converges faster. First equation is kept for further investigation. dGa_dW = -Ga**3 * (
                             ! S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! first (corrected)
-                            dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3) ! second (in paper)
+                            dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3)  ! second (in paper)
 
                             dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
                             df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
 
                             dW = -f/df_dW
                             W = W + dW
-                            if (abs(dW) < 1.e-12_wp*W) exit ! Relative convergence criterion
+                            if (abs(dW) < 1.e-12_wp*W) exit  ! Relative convergence criterion
                         end do
 
                         ! Recalculate pressure using converged W
@@ -638,14 +638,14 @@ contains
                         do i = 1, 3
                             qK_prim_vf(momxb + i - 1)%sf(j, k, l) = (qK_cons_vf(momxb + i - 1)%sf(j, k, l) + (S/W)*B(i))/(W + B2)
                         end do
-                        qK_prim_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
+                        qK_prim_vf(1)%sf(j, k, l) = D/Ga  ! Hard-coded for single-component for now
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = B_idx%beg, B_idx%end
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                         end do
 
-                        cycle ! skip all the non-relativistic conversions below
+                        cycle  ! skip all the non-relativistic conversions below
                     end if
 
                     if (chemistry) then
@@ -837,16 +837,16 @@ contains
         real(wp), dimension(nb)          :: Rtmp
         real(wp)                         :: G
         real(wp), dimension(2)           :: Re_K
-        integer                          :: i, j, k, l !< Generic loop iterators
+        integer                          :: i, j, k, l  !< Generic loop iterators
         real(wp), dimension(num_species) :: Ys
         real(wp)                         :: e_mix, mix_mol_weight, T
         real(wp)                         :: pres_mag
-        real(wp)                         :: Ga ! Lorentz factor (gamma in relativity)
-        real(wp)                         :: h ! relativistic enthalpy
-        real(wp)                         :: v2 ! Square of the velocity magnitude
-        real(wp)                         :: B2 ! Square of the magnetic field magnitude
-        real(wp)                         :: vdotB ! Dot product of the velocity and magnetic field vectors
-        real(wp)                         :: B(3) ! Magnetic field components
+        real(wp)                         :: Ga  ! Lorentz factor (gamma in relativity)
+        real(wp)                         :: h  ! relativistic enthalpy
+        real(wp)                         :: v2  ! Square of the velocity magnitude
+        real(wp)                         :: B2  ! Square of the magnetic field magnitude
+        real(wp)                         :: vdotB  ! Dot product of the velocity and magnetic field vectors
+        real(wp)                         :: B(3)  ! Magnetic field components
 
         pres_mag = 0._wp
 
@@ -886,7 +886,7 @@ contains
 
                         Ga = 1._wp/sqrt(1._wp - v2)
 
-                        h = 1._wp + (gamma + 1)*q_prim_vf(E_idx)%sf(j, k, l)/rho ! Assume perfect gas for now
+                        h = 1._wp + (gamma + 1)*q_prim_vf(E_idx)%sf(j, k, l)/rho  ! Assume perfect gas for now
 
                         B2 = 0._wp
                         do i = B_idx%beg, B_idx%end
@@ -917,7 +917,7 @@ contains
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
 
-                        cycle ! skip all the non-relativistic conversions below
+                        cycle  ! skip all the non-relativistic conversions below
                     end if
 
                     ! Transferring the continuity equation(s) variable(s)
@@ -1105,7 +1105,7 @@ contains
         real(wp), dimension(2) :: Re_K
         real(wp)               :: G_K
         real(wp)               :: T_K, mix_mol_weight, R_gas
-        integer                :: i, j, k, l !< Generic loop iterators
+        integer                :: i, j, k, l  !< Generic loop iterators
 
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
@@ -1145,7 +1145,7 @@ contains
                     pres_K = qK_prim_vf(j, k, l, E_idx)
                     if (elasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                                                                        & Re_K, G_K, Gs_vc)
+                            & Re_K, G_K, Gs_vc)
                     else
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
                     end if
@@ -1309,20 +1309,20 @@ contains
         real(wp)              :: blkmod1, blkmod2
         integer               :: q
 
-        if (chemistry) then ! Reacting mixture sound speed
+        if (chemistry) then  ! Reacting mixture sound speed
             if (avg_state == 1 .and. abs(c_c) > verysmall) then
                 c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
             end if
-        else if (relativity) then ! Relativistic sound speed
+        else if (relativity) then  ! Relativistic sound speed
             c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
         else
-            if (alt_soundspeed) then ! Wood's mixture sound speed via bulk moduli
+            if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
                 blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-            else if (model_eqns == 3) then ! Six-equation model sound speed
+            else if (model_eqns == 3) then  ! Six-equation model sound speed
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
@@ -1358,7 +1358,7 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', parallelism='[seq]', cray_noinline=True)
 
         real(wp), intent(in)  :: B(3), rho, c
-        real(wp), intent(in)  :: h ! only used for relativity
+        real(wp), intent(in)  :: h  ! only used for relativity
         real(wp), intent(out) :: c_fast
         integer, intent(in)   :: norm
         real(wp)              :: B2, term, disc

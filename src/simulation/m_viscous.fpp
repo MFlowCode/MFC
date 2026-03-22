@@ -29,7 +29,7 @@ contains
     !> @brief Allocates and populates the viscous Reynolds number arrays and transfers data to the GPU.
     impure subroutine s_initialize_viscous_module
 
-        integer :: i, j !< generic loop iterators
+        integer :: i, j  !< generic loop iterators
 
         @:ALLOCATE(Res_viscous(1:2, 1:Re_size_max))
 
@@ -54,7 +54,7 @@ contains
         type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
         type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum !< Mixture variables
+        real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(wp), dimension(2) :: Re_visc
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -65,7 +65,7 @@ contains
             real(wp), dimension(num_dims, num_dims) :: tau_Re
         #:endif
 
-        integer :: i, j, k, l, q !< Generic loop iterator
+        integer :: i, j, k, l, q  !< Generic loop iterator
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
@@ -85,7 +85,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            if (shear_stress) then ! Shear stresses
+            if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
                                     & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
@@ -187,7 +187,7 @@ contains
         #:endif
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            if (bulk_stress) then ! Bulk stresses
+            if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
                                     & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
@@ -284,7 +284,7 @@ contains
 
         if (p == 0) return
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            if (shear_stress) then ! Shear stresses
+            if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
                                     & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
@@ -383,7 +383,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (bulk_stress) then ! Bulk stresses
+            if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
                                     & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
@@ -524,8 +524,8 @@ contains
             $:GPU_UPDATE(device='[iv]')
 
             call s_reconstruct_cell_boundary_values_visc(q_prim_qp%vf(iv%beg:iv%end), qL_prim_rsx_vf, qL_prim_rsy_vf, &
-                                                         & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, i, &
-                                                         & qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), ix, iy, iz)
+                & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, i, qL_prim(i)%vf(iv%beg:iv%end), &
+                & qR_prim(i)%vf(iv%beg:iv%end), ix, iy, iz)
         end do
 
         if (weno_Re_flux) then
@@ -545,7 +545,7 @@ contains
                                                            & buff_size)
                 end if
             end do
-        else ! Compute velocity gradients at cell centers using central finite differences
+        else  ! Compute velocity gradients at cell centers using central finite differences
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
             $:GPU_UPDATE(device='[iv]')
 
@@ -881,7 +881,7 @@ contains
              & vR_y, vR_z
         integer, intent(in)               :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        integer                           :: recon_dir !< Coordinate direction of the WENO reconstruction
+        integer                           :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer                           :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
@@ -978,7 +978,7 @@ contains
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
         type(int_bounds_info), intent(in)                           :: ix, iy, iz
         integer, intent(in)                                         :: norm_dir
-        integer                                                     :: recon_dir !< Coordinate direction of the WENO reconstruction
+        integer                                                     :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer                                                     :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
@@ -1087,7 +1087,7 @@ contains
         type(int_bounds_info), intent(in)                                 :: ix, iy, iz, iv_in
         integer, intent(in)                                               :: dim, buff_size_in
         real(wp), dimension(-buff_size_in:dim + buff_size_in), intent(in) :: dL
-        integer                                                           :: i, j, k, l !< Generic loop iterators
+        integer                                                           :: i, j, k, l  !< Generic loop iterators
 
         is1_viscous = ix
         is2_viscous = iy
@@ -1176,7 +1176,7 @@ contains
         type(scalar_field), intent(inout) :: grad_y
         type(scalar_field), intent(inout) :: grad_z
         type(int_bounds_info)             :: ix, iy, iz
-        integer                           :: j, k, l !< Generic loop iterators
+        integer                           :: j, k, l  !< Generic loop iterators
 
         ix%beg = 1 - buff_size; ix%end = m + buff_size - 1
         if (n > 0) then
@@ -1343,7 +1343,7 @@ contains
         real(wp), dimension(1:3, 1:3)                         :: velocity_gradient_tensor
         real(wp), dimension(1:3)                              :: dx
         real(wp)                                              :: divergence
-        integer                                               :: l, q ! iterators
+        integer                                               :: l, q  ! iterators
 
         ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
         viscous_stress_tensor = 0._wp

@@ -104,7 +104,7 @@ contains
         @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
 
-        if (igr_iter_solver == 1) then ! Jacobi iteration
+        if (igr_iter_solver == 1) then  ! Jacobi iteration
             @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
 #else
@@ -129,7 +129,7 @@ contains
             jac_rhs(-1:m, -1:n, -1:p) => jac_rhs_host(:,:,:)
         end if
 
-        if (igr_iter_solver == 1) then ! Jacobi iteration
+        if (igr_iter_solver == 1) then  ! Jacobi iteration
             if (nv_uvm_temp_on_gpu(3) == 1) then
                 @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                 @:PREFER_GPU(jac_old)
@@ -162,7 +162,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                vidxb = -1; vidxe = 2;
+                vidxb = -1; vidxe = 2
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(0:2))
@@ -175,7 +175,7 @@ contains
                 coeff_R(0) = (5._wp/6._wp)
                 coeff_R(-1) = (-1._wp/6._wp)
             else if (igr_order == 5) then
-                vidxb = -2; vidxe = 3;
+                vidxb = -2; vidxe = 3
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(-1:3))
@@ -259,7 +259,7 @@ contains
                             fd_coeff = fd_coeff + alf_igr*(1._wp/dz(l)**2._wp)*(1._wp/rho_lz + 1._wp/rho_rz)
                         end if
 
-                        if (igr_iter_solver == 1) then ! Jacobi iteration
+                        if (igr_iter_solver == 1) then  ! Jacobi iteration
                             if (num_dims == 3) then
                                 jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/dx(j)**2._wp)*(jac_old(j - 1, k, &
                                     & l)/rho_lx + jac_old(j + 1, k, l)/rho_rx) + (1._wp/dy(k)**2._wp)*(jac_old(j, k - 1, &
@@ -273,7 +273,7 @@ contains
                                     & kind=wp)/rho_ly + real(jac_old(j, k + 1, l), kind=wp)/rho_ry)) + real(jac_rhs(j, k, l), &
                                     & kind=wp)/fd_coeff, kind=stp)
                             end if
-                        else ! Gauss Seidel iteration
+                        else  ! Gauss Seidel iteration
                             if (num_dims == 3) then
                                 jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/dx(j)**2._wp)*(jac(j - 1, k, &
                                     & l)/rho_lx + jac(j + 1, k, l)/rho_rx) + (1._wp/dy(k)**2._wp)*(jac(j, k - 1, &
@@ -293,7 +293,7 @@ contains
 
             call s_populate_F_igr_buffers(bc_type, jac_sf)
 
-            if (igr_iter_solver == 1 .or. dummy) then ! Jacobi iteration
+            if (igr_iter_solver == 1 .or. dummy) then  ! Jacobi iteration
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -2716,7 +2716,7 @@ contains
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:DEALLOCATE(jac, jac_rhs)
 
-        if (igr_iter_solver == 1) then ! Jacobi iteration
+        if (igr_iter_solver == 1) then  ! Jacobi iteration
             @:DEALLOCATE(jac_old)
         end if
 #else
@@ -2734,7 +2734,7 @@ contains
             deallocate (jac_rhs_host)
         end if
 
-        if (igr_iter_solver == 1) then ! Jacobi iteration
+        if (igr_iter_solver == 1) then  ! Jacobi iteration
             if (nv_uvm_temp_on_gpu(3) == 1) then
                 @:DEALLOCATE(jac_old)
             else

@@ -77,7 +77,7 @@ contains
     impure subroutine s_read_input_file
 
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
-        logical                            :: file_exist !< Logical used to check the existence of the input file
+        logical                            :: file_exist  !< Logical used to check the existence of the input file
         integer                            :: iostatus
         !! Integer to check iostat of file read
 
@@ -175,8 +175,8 @@ contains
     impure subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        character(LEN=path_len + 2*name_len) :: t_step_dir !< Relative path to the starting time-step directory
-        character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the grid and conservative variables data files
+        character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the starting time-step directory
+        character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
         logical :: file_exist
         integer :: i, r
 
@@ -320,7 +320,7 @@ contains
         ! Downsampled data variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer :: m_glb_read, n_glb_read, p_glb_read ! data size of read
+        integer :: m_glb_read, n_glb_read, p_glb_read  ! data size of read
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -443,7 +443,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size ! adv_idx%end
+                    do i = 1, sys_size  ! adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -507,7 +507,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size ! adv_idx%end
+                    do i = 1, sys_size  ! adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
@@ -647,11 +647,14 @@ contains
 
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time
+                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
+                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, "")', int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time
+                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, "")', &
+                    & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time
             end if
         end if
 
@@ -809,7 +812,7 @@ contains
             $:GPU_UPDATE(host='[q_beta(1)%sf]')
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(1))
             $:GPU_UPDATE(host='[Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel]')
-            call s_write_restart_lag_bubbles(save_count) ! parallel
+            call s_write_restart_lag_bubbles(save_count)  ! parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)

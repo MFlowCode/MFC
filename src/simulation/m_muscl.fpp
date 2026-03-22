@@ -44,7 +44,7 @@ contains
         if (n == 0) then
             is2_muscl%beg = 0
         else
-            is2_muscl%beg = -buff_size;
+            is2_muscl%beg = -buff_size
         end if
 
         is2_muscl%end = n - is2_muscl%beg
@@ -168,27 +168,27 @@ contains
                                     slopeR = v_rs_ws_${XYZ}$_muscl(j, k, l, i) - v_rs_ws_${XYZ}$_muscl(j - 1, k, l, i)
                                     slope = 0._wp
 
-                                    if (muscl_lim == 1) then ! minmod
+                                    if (muscl_lim == 1) then  ! minmod
                                         if (slopeL*slopeR > 1e-9_wp) then
                                             slope = min(abs(slopeL), abs(slopeR))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
-                                    else if (muscl_lim == 2) then ! MC
+                                    else if (muscl_lim == 2) then  ! MC
                                         if (slopeL*slopeR > 1e-9_wp) then
                                             slope = min(2._wp*abs(slopeL), 2._wp*abs(slopeR))
                                             slope = min(slope, 5e-1_wp*(abs(slopeL) + abs(slopeR)))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
-                                    else if (muscl_lim == 3) then ! Van Albada
+                                    else if (muscl_lim == 3) then  ! Van Albada
                                         if (abs(slopeL) > 1e-6_wp .and. abs(slopeR) > 1e-6_wp .and. abs(slopeL + slopeR) &
                                             & > 1e-6_wp .and. slopeL*slopeR > 1e-6_wp) then
                                             slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2._wp + slopeR**2._wp)
                                         end if
-                                    else if (muscl_lim == 4) then ! Van Leer
+                                    else if (muscl_lim == 4) then  ! Van Leer
                                         if (abs(slopeL + slopeR) > 1.e-6_wp .and. slopeL*slopeR > 1.e-6_wp) then
                                             slope = 2._wp*slopeL*slopeR/(slopeL + slopeR)
                                         end if
-                                    else if (muscl_lim == 5) then ! SUPERBEE
+                                    else if (muscl_lim == 5) then  ! SUPERBEE
                                         if (slopeL*slopeR > 1e-6_wp) then
                                             slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
                                                                & 2._wp*abs(slopeR)))
@@ -240,7 +240,7 @@ contains
 
                             moncon = (aCR - aC)*(aC - aCL)
 
-                            if (aC >= ic_eps .and. aC <= 1._wp - ic_eps .and. moncon > moncon_cutoff) then ! Interface cell
+                            if (aC >= ic_eps .and. aC <= 1._wp - ic_eps .and. moncon > moncon_cutoff) then  ! Interface cell
 
                                 if (aCR - aCL > 0._wp) then
                                     sign = 1._wp
@@ -291,7 +291,7 @@ contains
 
         type(scalar_field), dimension(:), intent(in) :: v_vf
         integer, intent(in)                          :: muscl_dir
-        integer                                      :: j, k, l, q !< Generic loop iterators
+        integer                                      :: j, k, l, q  !< Generic loop iterators
         ! Determine MUSCL-reconstructed variables and map coordinate directions
 
         v_size = ubound(v_vf, 1)

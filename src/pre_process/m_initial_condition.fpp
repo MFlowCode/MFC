@@ -19,10 +19,10 @@ module m_initial_condition
     implicit none
 
     ! NOTE: Abstract interface enables dynamic dispatch without repeated model_eqns checks
-    type(scalar_field), allocatable, dimension(:)    :: q_prim_vf !< primitive variables
-    type(scalar_field), allocatable, dimension(:)    :: q_cons_vf !< conservative variables
-    type(scalar_field)                               :: q_T_sf    !< Temperature field
-    type(integer_field), dimension(:,:), allocatable :: bc_type   !< bc_type fields
+    type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< primitive variables
+    type(scalar_field), allocatable, dimension(:)    :: q_cons_vf  !< conservative variables
+    type(scalar_field)                               :: q_T_sf     !< Temperature field
+    type(integer_field), dimension(:,:), allocatable :: bc_type    !< bc_type fields
     !> @cond
 #ifdef MFC_MIXED_PRECISION
     integer(kind=1), allocatable, dimension(:,:,:) :: patch_id_fp
@@ -60,8 +60,8 @@ contains
         end if
 
         do i = 1, sys_size
-            q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
-            q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)
+            q_cons_vf(i)%sf = -1.e-6_stp  ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
+            q_prim_vf(i)%sf = -1.e-6_stp  ! real(dflt_real, kind=stp)
         end do
 
         allocate (bc_type(1:num_dims, 1:2))
