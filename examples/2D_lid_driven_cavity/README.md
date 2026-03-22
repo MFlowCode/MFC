@@ -6,8 +6,6 @@ Reference:
 > Ghia, U., & Ghia, K. N., & Shin, C. T. (1982). High-re solutions for incompressible flow
 using the Navier-Stokes equations and a multigrid method. Journal of Computational Physics, 48, 387-411
 
-Video: https://youtube.com/shorts/JEP28scZrBM?feature=share
-
 ## Final Condition
 
 <img src="final_condition.png" height="MAX_HEIGHT"/>

@@ -1,0 +1,5 @@
+# Generated data files - recreate with: python -m mfc.params_tests.runner build
+data/
+
+# Python cache
+__pycache__/

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 lam = 0.2
 h = 1.2
@@ -8,11 +8,11 @@ k = 2 * math.pi / lam
 amp = 0.05 / k
 
 # Numerical setup
-x0 = 0
+x0 = 0.0
 x1 = lam / 2
 y0 = 0.0
 y1 = h
-z0 = 0
+z0 = 0.0
 z1 = lam / 2
 
 Nx = 99
@@ -92,7 +92,7 @@ data = {
     "p_y": 0.0,
     "g_y": -98.1,
     # Water Patch
-    "patch_icpp(1)%geometry": 13,
+    "patch_icpp(1)%geometry": 9,
     "patch_icpp(1)%hcid": 300,
     "patch_icpp(1)%x_centroid": 0,
     "patch_icpp(1)%y_centroid": h / 2,

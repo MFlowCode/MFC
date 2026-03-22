@@ -1,6 +1,10 @@
 name: Lint Toolchain
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   lint-toolchain:
@@ -10,8 +14,44 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: MFC Python setup
+    - name: Initialize MFC
       run: ./mfc.sh init
 
-    - name: Lint the toolchain
-      run: ./mfc.sh lint
+    - name: Precheck (format, spelling, lint, source lint, docs)
+      run: ./mfc.sh precheck -j $(nproc)
+
+    - name: Generate toolchain files
+      run: ./mfc.sh generate
+
+    - name: CLI smoke tests
+      run: |
+        ./mfc.sh --help
+        ./mfc.sh build --help
+        ./mfc.sh run --help
+        ./mfc.sh test --help
+        ./mfc.sh params --count
+        ./mfc.sh new --list
+
+    - name: Bash completion syntax check
+      run: bash -n toolchain/completions/mfc.bash
+
+    - name: Validate example cases
+      run: |
+        failed=0
+        passed=0
+        for case in examples/*/case.py; do
+          [ -f "$case" ] || continue
+          output=$(./mfc.sh validate "$case" 2>&1)
+          if [ $? -eq 0 ]; then
+            passed=$((passed + 1))
+          else
+            echo "FAIL: $case"
+            echo "$output"
+            failed=$((failed + 1))
+          fi
+        done
+        echo ""
+        echo "Results: $passed passed, $failed failed"
+        if [ "$failed" -ne 0 ]; then
+          exit 1
+        fi

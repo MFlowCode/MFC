@@ -1,23 +1,27 @@
-import os, glob, typing, typing
+import glob
+import os
+import typing
+
 import rich.table
 
-from .state   import ARG
-from .common  import MFC_ROOT_DIR, format_list_to_string, MFCException
+from .common import MFC_ROOT_DIR, MFCException, format_list_to_string
 from .printer import cons
+from .state import ARG
+
 
 def handle_dir(mfc_dir: str, srcdirname: str) -> typing.Tuple[typing.Dict[str, int], int]:
     files = {}
     total = 0
 
-    for filepath in glob.glob(os.path.join(mfc_dir, 'src', srcdirname, '*.*f*')):
+    for filepath in glob.glob(os.path.join(mfc_dir, "src", srcdirname, "*.*f*")):
         with open(filepath) as f:
             counter = 0
-            for l in f.read().split('\n'):
+            for line in f.read().split("\n"):
                 # Skip whitespace
-                if l.isspace() or len(l) == 0:
+                if line.isspace() or len(line) == 0:
                     continue
                 # Skip comments but not !$acc ones!
-                if l.lstrip().startswith("!") and not l.lstrip().startswith("!$acc"):
+                if line.lstrip().startswith("!") and not line.lstrip().startswith("!$acc"):
                     continue
                 counter += 1
 
@@ -26,14 +30,15 @@ def handle_dir(mfc_dir: str, srcdirname: str) -> typing.Tuple[typing.Dict[str, i
 
     return (files, total)
 
+
 def count():
-    target_str_list = format_list_to_string(ARG('targets'), 'magenta')
+    target_str_list = format_list_to_string(ARG("targets"), "magenta")
 
     cons.print(f"[bold]Counting lines of code in {target_str_list}[/bold] (excluding whitespace lines)")
     cons.indent()
 
     total = 0
-    for codedir in ['common'] + ARG("targets"):
+    for codedir in ["common"] + ARG("targets"):
         dirfiles, dircount = handle_dir(MFC_ROOT_DIR, codedir)
         table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
         table.add_column(f"File (in [magenta]{codedir}[/magenta])", justify="left")
@@ -50,21 +55,21 @@ def count():
     cons.print()
     cons.unindent()
 
-# pylint: disable=too-many-locals
+
 def count_diff():
-    target_str_list = format_list_to_string(ARG('targets'), 'magenta')
+    target_str_list = format_list_to_string(ARG("targets"), "magenta")
     cons.print(f"[bold]Counting lines of code in {target_str_list}[/bold] (excluding whitespace lines)")
     cons.indent()
 
     total = 0
-    MFC_COMPARE_DIR=os.getenv('MFC_PR')
+    MFC_COMPARE_DIR = os.getenv("MFC_PR")
     if MFC_COMPARE_DIR is None:
         raise MFCException("MFC_PR is not in your environment.")
 
-    print('compare dir', MFC_COMPARE_DIR)
+    print("compare dir", MFC_COMPARE_DIR)
 
     # MFC_COMPARE_DIR="/Users/spencer/Downloads/MFC-shbfork"
-    for codedir in ['common'] + ARG("targets"):
+    for codedir in ["common"] + ARG("targets"):
         dirfiles_root, dircount_root = handle_dir(MFC_ROOT_DIR, codedir)
         dirfiles_pr, dircount_pr = handle_dir(MFC_COMPARE_DIR, codedir)
         table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
@@ -78,17 +83,19 @@ def count_diff():
             dirfiles_root[filepath] = dirfiles_root.get(filepath, 0)
             dirfiles_pr[filepath] = dirfiles_pr.get(filepath, 0)
 
-            PLUS  = "++ "
+            PLUS = "++ "
             MINUS = "-- "
 
             diff_count = dirfiles_pr[filepath] - dirfiles_root[filepath]
             mycolor = "red" if diff_count > 0 else "green"
             mysymbol = PLUS if diff_count > 0 else MINUS
-            table.add_row(os.path.basename(filepath),
-                          f"[bold cyan]{dirfiles_root[filepath]}[/bold cyan]",
-                          f"[bold cyan]{dirfiles_pr[filepath]}[/bold cyan]",
-                          mysymbol,
-                          f"[bold {mycolor}]{diff_count}[/bold {mycolor}]")
+            table.add_row(
+                os.path.basename(filepath),
+                f"[bold cyan]{dirfiles_root[filepath]}[/bold cyan]",
+                f"[bold cyan]{dirfiles_pr[filepath]}[/bold cyan]",
+                mysymbol,
+                f"[bold {mycolor}]{diff_count}[/bold {mycolor}]",
+            )
 
         total += dircount_root
 

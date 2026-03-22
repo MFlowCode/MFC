@@ -14,7 +14,7 @@
 % if account:
 #SBATCH --account="${account}"
 % endif
-% if gpu:
+% if gpu_enabled:
 #SBATCH --gpus-per-node=${tasks_per_node}
 #SBATCH --mem=208G
 #SBATCH --gpu-bind=closest
@@ -32,12 +32,13 @@ ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
-. ./mfc.sh load -c d -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c d -m ${'g' if gpu_enabled else 'c'}
 cd - > /dev/null
 echo
 
-# Fixes Delta not being able to find core library file
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/nvhpc-24.1/openmpi-4.1.5-zkiklxi/lib/
+% if gpu_enabled:
+    export MPICH_GPU_SUPPORT_ENABLED=0 # Disable GPU-Direct MPI
+% endif
 
 % for target in targets:
     ${helpers.run_prologue(target)}

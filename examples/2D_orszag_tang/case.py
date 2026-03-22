@@ -9,9 +9,9 @@ print(
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
-            "x_domain%beg": 0,
+            "x_domain%beg": 0.0,
             "x_domain%end": 1.0,
-            "y_domain%beg": 0,
+            "y_domain%beg": 0.0,
             "y_domain%end": 1.0,
             "m": 512,
             "n": 512,
@@ -54,7 +54,7 @@ print(
             #     v = (-sin(2*pi*y), sin(2*pi*x), 0)
             #     B = (-sin(2*pi*y)/sqrt(4*pi), sin(4*pi*x)/sqrt(4*pi), 0)
             "patch_icpp(1)%hcid": 250,
-            "patch_icpp(1)%geometry": 7,
+            "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
             "patch_icpp(1)%y_centroid": 0.5,
             "patch_icpp(1)%length_x": 1.0,

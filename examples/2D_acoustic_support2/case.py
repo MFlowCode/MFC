@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import json, math
+import json
+import math
 
 # Configuring case dictionary
 print(
@@ -8,9 +9,9 @@ print(
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
-            "x_domain%beg": 0,
+            "x_domain%beg": 0.0,
             "x_domain%end": 0.001,
-            "y_domain%beg": 0,
+            "y_domain%beg": 0.0,
             "y_domain%end": 0.001,
             "m": 99,
             "n": 99,

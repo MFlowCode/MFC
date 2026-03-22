@@ -1,5 +1,5 @@
-import math
 import json
+import math
 
 # Parameters
 epsilon = "5d0"
@@ -20,14 +20,14 @@ alpha_rho1 = (
     f"{alpha_rho1_i}*(1d0 - ({alpha_rho1_i}/{pres_i})*({epsilon}/(2d0*pi))*"
     + f"({epsilon}/(8d0*{alpha}*({gamma} + 1d0)*pi))*"
     + f"exp(2d0*{alpha}*(1d0 - (x - xc)**2d0"
-    + f"- (y - yc)**2d0))"
+    + "- (y - yc)**2d0))"
     + f")**{gamma}"
 )
 pres = (
     f"{pres_i}*(1d0 - ({alpha_rho1_i}/{pres_i})*({epsilon}/(2d0*pi))*"
     + f"({epsilon}/(8d0*{alpha}*({gamma} + 1d0)*pi))*"
     + f"exp(2d0*{alpha}*(1d0 - (x - xc)**2d0"
-    + f"- (y - yc)**2d0))"
+    + "- (y - yc)**2d0))"
     + f")**({gamma} + 1d0)"
 )
 
@@ -101,10 +101,11 @@ print(
             "patch_icpp(1)%y_centroid": 0,
             "patch_icpp(1)%length_x": 10.0,
             "patch_icpp(1)%length_y": 10.0,
-            "patch_icpp(1)%vel(1)": vel1,
-            "patch_icpp(1)%vel(2)": vel2,
-            "patch_icpp(1)%pres": pres,
-            "patch_icpp(1)%alpha_rho(1)": alpha_rho1,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%pres": 0.0,
+            "patch_icpp(1)%alpha_rho(1)": 0.0,
+            "patch_icpp(1)%hcid": 280,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),

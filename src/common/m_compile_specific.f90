@@ -1,8 +1,8 @@
 !>
-!! @file m_compile_specific.f90
+!! @file
 !! @brief Contains module m_compile_specific
 
-!> @brief This module contains subroutines that are compiler specific
+!> @brief Platform-specific file and directory operations: create, delete, inquire, getcwd, and basename
 module m_compile_specific
 
     ! Dependencies
@@ -14,7 +14,7 @@ contains
 
     !>  Creates a directory and all its parents if it does not exist
         !!  @param dir_name Directory path
-    subroutine s_create_directory(dir_name)
+    impure subroutine s_create_directory(dir_name)
         character(LEN=*), intent(in) :: dir_name
 
 #ifdef _WIN32
@@ -25,7 +25,8 @@ contains
 
     end subroutine s_create_directory
 
-    subroutine s_delete_file(filepath)
+    !> @brief Deletes a file at the given path using a platform-specific system command.
+    impure subroutine s_delete_file(filepath)
         character(LEN=*), intent(in) :: filepath
 
 #ifdef _WIN32
@@ -36,7 +37,8 @@ contains
 
     end subroutine s_delete_file
 
-    subroutine s_delete_directory(dir_name)
+    !> @brief Recursively deletes a directory using a platform-specific system command.
+    impure subroutine s_delete_directory(dir_name)
         character(LEN=*), intent(in) :: dir_name
 
 #ifdef _WIN32
@@ -50,7 +52,7 @@ contains
     !>  Inquires on the existence of a directory
         !!  @param fileloc File directory location
         !!  @param dircheck Switch that indicates if directory exists
-    subroutine my_inquire(fileloc, dircheck)
+    impure subroutine my_inquire(fileloc, dircheck)
         character(LEN=*), intent(in) :: fileloc
         logical, intent(inout) :: dircheck
 
@@ -62,13 +64,15 @@ contains
 
     end subroutine my_inquire
 
-    subroutine s_get_cwd(cwd)
+    !> @brief Retrieves the current working directory path via the GETCWD intrinsic.
+    impure subroutine s_get_cwd(cwd)
         character(LEN=*), intent(out) :: cwd
 
         call GETCWD(cwd)
     end subroutine s_get_cwd
 
-    subroutine s_get_basename(dirpath, basename)
+    !> @brief Extracts the base filename from a directory path using the system basename command.
+    impure subroutine s_get_basename(dirpath, basename)
         character(LEN=*), intent(in) :: dirpath
         character(LEN=*), intent(out) :: basename
 

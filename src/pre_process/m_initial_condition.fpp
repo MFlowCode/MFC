@@ -1,19 +1,8 @@
 !>
-!! @file m_initial_condition.f90
+!! @file
 !! @brief Contains module m_initial_condition
 
-!> @brief This module provides a platform that is analogous to constructive
-!!              solid geometry techniques and in this way allows for the creation
-!!              of a wide variety of initial conditions. Several 1D, 2D and 3D
-!!              fundamental geometries are included that may further be combined
-!!              into more complex shapes. This is achieved by carefully setting
-!!              up the order in which the patches are laid out in the domain and
-!!              specifying the priority that each patch has over the preceding
-!!              ones. The resulting shapes may be identified both by the values
-!!              of their primitive variables and the associated patch identities.
-!!              Note that the user may choose to read in and modify a preexisting
-!!              initial condition. The module m_start_up.f90 is responsible for
-!!             reading in the relevant data files.
+!> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
 
     use m_derived_types         ! Definitions of the derived types
@@ -27,7 +16,7 @@ module m_initial_condition
     use m_variables_conversion  ! Subroutines to change the state variables from
     ! one form to another
 
-    use m_patches
+    use m_icpp_patches
 
     use m_assign_variables
 
@@ -51,24 +40,21 @@ module m_initial_condition
 
     type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
 
-    integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
-    !! Bookkepping variable used to track the patch identities (id) associated
-    !! with each of the cells in the computational domain. Note that only one
-    !! patch identity may be associated with any one cell.
-
-    type(integer_field) :: ib_markers !<
-    !! Bookkepping variable used to track whether a given cell is within an
-    !! immersed boundary. The default is 0, otherwise the value is assigned
-    !! to the patch ID of the immersed boundary.
-
-    type(levelset_field) :: levelset
-    type(levelset_norm_field) :: levelset_norm
+!> @cond
+#ifdef MFC_MIXED_PRECISION
+    integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
+#else
+!> @endcond
+    integer, allocatable, dimension(:, :, :) :: patch_id_fp
+!> @cond
+#endif
+!> @endcond
 
 contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module
+    impure subroutine s_initialize_initial_condition_module
 
         integer :: i, j, k, l !< generic loop iterators
 
@@ -80,7 +66,9 @@ contains
             allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                       idwbuff(2)%beg:idwbuff(2)%end, &
                                       idwbuff(3)%beg:idwbuff(3)%end))
-            allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
+            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         if (chemistry) then
@@ -89,11 +77,6 @@ contains
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
-
-        allocate (ib_markers%sf(0:m, 0:n, 0:p))
-
-        allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-        allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -111,42 +94,42 @@ contains
         ! up. The conservative variables do not need to be similarly treated
         ! since they are computed directly from the primitive variables.
         do i = 1, sys_size
-            q_cons_vf(i)%sf = dflt_real
-            q_prim_vf(i)%sf = dflt_real
+            q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
+            q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)
         end do
 
         ! Allocating arrays to store the bc types
-        allocate (bc_type(1:num_dims, -1:1))
+        allocate (bc_type(1:num_dims, 1:2))
 
-        allocate (bc_type(1, -1)%sf(0:0, 0:n, 0:p))
         allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 2)%sf(0:0, 0:n, 0:p))
 
         do l = 0, p
             do k = 0, n
-                bc_type(1, -1)%sf(0, k, l) = bc_x%beg
-                bc_type(1, 1)%sf(0, k, l) = bc_x%end
+                bc_type(1, 1)%sf(0, k, l) = int(min(bc_x%beg, 0), kind=1)
+                bc_type(1, 2)%sf(0, k, l) = int(min(bc_x%end, 0), kind=1)
             end do
         end do
 
         if (n > 0) then
-            allocate (bc_type(2, -1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
             allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size, 0:0, 0:p))
 
             do l = 0, p
                 do j = -buff_size, m + buff_size
-                    bc_type(2, -1)%sf(j, 0, l) = bc_y%beg
-                    bc_type(2, 1)%sf(j, 0, l) = bc_y%end
+                    bc_type(2, 1)%sf(j, 0, l) = int(min(bc_y%beg, 0), kind=1)
+                    bc_type(2, 2)%sf(j, 0, l) = int(min(bc_y%end, 0), kind=1)
                 end do
             end do
 
             if (p > 0) then
-                allocate (bc_type(3, -1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
                 allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
 
                 do k = -buff_size, n + buff_size
                     do j = -buff_size, m + buff_size
-                        bc_type(3, -1)%sf(j, k, 0) = bc_z%beg
-                        bc_type(3, 1)%sf(j, k, 0) = bc_z%end
+                        bc_type(3, 1)%sf(j, k, 0) = int(min(bc_z%beg, 0), kind=1)
+                        bc_type(3, 2)%sf(j, k, 0) = int(min(bc_z%end, 0), kind=1)
                     end do
                 end do
             end if
@@ -158,12 +141,18 @@ contains
             q_prim_vf(damage_idx)%sf = 0._wp
         end if
 
+        ! Initial hyper_cleaning state is always zero
+        ! TODO more general
+        if (hyper_cleaning) then
+            q_cons_vf(psi_idx)%sf = 0._wp
+            q_prim_vf(psi_idx)%sf = 0._wp
+        end if
+
         ! Setting default values for patch identities bookkeeping variable.
         ! This is necessary to avoid any confusion in the assessment of the
         ! extent of application that the overwrite permissions give a patch
         ! when it is being applied in the domain.
         patch_id_fp = 0
-        ib_markers%sf = 0
 
     end subroutine s_initialize_initial_condition_module
 
@@ -173,12 +162,9 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition
+    impure subroutine s_generate_initial_condition
 
-        integer :: i  !< Generic loop operator
-
-        ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        integer :: i
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -189,18 +175,20 @@ contains
                                                                idwbuff)
         end if
 
-        call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
+        call s_apply_icpp_patches(patch_id_fp, q_prim_vf)
+
         if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
-        if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
+        if (mixlayer_perturb) call s_perturb_mixlayer(q_prim_vf)
+        if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
         if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
@@ -211,7 +199,7 @@ contains
     end subroutine s_generate_initial_condition
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module
+    impure subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 
@@ -230,7 +218,21 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
-        deallocate (ib_markers%sf)
+
+        deallocate (bc_type(1, 1)%sf)
+        deallocate (bc_type(1, 2)%sf)
+
+        if (n > 0) then
+            deallocate (bc_type(2, 1)%sf)
+            deallocate (bc_type(2, 2)%sf)
+        end if
+
+        if (p > 0) then
+            deallocate (bc_type(3, 1)%sf)
+            deallocate (bc_type(3, 2)%sf)
+        end if
+
+        deallocate (bc_type)
 
     end subroutine s_finalize_initial_condition_module
 

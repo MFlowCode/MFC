@@ -3,7 +3,9 @@
 # + https://doi.org/10.1016/j.ijhydene.2023.03.190:  Verification of numerical method
 # + https://doi.org/10.1016/j.compfluid.2013.10.014: 4.7. Multi-species reactive shock tube
 
-import json, argparse
+import argparse
+import json
+
 import cantera as ct
 
 parser = argparse.ArgumentParser(prog="1D_reactive_shocktube", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -50,7 +52,7 @@ case = {
     # Logistics
     "run_time_info": "T",
     # Computational Domain Parameters
-    "x_domain%beg": 0,
+    "x_domain%beg": 0.0,
     "x_domain%end": L,
     "m": Nx,
     "n": 0,
@@ -110,8 +112,8 @@ case = {
 if args.chemistry:
     for i in range(len(sol_L.Y)):
         case[f"chem_wrt_Y({i + 1})"] = "T"
-        case[f"patch_icpp(1)%Y({i+1})"] = sol_L.Y[i]
-        case[f"patch_icpp(2)%Y({i+1})"] = sol_R.Y[i]
+        case[f"patch_icpp(1)%Y({i + 1})"] = sol_L.Y[i]
+        case[f"patch_icpp(2)%Y({i + 1})"] = sol_R.Y[i]
 
 if __name__ == "__main__":
     print(json.dumps(case))

@@ -1,3 +1,5 @@
+@page testing Testing
+
 ## Testing
 
 To run MFC's test suite, run
@@ -16,6 +18,7 @@ A test is considered passing when our error tolerances are met in order to maint
 - `--percent` (`%`) to specify a percentage of the test suite to select at random and test
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
 - `--no-examples` skips the testing of cases in the examples folder
+- `--rdma-mpi` runs additional tests where RDMA MPI is enabled.
 
 To specify a computer, pass the `-c` flag to `./mfc.sh run` like so:
 ```shell
@@ -96,8 +99,11 @@ To test the post-processing code, append the `-a` or `--test-all` option:
 ./mfc.sh test -a -j 8
 ```
 
-This argument will re-run the test stack with `parallel_io='T'`, which generates silo_hdf5 files.
+This argument will re-run the test stack with ``parallel_io='T'``, which generates silo_hdf5 files.
 It will also turn most write parameters (`*_wrt`) on.
 Then, it searches through the silo files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
 Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data.
 
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

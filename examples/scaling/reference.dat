@@ -1,0 +1,36 @@
+
+Weak Scaling - Memory: ~64GB, RDMA: F
+ nodes  time_avg  efficiency
+    16  1.040951    1.000000
+   128  1.047134    0.994095
+  1024  1.063446    0.978847
+  8192  1.068788    0.973955
+
+Weak Scaling - Memory: ~64GB, RDMA: T
+ nodes  time_avg  efficiency
+    16  0.959884    1.000000
+   128  0.962885    0.996884
+  1024  0.965518    0.994165
+  8192  0.988542    0.971010
+
+Strong Scaling - Memory: ~4096GB, RDMA: T
+ nodes  time_avg   speedup  efficiency
+     8  0.955644  1.000000    1.000000
+    64  0.149160  6.406820    0.800852
+   512  0.040367 23.674092    0.369908
+  4096  0.021175 45.130767    0.088146
+
+Strong Scaling - Memory: ~4096GB, RDMA: F
+ nodes  time_avg   speedup  efficiency
+     8  1.034303  1.000000    1.000000
+    64  0.171773  6.021347    0.752668
+   512  0.046694 22.150719    0.346105
+  4096  0.026555 35.987347    0.070288
+
+Grind Time - Single Device
+ memory  grind_time
+      8    1.309068
+     16    1.258899
+     32    1.144731
+     64    1.144664
+

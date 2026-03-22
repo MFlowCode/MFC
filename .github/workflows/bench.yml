@@ -1,12 +1,23 @@
 name: 'Benchmark'
 
-on: pull_request
+on:
+  pull_request:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'pull_request_review' && format('-review-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
 
 jobs:
   file-changes:
     name: Detect File Changes
+    if: >
+      github.event_name != 'pull_request_review' ||
+      github.event.review.user.type != 'Bot'
     runs-on: 'ubuntu-latest'
-    outputs: 
+    outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
@@ -15,23 +26,70 @@ jobs:
       - name: Detect Changes
         uses: dorny/paths-filter@v3
         id: changes
-        with: 
+        with:
           filters: ".github/file-filter.yml"
 
   self:
-    name: Georgia Tech | Phoenix (NVHPC)
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    name: "${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
+    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && github.event.pull_request.draft != true && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba')) || github.event_name=='workflow_dispatch') }}
     needs: file-changes
     strategy:
+      fail-fast: false
       matrix:
-        device: ['cpu', 'gpu']
+        include:
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: cpu
+            interface: none
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            interface: acc
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            interface: omp
+            build_script: ""
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            interface: acc
+            build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            interface: omp
+            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
+          - cluster: frontier_amd
+            name: Oak Ridge | Frontier (AMD)
+            group: phoenix
+            labels: frontier
+            flag: famd
+            device: gpu
+            interface: omp
+            build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp bench"
+    continue-on-error: ${{ matrix.cluster == 'frontier' || matrix.cluster == 'frontier_amd' }}
     runs-on:
-      group:  phoenix
-      labels: gt
-    timeout-minutes: 1400
-    env:
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      group: ${{ matrix.group }}
+      labels: ${{ matrix.labels }}
+    timeout-minutes: 480
     steps:
       - name: Clone - PR
         uses: actions/checkout@v4
@@ -45,24 +103,77 @@ jobs:
           ref: master
           path: master
 
-      - name: Bench (Master v. PR)
+      - name: Setup & Build
+        if: matrix.build_script != ''
+        timeout-minutes: 150
         run: |
-          (cd pr     && bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
-          (cd master && bash .github/workflows/phoenix/submit-bench.sh .github/workflows/phoenix/bench.sh ${{ matrix.device }}) &
-          wait %1 && wait %2
+          (cd pr     && ${{ matrix.build_script }}) &
+          pid1=$!
+          (cd master && ${{ matrix.build_script }}) &
+          pid2=$!
+          e1=0; e2=0
+          wait $pid1 || e1=$?
+          wait $pid2 || e2=$?
+          if [ $e1 -ne 0 ] || [ $e2 -ne 0 ]; then
+            echo "Build failures: pr=$e1 master=$e2"
+            exit 1
+          fi
+
+      - name: Bench (Master v. PR)
+        run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Generate & Post Comment
+        if: always()
         run: |
-          (cd pr && . ./mfc.sh load -c p -m g)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
+          (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)
 
-      - name: Archive Logs
-        uses: actions/upload-artifact@v4
+      - name: Print Logs
         if:   always()
+        run: |
+          cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+
+      - name: Print Per-Case Logs
+        if: always()
+        run: |
+          passed=() failed=()
+          for out in pr/build/benchmarks/*/*.out master/build/benchmarks/*/*.out; do
+            [ -f "$out" ] || continue
+            [ -f "${out%.out}.yaml" ] && passed+=("$out") || failed+=("$out")
+          done
+
+          echo "=== Per-Case Summary: ${#failed[@]} failed, ${#passed[@]} passed ==="
+          for out in "${failed[@]}"; do echo "  [FAILED] $out"; done
+          for out in "${passed[@]}"; do echo "  [PASSED] $out"; done
+
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo ""
+            echo "=== Failed Case Logs ==="
+            for out in "${failed[@]}"; do
+              echo "--- $out ---"
+              cat "$out"
+              echo ""
+            done
+          fi
+
+      # All other runners (non-Phoenix) just run without special env
+      - name: Archive Logs (Frontier)
+        if: always() && matrix.cluster != 'phoenix'
+        uses: actions/upload-artifact@v4
         with:
-          name: logs-${{ matrix.device }}
+          name: ${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
           path: |
-            pr/bench-${{ matrix.device }}.*
+            pr/bench-${{ matrix.device }}-${{ matrix.interface }}.*
             pr/build/benchmarks/*
-            master/bench-${{ matrix.device }}.*
+            master/bench-${{ matrix.device }}-${{ matrix.interface }}.*
             master/build/benchmarks/*

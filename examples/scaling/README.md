@@ -1,11 +1,10 @@
-# Strong- & Weak-scaling
+# Scaling and Performance test
 
-The [**Scaling**](case.py) case can exercise both weak- and strong-scaling. It
+The scaling case can exercise both weak- and strong-scaling. It
 adjusts itself depending on the number of requested ranks.
 
-This directory also contains a collection of scripts used to test strong-scaling
-on OLCF Frontier. They required modifying MFC to collect some metrics but are
-meant to serve as a reference to users wishing to run similar experiments.
+This directory also contains a collection of scripts used to test strong and weak
+scaling on OLCF Frontier.
 
 ## Weak Scaling
 
@@ -27,7 +26,7 @@ For example, to run a weak-scaling test that uses ~4GB of GPU memory per rank
 on 8 2-rank nodes with case optimization, one could:
 
 ```shell
-./mfc.sh run examples/scaling/case.py -t pre_process simulation                    \
+./mfc.sh run examples/scaling/benchmark.py -t pre_process simulation                    \
              -e batch -p mypartition -N 8 -n 2 -w "01:00:00" -# "MFC Weak Scaling" \
              --case-optimization -j 32 -- --scaling weak --memory 4
 ```

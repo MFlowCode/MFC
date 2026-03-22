@@ -21,6 +21,7 @@ include(ExternalProject)
 option(MFC_FFTW    "Build the FFTW3 dependency" OFF)
 option(MFC_HDF5    "Build the HDF5  dependency" OFF)
 option(MFC_SILO    "Build the SILO  dependency" OFF)
+option(MFC_LAPACK  "Build the LAPACK  dependency" OFF)
 option(MFC_HIPFORT "Build the HIPFORT dependency" OFF)
 
 
@@ -81,7 +82,7 @@ if (MFC_SILO)
 
         ExternalProject_Add(silo
             GIT_REPOSITORY "https://github.com/LLNL/Silo"
-            GIT_TAG        9af504ef4fb79153e1fbf3bdb75421b6b65f6dc4
+            GIT_TAG        0cddaa6865fb49ae7b2110fa1b6f2709592abe0b
             GIT_PROGRESS   ON
             PATCH_COMMAND  "${GIT_EXECUTABLE}" stash
                         && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo.patch"
@@ -98,12 +99,38 @@ if (MFC_SILO)
     endif()
 endif()
 
+# LAPACK
+ if (MFC_LAPACK)
+     find_package(LAPACK QUIET)
+     if (LAPACK_FOUND)
+         message(STATUS "LAPACK found.")
+         add_custom_target(lapack)
+     else()
+         # Use reference LAPACK from netlib
+         find_package(Git REQUIRED)
+
+         ExternalProject_Add(lapack
+             GIT_REPOSITORY "https://github.com/Reference-LAPACK/lapack"
+             GIT_TAG        v3.12.0
+             GIT_SHALLOW    ON
+             GIT_PROGRESS   ON
+             CMAKE_ARGS     -DBUILD_SHARED_LIBS=OFF
+                            -DBUILD_TESTING=OFF
+                            -DCBLAS=OFF
+                            -DLAPACKE=OFF
+                            -DBUILD_DEPRECATED=OFF
+                            "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+                            "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+         )
+     endif()
+ endif()
+
 # HIPFORT
 if (MFC_HIPFORT)
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         ExternalProject_Add(hipfort
             GIT_REPOSITORY "https://github.com/ROCmSoftwarePlatform/hipfort"
-            GIT_TAG        rocm-6.0.2
+            GIT_TAG        rocm-6.3.1
             GIT_SHALLOW    ON
             GIT_PROGRESS   ON
             CMAKE_ARGS     "-DHIPFORT_COMPILER=${CMAKE_Fortran_COMPILER}"

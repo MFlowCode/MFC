@@ -1,8 +1,8 @@
 !>
-!! @file m_boundary_conditions.fpp
+!! @file
 !! @brief Contains module m_boundary_conditions
 
-!> @brief This module contains
+!> @brief Applies spatially varying boundary condition patches along domain edges and faces
 module m_boundary_conditions
 
     use m_derived_types
@@ -24,18 +24,16 @@ module m_boundary_conditions
     real(wp) :: radius
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
 
-    private; public :: s_apply_boundary_patches, &
- s_write_serial_boundary_condition_files, &
- s_write_parallel_boundary_condition_files
+    private; public :: s_apply_boundary_patches
 
 contains
-    subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
+    !> @brief Applies a line-segment boundary condition patch along a domain edge in 2D.
+    impure subroutine s_line_segment_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
         integer, intent(in) :: patch_id
 
-        integer :: i, j, k, l
+        integer :: j
 
         ! Patch is a vertical line at x_beg or x_end
         if (patch_bc(patch_id)%dir == 1) then
@@ -46,11 +44,11 @@ contains
             y_boundary%end = y_centroid + 0.5_wp*length_y
 
             ! Patch is a vertical line at x_beg and x_beg is a domain boundary
-            #:for BOUND, X, LOC in [('beg', '-i', -1), ('end', 'm+i', 1)]
+            #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do j = 0, n
                         if (y_cc(j) > y_boundary%beg .and. y_cc(j) < y_boundary%end) then
-                            bc_type(1, ${LOC}$)%sf(0, j, 0) = patch_bc(patch_id)%type
+                            bc_type(1, ${IDX}$)%sf(0, j, 0) = patch_bc(patch_id)%type
                         end if
                     end do
                 end if
@@ -66,11 +64,11 @@ contains
             x_boundary%end = x_centroid + 0.5_wp*length_x
 
             ! Patch is a vertical line at x_beg and x_beg is a domain boundary
-            #:for BOUND, Y, LOC in [('beg', '-i', -1), ('end', 'n+i', 1)]
+            #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do j = 0, m
                         if (x_cc(j) > x_boundary%beg .and. x_cc(j) < x_boundary%end) then
-                            bc_type(2, ${LOC}$)%sf(j, 0, 0) = patch_bc(patch_id)%type
+                            bc_type(2, ${IDX}$)%sf(j, 0, 0) = patch_bc(patch_id)%type
                         end if
                     end do
                 end if
@@ -79,26 +77,26 @@ contains
 
     end subroutine s_line_segment_bc
 
-    subroutine s_circle_bc(patch_id, q_prim_vf, bc_type)
+    !> @brief Applies a circular boundary condition patch on a domain face in 3D.
+    impure subroutine s_circle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
 
-        integer :: i, j, k, l
+        integer :: j, k
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
             radius = patch_bc(patch_id)%radius
             ! Patch is a circle at x_beg and x_beg is a domain boundary
-            #:for BOUND, X, LOC in [('beg', '-i', -1), ('end', 'm+i', 1)]
+            #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, n
                             if ((z_cc(k) - z_centroid)**2._wp + &
                                 (y_cc(j) - y_centroid)**2._wp <= radius**2._wp) then
-                                bc_type(1, -1)%sf(0, j, k) = patch_bc(patch_id)%type
+                                bc_type(1, ${IDX}$)%sf(0, j, k) = patch_bc(patch_id)%type
                             end if
                         end do
                     end do
@@ -110,13 +108,13 @@ contains
             z_centroid = patch_bc(patch_id)%centroid(3)
             radius = patch_bc(patch_id)%radius
             ! Patch is a circle at y_beg and y_beg is a domain boundary
-            #:for BOUND, Y, LOC in [('beg', '-i', -1), ('end', 'n+i', 1)]
+            #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, m
                             if ((z_cc(k) - z_centroid)**2._wp + &
                                 (x_cc(j) - x_centroid)**2._wp <= radius**2._wp) then
-                                bc_type(2, -1)%sf(j, 0, k) = patch_bc(patch_id)%type
+                                bc_type(2, ${IDX}$)%sf(j, 0, k) = patch_bc(patch_id)%type
                             end if
                         end do
                     end do
@@ -127,13 +125,13 @@ contains
             x_centroid = patch_bc(patch_id)%centroid(1)
             y_centroid = patch_bc(patch_id)%centroid(2)
             radius = patch_bc(patch_id)%radius
-            #:for BOUND, Z, LOC in [('beg', '-i', -1), ('end', 'p+i', 1)]
+            #:for BOUND, Z, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'p+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                     do k = 0, n
                         do j = 0, m
                             if ((y_cc(k) - y_centroid)**2._wp + &
                                 (x_cc(j) - x_centroid)**2._wp <= radius**2._wp) then
-                                bc_type(3, -1)%sf(j, k, 0) = patch_bc(patch_id)%type
+                                bc_type(3, ${IDX}$)%sf(j, k, 0) = patch_bc(patch_id)%type
                             end if
                         end do
                     end do
@@ -143,13 +141,13 @@ contains
 
     end subroutine s_circle_bc
 
-    subroutine s_rectangle_bc(patch_id, q_prim_vf, bc_type)
+    !> @brief Applies a rectangular boundary condition patch on a domain face in 3D.
+    impure subroutine s_rectangle_bc(patch_id, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
 
         integer, intent(in) :: patch_id
-        integer :: i, j, k, l
+        integer :: j, k
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -162,7 +160,7 @@ contains
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
             ! Patch is a circle at x_beg and x_beg is a domain boundary
-            #:for BOUND, X, LOC in [('beg', '-i', -1), ('end', 'm+i', 1)]
+            #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, n
@@ -170,7 +168,7 @@ contains
                                 y_boundary%end >= y_cc(j) .and. &
                                 z_boundary%beg <= z_cc(k) .and. &
                                 z_boundary%end >= z_cc(k)) then
-                                bc_type(1, -1)%sf(0, j, k) = patch_bc(patch_id)%type
+                                bc_type(1, ${IDX}$)%sf(0, j, k) = patch_bc(patch_id)%type
                             end if
                         end do
                     end do
@@ -189,7 +187,7 @@ contains
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
             ! Patch is a circle at y_beg and y_beg is a domain boundary
-            #:for BOUND, Y, LOC in [('beg', '-i', -1), ('end', 'n+i', 1)]
+            #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, m
@@ -197,7 +195,7 @@ contains
                                 x_boundary%end >= x_cc(j) .and. &
                                 z_boundary%beg <= z_cc(k) .and. &
                                 z_boundary%end >= z_cc(k)) then
-                                bc_type(2, -1)%sf(j, 0, k) = patch_bc(patch_id)%type
+                                bc_type(2, ${IDX}$)%sf(j, 0, k) = patch_bc(patch_id)%type
                             end if
                         end do
                     end do
@@ -215,7 +213,7 @@ contains
 
             y_boundary%beg = y_centroid - 0.5_wp*length_y
             y_boundary%end = y_centroid + 0.5_wp*length_y
-            #:for BOUND, Z, LOC in [('beg', '-i', -1), ('end', 'p+i', 1)]
+            #:for BOUND, Z, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'p+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                     do k = 0, n
                         do j = 0, m
@@ -223,7 +221,7 @@ contains
                                 x_boundary%end >= x_cc(j) .and. &
                                 y_boundary%beg <= y_cc(k) .and. &
                                 y_boundary%end >= y_cc(k)) then
-                                bc_type(3, -1)%sf(j, k, 0) = patch_bc(patch_id)%type
+                                bc_type(3, ${IDX}$)%sf(j, k, 0) = patch_bc(patch_id)%type
                             end if
                         end do
                     end do
@@ -233,10 +231,11 @@ contains
 
     end subroutine s_rectangle_bc
 
-    subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
+    !> @brief Iterates over all boundary condition patches and dispatches them by geometry type.
+    impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2) :: bc_type
         integer :: i
 
         !< Apply 2D patches to 3D domain
@@ -247,9 +246,9 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 2) then
-                    call s_circle_bc(i, q_prim_vf, bc_type)
+                    call s_circle_bc(i, bc_type)
                 elseif (patch_bc(i)%geometry == 3) then
-                    call s_rectangle_bc(i, q_prim_vf, bc_type)
+                    call s_rectangle_bc(i, bc_type)
                 end if
             end do
             !< Apply 1D patches to 2D domain
@@ -260,151 +259,11 @@ contains
                 end if
 
                 if (patch_bc(i)%geometry == 1) then
-                    call s_line_segment_bc(i, q_prim_vf, bc_type)
+                    call s_line_segment_bc(i, bc_type)
                 end if
             end do
         end if
 
     end subroutine s_apply_boundary_patches
-
-    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath)
-
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
-
-        character(LEN=*), intent(in) :: step_dirpath
-
-        integer :: dir, loc, i
-        character(len=path_len) :: file_path
-
-        character(len=10) :: status
-
-        if (old_grid) then
-            status = 'old'
-        else
-            status = 'new'
-        end if
-
-        call s_pack_boundary_condition_buffers(q_prim_vf)
-
-        file_path = trim(step_dirpath)//'/bc_type.dat'
-        open (1, FILE=trim(file_path), FORM='unformatted', STATUS=status)
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                write (1) bc_type(dir, loc)%sf
-            end do
-        end do
-        close (1)
-
-        file_path = trim(step_dirpath)//'/bc_buffers.dat'
-        open (1, FILE=trim(file_path), FORM='unformatted', STATUS=status)
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                write (1) bc_buffers(dir, loc)%sf
-            end do
-        end do
-        close (1)
-
-    end subroutine s_write_serial_boundary_condition_files
-
-    subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
-
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
-
-        integer :: dir, loc
-        character(len=path_len) :: file_loc, file_path
-
-        character(len=10) :: status
-
-#ifdef MFC_MPI
-        integer :: ierr
-        integer :: file_id
-        integer :: offset
-        character(len=7) :: proc_rank_str
-        logical :: dir_check
-
-        call s_pack_boundary_condition_buffers(q_prim_vf)
-
-        file_loc = trim(case_dir)//'/restart_data/boundary_conditions'
-        if (proc_rank == 0) then
-            call my_inquire(file_loc, dir_check)
-            if (dir_check .neqv. .true.) then
-                call s_create_directory(trim(file_loc))
-            end if
-        end if
-
-        call s_create_mpi_types(bc_type)
-
-        call s_mpi_barrier()
-
-        call DelayFileAccess(proc_rank)
-
-        write (proc_rank_str, '(I7.7)') proc_rank
-        file_path = trim(file_loc)//'/bc_'//trim(proc_rank_str)//'.dat'
-        call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL, file_id, ierr)
-
-        offset = 0
-
-        ! Write bc_types
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), MPI_INTEGER, MPI_BC_TYPE_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
-                call MPI_File_write_all(file_id, bc_type(dir, loc)%sf, 1, MPI_BC_TYPE_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
-                offset = offset + sizeof(bc_type(dir, loc)%sf)
-            end do
-        end do
-
-        ! Write bc_buffers
-        do dir = 1, num_dims
-            do loc = -1, 1, 2
-                call MPI_File_set_view(file_id, int(offset, KIND=MPI_ADDRESS_KIND), mpi_p, MPI_BC_BUFFER_TYPE(dir, loc), 'native', MPI_INFO_NULL, ierr)
-                call MPI_File_write_all(file_id, bc_buffers(dir, loc)%sf, 1, MPI_BC_BUFFER_TYPE(dir, loc), MPI_STATUS_IGNORE, ierr)
-                offset = offset + sizeof(bc_buffers(dir, loc)%sf)
-            end do
-        end do
-
-        call MPI_File_close(file_id, ierr)
-#endif
-
-    end subroutine s_write_parallel_boundary_condition_files
-
-    subroutine s_pack_boundary_condition_buffers(q_prim_vf)
-
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        integer :: i, j, k
-
-        do k = 0, p
-            do j = 0, n
-                do i = 1, sys_size
-                    bc_buffers(1, -1)%sf(i, j, k) = q_prim_vf(i)%sf(0, j, k)
-                    bc_buffers(1, 1)%sf(i, j, k) = q_prim_vf(i)%sf(m, j, k)
-                end do
-            end do
-        end do
-
-        if (n > 0) then
-            do k = 0, p
-                do j = 1, sys_size
-                    do i = 0, m
-                        bc_buffers(2, -1)%sf(i, j, k) = q_prim_vf(j)%sf(i, 0, k)
-                        bc_buffers(2, 1)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
-                    end do
-                end do
-            end do
-
-            if (p > 0) then
-                do k = 1, sys_size
-                    do j = 0, n
-                        do i = 0, m
-                            bc_buffers(3, -1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, 0)
-                            bc_buffers(3, 1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, p)
-                        end do
-                    end do
-                end do
-            end if
-        end if
-
-    end subroutine s_pack_boundary_condition_buffers
 
 end module m_boundary_conditions

@@ -1,4 +1,0 @@
-[check]
-ignore = ["E001","S001","S101","C121","S091","MOD011","C001","S101","S102","C002","PORT011","C072","C003","C131","C141","C092"]
-file-extensions = ["f90","fpp","fypp"]
-output-format = "pylint"

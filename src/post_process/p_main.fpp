@@ -1,5 +1,5 @@
 !>
-!! @file p_main.f90
+!! @file
 !! @brief Contains program p_main
 
 !> @brief The post-process restructures raw unformatted data, outputted by
@@ -26,6 +26,7 @@ program p_main
     real(wp) :: pres
     real(wp) :: c
     real(wp) :: H
+    real(wp) :: start, finish
 
     call s_initialize_mpi_domain()
 
@@ -49,9 +50,21 @@ program p_main
         ! available step. To avoid this, we force synchronization here.
         call s_mpi_barrier()
 
+        call cpu_time(start)
+
         call s_perform_time_step(t_step)
 
         call s_save_data(t_step, varname, pres, c, H)
+
+        call cpu_time(finish)
+
+        wall_time = abs(finish - start)
+
+        if (t_step >= 2) then
+            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        else
+            wall_time_avg = 0._wp
+        end if
 
         if (cfl_dt) then
             if (t_step == n_save - 1) then
@@ -79,6 +92,10 @@ program p_main
 
     end do
     ! END: Time-Marching Loop
+
+    if (proc_rank == 0 .and. ib_state_wrt) then
+        call s_write_ib_state_files()
+    end if
 
     close (11)
 

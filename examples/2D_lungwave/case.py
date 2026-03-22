@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 pi = 3.141592653589
 # material parameters
@@ -153,7 +153,7 @@ print(
             "patch_icpp(1)%alpha(1)": alphal_back,
             "patch_icpp(1)%alpha(2)": alphag_back,
             # Patch 2: Lung
-            "patch_icpp(2)%geometry": 7,
+            "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%hcid": 205,
             "patch_icpp(2)%alter_patch(1)": "T",
             "patch_icpp(2)%x_centroid": dlengx / 2.0,
