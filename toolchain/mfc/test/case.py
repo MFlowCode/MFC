@@ -305,10 +305,15 @@ class TestCase(case.Case):
         # Set up environment
         env = dict(os.environ)
         env.update(cfg.env)
+        # GPU-enabled build: --gpu acc/mp sets ARG("gpu") to "acc"/"mp".
+        # Specific GPU IDs (-g) are optional; the build flag is what matters
+        # for MPI GPU support and srun GPU binding.
+        gpu_build = bool(ARG("gpu"))
         if gpus:
             gpu_ids = ",".join(str(g) for g in gpus)
             env["CUDA_VISIBLE_DEVICES"] = gpu_ids
             env["HIP_VISIBLE_DEVICES"] = gpu_ids
+        if gpu_build:
             env["MPICH_GPU_SUPPORT_ENABLED"] = "1"
 
         # Resolve binary paths using the original (unmodified) params for slug
@@ -318,7 +323,7 @@ class TestCase(case.Case):
         all_output = []
         for target_obj in target_objs:
             bin_path = target_obj.get_install_binpath(slug_case)
-            cmd = _mpi_cmd(cfg, self.ppn, bin_path, gpu=bool(gpus))
+            cmd = _mpi_cmd(cfg, self.ppn, bin_path, gpu=gpu_build)
 
             try:
                 result = subprocess.run(
