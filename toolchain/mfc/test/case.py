@@ -320,7 +320,7 @@ class TestCase(case.Case):
         all_output = []
         for target_obj in target_objs:
             bin_path = target_obj.get_install_binpath(slug_case)
-            cmd = _mpi_cmd(cfg, self.ppn, bin_path, gpu=gpu_build and target_obj.name == "simulation")
+            cmd = _mpi_cmd(cfg, self.ppn, bin_path, gpu=gpu_build)
 
             try:
                 result = subprocess.run(
