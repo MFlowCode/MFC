@@ -3,9 +3,10 @@
 <%namespace name="helpers" file="helpers.mako"/>
 <%
 mpi_config = {
-    "binary": "srun",
-    "flags":  ["--unbuffered", "--cpus-per-task", "7"],
-    "env":    {},
+    "binary":    "srun",
+    "flags":     ["--unbuffered", "--cpus-per-task", "7"],
+    "env":       {"MPICH_GPU_SUPPORT_ENABLED": "1"},
+    "gpu_flags": ["--gpus-per-task", "1", "--gpu-bind", "closest"],
 }
 %>
 

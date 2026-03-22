@@ -58,7 +58,10 @@ export NSYS_FILE=myreport.qdrep
 mpi_config = {
     "binary": "srun",
     "flags":  ["--unbuffered", "--cpus-per-task", "72", "--cpu-bind=none"],
-    "env":    {"MPICH_GPU_SUPPORT_ENABLED": "1", "MPICH_NO_BUFFER_ALIAS_CHECK": "1"},
+    "env":       {"MPICH_GPU_SUPPORT_ENABLED": "1", "MPICH_NO_BUFFER_ALIAS_CHECK": "1",
+                  "FI_CXI_RX_MATCH_MODE": "software", "FI_MR_CACHE_MONITOR": "disabled",
+                  "NV_ACC_USE_MALLOC": "0", "NVCOMPILER_ACC_MEMHINTS": "DISABLE"},
+    "gpu_flags": ["--gpus-per-task", "1"],
 }
 %>
 
