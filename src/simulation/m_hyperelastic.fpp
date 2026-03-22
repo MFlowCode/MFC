@@ -111,7 +111,6 @@ contains
                                                                     & Gs_hyper)
                     rho = max(rho, sgm_eps)
                     G_local = max(G_local, sgm_eps)
-                    ! if ( G_local <= verysmall ) G_K = 0._wp
 
                     if (G_local > verysmall) then
                         $:GPU_LOOP(parallelism='[seq]')

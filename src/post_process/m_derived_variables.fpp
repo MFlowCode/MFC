@@ -197,8 +197,6 @@ contains
 
                     if (f_approx_equal(top, bottom)) then
                         slope = 1._wp
-                        ! ELSEIF((top == 0._wp .AND. bottom /= 0._wp) & .OR. & (bottom == 0._wp .AND. top /= 0._wp)) THEN slope =
-                        ! 0._wp
                     else
                         slope = (top*bottom)/(bottom**2._wp + 1.e-16_wp)
                     end if
@@ -235,10 +233,7 @@ contains
         real(wp), dimension(ndim, ndim), intent(inout) :: A
         real(wp), dimension(ndim), intent(inout)       :: b
         real(wp), dimension(ndim), intent(out)         :: sol
-
-        ! EXTERNAL DGESV
-
-        integer :: i, j, k
+        integer                                        :: i, j, k
 
         ! Forward elimination with partial pivoting
 

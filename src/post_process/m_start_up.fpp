@@ -1010,8 +1010,6 @@ contains
 
         s_read_data_files => null()
 
-        ! if (sim_data .and. proc_rank == 0) then call s_close_intf_data_file() call s_close_energy_data_file() end if
-
         if (fft_wrt) then
             if (c_associated(fwd_plan_x)) call fftw_destroy_plan(fwd_plan_x)
             if (c_associated(fwd_plan_y)) call fftw_destroy_plan(fwd_plan_y)

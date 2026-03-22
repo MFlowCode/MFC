@@ -94,12 +94,6 @@ contains
 
         res = all(f_is_default(var_array))
 
-        ! logical :: res_array(size(var_array)) integer :: i
-
-        ! do i = 1, size(var_array) res_array(i) = f_is_default(var_array(i)) end do
-
-        ! res = all(res_array)
-
     end function f_all_default
 
     !> Checks if a real(wp) variable is an integer.

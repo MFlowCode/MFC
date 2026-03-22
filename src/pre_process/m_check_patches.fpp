@@ -41,7 +41,6 @@ contains
 
         do i = 1, num_patches_max
             if (i <= num_patches) then
-                ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
                 @:PROHIBIT(patch_icpp(i)%geometry == 6, &
                            & "Invalid patch geometry number. " // "patch_icpp(" // trim(iStr) // ")%geometry is deprecated.")
@@ -517,8 +516,6 @@ contains
         end if
 
         if (chemistry) then
-            !@:ASSERT(all(patch_icpp(patch_id)%Y(1:num_species) >=       0._wp), "Patch " // trim(iStr) // ".")
-            !@:ASSERT(any(patch_icpp(patch_id)%Y(1:num_species) >  verysmall), "Patch " // trim(iStr) // ".")
         end if
 
     end subroutine s_check_active_patch_primitive_variables

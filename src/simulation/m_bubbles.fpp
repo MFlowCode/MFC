@@ -190,12 +190,6 @@ contains
         f_Hdot = (fCpbw/(1._wp + fBtait) + 1._wp)**(-1._wp/fntait)*(tmp1 + tmp2) - (fCpinf/(1._wp + fBtait) + 1._wp) &
                   & **(-1._wp/fntait)*fCpinf_dot
 
-        ! Hdot = (Cpbw/(1+B) + 1)^(-1/n_tait)*(-3 gam)*(R0/R)^(3gam) V/R f_Hdot =
-        ! ((fCpbw/(1._wp+fBtait)+1._wp)**(-1._wp/fntait))*(-3._wp)*gam * & ( (fR0/fR)**(3._wp*gam ))*(fV/fR)
-
-        ! Hdot = Hdot - (Cpinf/(1+B) + 1)^(-1/n_tait) Cpinfdot f_Hdot = f_Hdot -
-        ! ((fCpinf/(1._wp+fBtait)+1._wp)**(-1._wp/fntait))*fCpinf_dot
-
     end function f_Hdot
 
     !> Function that computes the bubble radial acceleration for Rayleigh-Plesset bubbles
@@ -209,9 +203,6 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fCp, fRho, fR, fV, fCpbw
         real(wp)             :: f_rddot_RP
-
-        !! rddot = (1/r) ( -3/2 rdot^2 + ((r0/r)^3\gamma - Cp)/rho ) rddot = (1/r) ( -3/2 rdot^2 + (tmp1 - Cp)/rho ) rddot = (1/r) (
-        !! tmp2 )
 
         f_rddot_RP = (-1.5_wp*(fV**2._wp) + (fCpbw - fCp)/fRho)/fR
 

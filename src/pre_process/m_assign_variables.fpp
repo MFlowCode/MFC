@@ -572,10 +572,6 @@ contains
 
         if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
-        ! if (j == 1) then print *, (q_prim_vf(bub_idx%rs(i))%sf(j, k, l), i = 1, nb) print *, (q_prim_vf(bub_idx%fullmom(i, 1,
-        ! 0))%sf(j, k, l), i = 1, nb) print *, (R0(i), i = 1, nb) print *, patch_icpp(patch_id)%r0 print *, (bub_idx%rs(i), i = 1,
-        ! nb) print *, (bub_idx%fullmom(i, 1, 0), i = 1, nb) end if
-
     end subroutine s_assign_patch_species_primitive_variables
 
     !> @brief Nullifies the patch primitive variable assignment procedure pointer.
