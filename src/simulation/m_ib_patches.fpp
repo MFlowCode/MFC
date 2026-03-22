@@ -589,7 +589,6 @@ contains
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
-                    ! do i = -gp_layers, m+gp_layers
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else

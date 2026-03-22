@@ -490,18 +490,6 @@ contains
                                 end do
                             end if
 
-                            ! elastic energy update if ( hyperelasticity ) then G_L = 0._wp G_R = 0._wp
-                            !
-                            ! $:GPU_LOOP(parallelism='[seq]') do i = 1, num_fluids G_L = G_L + alpha_L(i)*Gs_rs(i) G_R = G_R +
-                            ! alpha_R(i)*Gs_rs(i) end do ! Elastic contribution to energy if G large enough if ((G_L > 1.e-3_wp)
-                            ! .and. (G_R > 1.e-3_wp)) then E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1) E_R = E_R +
-                            ! G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1) $:GPU_LOOP(parallelism='[seq]') do i = 1, b_size-1
-                            ! tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j
-                            ! + 1, k, l, strxb - 1 + i) end do $:GPU_LOOP(parallelism='[seq]') do i = 1, b_size-1 tau_e_L(i) = 0._wp
-                            ! tau_e_R(i) = 0._wp end do $:GPU_LOOP(parallelism='[seq]') do i = 1, num_dims xi_field_L(i) =
-                            ! qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg -
-                            ! 1 + i) end do end if end if
-
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms, 0._wp, c_L, &

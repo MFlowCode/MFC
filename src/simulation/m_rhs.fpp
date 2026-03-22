@@ -760,9 +760,6 @@ contains
                     irx%beg = 0; iry%beg = 0; irz%beg = -1
                 end if
                 irx%end = m; iry%end = n; irz%end = p
-                ! $:GPU_UPDATE(host='[qL_rsx_vf,qR_rsx_vf]') print *, "L", qL_rsx_vf(100:300, 0, 0, 1) print *, "R",
-                ! qR_rsx_vf(100:300, 0, 0, 1)
-
                 ! Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
                 call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, &
@@ -770,9 +767,6 @@ contains
                                       & dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, &
                                       & q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, flux_gsrc_n(id)%vf, id, irx, iry, irz)
                 call nvtxEndRange
-
-                !$:GPU_UPDATE(host='[flux_n(1)%vf(1)%sf]')
-                ! print *, "FLUX", flux_n(1)%vf(1)%sf(100:300, 0, 0)
 
                 ! Additional physics and source terms RHS addition for advection source
                 call nvtxStartRange("RHS-ADVECTION-SRC")

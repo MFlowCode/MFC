@@ -36,7 +36,6 @@ contains
 
         do i = 1, num_patches_max
             if (i <= num_ibs) then
-                ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. patch_ib("//trim(iStr)//")%geometry must be set.")
 

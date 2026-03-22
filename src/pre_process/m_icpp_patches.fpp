@@ -1386,8 +1386,6 @@ contains
             write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
             write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
 
-            ! call s_model_write("__out__.stl", model) call s_model_write("__out__.obj", model)
-
             grid_mm(1,:) = (/minval(x_cc) - 0.e5_wp*dx, maxval(x_cc) + 0.e5_wp*dx/)
             grid_mm(2,:) = (/minval(y_cc) - 0.e5_wp*dy, maxval(y_cc) + 0.e5_wp*dy/)
 

@@ -905,8 +905,6 @@ contains
     !> @brief Computes pressure and viscous forces and torques on immersed bodies via a volume integration method.
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, & idwbuff(2)%beg:idwbuff(2)%end, & idwbuff(3)%beg:idwbuff(3)%end),
-        ! intent(in) :: pressure
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
         integer                                                        :: gp_id, i, j, k, l, q, ib_idx, fluid_idx

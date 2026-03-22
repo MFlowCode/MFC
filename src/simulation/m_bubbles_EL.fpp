@@ -1374,9 +1374,6 @@ contains
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (.not. file_exist) then
                 open (12, FILE=trim(file_loc), form='formatted', position='rewind')
-                ! write (12, *) 'currentTime, averageVoidFraction, ', & 'maximumVoidFraction, totalParticlesVolume' write (12, *)
-                ! 'The averageVoidFraction value does ', & 'not reflect the real void fraction in the cloud since the ', & 'cells
-                ! which do not have bubbles are not accounted'
             else
                 open (12, FILE=trim(file_loc), form='formatted', position='append')
             end if

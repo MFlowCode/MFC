@@ -558,7 +558,6 @@ contains
             do i = 1, nb
                 if (f_is_default(real(q_prim_vf(bub_idx%ps(i))%sf(j, k, l), kind=wp))) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
-                    ! print *, 'setting to pb0'
                 end if
                 if (f_is_default(real(q_prim_vf(bub_idx%ms(i))%sf(j, k, l), kind=wp))) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
