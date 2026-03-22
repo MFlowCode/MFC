@@ -118,6 +118,7 @@ contains
                                             & l, i)
                             end do
 
+                            ! Continuum surface force capillary stress, Schmidmayer et al. JCP (2017)
                             flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + sigma*c_divs(num_dims + 1)%sf(j, k, &
                                         & l)*vSrc_rsx_vf(j, k, l, 1)
                         end if
@@ -159,6 +160,7 @@ contains
                                                 & j, l, i)
                                 end do
 
+                                ! Continuum surface force capillary stress, Schmidmayer et al. JCP (2017)
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, &
                                             & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
                             end if
@@ -201,6 +203,7 @@ contains
                                                 & k, j, i)
                                 end do
 
+                                ! Continuum surface force capillary stress, Schmidmayer et al. JCP (2017)
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, &
                                             & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsz_vf(l, k, j, 3)
                             end if

@@ -217,7 +217,7 @@ contains
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
-        ! calculate the deviatoric of the tensor
+        ! Deviatoric left Cauchy-Green tensor: dev(b) = b - (tr(b)/3)*I
         #:for IJ in [1,3,6]
             btensor_in(${IJ}$)%sf(j, k, l) = btensor_in(${IJ}$)%sf(j, k, l) - f13*trace
         #:endfor
@@ -226,7 +226,7 @@ contains
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
-        ! compute the invariant without the elastic modulus
+        ! First invariant strain energy: W = G/2 * (I1 - 3), neo-Hookean model
         q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
@@ -253,7 +253,7 @@ contains
         ! TODO Make this 1D and 2D capable tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
-        ! calculate the deviatoric of the tensor
+        ! Deviatoric left Cauchy-Green tensor: dev(b) = b - (tr(b)/3)*I
         btensor_in(1)%sf(j, k, l) = btensor_in(1)%sf(j, k, l) - f13*trace
         btensor_in(3)%sf(j, k, l) = btensor_in(3)%sf(j, k, l) - f13*trace
         btensor_in(6)%sf(j, k, l) = btensor_in(6)%sf(j, k, l) - f13*trace
@@ -263,7 +263,7 @@ contains
         do i = 1, b_size - 1
             q_prim_vf(strxb + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
-        ! compute the invariant without the elastic modulus
+        ! First invariant strain energy: W = G/2 * (I1 - 3), neo-Hookean model
         q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_Mooney_Rivlin_cauchy_solver

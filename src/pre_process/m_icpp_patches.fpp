@@ -331,6 +331,7 @@ contains
         do j = 0, n
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
+                    ! Smooth Heaviside via hyperbolic tangent; smooth_coeff controls interface sharpness
                     eta = tanh(smooth_coeff/min(dx, &
                                & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                 end if

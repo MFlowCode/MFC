@@ -194,6 +194,7 @@ contains
                             G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs_hypo(i) ! alpha_K(1) * Gs_hypo(1)
                         end do
 
+                        ! Continuum damage: (1-D) scales effective stiffness, D in [0,1]
                         if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
 
                         rho_K_field(k, l, q) = rho_K

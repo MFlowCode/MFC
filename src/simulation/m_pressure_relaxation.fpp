@@ -148,7 +148,8 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
         #:endif
-        integer, parameter  :: MAX_ITER = 50
+        integer, parameter :: MAX_ITER = 50
+        ! Pressure relaxation convergence tolerance
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
         integer             :: iter, i
 
@@ -186,6 +187,7 @@ contains
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
+                        ! Isentropic relation: rho = rho0 * (p/p0)^(1/gamma), Saurel et al. JFM (2009)
                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/max(q_cons_vf(i + advxb - 1)%sf(j, k, l), &
                                 & sgm_eps)*((pres_relax + ps_inf(i))/(pres_K_init(i) + ps_inf(i)))**(1._wp/gs_min(i))
                         f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)

@@ -1458,11 +1458,12 @@ contains
         real(wp) :: d_MD, d_LC         !< Median (md) curvature and large curvature (LC) measures
         ! The left and right upper bounds (UL), medians, large curvatures, minima, and maxima of the WENO-reconstructed values of
         ! the cell- average variables.
-        real(wp)            :: vL_UL, vR_UL
-        real(wp)            :: vL_MD, vR_MD
-        real(wp)            :: vL_LC, vR_LC
-        real(wp)            :: vL_min, vR_min
-        real(wp)            :: vL_max, vR_max
+        real(wp) :: vL_UL, vR_UL
+        real(wp) :: vL_MD, vR_MD
+        real(wp) :: vL_LC, vR_LC
+        real(wp) :: vL_min, vR_min
+        real(wp) :: vL_max, vR_max
+        ! Monotonicity-preserving bounds, Suresh & Huynh JCP (1997)
         real(wp), parameter :: alpha = 2._wp !>
         !! Determines the maximum Courant-Friedrichs-Lewy (CFL) number that may be utilized with the scheme. In theory, for
         !! stability, a CFL number less than 1/(1+alpha) is necessary. The default value for alpha is 2.
@@ -1478,10 +1479,12 @@ contains
             do k = is2_weno%beg, is2_weno%end
                 do j = is1_weno%beg, is1_weno%end
                     do i = 1, v_size
+                        ! Second-order undivided differences for curvature estimation
                         d(-1) = v_rs_ws(j, k, l, i) + v_rs_ws(j - 2, k, l, i) - v_rs_ws(j - 1, k, l, i)*2._wp
                         d(0) = v_rs_ws(j + 1, k, l, i) + v_rs_ws(j - 1, k, l, i) - v_rs_ws(j, k, l, i)*2._wp
                         d(1) = v_rs_ws(j + 2, k, l, i) + v_rs_ws(j, k, l, i) - v_rs_ws(j + 1, k, l, i)*2._wp
 
+                        ! Median function for oscillation detection Fourth-order curvature limiter (Eq. 2.12 in Suresh & Huynh)
                         d_MD = (sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, 4._wp*d(0) - d(-1)))*abs((sign(1._wp, &
                                 & 4._wp*d(-1) - d(0)) + sign(1._wp, d(-1)))*(sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, &
                                 & d(0))))*min(abs(4._wp*d(-1) - d(0)), abs(d(-1)), abs(4._wp*d(0) - d(-1)), abs(d(0)))/8._wp

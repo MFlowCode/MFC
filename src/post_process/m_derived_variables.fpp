@@ -222,7 +222,7 @@ contains
 
     end subroutine s_derive_flux_limiter
 
-    !> Computes the solution to the linear system Ax=b w/ sol = x
+    !> Solve Ax=b via Gaussian elimination with partial pivoting
     !! @param A Input matrix
     !! @param b right-hand-side
     !! @param sol Solution
@@ -365,7 +365,7 @@ contains
                         end do
                     end do
 
-                    ! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
+                    ! Decompose velocity gradient into symmetric strain-rate S and skew-symmetric rotation-rate O
                     do jj = 1, 3
                         do kk = 1, 3
                             S(jj, kk) = 0.5_wp*(q_jacobian_sf(jj, kk) + q_jacobian_sf(kk, jj))
@@ -380,8 +380,10 @@ contains
                         end do
                     end do
 
+                    ! Q-criterion: Q = (||O||^2 - ||S||^2)/2, Hunt et al. CTR (1988)
                     Q = 0.5_wp*((O2(1, 1) + O2(2, 2) + O2(3, 3)) - (S2(1, 1) + S2(2, 2) + S2(3, 3)))
                     trS = S(1, 1) + S(2, 2) + S(3, 3)
+                    ! Second invariant of strain-rate tensor
                     IIS = 0.5_wp*((S(1, 1) + S(2, 2) + S(3, 3))**2 - (S2(1, 1) + S2(2, 2) + S2(3, 3)))
                     q_sf(j, k, l) = Q + IIS
                 end do
@@ -394,6 +396,8 @@ contains
     !! magnitude based on Xu et al. (2019).
     !! @param q_prim_vf Primitive variables
     impure subroutine s_derive_liutex(q_prim_vf, liutex_mag, liutex_axis)
+
+        ! Liutex vortex identification via real eigenvector of velocity gradient, Xu et al. PoF (2019)
 
         integer, parameter                                  :: nm = 3
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -445,7 +449,7 @@ contains
                     call dgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
 #endif
 
-                    ! Find real eigenvector
+                    ! Find eigenvector with smallest imaginary eigenvalue (real eigenvector of VGT)
                     idx = 1
                     do r = 2, 3
                         if (abs(li(r)) < abs(li(idx))) then
@@ -472,11 +476,12 @@ contains
                         omega_proj = -omega_proj
                     end if
 
-                    ! Find imaginary part of complex eigenvalue
+                    ! Imaginary eigenvalue of the complex conjugate pair (cyclic index selection)
                     lci = li(mod(idx, 3) + 1)
 
-                    ! Compute Liutex magnitude
-                    alpha = omega_proj**2._wp - 4._wp*lci**2._wp ! (2*alpha)^2
+                    ! Discriminant: determines whether rotation dominates strain
+                    alpha = omega_proj**2._wp - 4._wp*lci**2._wp
+                    ! Liutex magnitude = omega_proj - sqrt(discriminant) when rotation dominates
                     if (alpha > 0._wp) then
                         liutex_mag(j, k, l) = omega_proj - sqrt(alpha)
                     else

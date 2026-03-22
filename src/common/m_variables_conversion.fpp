@@ -566,6 +566,8 @@ contains
 #endif
                     end if
 
+                    ! Recover primitive variables from relativistic MHD conserved variables via Newton-Raphson iteration on total
+                    ! enthalpy W. Mignone & Bodo A&A (2006) W = total enthalpy, Ga = Lorentz factor, B2 = |B|^2, m2 = |m|^2, S = m.B
                     if (relativity) then
                         if (n == 0) then
                             B(1) = Bx0
@@ -602,8 +604,10 @@ contains
                         W = E + D
                         $:GPU_LOOP(parallelism='[seq]')
                         do iter = 1, relativity_cons_to_prim_max_iter
+                            ! Lorentz factor from total enthalpy and magnetic field
                             Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
-                            pres = (W - D*Ga)/((gamma_K + 1)*Ga**2) ! Thermal pressure from EOS
+                            ! Thermal pressure from EOS
+                            pres = (W - D*Ga)/((gamma_K + 1)*Ga**2)
                             f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
 
                             ! The first equation below corrects a typo in (Mignone & Bodo, 2006) m2*W**2 -> 2*m2*W**2, which would
@@ -617,7 +621,7 @@ contains
 
                             dW = -f/df_dW
                             W = W + dW
-                            if (abs(dW) < 1.e-12_wp*W) exit
+                            if (abs(dW) < 1.e-12_wp*W) exit ! Relative convergence criterion
                         end do
 
                         ! Recalculate pressure using converged W
@@ -1294,21 +1298,20 @@ contains
         real(wp)              :: blkmod1, blkmod2
         integer               :: q
 
-        if (chemistry) then
+        if (chemistry) then ! Reacting mixture sound speed
             if (avg_state == 1 .and. abs(c_c) > verysmall) then
                 c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
             end if
-        else if (relativity) then
-            ! Only supports perfect gas for now
+        else if (relativity) then ! Relativistic sound speed
             c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
         else
-            if (alt_soundspeed) then
+            if (alt_soundspeed) then ! Wood's mixture sound speed via bulk moduli
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
                 blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-            else if (model_eqns == 3) then
+            else if (model_eqns == 3) then ! Six-equation model sound speed
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids

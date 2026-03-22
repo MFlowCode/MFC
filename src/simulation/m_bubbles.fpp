@@ -75,7 +75,8 @@ contains
 
     end function f_rddot
 
-    !> Function that computes that bubble wall pressure for Gilmore bubbles
+    !> Bubble wall pressure: stiffened gas with Laplace pressure and viscous stress Ca = cavitation number, Web = Weber number,
+    !! Re_inv = inverse Reynolds number Rayleigh PRSLA (1917), Plesset JAM (1949), Keller-Miksis JASA (1980)
     !! @param fR0 Equilibrium bubble radius
     !! @param fR Current bubble radius
     !! @param fV Current bubble velocity
@@ -161,7 +162,7 @@ contains
 
     end function f_cpinfdot
 
-    !> Function that computes the time derivative of the enthalpy
+    !> Enthalpy derivative for Gilmore bubble model, Gilmore (1952)
     !! @param fCpbw Bubble wall pressure
     !! @param fCpinf Driving bubble pressure
     !! @param fCpinf_dot Time derivative of the driving pressure
@@ -192,7 +193,7 @@ contains
 
     end function f_Hdot
 
-    !> Function that computes the bubble radial acceleration for Rayleigh-Plesset bubbles
+    !> Rayleigh-Plesset bubble radial acceleration
     !! @param fCp Driving pressure
     !! @param fRho Current density
     !! @param fR Current bubble radius
@@ -256,7 +257,7 @@ contains
 
     end function f_cpbw_KM
 
-    !> Function that computes the bubble radial acceleration for Keller--Miksis bubbles
+    !> Keller-Miksis bubble radial acceleration
     !! @param fpbdot Time-derivative of internal bubble pressure
     !! @param fCp Driving pressure
     !! @param fCpbw Bubble wall pressure

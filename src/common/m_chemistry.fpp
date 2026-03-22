@@ -41,6 +41,7 @@ contains
 
         call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L)
         call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R)
+        ! Convert dynamic viscosity to inverse (MFC stores 1/mu for Reynolds number convention)
         Re_L = 1.0_wp/Re_L
         Re_R = 1.0_wp/Re_R
 

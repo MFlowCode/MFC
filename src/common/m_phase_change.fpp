@@ -22,12 +22,12 @@ module m_phase_change
 
     !> @name Parameters for the first order transition phase change
     !> @{
-    integer, parameter  :: max_iter = 1e8_wp           !< max # of iterations
-    real(wp), parameter :: pCr = 4.94e7_wp             !< Critical water pressure
-    real(wp), parameter :: TCr = 385.05_wp + 273.15_wp !< Critical water temperature
-    real(wp), parameter :: mixM = 1.0e-8_wp            !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
-    integer, parameter  :: lp = 1                      !< index for the liquid phase of the reacting fluid
-    integer, parameter  :: vp = 2                      !< index for the vapor phase of the reacting fluid
+    integer, parameter  :: max_iter = 1e8_wp !< max # of iterations
+    real(wp), parameter :: pCr = 4.94e7_wp ! Critical pressure of water [Pa]
+    real(wp), parameter :: TCr = 385.05_wp + 273.15_wp ! Critical temperature of water [K]
+    real(wp), parameter :: mixM = 1.0e-8_wp ! Mixture mass fraction threshold for triggering phase change
+    integer, parameter  :: lp = 1            !< index for the liquid phase of the reacting fluid
+    integer, parameter  :: vp = 2            !< index for the vapor phase of the reacting fluid
     !> @}
 
     !> @name Gibbs free energy phase change parameters
@@ -54,7 +54,9 @@ contains
     !! selecting the phase change module that will be used (pT- or pTg-equilibrium)
     impure subroutine s_initialize_phasechange_module
 
-        ! variables used in the calculation of the saturation curves for fluids 1 and 2
+        ! Saturation curve coefficients derived from Clausius-Clapeyron relation via stiffened gas EOS. Saurel et al. JCP (2008), Le
+        ! Metayer et al. JFE (2004) gs_min = gamma-1, cvs = specific heat at constant volume, qvps = reference entropy, qvs =
+        ! reference energy
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
 
         B = (qvs(lp) - qvs(vp))/((gs_min(vp) - 1.0_wp)*cvs(vp))

@@ -496,7 +496,7 @@ contains
 
     !> The following is the implementation of the CBC based on the work of Thompson (1987, 1990) on hyperbolic systems. The CBC is
     !! indirectly applied in the computation of the right-hand-side (RHS) near the relevant domain boundary through the modification
-    !! of the fluxes.
+    !! of the fluxes. Characteristic boundary conditions, Thompson JCP (1987, 1990)
     !! @param q_prim_vf Cell-average primitive variables
     !! @param flux_vf Cell-boundary-average fluxes
     !! @param flux_src_vf Cell-boundary-average flux sources

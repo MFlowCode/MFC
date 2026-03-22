@@ -524,6 +524,7 @@ contains
                                     s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
+                                    ! Elastic longitudinal wave speed: sqrt(c^2 + (4G/3 + tau_e)/rho), Rodriguez et al. JCP (2019)
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1))) &
                                               & /rho_L), &
                                               & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1))) &
@@ -543,7 +544,7 @@ contains
                                 end if
 
                                 if (hyper_cleaning) then
-                                    ! Dedner GLM: (B_n, psi) subsystem has eigenvalues +/- c_h in the lab frame.
+                                    ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
                                     s_L = min(s_L, -hyper_cleaning_speed)
                                     s_R = max(s_R, hyper_cleaning_speed)
                                 end if
@@ -556,6 +557,7 @@ contains
 
                                 pres_SR = pres_SL
 
+                                ! Low Mach correction: Thornber et al. JCP (2008)
                                 Ms_L = max(1._wp, &
                                            & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                            & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -2022,6 +2024,8 @@ contains
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
+                                        ! Elastic longitudinal wave speed: sqrt(c^2 + (4G/3 + tau_e)/rho), Rodriguez et al. JCP
+                                        ! (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
                                                   & ))/rho_L), &
                                                   & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
@@ -2046,6 +2050,7 @@ contains
 
                                     pres_SR = pres_SL
 
+                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -2329,6 +2334,7 @@ contains
 
                                     pres_SR = pres_SL
 
+                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -2680,6 +2686,7 @@ contains
 
                                     pres_SR = pres_SL
 
+                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -3091,6 +3098,8 @@ contains
 
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
+                                        ! Elastic longitudinal wave speed: sqrt(c^2 + (4G/3 + tau_e)/rho), Rodriguez et al. JCP
+                                        ! (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
                                                   & ))/rho_L), &
                                                   & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
@@ -3115,6 +3124,7 @@ contains
 
                                     pres_SR = pres_SL
 
+                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))

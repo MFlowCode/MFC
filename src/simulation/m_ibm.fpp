@@ -111,6 +111,9 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        ! Ghost-cell immersed boundary method procedure: 1. Identify ghost points adjacent to IB surface 2. Apply levelset to
+        ! determine inside/outside 3. Compute image points (reflection across IB surface) 4. Interpolate flow variables at image
+        ! points Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
 
@@ -241,8 +244,7 @@ contains
                     q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
-                        ! Set the pressure inside a moving immersed boundary based upon the pressure of the image point.
-                        ! acceleration, and normal vector direction
+                        ! Pressure correction for moving IB: accounts for acceleration of IB surface
                         q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, &
                                   & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
                                   & *dot_product(patch_ib(patch_id) %force/patch_ib(patch_id)%mass, gp%levelset_norm))
