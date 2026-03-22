@@ -572,8 +572,7 @@ contains
 #endif
                     end if
 
-                    ! Recover primitive variables from relativistic MHD conserved variables via Newton-Raphson iteration on total
-                    ! enthalpy W. Mignone & Bodo A&A (2006) W = total enthalpy, Ga = Lorentz factor, B2 = |B|^2, m2 = |m|^2, S = m.B
+                    ! Relativistic MHD primitive variable recovery, Mignone & Bodo A&A (2006)
                     if (relativity) then
                         if (n == 0) then
                             B(1) = Bx0

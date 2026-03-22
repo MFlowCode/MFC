@@ -174,7 +174,7 @@ contains
         integer                 :: ir
         real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN, rhol0
         real(wp), parameter     :: k_poly = 1._wp !< polytropic index used to compute isothermal natural frequency
-        ! Chapman-Enskog transport coefficients for vapor-gas mixture, Ando JAS (2010) Eq. 2.22
+        ! Chapman-Enskog transport coefficients for vapor-gas mixture, Ando JAS (2010)
 
         phi_vg = (1._wp + sqrt(mu_v/mu_g)*(M_g/M_v)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_v/M_g))
         phi_gv = (1._wp + sqrt(mu_g/mu_v)*(M_v/M_g)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_g/M_v))
@@ -182,7 +182,7 @@ contains
         ! Initial internal bubble pressure (Euler number + Laplace pressure)
         pb0 = Eu + 2._wp/Web/R0
 
-        ! Vapor mass fraction at bubble wall, Ando JAS (2010) Eq. 2.19
+        ! Vapor mass fraction at bubble wall, Ando JAS (2010)
         chi_vw0 = 1._wp/(1._wp + R_v/R_g*(pb0/pv - 1._wp))
 
         ! Mixture specific heat from mass-weighted vapor/gas contributions
@@ -206,7 +206,7 @@ contains
         ! Peclet numbers
         Pe_T(:) = rho_m0*cp_m0(:)/k_m0(:)
 
-        ! Bubble natural frequency, Ando JAS (2010) Eq. B.1
+        ! Bubble natural frequency, Ando JAS (2010)
         omegaN(:) = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0/sqrt(rho0ref)
         do ir = 1, nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), Re_trans_T(ir), Im_trans_T(ir))

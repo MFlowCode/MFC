@@ -526,7 +526,7 @@ contains
                                     s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
-                                    ! Elastic longitudinal wave speed: sqrt(c^2 + (4G/3 + tau_e)/rho), Rodriguez et al. JCP (2019)
+                                    ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1))) &
                                               & /rho_L), &
                                               & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1))) &
@@ -2026,8 +2026,7 @@ contains
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
-                                        ! Elastic longitudinal wave speed: sqrt(c^2 + (4G/3 + tau_e)/rho), Rodriguez et al. JCP
-                                        ! (2019)
+                                        ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
                                                   & ))/rho_L), &
                                                   & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
@@ -3101,8 +3100,7 @@ contains
 
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
-                                        ! Elastic longitudinal wave speed: sqrt(c^2 + (4G/3 + tau_e)/rho), Rodriguez et al. JCP
-                                        ! (2019)
+                                        ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
                                                   & ))/rho_L), &
                                                   & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &

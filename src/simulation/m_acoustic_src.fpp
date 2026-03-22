@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief One-way acoustic source injection following Maeda and Colonius, JCP 2017. Supports planar, focused transducer, transducer
-!! array, and broadband waveforms.
+!> @brief One-way acoustic source injection, Maeda and Colonius JCP (2017)
 module m_acoustic_src
 
     use m_derived_types        !< Definitions of the derived types

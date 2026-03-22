@@ -54,9 +54,7 @@ contains
     !! selecting the phase change module that will be used (pT- or pTg-equilibrium)
     impure subroutine s_initialize_phasechange_module
 
-        ! Saturation curve coefficients derived from Clausius-Clapeyron relation via stiffened gas EOS. Saurel et al. JCP (2008), Le
-        ! Metayer et al. JFE (2004) gs_min = gamma-1, cvs = specific heat at constant volume, qvps = reference entropy, qvs =
-        ! reference energy
+        ! Saturation curve coefficients via stiffened gas EOS. Saurel et al. JCP (2008), Le Metayer et al. JFE (2004)
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
 
         B = (qvs(lp) - qvs(vp))/((gs_min(vp) - 1.0_wp)*cvs(vp))

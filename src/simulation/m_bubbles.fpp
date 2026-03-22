@@ -75,8 +75,7 @@ contains
 
     end function f_rddot
 
-    !> Bubble wall pressure: stiffened gas with Laplace pressure and viscous stress Ca = cavitation number, Web = Weber number,
-    !! Re_inv = inverse Reynolds number Rayleigh PRSLA (1917), Plesset JAM (1949), Keller-Miksis JASA (1980)
+    !> Bubble wall pressure: stiffened gas with Laplace pressure and viscous stress
     !! @param fR0 Equilibrium bubble radius
     !! @param fR Current bubble radius
     !! @param fV Current bubble velocity
@@ -234,7 +233,7 @@ contains
 
     end function f_rddot_G
 
-    !> Function that computes the bubble wall pressure for Keller--Miksis bubbles
+    !> Keller-Miksis bubble wall pressure
     !! @param fR0 Equilibrium bubble radius
     !! @param fR Current bubble radius
     !! @param fV Current bubble velocity

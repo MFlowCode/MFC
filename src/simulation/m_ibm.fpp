@@ -111,9 +111,7 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
-        ! Ghost-cell immersed boundary method procedure: 1. Identify ghost points adjacent to IB surface 2. Apply levelset to
-        ! determine inside/outside 3. Compute image points (reflection across IB surface) 4. Interpolate flow variables at image
-        ! points Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
+        ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
 
