@@ -309,6 +309,7 @@ class TestCase(case.Case):
             gpu_ids = ",".join(str(g) for g in gpus)
             env["CUDA_VISIBLE_DEVICES"] = gpu_ids
             env["HIP_VISIBLE_DEVICES"] = gpu_ids
+            env["MPICH_GPU_SUPPORT_ENABLED"] = "1"
 
         # Resolve binary paths using the original (unmodified) params for slug
         slug_case = self.to_input_file()
