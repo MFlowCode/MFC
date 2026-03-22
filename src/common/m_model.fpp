@@ -28,10 +28,8 @@ module m_model
     public :: s_instantiate_STL_models
 #endif
 
-    !! array of STL models that can be allocated and then used in IB marker and levelset compute
-    type(t_model_array), allocatable, target :: models(:)
-    !! GPU-friendly flat arrays for STL model data
-    integer, allocatable                      :: gpu_ntrs(:)
+    type(t_model_array), allocatable, target  :: models(:)    !< STL/OBJ models for IB markers and levelset
+    integer, allocatable                      :: gpu_ntrs(:)  !< GPU-friendly flat arrays for STL model data
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_trs_v
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_boundary_v
@@ -414,6 +412,7 @@ contains
 
     end subroutine s_model_free
 
+    !> Read the next non-blank, non-comment line from an STL or OBJ model file.
     impure function f_read_line(iunit, line) result(bIsLine)
 
         integer, intent(in)        :: iunit
@@ -964,6 +963,7 @@ contains
     end subroutine s_distance_normals_2D
 
 #ifdef MFC_SIMULATION
+    !> Load, transform, and register STL/OBJ immersed-boundary models onto the simulation grid.
     subroutine s_instantiate_STL_models()
 
         ! Variables for IBM+STL
@@ -1126,6 +1126,7 @@ contains
     end subroutine s_instantiate_STL_models
 #endif
 
+    !> Pack triangle vertices and normals from a model into flat arrays for GPU transfer.
     subroutine s_pack_model_for_gpu(ma)
 
         type(t_model_array), intent(inout) :: ma

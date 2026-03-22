@@ -138,9 +138,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    !> Gather the Silo database metadata for the spatial extents to boost the performance of the multidimensional visualization.
-    ! ! @param spatial_extents Spatial extents for each processor's sub-domain. First dimension corresponds to the minimum and
-    ! maximum values, respectively, while the second dimension corresponds to the processor rank.
+    !> Gather spatial extents from all ranks for Silo database metadata
     impure subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
         real(wp), dimension(1:, 0:), intent(inout) :: spatial_extents

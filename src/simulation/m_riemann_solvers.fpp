@@ -136,7 +136,7 @@ contains
 
     end subroutine s_compute_viscous_source_flux
 
-    ! HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
+    !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -813,7 +813,7 @@ contains
 
     end subroutine s_hll_riemann_solver
 
-    ! Lax-Friedrichs (Rusanov) approximate Riemann solver
+    !> Lax-Friedrichs (Rusanov) approximate Riemann solver
     subroutine s_lf_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -1681,7 +1681,7 @@ contains
 
     end subroutine s_lf_riemann_solver
 
-    ! HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
+    !> HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -3294,7 +3294,7 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
-    ! HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
+    !> HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
     subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &

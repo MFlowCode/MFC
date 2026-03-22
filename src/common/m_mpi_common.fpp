@@ -22,7 +22,6 @@ module m_mpi_common
 
     integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
-    !! Generic flags used to identify and report MPI errors
 
     !> This variable is utilized to pack and send the buffer of the cell-average primitive variables, for a single computational
     !! domain boundary at the time, to the relevant neighboring processor.
@@ -99,6 +98,7 @@ contains
 
     end subroutine s_mpi_initialize
 
+    !> Set up MPI I/O data views and variable pointers for parallel file output.
     impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -180,6 +180,7 @@ contains
 
     end subroutine s_initialize_mpi_data
 
+    !> Set up MPI I/O data views for downsampled (coarsened) parallel file output.
     subroutine s_initialize_mpi_data_ds(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -401,9 +402,7 @@ contains
 
     end subroutine s_mpi_allreduce_max
 
-    !> Reduce a local real value to its global minimum and broadcast the result to all ranks.
-    ! ! @param var_loc holds the local value to be reduced among all the processors in communicator. On output, the variable holds
-    ! the minimum value, reduced amongst all of the local values.
+    !> Reduce a local real value to its global minimum across all ranks
     impure subroutine s_mpi_reduce_min(var_loc)
 
         real(wp), intent(inout) :: var_loc
@@ -422,9 +421,7 @@ contains
     end subroutine s_mpi_reduce_min
 
     !> Reduce a 2-element variable to its global maximum value with the owning processor rank (MPI_MAXLOC).
-    ! ! @param var_loc On input, this variable holds the local value and processor rank, which are to be reduced among all the
-    ! processors in communicator. On output, this variable holds the maximum value, reduced amongst all of the local values, and the
-    ! process rank to which the value belongs.
+    !> Reduce a local value to its global maximum with location (rank) across all ranks
     impure subroutine s_mpi_reduce_maxloc(var_loc)
 
         real(wp), dimension(2), intent(inout) :: var_loc

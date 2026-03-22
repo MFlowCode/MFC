@@ -57,8 +57,7 @@ module m_global_parameters
     !> @{
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-    ! type(bounds_info) :: x_domain, y_domain, z_domain !<
-    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
+    ! type(bounds_info) :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
@@ -360,12 +359,9 @@ module m_global_parameters
     logical                                               :: ib
     integer                                               :: num_ibs
     logical                                               :: ib_state_wrt
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
     integer                                               :: Np
-    !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
-    !! condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
-    !! m_derived_types.f90.
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
     !> @}

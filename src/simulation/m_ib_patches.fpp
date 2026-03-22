@@ -32,20 +32,20 @@ module m_ib_patches
     integer  :: smooth_patch_id
     real(wp) :: smooth_coeff
     $:GPU_DECLARE(create='[smooth_patch_id, smooth_coeff]')
-    !! These variables are analogous in both meaning and use to the similarly named components in the ic_patch_parameters type (see
-    !! m_derived_types.f90 for additional details). They are employed as a means to more concisely perform the actions necessary to
-    !! lay out a particular patch on the grid.
+    ! These variables are analogous in both meaning and use to the similarly named components in the ic_patch_parameters type (see
+    ! m_derived_types.f90 for additional details). They are employed as a means to more concisely perform the actions necessary to
+    ! lay out a particular patch on the grid.
 
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi
     $:GPU_DECLARE(create='[cart_x, cart_y, cart_z, sph_phi]')
-    !! Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
+    ! Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
 
     type(bounds_info) :: x_boundary, y_boundary, z_boundary
     $:GPU_DECLARE(create='[x_boundary, y_boundary, z_boundary]')
-    !! These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the
-    !! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
-    !! necessary to lay out a particular patch on the grid.
+    ! These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the
+    ! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
+    ! necessary to lay out a particular patch on the grid.
 
     character(len=5) :: istr  ! string to store int to string result for error checking
 
@@ -277,13 +277,11 @@ contains
                         end do
                         if (f_approx_equal(airfoil_grid_u(k)%x, xy_local(1))) then
                             if (xy_local(2) <= airfoil_grid_u(k)%y) then
-                                !!IB
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         else
                             f = (airfoil_grid_u(k)%x - xy_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                             if (xy_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
-                                !!IB
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         end if
@@ -294,14 +292,12 @@ contains
                         end do
                         if (f_approx_equal(airfoil_grid_l(k)%x, xy_local(1))) then
                             if (xy_local(2) >= airfoil_grid_l(k)%y) then
-                                !!IB
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         else
                             f = (airfoil_grid_l(k)%x - xy_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                             if (xy_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                !!IB
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         end if
@@ -440,7 +436,6 @@ contains
                                 else
                                     f = (airfoil_grid_u(k)%x - xyz_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                                     if (xyz_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
-                                        !!IB
                                         ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 end if
@@ -451,14 +446,12 @@ contains
                                 end do
                                 if (f_approx_equal(airfoil_grid_l(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) >= airfoil_grid_l(k)%y) then
-                                        !!IB
                                         ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_l(k)%x - xyz_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                                     if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                        !!IB
                                         ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 end if
@@ -538,8 +531,7 @@ contains
         real(wp)                 :: radius
         real(wp), dimension(1:3) :: center
 
-        !! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al.
-        !! (2013)
+        ! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
 
         ! Transferring spherical patch's radius, centroid, smoothing patch identity and smoothing coefficient information
 

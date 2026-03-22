@@ -40,6 +40,7 @@ module m_surface_tension
 
 contains
 
+    !> Allocate and initialize surface tension module arrays
     impure subroutine s_initialize_surface_tension_module
 
         integer :: j

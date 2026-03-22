@@ -37,7 +37,7 @@ module m_variables_conversion
 #endif
     s_finalize_variables_conversion_module
 
-    !! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
+    ! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
     real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')

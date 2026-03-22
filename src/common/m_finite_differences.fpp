@@ -13,6 +13,7 @@ module m_finite_differences
 
 contains
 
+    !> Accumulate the finite-difference divergence of a vector field onto a scalar field.
     subroutine s_compute_fd_divergence(div, fields, ix_s, iy_s, iz_s)
 
         type(scalar_field), intent(inout) :: div

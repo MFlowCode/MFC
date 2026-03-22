@@ -164,6 +164,7 @@ contains
 
     end subroutine s_open_probe_files
 
+    !> Open the immersed boundary state file for binary output
     impure subroutine s_open_ib_state_file
 
         character(len=path_len + 2*name_len) :: file_loc
@@ -1536,6 +1537,7 @@ contains
 
     end subroutine s_close_probe_files
 
+    !> Close the immersed boundary state file
     impure subroutine s_close_ib_state_file
 
         close (ib_state_unit)

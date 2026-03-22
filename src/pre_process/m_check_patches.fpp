@@ -243,6 +243,7 @@ contains
 
     end subroutine s_check_sphere_patch_geometry
 
+    !> Validate geometry parameters for a 2D modal (Fourier) patch
     impure subroutine s_check_2d_modal_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -257,6 +258,7 @@ contains
 
     end subroutine s_check_2d_modal_patch_geometry
 
+    !> Validate geometry parameters for a 3D spherical harmonic patch
     impure subroutine s_check_3d_spherical_harmonic_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -356,8 +358,7 @@ contains
 
     end subroutine s_check_ellipsoid_patch_geometry
 
-    !!>  This subroutine verifies that the geometric parameters of
-    !! the inactive patch remain unaltered by the user inputs. @param patch_id Patch identifier
+    !> Verify that inactive patch geometry parameters remain at defaults
     impure subroutine s_check_inactive_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id

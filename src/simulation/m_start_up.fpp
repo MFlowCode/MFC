@@ -77,7 +77,7 @@ contains
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
         logical                            :: file_exist  !< Logical used to check the existence of the input file
         integer                            :: iostatus
-        !! Integer to check iostat of file read
+        ! Integer to check iostat of file read
 
         character(len=1000) :: line
 

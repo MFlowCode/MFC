@@ -23,25 +23,25 @@ module m_cbc
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
 
-    !! The cell-average primitive variables. They are obtained by reshaping (RS) q_prim_vf in the coordinate direction normal to the
-    !! domain boundary along which the CBC is applied.
+    ! The cell-average primitive variables. They are obtained by reshaping (RS) q_prim_vf in the coordinate direction normal to the
+    ! domain boundary along which the CBC is applied.
 
     real(wp), allocatable, dimension(:,:,:,:) :: q_prim_rsx_vf
     real(wp), allocatable, dimension(:,:,:,:) :: q_prim_rsy_vf
     real(wp), allocatable, dimension(:,:,:,:) :: q_prim_rsz_vf
     $:GPU_DECLARE(create='[q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf]')
 
-    !! Cell-average fluxes (src - source). These are directly determined from the cell-average primitive variables, q_prims_rs_vf,
-    !! and not a Riemann solver.
+    ! Cell-average fluxes (src - source). These are directly determined from the cell-average primitive variables, q_prims_rs_vf,
+    ! and not a Riemann solver.
 
     real(wp), allocatable, dimension(:,:,:,:) :: F_rsx_vf, F_src_rsx_vf
     real(wp), allocatable, dimension(:,:,:,:) :: F_rsy_vf, F_src_rsy_vf
     real(wp), allocatable, dimension(:,:,:,:) :: F_rsz_vf, F_src_rsz_vf
     $:GPU_DECLARE(create='[F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf]')
 
-    !! There is a CCE bug that is causing some subset of these variables to interfere with variables of the same name in
-    !! m_riemann_solvers.fpp, and giving this versions unique "_l" names works around the bug. Other private module allocatable
-    !! arrays in `acc declare create` clauses don't have this problem, so we still need to isolate this bug.
+    ! There is a CCE bug that is causing some subset of these variables to interfere with variables of the same name in
+    ! m_riemann_solvers.fpp, and giving this versions unique "_l" names works around the bug. Other private module allocatable
+    ! arrays in `acc declare create` clauses don't have this problem, so we still need to isolate this bug.
 
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf_l, flux_src_rsx_vf_l
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsy_vf_l, flux_src_rsy_vf_l
@@ -63,8 +63,8 @@ module m_cbc
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_z  !< Polynomial interpolant coefficients in z-dir
     $:GPU_DECLARE(create='[ds, fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z]')
 
-    !! The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients
-    !! and the last dimension denotes the location of the CBC.
+    ! The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients
+    ! and the last dimension denotes the location of the CBC.
 
     type(int_bounds_info) :: is1, is2, is3  !< Indical bounds in the s1-, s2- and s3-directions
     $:GPU_DECLARE(create='[is1, is2, is3]')
@@ -76,8 +76,8 @@ module m_cbc
     $:GPU_DECLARE(create='[dj, bcxb, bcxe, bcyb, bcye, bczb, bcze]')
     $:GPU_DECLARE(create='[cbc_dir, cbc_loc, flux_cbc_index]')
 
-    !! GRCBC inputs for subsonic inflow and outflow conditions consisting of inflow velocities, pressure, density and void fraction
-    !! as well as outflow velocities and pressure
+    ! GRCBC inputs for subsonic inflow and outflow conditions consisting of inflow velocities, pressure, density and void fraction
+    ! as well as outflow velocities and pressure
 
     real(wp), allocatable, dimension(:)   :: pres_in, pres_out, Del_in, Del_out
     real(wp), allocatable, dimension(:,:) :: vel_in, vel_out

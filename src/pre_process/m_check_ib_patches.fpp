@@ -209,8 +209,7 @@ contains
 
     end subroutine s_check_model_ib_patch_geometry
 
-    !!>  This subroutine verifies that the geometric parameters of
-    !! the inactive patch remain unaltered by the user inputs. @param patch_id Patch identifier
+    !> Verify that inactive IB patch geometry parameters remain at defaults
     impure subroutine s_check_inactive_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id

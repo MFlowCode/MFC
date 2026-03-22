@@ -153,9 +153,7 @@ module m_global_parameters
     type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp
     integer                                                  :: num_bc_patches  !< Number of boundary condition patches
     logical                                                  :: bc_io           !< whether or not to save BC data
-    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
-    !! Database of the boundary condition patch parameters for each of the patches employed in the configuration of the boundary
-    !! conditions
+    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc        !< Boundary condition patch parameters
 
     ! Fluids Physical Parameters
     !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
@@ -179,14 +177,11 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                               :: ib       !< Turn immersed boundaries on
-    integer                                               :: num_ibs  !< Number of immersed boundaries
+    logical                                               :: ib        !< Turn immersed boundaries on
+    integer                                               :: num_ibs   !< Number of immersed boundaries
     integer                                               :: Np
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
-    !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
-    !! condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
-    !! m_derived_types.f90.
     !> @}
 
     !> @name Non-polytropic bubble gas compression

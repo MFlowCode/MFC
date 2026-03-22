@@ -12,8 +12,7 @@ module m_compile_specific
 
 contains
 
-    !> Creates a directory and all its parents if it does not exist
-    !! @param dir_name Directory path
+    !> Create a directory and all its parents if it does not exist
     impure subroutine s_create_directory(dir_name)
 
         character(LEN=*), intent(in) :: dir_name

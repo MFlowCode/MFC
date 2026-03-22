@@ -725,7 +725,7 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            !! Void fraction field
+            ! Void fraction field
             q_sf(:,:,:) = 1._wp - q_cons_vf(beta_idx)%sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, &
                  & -offset_z%beg:p + offset_z%end)
             write (varname, '(A)') 'voidFraction'

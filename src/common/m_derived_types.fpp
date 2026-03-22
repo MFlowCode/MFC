@@ -236,13 +236,11 @@ module m_derived_types
         real(wp)               :: V0          !< Bubble velocity
         real(wp)               :: p0          !< Bubble size
         real(wp)               :: m0          !< Bubble velocity
-        integer                :: hcid
-        !! id for hard coded initial condition
+        integer                :: hcid        !< Hardcoded initial condition ID
+        real(wp)               :: cf_val      !< Color function value
+        real(wp)               :: Y(1:num_species)
 
-        real(wp) :: cf_val !! color function value
-        real(wp) :: Y(1:num_species)
-
-        !! STL or OBJ model input parameter
+        ! STL or OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath  !< Path the STL file relative to case_dir.
         real(wp), dimension(1:3) :: model_translate  !< Translation of the STL object.
         real(wp), dimension(1:3) :: model_scale  !< Scale factor for the STL object.
@@ -271,7 +269,7 @@ module m_derived_types
         real(wp)                      :: theta
         logical                       :: slip
 
-        !! STL or OBJ model input parameter
+        ! STL or OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath  !< Path the STL file relative to case_dir.
         real(wp), dimension(1:3) :: model_translate  !< Translation of the STL object.
         real(wp), dimension(1:3) :: model_scale  !< Scale factor for the STL object.

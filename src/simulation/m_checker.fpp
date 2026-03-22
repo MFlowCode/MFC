@@ -91,6 +91,7 @@ contains
 
     end subroutine s_check_inputs_time_stepping
 
+    !> Validate NVIDIA unified virtual memory configuration parameters
     impure subroutine s_check_inputs_nvidia_uvm
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM

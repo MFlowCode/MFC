@@ -17,8 +17,8 @@ module m_hyperelastic
 
     private; public :: s_hyperelastic_rmt_stress_update, s_initialize_hyperelastic_module, s_finalize_hyperelastic_module
 
-    !! The btensor at the cell-interior Gaussian quadrature points. These tensor is needed to be calculated once and make the code
-    !! DRY.
+    ! The btensor at the cell-interior Gaussian quadrature points. These tensor is needed to be calculated once and make the code
+    ! DRY.
     type(vector_field) :: btensor
     $:GPU_DECLARE(create='[btensor]')
 

@@ -98,6 +98,7 @@ contains
 
     end function f_is_integer
 
+    !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
 
         & bubbles_lagrange, m, n, p, num_dims, igr, ib)

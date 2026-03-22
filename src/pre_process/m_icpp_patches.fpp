@@ -982,8 +982,7 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        !! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al.
-        !! (2013)
+        ! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
 
         ! Transferring spherical patch's radius, centroid, smoothing patch identity and smoothing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid

@@ -38,14 +38,10 @@ module m_rhs
 
     private; public :: s_initialize_rhs_module, s_compute_rhs, s_finalize_rhs_module
 
-    !! This variable contains the WENO-reconstructed values of the cell-average conservative variables, which are located in
-    !! q_cons_vf, at cell-interior Gaussian quadrature points (QP).
-    type(vector_field) :: q_cons_qp
+    type(vector_field) :: q_cons_qp  !< WENO-reconstructed cell-average conservative variables at quadrature points
     $:GPU_DECLARE(create='[q_cons_qp]')
 
-    !! The primitive variables at cell-interior Gaussian quadrature points. These are calculated from the conservative variables and
-    !! gradient magnitude (GM) of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
-    type(vector_field) :: q_prim_qp
+    type(vector_field) :: q_prim_qp  !< Primitive variables at cell-interior quadrature points
     $:GPU_DECLARE(create='[q_prim_qp]')
 
     !> @name The first-order spatial derivatives of the primitive variables at cell- interior Gaussian quadrature points. These are

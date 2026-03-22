@@ -1114,6 +1114,7 @@ contains
 
     end subroutine s_write_lag_variable_to_formatted_database_file
 
+    !> Convert the binary immersed-boundary state file to per-body formatted text files
     impure subroutine s_write_ib_state_files()
 
         character(len=len_trim(case_dir) + 4*name_len) :: in_file, out_file, file_loc

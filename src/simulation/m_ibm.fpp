@@ -151,7 +151,7 @@ contains
             real(wp), dimension(nb*nmom)    :: nmom_IP
             real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
         #:endif
-        !! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
+        ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
         real(wp), dimension(3) :: physical_loc       !< Physical loc of GP
