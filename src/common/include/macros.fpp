@@ -14,7 +14,7 @@
 
 ! Caution: This macro requires the use of a binding script to set CUDA_VISIBLE_DEVICES, such that we have one GPU device per MPI
 ! rank. That's because for both cudaMemAdvise (preferred location) and cudaMemPrefetchAsync we use location = device_id = 0. For an
-! example see misc/nvidia_uvm/bind.sh.
+! example see misc/nvidia_uvm/bind.sh. NVIDIA unified memory page placement hint
 #:def PREFER_GPU(*args)
 #ifdef MFC_SIMULATION
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -55,6 +55,7 @@
 #endif
 #:enddef
 
+! Allocate and create GPU device memory
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     #:set allocated_variables = ', '.join(args)
@@ -74,6 +75,7 @@
     $:GPU_ENTER_DATA(create='[' + joined + ']')
 #:enddef ALLOCATE
 
+! Free GPU device memory and deallocate
 #:def DEALLOCATE(*args)
     @:LOG({'@:DEALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     #:set allocated_variables = ', '.join(args)
@@ -81,6 +83,7 @@
     deallocate (${allocated_variables}$)
 #:enddef DEALLOCATE
 
+! Cray-specific GPU pointer setup for vector fields
 #:def ACC_SETUP_VFs(*args)
 #ifdef _CRAYFTN
     block
@@ -104,6 +107,7 @@
 #endif
 #:enddef
 
+! Cray-specific GPU pointer setup for scalar fields
 #:def ACC_SETUP_SFs(*args)
 #ifdef _CRAYFTN
     block
@@ -119,6 +123,7 @@
 #endif
 #:enddef
 
+! Cray-specific GPU pointer setup for acoustic source spatials
 #:def ACC_SETUP_source_spatials(*args)
 #ifdef _CRAYFTN
     block

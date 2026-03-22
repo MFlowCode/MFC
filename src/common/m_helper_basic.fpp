@@ -16,11 +16,8 @@ module m_helper_basic
 
 contains
 
-    !> This procedure checks if two floating point numbers of wp are within tolerance.
-    !! @param a First number.
-    !! @param b Second number.
+    !> Check if two floating point numbers of wp are within tolerance.
     !! @param tol_input Relative error (default = 1.e-10_wp).
-    !! @return Result of the comparison.
     logical elemental function f_approx_equal(a, b, tol_input) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -44,11 +41,8 @@ contains
 
     end function f_approx_equal
 
-    !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
-    !! @param a First number.
-    !! @param b Array that contains several point numbers.
+    !> Check if a wp value approximately matches any element of an array within tolerance.
     !! @param tol_input Relative error (default = 1e-10_wp).
-    !! @return Result of the comparison.
     logical function f_approx_in_array(a, b, tol_input) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -76,7 +70,6 @@ contains
     end function f_approx_in_array
 
     !> Checks if a real(wp) variable is of default value.
-    !! @param var Variable to check.
     logical elemental function f_is_default(var) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -87,7 +80,6 @@ contains
     end function f_is_default
 
     !> Checks if ALL elements of a real(wp) array are of default value.
-    !! @param var_array Array to check.
     logical function f_all_default(var_array) result(res)
 
         real(wp), intent(in) :: var_array(:)
@@ -97,7 +89,6 @@ contains
     end function f_all_default
 
     !> Checks if a real(wp) variable is an integer.
-    !! @param var Variable to check.
     logical elemental function f_is_integer(var) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -157,10 +148,7 @@ contains
     end subroutine s_configure_coordinate_bounds
 
     !> Updates the min and max number of cells in each set of axes
-    !! @param bounds Min ans max values to update
-    !! @param m Number of cells in x-axis
-    !! @param n Number of cells in y-axis
-    !! @param p Number of cells in z-axis
+    !! @param bounds Min and max values to update
     elemental subroutine s_update_cell_bounds(bounds, m, n, p)
 
         type(cell_num_bounds), intent(out) :: bounds

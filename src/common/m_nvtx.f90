@@ -57,7 +57,7 @@ module m_nvtx
 
 contains
 
-    !> @brief Pushes a named NVTX range for GPU profiling, optionally with a color based on the given identifier.
+    !> Push a named NVTX range for GPU profiling, optionally with a color based on the given identifier.
     subroutine nvtxStartRange(name, id)
 
         character(kind=c_char, len=*), intent(in) :: name
@@ -78,7 +78,7 @@ contains
 
     end subroutine nvtxStartRange
 
-    !> @brief Pops the current NVTX range to end the GPU profiling region.
+    !> Pop the current NVTX range to end the GPU profiling region.
     subroutine nvtxEndRange
 
 #if defined(MFC_GPU) && defined(__PGI)

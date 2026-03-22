@@ -853,8 +853,7 @@ contains
 
     end subroutine s_assign_default_values_to_user_inputs
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the global parameters module
     impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, k

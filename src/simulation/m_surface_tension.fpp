@@ -66,7 +66,7 @@ contains
 
     end subroutine s_initialize_surface_tension_module
 
-    !> @brief Computes the capillary (surface-tension) source flux from reconstructed color-gradient fields.
+    !> Compute the capillary source flux from reconstructed color-gradient fields
     subroutine s_compute_capillary_source_flux(vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, flux_src_vf, id, isx, isy, isz)
 
         real(wp), dimension(-1:, 0:, 0:, 1:), intent(in)       :: vSrc_rsx_vf
@@ -214,7 +214,7 @@ contains
 
     end subroutine s_compute_capillary_source_flux
 
-    !> @brief Computes color-function gradients and their norms, then reconstructs them at cell boundaries.
+    !> Compute color-function gradients and reconstruct them at cell boundaries
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in)         :: q_prim_vf
@@ -291,7 +291,7 @@ contains
 
     end subroutine s_get_capillary
 
-    !> @brief Reconstructs left and right cell-boundary values of capillary (color-gradient) variables using WENO or MUSCL.
+    !> Reconstruct left and right cell-boundary values of capillary variables
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
@@ -366,7 +366,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
-    !> @brief Deallocates the color-gradient divergence and reconstructed boundary arrays for surface tension.
+    !> Finalize the surface tension module
     impure subroutine s_finalize_surface_tension_module
 
         integer :: j

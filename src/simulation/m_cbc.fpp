@@ -88,8 +88,7 @@ module m_cbc
 
 contains
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the CBC module
     impure subroutine s_initialize_cbc_module
 
         integer               :: i
@@ -352,8 +351,6 @@ contains
     end subroutine s_initialize_cbc_module
 
     !> Compute CBC coefficients
-    !! @param cbc_dir_in CBC coordinate direction
-    !! @param cbc_loc_in CBC coordinate location
     subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in)
 
         ! Compute grid-dependent CBC coefficients for given direction and location
@@ -437,11 +434,7 @@ contains
 
     end subroutine s_compute_cbc_coefficients
 
-    !> @brief Associates finite-difference and polynomial-interpolation CBC coefficients with targets based on coordinate direction
-    !! and boundary location. The goal of the procedure is to associate the FD and PI coefficients, or CBC coefficients, with the
-    !! appropriate targets, based on the coordinate direction and location of the CBC.
-    !! @param cbc_dir_in CBC coordinate direction
-    !! @param cbc_loc_in CBC coordinate location
+    !> Associate CBC finite-difference and polynomial-interpolation coefficients based on direction and boundary location
     subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
@@ -494,17 +487,7 @@ contains
 
     end subroutine s_associate_cbc_coefficients_pointers
 
-    !> The following is the implementation of the CBC based on the work of Thompson (1987, 1990) on hyperbolic systems. The CBC is
-    !! indirectly applied in the computation of the right-hand-side (RHS) near the relevant domain boundary through the modification
-    !! of the fluxes. Characteristic boundary conditions, Thompson JCP (1987, 1990)
-    !! @param q_prim_vf Cell-average primitive variables
-    !! @param flux_vf Cell-boundary-average fluxes
-    !! @param flux_src_vf Cell-boundary-average flux sources
-    !! @param cbc_dir_norm CBC coordinate direction
-    !! @param cbc_loc_norm CBC coordinate location
-    !! @param ix Index bound in the first coordinate direction
-    !! @param iy Index bound in the second coordinate direction
-    !! @param iz Index bound in the third coordinate direction
+    !> Apply characteristic boundary conditions by modifying fluxes near domain boundaries
     subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
@@ -970,14 +953,7 @@ contains
 
     end subroutine s_cbc
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are required for the setup of the selected CBC.
-    !! @param q_prim_vf Cell-average primitive variables
-    !! @param flux_vf Cell-boundary-average fluxes
-    !! @param flux_src_vf Cell-boundary-average flux sources
-    !! @param ix Index bound in the first coordinate direction
-    !! @param iy Index bound in the second coordinate direction
-    !! @param iz Index bound in the third coordinate direction
+    !> Set up the selected CBC for the current boundary
     subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -1231,8 +1207,6 @@ contains
     end subroutine s_initialize_cbc
 
     !> Deallocation and/or the disassociation procedures that are necessary in order to finalize the CBC application
-    !! @param flux_vf Cell-boundary-average fluxes
-    !! @param flux_src_vf Cell-boundary-average flux sources
     subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
@@ -1395,7 +1369,7 @@ contains
 
     end subroutine s_finalize_cbc
 
-    !> @brief Detects whether any domain boundary uses characteristic boundary conditions.
+    !> Detect whether any domain boundary uses characteristic boundary conditions
     elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle

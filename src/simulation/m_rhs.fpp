@@ -133,8 +133,7 @@ module m_rhs
 
 contains
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the RHS module
     impure subroutine s_initialize_rhs_module
 
         integer :: i, j, k, l, id  !< Generic loop iterators
@@ -538,7 +537,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    !> @brief Computes the right-hand side of the semi-discrete governing equations for a single time stage.
+    !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
 
         & time_avg, stage)
@@ -905,7 +904,7 @@ contains
 
     end subroutine s_compute_rhs
 
-    !> @brief Accumulates advection source contributions from a given coordinate direction into the RHS.
+    !> Accumulate advection source contributions from a given coordinate direction into the RHS
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
         integer, intent(in) :: idir
@@ -1138,7 +1137,7 @@ contains
 
     contains
 
-        !> @brief Adds the advection source flux-difference terms for a single coordinate direction to the RHS.
+        !> Add the advection source flux-difference terms for a single coordinate direction to the RHS
         subroutine s_add_directional_advection_source_terms(current_idir, rhs_vf_arg, q_cons_vf_arg, q_prim_vf_arg, &
 
             & flux_src_n_vf_arg, Kterm_arg)
@@ -1377,7 +1376,7 @@ contains
 
     end subroutine s_compute_advection_source_term
 
-    !> @brief Adds viscous, surface-tension, and species-diffusion source flux contributions to the RHS for a given direction.
+    !> Add viscous, surface-tension, and species-diffusion source flux contributions to the RHS for a given direction
     subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n_in, dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf)
 
         integer, intent(in)                                    :: idir
@@ -1627,16 +1626,7 @@ contains
 
     end subroutine s_compute_additional_physics_rhs
 
-    !> The purpose of this subroutine is to WENO-reconstruct the left and the right cell-boundary values, including values at the
-    !! Gaussian quadrature points, from the cell-averaged variables.
-    !! @param v_vf Cell-average variables
-    !! @param vL_x Left reconstructed cell-boundary values in x
-    !! @param vL_y Left reconstructed cell-boundary values in y
-    !! @param vL_z Left reconstructed cell-boundary values in z
-    !! @param vR_x Right reconstructed cell-boundary values in x
-    !! @param vR_y Right reconstructed cell-boundary values in y
-    !! @param vR_z Right reconstructed cell-boundary values in z
-    !! @param norm_dir Splitting coordinate direction
+    !> Reconstruct left and right cell-boundary values from cell-averaged variables
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
@@ -1682,7 +1672,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values
 
-    !> @brief Performs first-order (piecewise constant) reconstruction of left and right cell-boundary values.
+    !> Perform first-order (piecewise constant) reconstruction of left and right cell-boundary values
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf

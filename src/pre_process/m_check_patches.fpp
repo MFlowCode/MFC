@@ -31,7 +31,7 @@ module m_check_patches
 
 contains
 
-    !> @brief Validates the geometry parameters of all active and inactive initial condition patches.
+    !> Validate the geometry parameters of all active and inactive initial condition patches.
     impure subroutine s_check_patches
 
         integer           :: i
@@ -125,8 +125,7 @@ contains
 
     end subroutine s_check_patches
 
-    !> This subroutine checks the line segment patch input
-    !! @param patch_id Patch identifier
+    !> Check the line segment patch input
     impure subroutine s_check_line_segment_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -141,8 +140,7 @@ contains
 
     end subroutine s_check_line_segment_patch_geometry
 
-    !> This subroutine checks the circle patch input
-    !! @param patch_id Patch identifier
+    !> Check the circle patch input
     impure subroutine s_check_circle_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -157,8 +155,7 @@ contains
 
     end subroutine s_check_circle_patch_geometry
 
-    !> This subroutine checks the rectangle patch input
-    !! @param patch_id Patch identifier
+    !> Check the rectangle patch input
     impure subroutine s_check_rectangle_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -174,8 +171,7 @@ contains
 
     end subroutine s_check_rectangle_patch_geometry
 
-    !> This subroutine checks the line sweep patch input
-    !! @param patch_id Patch identifier
+    !> Check the line sweep patch input
     impure subroutine s_check_line_sweep_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -193,8 +189,7 @@ contains
 
     end subroutine s_check_line_sweep_patch_geometry
 
-    !> This subroutine checks the ellipse patch input
-    !! @param patch_id Patch identifier
+    !> Check the ellipse patch input
     impure subroutine s_check_ellipse_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -211,8 +206,7 @@ contains
 
     end subroutine s_check_ellipse_patch_geometry
 
-    !> This subroutine checks the model patch input
-    !! @param patch_id Patch identifier
+    !> Check the model patch input
     impure subroutine s_check_2D_TaylorGreen_vortex_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -234,8 +228,7 @@ contains
 
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry
 
-    !> This subroutine checks the model patch input
-    !! @param patch_id Patch identifier
+    !> Check the model patch input
     impure subroutine s_check_sphere_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -282,8 +275,7 @@ contains
 
     end subroutine s_check_3d_spherical_harmonic_patch_geometry
 
-    !> This subroutine checks the model patch input
-    !! @param patch_id Patch identifier
+    !> Check the model patch input
     impure subroutine s_check_cuboid_patch_geometry(patch_id)
 
         ! Patch identifier
@@ -301,8 +293,7 @@ contains
 
     end subroutine s_check_cuboid_patch_geometry
 
-    !> This subroutine checks the model patch input
-    !! @param patch_id Patch identifier
+    !> Check the model patch input
     impure subroutine s_check_cylinder_patch_geometry(patch_id)
 
         ! Patch identifier
@@ -330,8 +321,7 @@ contains
 
     end subroutine s_check_cylinder_patch_geometry
 
-    !> This subroutine checks the model patch input
-    !! @param patch_id Patch identifier
+    !> Check the model patch input
     impure subroutine s_check_plane_sweep_patch_geometry(patch_id)
 
         ! Patch identifier
@@ -349,8 +339,7 @@ contains
 
     end subroutine s_check_plane_sweep_patch_geometry
 
-    !> This subroutine checks the model patch input
-    !! @param patch_id Patch identifier
+    !> Check the model patch input
     impure subroutine s_check_ellipsoid_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -396,8 +385,7 @@ contains
 
     end subroutine s_check_inactive_patch_geometry
 
-    !> This subroutine verifies the active patch's right to overwrite the preceding patches
-    !! @param patch_id Patch identifier
+    !> Verify the active patch's right to overwrite the preceding patches
     impure subroutine s_check_active_patch_alteration_rights(patch_id)
 
         integer, intent(in) :: patch_id
@@ -411,8 +399,7 @@ contains
 
     end subroutine s_check_active_patch_alteration_rights
 
-    !> This subroutine verifies that inactive patches cannot overwrite other patches
-    !! @param patch_id Patch identifier
+    !> Verify that inactive patches cannot overwrite other patches
     impure subroutine s_check_inactive_patch_alteration_rights(patch_id)
 
         ! Patch identifier
@@ -426,8 +413,7 @@ contains
 
     end subroutine s_check_inactive_patch_alteration_rights
 
-    !> This subroutine checks the smoothing parameters
-    !! @param patch_id Patch identifier
+    !> Check the smoothing parameters
     impure subroutine s_check_supported_patch_smoothing(patch_id)
 
         integer, intent(in) :: patch_id
@@ -450,8 +436,7 @@ contains
 
     end subroutine s_check_supported_patch_smoothing
 
-    !> This subroutine verifies that inactive patches cannot be smoothed
-    !! @param patch_id Patch identifier
+    !> Verify that inactive patches cannot be smoothed
     impure subroutine s_check_unsupported_patch_smoothing(patch_id)
 
         ! Patch identifier
@@ -467,8 +452,7 @@ contains
 
     end subroutine s_check_unsupported_patch_smoothing
 
-    !> This subroutine checks the primitive variables
-    !! @param patch_id Patch identifier
+    !> Check the primitive variables
     impure subroutine s_check_active_patch_primitive_variables(patch_id)
 
         integer, intent(in)   :: patch_id
@@ -520,9 +504,7 @@ contains
 
     end subroutine s_check_active_patch_primitive_variables
 
-    !> This subroutine verifies that the primitive variables associated with the given inactive patch remain unaltered by the user
-    !! inputs.
-    !! @param patch_id Patch identifier
+    !> Verify that the primitive variables associated with the given inactive patch remain unaltered by the user inputs.
     impure subroutine s_check_inactive_patch_primitive_variables(patch_id)
 
         integer, intent(in) :: patch_id
@@ -540,7 +522,7 @@ contains
 
     end subroutine s_check_inactive_patch_primitive_variables
 
-    !> @brief Verifies that the model file referenced by the given patch exists on disk.
+    !> Verify that the model file referenced by the given patch exists on disk.
     impure subroutine s_check_model_geometry(patch_id)
 
         integer, intent(in) :: patch_id

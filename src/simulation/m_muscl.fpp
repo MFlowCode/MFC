@@ -89,7 +89,7 @@ contains
 
     end subroutine s_initialize_muscl_module
 
-    !> @brief Performs MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables.
+    !> Perform MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables
     subroutine s_muscl(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, is1_muscl_d, &
 
         & is2_muscl_d, is3_muscl_d)
@@ -216,7 +216,7 @@ contains
 
     end subroutine s_muscl
 
-    !> @brief Applies THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces.
+    !> Apply THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces
     subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, &
 
         & is1_muscl_d, is2_muscl_d, is3_muscl_d)
@@ -286,7 +286,7 @@ contains
 
     end subroutine s_interface_compression
 
-    !> @brief Reshapes cell-averaged variable data into direction-local work arrays for MUSCL reconstruction.
+    !> Reshape cell-averaged variable data into direction-local work arrays for MUSCL reconstruction
     subroutine s_initialize_muscl(v_vf, muscl_dir)
 
         type(scalar_field), dimension(:), intent(in) :: v_vf
@@ -346,7 +346,7 @@ contains
 
     end subroutine s_initialize_muscl
 
-    !> @brief Deallocates the MUSCL direction-local work arrays.
+    !> Finalize the MUSCL module
     subroutine s_finalize_muscl_module()
 
         @:DEALLOCATE(v_rs_ws_x_muscl)

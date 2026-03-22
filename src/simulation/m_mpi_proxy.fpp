@@ -33,7 +33,7 @@ module m_mpi_proxy
 
 contains
 
-    !> @brief Allocates immersed boundary communication buffers for MPI halo exchanges.
+    !> Initialize the MPI proxy module
     subroutine s_initialize_mpi_proxy_module()
 
 #ifdef MFC_MPI
@@ -241,7 +241,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
+    !> Broadcast random phase numbers from rank 0 to all MPI processes
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
 
         integer, intent(in)                            :: num_freq
@@ -255,7 +255,7 @@ contains
 
     end subroutine s_mpi_send_random_number
 
-    !> @brief Deallocates immersed boundary MPI communication buffers.
+    !> Finalize the MPI proxy module
     subroutine s_finalize_mpi_proxy_module()
 
 #ifdef MFC_MPI

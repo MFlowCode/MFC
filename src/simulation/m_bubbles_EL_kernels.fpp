@@ -12,14 +12,7 @@ module m_bubbles_EL_kernels
 
 contains
 
-    !> The purpose of this subroutine is to smear the strength of the lagrangian bubbles into the Eulerian framework using different
-    !! approaches.
-    !! @param nBubs Number of lagrangian bubbles in the current domain
-    !! @param lbk_rad Radius of the bubbles
-    !! @param lbk_vel Interface velocity of the bubbles
-    !! @param lbk_s Computational coordinates of the bubbles
-    !! @param lbk_pos Spatial coordinates of the bubbles
-    !! @param updatedvar Eulerian variable to be updated
+    !> Smear the Lagrangian bubble effects onto the Eulerian grid using the selected kernel
     subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in)                                               :: nBubs
@@ -36,8 +29,7 @@ contains
 
     end subroutine s_smoothfunction
 
-    !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles. The
-    !! effect of the bubbles only affects the cell where the bubble is located.
+    !> Apply the delta kernel function to map bubble effects onto the containing cell
     subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
 
         integer, intent(in)                                               :: nBubs
@@ -88,8 +80,7 @@ contains
 
     end subroutine s_deltafunc
 
-    !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the bubbles.
-    !! The effect of the bubbles affects the 3X3x3 cells that surround the bubble.
+    !> Apply the Gaussian kernel function to smear bubble effects onto surrounding cells
     subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in)                                               :: nBubs
@@ -187,7 +178,7 @@ contains
 
     end subroutine s_gaussian
 
-    !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
+    !> Evaluate the Gaussian kernel at a grid node for a given bubble center
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
 
         $:GPU_ROUTINE(function_name='s_applygaussian',parallelism='[seq]', cray_inline=True)
@@ -251,10 +242,7 @@ contains
 
     end subroutine s_applygaussian
 
-    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost
-    !! cells).
-    !! @param cellaux Tested cell to smear the bubble effect in.
-    !! @param celloutside If true, then cellaux is outside the computational domain.
+    !> Check if the current cell is outside the computational domain including ghost cells
     subroutine s_check_celloutside(cellaux, celloutside)
 
         $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', cray_inline=True)
@@ -286,9 +274,7 @@ contains
 
     end subroutine s_check_celloutside
 
-    !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
-    !! @param cell Cell of the current bubble
-    !! @param cellaux Cell to map the bubble effect in.
+    !> Relocate cells that intersect a symmetric boundary
     subroutine s_shift_cell_symmetric_bc(cellaux, cell)
 
         $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', parallelism='[seq]', cray_inline=True)
@@ -325,9 +311,6 @@ contains
     end subroutine s_shift_cell_symmetric_bc
 
     !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
-    !! @param cell Cell where the bubble is located
-    !! @param volpart Volume of the bubble
-    !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
 
         $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', cray_inline=True)
@@ -363,11 +346,7 @@ contains
 
     end subroutine s_compute_stddsv
 
-    !> The purpose of this procedure is to calculate the characteristic cell volume
-    !! @param cellx x-direction cell index
-    !! @param celly y-direction cell index
-    !! @param cellz z-direction cell index
-    !! @param Charvol Characteristic volume
+    !> Compute the characteristic cell volume
     subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
 
         $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', cray_inline=True)
@@ -387,9 +366,7 @@ contains
 
     end subroutine s_get_char_vol
 
-    !> This subroutine transforms the computational coordinates of the bubble from real type into integer.
-    !! @param s_cell Computational coordinates of the bubble, real type
-    !! @param get_cell Computational coordinates of the bubble, integer type
+    !> Convert bubble computational coordinates from real to integer cell indices
     subroutine s_get_cell(s_cell, get_cell)
 
         $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', cray_inline=True)

@@ -74,7 +74,7 @@ module m_data_output
 
 contains
 
-    !> @brief Allocate storage arrays, configure output directories, and count flow variables for formatted database output.
+    !> Allocate storage arrays, configure output directories, and count flow variables for formatted database output.
     impure subroutine s_initialize_data_output_module()
 
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
@@ -314,7 +314,7 @@ contains
 
     end subroutine s_initialize_data_output_module
 
-    !> @brief Compute the cell-index bounds for the user-specified partial output domain in each coordinate direction.
+    !> Compute the cell-index bounds for the user-specified partial output domain in each coordinate direction.
     impure subroutine s_define_output_region
 
         integer :: i
@@ -349,7 +349,7 @@ contains
 
     end subroutine s_define_output_region
 
-    !> @brief Open (or create) the Silo-HDF5 or Binary formatted database slave and master files for a given time step.
+    !> Open (or create) the Silo-HDF5 or Binary formatted database slave and master files for a given time step.
     impure subroutine s_open_formatted_database_file(t_step)
 
         integer, intent(in)                            :: t_step
@@ -414,7 +414,7 @@ contains
 
     end subroutine s_open_formatted_database_file
 
-    !> @brief Open the interface data file for appending extracted interface coordinates.
+    !> Open the interface data file for appending extracted interface coordinates.
     impure subroutine s_open_intf_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path
@@ -426,7 +426,7 @@ contains
 
     end subroutine s_open_intf_data_file
 
-    !> @brief Open the energy data file for appending volume-integrated energy budget quantities.
+    !> Open the energy data file for appending volume-integrated energy budget quantities.
     impure subroutine s_open_energy_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path
@@ -438,7 +438,7 @@ contains
 
     end subroutine s_open_energy_data_file
 
-    !> @brief Write the computational grid (cell-boundary coordinates) to the formatted database slave and master files.
+    !> Write the computational grid (cell-boundary coordinates) to the formatted database slave and master files.
     impure subroutine s_write_grid_to_formatted_database_file(t_step)
 
         integer, intent(in) :: t_step
@@ -575,7 +575,7 @@ contains
 
     end subroutine s_write_grid_to_formatted_database_file
 
-    !> @brief Write a single flow variable field to the formatted database slave and master files for a given time step.
+    !> Write a single flow variable field to the formatted database slave and master files for a given time step.
     impure subroutine s_write_variable_to_formatted_database_file(varname, t_step)
 
         character(LEN=*), intent(in) :: varname
@@ -708,8 +708,7 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file
 
-    !> Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
-    !! @param t_step Current time step
+    !> Write the post-processed results in the folder 'lag_bubbles_data'
     impure subroutine s_write_lag_bubbles_results_to_text(t_step)
 
         integer, intent(in)                            :: t_step
@@ -862,7 +861,7 @@ contains
 
     end subroutine s_write_lag_bubbles_results_to_text
 
-    !> @brief Read Lagrangian bubble restart data and write bubble positions and scalar fields to the Silo database.
+    !> Read Lagrangian bubble restart data and write bubble positions and scalar fields to the Silo database.
     impure subroutine s_write_lag_bubbles_to_formatted_database_file(t_step)
 
         integer, intent(in)                            :: t_step
@@ -1070,7 +1069,7 @@ contains
 
     end subroutine s_write_lag_bubbles_to_formatted_database_file
 
-    !> @brief Write a single Lagrangian bubble point-variable to the Silo database slave and master files.
+    !> Write a single Lagrangian bubble point-variable to the Silo database slave and master files.
     subroutine s_write_lag_variable_to_formatted_database_file(varname, t_step, data, nBubs)
 
         character(len=*), intent(in)                  :: varname
@@ -1165,8 +1164,7 @@ contains
 
     end subroutine s_write_ib_state_files
 
-    !> @brief Extract the volume-fraction interface contour from primitive fields and write the coordinates to the interface data
-    !! file.
+    !> Extract the volume-fraction interface contour from primitive fields and write the coordinates to the interface data file.
     impure subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -1252,8 +1250,7 @@ contains
 
     end subroutine s_write_intf_data_file
 
-    !> @brief Compute volume-integrated kinetic, potential, and internal energies and write the energy budget to the energy data
-    !! file.
+    !> Compute volume-integrated kinetic, potential, and internal energies and write the energy budget to the energy data file.
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf, q_cons_vf
@@ -1345,7 +1342,7 @@ contains
 
     end subroutine s_write_energy_data_file
 
-    !> @brief Close the formatted database slave file and, for the root process, the master file.
+    !> Close the formatted database slave file and, for the root process, the master file.
     impure subroutine s_close_formatted_database_file()
 
         integer :: ierr
@@ -1360,21 +1357,21 @@ contains
 
     end subroutine s_close_formatted_database_file
 
-    !> @brief Close the interface data file.
+    !> Close the interface data file.
     impure subroutine s_close_intf_data_file()
 
         close (211)
 
     end subroutine s_close_intf_data_file
 
-    !> @brief Close the energy data file.
+    !> Close the energy data file.
     impure subroutine s_close_energy_data_file()
 
         close (251)
 
     end subroutine s_close_energy_data_file
 
-    !> @brief Deallocate module arrays and release all data-output resources.
+    !> Deallocate module arrays and release all data-output resources.
     impure subroutine s_finalize_data_output_module()
 
         deallocate (q_sf)

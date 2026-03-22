@@ -57,12 +57,6 @@ module m_data_output
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
-    !! @param q_cons_vf Conservative variables
-    !! @param q_T_sf Temperature scalar field
-    !! @param q_prim_vf Primitive variables
-    !! @param t_step Current time step
-    !! @param bc_type Boundary condition type
-    !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf
@@ -80,9 +74,7 @@ contains
 
     end subroutine s_write_data_files
 
-    !> The purpose of this subroutine is to open a new or pre- existing run-time information file and append to it the basic header
-    !! information relevant to current simulation. In general, this requires generating a table header for those stability criteria
-    !! which will be written at every time-step.
+    !> Open the run-time information file and write the stability criteria table header
     impure subroutine s_open_run_time_information_file
 
         character(LEN=name_len), parameter :: file_name = 'run_time.inf'  !< Name of the run-time information file
@@ -116,7 +108,7 @@ contains
 
     end subroutine s_open_run_time_information_file
 
-    !> This opens a formatted data file where the root processor can write out the CoM information
+    !> Open center-of-mass data files for writing
     impure subroutine s_open_com_files()
 
         character(len=path_len + 3*name_len) :: file_path  !< Relative path to the CoM file in the case directory
@@ -141,7 +133,7 @@ contains
 
     end subroutine s_open_com_files
 
-    !> This opens a formatted data file where the root processor can write out flow probe information
+    !> Open flow probe data files for writing
     impure subroutine s_open_probe_files
 
         character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the probe data file in the case directory
@@ -184,11 +176,7 @@ contains
 
     end subroutine s_open_ib_state_file
 
-    !> The goal of the procedure is to output to the run-time information file the stability criteria extrema in the entire
-    !! computational domain and at the given time-step. Moreover, the subroutine is also in charge of tracking these stability
-    !! criteria extrema over all time-steps.
-    !! @param q_prim_vf Cell-average primitive variables
-    !! @param t_step Current time step
+    !> Write stability criteria extrema to the run-time information file at the given time step
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -303,13 +291,7 @@ contains
 
     end subroutine s_write_run_time_information
 
-    !> The goal of this subroutine is to output the grid and conservative variables data files for given time-step.
-    !! @param q_cons_vf Cell-average conservative variables
-    !! @param q_T_sf Temperature scalar field
-    !! @param q_prim_vf Cell-average primitive variables
-    !! @param t_step Current time-step
-    !! @param bc_type Boundary condition type
-    !! @param beta Eulerian void fraction from lagrangian bubbles
+    !> Write grid and conservative variable data files in serial format
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -665,11 +647,7 @@ contains
 
     end subroutine s_write_serial_data_files
 
-    !> The goal of this subroutine is to output the grid and conservative variables data files for given time-step.
-    !! @param q_cons_vf Cell-average conservative variables
-    !! @param t_step Current time-step
-    !! @param bc_type Boundary condition type
-    !! @param beta Eulerian void fraction from lagrangian bubbles
+    !> Write grid and conservative variable data files in parallel via MPI I/O
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf
@@ -865,7 +843,7 @@ contains
 
     end subroutine s_write_parallel_data_files
 
-    !> @brief Writes immersed boundary marker data to a serial (per-processor) unformatted file.
+    !> Write immersed boundary marker data to a serial (per-processor) unformatted file
     subroutine s_write_serial_ib_data(time_step)
 
         integer, intent(in)                  :: time_step
@@ -883,7 +861,7 @@ contains
 
     end subroutine s_write_serial_ib_data
 
-    !> @brief Writes immersed boundary marker data in parallel using MPI I/O.
+    !> Write immersed boundary marker data in parallel using MPI I/O
     subroutine s_write_parallel_ib_data(time_step)
 
         integer, intent(in) :: time_step
@@ -920,7 +898,7 @@ contains
 
     end subroutine s_write_parallel_ib_data
 
-    !> @brief Dispatches immersed boundary data output to the serial or parallel writer.
+    !> Dispatch immersed boundary data output to the serial or parallel writer
     subroutine s_write_ib_data_file(time_step)
 
         integer, intent(in) :: time_step
@@ -933,7 +911,7 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> @brief Writes IB state records to D/ib_state.dat. Must be called only on rank 0.
+    !> Write IB state records to D/ib_state.dat (rank 0 only)
     impure subroutine s_write_ib_state_file()
 
         integer :: i
@@ -945,9 +923,7 @@ contains
 
     end subroutine s_write_ib_state_file
 
-    !> This writes a formatted data file where the root processor can write out the CoM information
-    !! @param t_step Current time-step
-    !! @param c_mass_in Center of mass information
+    !> Write center-of-mass data at the current time step
     impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in)                            :: t_step
@@ -980,10 +956,7 @@ contains
 
     end subroutine s_write_com_files
 
-    !> This writes a formatted data file for the flow probe information
-    !! @param t_step Current time-step
-    !! @param q_cons_vf Conservative variables
-    !! @param accel_mag Acceleration magnitude information
+    !> Write flow probe data at the current time step
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in)                                 :: t_step
@@ -1520,9 +1493,7 @@ contains
 
     end subroutine s_write_probe_files
 
-    !> The goal of this subroutine is to write to the run-time information file basic footer information applicable to the current
-    !! computation and to close the file when done. The footer contains the stability criteria extrema over all of the time-steps
-    !! and the simulation run-time.
+    !> Write footer with stability criteria extrema and run-time to the information file, then close it
     impure subroutine s_close_run_time_information_file
 
         real(wp) :: run_time  !< Run-time of the simulation
@@ -1571,8 +1542,7 @@ contains
 
     end subroutine s_close_ib_state_file
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the data output module
     impure subroutine s_initialize_data_output_module
 
         integer :: i, m_ds, n_ds, p_ds

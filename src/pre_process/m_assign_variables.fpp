@@ -28,13 +28,6 @@ module m_assign_variables
     abstract interface
 
         !> Skeleton of s_assign_patch_mixture_primitive_variables and s_assign_patch_species_primitive_variables
-        !! @param patch_id is the patch identifier
-        !! @param j (x) cell index in which the mixture or species primitive variables from the indicated patch are assigned
-        !! @param k (y,th) cell index in which the mixture or species primitive variables from the indicated patch are assigned
-        !! @param l (z) cell index in which the mixture or species primitive variables from the indicated patch are assigned
-        !! @param eta pseudo volume fraction
-        !! @param q_prim_vf Primitive variables
-        !! @param patch_id_fp Array to track patch ids
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, eta, q_prim_vf, patch_id_fp)
 
             import :: scalar_field, sys_size, n, m, p, wp
@@ -59,7 +52,7 @@ module m_assign_variables
 
 contains
 
-    !> @brief Allocates volume fraction sum and sets the patch primitive variable assignment procedure pointer.
+    !> Allocate volume fraction sum and set the patch primitive variable assignment procedure pointer.
     impure subroutine s_initialize_assign_variables_module
 
         if (.not. igr) then
@@ -76,18 +69,11 @@ contains
 
     end subroutine s_initialize_assign_variables_module
 
-    !> This subroutine assigns the mixture primitive variables of the patch designated by the patch_id, to the cell that is
-    !! designated by the indexes (j,k,l). In addition, the variable bookkeeping the patch identities in the entire domain is updated
-    !! with the new assignment. Note that if the smoothing of the patch's boundaries is employed, the ensuing primitive variables in
-    !! the cell will be a type of combination of the current patch's primitive variables with those of the smoothing patch. The
-    !! specific details of the combination may be found in Shyue's work (1998).
-    !! @param patch_id the patch identifier
-    !! @param j the x-dir node index
-    !! @param k the y-dir node index
-    !! @param l the z-dir node index
-    !! @param eta pseudo volume fraction
-    !! @param q_prim_vf Primitive variables
-    !! @param patch_id_fp Array to track patch ids
+    !> Assign the mixture primitive variables of the patch designated by the patch_id to the cell that is designated by the indexes
+    !! (j,k,l). In addition, the variable bookkeeping the patch identities in the entire domain is updated with the new assignment.
+    !! Note that if the smoothing of the patch's boundaries is employed, the ensuing primitive variables in the cell will be a type
+    !! of combination of the current patch's primitive variables with those of the smoothing patch. The specific details of the
+    !! combination may be found in Shyue's work (1998).
     subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, eta, q_prim_vf, patch_id_fp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -148,11 +134,7 @@ contains
 
     end subroutine s_assign_patch_mixture_primitive_variables
 
-    !> @brief Applies a stable pressure perturbation following Ando's method for bubble-laden flows.
-    !! @param j the x-dir node index
-    !! @param k the y-dir node index
-    !! @param l the z-dir node index
-    !! @param q_prim_vf Primitive variables
+    !> Apply a stable pressure perturbation following Ando's method for bubble-laden flows.
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         integer, intent(in)                                      :: j, k, l
@@ -223,15 +205,8 @@ contains
 
     end subroutine s_perturb_primitive
 
-    !> This subroutine assigns the species primitive variables. This follows s_assign_patch_species_primitive_variables with
-    !! adaptation for ensemble-averaged bubble modeling
-    !! @param patch_id the patch identifier
-    !! @param j the x-dir node index
-    !! @param k the y-dir node index
-    !! @param l the z-dir node index
-    !! @param eta pseudo volume fraction
-    !! @param q_prim_vf Primitive variables
-    !! @param patch_id_fp Array to track patch ids
+    !> Assign the species primitive variables, following s_assign_patch_species_primitive_variables with adaptation for
+    !! ensemble-averaged bubble modeling
     impure subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, eta, q_prim_vf, patch_id_fp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -573,7 +548,7 @@ contains
 
     end subroutine s_assign_patch_species_primitive_variables
 
-    !> @brief Nullifies the patch primitive variable assignment procedure pointer.
+    !> Nullify the patch primitive variable assignment procedure pointer.
     impure subroutine s_finalize_assign_variables_module
 
         s_assign_patch_primitive_variables => null()

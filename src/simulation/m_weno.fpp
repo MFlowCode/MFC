@@ -82,8 +82,7 @@ module m_weno
 
 contains
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the WENO module
     impure subroutine s_initialize_weno_module
 
         if (weno_order == 1) return
@@ -170,10 +169,7 @@ contains
 
     end subroutine s_initialize_weno_module
 
-    !> The purpose of this subroutine is to compute the grid dependent coefficients of the WENO polynomials, ideal weights and
-    !! smoothness indicators, provided the order, the coordinate direction and the location of the WENO reconstruction.
-    !! @param weno_dir Coordinate direction of the WENO reconstruction
-    !! @param is Index bounds in the s-direction
+    !> Compute WENO polynomial coefficients, ideal weights, and smoothness indicators for a given direction
     subroutine s_compute_weno_coefficients(weno_dir, is)
 
         ! Compute WENO coefficients for a given coordinate direction. Shu (1997)
@@ -860,7 +856,7 @@ contains
 
     end subroutine s_compute_weno_coefficients
 
-    !> @brief Performs WENO reconstruction of left and right cell-boundary values from cell-averaged variables.
+    !> Perform WENO reconstruction of left and right cell-boundary values from cell-averaged variables
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, weno_dir, is1_weno_d, &
 
         & is2_weno_d, is3_weno_d)
@@ -1386,10 +1382,7 @@ contains
 
     end subroutine s_weno
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are required for the setup of the WENO reconstruction.
-    !! @param v_vf Cell-averaged variables
-    !! @param weno_dir Coordinate direction of the WENO reconstruction
+    !> Set up the WENO reconstruction for a given direction
     subroutine s_initialize_weno(v_vf, weno_dir)
 
         type(scalar_field), dimension(:), intent(in) :: v_vf
@@ -1451,12 +1444,7 @@ contains
 
     end subroutine s_initialize_weno
 
-    !> The goal of this subroutine is to ensure that the WENO reconstruction is monotonic. The latter is achieved by enforcing
-    !! monotonicity preserving bounds of Suresh and Huynh (1997). The resulting MPWENO reconstruction, see Balsara and Shu (2000),
-    !! ensures that the reconstructed values do not reside outside the range spanned by WENO stencil.
-    !! @param v_rs_ws Reshaped cell-averaged variables
-    !! @param vL_rs_vf Left WENO reconstructed cell-boundary values
-    !! @param vR_rs_vf Right WENO reconstructed cell-boundary values
+    !> Enforce monotonicity-preserving bounds on the WENO reconstruction
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(in) :: v_rs_ws

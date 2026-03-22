@@ -97,10 +97,6 @@ contains
     end subroutine s_initialize_derived_variables
 
     !> Writes coherent body information, communication files, and probes.
-    !! @param t_step Current time-step
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_ts1 Primitive variables at time-stage 1
-    !! @param q_prim_ts2 Primitive variables at time-stage 2
     subroutine s_compute_derived_variables(t_step, q_cons_vf, q_prim_ts1, q_prim_ts2)
 
         integer, intent(in)                             :: t_step
@@ -146,15 +142,7 @@ contains
 
     end subroutine s_compute_derived_variables
 
-    !> This subroutine receives as inputs the indicator of the component of the acceleration that should be outputted and the
-    !! primitive variables. From those inputs, it proceeds to calculate values of the desired acceleration component, which are
-    !! subsequently stored in derived flow quantity storage variable, q_sf.
-    !! @param i Acceleration component indicator
-    !! @param q_prim_vf0 Primitive variables
-    !! @param q_prim_vf1 Primitive variables
-    !! @param q_prim_vf2 Primitive variables
-    !! @param q_prim_vf3 Primitive variables
-    !! @param q_sf Acceleration component
+    !> Compute a component of the acceleration field from the primitive variables
     subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, q_prim_vf2, q_prim_vf3, q_sf)
 
         integer, intent(in)                                 :: i
@@ -348,11 +336,7 @@ contains
 
     end subroutine s_derive_acceleration_component
 
-    !> This subroutine is used together with the volume fraction model and when called upon, it computes the location of of the
-    !! center of mass for each fluid from the inputted primitive variables, q_prim_vf. The computed location is then written to a
-    !! formatted data file by the root process.
-    !! @param q_vf Primitive variables
-    !! @param c_m Mass,x-location,y-location,z-location
+    !> Compute the center of mass for each fluid from the primitive variables
     impure subroutine s_derive_center_of_mass(q_vf, c_m)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf

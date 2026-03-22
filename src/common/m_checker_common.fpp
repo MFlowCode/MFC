@@ -32,7 +32,7 @@ contains
     end subroutine s_check_inputs_common
 
 #ifndef MFC_SIMULATION
-    !> @brief Verifies that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.
+    !> Verify that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.
     impure subroutine s_check_total_cells
 
         character(len=18) :: numStr  !< for int to string conversion
@@ -48,7 +48,7 @@ contains
     end subroutine s_check_total_cells
 #endif
 
-    !> @brief Checks that simulation parameters stay within AMD GPU compiler limits when case optimization is disabled.
+    !> Check that simulation parameters stay within AMD GPU compiler limits when case optimization is disabled.
     impure subroutine s_check_amd
 
         #:if not MFC_CASE_OPTIMIZATION

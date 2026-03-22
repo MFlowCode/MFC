@@ -31,9 +31,7 @@ module m_hyperelastic
 
 contains
 
-    !> The following subroutine handles the calculation of the btensor. The calculation of the btensor takes qprimvf. calculate the
-    !! grad_xi, grad_xi is a nxn tensor calculate the inverse of grad_xi to obtain F, F is a nxn tensor calculate the FFtranspose to
-    !! obtain the btensor, btensor is nxn tensor btensor is symmetric, save the data space
+    !> Initialize the hyperelastic module
     impure subroutine s_initialize_hyperelastic_module
 
         integer :: i  !< generic iterator
@@ -73,11 +71,7 @@ contains
 
     end subroutine s_initialize_hyperelastic_module
 
-    !> The following subroutine handles the calculation of the btensor. The calculation of the btensor takes qprimvf.
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf Primitive variables
-    !! calculate the grad_xi, grad_xi is a nxn tensor calculate the inverse of grad_xi to obtain F, F is a nxn tensor calculate the
-    !! FFtranspose to obtain the btensor, btensor is nxn tensor btensor is symmetric, save the data space
+    !> Compute the left Cauchy-Green deformation tensor and update the hyperelastic stress
     subroutine s_hyperelastic_rmt_stress_update(q_cons_vf, q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -195,15 +189,7 @@ contains
 
     end subroutine s_hyperelastic_rmt_stress_update
 
-    !> The following subroutine handles the calculation of the btensor. The calculation of the btensor takes qprimvf.
-    !! @param btensor_in Left Cauchy-Green deformation tensor
-    !! @param q_prim_vf Primitive variables
-    !! @param G_param Elastic shear modulus
-    !! @param j x-direction cell index
-    !! @param k y-direction cell index
-    !! @param l z-direction cell index
-    !! calculate the grad_xi, grad_xi is a nxn tensor calculate the inverse of grad_xi to obtain F, F is a nxn tensor calculate the
-    !! FFtranspose to obtain the btensor, btensor is nxn tensor btensor is symmetric, save the data space
+    !> Compute the neo-Hookean Cauchy stress from the left Cauchy-Green tensor
     subroutine s_neoHookean_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -231,15 +217,7 @@ contains
 
     end subroutine s_neoHookean_cauchy_solver
 
-    !> The following subroutine handles the calculation of the btensor. The calculation of the btensor takes qprimvf.
-    !! @param btensor_in Left Cauchy-Green deformation tensor
-    !! @param q_prim_vf Primitive variables
-    !! @param G_param Elastic shear modulus
-    !! @param j x-direction cell index
-    !! @param k y-direction cell index
-    !! @param l z-direction cell index
-    !! calculate the grad_xi, grad_xi is a nxn tensor calculate the inverse of grad_xi to obtain F, F is a nxn tensor calculate the
-    !! FFtranspose to obtain the btensor, btensor is nxn tensor btensor is symmetric, save the data space
+    !> Compute the Mooney-Rivlin Cauchy stress from the left Cauchy-Green tensor
     subroutine s_Mooney_Rivlin_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -268,7 +246,7 @@ contains
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 
-    !> @brief Deallocates memory for hyperelastic deformation tensor and finite-difference coefficients.
+    !> Finalize the hyperelastic module
     impure subroutine s_finalize_hyperelastic_module()
 
         integer :: i  !< iterator

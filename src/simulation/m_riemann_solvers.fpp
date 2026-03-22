@@ -85,28 +85,6 @@ contains
 
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
     !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_exact_riemann_solver 4) s_hlld_riemann_solver
-    !! @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
-    !! @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
-    !! @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
-    !! @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the      first-order x-dir spatial derivatives
-    !! @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the      first-order y-dir spatial derivatives
-    !! @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the      first-order z-dir spatial derivatives
-    !! @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the      cell-average primitive variables
-    !! @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
-    !! @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
-    !! @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
-    !! @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the      first-order x-dir spatial derivatives
-    !! @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the      first-order y-dir spatial derivatives
-    !! @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the      first-order z-dir spatial derivatives
-    !! @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the      cell-average primitive variables
-    !! @param q_prim_vf Cell-averaged primitive variables
-    !! @param flux_vf Intra-cell fluxes
-    !! @param flux_src_vf Intra-cell fluxes sources
-    !! @param flux_gsrc_vf Intra-cell geometric fluxes sources
-    !! @param norm_dir Dir. splitting direction
-    !! @param ix Index bounds in the x-dir
-    !! @param iy Index bounds in the y-dir
-    !! @param iz Index bounds in the z-dir
     subroutine s_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
 
         & qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
@@ -1704,28 +1682,6 @@ contains
     end subroutine s_lf_riemann_solver
 
     ! HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
-    !! @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
-    !! @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
-    !! @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
-    !! @param dqL_prim_dx_vf The left WENO-reconstructed cell-boundary values of the      first-order x-dir spatial derivatives
-    !! @param dqL_prim_dy_vf The left WENO-reconstructed cell-boundary values of the      first-order y-dir spatial derivatives
-    !! @param dqL_prim_dz_vf The left WENO-reconstructed cell-boundary values of the      first-order z-dir spatial derivatives
-    !! @param qL_prim_vf The left WENO-reconstructed cell-boundary values of the      cell-average primitive variables
-    !! @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
-    !! @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
-    !! @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
-    !! @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the      first-order x-dir spatial derivatives
-    !! @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the      first-order y-dir spatial derivatives
-    !! @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the      first-order z-dir spatial derivatives
-    !! @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the      cell-average primitive variables
-    !! @param q_prim_vf Cell-averaged primitive variables
-    !! @param flux_vf Intra-cell fluxes
-    !! @param flux_src_vf Intra-cell fluxes sources
-    !! @param flux_gsrc_vf Intra-cell geometric fluxes sources
-    !! @param norm_dir Dir. splitting direction
-    !! @param ix Index bounds in the x-dir
-    !! @param iy Index bounds in the y-dir
-    !! @param iz Index bounds in the z-dir
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
 
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -3590,8 +3546,7 @@ contains
 
     end subroutine s_hlld_riemann_solver
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the Riemann solvers module
     impure subroutine s_initialize_riemann_solvers_module
 
         ! Allocating the variables that will be utilized to formulate the left, right, and average states of the Riemann problem, as
@@ -3673,24 +3628,7 @@ contains
 
     end subroutine s_initialize_riemann_solvers_module
 
-    !> The purpose of this subroutine is to populate the buffers of the left and right Riemann states variables, depending on the
-    !! boundary conditions.
-    !! @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
-    !! @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
-    !! @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
-    !! @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the      first-order x-dir spatial derivatives
-    !! @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the      first-order y-dir spatial derivatives
-    !! @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the      first-order z-dir spatial derivatives
-    !! @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
-    !! @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
-    !! @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
-    !! @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the      first-order x-dir spatial derivatives
-    !! @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the      first-order y-dir spatial derivatives
-    !! @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the      first-order z-dir spatial derivatives
-    !! @param norm_dir Dir. splitting direction
-    !! @param ix Index bounds in the x-dir
-    !! @param iy Index bounds in the y-dir
-    !! @param iz Index bounds in the z-dir
+    !> Populate the left and right Riemann state variable buffers based on boundary conditions
     subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
 
         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -4024,10 +3962,7 @@ contains
 
     end subroutine s_populate_riemann_states_variables_buffers
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures needed to configure the chosen Riemann solver algorithm.
-    !! @param flux_src_vf Intra-cell fluxes sources
-    !! @param norm_dir Dir. splitting direction
+    !> Set up the chosen Riemann solver algorithm for the current direction
     subroutine s_initialize_riemann_solver(flux_src_vf, norm_dir)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
@@ -4176,22 +4111,7 @@ contains
 
     end subroutine s_initialize_riemann_solver
 
-    !> @brief Computes cylindrical viscous source flux contributions for momentum and energy. Calculates Cartesian components of the
-    !! stress tensor using averaged velocity derivatives and cylindrical geometric factors, then updates `flux_src_vf`. Assumes
-    !! x-dir is axial (z_cyl), y-dir is radial (r_cyl), z-dir is azimuthal (theta_cyl for derivatives).
-    !! @param[in] velL_vf Left boundary velocity (\f$v_x, v_y, v_z\f$) (num_dims scalar_field).
-    !! @param[in] dvelL_dx_vf Left boundary \f$\partial v_i/\partial x\f$ (num_dims scalar_field).
-    !! @param[in] dvelL_dy_vf Left boundary \f$\partial v_i/\partial y\f$ (num_dims scalar_field).
-    !! @param[in] dvelL_dz_vf Left boundary \f$\partial v_i/\partial z\f$ (num_dims scalar_field).
-    !! @param[in] velR_vf Right boundary velocity (\f$v_x, v_y, v_z\f$) (num_dims scalar_field).
-    !! @param[in] dvelR_dx_vf Right boundary \f$\partial v_i/\partial x\f$ (num_dims scalar_field).
-    !! @param[in] dvelR_dy_vf Right boundary \f$\partial v_i/\partial y\f$ (num_dims scalar_field).
-    !! @param[in] dvelR_dz_vf Right boundary \f$\partial v_i/\partial z\f$ (num_dims scalar_field).
-    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
-    !! @param[in] norm_dir Interface normal direction (1=x-face, 2=y-face, 3=z-face).
-    !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
-    !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
-    !! @param[in] iz Global Z-direction loop bounds (int_bounds_info).
+    !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
 
         & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
@@ -4365,16 +4285,7 @@ contains
 
     end subroutine s_compute_cylindrical_viscous_source_flux
 
-    !> @brief Computes Cartesian viscous source flux contributions for momentum and energy. Calculates averaged velocity gradients,
-    !! gets Re and interface velocities, calls helpers for shear/bulk stress, then updates `flux_src_vf`.
-    !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
-    !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
-    !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
-    !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
-    !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
-    !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
-    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
-    !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
+    !> Compute Cartesian viscous source flux contributions for momentum and energy
     subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
 
         & dvelR_dz_vf, flux_src_vf, norm_dir)
@@ -4498,11 +4409,7 @@ contains
 
     end subroutine s_compute_cartesian_viscous_source_flux
 
-    !> @brief Calculates shear stress tensor components. tau_ij_shear = ( (dui/dxj + duj/dxi) - (2/3)*(div_v)*delta_ij ) / Re_shear
-    !! @param[in] vel_grad_avg Averaged velocity gradient tensor (d(vel_i)/d(coord_j)).
-    !! @param[in] Re_shear Shear Reynolds number.
-    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
-    !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
+    !> Compute shear stress tensor components
     subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -4534,10 +4441,7 @@ contains
 
     end subroutine s_calculate_shear_stress_tensor
 
-    !> @brief Calculates bulk stress tensor components (diagonal only). tau_ii_bulk = (div_v) / Re_bulk. Off-diagonals are zero.
-    !! @param[in] Re_bulk Bulk Reynolds number.
-    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
-    !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
+    !> Compute bulk stress tensor components (diagonal only)
     subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -4562,10 +4466,6 @@ contains
     end subroutine s_calculate_bulk_stress_tensor
 
     !> Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver
-    !! @param flux_vf       Intercell fluxes
-    !! @param flux_src_vf   Intercell source fluxes
-    !! @param flux_gsrc_vf  Intercell geometric source fluxes
-    !! @param norm_dir Dimensional splitting coordinate direction
     subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf

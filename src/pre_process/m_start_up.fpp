@@ -43,13 +43,12 @@ module m_start_up
 
     abstract interface
 
-        !> @brief Abstract interface for reading grid data files in serial or parallel.
+        !> Abstract interface for reading grid data files in serial or parallel.
         impure subroutine s_read_abstract_grid_data_files
 
         end subroutine s_read_abstract_grid_data_files
 
-        !> @brief Abstract interface for reading initial condition data files in serial or parallel.
-        !! @param q_cons_vf Conservative variables
+        !> Abstract interface for reading initial condition data files in serial or parallel.
         impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in)
 
             import :: scalar_field, integer_field, sys_size, pres_field
@@ -264,7 +263,6 @@ contains
 
     !> The goal of this subroutine is to read in any preexisting initial condition data files so that they may be used by the
     !! pre-process as a starting point in the creation of an all new initial condition.
-    !! @param q_cons_vf_in Conservative variables
     impure subroutine s_read_serial_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), dimension(sys_size), intent(inout)   :: q_cons_vf_in
@@ -412,7 +410,6 @@ contains
 
     !> The goal of this subroutine is to read in any preexisting initial condition data files so that they may be used by the
     !! pre-process as a starting point in the creation of an all new initial condition.
-    !! @param q_cons_vf_in Conservative variables
     impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf_in
@@ -487,7 +484,7 @@ contains
 
     end subroutine s_read_parallel_ic_data_files
 
-    !> @brief Initializes all pre-process modules, allocates data structures, and sets I/O procedure pointers.
+    !> Initialize all pre-process modules, allocate data structures, and set I/O procedure pointers.
     impure subroutine s_initialize_modules
 
         call s_initialize_global_parameters_module()
@@ -521,7 +518,7 @@ contains
 
     end subroutine s_initialize_modules
 
-    !> @brief Reads an existing grid from data files or generates a new grid from user inputs.
+    !> Read an existing grid from data files or generate a new grid from user inputs.
     impure subroutine s_read_grid()
 
         if (old_grid) then
@@ -540,7 +537,7 @@ contains
 
     end subroutine s_read_grid
 
-    !> @brief Generates or reads the initial condition, applies relaxation if needed, and writes output data files.
+    !> Generate or read the initial condition, apply relaxation if needed, and write output data files.
     impure subroutine s_apply_initial_condition(start, finish)
 
         real(wp), intent(inout) :: start, finish
@@ -583,7 +580,7 @@ contains
 
     end subroutine s_apply_initial_condition
 
-    !> @brief Gathers processor timing data and writes elapsed wall-clock time to a summary file.
+    !> Gather processor timing data and write elapsed wall-clock time to a summary file.
     impure subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
 
         real(wp), dimension(:), intent(inout) :: proc_time
@@ -619,7 +616,7 @@ contains
 
     end subroutine s_save_data
 
-    !> @brief Initializes MPI, reads and validates user inputs on rank 0, and decomposes the computational domain.
+    !> Initialize MPI, read and validate user inputs on rank 0, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
 
         call s_mpi_initialize()
@@ -640,7 +637,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    !> @brief Finalizes all pre-process modules, deallocates resources, and shuts down MPI.
+    !> Finalize all pre-process modules, deallocate resources, and shut down MPI.
     impure subroutine s_finalize_modules
 
         s_generate_grid => null()

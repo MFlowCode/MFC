@@ -59,8 +59,7 @@ module m_time_steppers
 
 contains
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the time steppers module
     impure subroutine s_initialize_time_steppers_module
 
 #ifdef FRONTIER_UNIFIED
@@ -453,7 +452,7 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
-    !> @brief Advances the solution one full step using a TVD Runge-Kutta time integrator.
+    !> Advance the solution one full step using a TVD Runge-Kutta time integrator
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 
 #ifdef _CRAYFTN
@@ -597,7 +596,6 @@ contains
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
-    !! @param stage Current time-stage
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
@@ -625,7 +623,7 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
-    !> @brief Computes the global time step size from CFL stability constraints across all cells.
+    !> Compute the global time step size from CFL stability constraints across all cells
     impure subroutine s_compute_dt()
 
         real(wp) :: rho  !< Cell-avg. density
@@ -686,10 +684,7 @@ contains
 
     end subroutine s_compute_dt
 
-    !> This subroutine applies the body forces source term at each Runge-Kutta stage
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf_in Primitive variables
-    !! @param rhs_vf_in Right-hand side variables
+    !> Apply the body forces source term at each Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
@@ -717,7 +712,7 @@ contains
 
     end subroutine s_apply_bodyforces
 
-    !> @brief Updates immersed boundary positions and velocities at the current Runge-Kutta stage.
+    !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
     subroutine s_propagate_immersed_boundaries(s)
 
         integer, intent(in) :: s
@@ -785,8 +780,7 @@ contains
 
     end subroutine s_propagate_immersed_boundaries
 
-    !> This subroutine saves the temporary q_prim_vf vector into the q_prim_ts vector that is then used in p_main
-    !! @param t_step current time-step
+    !> Save the temporary q_prim_vf vector into q_prim_ts for use in p_main
     subroutine s_time_step_cycling(t_step)
 
         integer, intent(in) :: t_step

@@ -58,8 +58,7 @@ module m_fftw
 
 contains
 
-    !> The purpose of this subroutine is to create the fftw plan that will be used in the forward and backward DFTs when applying
-    !! the Fourier filter in the azimuthal direction.
+    !> Initialize the FFTW module
     impure subroutine s_initialize_fftw_module
 
         integer :: ierr  !< Generic flag used to identify and report GPU errors
@@ -116,9 +115,7 @@ contains
 
     end subroutine s_initialize_fftw_module
 
-    !> The purpose of this subroutine is to apply a Fourier low- pass filter to the flow variables in the azimuthal direction to
-    !! remove the high-frequency content. This alleviates the restrictive CFL condition arising from cells near the axis.
-    !! @param q_cons_vf Conservative variables
+    !> Apply a Fourier low-pass filter in the azimuthal direction to remove high-frequency content
     impure subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -289,8 +286,7 @@ contains
 
     end subroutine s_apply_fourier_filter
 
-    !> The purpose of this subroutine is to destroy the fftw plan that will be used in the forward and backward DFTs when applying
-    !! the Fourier filter in the azimuthal direction.
+    !> Finalize the FFTW module
     impure subroutine s_finalize_fftw_module
 
 #if defined(MFC_GPU)

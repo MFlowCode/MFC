@@ -49,7 +49,7 @@ module m_icpp_patches
 
 contains
 
-    !> @brief Dispatches each initial condition patch to its geometry-specific initialization routine.
+    !> Dispatch each initial condition patch to its geometry-specific initialization routine.
     impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
@@ -165,9 +165,6 @@ contains
     !> The line segment patch is a 1D geometry that may be used, for example, in creating a Riemann problem. The geometry of the
     !! patch is well-defined when its centroid and length in the x-coordinate direction are provided. Note that the line segment
     !! patch DOES NOT allow for the smearing of its boundaries.
-    !! @param patch_id patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_line_segment(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -228,9 +225,6 @@ contains
 
     !> The spiral patch is a 2D geometry that may be used, The geometry of the patch is well-defined when its centroid and radius
     !! are provided. Note that the circular patch DOES allow for the smoothing of its boundary.
-    !! @param patch_id patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     impure subroutine s_icpp_spiral(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -296,9 +290,6 @@ contains
     !> The circular patch is a 2D geometry that may be used, for example, in creating a bubble or a droplet. The geometry of the
     !! patch is well-defined when its centroid and radius are provided. Note that the circular patch DOES allow for the smoothing of
     !! its boundary.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -352,9 +343,6 @@ contains
     end subroutine s_icpp_circle
 
     !> The varcircle patch is a 2D geometry that may be used . It generatres an annulus
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_varcircle(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
@@ -411,10 +399,7 @@ contains
 
     end subroutine s_icpp_varcircle
 
-    !> @brief Initializes a 3D variable-thickness circular annulus patch extruded along the z-axis.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
+    !> Initialize a 3D variable-thickness circular annulus patch extruded along the z-axis.
     subroutine s_icpp_3dvarcircle(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
@@ -479,9 +464,6 @@ contains
 
     !> The elliptical patch is a 2D geometry. The geometry of the patch is well-defined when its centroid and radii are provided.
     !! Note that the elliptical patch DOES allow for the smoothing of its boundary
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_ellipse(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -538,9 +520,6 @@ contains
 
     !> The ellipsoidal patch is a 3D geometry. The geometry of the patch is well-defined when its centroid and radii are provided.
     !! Note that the ellipsoidal patch DOES allow for the smoothing of its boundary
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_ellipsoid(patch_id, patch_id_fp, q_prim_vf)
 
         ! Patch identifier
@@ -614,9 +593,6 @@ contains
     !! region, in alignment with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x- and y- coordinate directions are provided. Please note that the rectangular patch DOES NOT
     !! allow for the smoothing of its boundaries.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_rectangle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -687,9 +663,6 @@ contains
     !! region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-defined
     !! when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep line patch DOES allow
     !! the smoothing of its boundary.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_sweep_line(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -747,9 +720,6 @@ contains
 
     !> The Taylor Green vortex is 2D decaying vortex that may be used, for example, to verify the effects of viscous attenuation.
     !! Geometry of the patch is well-defined when its centroid are provided.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -817,10 +787,7 @@ contains
 
     end subroutine s_icpp_2D_TaylorGreen_Vortex
 
-    !> @brief Initializes a 1D bubble-pulse patch with analytical primitive variable profiles.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
+    !> Initialize a 1D bubble-pulse patch with analytical primitive variable profiles.
     subroutine s_icpp_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf)
 
         ! Description: This patch assigns the primitive variables as analytical functions such that the code can be verified.
@@ -997,9 +964,6 @@ contains
     !> The spherical patch is a 3D geometry that may be used, for example, in creating a bubble or a droplet. The patch geometry is
     !! well-defined when its centroid and radius are provided. Please note that the spherical patch DOES allow for the smoothing of
     !! its boundary.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_sphere(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1070,9 +1034,6 @@ contains
     !! which is aligned with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x-, y- and z-coordinate directions are provided. Please notice that the cuboidal patch DOES NOT
     !! allow for the smearing of its boundaries.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_cuboid(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1143,9 +1104,6 @@ contains
     !! like a blood vessel. The geometry of this patch is well-defined when the centroid, the radius and the length along the
     !! cylinder's axis, parallel to the x-, y- or z-coordinate direction, are provided. Please note that the cylindrical patch DOES
     !! allow for the smoothing of its lateral boundary.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
     subroutine s_icpp_cylinder(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1241,9 +1199,6 @@ contains
     !! region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-defined
     !! when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep plane patch DOES allow
     !! the smoothing of its boundary.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Primitive variables
     subroutine s_icpp_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1312,9 +1267,6 @@ contains
     end subroutine s_icpp_sweep_plane
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Primitive variables
     subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1440,7 +1392,7 @@ contains
 
     end subroutine s_icpp_model
 
-    !> @brief Converts cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
+    !> Convert cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1452,7 +1404,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
-    !> @brief Returns a 3D Cartesian coordinate vector from a cylindrical (x, r, theta) input vector.
+    !> Return a 3D Cartesian coordinate vector from a cylindrical (x, r, theta) input vector.
     function f_convert_cyl_to_cart(cyl) result(cart)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1464,7 +1416,7 @@ contains
 
     end function f_convert_cyl_to_cart
 
-    !> @brief Computes the spherical azimuthal angle from cylindrical (x, r) coordinates.
+    !> Compute the spherical azimuthal angle from cylindrical (x, r) coordinates.
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1476,9 +1428,6 @@ contains
     end subroutine s_convert_cylindrical_to_spherical_coord
 
     !> Archimedes spiral function
-    !! @param myth Angle
-    !! @param offset Thickness
-    !! @param a Starting position
     elemental function f_r(myth, offset, a)
 
         $:GPU_ROUTINE(parallelism='[seq]')

@@ -65,7 +65,7 @@ contains
 
     end subroutine s_check_inputs_weno
 
-    !> @brief Validates that the grid resolution is sufficient for the MUSCL reconstruction order.
+    !> Validate that the grid resolution is sufficient for the MUSCL reconstruction order
     impure subroutine s_check_inputs_muscl
 
         character(len=5) :: numStr  !< for int to string conversion

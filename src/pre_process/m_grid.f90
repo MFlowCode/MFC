@@ -20,7 +20,7 @@ module m_grid
 
     abstract interface
 
-        !> @brief Abstract interface for generating a rectilinear computational grid.
+        !> Abstract interface for generating a rectilinear computational grid.
         impure subroutine s_generate_abstract_grid
 
         end subroutine s_generate_abstract_grid
@@ -30,9 +30,7 @@ module m_grid
 
 contains
 
-    !> The following subroutine generates either a uniform or non-uniform rectilinear grid in serial, defined by the parameters
-    !! inputted by the user. The grid information is stored in the grid variables containing coordinates of the cell- centers and
-    !! cell-boundaries.
+    !> Generate a uniform or stretched rectilinear grid in serial from user parameters.
     impure subroutine s_generate_serial_grid
 
         ! Generic loop iterator
@@ -154,9 +152,7 @@ contains
 
     end subroutine s_generate_serial_grid
 
-    !> The following subroutine generates either a uniform or non-uniform rectilinear grid in parallel, defined by the parameters
-    !! inputted by the user. The grid information is stored in the grid variables containing coordinates of the cell- centers and
-    !! cell-boundaries.
+    !> Generate a uniform or stretched rectilinear grid in parallel from user parameters.
     impure subroutine s_generate_parallel_grid
 
 #ifdef MFC_MPI

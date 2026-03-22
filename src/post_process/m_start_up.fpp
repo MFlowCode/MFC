@@ -135,7 +135,7 @@ contains
 
     end subroutine s_check_input_file
 
-    !> @brief Load grid and conservative data for a time step, fill ghost-cell buffers, and convert to primitive variables.
+    !> Load grid and conservative data for a time step, fill ghost-cell buffers, and convert to primitive variables.
     impure subroutine s_perform_time_step(t_step)
 
         integer, intent(inout) :: t_step
@@ -165,7 +165,7 @@ contains
 
     end subroutine s_perform_time_step
 
-    !> @brief Derive requested flow quantities from primitive variables and write them to the formatted database files.
+    !> Derive requested flow quantities from primitive variables and write them to the formatted database files.
     impure subroutine s_save_data(t_step, varname, pres, c, H)
 
         integer, intent(inout)                 :: t_step
@@ -745,7 +745,7 @@ contains
 
     end subroutine s_save_data
 
-    !> @brief Transpose 3-D complex data from x-pencil to y-pencil layout via MPI_Alltoall.
+    !> Transpose 3-D complex data from x-pencil to y-pencil layout via MPI_Alltoall.
     subroutine s_mpi_transpose_x2y
 
         complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
@@ -787,7 +787,7 @@ contains
 
     end subroutine s_mpi_transpose_x2y
 
-    !> @brief Transpose 3-D complex data from y-pencil to z-pencil layout via MPI_Alltoall.
+    !> Transpose 3-D complex data from y-pencil to z-pencil layout via MPI_Alltoall.
     subroutine s_mpi_transpose_y2z
 
         complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
@@ -830,7 +830,7 @@ contains
 
     end subroutine s_mpi_transpose_y2z
 
-    !> @brief Initialize all post-process sub-modules, set up I/O pointers, and prepare FFTW plans and MPI communicators.
+    !> Initialize all post-process sub-modules, set up I/O pointers, and prepare FFTW plans and MPI communicators.
     impure subroutine s_initialize_modules
 
         integer :: size_n(1), inembed(1), onembed(1)
@@ -919,7 +919,7 @@ contains
 
     end subroutine s_initialize_modules
 
-    !> @brief Perform a distributed forward 3-D FFT using pencil decomposition with FFTW and MPI transposes.
+    !> Perform a distributed forward 3-D FFT using pencil decomposition with FFTW and MPI transposes.
     subroutine s_mpi_FFT_fwd
 
         integer :: j, k, l
@@ -986,7 +986,7 @@ contains
 
     end subroutine s_mpi_FFT_fwd
 
-    !> @brief Set up the MPI environment, read and broadcast user inputs, and decompose the computational domain.
+    !> Set up the MPI environment, read and broadcast user inputs, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
 
         num_dims = 1 + min(1, n) + min(1, p)
@@ -1008,7 +1008,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    !> @brief Destroy FFTW plans, free MPI communicators, and finalize all post-process sub-modules.
+    !> Destroy FFTW plans, free MPI communicators, and finalize all post-process sub-modules.
     impure subroutine s_finalize_modules
 
         s_read_data_files => null()

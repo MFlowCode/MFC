@@ -29,7 +29,7 @@ module m_check_ib_patches
 
 contains
 
-    !> @brief Validates the geometry parameters of all active and inactive immersed boundary patches.
+    !> Validate the geometry parameters of all active and inactive immersed boundary patches.
     impure subroutine s_check_ib_patches
 
         integer :: i
@@ -72,8 +72,8 @@ contains
 
     end subroutine s_check_ib_patches
 
-    !> This subroutine verifies that the geometric parameters of the circle patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the circle patch have been consistently inputted.
+
     impure subroutine s_check_circle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -85,8 +85,8 @@ contains
 
     end subroutine s_check_circle_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the ellipse patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the ellipse patch have been consistently inputted.
+
     impure subroutine s_check_ellipse_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -99,8 +99,8 @@ contains
 
     end subroutine s_check_ellipse_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the airfoil patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the airfoil patch have been consistently inputted.
+
     impure subroutine s_check_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -113,8 +113,8 @@ contains
 
     end subroutine s_check_airfoil_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the 3d airfoil patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the 3D airfoil patch have been consistently inputted.
+
     impure subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -129,8 +129,8 @@ contains
 
     end subroutine s_check_3d_airfoil_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the rectangle patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the rectangle patch have been consistently inputted.
+
     impure subroutine s_check_rectangle_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -143,8 +143,8 @@ contains
 
     end subroutine s_check_rectangle_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the sphere patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the sphere patch have been consistently inputted.
+
     impure subroutine s_check_sphere_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -157,8 +157,8 @@ contains
 
     end subroutine s_check_sphere_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the cuboid patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the cuboid patch have been consistently inputted.
+
     impure subroutine s_check_cuboid_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -172,8 +172,8 @@ contains
 
     end subroutine s_check_cuboid_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the cylinder patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the cylinder patch have been consistently inputted.
+
     impure subroutine s_check_cylinder_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -194,8 +194,8 @@ contains
 
     end subroutine s_check_cylinder_ib_patch_geometry
 
-    !> This subroutine verifies that the geometric parameters of the model patch have consistently been inputted by the user.
-    !! @param patch_id Patch identifier
+    !> Verify that the geometric parameters of the model patch have been consistently inputted.
+
     impure subroutine s_check_model_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id

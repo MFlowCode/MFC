@@ -33,7 +33,6 @@ module m_data_output
     abstract interface
 
         !> Interface for the conservative data
-        !! @param q_cons_vf Conservative variables
         impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type)
 
             import :: scalar_field, integer_field, sys_size, m, n, p, pres_field, num_dims
@@ -52,9 +51,6 @@ module m_data_output
 contains
 
     !> Writes grid and initial condition data files to the "0" time-step directory in the local processor rank folder
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf Primitive variables
-    !! @param bc_type Boundary condition types
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
@@ -384,9 +380,6 @@ contains
     end subroutine s_write_serial_data_files
 
     !> Writes grid and initial condition data files in parallel to the "0" time-step directory in the local processor rank folder
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf Primitive variables
-    !! @param bc_type Boundary condition types
     impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf

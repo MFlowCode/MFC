@@ -35,7 +35,7 @@ module m_hypoelastic
 
 contains
 
-    !> @brief Allocates arrays and computes finite-difference coefficients for the hypoelastic stress model.
+    !> Initialize the hypoelastic module
     impure subroutine s_initialize_hypoelastic_module
 
         integer :: i
@@ -78,10 +78,7 @@ contains
 
     end subroutine s_initialize_hypoelastic_module
 
-    !> The purpose of this procedure is to compute the source terms that are needed for the elastic stress equations
-    !! @param idir Dimension splitting index
-    !! @param q_prim_vf Primitive variables
-    !! @param rhs_vf rhs variables
+    !> Compute the hypoelastic stress source terms
     subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
 
         integer, intent(in)                                    :: idir
@@ -331,7 +328,7 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs
 
-    !> @brief Deallocates arrays used by the hypoelastic stress module.
+    !> Finalize the hypoelastic module
     impure subroutine s_finalize_hypoelastic_module()
 
         @:DEALLOCATE(Gs_hypo)
@@ -349,7 +346,7 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
-    !> @brief Computes the continuum damage source term from the principal stress state.
+    !> Compute the continuum damage source term from the principal stress state
     subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf

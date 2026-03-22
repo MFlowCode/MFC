@@ -42,9 +42,7 @@ module m_model
 
 contains
 
-    !> This procedure reads a binary STL file.
-    !! @param filepath Path to the STL file.
-    !! @param model The binary of the STL file.
+    !> Read a binary STL file.
     impure subroutine s_read_stl_binary(filepath, model)
 
         character(LEN=*), intent(in)   :: filepath
@@ -88,9 +86,7 @@ contains
 
     end subroutine s_read_stl_binary
 
-    !> This procedure reads an ASCII STL file.
-    !! @param filepath Path to the STL file.
-    !! @param model the STL file.
+    !> Read an ASCII STL file.
     impure subroutine s_read_stl_ascii(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -198,9 +194,7 @@ contains
 
     end subroutine s_read_stl_ascii
 
-    !> This procedure reads an STL file.
-    !! @param filepath Path to the STL file.
-    !! @param model the STL file.
+    !> Read an STL file.
     impure subroutine s_read_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -228,9 +222,7 @@ contains
 
     end subroutine s_read_stl
 
-    !> This procedure reads an OBJ file.
-    !! @param filepath Path to the obj file.
-    !! @param model The obj file.
+    !> Read an OBJ file.
     impure subroutine s_read_obj(filepath, model)
 
         character(LEN=*), intent(in)          :: filepath
@@ -299,9 +291,7 @@ contains
 
     end subroutine s_read_obj
 
-    !> This procedure reads a mesh from a file.
-    !! @param filepath Path to the file to read.
-    !! @return The model read from the file.
+    !> Read a mesh from a file.
     impure function f_model_read(filepath) result(model)
 
         character(LEN=*), intent(in) :: filepath
@@ -320,9 +310,7 @@ contains
 
     end function f_model_read
 
-    !> This procedure writes a binary STL file.
-    !! @param filepath Path to the STL file.
-    !! @param model STL to write
+    !> Write a binary STL file.
     impure subroutine s_write_stl(filepath, model)
 
         character(LEN=*), intent(in)              :: filepath
@@ -367,9 +355,7 @@ contains
 
     end subroutine s_write_stl
 
-    !> This procedure writes an OBJ file.
-    !! @param filepath Path to the obj file.
-    !! @param model obj to write.
+    !> Write an OBJ file.
     impure subroutine s_write_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -400,9 +386,7 @@ contains
 
     end subroutine s_write_obj
 
-    !> This procedure writes a binary STL file.
-    !! @param filepath  Path to the file to write.
-    !! @param model Model to write.
+    !> Write a mesh to a file.
     impure subroutine s_model_write(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -421,7 +405,7 @@ contains
 
     end subroutine s_model_write
 
-    !> This procedure frees the memory allocated for an STL mesh.
+    !> Free the memory allocated for an STL mesh.
     subroutine s_model_free(model)
 
         type(t_model), intent(inout) :: model
@@ -458,7 +442,7 @@ contains
 
     end function f_read_line
 
-    !> @brief Reads the next non-comment line from a model file, using a buffered look-ahead mechanism.
+    !> Read the next non-comment line from a model file, using a buffered look-ahead mechanism.
     impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
 
         integer, intent(in)          :: iunit
@@ -478,8 +462,8 @@ contains
 
     end subroutine s_skip_ignored_lines
 
-    !> This function is used to replace the fortran random number generator because the native generator is not compatible being
-    !! called from GPU routines/functions
+    !> Generate a pseudo-random number using a seed-based xorshift, replacing the Fortran intrinsic which is incompatible with GPU
+    !! routines
     function f_model_random_number(seed) result(rval)
 
         ! $:GPU_ROUTINE(parallelism='[seq]')
@@ -495,12 +479,8 @@ contains
 
     end function f_model_random_number
 
-    !> This procedure, recursively, finds whether a point is inside an octree.
-    !! @param model    Model to search in.
-    !! @param point    Point to test.
-    !! @param spacing  Space around the point to search in (grid spacing).
+    !> Determine whether a point is inside a model using stochastic ray casting.
     !! @param spc      Number of samples per cell.
-    !! @return True if the point is inside the octree, false otherwise.
     impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
         ! $:GPU_ROUTINE(parallelism='[seq]')
@@ -552,13 +532,10 @@ contains
 
     end function f_model_is_inside
 
-    !> This procedure determines if a point is inside a surface using the generalized winding number (Jacobson et al., SIGGRAPH
-    !! 2013). In 3D, sums the solid angle subtended by each triangle (Van Oosterom-Strackee formula). In 2D (p==0), sums the signed
-    !! angle subtended by each boundary edge. Returns ~1.0 inside, ~0.0 outside. Unlike ray casting, this is robust to small
-    !! triangles/edges and vertex winding order.
-    !! @param ntrs     Number of triangles in the model.
-    !! @param pid      Patch ID of this model.
-    !! @param point    Point to test.
+    !> Determine if a point is inside a surface using the generalized winding number (Jacobson et al., SIGGRAPH 2013). In 3D, sums
+    !! the solid angle subtended by each triangle (Van Oosterom-Strackee formula). In 2D (p==0), sums the signed angle subtended by
+    !! each boundary edge. Returns ~1.0 inside, ~0.0 outside. Unlike ray casting, this is robust to small triangles/edges and vertex
+    !! winding order.
     !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
     function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
 
@@ -620,11 +597,9 @@ contains
 
     end function f_model_is_inside_flat
 
-    !> This procedure checks if a ray intersects a triangle using the Moller-Trumbore algorithm (barycentric coordinates). Unlike
-    !! the previous cross-product sign test, this is vertex winding-order independent.
-    !! @param ray      Ray.
-    !! @param triangle Triangle.
-    !! @return         1 if the ray intersects the triangle, 0 otherwise.
+    !> Check if a ray intersects a triangle using the Moller-Trumbore algorithm (barycentric coordinates). Unlike the previous
+    !! cross-product sign test, this is vertex winding-order independent.
+    !! @return 1 if the ray intersects the triangle, 0 otherwise.
     function f_intersects_triangle(ray, triangle) result(intersects)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -662,9 +637,7 @@ contains
 
     end function f_intersects_triangle
 
-    !> This procedure checks and labels edges shared by two or more triangles facets of the 2D STL model.
-    !! @param model                      Model to search in.
-    !! @param boundary_vertex_count      Output total boundary vertex count
+    !> Check and label edges shared by two or more triangle facets of the 2D STL model.
     subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
         type(t_model), intent(in) :: model
@@ -776,7 +749,7 @@ contains
 
     end subroutine s_check_boundary
 
-    !> This procedure appends the edge end vertices to a temporary buffer.
+    !> Append the edge end vertices to a temporary buffer.
     subroutine s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
         integer, intent(inout)                                     :: edge_index       !< Edge index iterator
@@ -791,15 +764,8 @@ contains
 
     end subroutine s_register_edge
 
-    !> This procedure determines the levelset distance and normals of 3D models by computing the exact closest point via projection
-    !! onto triangle surfaces.
-    !! @param ntrs                  Number of triangles for this patch
-    !! @param trs_v                 Flat GPU array of triangle vertices for all patches
-    !! @param trs_n                 Flat GPU array of triangle normals for all patches
-    !! @param pid                   Patch index into the arrays
-    !! @param point                 The cell center of the current levelset cell
-    !! @param normals               Output levelset normals
-    !! @param distance              Output levelset distance
+    !> Determine the levelset distance and normals of 3D models by computing the exact closest point via projection onto triangle
+    !! surfaces.
     subroutine s_distance_normals_3D(ntrs, pid, point, normals, distance)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -928,14 +894,8 @@ contains
 
     end subroutine s_distance_normals_3D
 
-    !> This procedure determines the levelset distance and normals of 2D models by computing the exact closest point via projection
-    !! onto boundary edges.
-    !! @param boundary_v            Flat GPU array of boundary vertices/normals for all patches
-    !! @param pid                   Patch index into the boundary_v array
-    !! @param boundary_edge_count   Total number of boundary edges for this patch
-    !! @param point                 The cell center of the current levelset cell
-    !! @param normals               Output levelset normals
-    !! @param distance              Output levelset distance
+    !> Determine the levelset distance and normals of 2D models by computing the exact closest point via projection onto boundary
+    !! edges.
     subroutine s_distance_normals_2D(pid, boundary_edge_count, point, normals, distance)
 
         $:GPU_ROUTINE(parallelism='[seq]')

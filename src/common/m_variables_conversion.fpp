@@ -60,17 +60,6 @@ contains
 
     !> Dispatch to the s_convert_mixture_to_mixture_variables and s_convert_species_to_mixture_variables subroutines. Replaces a
     !! procedure pointer.
-    !! @param q_vf Conservative or primitive variables
-    !! @param i First-coordinate cell index
-    !! @param j Second-coordinate cell index
-    !! @param k Third-coordinate cell index
-    !! @param rho Density
-    !! @param gamma Specific heat ratio function
-    !! @param pi_inf Liquid stiffness function
-    !! @param qv Fluid reference energy
-    !! @param Re_K Reynolds number (optional)
-    !! @param G_K Shear modulus (optional)
-    !! @param G Shear moduli of the fluids (optional)
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in)   :: q_vf
@@ -88,21 +77,7 @@ contains
 
     end subroutine s_convert_to_mixture_variables
 
-    !> This procedure conditionally calculates the appropriate pressure
-    !! @param energy Energy
-    !! @param alf Void Fraction
-    !! @param dyn_p Dynamic Pressure
-    !! @param pi_inf Liquid Stiffness
-    !! @param gamma Specific Heat Ratio
-    !! @param rho Density
-    !! @param qv fluid reference energy
-    !! @param rhoYks Species partial densities
-    !! @param pres Pressure to calculate
-    !! @param T Temperature
-    !! @param stress Shear Stress
-    !! @param mom Momentum
-    !! @param G Shear modulus (optional)
-    !! @param pres_mag Magnetic pressure (optional)
+    !> Compute the pressure from the appropriate equation of state
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
 
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', cray_noinline=True)
@@ -169,16 +144,9 @@ contains
 
     end subroutine s_compute_pressure
 
-    !> This subroutine is designed for the gamma/pi_inf model and provided a set of either conservative or primitive variables,
-    !! transfers the density, specific heat ratio function and the liquid stiffness function from q_vf to rho, gamma and pi_inf.
-    !! @param q_vf conservative or primitive variables
-    !! @param i cell index to transfer mixture variables
-    !! @param j cell index to transfer mixture variables
-    !! @param k cell index to transfer mixture variables
-    !! @param rho density
-    !! @param gamma  specific heat ratio function
-    !! @param pi_inf liquid stiffness
-    !! @param qv fluid reference energy
+    !> Convert mixture variables to density, gamma, pi_inf, and qv for the gamma/pi_inf model. Given conservative or primitive
+    !! variables, transfers the density, specific heat ratio function and the liquid stiffness function from q_vf to rho, gamma and
+    !! pi_inf.
     subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
@@ -205,20 +173,9 @@ contains
 
     end subroutine s_convert_mixture_to_mixture_variables
 
-    !> This subroutine is designed for the volume fraction model and provided a set of either conservative or primitive variables,
-    !! computes the density, the specific heat ratio function and the liquid stiffness function from q_vf and stores the results
-    !! into rho, gamma and pi_inf.
-    !! @param q_vf primitive variables
-    !! @param k Cell index
-    !! @param l Cell index
-    !! @param r Cell index
-    !! @param rho density
-    !! @param gamma specific heat ratio
-    !! @param pi_inf liquid stiffness
-    !! @param qv fluid reference energy
-    !! @param Re_K Reynolds number (optional)
-    !! @param G_K Shear modulus (optional)
-    !! @param G Shear moduli of the fluids (optional)
+    !> Convert species volume fractions and partial densities to mixture density, gamma, pi_inf, and qv. Given conservative or
+    !! primitive variables, computes the density, the specific heat ratio function and the liquid stiffness function from q_vf and
+    !! stores the results into rho, gamma and pi_inf.
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
         type(scalar_field), dimension(sys_size), intent(in)   :: q_vf
@@ -286,8 +243,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
-    !> @brief GPU-accelerated conversion of species volume fractions and partial densities to mixture density, gamma, pi_inf, and
-    !! qv.
+    !> GPU-accelerated conversion of species volume fractions and partial densities to mixture density, gamma, pi_inf, and qv.
     subroutine s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, G)
 
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_acc', parallelism='[seq]', cray_noinline=True)
@@ -356,8 +312,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables_acc
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the variables conversion module.
     impure subroutine s_initialize_variables_conversion_module
 
         integer :: i, j
@@ -437,7 +392,7 @@ contains
 
     end subroutine s_initialize_variables_conversion_module
 
-    !> @brief Initializes bubble mass-vapor values at quadrature nodes from the conserved moment statistics.
+    !> Initialize bubble mass-vapor values at quadrature nodes from the conserved moment statistics.
     subroutine s_initialize_mv(qK_cons_vf, mv)
 
         type(scalar_field), dimension(sys_size), intent(in)                                         :: qK_cons_vf
@@ -466,7 +421,7 @@ contains
 
     end subroutine s_initialize_mv
 
-    !> @brief Initializes bubble internal pressures at quadrature nodes using isothermal relations from the Preston model.
+    !> Initialize bubble internal pressures at quadrature nodes using isothermal relations from the Preston model.
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
 
         type(scalar_field), dimension(sys_size), intent(in)                                         :: qK_cons_vf
@@ -503,10 +458,6 @@ contains
 
     !> Convert conserved variables (rho*alpha, rho*u, E, alpha) to primitives (rho, u, p, alpha). Conversion depends on model_eqns:
     !! each model has different variable sets and EOS.
-    !! @param qK_cons_vf Conservative variables
-    !! @param q_T_sf Temperature scalar field
-    !! @param qK_prim_vf Primitive variables
-    !! @param ibounds Index bounds in each coordinate direction
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
@@ -819,8 +770,6 @@ contains
     end subroutine s_convert_conservative_to_primitive_variables
 
     !> Convert primitives (rho, u, p, alpha) to conserved variables (rho*alpha, rho*u, E, alpha).
-    !! @param q_prim_vf Primitive variables
-    !! @param q_cons_vf Conservative variables
     impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
@@ -1064,15 +1013,7 @@ contains
 
     end subroutine s_convert_primitive_to_conservative_variables
 
-    !> The following subroutine handles the conversion between the primitive variables and the Eulerian flux variables.
-    !! @param qK_prim_vf Primitive variables
-    !! @param FK_vf Flux variables
-    !! @param FK_src_vf Flux source variables
-    !! @param is1 Index bounds in the first coordinate direction
-    !! @param is2 Index bounds in the second coordinate direction
-    !! @param is3 Index bounds in the third coordinate direction
-    !! @param s2b Starting boundary index in the second coordinate direction
-    !! @param s3b Starting boundary index in the third coordinate direction
+    !> Convert primitive variables to Eulerian flux variables.
     subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b)
 
         integer, intent(in)                                                              :: s2b, s3b
@@ -1216,7 +1157,7 @@ contains
 
     end subroutine s_convert_primitive_to_flux_variables
 
-    !> This subroutine computes partial densities and volume fractions
+    !> Compute partial densities and volume fractions
     subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
 
         $:GPU_ROUTINE(function_name='s_compute_species_fraction', parallelism='[seq]', cray_noinline=True)
@@ -1267,7 +1208,7 @@ contains
 
     end subroutine s_compute_species_fraction
 
-    !> @brief Deallocates fluid property arrays and post-processing fields allocated during module initialization.
+    !> Deallocate fluid property arrays and post-processing fields allocated during module initialization.
     impure subroutine s_finalize_variables_conversion_module()
 
         ! Deallocating the density, the specific heat ratio function and the liquid stiffness function
@@ -1290,7 +1231,7 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    !> @brief Computes the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
+    !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1352,7 +1293,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    !> @brief Computes the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
+    !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
 
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', parallelism='[seq]', cray_noinline=True)

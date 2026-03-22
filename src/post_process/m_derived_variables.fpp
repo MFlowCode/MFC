@@ -69,9 +69,8 @@ contains
 
     end subroutine s_initialize_derived_variables_module
 
-    !> This subroutine receives as input the specific heat ratio function, gamma_sf, and derives from it the specific heat ratio.
-    !! The latter is stored in the derived flow quantity storage variable, q_sf.
-    !! @param q_sf Specific heat ratio
+    !> Derive the specific heat ratio from the specific heat ratio function gamma_sf. The latter is stored in the derived flow
+    !! quantity storage variable, q_sf.
     subroutine s_derive_specific_heat_ratio(q_sf)
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
@@ -88,10 +87,9 @@ contains
 
     end subroutine s_derive_specific_heat_ratio
 
-    !> This subroutine admits as inputs the specific heat ratio function and the liquid stiffness function, gamma_sf and pi_inf_sf,
+    !> Compute the liquid stiffness from the specific heat ratio function gamma_sf and the liquid stiffness function pi_inf_sf,
     !! respectively. These are used to calculate the values of the liquid stiffness, which are stored in the derived flow quantity
     !! storage variable, q_sf.
-    !! @param q_sf Liquid stiffness
     subroutine s_derive_liquid_stiffness(q_sf)
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end), &
@@ -108,11 +106,9 @@ contains
 
     end subroutine s_derive_liquid_stiffness
 
-    !> This subroutine admits as inputs the primitive variables, the density, the specific heat ratio function and liquid stiffness
+    !> Compute the speed of sound from the primitive variables, density, specific heat ratio function, and liquid stiffness
     !! function. It then computes from those variables the values of the speed of sound, which are stored in the derived flow
     !! quantity storage variable, q_sf.
-    !! @param q_prim_vf Primitive variables
-    !! @param q_sf Speed of sound
     subroutine s_derive_sound_speed(q_prim_vf, q_sf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -147,12 +143,8 @@ contains
 
     end subroutine s_derive_sound_speed
 
-    !> This subroutine derives the flux_limiter at cell boundary i+1/2. This is an approximation because the velocity used to
-    !! determine the upwind direction is the velocity at the cell center i instead of the contact velocity at the cell boundary from
-    !! the Riemann solver.
-    !! @param i Component indicator
-    !! @param q_prim_vf Primitive variables
-    !! @param q_sf Flux limiter
+    !> Derive the flux limiter at cell boundary i+1/2. This is an approximation because the velocity used to determine the upwind
+    !! direction is the velocity at the cell center i instead of the contact velocity at the cell boundary from the Riemann solver.
     subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
         integer, intent(in)                                 :: i
@@ -223,10 +215,6 @@ contains
     end subroutine s_derive_flux_limiter
 
     !> Solve Ax=b via Gaussian elimination with partial pivoting
-    !! @param A Input matrix
-    !! @param b right-hand-side
-    !! @param sol Solution
-    !! @param ndim Problem size
     subroutine s_solve_linear_system(A, b, sol, ndim)
 
         integer, intent(in)                            :: ndim
@@ -262,12 +250,8 @@ contains
 
     end subroutine s_solve_linear_system
 
-    !> This subroutine receives as inputs the indicator of the component of the vorticity that should be outputted and the primitive
-    !! variables. From those inputs, it proceeds to calculate values of the desired vorticity component, which are subsequently
-    !! stored in derived flow quantity storage variable, q_sf.
-    !! @param i Vorticity component indicator
-    !! @param q_prim_vf Primitive variables
-    !! @param q_sf Vorticity component
+    !> Compute the specified component of the vorticity from the primitive variables. From those inputs, it proceeds to calculate
+    !! values of the desired vorticity component, which are subsequently stored in derived flow quantity storage variable, q_sf.
     subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
         integer, intent(in)                                 :: i
@@ -331,10 +315,8 @@ contains
 
     end subroutine s_derive_vorticity_component
 
-    !> This subroutine gets as inputs the primitive variables. From those inputs, it proceeds to calculate the value of the Q_M
-    !! function, which are subsequently stored in the derived flow quantity storage variable, q_sf.
-    !! @param q_prim_vf Primitive variables
-    !! @param q_sf Q_M
+    !> Compute the Q_M criterion from the primitive variables. The Q_M function, which are subsequently stored in the derived flow
+    !! quantity storage variable, q_sf.
     subroutine s_derive_qm(q_prim_vf, q_sf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -392,9 +374,7 @@ contains
 
     end subroutine s_derive_qm
 
-    !> This subroutine gets as inputs the primitive variables. From those inputs, it proceeds to calculate the Liutex vector and its
-    !! magnitude based on Xu et al. (2019).
-    !! @param q_prim_vf Primitive variables
+    !> Compute the Liutex vector and its magnitude based on Xu et al. (2019).
     impure subroutine s_derive_liutex(q_prim_vf, liutex_mag, liutex_axis)
 
         ! Liutex vortex identification via real eigenvector of velocity gradient, Xu et al. PoF (2019)
@@ -498,10 +478,8 @@ contains
 
     end subroutine s_derive_liutex
 
-    !> This subroutine gets as inputs the conservative variables and density. From those inputs, it proceeds to calculate the values
-    !! of the numerical Schlieren function, which are subsequently stored in the derived flow quantity storage variable, q_sf.
-    !! @param q_cons_vf Conservative variables
-    !! @param q_sf Numerical Schlieren function
+    !> Compute the values of the numerical Schlieren function, which are subsequently stored in the derived flow quantity storage
+    !! variable, q_sf.
     impure subroutine s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf

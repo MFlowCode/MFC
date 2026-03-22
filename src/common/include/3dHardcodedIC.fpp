@@ -165,10 +165,10 @@
         end if
 
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
-    case (370)
+    case (370)  ! 3D extrusion of 2D profile from external data
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
-    case (380)
+    case (380)  ! Taylor-Green vortex
         ! This is patch is hard-coded for test suite optimization used in the 3D_TaylorGreenVortex case: This analytic patch used
         ! geometry 9
         Mach = 0.1

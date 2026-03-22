@@ -26,7 +26,7 @@ module m_bubbles_EE
 
 contains
 
-    !> @brief Allocates and initializes arrays for the Euler-Euler bubble model.
+    !> Initialize the Euler-Euler bubble module
     impure subroutine s_initialize_bubbles_EE_module
 
         integer :: l
@@ -64,8 +64,7 @@ contains
 
     end subroutine s_initialize_bubbles_EE_module
 
-    !> @brief Computes the bubble volume fraction alpha from the bubble number density.
-    !! @param q_cons_vf is the conservative variable
+    !> Compute the bubble volume fraction alpha from the bubble number density
     subroutine s_comp_alpha_from_n(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -90,8 +89,6 @@ contains
     end subroutine s_comp_alpha_from_n
 
     !> Compute the right-hand side for Euler-Euler bubble transport
-    !! @param idir Direction index
-    !! @param q_prim_vf Primitive variables
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in)                                 :: idir
@@ -139,10 +136,7 @@ contains
 
     end subroutine s_compute_bubbles_EE_rhs
 
-    !> The purpose of this procedure is to compute the source terms that are needed for the bubble modeling
-    !! @param q_prim_vf Primitive variables
-    !! @param q_cons_vf Conservative variables
-    !! @param rhs_vf Right-hand side variables
+    !> Compute the Euler-Euler bubble source terms
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf

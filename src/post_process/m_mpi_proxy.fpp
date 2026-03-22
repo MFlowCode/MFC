@@ -138,8 +138,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    !> This subroutine gathers the Silo database metadata for the spatial extents in order to boost the performance of the
-    !! multidimensional visualization.
+    !> Gather the Silo database metadata for the spatial extents to boost the performance of the multidimensional visualization.
     ! ! @param spatial_extents Spatial extents for each processor's sub-domain. First dimension corresponds to the minimum and
     ! maximum values, respectively, while the second dimension corresponds to the processor rank.
     impure subroutine s_mpi_gather_spatial_extents(spatial_extents)
@@ -232,8 +231,8 @@ contains
 
     end subroutine s_mpi_gather_spatial_extents
 
-    !> This subroutine collects the sub-domain cell-boundary or cell-center locations data from all of the processors and puts back
-    !! together the grid of the entire computational domain on the rank 0 processor. This is only done for 1D simulations.
+    !> Collect the sub-domain cell-boundary or cell-center location data from all processors and put back together the grid of the
+    !! entire computational domain on the rank 0 processor. This is only done for 1D simulations.
     impure subroutine s_mpi_defragment_1d_grid_variable
 
 #ifdef MFC_MPI
@@ -253,11 +252,8 @@ contains
 
     end subroutine s_mpi_defragment_1d_grid_variable
 
-    !> This subroutine gathers the Silo database metadata for the flow variable's extents as to boost performance of the
-    !! multidimensional visualization.
-    !! @param q_sf Flow variable defined on a single computational sub-domain
-    ! ! @param data_extents The flow variable extents on each of the processor's sub-domain. First dimension of array corresponds to
-    ! the former's minimum and maximum values, respectively, while second dimension corresponds to each processor's rank.
+    !> Gather the Silo database metadata for the flow variable's extents to boost performance of the multidimensional visualization.
+    !! @param q_sf Flow variable on a single computational sub-domain
     impure subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
         real(wp), dimension(:,:,:), intent(in)                   :: q_sf
@@ -289,10 +285,10 @@ contains
 
     end subroutine s_mpi_gather_data_extents
 
-    !> This subroutine gathers the sub-domain flow variable data from all of the processors and puts it back together for the entire
-    !! computational domain on the rank 0 processor. This is only done for 1D simulations.
-    !! @param q_sf Flow variable defined on a single computational sub-domain
-    !! @param q_root_sf Flow variable defined on the entire computational domain
+    !> Gather the sub-domain flow variable data from all processors and reassemble it for the entire computational domain on the
+    !! rank 0 processor. This is only done for 1D simulations.
+    !! @param q_sf Flow variable on a single computational sub-domain
+    !! @param q_root_sf Flow variable on the entire computational domain
     impure subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
         real(wp), dimension(0:m), intent(in)    :: q_sf

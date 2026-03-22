@@ -2,7 +2,7 @@
 !! @file
 !! @brief Contains program p_main
 
-!> @brief This program takes care of setting up the initial condition and grid data for the multicomponent flow code.
+!> @brief Set up the initial condition and grid data for the multicomponent flow code.
 program p_main
 
     use m_global_parameters

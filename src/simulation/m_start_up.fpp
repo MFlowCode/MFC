@@ -59,7 +59,6 @@ module m_start_up
 contains
 
     !> Read data files. Dispatch subroutine that replaces procedure pointer.
-    !! @param q_cons_vf Conservative variables
     impure subroutine s_read_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -72,8 +71,7 @@ contains
 
     end subroutine s_read_data_files
 
-    !> The purpose of this procedure is to first verify that an input file has been made available by the user. Provided that this
-    !! is so, the input file is then read in.
+    !> Verify the input file exists and read it
     impure subroutine s_read_input_file
 
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
@@ -150,8 +148,7 @@ contains
 
     end subroutine s_read_input_file
 
-    !> The goal of this procedure is to verify that each of the user provided inputs is valid and that their combination constitutes
-    !! a meaningful configuration for the simulation.
+    !> Validate that all user-provided inputs form a consistent simulation configuration
     impure subroutine s_check_input_file
 
         character(LEN=path_len) :: file_path
@@ -170,8 +167,7 @@ contains
 
     end subroutine s_check_input_file
 
-    !> @brief Reads serial initial condition and grid data files and computes cell-width distributions.
-    !! @param q_cons_vf Cell-averaged conservative variables
+    !> Read serial initial condition and grid data files and compute cell-width distributions
     impure subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -297,8 +293,7 @@ contains
 
     end subroutine s_read_serial_data_files
 
-    !> @brief Reads parallel initial condition and grid data files via MPI I/O.
-    !! @param q_cons_vf Conservative variables
+    !> Read parallel initial condition and grid data files via MPI I/O
     impure subroutine s_read_parallel_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -554,9 +549,7 @@ contains
 
     end subroutine s_read_parallel_data_files
 
-    !> The purpose of this procedure is to initialize the values of the internal-energy equations of each phase from the mass of
-    !! each phase, the mixture momentum and mixture-total-energy equations.
-    !! @param v_vf conservative variables
+    !> Initialize internal-energy equations from phase mass, mixture momentum, and total energy
     subroutine s_initialize_internal_energy_equations(v_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
@@ -613,7 +606,7 @@ contains
 
     end subroutine s_initialize_internal_energy_equations
 
-    !> @brief Advances the simulation by one time step, handling CFL-based dt and time-stepper dispatch.
+    !> Advance the simulation by one time step, handling CFL-based dt and time-stepper dispatch
     impure subroutine s_perform_time_step(t_step, time_avg)
 
         integer, intent(inout)  :: t_step
@@ -679,7 +672,7 @@ contains
 
     end subroutine s_perform_time_step
 
-    !> @brief Collects per-process wall-clock times and writes aggregate performance metrics to file.
+    !> Collect per-process wall-clock times and write aggregate performance metrics to file
     impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
 
         & file_exists)
@@ -740,7 +733,7 @@ contains
 
     end subroutine s_save_performance_metrics
 
-    !> @brief Saves conservative variable data to disk at the current time step.
+    !> Save conservative variable data to disk at the current time step
     impure subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
 
         integer, intent(inout)  :: t_step
@@ -834,7 +827,7 @@ contains
 
     end subroutine s_save_data
 
-    !> @brief Initializes all simulation sub-modules in the required dependency order.
+    !> Initialize all simulation sub-modules in the required dependency order
     impure subroutine s_initialize_modules
 
         integer  :: m_ds, n_ds, p_ds
@@ -945,7 +938,7 @@ contains
 
     end subroutine s_initialize_modules
 
-    !> @brief Sets up the MPI execution environment, binds GPUs, and decomposes the computational domain.
+    !> Set up the MPI execution environment, bind GPUs, and decompose the computational domain
     impure subroutine s_initialize_mpi_domain
 
         integer :: ierr
@@ -1015,7 +1008,7 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    !> @brief Transfers initial conservative variable and model parameter data to the GPU device.
+    !> Transfer initial conservative variable and model parameter data to the GPU device
     subroutine s_initialize_gpu_vars
 
         integer :: i
@@ -1085,7 +1078,7 @@ contains
 
     end subroutine s_initialize_gpu_vars
 
-    !> @brief Finalizes and deallocates all simulation sub-modules in reverse initialization order.
+    !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()

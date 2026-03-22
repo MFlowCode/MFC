@@ -25,7 +25,6 @@ module m_data_input
     abstract interface
 
         !> Subroutine for reading data files
-        !! @param t_step Current time-step to input
         impure subroutine s_read_abstract_data_files(t_step)
 
             implicit none
@@ -48,12 +47,6 @@ module m_data_input
 contains
 
     !> Helper subroutine to read grid data files for a given direction
-    !! @param t_step_dir Directory containing the time-step data
-    !! @param direction Direction name ('x', 'y', 'z')
-    !! @param cb_array Cell boundary array to populate
-    !! @param d_array Cell width array to populate
-    !! @param cc_array Cell center array to populate
-    !! @param size_dim Size of the dimension
     impure subroutine s_read_grid_data_direction(t_step_dir, direction, cb_array, d_array, cc_array, size_dim)
 
         character(len=*), intent(in)             :: t_step_dir
@@ -83,9 +76,6 @@ contains
 
 #ifdef MFC_MPI
     !> Helper subroutine to setup MPI data I/O parameters
-    !! @param data_size Local array size (output)
-    !! @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions (output)
-    !! @param WP_MOK, MOK, str_MOK, NVARS_MOK Other MPI offset kinds (output)
     impure subroutine s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
         integer, intent(out)                       :: data_size
@@ -112,8 +102,6 @@ contains
 #endif
 
     !> Helper subroutine to read IB data files
-    !! @param file_loc_base Base file location for IB data
-    !! @param t_step Time step index
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in)                :: file_loc_base
@@ -174,10 +162,6 @@ contains
     end subroutine s_read_ib_data_files
 
     !> Helper subroutine to allocate field arrays for given dimensionality
-    !! @param local_start_idx Starting index for allocation
-    !! @param end_x End index for x dimension
-    !! @param end_y End index for y dimension
-    !! @param end_z End index for z dimension
     impure subroutine s_allocate_field_arrays(local_start_idx, end_x, end_y, end_z)
 
         integer, intent(in) :: local_start_idx, end_x, end_y, end_z
@@ -198,9 +182,8 @@ contains
 
     end subroutine s_allocate_field_arrays
 
-    !> This subroutine is called at each time-step that has to be post-processed in order to read the raw data files present in the
-    !! corresponding time-step directory and to populate the associated grid and conservative variables.
-    !! @param t_step Current time-step
+    !> Read the raw data files present in the corresponding time-step directory and to populate the associated grid and conservative
+    !! variables.
     impure subroutine s_read_serial_data_files(t_step)
 
         integer, intent(in)                                      :: t_step
@@ -259,9 +242,8 @@ contains
 
     end subroutine s_read_serial_data_files
 
-    !> This subroutine is called at each time-step that has to be post-processed in order to parallel-read the raw data files
-    !! present in the corresponding time-step directory and to populate the associated grid and conservative variables.
-    !! @param t_step Current time-step
+    !> Parallel-read the raw data files present in the corresponding time-step directory and to populate the associated grid and
+    !! conservative variables.
     impure subroutine s_read_parallel_data_files(t_step)
 
         integer, intent(in) :: t_step
@@ -380,9 +362,6 @@ contains
 
 #ifdef MFC_MPI
     !> Helper subroutine to read parallel conservative variable data
-    !! @param t_step Current time-step
-    !! @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions
-    !! @param WP_MOK, MOK, str_MOK, NVARS_MOK Other MPI offset kinds
     impure subroutine s_read_parallel_conservative_data(t_step, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
         integer, intent(in)                          :: t_step

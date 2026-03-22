@@ -26,7 +26,7 @@ contains
 
     end subroutine s_create_directory
 
-    !> @brief Deletes a file at the given path using a platform-specific system command.
+    !> Delete a file at the given path using a platform-specific system command.
     impure subroutine s_delete_file(filepath)
 
         character(LEN=*), intent(in) :: filepath
@@ -39,7 +39,7 @@ contains
 
     end subroutine s_delete_file
 
-    !> @brief Recursively deletes a directory using a platform-specific system command.
+    !> Recursively delete a directory using a platform-specific system command.
     impure subroutine s_delete_directory(dir_name)
 
         character(LEN=*), intent(in) :: dir_name
@@ -53,7 +53,6 @@ contains
     end subroutine s_delete_directory
 
     !> Inquires on the existence of a directory
-    !! @param fileloc File directory location
     !! @param dircheck Switch that indicates if directory exists
     impure subroutine my_inquire(fileloc, dircheck)
 
@@ -68,7 +67,7 @@ contains
 
     end subroutine my_inquire
 
-    !> @brief Retrieves the current working directory path via the GETCWD intrinsic.
+    !> Retrieve the current working directory path via the GETCWD intrinsic.
     impure subroutine s_get_cwd(cwd)
 
         character(LEN=*), intent(out) :: cwd
@@ -77,7 +76,7 @@ contains
 
     end subroutine s_get_cwd
 
-    !> @brief Extracts the base filename from a directory path using the system basename command.
+    !> Extract the base filename from a directory path using the system basename command.
     impure subroutine s_get_basename(dirpath, basename)
 
         character(LEN=*), intent(in)  :: dirpath

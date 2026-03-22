@@ -2,10 +2,10 @@
 !! @file
 !! @brief Contains program p_main
 
-!> @brief The post-process restructures raw unformatted data, outputted by the simulation, into a formatted database, Silo-HDF5 or
-!! Binary, chosen by the user. The user may also specify which variables to include in the database. The choices range from any one
-!! of the primitive and conservative variables, as well as quantities that can be derived from those such as the unadvected volume
-!! fraction, specific heat ratio, liquid stiffness, speed of sound, vorticity and the numerical Schlieren function.
+!> @brief Restructure raw simulation data into a formatted database (Silo-HDF5 or Binary, chosen by the user. The user may also
+!! specify which variables to include in the database. The choices range from any one of the primitive and conservative variables,
+!! as well as quantities that can be derived from those such as the unadvected volume fraction, specific heat ratio, liquid
+!! stiffness, speed of sound, vorticity and the numerical Schlieren function.
 program p_main
 
     use m_global_parameters

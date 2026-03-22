@@ -22,20 +22,7 @@ module m_bubbles
 
 contains
 
-    !> Function that computes the bubble radial acceleration based on bubble models
-    !! @param fRho Current density
-    !! @param fP Current driving pressure
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fpb Internal bubble pressure
-    !! @param fpbdot Time-derivative of internal bubble pressure
-    !! @param alf bubble volume fraction
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
-    !! @param f_bub_adv_src Source for bubble volume fraction
-    !! @param f_divu Divergence of velocity
-    !! @param fCson Speed of sound from fP (EL)
+    !> Compute the bubble radial acceleration based on the selected bubble model
     elemental function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -76,10 +63,6 @@ contains
     end function f_rddot
 
     !> Bubble wall pressure: stiffened gas with Laplace pressure and viscous stress
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fpb Internal bubble pressure
     elemental function f_cpbw(fR0, fR, fV, fpb)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -94,11 +77,7 @@ contains
 
     end function f_cpbw
 
-    !> Function that computes the bubble enthalpy
-    !! @param fCpbw Bubble wall pressure
-    !! @param fCpinf Driving bubble pressure
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
+    !> Compute the bubble enthalpy
     elemental function f_H(fCpbw, fCpinf, fntait, fBtait)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -114,11 +93,7 @@ contains
 
     end function f_H
 
-    !> Function that computes the sound speed for the bubble
-    !! @param fCpinf Driving bubble pressure
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
-    !! @param fH Bubble enthalpy
+    !> Compute the sound speed for the bubble
     elemental function f_cgas(fCpinf, fntait, fBtait, fH)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -134,14 +109,7 @@ contains
 
     end function f_cgas
 
-    !> Function that computes the time derivative of the driving pressure
-    !! @param fRho Local liquid density
-    !! @param fP Local pressure
-    !! @param falf Local void fraction
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
-    !! @param advsrc Advection equation source term
-    !! @param divu Divergence of velocity
+    !> Compute the time derivative of the driving pressure
     elemental function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -162,15 +130,6 @@ contains
     end function f_cpinfdot
 
     !> Enthalpy derivative for Gilmore bubble model, Gilmore (1952)
-    !! @param fCpbw Bubble wall pressure
-    !! @param fCpinf Driving bubble pressure
-    !! @param fCpinf_dot Time derivative of the driving pressure
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fpbdot Time derivative of the internal bubble pressure
     elemental function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -193,11 +152,6 @@ contains
     end function f_Hdot
 
     !> Rayleigh-Plesset bubble radial acceleration
-    !! @param fCp Driving pressure
-    !! @param fRho Current density
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fCpbw Boundary wall pressure
     elemental function f_rddot_RP(fCp, fRho, fR, fV, fCpbw)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -208,15 +162,7 @@ contains
 
     end function f_rddot_RP
 
-    !> Function that computes the bubble radial acceleration
-    !! @param fCpbw Bubble wall pressure
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fH Current enthalpy
-    !! @param fHdot Current time derivative of the enthalpy
-    !! @param fcgas Current gas sound speed
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
+    !> Compute the Gilmore bubble radial acceleration
     elemental function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -234,10 +180,6 @@ contains
     end function f_rddot_G
 
     !> Keller-Miksis bubble wall pressure
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fpb Internal bubble pressure
     elemental function f_cpbw_KM(fR0, fR, fV, fpb)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -257,14 +199,6 @@ contains
     end function f_cpbw_KM
 
     !> Keller-Miksis bubble radial acceleration
-    !! @param fpbdot Time-derivative of internal bubble pressure
-    !! @param fCp Driving pressure
-    !! @param fCpbw Bubble wall pressure
-    !! @param fRho Current density
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fC Current sound speed
     elemental function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -293,9 +227,7 @@ contains
 
     end function f_rddot_KM
 
-    !> Subroutine that computes bubble wall properties for vapor bubbles
-    !! @param pb_in Internal bubble pressure
-    !! @param iR0 Current bubble size index
+    !> Compute bubble wall properties for vapor bubbles
     elemental subroutine s_bwproperty(pb_in, iR0, chi_vw_out, k_mw_out, rho_mw_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -316,17 +248,7 @@ contains
 
     end subroutine s_bwproperty
 
-    !> Function that computes the vapour flux
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fpb
-    !! @param fmass_v Current mass of vapour
-    !! @param iR0 Bubble size index (EE) or bubble identifier (EL)
-    !! @param vflux Computed vapour flux
-    !! @param fmass_g Current gas mass (EL)
-    !! @param fbeta_c Mass transfer coefficient (EL)
-    !! @param fR_m Mixture gas constant (EL)
-    !! @param fgamma_m Mixture gamma (EL)
+    !> Compute the vapour flux
     elemental subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_g, fbeta_c, fR_m, fgamma_m)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -374,16 +296,7 @@ contains
 
     end subroutine s_vflux
 
-    !> Function that computes the time derivative of the internal bubble pressure
-    !! @param fvflux Vapour flux
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fpb Current internal bubble pressure
-    !! @param fmass_v Current mass of vapour
-    !! @param iR0 Bubble size index (EE) or bubble identifier (EL)
-    !! @param fbeta_t Mass transfer coefficient (EL)
-    !! @param fR_m Mixture gas constant (EL)
-    !! @param fgamma_m Mixture gamma (EL)
+    !> Compute the time derivative of the internal bubble pressure
     elemental function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -418,25 +331,6 @@ contains
 
     !> Adaptive time stepping routine for subgrid bubbles (See Heirer, E. Hairer S.P.Norsett G. Wanner, Solving Ordinary
     !! Differential Equations I, Chapter II.4)
-    !! @param fRho Current density
-    !! @param fP Current driving pressure
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble radial velocity
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fpb Internal bubble pressure
-    !! @param fpbdot Time-derivative of internal bubble pressure
-    !! @param alf bubble volume fraction
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
-    !! @param f_bub_adv_src Source for bubble volume fraction
-    !! @param f_divu Divergence of velocity
-    !! @param bub_id Bubble identifier (EL)
-    !! @param fmass_v Current mass of vapour (EL)
-    !! @param fmass_g Current mass of gas (EL)
-    !! @param fbeta_c Mass transfer coefficient (EL)
-    !! @param fbeta_t Heat transfer coefficient (EL)
-    !! @param fCson Speed of sound (EL)
-    !! @param adap_dt_stop Fail-safe exit if max iteration count reached
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, fmass_v, &
 
         & fmass_g, fbeta_c, fbeta_t, fCson, adap_dt_stop)
@@ -547,20 +441,6 @@ contains
 
     !> Choose the initial time step size for the adaptive time stepping routine (See Heirer, E. Hairer S.P.Norsett G. Wanner,
     !! Solving Ordinary Differential Equations I, Chapter II.4)
-    !! @param fRho Current density
-    !! @param fP Current driving pressure
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fpb Internal bubble pressure
-    !! @param fpbdot Time-derivative of internal bubble pressure
-    !! @param alf bubble volume fraction
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
-    !! @param f_bub_adv_src Source for bubble volume fraction
-    !! @param f_divu Divergence of velocity
-    !! @param fCson Speed of sound (EL)
-    !! @param h Time step size
     subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson, h)
 
         $:GPU_ROUTINE(function_name='s_initial_substep_h',parallelism='[seq]', cray_inline=True)
@@ -606,30 +486,6 @@ contains
     end subroutine s_initial_substep_h
 
     !> Integrate bubble variables over the given time step size, h, using a third-order accurate embedded Runge-Kutta scheme.
-    !! @param err Estimated error
-    !! @param fRho Current density
-    !! @param fP Current driving pressure
-    !! @param fR Current bubble radius
-    !! @param fV Current bubble velocity
-    !! @param fR0 Equilibrium bubble radius
-    !! @param fpb Internal bubble pressure
-    !! @param fpbdot Time-derivative of internal bubble pressure
-    !! @param alf bubble volume fraction
-    !! @param fntait Tait EOS parameter
-    !! @param fBtait Tait EOS parameter
-    !! @param f_bub_adv_src Source for bubble volume fraction
-    !! @param f_divu Divergence of velocity
-    !! @param bub_id Bubble identifier (EL)
-    !! @param fmass_v Current mass of vapour (EL)
-    !! @param fmass_g Current mass of gas (EL)
-    !! @param fbeta_c Mass transfer coefficient (EL)
-    !! @param fbeta_t Heat transfer coefficient (EL)
-    !! @param fCson Speed of sound (EL)
-    !! @param h Time step size
-    !! @param myR_tmp Bubble radius at each stage
-    !! @param myV_tmp Bubble radial velocity at each stage
-    !! @param myPb_tmp Internal bubble pressure at each stage (EL)
-    !! @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
     subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, &
 
         & fmass_v, fmass_g, fbeta_c, fbeta_t, fCson, h, myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
@@ -720,16 +576,6 @@ contains
     end subroutine s_advance_substep
 
     !> Changes of pressure and vapor mass in the lagrange bubbles.
-    !! @param fR_tmp Bubble radius
-    !! @param fV_tmp Bubble radial velocity
-    !! @param fPb_tmp Internal bubble pressure
-    !! @param fMv_tmp Mass of vapor in the bubble
-    !! @param bub_id Bubble identifier
-    !! @param fmass_g Current mass of gas
-    !! @param fbeta_c Mass transfer coefficient
-    !! @param fbeta_t Heat transfer coefficient
-    !! @param fdPbdt_tmp Rate of change of the internal bubble pressure
-    !! @param advance_EL Rate of change of the mass of vapor in the bubble
     elemental subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_g, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
 
         $:GPU_ROUTINE(parallelism='[seq]')

@@ -48,7 +48,6 @@ contains
     end subroutine s_finalize_pressure_relaxation_module
 
     !> The main pressure relaxation procedure
-    !! @param q_cons_vf Cell-average conservative variables
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf

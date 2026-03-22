@@ -39,8 +39,7 @@ module m_mpi_common
 
 contains
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the module.
     impure subroutine s_initialize_mpi_common_module
 
 #ifdef MFC_MPI
@@ -77,8 +76,7 @@ contains
 
     end subroutine s_initialize_mpi_common_module
 
-    !> The subroutine initializes the MPI execution environment and queries both the number of processors which will be available
-    !! for the job and the local processor rank.
+    !> Initialize the MPI execution environment and query the number of processors and local rank.
     impure subroutine s_mpi_initialize
 
 #ifdef MFC_MPI
@@ -101,9 +99,6 @@ contains
 
     end subroutine s_mpi_initialize
 
-    !! @param q_cons_vf Conservative variables
-    !! @param ib_markers track if a cell is within the immersed boundary
-    !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -185,7 +180,6 @@ contains
 
     end subroutine s_initialize_mpi_data
 
-    !! @param q_cons_vf Conservative variables
     subroutine s_initialize_mpi_data_ds(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -231,7 +225,7 @@ contains
 
     end subroutine s_initialize_mpi_data_ds
 
-    !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
+    !> Gather variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
         integer, intent(in)                     :: counts  ! Array of vector lengths for each process
@@ -261,7 +255,7 @@ contains
 
     end subroutine s_mpi_gather_data
 
-    !> @brief Gathers per-rank time step wall-clock times onto rank 0 for performance reporting.
+    !> Gather per-rank time step wall-clock times onto rank 0 for performance reporting.
     impure subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
@@ -275,7 +269,7 @@ contains
 
     end subroutine mpi_bcast_time_step_values
 
-    !> @brief Prints a case file error with the prohibited condition and message, then aborts execution.
+    !> Print a case file error with the prohibited condition and message, then abort execution.
     impure subroutine s_prohibit_abort(condition, message)
 
         character(len=*), intent(in) :: condition, message
@@ -295,12 +289,6 @@ contains
     !! performed by sifting through the local extrema of each stability criterion. Note that each of the local extrema is from a
     !! single process, within its assigned section of the computational domain. Finally, note that the global extrema values are
     !! only bookkeept on the rank 0 processor.
-    !! @param icfl_max_loc Local maximum ICFL stability criterion
-    !! @param vcfl_max_loc Local maximum VCFL stability criterion
-    !! @param Rc_min_loc Local minimum Rc stability criterion
-    !! @param icfl_max_glb Global maximum ICFL stability criterion
-    !! @param vcfl_max_glb Global maximum VCFL stability criterion
-    !! @param Rc_min_glb Global minimum Rc stability criterion
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
 
         & Rc_min_glb)
@@ -334,11 +322,7 @@ contains
 
     end subroutine s_mpi_reduce_stability_criteria_extrema
 
-    !> The following subroutine takes the input local variable from all processors and reduces to the sum of all values. The reduced
-    !! variable is recorded back onto the original local variable on each processor.
-    ! ! @param var_loc Some variable containing the local value which should be reduced amongst all the processors in the
-    ! communicator.
-    !! @param var_glb The globally reduced value
+    !> Reduce a local real value to its global sum across all MPI ranks.
     impure subroutine s_mpi_allreduce_sum(var_loc, var_glb)
 
         real(wp), intent(in)  :: var_loc
@@ -352,8 +336,7 @@ contains
 
     end subroutine s_mpi_allreduce_sum
 
-    !> This subroutine follows the behavior of the s_mpi_allreduce_sum subroutine
-    !> with the additional feature that it reduces an array of vectors.
+    !> Reduce an array of vectors to their global sums across all MPI ranks.
     impure subroutine s_mpi_allreduce_vectors_sum(var_loc, var_glb, num_vectors, vector_length)
 
         integer, intent(in)                   :: num_vectors, vector_length
@@ -374,11 +357,7 @@ contains
 
     end subroutine s_mpi_allreduce_vectors_sum
 
-    !> The following subroutine takes the input local variable from all processors and reduces to the sum of all values. The reduced
-    !! variable is recorded back onto the original local variable on each processor.
-    ! ! @param var_loc Some variable containing the local value which should be reduced amongst all the processors in the
-    ! communicator.
-    !! @param var_glb The globally reduced value
+    !> Reduce a local integer value to its global sum across all MPI ranks.
     impure subroutine s_mpi_allreduce_integer_sum(var_loc, var_glb)
 
         integer, intent(in)  :: var_loc
@@ -394,11 +373,7 @@ contains
 
     end subroutine s_mpi_allreduce_integer_sum
 
-    !> The following subroutine takes the input local variable from all processors and reduces to the minimum of all values. The
-    !! reduced variable is recorded back onto the original local variable on each processor.
-    ! ! @param var_loc Some variable containing the local value which should be reduced amongst all the processors in the
-    ! communicator.
-    !! @param var_glb The globally reduced value
+    !> Reduce a local real value to its global minimum across all MPI ranks.
     impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
 
         real(wp), intent(in)  :: var_loc
@@ -412,11 +387,7 @@ contains
 
     end subroutine s_mpi_allreduce_min
 
-    !> The following subroutine takes the input local variable from all processors and reduces to the maximum of all values. The
-    !! reduced variable is recorded back onto the original local variable on each processor.
-    ! ! @param var_loc Some variable containing the local value which should be reduced amongst all the processors in the
-    ! communicator.
-    !! @param var_glb The globally reduced value
+    !> Reduce a local real value to its global maximum across all MPI ranks.
     impure subroutine s_mpi_allreduce_max(var_loc, var_glb)
 
         real(wp), intent(in)  :: var_loc
@@ -430,8 +401,7 @@ contains
 
     end subroutine s_mpi_allreduce_max
 
-    !> The following subroutine takes the inputted variable and determines its minimum value on the entire computational domain. The
-    !! result is stored back into inputted variable.
+    !> Reduce a local real value to its global minimum and broadcast the result to all ranks.
     ! ! @param var_loc holds the local value to be reduced among all the processors in communicator. On output, the variable holds
     ! the minimum value, reduced amongst all of the local values.
     impure subroutine s_mpi_reduce_min(var_loc)
@@ -451,9 +421,7 @@ contains
 
     end subroutine s_mpi_reduce_min
 
-    !> The following subroutine takes the first element of the 2-element inputted variable and determines its maximum value on the
-    !! entire computational domain. The result is stored back into the first element of the variable while the rank of the processor
-    !! that is in charge of the sub- domain containing the maximum is stored into the second element of the variable.
+    !> Reduce a 2-element variable to its global maximum value with the owning processor rank (MPI_MAXLOC).
     ! ! @param var_loc On input, this variable holds the local value and processor rank, which are to be reduced among all the
     ! processors in communicator. On output, this variable holds the maximum value, reduced amongst all of the local values, and the
     ! process rank to which the value belongs.
@@ -476,8 +444,6 @@ contains
     end subroutine s_mpi_reduce_maxloc
 
     !> The subroutine terminates the MPI execution environment.
-    !! @param prnt error message to be printed
-    !! @param code optional exit code
     impure subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
@@ -532,12 +498,6 @@ contains
 
     !> The goal of this procedure is to populate the buffers of the cell-average conservative variables by communicating with the
     !! neighboring processors.
-    !! @param q_comm Cell-average conservative variables
-    !! @param mpi_dir MPI communication coordinate direction
-    !! @param pbc_loc Processor boundary condition (PBC) location
-    !! @param nVar Number of variables to communicate
-    !! @param pb_in Optional internal bubble pressure
-    !! @param mv_in Optional bubble mass velocity
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, mpi_dir, pbc_loc, nVar, pb_in, mv_in)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
@@ -952,9 +912,7 @@ contains
 
     end subroutine s_mpi_sendrecv_variables_buffers
 
-    !> The purpose of this procedure is to optimally decompose the computational domain among the available processors. This is
-    !! performed by attempting to award each processor, in each of the coordinate directions, approximately the same number of
-    !! cells, and then recomputing the affected global parameters.
+    !> Decompose the computational domain among processors by balancing cells per rank in each coordinate direction.
     subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
@@ -1371,8 +1329,6 @@ contains
     !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
     !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
     !! cell-boundary locations may be calculated directly from those of the cell-width distributions.
-    !! @param mpi_dir MPI communication coordinate direction
-    !! @param pbc_loc Processor boundary condition (PBC) location
 #ifndef MFC_PRE_PROCESS
     subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
 

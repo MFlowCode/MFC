@@ -119,9 +119,9 @@ contains
 
     end subroutine s_initialize_initial_condition_module
 
-    !> This subroutine peruses the patches and depending on the type of geometry associated with a particular patch, it calls the
-    !! related subroutine to setup the said geometry on the grid using the primitive variables included with the patch parameters.
-    !! The subroutine is complete once the primitive variables are converted to conservative ones.
+    !> Iterate over patches and, depending on the geometry type, call the related subroutine to setup the said geometry on the grid
+    !! using the primitive variables included with the patch parameters. The subroutine is complete once the primitive variables are
+    !! converted to conservative ones.
     impure subroutine s_generate_initial_condition
 
         integer :: i

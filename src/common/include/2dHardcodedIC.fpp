@@ -18,7 +18,7 @@
 
 #:def Hardcoded2D()
     select case (patch_icpp(patch_id)%hcid)  ! 2D_hardcoded_ic example case
-    case (200)
+    case (200)  ! Two-fluid cubic interface
         if (y_cc(j) <= (-x_cc(i)**3 + 1)**(1._wp/3._wp)) then
             ! Volume Fractions
             q_prim_vf(advxb)%sf(i, j, 0) = eps
@@ -263,10 +263,10 @@
             q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = (5._wp/sqrt(4._wp*pi))*sinA + (5._wp/sqrt(4._wp*pi))*cosA
         end if
         ! v^z and B^z remain zero by default
-    case (270)
+    case (270)  ! 2D extrusion of 1D profile from external data
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
         @: HardcodedReadValues()
-    case (280)
+    case (280)  ! Isentropic vortex
         ! This is patch is hard-coded for test suite optimization used in the 2D_isentropicvortex case: This analytic patch uses
         ! geometry 2
         if (patch_id == 1) then
@@ -283,7 +283,7 @@
                       & 0) = 0.0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1) &
                       & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
         end if
-    case (281)
+    case (281)  ! Acoustic pulse
         ! This is patch is hard-coded for test suite optimization used in the 2D_acoustic_pulse case: This analytic patch uses
         ! geometry 2
         if (patch_id == 2) then
@@ -292,7 +292,7 @@
             q_prim_vf(contxb + 0)%sf(i, j, &
                       & 0) = 1*(1 - 0.5*(1.4 - 1)*(0.4)**2*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2))))**(1/(1.4 - 1))
         end if
-    case (282)
+    case (282)  ! Zero-circulation vortex
         ! This is patch is hard-coded for test suite optimization used in the 2D_zero_circ_vortex case: This analytic patch uses
         ! geometry 2
         if (patch_id == 2) then
