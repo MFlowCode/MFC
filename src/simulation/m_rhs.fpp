@@ -1521,8 +1521,8 @@ contains
                         do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                     local_inv_ds = 1._wp/dx(k_idx)
                                     local_term_coeff = q_cons_vf_arg%vf(j_adv)%sf(k_idx, l_idx, q_idx)
-                                    local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx - 1, l_idx, q_idx)
-                                    local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
+                                    local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
+                                    local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx - 1, l_idx, q_idx)
                                     rhs_vf_arg(j_adv)%sf(k_idx, l_idx, q_idx) = rhs_vf_arg(j_adv)%sf(k_idx, l_idx, q_idx) + &
                                                                                 local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                 end do; end do; end do
@@ -1593,8 +1593,8 @@ contains
                         do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                     local_inv_ds = 1._wp/dy(k_idx)
                                     local_term_coeff = q_cons_vf_arg%vf(j_adv)%sf(q_idx, k_idx, l_idx)
-                                    local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(q_idx, k_idx - 1, l_idx)
-                                    local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(q_idx, k_idx, l_idx)
+                                    local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(q_idx, k_idx, l_idx)
+                                    local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(q_idx, k_idx - 1, l_idx)
                                     rhs_vf_arg(j_adv)%sf(q_idx, k_idx, l_idx) = rhs_vf_arg(j_adv)%sf(q_idx, k_idx, l_idx) + &
                                                                                 local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                 end do; end do; end do
@@ -1723,8 +1723,8 @@ contains
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                         local_inv_ds = 1._wp/dz(k_idx)
                                         local_term_coeff = q_cons_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
-                                        local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx - 1)
-                                        local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx)
+                                        local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx)
+                                        local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx - 1)
                                         rhs_vf_arg(j_adv)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(j_adv)%sf(l_idx, q_idx, k_idx) + &
                                                                                     local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                     end do; end do; end do

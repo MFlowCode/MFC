@@ -3344,7 +3344,7 @@ contains
                                     else if (p == 0) then
                                         tau_nt_L = tau_e_L(2)
                                         tau_nt_R = tau_e_R(2)
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             tau_nn_L = tau_e_L(1)
                                             tau_nn_R = tau_e_R(1)
                                             tau_tt_L = tau_e_L(3)
@@ -3364,7 +3364,7 @@ contains
                                             u_t_R = vel_R(1)
                                         end if
                                     else
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             u_n_L = vel_L(1); u_n_R = vel_R(1)
                                             u_t_L = vel_L(2); u_t_R = vel_R(2)
                                             u_t2_L = vel_L(3); u_t2_R = vel_R(3)
@@ -3374,7 +3374,7 @@ contains
                                             tau_tt_L = tau_e_L(3); tau_tt_R = tau_e_R(3)
                                             tau_t2t2_L = tau_e_L(6); tau_t2t2_R = tau_e_R(6)
                                             tau_t1t2_L = tau_e_L(5); tau_t1t2_R = tau_e_R(5)
-                                        else if (idx1 == 2) then
+                                        else if (dir_idx(1) == 2) then
                                             u_n_L = vel_L(2); u_n_R = vel_R(2)
                                             u_t_L = vel_L(1); u_t_R = vel_R(1)
                                             u_t2_L = vel_L(3); u_t2_R = vel_R(3)
@@ -3686,14 +3686,14 @@ contains
                                         u_t2_L = 0._wp; u_t2_R = 0._wp
                                         tau_nt2_L = 0._wp; tau_nt2_R = 0._wp
                                     end if
-                                    A_L = rho_L*(s_L - vel_L(idx1))
-                                    A_R = rho_R*(s_R - vel_R(idx1))
+                                    A_L = rho_L*(s_L - vel_L(dir_idx(1)))
+                                    A_R = rho_R*(s_R - vel_R(dir_idx(1)))
                                     denom_A = A_R - A_L
                                     u_t_star = (A_R*u_t_R - A_L*u_t_L + (tau_nt_R - tau_nt_L))/(denom_A + sgm_eps)
                                     tau_nt_star = (A_R*tau_nt_R - A_L*tau_nt_L)/(denom_A + sgm_eps)
                                     u_t2_star = (A_R*u_t2_R - A_L*u_t2_L + (tau_nt2_R - tau_nt2_L))/(denom_A + sgm_eps)
                                     tau_nt2_star = (A_R*tau_nt2_R - A_L*tau_nt2_L)/(denom_A + sgm_eps)
-                                    pres_tot_star = pres_tot_L + A_L*(s_S - vel_L(idx1))
+                                    pres_tot_star = pres_tot_L + A_L*(s_S - vel_L(dir_idx(1)))
                                 end if
 
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -3706,81 +3706,79 @@ contains
                                 end do
 
                                 if (hypoelasticity) then
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
-                                        xi_M*(rho_L*(vel_L(idx1)*vel_L(idx1) + &
-                                                     s_M*(xi_L*s_S - vel_L(idx1))) + pres_tot_L) &
-                                        + xi_P*(rho_R*(vel_R(idx1)*vel_R(idx1) + &
-                                                       s_P*(xi_R*s_S - vel_R(idx1))) + pres_tot_R) &
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
+                                        xi_M*(rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(1)) + &
+                                                     s_M*(xi_L*s_S - vel_L(dir_idx(1)))) + pres_tot_L) &
+                                        + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) + &
+                                                       s_P*(xi_R*s_S - vel_R(dir_idx(1)))) + pres_tot_R) &
                                         + (s_M/s_L)*(s_P/s_R)*pcorr
                                     if (n > 0) then
-                                        idxi = dir_idx(2)
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                            xi_M*(rho_L*(vel_L(idx1)*u_t_L + &
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(2)) = &
+                                            xi_M*(rho_L*(vel_L(dir_idx(1))*u_t_L + &
                                                          s_M*(xi_L*u_t_star - u_t_L)) - tau_nt_L) &
-                                            + xi_P*(rho_R*(vel_R(idx1)*u_t_R + &
+                                            + xi_P*(rho_R*(vel_R(dir_idx(1))*u_t_R + &
                                                            s_P*(xi_R*u_t_star - u_t_R)) - tau_nt_R)
                                     end if
                                     if (p > 0) then
-                                        idxi = dir_idx(3)
-                                        flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                            xi_M*(rho_L*(vel_L(idx1)*u_t2_L + &
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(3)) = &
+                                            xi_M*(rho_L*(vel_L(dir_idx(1))*u_t2_L + &
                                                          s_M*(xi_L*u_t2_star - u_t2_L)) - tau_nt2_L) &
-                                            + xi_P*(rho_R*(vel_R(idx1)*u_t2_R + &
+                                            + xi_P*(rho_R*(vel_R(dir_idx(1))*u_t2_R + &
                                                            s_P*(xi_R*u_t2_star - u_t2_R)) - tau_nt2_R)
                                     end if
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        xi_M*((E_L + pres_tot_L)*vel_L(idx1) &
+                                        xi_M*((E_L + pres_tot_L)*vel_L(dir_idx(1)) &
                                               - u_t_L*tau_nt_L - u_t2_L*tau_nt2_L + &
-                                              s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
-                                                         (rho_L*s_S + pres_tot_L/(s_L - vel_L(idx1))) &
+                                              s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                                         (rho_L*s_S + pres_tot_L/(s_L - vel_L(dir_idx(1)))) &
                                                          + (u_t_L*tau_nt_L - u_t_star*tau_nt_star) &
-                                                         /(s_L - vel_L(idx1)) &
+                                                         /(s_L - vel_L(dir_idx(1))) &
                                                          + (u_t2_L*tau_nt2_L - u_t2_star*tau_nt2_star) &
-                                                         /(s_L - vel_L(idx1))) &
+                                                         /(s_L - vel_L(dir_idx(1)))) &
                                                    - E_L)) &
-                                        + xi_P*((E_R + pres_tot_R)*vel_R(idx1) &
+                                        + xi_P*((E_R + pres_tot_R)*vel_R(dir_idx(1)) &
                                                 - u_t_R*tau_nt_R - u_t2_R*tau_nt2_R + &
-                                                s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
-                                                           (rho_R*s_S + pres_tot_R/(s_R - vel_R(idx1))) &
+                                                s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                                           (rho_R*s_S + pres_tot_R/(s_R - vel_R(dir_idx(1)))) &
                                                            + (u_t_R*tau_nt_R - u_t_star*tau_nt_star) &
-                                                           /(s_R - vel_R(idx1)) &
+                                                           /(s_R - vel_R(dir_idx(1))) &
                                                            + (u_t2_R*tau_nt2_R - u_t2_star*tau_nt2_star) &
-                                                           /(s_R - vel_R(idx1))) &
+                                                           /(s_R - vel_R(dir_idx(1)))) &
                                                      - E_R)) &
                                         + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                     if (n == 0) then
                                         flux_rs${XYZ}$_vf(j, k, l, strxb) = &
-                                            xi_M*rho_L*tau_nn_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                            + xi_P*rho_R*tau_nn_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                            xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                            + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                     else if (p == 0) then
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             flux_rs${XYZ}$_vf(j, k, l, strxb) = &
-                                                xi_M*rho_L*tau_nn_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                                + xi_P*rho_R*tau_nn_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                                xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                             flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = &
-                                                xi_M*(rho_L*vel_L(idx1)*tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
-                                                + xi_P*(rho_R*vel_R(idx1)*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
+                                                xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
+                                                + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
                                             flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = &
-                                                xi_M*rho_L*tau_tt_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                                + xi_P*rho_R*tau_tt_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                                xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         else
                                             flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = &
-                                                xi_M*rho_L*tau_nn_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                                + xi_P*rho_R*tau_nn_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                                xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                             flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = &
-                                                xi_M*(rho_L*vel_L(idx1)*tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
-                                                + xi_P*(rho_R*vel_R(idx1)*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
+                                                xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
+                                                + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
                                             flux_rs${XYZ}$_vf(j, k, l, strxb) = &
-                                                xi_M*rho_L*tau_tt_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                                + xi_P*rho_R*tau_tt_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                                xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         end if
                                     else
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             itnn = strxb; itnt1 = strxb + 1; itnt2 = strxb + 3
                                             itss1 = strxb + 2; itss2 = strxb + 5; itt12 = strxb + 4
-                                        else if (idx1 == 2) then
+                                        else if (dir_idx(1) == 2) then
                                             itnn = strxb + 2; itnt1 = strxb + 1; itnt2 = strxb + 4
                                             itss1 = strxb; itss2 = strxb + 5; itt12 = strxb + 3
                                         else
@@ -3788,41 +3786,41 @@ contains
                                             itss1 = strxb; itss2 = strxb + 2; itt12 = strxb + 1
                                         end if
                                         flux_rs${XYZ}$_vf(j, k, l, itnn) = &
-                                            xi_M*rho_L*tau_nn_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                            + xi_P*rho_R*tau_nn_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                            xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                            + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rs${XYZ}$_vf(j, k, l, itnt1) = &
-                                            xi_M*(rho_L*vel_L(idx1)*tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
-                                            + xi_P*(rho_R*vel_R(idx1)*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
+                                            xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
+                                            + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
                                         flux_rs${XYZ}$_vf(j, k, l, itnt2) = &
-                                            xi_M*(rho_L*vel_L(idx1)*tau_nt2_L + s_M*(rho_L*xi_L*tau_nt2_star - rho_L*tau_nt2_L)) &
-                                            + xi_P*(rho_R*vel_R(idx1)*tau_nt2_R + s_P*(rho_R*xi_R*tau_nt2_star - rho_R*tau_nt2_R))
+                                            xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt2_L + s_M*(rho_L*xi_L*tau_nt2_star - rho_L*tau_nt2_L)) &
+                                            + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt2_R + s_P*(rho_R*xi_R*tau_nt2_star - rho_R*tau_nt2_R))
                                         flux_rs${XYZ}$_vf(j, k, l, itss1) = &
-                                            xi_M*rho_L*tau_tt_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                            + xi_P*rho_R*tau_tt_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                            xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                            + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rs${XYZ}$_vf(j, k, l, itss2) = &
-                                            xi_M*rho_L*tau_t2t2_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                            + xi_P*rho_R*tau_t2t2_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                            xi_M*rho_L*tau_t2t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                            + xi_P*rho_R*tau_t2t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rs${XYZ}$_vf(j, k, l, itt12) = &
-                                            xi_M*rho_L*tau_t1t2_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                            + xi_P*rho_R*tau_t1t2_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                            xi_M*rho_L*tau_t1t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                            + xi_P*rho_R*tau_t1t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                     end if
                                     if (cyl_coord) then
                                         flux_rs${XYZ}$_vf(j, k, l, strxe) = &
-                                            xi_M*rho_L*tau_qq_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
-                                            + xi_P*rho_R*tau_qq_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                            xi_M*rho_L*tau_qq_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                            + xi_P*rho_R*tau_qq_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                     end if
 
                                     if (s_L >= 0._wp) then
-                                        u_n_HLLC = vel_L(idx1); u_t_HLLC = u_t_L; u_t2_HLLC = u_t2_L
+                                        u_n_HLLC = vel_L(dir_idx(1)); u_t_HLLC = u_t_L; u_t2_HLLC = u_t2_L
                                     elseif (s_R <= 0._wp) then
-                                        u_n_HLLC = vel_R(idx1); u_t_HLLC = u_t_R; u_t2_HLLC = u_t2_R
+                                        u_n_HLLC = vel_R(dir_idx(1)); u_t_HLLC = u_t_R; u_t2_HLLC = u_t2_R
                                     else
                                         u_n_HLLC = s_S*(xi_M*xi_L + xi_P*xi_R); u_t_HLLC = u_t_star; u_t2_HLLC = u_t2_star
                                     end if
                                     if (num_dims == 1) then
                                         nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                     else if (num_dims == 2) then
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
                                         else
@@ -3830,11 +3828,11 @@ contains
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
                                         end if
                                     else
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
-                                        else if (idx1 == 2) then
+                                        else if (dir_idx(1) == 2) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
@@ -4108,7 +4106,7 @@ contains
                                             F_HLL(strxb) + phi*(flux_rs${XYZ}$_vf(j, k, l, strxb) - F_HLL(strxb))
                                     else if (p == 0) then
                                         ! 2D: tau_nn and tau_t1t1 (mapped by sweep direction)
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             flux_rs${XYZ}$_vf(j, k, l, strxb) = &
                                                 F_HLL(strxb) + phi*(flux_rs${XYZ}$_vf(j, k, l, strxb) - F_HLL(strxb))
                                             flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = &
@@ -4141,7 +4139,7 @@ contains
                                     u_t2_HLLC = u_t2_HLL_trace + phi*(u_t2_HLLC - u_t2_HLL_trace)
 
                                     ! Overwrite vel_src with blended velocities
-                                    vel_src_rs${XYZ}$_vf(j, k, l, idx1) = u_n_HLLC
+                                    vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1)) = u_n_HLLC
                                     if (n > 0) vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(2)) = u_t_HLLC
                                     if (p > 0) vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(3)) = u_t2_HLLC
 
@@ -4152,7 +4150,7 @@ contains
                                     if (num_dims == 1) then
                                         nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                     else if (num_dims == 2) then
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
                                         else
@@ -4160,11 +4158,11 @@ contains
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
                                         end if
                                     else
-                                        if (idx1 == 1) then
+                                        if (dir_idx(1) == 1) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
-                                        else if (idx1 == 2) then
+                                        else if (dir_idx(1) == 2) then
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
@@ -4390,7 +4388,7 @@ contains
 
                                 !         flux_rs${XYZ}$_vf(j, k, l, momxb) = F_HLLC(momxb)
                                 !     else
-                                !         if (idx1 == 1) then
+                                !         if (dir_idx(1) == 1) then
                                 !             flux_rs${XYZ}$_vf(j, k, l, strxb)     = F_HLLC(strxb)
                                 !             flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_HLLC(strxb + 1)
                                 !             flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_HLLC(strxb + 2)
@@ -4436,8 +4434,8 @@ contains
                                         else
                                             p_face = pres_tot_star + tau_nn_R; tau_qq_face = tau_qq_R
                                         end if
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
-                                            flux_rs${XYZ}$_vf(j, k, l, contxe + idx1) - p_face + tau_qq_face
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
+                                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) - p_face + tau_qq_face
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = advxb, advxe
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
@@ -4915,13 +4913,13 @@ contains
 
         call s_populate_riemann_states_variables_buffers( &
             qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-            dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
+            dqL_prim_dy_vf, dqL_prim_dz_vf, &
             qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
-            dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
+            dqR_prim_dy_vf, dqR_prim_dz_vf, &
             norm_dir, ix, iy, iz)
 
         call s_initialize_riemann_solver( &
-            q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+            flux_src_vf, norm_dir)
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
@@ -5144,10 +5142,10 @@ contains
                             G_L = 0._wp; G_R = 0._wp; G_hat = 0._wp
                             !$acc loop seq
                             do i = 1, num_fluids
-                                G_L = G_L + alpha_L(i)*Gs(i)
-                                G_R = G_R + alpha_R(i)*Gs(i)
+                                G_L = G_L + alpha_L(i)*Gs_rs(i)
+                                G_R = G_R + alpha_R(i)*Gs_rs(i)
 
-                                G_hat = G_hat + alpha_hat(i)*Gs(i)
+                                G_hat = G_hat + alpha_hat(i)*Gs_rs(i)
                             end do
 
                             E%L = gamma%L*pres%L + pi_inf%L + 5e-1*rho%L*vel_rms%L + qv%L
@@ -5173,8 +5171,8 @@ contains
 
                             ! ==================== Compute Riemann states ====================
 
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H%L, alpha_L, vel_rms%L, 0._wp, c%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R)
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H%L, alpha_L, vel_rms%L, 0._wp, c%L, qv%L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R, qv%R)
 
                             S_L = min(u_n_L - sqrt(c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L), u_n_R - sqrt(c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R))
                             S_R = max(u_n_R + sqrt(c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R), u_n_L + sqrt(c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L))
@@ -5185,9 +5183,9 @@ contains
                             if (alt_soundspeed) then
                                 pres_hat = q_hat_prim_${XYZ}$_vf(j, k, l, E_idx)
                                 blkmod1_hat = ((gammas(1) + 1._wp)*pres_hat + pi_infs(1))/gammas(1) + &
-                                              (4._wp/3._wp)*Gs(1)
+                                              (4._wp/3._wp)*Gs_rs(1)
                                 blkmod2_hat = ((gammas(2) + 1._wp)*pres_hat + pi_infs(2))/gammas(2) + &
-                                              (4._wp/3._wp)*Gs(2)
+                                              (4._wp/3._wp)*Gs_rs(2)
                                 K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat) &
                                         /(alpha_hat(1)*blkmod2_hat + alpha_hat(2)*blkmod1_hat + verysmall)
                             end if
@@ -5718,7 +5716,7 @@ contains
         #:endfor
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, &
-                                       norm_dir, ix, iy, iz)
+                                       norm_dir)
     end subroutine s_hypo_hlld_riemann_solver
 
     !>  The computation of parameters, the allocation of memory,
