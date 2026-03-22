@@ -596,10 +596,10 @@ contains
             do l = 0, n
                 do k = 0, m
                     du_dx_hypo(k, l, q) = (nc_iface_vel_x_vf(1)%sf(k, l, q) - &
-                                      nc_iface_vel_x_vf(1)%sf(k - 1, l, q))/dx(k)
+                                           nc_iface_vel_x_vf(1)%sf(k - 1, l, q))/dx(k)
 
                     dv_dy_hypo(k, l, q) = (nc_iface_vel_y_vf(2)%sf(k, l, q) - &
-                                      nc_iface_vel_y_vf(2)%sf(k, l - 1, q))/dy(l)
+                                           nc_iface_vel_y_vf(2)%sf(k, l - 1, q))/dy(l)
                 end do
             end do
         end do

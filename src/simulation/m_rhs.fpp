@@ -2379,12 +2379,6 @@ contains
             @:DEALLOCATE(nc_iface_vel_n)
         end if
 
-        if (viscous .and. cyl_coord) then
-            do i = 1, num_dims
-                @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
-            end do
-        end if
-
     end subroutine s_finalize_rhs_module
 
 end module m_rhs

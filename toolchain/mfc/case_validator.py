@@ -160,7 +160,7 @@ PHYSICS_DOCS = {
     "check_hypoelasticity": {
         "title": "Hypoelasticity",
         "category": "Feature Compatibility",
-        "explanation": "Requires model_eqns = 2, HLL Riemann solver.",
+        "explanation": "Requires model_eqns = 2, HLL/HLLC/HLLD Riemann solver.",
     },
     "check_phase_change": {
         "title": "Phase Change",
@@ -170,7 +170,7 @@ PHYSICS_DOCS = {
     "check_alt_soundspeed": {
         "title": "Alternative Sound Speed",
         "category": "Feature Compatibility",
-        "explanation": "Requires model_eqns = 2, num_fluids 2 or 3, HLLC solver. Incompatible with bubbles.",
+        "explanation": "Requires model_eqns = 2, num_fluids 2 or 3, HLL/HLLC/HLLD solver. Incompatible with bubbles.",
     },
     "check_igr": {
         "title": "Iterative Generalized Riemann (IGR)",
@@ -529,7 +529,7 @@ class CaseValidator:
             return
 
         self.prohibit(model_eqns is not None and model_eqns != 2, "hypoelasticity requires model_eqns = 2")
-        self.prohibit(riemann_solver is not None and riemann_solver != 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
+        self.prohibit(riemann_solver is not None and riemann_solver not in [1, 2, 4], "hypoelasticity requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
 
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""
@@ -846,7 +846,8 @@ class CaseValidator:
 
         self.prohibit(mhd and riemann_solver is not None and riemann_solver not in [1, 4], "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
         self.prohibit(mhd and wave_speeds is not None and wave_speeds == 2, "MHD requires wave_speeds = 1")
-        self.prohibit(riemann_solver == 4 and not mhd, "HLLD (riemann_solver = 4) is only available for MHD simulations")
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        self.prohibit(riemann_solver == 4 and not mhd and not hypoelasticity, "HLLD (riemann_solver = 4) requires MHD or hypoelasticity")
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")
@@ -1084,7 +1085,10 @@ class CaseValidator:
         self.prohibit(model_eqns is not None and model_eqns != 2, "5-equation model (model_eqns = 2) is required for alt_soundspeed")
         self.prohibit(bubbles_euler, "alt_soundspeed is not compatible with bubbles_euler")
         self.prohibit(avg_state is not None and avg_state != 2, "alt_soundspeed requires avg_state = 2")
-        self.prohibit(riemann_solver is not None and riemann_solver != 2, "alt_soundspeed requires HLLC Riemann solver (riemann_solver = 2)")
+        self.prohibit(
+            riemann_solver is not None and riemann_solver not in [1, 2, 4],
+            "alt_soundspeed requires HLL (1), HLLC (2), or HLLD (4) Riemann solver"
+        )
         self.prohibit(num_fluids is not None and num_fluids not in [2, 3], "alt_soundspeed requires num_fluids = 2 or 3")
 
     def check_bubbles_lagrange(self):
