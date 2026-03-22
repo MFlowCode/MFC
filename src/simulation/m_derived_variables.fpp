@@ -8,10 +8,10 @@
 
 module m_derived_variables
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Global parameters for the code
-    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
-    use m_data_output       !< Data output module
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_data_output
     use m_compile_specific
     use m_helper
     use m_finite_differences

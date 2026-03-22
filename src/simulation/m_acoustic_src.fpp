@@ -7,12 +7,12 @@
 !> @brief One-way acoustic source injection, Maeda and Colonius JCP (2017)
 module m_acoustic_src
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_bubbles              !< Bubble dynamic routines
-    use m_variables_conversion !< State variables type conversion procedures
-    use m_helper_basic         !< Functions to compare floating point numbers
-    use m_constants            !< Definitions of the constants
+    use m_derived_types
+    use m_global_parameters
+    use m_bubbles
+    use m_variables_conversion
+    use m_helper_basic
+    use m_constants
     implicit none
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 

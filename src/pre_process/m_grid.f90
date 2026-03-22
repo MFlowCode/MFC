@@ -8,7 +8,7 @@ module m_grid
     use m_derived_types ! Definitions of the derived types
     use m_global_parameters ! Global parameters for the code
     use m_mpi_proxy ! Message passing interface (MPI) module proxy
-    use m_helper_basic !< Functions to compare floating point numbers
+    use m_helper_basic
 #ifdef MFC_MPI
     use mpi ! Message passing interface (MPI) module
 #endif

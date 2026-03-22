@@ -7,13 +7,13 @@
 !> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
 module m_weno
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_variables_conversion !< State variables type conversion procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_variables_conversion
     ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
-    use m_muscl !< For Interface Compression
+    use m_muscl
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they are stored in v_vf. However, they are

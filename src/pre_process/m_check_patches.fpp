@@ -11,16 +11,16 @@
 module m_check_patches
 
     ! Dependencies
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Global parameters for the code
-    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
-    use m_data_output       !< Procedures to write the grid data and the conservative variables to files
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_data_output
 #ifdef MFC_MPI
     use mpi !< Message passing interface (MPI) module
 #endif
 
     use m_compile_specific
-    use m_helper_basic !< Functions to compare floating point numbers
+    use m_helper_basic
     use m_helper
 
     implicit none

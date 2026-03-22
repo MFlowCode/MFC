@@ -9,17 +9,17 @@
 !! physical source terms
 module m_rhs
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_variables_conversion !< State variables type conversion procedures
-    use m_weno                 !< Weighted and essentially non-oscillatory (WENO) schemes for spatial reconstruction of variables
-    use m_muscl                !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
-    use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
-    use m_cbc                  !< Characteristic boundary conditions (CBC)
-    use m_bubbles_EE           !< Ensemble-averaged bubble dynamics routines
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_variables_conversion
+    use m_weno
+    use m_muscl
+    use m_riemann_solvers
+    use m_cbc
+    use m_bubbles_EE
     use m_bubbles_EL
-    use m_qbmm                 !< Moment inversion
+    use m_qbmm
     use m_hypoelastic
     use m_hyperelastic
     use m_acoustic_src

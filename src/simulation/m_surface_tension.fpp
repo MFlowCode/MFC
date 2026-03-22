@@ -9,12 +9,12 @@
 !> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
     use m_variables_conversion
     use m_weno
-    use m_muscl             !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
+    use m_muscl
     use m_helper
     use m_boundary_common
 

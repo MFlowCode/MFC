@@ -7,14 +7,14 @@
 !> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
 
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_bubbles_EL_kernels   !< Definitions of the kernel functions
-    use m_bubbles              !< General bubble dynamics procedures
-    use m_variables_conversion !< State variables type conversion procedures
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_bubbles_EL_kernels
+    use m_bubbles
+    use m_variables_conversion
     use m_compile_specific
     use m_boundary_common
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_helper_basic
     use m_sim_helpers
     use m_helper
 

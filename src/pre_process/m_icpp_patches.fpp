@@ -14,9 +14,9 @@ module m_icpp_patches
 
     use m_model ! Subroutine(s) related to STL files
     use m_derived_types ! Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
+    use m_global_parameters
     use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
-    use m_helper_basic      !< Functions to compare floating point numbers
+    use m_helper_basic
     use m_helper
     use m_mpi_common
     use m_assign_variables

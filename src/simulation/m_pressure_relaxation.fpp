@@ -9,8 +9,8 @@
 !! correction
 module m_pressure_relaxation
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     implicit none
 
     private; public :: s_pressure_relaxation_procedure, s_initialize_pressure_relaxation_module, &

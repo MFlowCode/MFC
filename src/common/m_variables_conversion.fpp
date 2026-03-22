@@ -8,10 +8,10 @@
 !> @brief Conservative-to-primitive variable conversion, mixture property evaluation, and pressure computation
 module m_variables_conversion
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
-    use m_helper_basic      !< Functions to compare floating point numbers
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_helper_basic
     use m_helper
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass

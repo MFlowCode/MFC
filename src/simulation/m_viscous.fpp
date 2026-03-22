@@ -7,10 +7,10 @@
 !> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_weno
-    use m_muscl             !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
+    use m_muscl
     use m_helper
     use m_finite_differences
 

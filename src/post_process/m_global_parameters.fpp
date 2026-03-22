@@ -11,8 +11,8 @@ module m_global_parameters
     use mpi !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types !< Definitions of the derived types
-    use m_helper_basic  !< Functions to compare floating point numbers
+    use m_derived_types
+    use m_helper_basic
     use m_thermochem, only: num_species, species_names
 
     implicit none

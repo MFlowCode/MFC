@@ -11,7 +11,7 @@ module m_assign_variables
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
-    use m_helper_basic !< Functions to compare floating point numbers
+    use m_helper_basic
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
 
     implicit none

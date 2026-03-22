@@ -8,9 +8,9 @@
 !> @brief Utility routines for bubble model setup, coordinate transforms, array sampling, and special functions
 module m_helper
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use ieee_arithmetic     !< For checking NaN
+    use m_derived_types
+    use m_global_parameters
+    use ieee_arithmetic !< For checking NaN
     implicit none
 
     private;

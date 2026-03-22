@@ -7,8 +7,8 @@
 !> @brief Computes hypoelastic stress-rate source terms and damage-state evolution
 module m_hypoelastic
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_finite_differences
     use m_helper
 

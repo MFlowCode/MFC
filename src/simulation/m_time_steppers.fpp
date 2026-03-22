@@ -8,16 +8,16 @@
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
 
-    use m_derived_types       !< Definitions of the derived types
-    use m_global_parameters   !< Definitions of the global parameters
-    use m_rhs                 !< Right-hane-side (RHS) evaluation procedures
-    use m_pressure_relaxation !< Pressure relaxation procedures
-    use m_data_output         !< Run-time info & solution data output procedures
-    use m_bubbles_EE          !< Ensemble-averaged bubble dynamics routines
-    use m_bubbles_EL          !< Lagrange bubble dynamics routines
+    use m_derived_types
+    use m_global_parameters
+    use m_rhs
+    use m_pressure_relaxation
+    use m_data_output
+    use m_bubbles_EE
+    use m_bubbles_EL
     use m_ibm
     use m_hyperelastic
-    use m_mpi_proxy           !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy
     use m_boundary_common
     use m_helper
     use m_sim_helpers

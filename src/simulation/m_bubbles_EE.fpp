@@ -7,11 +7,11 @@
 !> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_variables_conversion !< State variables type conversion procedures
-    use m_bubbles              !< General bubble dynamics procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_variables_conversion
+    use m_bubbles
     implicit none
 
     real(wp), allocatable, dimension(:,:,:)   :: bub_adv_src

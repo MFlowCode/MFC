@@ -8,7 +8,7 @@
 !> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
 
-    use m_derived_types !< Definitions of the derived types
+    use m_derived_types
     use m_global_parameters
     use m_variables_conversion
 

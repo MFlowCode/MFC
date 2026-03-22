@@ -7,7 +7,7 @@
 !> @brief Shared derived types for field data, patch geometry, bubble dynamics, and MPI I/O structures
 module m_derived_types
 
-    use m_constants !< Constants
+    use m_constants
     use m_precision_select
     use m_thermochem, only: num_species
 

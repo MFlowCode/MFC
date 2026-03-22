@@ -7,12 +7,12 @@
 !> @brief Computes signed-distance level-set fields and surface normals for immersed-boundary patch geometries
 module m_compute_levelset
 
-    use m_ib_patches        !< The IB patch parameters
-    use m_model             !< Subroutine(s) related to STL files
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use m_mpi_proxy         !< Message passing interface (MPI) module proxy
-    use m_helper_basic      !< Functions to compare floating point numbers
+    use m_ib_patches
+    use m_model
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_helper_basic
     implicit none
 
     private; public :: s_apply_levelset

@@ -9,12 +9,12 @@
 module m_phase_change
 
 #ifndef MFC_POST_PROCESS
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_variables_conversion !< State variables type conversion procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_variables_conversion
     use ieee_arithmetic
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_helper_basic
     implicit none
 
     private;

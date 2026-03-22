@@ -8,7 +8,7 @@
 !> @brief Iterative ghost rasterization (IGR) for sharp immersed boundary treatment
 module m_igr
 
-    use m_derived_types !< Definitions of the derived types
+    use m_derived_types
     use m_global_parameters
     use m_variables_conversion
     use m_mpi_proxy

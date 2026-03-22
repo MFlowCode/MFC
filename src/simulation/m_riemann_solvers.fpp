@@ -10,14 +10,14 @@
 
 module m_riemann_solvers
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-    use m_variables_conversion !< State variables type conversion procedures
-    use m_bubbles              !< To get the bubble wall pressure function
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_variables_conversion
+    use m_bubbles
     use m_bubbles_EE
-    use m_surface_tension      !< To get the capillary fluxes
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_surface_tension
+    use m_helper_basic
     use m_chemistry
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
         & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass

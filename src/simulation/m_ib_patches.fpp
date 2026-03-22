@@ -14,8 +14,8 @@ module m_ib_patches
 
     use m_model ! Subroutine(s) related to STL files
     use m_derived_types ! Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
-    use m_helper_basic      !< Functions to compare floating point numbers
+    use m_global_parameters
+    use m_helper_basic
     use m_helper
     use m_mpi_common
 

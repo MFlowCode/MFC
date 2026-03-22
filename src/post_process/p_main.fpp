@@ -8,7 +8,7 @@
 !! fraction, specific heat ratio, liquid stiffness, speed of sound, vorticity and the numerical Schlieren function.
 program p_main
 
-    use m_global_parameters !< Global parameters for the code
+    use m_global_parameters
     use m_start_up
 
     implicit none

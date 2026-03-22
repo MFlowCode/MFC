@@ -7,9 +7,9 @@
 !> @brief MUSCL reconstruction with interface sharpening for contact-preserving advection
 module m_muscl
 
-    use m_derived_types        !< Definitions of the derived types
-    use m_global_parameters    !< Definitions of the global parameters
-    use m_variables_conversion !< State variables type conversion procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_variables_conversion
 #ifdef MFC_OpenACC
     use openacc
 #endif

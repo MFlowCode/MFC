@@ -8,8 +8,8 @@
 
 module m_boundary_common
 
-    use m_derived_types     !< Definitions of the derived types
-    use m_global_parameters !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_mpi_proxy
     use m_constants
     use m_delay_file_access
