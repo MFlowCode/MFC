@@ -34,6 +34,7 @@ class MPIConfig:
     flags: List[str] = dataclasses.field(default_factory=list)
     env: Dict[str, str] = dataclasses.field(default_factory=dict)
     gpu_flags: List[str] = dataclasses.field(default_factory=list)
+    gpu_env: Dict[str, str] = dataclasses.field(default_factory=dict)
 
 
 def _extract_mpi_config(template_name: str) -> Optional[MPIConfig]:
@@ -70,6 +71,7 @@ def _extract_mpi_config(template_name: str) -> Optional[MPIConfig]:
                         flags=d.get("flags", []),
                         env=d.get("env", {}),
                         gpu_flags=d.get("gpu_flags", []),
+                        gpu_env=d.get("gpu_env", {}),
                     )
     except (ValueError, SyntaxError, KeyError):
         return None
@@ -303,11 +305,13 @@ class TestCase(case.Case):
         # Get MPI config for the current system (resolved once, cached)
         cfg = _get_mpi_config()
 
-        # Set up environment: apply system-specific env vars from mpi_config,
-        # then pin GPU device visibility if specific GPU IDs were passed (-g).
+        # Set up environment: apply system-specific env vars from mpi_config.
+        # gpu_env is applied only for GPU builds (e.g. MPICH_GPU_SUPPORT_ENABLED).
         env = dict(os.environ)
         env.update(cfg.env)
         gpu_build = bool(ARG("gpu"))
+        if gpu_build:
+            env.update(cfg.gpu_env)
         if gpus:
             gpu_ids = ",".join(str(g) for g in gpus)
             env["CUDA_VISIBLE_DEVICES"] = gpu_ids

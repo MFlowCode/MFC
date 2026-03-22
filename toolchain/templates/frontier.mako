@@ -5,7 +5,8 @@
 mpi_config = {
     "binary":    "srun",
     "flags":     ["--unbuffered", "--cpus-per-task", "7"],
-    "env":       {"MPICH_GPU_SUPPORT_ENABLED": "1"},
+    "env":       {},
+    "gpu_env":   {"MPICH_GPU_SUPPORT_ENABLED": "1"},
     "gpu_flags": [],
 }
 %>
