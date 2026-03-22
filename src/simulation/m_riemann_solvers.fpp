@@ -3545,7 +3545,7 @@ contains
                             U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, Bz_double, &
                                 & E_double]
 
-                            ! Select HLLD flux from the 5 wave-speed regions: L, *L, **L/**R, *R, R
+                            ! Select HLLD flux region
                             if (0.0_wp <= s_L) then
                                 F_hlld = F_L
                             else if (0.0_wp <= s_starL) then
