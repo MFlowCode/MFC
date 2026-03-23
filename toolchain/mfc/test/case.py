@@ -307,9 +307,10 @@ class TestCase(case.Case):
 
         # Set up environment: apply system-specific env vars from mpi_config.
         # gpu_env is applied only for GPU builds (e.g. MPICH_GPU_SUPPORT_ENABLED).
+        # ARG("gpu") is "acc", "mp", or "no"/"" — only truthy GPU backends apply.
         env = dict(os.environ)
         env.update(cfg.env)
-        gpu_build = bool(ARG("gpu"))
+        gpu_build = ARG("gpu") not in (None, "", "no")
         if gpu_build:
             env.update(cfg.gpu_env)
         if gpus:
