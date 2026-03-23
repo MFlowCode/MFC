@@ -86,7 +86,7 @@ contains
         open (3, FILE=trim(file_path), form='formatted', STATUS='replace')
 
         write (3, '(A)') 'Description: Stability information at ' // 'each time-step of the simulation. This'
-        write (3, '(13X,A)') 'data is composed of the inviscid ' // 'CourantÃ¢ÂÂFriedrichsÃ¢ÂÂLewy (ICFL)'
+        write (3, '(13X,A)') 'data is composed of the inviscid ' // 'Courant-Friedrichs-Lewy (ICFL)'
         write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, ' // 'the capillary CFL (CCFL)'
         write (3, '(13X,A)') 'number and the cell Reynolds (Rc) ' // 'number. Please note that only'
         write (3, '(13X,A)') 'those stability conditions pertinent ' // 'to the physics included in'
