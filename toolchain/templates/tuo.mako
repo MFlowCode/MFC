@@ -23,7 +23,7 @@
 mpi_config = {
     "binary":    "flux",
     "flags":     ["run", "-o", "spindle.level=off", "--exclusive"],
-    "env":       {"HSA_XNACK": "0"},
+    "env":       {"HSA_XNACK": "0", "MPICH_GPU_SUPPORT_ENABLED": "0"},
     "gpu_env":   {"MPICH_GPU_SUPPORT_ENABLED": "1"},
     "gpu_flags": ["--gpus-per-task", "1"],
 }
