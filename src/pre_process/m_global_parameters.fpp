@@ -105,7 +105,7 @@ module m_global_parameters
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z   !< Boundary conditions in the x-, y- and z-coordinate directions
-    integer               :: shear_num !! Number of shear stress components
+    integer               :: shear_num          !< Number of shear stress components
     integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
     integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
     !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
@@ -622,7 +622,7 @@ contains
                 bub_idx%beg = sys_size + 1
                 if (qbmm) then
                     if (nnode == 4) then
-                        nmom = 6 !! Already set as a parameter
+                        nmom = 6  !< Already set as a parameter
                     end if
                     bub_idx%end = adv_idx%end + nb*nmom
                 else

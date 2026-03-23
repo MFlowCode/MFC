@@ -147,38 +147,38 @@ module m_derived_types
     end type ic_model_parameters
 
     type :: t_triangle
-        real(wp), dimension(1:3, 1:3) :: v  ! Vertices of the triangle
-        real(wp), dimension(1:3)      :: n  ! Normal vector
+        real(wp), dimension(1:3, 1:3) :: v  !< Vertices of the triangle
+        real(wp), dimension(1:3)      :: n  !< Normal vector
     end type t_triangle
 
     type :: t_ray
-        real(wp), dimension(1:3) :: o  ! Origin
-        real(wp), dimension(1:3) :: d  ! Direction
+        real(wp), dimension(1:3) :: o  !< Origin
+        real(wp), dimension(1:3) :: d  !< Direction
     end type t_ray
 
     type :: t_bbox
-        real(wp), dimension(1:3) :: min  ! Minimum coordinates
-        real(wp), dimension(1:3) :: max  ! Maximum coordinates
+        real(wp), dimension(1:3) :: min  !< Minimum coordinates
+        real(wp), dimension(1:3) :: max  !< Maximum coordinates
     end type t_bbox
 
     type :: t_model
-        integer                       :: ntrs  ! Number of triangles
-        type(t_triangle), allocatable :: trs(:)  ! Triangles
+        integer                       :: ntrs    !< Number of triangles
+        type(t_triangle), allocatable :: trs(:)  !< Triangles
     end type t_model
 
     type :: t_model_array
         ! Original CPU-side fields (unchanged)
-        type(t_model), allocatable              :: model
-        real(wp), allocatable, dimension(:,:,:) :: boundary_v
-        real(wp), allocatable, dimension(:,:)   :: interpolated_boundary_v
-        integer                                 :: boundary_edge_count
-        integer                                 :: total_vertices
-        integer                                 :: interpolate
+        type(t_model), allocatable              :: model                    !< STL/OBJ geometry model
+        real(wp), allocatable, dimension(:,:,:) :: boundary_v               !< Boundary vertices
+        real(wp), allocatable, dimension(:,:)   :: interpolated_boundary_v  !< Interpolated boundary vertices
+        integer                                 :: boundary_edge_count      !< Number of boundary edges
+        integer                                 :: total_vertices           !< Total vertex count
+        integer                                 :: interpolate              !< Interpolation flag
 
         ! GPU-friendly flattened arrays
-        integer                                 :: ntrs  ! copy of model%ntrs
-        real(wp), allocatable, dimension(:,:,:) :: trs_v  ! (3, 3, ntrs) - triangle vertices
-        real(wp), allocatable, dimension(:,:)   :: trs_n  ! (3, ntrs)    - triangle normals
+        integer                                 :: ntrs   !< Copy of model%ntrs
+        real(wp), allocatable, dimension(:,:,:) :: trs_v  !< Triangle vertices (3, 3, ntrs)
+        real(wp), allocatable, dimension(:,:)   :: trs_n  !< Triangle normals (3, ntrs)
     end type t_model_array
 
     !> Derived type adding initial condition (ic) patch parameters as attributes NOTE: The requirements for the specification of the
@@ -230,15 +230,15 @@ module m_derived_types
         !> Primitive variables associated with the patch. In order, these include the partial densities, density, velocity,
         !! pressure, volume fractions, specific heat ratio function and the liquid stiffness function.
         real(wp)               :: qvp
-        real(wp)               :: Bx, By, Bz  !< Magnetic field components; B%x is not used for 1D
-        real(wp), dimension(6) :: tau_e       !< Elastic stresses added to primitive variables if hypoelasticity = True
-        real(wp)               :: R0          !< Bubble size
-        real(wp)               :: V0          !< Bubble velocity
-        real(wp)               :: p0          !< Bubble size
-        real(wp)               :: m0          !< Bubble velocity
-        integer                :: hcid        !< Hardcoded initial condition ID
-        real(wp)               :: cf_val      !< Color function value
-        real(wp)               :: Y(1:num_species)
+        real(wp)               :: Bx, By, Bz        !< Magnetic field components; B%x is not used for 1D
+        real(wp), dimension(6) :: tau_e             !< Elastic stresses added to primitive variables if hypoelasticity = True
+        real(wp)               :: R0                !< Bubble size
+        real(wp)               :: V0                !< Bubble velocity
+        real(wp)               :: p0                !< Bubble size
+        real(wp)               :: m0                !< Bubble velocity
+        integer                :: hcid              !< Hardcoded initial condition ID
+        real(wp)               :: cf_val            !< Color function value
+        real(wp)               :: Y(1:num_species)  !< Species mass fractions
 
         ! STL or OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath  !< Path the STL file relative to case_dir.

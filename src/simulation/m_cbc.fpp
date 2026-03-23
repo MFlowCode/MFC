@@ -53,9 +53,7 @@ module m_cbc
 
     real(wp), allocatable, dimension(:,:) :: fd_coef_x  !< Finite diff. coefficients x-dir
     real(wp), allocatable, dimension(:,:) :: fd_coef_y  !< Finite diff. coefficients y-dir
-    !> Finite diff. coefficients z-dir The first dimension identifies the location of a coefficient in the FD formula, while the
-    !! last dimension denotes the location of the CBC.
-    real(wp), allocatable, dimension(:,:) :: fd_coef_z
+    real(wp), allocatable, dimension(:,:) :: fd_coef_z  !< Finite diff. coefficients, z-direction
     ! Bug with NVHPC when using nullified pointers in a declare create real(wp), pointer, dimension(:, :) :: fd_coef => null()
 
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_x  !< Polynomial interpolant coefficients in x-dir

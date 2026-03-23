@@ -306,7 +306,7 @@ module m_global_parameters
     !> @{
     integer, dimension(3)  :: dir_idx
     real(wp), dimension(3) :: dir_flg
-    integer, dimension(3)  :: dir_idx_tau !!used for hypoelasticity=true
+    integer, dimension(3)  :: dir_idx_tau  !< used for hypoelasticity=true
     !> @}
 
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
@@ -316,7 +316,7 @@ module m_global_parameters
     integer :: buff_size
     $:GPU_DECLARE(create='[buff_size]')
 
-    integer               :: shear_num !! Number of shear stress components
+    integer               :: shear_num          !< Number of shear stress components
     integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
     integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
     !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,

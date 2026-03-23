@@ -1460,13 +1460,8 @@ contains
         real(wp) :: vL_min, vR_min
         real(wp) :: vL_max, vR_max
         ! Monotonicity-preserving bounds, Suresh & Huynh JCP (1997)
-        real(wp), parameter :: alpha = 2._wp !>
-        !! Determines the maximum Courant-Friedrichs-Lewy (CFL) number that may be utilized with the scheme. In theory, for
-        !! stability, a CFL number less than 1/(1+alpha) is necessary. The default value for alpha is 2.
-
-        !> Determines the amount of freedom available from utilizing a large value for the local curvature. The default value for
-        !! beta is 4/3.
-        real(wp), parameter :: beta = 4._wp/3._wp
+        real(wp), parameter :: alpha = 2._wp       !< Max CFL stability parameter (CFL < 1/(1+alpha))
+        real(wp), parameter :: beta = 4._wp/3._wp  !< Local curvature freedom parameter
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
 
