@@ -117,11 +117,21 @@ if ! python3 toolchain/mfc/lint_docs.py > /dev/null 2>&1; then
     DOC_FAILED=1
 fi
 
+# Parameter documentation check
+(
+    if python3 toolchain/mfc/lint_param_docs.py > /dev/null 2>&1; then
+        echo "0" > "$TMPDIR_PC/param_docs_exit"
+    else
+        echo "1" > "$TMPDIR_PC/param_docs_exit"
+    fi
+) &
+PID_PARAM_DOCS=$!
+
 # --- Collect results ---
 
 FAILED=0
 
-log "[$CYAN 1/5$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
+log "[$CYAN 1/6$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
 if [ "$FORMAT_OK" = "1" ]; then
     error "Formatting check failed to run."
     FAILED=1
@@ -136,7 +146,7 @@ else
 fi
 
 wait $PID_SPELL
-log "[$CYAN 2/5$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
+log "[$CYAN 2/6$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 SPELL_RC=$(cat "$TMPDIR_PC/spell_exit" 2>/dev/null || echo "1")
 if [ "$SPELL_RC" = "0" ]; then
     ok "Spell check passed."
@@ -146,7 +156,7 @@ else
 fi
 
 wait $PID_LINT
-log "[$CYAN 3/5$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
+log "[$CYAN 3/6$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
 LINT_RC=$(cat "$TMPDIR_PC/lint_exit" 2>/dev/null || echo "1")
 if [ "$LINT_RC" = "0" ]; then
     ok "Toolchain lint passed."
@@ -156,7 +166,7 @@ else
 fi
 
 wait $PID_SOURCE
-log "[$CYAN 4/5$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
+log "[$CYAN 4/6$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
 SOURCE_RC=$(cat "$TMPDIR_PC/source_exit" 2>/dev/null || echo "1")
 if [ "$SOURCE_RC" = "0" ]; then
     ok "Source lint passed."
@@ -165,11 +175,21 @@ else
     FAILED=1
 fi
 
-log "[$CYAN 5/5$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
+log "[$CYAN 5/6$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if [ $DOC_FAILED -eq 0 ]; then
     ok "Doc references are valid."
 else
     error "Doc reference check failed. Run$MAGENTA python3 toolchain/mfc/lint_docs.py$COLOR_RESET for details."
+    FAILED=1
+fi
+
+wait $PID_PARAM_DOCS
+log "[$CYAN 6/6$COLOR_RESET] Checking$MAGENTA parameter docs$COLOR_RESET..."
+PARAM_DOCS_RC=$(cat "$TMPDIR_PC/param_docs_exit" 2>/dev/null || echo "1")
+if [ "$PARAM_DOCS_RC" = "0" ]; then
+    ok "Parameter documentation check passed."
+else
+    error "Parameter documentation check failed. Run$MAGENTA python3 toolchain/mfc/lint_param_docs.py$COLOR_RESET for details."
     FAILED=1
 fi
 

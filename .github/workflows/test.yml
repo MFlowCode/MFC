@@ -6,6 +6,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6 AM UTC: refresh coverage cache before 7-day expiry
 
 concurrency:
   # PRs: group by branch (new push cancels old). Push to master: unique per SHA (never cancelled).
@@ -39,20 +41,14 @@ jobs:
       - name: Lint Toolchain
         run: ./mfc.sh lint
 
-      - name: Lint Source - No Raw Directives
-        run: |
-          ! grep -iR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="acc_macros.fpp" --exclude="omp_macros.fpp" --exclude="shared_parallel_macros.fpp" --exclude="syscheck.fpp" ./src/*
-
-      - name: Lint Source - No Double Precision Intrinsics
-        run: |
-          ! grep -iR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/*
-
-      - name: Lint Source - No Junk Code
-        run: |
-          ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+      - name: Lint Source
+        run: python3 toolchain/mfc/lint_source.py
 
       - name: Lint Docs
         run: python3 toolchain/mfc/lint_docs.py
+
+      - name: Lint Parameter Docs
+        run: python3 toolchain/mfc/lint_param_docs.py
 
   file-changes:
     name: Detect File Changes
@@ -117,14 +113,13 @@ jobs:
         (github.event_name == 'push' &&
          (needs.file-changes.outputs.cases_py == 'true' ||
           needs.file-changes.outputs.dep_changed == 'true')) ||
-        github.event_name == 'workflow_dispatch'
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule'
       )
     timeout-minutes: 240
     runs-on:
       group:  phoenix
       labels: gt
-    permissions:
-      contents: write   # Required for Commit Cache to Master on push events
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -140,36 +135,18 @@ jobs:
         run:  cat rebuild-cache-cpu-none.out
 
       - name: Upload Cache Artifact
-        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-cache
           path: toolchain/mfc/test/test_coverage_cache.json.gz
           retention-days: 1
 
-      - name: Commit Cache to Master
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
-        env:
-          CACHE_PUSH_TOKEN: ${{ secrets.CACHE_PUSH_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add toolchain/mfc/test/test_coverage_cache.json.gz
-          if git diff --cached --quiet; then
-            echo "Coverage cache unchanged."
-          else
-            git commit --no-verify -m "Regenerate gcov coverage cache [skip ci]"
-            # Rebase onto latest master in case it advanced during the build
-            # (which can take 20-240 minutes). Only test_coverage_cache.json.gz
-            # is changed, so rebase conflicts are essentially impossible.
-            git fetch origin master
-            git rebase origin/master || { git rebase --abort; echo "Rebase conflict — cache will be regenerated on the next trigger."; exit 0; }
-            # Push using admin token to bypass branch protection rulesets.
-            # The default GITHUB_TOKEN lacks the Repository Admin role needed
-            # to push directly to master. Use credential helper to avoid
-            # leaking the token in git error messages.
-            git -c "http.https://github.com/.extraheader=Authorization: basic $(echo -n "x-access-token:${CACHE_PUSH_TOKEN}" | base64)" push origin HEAD:refs/heads/master
-          fi
+      - name: Save Coverage Cache
+        uses: actions/cache/save@v4
+        with:
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
+        continue-on-error: true
 
   github:
     name: Github
@@ -212,12 +189,37 @@ jobs:
           git fetch --deepen=200
         continue-on-error: true
 
-      - name: Download Coverage Cache
+      - name: Download Coverage Cache (from rebuild in this run)
+        id: cache-artifact
         uses: actions/download-artifact@v4
         with:
           name: coverage-cache
           path: toolchain/mfc/test
         continue-on-error: true
+
+      - name: Restore Coverage Cache (from previous run)
+        if: steps.cache-artifact.outcome != 'success'
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
+          restore-keys: |
+            coverage-cache-${{ github.event.pull_request.number || 'master' }}-
+            coverage-cache-master-
+        continue-on-error: true
+
+      - name: Coverage Cache Status
+        run: |
+          if [ "${{ steps.cache-artifact.outcome }}" = "success" ]; then
+            echo "Coverage cache: loaded from rebuild artifact (this run)"
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
+            echo "Coverage cache: restored from actions/cache (previous run)"
+          elif [ -f toolchain/mfc/test/test_coverage_cache.json.gz ]; then
+            echo "Coverage cache: using committed fallback in repo"
+          else
+            echo "Coverage cache: none available — full test suite will run"
+          fi
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -366,12 +368,37 @@ jobs:
       - name: Clean stale output files
         run:  rm -f *.out
 
-      - name: Download Coverage Cache
+      - name: Download Coverage Cache (from rebuild in this run)
+        id: cache-artifact
         uses: actions/download-artifact@v4
         with:
           name: coverage-cache
           path: toolchain/mfc/test
         continue-on-error: true
+
+      - name: Restore Coverage Cache (from previous run)
+        if: steps.cache-artifact.outcome != 'success'
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
+          restore-keys: |
+            coverage-cache-${{ github.event.pull_request.number || 'master' }}-
+            coverage-cache-master-
+        continue-on-error: true
+
+      - name: Coverage Cache Status
+        run: |
+          if [ "${{ steps.cache-artifact.outcome }}" = "success" ]; then
+            echo "Coverage cache: loaded from rebuild artifact (this run)"
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
+            echo "Coverage cache: restored from actions/cache (previous run)"
+          elif [ -f toolchain/mfc/test/test_coverage_cache.json.gz ]; then
+            echo "Coverage cache: using committed fallback in repo"
+          else
+            echo "Coverage cache: none available — full test suite will run"
+          fi
 
       - name: Build (login node)
         if:   matrix.cluster != 'phoenix'

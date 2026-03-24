@@ -37,7 +37,15 @@ COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_cover
 
 # Changes to these files trigger the full test suite.
 # CPU coverage cannot tell us about GPU directive changes (macro files), and
-# toolchain files define or change the set of tests themselves.
+# toolchain files that affect .inp generation or test execution must run all.
+#
+# NOT included (safe to prune):
+#   - cases.py: adding a test doesn't invalidate existing coverage; new tests
+#     are conservatively included (not in cache -> always runs).
+#   - definitions.py: adding a parameter doesn't affect tests that don't use it;
+#     the PR's .fpp changes trigger the relevant tests via coverage overlap.
+#   - case_validator.py: validation only affects user-facing error messages for
+#     invalid configs, not test outputs (tests use valid configs).
 ALWAYS_RUN_ALL = frozenset(
     [
         "CMakeLists.txt",
@@ -48,11 +56,8 @@ ALWAYS_RUN_ALL = frozenset(
         "src/common/include/macros.fpp",
         "src/common/include/case.fpp",
         "toolchain/mfc/test/case.py",
-        "toolchain/mfc/test/cases.py",
         "toolchain/mfc/test/coverage.py",
-        "toolchain/mfc/params/definitions.py",
         "toolchain/mfc/run/input.py",
-        "toolchain/mfc/case_validator.py",
     ]
 )
 
@@ -663,16 +668,18 @@ def load_coverage_cache(root_dir: str) -> Optional[dict]:
         cons.print("[yellow]Warning: Coverage cache has unexpected format.[/yellow]")
         return None
 
+    # Check staleness but don't reject — old tests' coverage data is still
+    # valid even when cases.py changes (new tests are simply not in the cache
+    # and will be conservatively included by filter_tests_by_coverage).
     cases_py = Path(root_dir) / "toolchain/mfc/test/cases.py"
     try:
         current_hash = hashlib.sha256(cases_py.read_bytes()).hexdigest()
     except OSError as exc:
-        cons.print(f"[yellow]Warning: Cannot read cases.py for cache staleness check: {exc}[/yellow]")
-        return None
+        cons.print(f"[yellow]Warning: Cannot read cases.py for staleness check: {exc}[/yellow]")
+        current_hash = ""
     stored_hash = cache.get("_meta", {}).get("cases_hash", "")
     if current_hash != stored_hash:
-        cons.print("[yellow]Warning: Coverage cache is stale (cases.py changed).[/yellow]")
-        return None
+        cons.print("[dim]Coverage cache was built with a different cases.py — new tests will be included conservatively.[/dim]")
 
     cache = _normalize_cache(cache)
 
