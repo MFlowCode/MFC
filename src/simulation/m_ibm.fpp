@@ -298,7 +298,7 @@ contains
                         ! compute the linear velocity of the ghost point due to rotation
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
                                                         patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
-                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector, rotation_velocity)
+                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
 
                         ! add only the component of the IB's motion that is normal to the surface
                         vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
@@ -312,7 +312,7 @@ contains
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
                                                         patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
                         ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
-                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector, rotation_velocity)
+                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
                         do q = 1, 3
                             ! if mibm is 1 or 2, then the boundary may be moving
                             vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
@@ -1075,7 +1075,7 @@ contains
         ! apply the summed forces
         do i = 1, num_ibs
             patch_ib(i)%force(:) = forces(i, :)
-            patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be converted to the local coordinates of the IB
+            patch_ib(i)%torque(:) = torques(i, :) ! torques must be converted to the local coordinates of the IB
         end do
 
         call nvtxEndRange
