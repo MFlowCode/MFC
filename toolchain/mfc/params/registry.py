@@ -49,9 +49,7 @@ class RegistryFrozenError(RuntimeError):
 _INDEXED_RE = re.compile(r"^([a-zA-Z_]\w*)\((\d+)\)%(.+)$")
 
 
-def _resolve_family(
-    name: str, families: Dict[str, "IndexedFamily"]
-) -> Optional[Tuple[ParamType, Set[str]]]:
+def _resolve_family(name: str, families: Dict[str, "IndexedFamily"]) -> Optional[Tuple[ParamType, Set[str]]]:
     """
     Resolve a parameter name against indexed families.
 
@@ -291,10 +289,7 @@ class ParamRegistry:
         if self._frozen and self._all_params_view is not None:
             return self._all_params_view
         if self._families:
-            raise RuntimeError(
-                "Cannot access all_params before freeze() when indexed families "
-                "are registered. Call freeze() first."
-            )
+            raise RuntimeError("Cannot access all_params before freeze() when indexed families are registered. Call freeze() first.")
         return self._params
 
     def is_known_param(self, name: str) -> bool:
