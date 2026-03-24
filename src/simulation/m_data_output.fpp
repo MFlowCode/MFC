@@ -265,11 +265,20 @@ contains
 
         write (file_loc, '(A)') 'ib_state.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-        open (newunit=ib_state_unit, file=trim(file_loc), &
-              form='unformatted', &
-              access='stream', &
-              status='replace', &
-              iostat=ios)
+        if (t_step_start /= 0) then
+            ! On restart, append to existing file to preserve history
+            open (newunit=ib_state_unit, file=trim(file_loc), &
+                  form='unformatted', &
+                  access='stream', &
+                  status='old', position='append', &
+                  iostat=ios)
+        else
+            open (newunit=ib_state_unit, file=trim(file_loc), &
+                  form='unformatted', &
+                  access='stream', &
+                  status='replace', &
+                  iostat=ios)
+        end if
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: '//trim(file_loc))
     end subroutine s_open_ib_state_file
 
