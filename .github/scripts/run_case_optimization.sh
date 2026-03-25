@@ -24,11 +24,17 @@ benchmarks=(
 # For Frontier/Frontier AMD: deps were fetched on the login node via --deps-only;
 # build case-optimized binaries here on the compute node before running.
 # For Phoenix: prebuild-case-optimization.sh already built everything in a prior SLURM job.
+# Frontier Cray: -j 1 to work around CCE 19.0.0 IPA SIGSEGV
+build_jobs=8
+if [ "$job_cluster" = "frontier" ]; then
+    build_jobs=1
+fi
+
 if [ "$job_cluster" != "phoenix" ]; then
     echo "=== Building case-optimized binaries on compute node ==="
     for case in "${benchmarks[@]}"; do
         echo "--- Building: $case ---"
-        ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
+        ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j $build_jobs
     done
     echo "=== All case-optimized binaries built ==="
 fi

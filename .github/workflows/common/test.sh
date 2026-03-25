@@ -41,8 +41,14 @@ if [ "$job_cluster" = "phoenix" ]; then
     validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || "$syscheck_bin" > /dev/null 2>&1'
 fi
 
+# Frontier Cray: -j 1 to work around CCE 19.0.0 IPA SIGSEGV
+build_jobs=8
+if [ "$job_cluster" = "frontier" ]; then
+    build_jobs=1
+fi
+
 RETRY_VALIDATE_CMD="$validate_cmd" \
-    retry_build ./mfc.sh test -v --dry-run -j 8 $build_opts || exit 1
+    retry_build ./mfc.sh test -v --dry-run -j $build_jobs $build_opts || exit 1
 
 # --- GPU detection and thread count ---
 device_opts=""
