@@ -600,16 +600,15 @@ def build(targets=None, case: input.MFCInputFile = None, history: typing.Set[str
     case = case or input.load(ARG("input"), ARG("--"), {})
     case.validate_params()
 
-    if ARG("deps_only", False):
+    if ARG("deps_only", False) and len(history) == 0:
         all_deps = set()
         for t in targets:
             resolved = get_target(t)
             for dep in resolved.requires.compute():
                 all_deps.add(dep)
 
-        if len(history) == 0:
-            cons.print(f"[bold]Fetch Dependencies | {format_list_to_string([d.name for d in all_deps], 'magenta', 'None')}[/bold]")
-            cons.print(no_indent=True)
+        cons.print(f"[bold]Fetch Dependencies | {format_list_to_string([d.name for d in all_deps], 'magenta', 'None')}[/bold]")
+        cons.print(no_indent=True)
 
         if not all_deps:
             cons.print("[yellow]No dependencies to build for the requested targets.[/yellow]")
