@@ -13,13 +13,6 @@ if [ "$job_device" = "gpu" ] && [ "$ngpus" -eq 0 ]; then
     ngpus=1
 fi
 
-# Verify the venv Python interpreter exists (created by ./mfc.sh build)
-if [ ! -x build/venv/bin/python3 ]; then
-    echo "ERROR: build/venv/bin/python3 not found."
-    echo "The MFC build venv may not have been created. Was the pre-build step successful?"
-    exit 1
-fi
-
 benchmarks=(
     benchmarks/5eq_rk3_weno3_hllc/case.py
     benchmarks/viscous_weno5_sgb_acoustic/case.py
@@ -27,6 +20,18 @@ benchmarks=(
     benchmarks/ibm/case.py
     benchmarks/igr/case.py
 )
+
+# For Frontier/Frontier AMD: deps were fetched on the login node via --deps-only;
+# build case-optimized binaries here on the compute node before running.
+# For Phoenix: prebuild-case-optimization.sh already built everything in a prior SLURM job.
+if [ "$job_cluster" != "phoenix" ]; then
+    echo "=== Building case-optimized binaries on compute node ==="
+    for case in "${benchmarks[@]}"; do
+        echo "--- Building: $case ---"
+        ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
+    done
+    echo "=== All case-optimized binaries built ==="
+fi
 
 passed=0
 failed=0

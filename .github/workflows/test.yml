@@ -486,15 +486,20 @@ jobs:
       - name: Clean stale output files
         run:  rm -f *.out
 
+      - name: Fetch Dependencies
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh cpu ${{ matrix.interface }} ${{ matrix.cluster }}
 
-      - name: Pre-Build (login node)
+      - name: Build & Run Case-Optimization Tests
         if:   matrix.cluster != 'phoenix'
-        run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Run Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Cancel SLURM Jobs
