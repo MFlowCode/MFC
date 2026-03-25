@@ -36,15 +36,15 @@ for case in "${benchmarks[@]}"; do
     case_dir="$(dirname "$case")"
     case_name="$(basename "$case_dir")"
     echo ""
-    echo "========================================"
+    echo "===================="
     echo "Case-optimization test: $case_name"
-    echo "========================================"
+    echo "===================="
 
     # Clean any previous output
     rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
 
     # Build + run with --case-optimization, small grid, 10 timesteps
-    if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j "$(nproc)" -- --gbpp 1 --steps 10; then
+    if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -- --gbpp 1 --steps 10; then
         # Validate output
         if build/venv/bin/python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
             echo "PASS: $case_name"
@@ -65,11 +65,11 @@ for case in "${benchmarks[@]}"; do
 done
 
 echo ""
-echo "========================================"
+echo "===================="
 echo "Case-optimization summary: $passed passed, $failed failed"
 if [ $failed -gt 0 ]; then
     echo "Failed cases:$failed_cases"
 fi
-echo "========================================"
+echo "===================="
 
 [ $failed -eq 0 ] && exit 0 || exit 1

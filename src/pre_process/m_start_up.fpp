@@ -2,6 +2,8 @@
 !! @file
 !! @brief Contains module m_start_up
 
+#:include 'macros.fpp'
+
 !> @brief Reads and validates user inputs, loads existing grid/IC data, and initializes pre-process modules
 module m_start_up
 
@@ -355,7 +357,7 @@ contains
         ! the time-step directory that will contain the new grid and initial
         ! condition data are also generated.
         if (old_ic .neqv. .true.) then
-            call s_delete_directory(trim(proc_rank_dir)//'/*')
+            call s_delete_directory(trim(proc_rank_dir))
             call s_create_directory(trim(proc_rank_dir)//'/0')
         end if
 
@@ -476,10 +478,10 @@ contains
             end do
 
             do i = 1, nb
-                do r = 1, 4
+                do r = 1, nnode
                     ! Checking whether data file associated with variable position
                     ! of the currently manipulated bubble variable exists
-                    write (file_num, '(I0)') sys_size + r + (i - 1)*4
+                    write (file_num, '(I0)') sys_size + r + (i - 1)*nnode
                     file_loc = trim(t_step_dir)//'/mv'// &
                                trim(file_num)//'.dat'
                     inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -505,7 +507,7 @@ contains
         ! process may be cleaned out to make room for new pre-process data.
         ! In addition, the time-step folder that will contain the new grid
         ! and initial condition data are also generated.
-        call s_create_directory(trim(proc_rank_dir)//'/*')
+        call s_delete_directory(trim(proc_rank_dir))
         call s_create_directory(trim(proc_rank_dir)//'/0')
 
     end subroutine s_read_serial_ic_data_files
@@ -660,7 +662,7 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
@@ -679,7 +681,7 @@ contains
             end do
 
             if (qbmm .and. .not. polytropic) then
-                do i = sys_size + 1, sys_size + 2*nb*4
+                do i = sys_size + 1, sys_size + 2*nb*nnode
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -767,7 +769,8 @@ contains
 
         real(wp), intent(inout) :: start, finish
 
-        integer :: j, k
+        integer :: j, k, l
+        real(wp) :: r2
 
         ! Setting up the grid and the initial condition. If the grid is read in from
         ! preexisting grid data files, it is checked for consistency. If the grid is
@@ -787,10 +790,16 @@ contains
 
         ! hard-coded psi
         if (hyper_cleaning) then
-            do j = 0, m
+            @:ASSERT(psi_idx > 0, "hyper_cleaning requires psi_idx to be set")
+            do l = 0, p
                 do k = 0, n
-                    q_cons_vf(psi_idx)%sf(j, k, 0) = 1d-2*exp(-(x_cc(j)**2 + y_cc(k)**2)/(2.0*0.05**2))
-                    q_prim_vf(psi_idx)%sf(j, k, 0) = q_cons_vf(psi_idx)%sf(j, k, 0)
+                    do j = 0, m
+                        r2 = x_cc(j)**2
+                        if (n > 0) r2 = r2 + y_cc(k)**2
+                        if (p > 0) r2 = r2 + z_cc(l)**2
+                        q_cons_vf(psi_idx)%sf(j, k, l) = 1.0e-2_wp*exp(-r2/(2.0_wp*0.05_wp**2))
+                        q_prim_vf(psi_idx)%sf(j, k, l) = q_cons_vf(psi_idx)%sf(j, k, l)
+                    end do
                 end do
             end do
         end if
@@ -798,7 +807,7 @@ contains
         if (relax) then
             if (proc_rank == 0) then
                 print *, 'initial condition might have been altered due to enforcement of &
-&                pTg-equilirium (relax = "T" activated)'
+&                pTg-equilibrium (relax = "T" activated)'
             end if
 
             call s_infinite_relaxation_k(q_cons_vf)

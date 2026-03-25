@@ -27,8 +27,12 @@ Typical usage:
     3. Physics validation (via case_validator.py)
 """
 
-from typing import Dict, Any, List, Optional, Tuple
-from .registry import REGISTRY
+from typing import Any, Dict, List, Optional, Tuple
+
+# Note: definitions is imported by params/__init__.py to populate REGISTRY.
+# This redundant import ensures REGISTRY is populated even if this module
+# is imported directly (e.g., during testing).
+from . import definitions  # noqa: F401
 from .errors import (
     dependency_error,
     dependency_recommendation,
@@ -36,19 +40,57 @@ from .errors import (
     format_error_list,
     unknown_param_error,
 )
+from .registry import REGISTRY
 from .suggest import suggest_parameter
-# Note: definitions is imported by params/__init__.py to populate REGISTRY.
-# This redundant import ensures REGISTRY is populated even if this module
-# is imported directly (e.g., during testing).
-from . import definitions  # noqa: F401  pylint: disable=unused-import
+
+
+def _family_attr_error(name: str) -> Optional[str]:
+    """
+    Diagnose why a family-pattern param was rejected by the registry.
+
+    Distinguishes three cases for known family bases:
+    - Invalid index (0 or exceeding max_index)
+    - Unknown attribute
+    - Unknown family base (returns None to let caller handle)
+
+    Returns a targeted error message, or None if name doesn't match
+    any family pattern.
+    """
+    from .registry import _INDEXED_RE
+
+    m = _INDEXED_RE.match(name)
+    if m is None:
+        return None
+    base, idx_str, attr = m.groups()
+    fam = REGISTRY.families.get(base)
+    if fam is None:
+        return None
+
+    # Check if the problem is the index (attr is valid but index is out of range)
+    idx = int(idx_str)
+    if attr in fam.attrs:
+        if idx < 1:
+            return f"Invalid index {idx} for {base}: indices are 1-based (must be >= 1)"
+        if fam.max_index is not None and idx > fam.max_index:
+            return f"Index {idx} exceeds maximum ({fam.max_index}) for {base}"
+        return None  # Both attr and index look valid; shouldn't reach here
+
+    # Unknown attribute — provide targeted message
+    valid = sorted(fam.attrs.keys())
+    if len(valid) > 8:
+        shown = ", ".join(valid[:8]) + f", ... ({len(valid)} total)"
+    else:
+        shown = ", ".join(valid)
+    return f"Unknown attribute '{attr}' for {base}. Valid attributes: {shown}"
 
 
 def check_unknown_params(params: Dict[str, Any]) -> List[str]:
     """
     Check for unknown parameters and suggest corrections.
 
-    Uses fuzzy matching via rapidfuzz to provide "Did you mean?" suggestions
-    for parameter names that don't exist in the registry.
+    For indexed family params with a known base but invalid attribute,
+    provides a targeted "valid attributes" message. Otherwise, uses
+    fuzzy matching to provide "Did you mean?" suggestions.
 
     Args:
         params: Dictionary of parameter name -> value
@@ -59,9 +101,13 @@ def check_unknown_params(params: Dict[str, Any]) -> List[str]:
     errors = []
 
     for name in params.keys():
-        if name not in REGISTRY.all_params:
-            suggestions = suggest_parameter(name)
-            errors.append(unknown_param_error(name, suggestions))
+        if not REGISTRY.is_known_param(name):
+            family_err = _family_attr_error(name)
+            if family_err:
+                errors.append(family_err)
+            else:
+                suggestions = suggest_parameter(name)
+                errors.append(unknown_param_error(name, suggestions))
 
     return errors
 
@@ -79,7 +125,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     errors = []
 
     for name, value in params.items():
-        param_def = REGISTRY.all_params.get(name)
+        param_def = REGISTRY.get_param_def(name)
         if param_def is None:
             continue  # Unknown params handled by check_unknown_params
 
@@ -96,7 +142,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def _check_condition(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _check_condition(
     name: str,
     condition: Dict[str, Any],
     condition_label: Optional[str],
@@ -122,12 +168,18 @@ def _check_condition(  # pylint: disable=too-many-arguments,too-many-positional-
             else:
                 got = params[req_param]
                 if got not in expected_vals:
-                    errors.append(dependency_value_error(
-                        name, condition_label, req_param, expected_vals, got,
-                    ))
+                    errors.append(
+                        dependency_value_error(
+                            name,
+                            condition_label,
+                            req_param,
+                            expected_vals,
+                            got,
+                        )
+                    )
 
 
-def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  # pylint: disable=too-many-branches
+def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:
     """
     Check parameter dependencies.
 
@@ -143,7 +195,7 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  
     warnings = []
 
     for name, value in params.items():
-        param_def = REGISTRY.all_params.get(name)
+        param_def = REGISTRY.get_param_def(name)
         if param_def is None or param_def.dependencies is None:
             continue
 
@@ -162,7 +214,12 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  
             for trigger_val, condition in deps["when_value"].items():
                 if value == trigger_val:
                     _check_condition(
-                        name, condition, f"={trigger_val}", params, errors, warnings,
+                        name,
+                        condition,
+                        f"={trigger_val}",
+                        params,
+                        errors,
+                        warnings,
                     )
 
     return errors, warnings

@@ -1,7 +1,8 @@
 import os
 import re
-import pandas as pd
 from io import StringIO
+
+import pandas as pd
 
 
 def parse_time_avg(path):
@@ -172,7 +173,7 @@ if not grind_df.empty:
 
     subset["grind_time"] = times
     subset["rel_perf"] = subset["grind_time"] / ref["grind_time"].values
-    print(f"Grind Time - Single Device")
+    print("Grind Time - Single Device")
     print(subset[["memory", "grind_time", "rel_perf"]].to_string(index=False))
 
 print()

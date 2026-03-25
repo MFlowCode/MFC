@@ -38,3 +38,5 @@ Reviews are not triggered automatically. To request a review, comment on the PR:
 - `@coderabbitai full review` — full review from scratch
 - `/review` — Qodo review
 - `/improve` — Qodo code suggestions
+- `@claude full review` — Claude full review (also triggers on PR open/reopen/ready)
+- Add label `claude-full-review` — Claude full review via label

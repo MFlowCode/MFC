@@ -113,6 +113,8 @@ endif()
 # debug builds. These include optimization and debug flags, as well as some that
 # are required for a successful build of MFC.
 
+set(FYPP_GCOV_OPTS "")
+
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>
@@ -131,13 +133,20 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
-            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
-	    )
+        )
 
         add_link_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
             $<$<COMPILE_LANGUAGE:Fortran>:--coverage>
         )
+
+        # Override Release -O3 with -O1 for gcov: coverage instrumentation is
+        # inaccurate at -O3, and aggressive codegen (e.g. AVX-512 FP16 on
+        # Granite Rapids) can emit instructions that older assemblers reject.
+        set(CMAKE_Fortran_FLAGS_RELEASE "-O1 -DNDEBUG" CACHE STRING "" FORCE)
+
+        # Use gfortran5 line markers so gcov can map coverage to .fpp sources.
+        set(FYPP_GCOV_OPTS "--line-marker-format=gfortran5")
     endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -150,6 +159,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
+            -Wconversion
             -Wintrinsic-shadow
             -Wunderflow
             -Wrealloc-lhs
@@ -224,18 +234,32 @@ endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     # Processor tuning: Check if we can target the host's native CPU's ISA.
-    CHECK_FORTRAN_COMPILER_FLAG("-march=native" SUPPORTS_MARCH_NATIVE)
-    if (SUPPORTS_MARCH_NATIVE)
-        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-march=native>)
-    else()
-    	CHECK_FORTRAN_COMPILER_FLAG("-mcpu=native" SUPPORTS_MCPU_NATIVE)
-        if (SUPPORTS_MCPU_NATIVE)
-            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-mcpu=native>)
+    # Skip for gcov builds — -march=native on newer CPUs (e.g. Granite Rapids)
+    # can emit instructions the system assembler doesn't support.
+    if (NOT MFC_GCov)
+        CHECK_FORTRAN_COMPILER_FLAG("-march=native" SUPPORTS_MARCH_NATIVE)
+        if (SUPPORTS_MARCH_NATIVE)
+            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-march=native>)
+            # Disable AVX-512 FP16: gfortran >=12 emits vmovw instructions on
+            # Granite Rapids CPUs, but binutils <2.38 cannot assemble them.
+            # FP16 is unused in MFC's double-precision computations.
+            CHECK_FORTRAN_COMPILER_FLAG("-mno-avx512fp16" SUPPORTS_MNO_AVX512FP16)
+            if (SUPPORTS_MNO_AVX512FP16)
+                add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-mno-avx512fp16>)
+            endif()
+        else()
+            CHECK_FORTRAN_COMPILER_FLAG("-mcpu=native" SUPPORTS_MCPU_NATIVE)
+            if (SUPPORTS_MCPU_NATIVE)
+                add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-mcpu=native>)
+            endif()
         endif()
     endif()
 
-    # Enable LTO/IPO if supported
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+    # Enable LTO/IPO if supported (skip for gcov — LTO interferes with coverage
+    # instrumentation and can trigger assembler errors on newer architectures).
+    if (MFC_GCov)
+        message(STATUS "LTO/IPO disabled for gcov build")
+    elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         if (MFC_Unified)
             message(STATUS "LTO/IPO is not available with NVHPC using Unified Memory")
         elseif (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER "24.11" AND CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "25.9")
@@ -381,6 +405,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  --no-folding
 								 --line-length=999
 		 						 --line-numbering-mode=nocontlines
+                                 ${FYPP_GCOV_OPTS}
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
@@ -396,6 +421,7 @@ HANDLE_SOURCES(pre_process ON)
 HANDLE_SOURCES(simulation ON)
 HANDLE_SOURCES(post_process ON)
 HANDLE_SOURCES(syscheck OFF)
+
 
 # MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
 # executable <target> with the appropriate sources, compiler definitions, and
@@ -633,6 +659,23 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
+    # CCE 19.0.0 IPA workaround: two files trigger IPA crashes:
+    #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
+    #   m_phase_change: bring_routine_resident SIGSEGV
+    # Disabling IPA per-file avoids the crashes while preserving IPA for
+    # the rest of simulation (needed for thermochem INLINEALWAYS inlining).
+    # Applied to Cray+OpenACC and Cray CPU, but NOT Cray+OpenMP: on OpenMP,
+    # m_thermochem uses !DIR$ INLINEALWAYS (requires IPA), so disabling IPA
+    # for these files breaks thermochem on-device calls. On OpenACC the
+    # pyrometheus patch emits !$acc routine seq instead (no IPA needed).
+    # See PR #1286.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
+            PROPERTIES COMPILE_OPTIONS "-Oipa0"
+        )
+    endif()
 endif()
 
 if (MFC_POST_PROCESS)

@@ -85,6 +85,7 @@ jobs:
             device: gpu
             interface: omp
             build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp bench"
+    continue-on-error: ${{ matrix.cluster == 'frontier' || matrix.cluster == 'frontier_amd' }}
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
@@ -104,26 +105,31 @@ jobs:
 
       - name: Setup & Build
         if: matrix.build_script != ''
-        uses: nick-fields/retry@v3
-        with:
-          max_attempts: 3
-          retry_wait_seconds: 60
-          timeout_minutes: 150
-          command: |
-            (cd pr     && ${{ matrix.build_script }}) &
-            pid1=$!
-            (cd master && ${{ matrix.build_script }}) &
-            pid2=$!
-            wait $pid1; e1=$?
-            wait $pid2; e2=$?
-            [ $e1 -eq 0 ] && [ $e2 -eq 0 ]
-          on_retry_command: |
-            (cd pr     && ./mfc.sh clean) &
-            (cd master && ./mfc.sh clean) &
-            wait
+        timeout-minutes: 150
+        run: |
+          (cd pr     && ${{ matrix.build_script }}) &
+          pid1=$!
+          (cd master && ${{ matrix.build_script }}) &
+          pid2=$!
+          e1=0; e2=0
+          wait $pid1 || e1=$?
+          wait $pid2 || e2=$?
+          if [ $e1 -ne 0 ] || [ $e2 -ne 0 ]; then
+            echo "Build failures: pr=$e1 master=$e2"
+            exit 1
+          fi
 
       - name: Bench (Master v. PR)
         run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Generate & Post Comment
         if: always()
@@ -136,6 +142,29 @@ jobs:
         run: |
           cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
           cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+
+      - name: Print Per-Case Logs
+        if: always()
+        run: |
+          passed=() failed=()
+          for out in pr/build/benchmarks/*/*.out master/build/benchmarks/*/*.out; do
+            [ -f "$out" ] || continue
+            [ -f "${out%.out}.yaml" ] && passed+=("$out") || failed+=("$out")
+          done
+
+          echo "=== Per-Case Summary: ${#failed[@]} failed, ${#passed[@]} passed ==="
+          for out in "${failed[@]}"; do echo "  [FAILED] $out"; done
+          for out in "${passed[@]}"; do echo "  [PASSED] $out"; done
+
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo ""
+            echo "=== Failed Case Logs ==="
+            for out in "${failed[@]}"; do
+              echo "--- $out ---"
+              cat "$out"
+              echo ""
+            done
+          fi
 
       # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)

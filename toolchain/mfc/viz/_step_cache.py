@@ -28,10 +28,10 @@ from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
-CACHE_MAX: int = 20
+CACHE_MAX: int = 40
 _cache: dict = {}
 _cache_order: list = []
-_in_flight: set = set()   # steps currently being prefetched
+_in_flight: set = set()  # steps currently being prefetched
 _lock = threading.Lock()
 
 _prefetch_pool: Optional[ThreadPoolExecutor] = None
@@ -40,11 +40,10 @@ _prefetch_pool_lock = threading.Lock()
 
 def _get_prefetch_pool() -> ThreadPoolExecutor:
     """Return the prefetch pool, creating it lazily on first use."""
-    global _prefetch_pool  # pylint: disable=global-statement
+    global _prefetch_pool  # noqa: PLW0603
     with _prefetch_pool_lock:
         if _prefetch_pool is None:
-            _prefetch_pool = ThreadPoolExecutor(
-                max_workers=1, thread_name_prefix='mfc_prefetch')
+            _prefetch_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="mfc_prefetch")
             atexit.register(_prefetch_pool.shutdown, wait=False)
         return _prefetch_pool
 
@@ -117,7 +116,7 @@ def _bg_load(key: object, read_func: Callable) -> None:
                     _cache.pop(evict, None)
                 _cache[key] = data
                 _cache_order.append(key)
-    except Exception:  # pylint: disable=broad-except
+    except Exception:
         logger.debug("Prefetch failed for key %s", key, exc_info=True)
     finally:
         with _lock:

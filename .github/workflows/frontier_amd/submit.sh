@@ -1,1 +1,0 @@
-../frontier/submit.sh

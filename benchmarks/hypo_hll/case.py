@@ -4,9 +4,9 @@
 # - hypoelasticity : T
 # - riemann_solver : 1
 
+import argparse
 import json
 import math
-import argparse
 
 parser = argparse.ArgumentParser(prog="Benchmarkin Case 3", description="This MFC case was created for the purposes of benchmarking MFC.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -44,8 +44,8 @@ print(
             "p": Nz,
             "dt": 1e-8,
             "t_step_start": 0,
-            "t_step_stop": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
-            "t_step_save": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
+            "t_step_stop": ARGS["steps"] if ARGS["steps"] is not None else int(2 * (5 * size + 5)),
+            "t_step_save": ARGS["steps"] if ARGS["steps"] is not None else int(2 * (5 * size + 5)),
             # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,

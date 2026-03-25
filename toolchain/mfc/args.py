@@ -5,17 +5,21 @@ This module provides argument parsing using auto-generated parsers
 from the central CLI schema in cli/commands.py.
 """
 
+import os.path
 import re
 import sys
-import os.path
 
+from .cli.argparse_gen import generate_parser
+from .cli.commands import COMMAND_ALIASES, MFC_CLI_SCHEMA
 from .common import MFCException
 from .state import MFCConfig
-from .cli.commands import MFC_CLI_SCHEMA, COMMAND_ALIASES
-from .cli.argparse_gen import generate_parser
 from .user_guide import (
-    print_help, is_first_time_user, print_welcome,
-    print_command_help, print_topic_help, print_help_topics,
+    is_first_time_user,
+    print_command_help,
+    print_help,
+    print_help_topics,
+    print_topic_help,
+    print_welcome,
 )
 
 
@@ -27,7 +31,7 @@ def _get_command_from_args(args_list):
     """
     # Skip the program name and any leading options (starting with '-')
     for token in args_list[1:]:
-        if not token.startswith('-'):
+        if not token.startswith("-"):
             return COMMAND_ALIASES.get(token, token)
     return None
 
@@ -51,7 +55,6 @@ def _handle_enhanced_help(args_list):
     return None
 
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def parse(config: MFCConfig):
     """Parse command line arguments using the CLI schema."""
     # Handle enhanced help before argparse
@@ -66,7 +69,7 @@ def parse(config: MFCConfig):
         sys.exit(0)
 
     try:
-        extra_index = sys.argv.index('--')
+        extra_index = sys.argv.index("--")
     except ValueError:
         extra_index = len(sys.argv)
 
@@ -80,13 +83,13 @@ def parse(config: MFCConfig):
             print_command_help(attempted_command, show_argparse=False)
             subparser.print_help()
             sys.stdout.flush()  # Ensure help prints before error
-            sys.stderr.write(f'\n{subparser.prog}: error: {message}\n')
+            sys.stderr.write(f"\n{subparser.prog}: error: {message}\n")
             sys.exit(2)
 
         subparser.error = custom_error
 
     args: dict = vars(parser.parse_args(sys.argv[1:extra_index]))
-    args["--"] = sys.argv[extra_index + 1:]
+    args["--"] = sys.argv[extra_index + 1 :]
 
     # Handle --help at top level
     if args.get("help") and args["command"] is None:
@@ -145,7 +148,7 @@ def parse(config: MFCConfig):
 
     # "Slugify" the name of the job (only for batch jobs, not for new command)
     if args.get("name") is not None and isinstance(args["name"], str) and args["command"] != "new":
-        args["name"] = re.sub(r'[\W_]+', '-', args["name"])
+        args["name"] = re.sub(r"[\W_]+", "-", args["name"])
 
     # We need to check for some invalid combinations of arguments because of
     # the limitations of argparse.
@@ -158,7 +161,8 @@ def parse(config: MFCConfig):
 
     # Resolve test case defaults (deferred to avoid slow startup for non-test commands)
     if args["command"] == "test":
-        from .test.cases import list_cases  # pylint: disable=import-outside-toplevel
+        from .test.cases import list_cases
+
         test_cases = list_cases()
         if args.get("from") is None:
             args["from"] = test_cases[0].get_uuid()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 pi = 3.141592653589
 # material parameters

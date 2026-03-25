@@ -7,9 +7,9 @@ This helps identify gaps in test coverage before refactoring.
 
 import ast
 import json
-from pathlib import Path
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List
 
 
 @dataclass
@@ -24,6 +24,7 @@ class ConstraintInfo:
         message: Error message shown when constraint is violated.
         condition_code: Unparsed source code of the condition expression.
     """
+
     method: str
     line_number: int
     message: str
@@ -36,10 +37,7 @@ def _extract_message(msg_node: ast.expr) -> str:
         return msg_node.value
     if isinstance(msg_node, ast.JoinedStr):
         # f-string - extract the static parts
-        return "".join(
-            p.value if isinstance(p, ast.Constant) else "{...}"
-            for p in msg_node.values
-        )
+        return "".join(p.value if isinstance(p, ast.Constant) else "{...}" for p in msg_node.values)
     return "<dynamic>"
 
 
@@ -49,7 +47,7 @@ def _is_prohibit_call(node: ast.AST) -> bool:
         return False
     if not isinstance(node.func, ast.Attribute):
         return False
-    return node.func.attr == 'prohibit' and len(node.args) >= 2
+    return node.func.attr == "prohibit" and len(node.args) >= 2
 
 
 def _find_case_validator_class(tree: ast.Module) -> ast.ClassDef:
@@ -64,7 +62,7 @@ def extract_constraints_from_validator() -> List[ConstraintInfo]:
     """Parse case_validator.py and extract all prohibit() calls."""
     validator_path = Path(__file__).parent.parent / "case_validator.py"
 
-    with open(validator_path, 'r', encoding='utf-8') as f:
+    with open(validator_path, "r", encoding="utf-8") as f:
         source = f.read()
 
     tree = ast.parse(source)
@@ -94,12 +92,7 @@ def extract_constraints_from_validator() -> List[ConstraintInfo]:
             # Note: node.lineno points to the start of the prohibit() call.
             # For multi-line calls, this is the first line, not where the
             # condition or message appears.
-            constraints.append(ConstraintInfo(
-                method=item.name,
-                line_number=node.lineno,
-                message=message,
-                condition_code=condition_code
-            ))
+            constraints.append(ConstraintInfo(method=item.name, line_number=node.lineno, message=message, condition_code=condition_code))
 
     return constraints
 
@@ -117,7 +110,7 @@ def extract_check_methods() -> Dict[str, Dict[str, Any]]:
     """Extract all check_* methods from validator with their stage."""
     validator_path = Path(__file__).parent.parent / "case_validator.py"
 
-    with open(validator_path, 'r', encoding='utf-8') as f:
+    with open(validator_path, "r", encoding="utf-8") as f:
         source = f.read()
 
     methods = {}
@@ -136,7 +129,7 @@ def extract_check_methods() -> Dict[str, Dict[str, Any]]:
         docstring = ast.get_docstring(item) or ""
         methods[item.name] = {
             "line_number": item.lineno,
-            "docstring": docstring.split('\n')[0] if docstring else "",
+            "docstring": docstring.split("\n")[0] if docstring else "",
             "prohibit_count": _count_prohibit_calls(item),
         }
 
@@ -168,7 +161,7 @@ def extract_validate_dispatch() -> Dict[str, List[str]]:
     """Extract which check methods are called for each stage."""
     validator_path = Path(__file__).parent.parent / "case_validator.py"
 
-    with open(validator_path, 'r', encoding='utf-8') as f:
+    with open(validator_path, "r", encoding="utf-8") as f:
         source = f.read()
 
     dispatch = {stage: [] for stage in _VALIDATE_METHOD_TO_STAGE.values()}
@@ -200,11 +193,7 @@ def generate_coverage_report() -> Dict[str, Any]:
     for c in constraints:
         if c.method not in by_method:
             by_method[c.method] = []
-        by_method[c.method].append({
-            "line": c.line_number,
-            "message": c.message,
-            "condition": c.condition_code[:80] + "..." if len(c.condition_code) > 80 else c.condition_code
-        })
+        by_method[c.method].append({"line": c.line_number, "message": c.message, "condition": c.condition_code[:80] + "..." if len(c.condition_code) > 80 else c.condition_code})
 
     # Calculate coverage per stage
     stage_coverage = {}
@@ -223,18 +212,13 @@ def generate_coverage_report() -> Dict[str, Any]:
     common_constraints = stage_coverage.get("common", {}).get("constraint_count", 0)
     for stage in ["pre_process", "simulation", "post_process"]:
         if stage in stage_coverage:
-            stage_coverage[stage]["total_with_common"] = (
-                stage_coverage[stage]["constraint_count"] + common_constraints
-            )
+            stage_coverage[stage]["total_with_common"] = stage_coverage[stage]["constraint_count"] + common_constraints
 
     return {
         "summary": {
             "total_constraints": len(constraints),
             "total_check_methods": len(methods),
-            "methods_with_most_constraints": sorted(
-                [(name, info["prohibit_count"]) for name, info in methods.items()],
-                key=lambda x: -x[1]
-            )[:10],
+            "methods_with_most_constraints": sorted([(name, info["prohibit_count"]) for name, info in methods.items()], key=lambda x: -x[1])[:10],
         },
         "stage_coverage": stage_coverage,
         "methods": methods,
@@ -254,12 +238,12 @@ def print_coverage_report():
     print(f"Total check methods: {report['summary']['total_check_methods']}")
 
     print("\nMethods with most constraints:")
-    for method, count in report['summary']['methods_with_most_constraints']:
+    for method, count in report["summary"]["methods_with_most_constraints"]:
         print(f"  {method}: {count} constraints")
 
     print("\nConstraints by stage:")
-    for stage, info in report['stage_coverage'].items():
-        total = info.get('total_with_common', info['constraint_count'])
+    for stage, info in report["stage_coverage"].items():
+        total = info.get("total_with_common", info["constraint_count"])
         print(f"  {stage}:")
         print(f"    Methods: {info['method_count']}")
         print(f"    Constraints: {info['constraint_count']} (+ common = {total})")
@@ -268,12 +252,12 @@ def print_coverage_report():
     print("Detailed constraint listing (top methods):")
     print("=" * 70)
 
-    for method, count in report['summary']['methods_with_most_constraints'][:5]:
+    for method, count in report["summary"]["methods_with_most_constraints"][:5]:
         print(f"\n{method} ({count} constraints):")
-        if method in report['constraints_by_method']:
-            for c in report['constraints_by_method'][method][:5]:
+        if method in report["constraints_by_method"]:
+            for c in report["constraints_by_method"][method][:5]:
                 print(f"  L{c['line']}: {c['message'][:60]}")
-            if len(report['constraints_by_method'][method]) > 5:
+            if len(report["constraints_by_method"][method]) > 5:
                 print(f"  ... and {len(report['constraints_by_method'][method]) - 5} more")
 
 
@@ -284,7 +268,7 @@ def save_coverage_report(output_path: Path = None):
 
     report = generate_coverage_report()
 
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
 
     return output_path

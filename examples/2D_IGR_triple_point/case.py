@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 eps = 1e-8
 Nx = 699

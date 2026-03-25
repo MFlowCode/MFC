@@ -1,4 +1,6 @@
-import dataclasses, math
+import dataclasses
+import math
+
 
 @dataclasses.dataclass(repr=False)
 class Error:
@@ -24,18 +26,17 @@ def compute_error(measured: float, expected: float) -> Error:
 
 class AverageError:
     accumulated: Error
-    count:       int
+    count: int
 
     def __init__(self) -> None:
         self.accumulated = Error(0, 0)
-        self.count       = 0
+        self.count = 0
 
     def get(self) -> Error:
         if self.count == 0:
             return Error(0, 0)
 
-        return Error(self.accumulated.absolute / self.count,
-                     self.accumulated.relative / self.count)
+        return Error(self.accumulated.absolute / self.count, self.accumulated.relative / self.count)
 
     def push(self, error: Error) -> None:
         # Do not include nans in the result

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 # athmospheric pressure - Pa (used as reference value)
 patm = 101325

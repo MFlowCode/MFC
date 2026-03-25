@@ -7,7 +7,8 @@ in sync with the CLI schema definitions.
 
 import re
 from typing import List
-from .schema import CLISchema, Command, Argument
+
+from .schema import Argument, CLISchema, Command
 
 
 def _escape_doxygen(text: str) -> str:
@@ -194,11 +195,7 @@ def _generate_command_section(cmd: Command, schema: CLISchema) -> List[str]:
     return lines
 
 
-def _generate_commands_by_category(
-    schema: CLISchema,
-    category_commands: List[str],
-    header: str
-) -> List[str]:
+def _generate_commands_by_category(schema: CLISchema, category_commands: List[str], header: str) -> List[str]:
     """Generate command sections for a category."""
     lines = []
     matching = [c for c in schema.commands if c.name in category_commands]
@@ -260,45 +257,47 @@ def generate_cli_reference(schema: CLISchema) -> str:
     lines.extend(_generate_commands_by_category(schema, other_commands, "Other Commands"))
 
     # Common options section
-    lines.extend([
-        "## Common Options",
-        "",
-        "Many commands share common option sets:",
-        "",
-        "### Target Selection (`-t, --targets`)",
-        "",
-        "Available targets:",
-        "- `pre_process` - Pre-processor",
-        "- `simulation` - Main simulation",
-        "- `post_process` - Post-processor",
-        "- `syscheck` - System check utility",
-        "- `documentation` - Build documentation",
-        "",
-        "### Build Configuration Flags",
-        "",
-        "| Flag | Description |",
-        "|------|-------------|",
-        "| `--mpi` / `--no-mpi` | Enable/disable MPI support |",
-        "| `--gpu [acc/mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
-        "| `--debug` / `--no-debug` | Build with debug compiler flags |",
-        "| `--gcov` / `--no-gcov` | Enable code coverage |",
-        "| `--single` / `--no-single` | Single precision |",
-        "| `--mixed` / `--no-mixed` | Mixed precision |",
-        "",
-        "### Verbosity (`-v, --verbose`)",
-        "",
-        "Controls output verbosity level:",
-        "",
-        "- `-v` - Basic verbose output",
-        "- `-vv` - Show build commands",
-        "- `-vvv` - Full verbose output including CMake details",
-        "",
-        "### Debug Logging (`-d, --debug-log`)",
-        "",
-        "Enables debug logging for the Python toolchain (mfc.sh internals).",
-        "This is for troubleshooting the build system, not the MFC simulation code.",
-        "",
-    ])
+    lines.extend(
+        [
+            "## Common Options",
+            "",
+            "Many commands share common option sets:",
+            "",
+            "### Target Selection (`-t, --targets`)",
+            "",
+            "Available targets:",
+            "- `pre_process` - Pre-processor",
+            "- `simulation` - Main simulation",
+            "- `post_process` - Post-processor",
+            "- `syscheck` - System check utility",
+            "- `documentation` - Build documentation",
+            "",
+            "### Build Configuration Flags",
+            "",
+            "| Flag | Description |",
+            "|------|-------------|",
+            "| `--mpi` / `--no-mpi` | Enable/disable MPI support |",
+            "| `--gpu [acc/mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
+            "| `--debug` / `--no-debug` | Build with debug compiler flags |",
+            "| `--gcov` / `--no-gcov` | Enable code coverage |",
+            "| `--single` / `--no-single` | Single precision |",
+            "| `--mixed` / `--no-mixed` | Mixed precision |",
+            "",
+            "### Verbosity (`-v, --verbose`)",
+            "",
+            "Controls output verbosity level:",
+            "",
+            "- `-v` - Basic verbose output",
+            "- `-vv` - Show build commands",
+            "- `-vvv` - Full verbose output including CMake details",
+            "",
+            "### Debug Logging (`-d, --debug-log`)",
+            "",
+            "Enables debug logging for the Python toolchain (mfc.sh internals).",
+            "This is for troubleshooting the build system, not the MFC simulation code.",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -316,28 +315,30 @@ def generate_command_summary(schema: CLISchema) -> str:
         alias_str = f" ({cmd.aliases[0]})" if cmd.aliases else ""
         lines.append(f"- **{cmd.name}**{alias_str}: {cmd.help}")
 
-    lines.extend([
-        "",
-        "## Common Patterns",
-        "",
-        "```bash",
-        "# Build MFC",
-        "./mfc.sh build",
-        "./mfc.sh build --gpu          # With GPU support",
-        "./mfc.sh build -j 8           # Parallel build",
-        "",
-        "# Run a case",
-        "./mfc.sh run case.py",
-        "./mfc.sh run case.py -n 4     # 4 MPI ranks",
-        "",
-        "# Run tests",
-        "./mfc.sh test",
-        "./mfc.sh test -j 4            # Parallel tests",
-        "",
-        "# Validate a case",
-        "./mfc.sh validate case.py",
-        "```",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Common Patterns",
+            "",
+            "```bash",
+            "# Build MFC",
+            "./mfc.sh build",
+            "./mfc.sh build --gpu          # With GPU support",
+            "./mfc.sh build -j 8           # Parallel build",
+            "",
+            "# Run a case",
+            "./mfc.sh run case.py",
+            "./mfc.sh run case.py -n 4     # 4 MPI ranks",
+            "",
+            "# Run tests",
+            "./mfc.sh test",
+            "./mfc.sh test -j 4            # Parallel tests",
+            "",
+            "# Validate a case",
+            "./mfc.sh validate case.py",
+            "```",
+            "",
+        ]
+    )
 
     return "\n".join(lines)

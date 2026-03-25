@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 gam = 1.4
 Ma0 = 1e-3

@@ -76,10 +76,6 @@ contains
                 call MPI_BCAST(patch_bc(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in ['vel', 'angular_vel', 'angles']
-                call MPI_BCAST(patch_ib(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-
             call MPI_BCAST(patch_bc(i)%radius, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in ['centroid', 'length']
@@ -111,16 +107,26 @@ contains
             call MPI_BCAST(patch_icpp(i)%model_filepath, len(patch_icpp(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate', &
-                'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha' ]
+                'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha', &
+                'fourier_cos', 'fourier_sin' ]
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+
+            call MPI_BCAST(patch_icpp(i)%sph_har_coeff, size(patch_icpp(i)%sph_har_coeff), mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%modal_clip_r_to_min, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%modal_r_min, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_icpp(i)%modal_use_exp_form, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
             call MPI_BCAST(patch_icpp(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             if (chemistry) then
                 call MPI_BCAST(patch_icpp(i)%Y, size(patch_icpp(i)%Y), mpi_p, 0, MPI_COMM_WORLD, ierr)
             end if
-            ! Broadcast IB variables
+            ! Broadcast IB variables: patch_ib is indexed 1:num_patches_max,
+            ! not 1:num_bc_patches_max, so these must live in the num_patches_max loop.
+            #:for VAR in ['vel', 'angular_vel', 'angles']
+                call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_threshold, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)

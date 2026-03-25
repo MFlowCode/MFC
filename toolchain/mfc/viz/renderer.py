@@ -11,65 +11,66 @@ import os
 import re
 import tempfile
 
+import imageio
+import matplotlib
 import numpy as np
 
-import imageio
-
-import matplotlib
 try:
-    matplotlib.use('Agg')
+    matplotlib.use("Agg")
 except ValueError:
     pass
-import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
-from matplotlib.colors import LogNorm  # pylint: disable=wrong-import-position
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import LogNorm  # noqa: E402
 
-matplotlib.rcParams.update({
-    'mathtext.fontset': 'cm',
-    'font.family': 'serif',
-})
+matplotlib.rcParams.update(
+    {
+        "mathtext.fontset": "cm",
+        "font.family": "serif",
+    }
+)
 
 # LaTeX-style labels for known MFC variable names
 _LABEL_MAP = {
-    'pres':     r'$p$',
-    'rho':      r'$\rho$',
-    'E':        r'$E$',
-    'T':        r'$T$',
-    'D':        r'$D$',
-    'c':        r'$c$',
-    'gamma':    r'$\gamma$',
-    'pi_inf':   r'$\pi_\infty$',
-    'pres_inf': r'$p_\infty$',
-    'heat_ratio': r'$\gamma$',
-    'schlieren':  r'$|\nabla \rho|$',
-    'psi':        r'$\psi$',
-    'n':          r'$n$',
-    'qm':         r'$q_m$',
-    'Bx': r'$B_x$', 'By': r'$B_y$', 'Bz': r'$B_z$',
-    'voidFraction': r'void fraction',
-    'liutex_mag':   r'$|\lambda|$',
-    'damage_state': r'damage',
+    "pres": r"$p$",
+    "rho": r"$\rho$",
+    "E": r"$E$",
+    "T": r"$T$",
+    "D": r"$D$",
+    "c": r"$c$",
+    "gamma": r"$\gamma$",
+    "pi_inf": r"$\pi_\infty$",
+    "pres_inf": r"$p_\infty$",
+    "heat_ratio": r"$\gamma$",
+    "schlieren": r"$|\nabla \rho|$",
+    "psi": r"$\psi$",
+    "n": r"$n$",
+    "qm": r"$q_m$",
+    "Bx": r"$B_x$",
+    "By": r"$B_y$",
+    "Bz": r"$B_z$",
+    "voidFraction": r"void fraction",
+    "liutex_mag": r"$|\lambda|$",
+    "damage_state": r"damage",
 }
 
 _INDEXED_PATTERNS = [
-    (r'^vel(\d+)$',        lambda m: [r'$u$', r'$v$', r'$w$'][int(m.group(1)) - 1]
-     if int(m.group(1)) <= 3 else rf'$v_{m.group(1)}$'),
-    (r'^mom(\d+)$',        lambda m: rf'$\rho {["u", "v", "w"][int(m.group(1)) - 1]}$'
-     if int(m.group(1)) <= 3 else rf'$m_{m.group(1)}$'),
-    (r'^alpha(\d+)$',      lambda m: rf'$\alpha_{m.group(1)}$'),
-    (r'^alpha_rho(\d+)$',  lambda m: rf'$\alpha_{m.group(1)}\rho_{m.group(1)}$'),
-    (r'^alpha_rho_e(\d+)$', lambda m: rf'$\alpha_{m.group(1)}\rho_{m.group(1)}e_{m.group(1)}$'),
-    (r'^omega(\d+)$',      lambda m: rf'$\omega_{m.group(1)}$'),
-    (r'^tau(\d+)$',        lambda m: rf'$\tau_{m.group(1)}$'),
-    (r'^xi(\d+)$',         lambda m: rf'$\xi_{m.group(1)}$'),
-    (r'^flux(\d+)$',       lambda m: rf'$F_{m.group(1)}$'),
-    (r'^liutex_axis(\d+)$', lambda m: rf'$\lambda_{m.group(1)}$'),
-    (r'^rho(\d+)$',        lambda m: rf'$\rho_{m.group(1)}$'),
-    (r'^Y_(.+)$',          lambda m: rf'$Y_{{\mathrm{{{m.group(1)}}}}}$'),
-    (r'^nR(\d+)$',         lambda m: rf'$nR_{{{m.group(1)}}}$'),
-    (r'^nV(\d+)$',         lambda m: rf'$nV_{{{m.group(1)}}}$'),
-    (r'^nP(\d+)$',         lambda m: rf'$nP_{{{m.group(1)}}}$'),
-    (r'^nM(\d+)$',         lambda m: rf'$nM_{{{m.group(1)}}}$'),
-    (r'^color_function(\d+)$', lambda m: rf'color $f_{m.group(1)}$'),
+    (r"^vel(\d+)$", lambda m: [r"$u$", r"$v$", r"$w$"][int(m.group(1)) - 1] if int(m.group(1)) <= 3 else rf"$v_{m.group(1)}$"),
+    (r"^mom(\d+)$", lambda m: rf"$\rho {['u', 'v', 'w'][int(m.group(1)) - 1]}$" if int(m.group(1)) <= 3 else rf"$m_{m.group(1)}$"),
+    (r"^alpha(\d+)$", lambda m: rf"$\alpha_{m.group(1)}$"),
+    (r"^alpha_rho(\d+)$", lambda m: rf"$\alpha_{m.group(1)}\rho_{m.group(1)}$"),
+    (r"^alpha_rho_e(\d+)$", lambda m: rf"$\alpha_{m.group(1)}\rho_{m.group(1)}e_{m.group(1)}$"),
+    (r"^omega(\d+)$", lambda m: rf"$\omega_{m.group(1)}$"),
+    (r"^tau(\d+)$", lambda m: rf"$\tau_{m.group(1)}$"),
+    (r"^xi(\d+)$", lambda m: rf"$\xi_{m.group(1)}$"),
+    (r"^flux(\d+)$", lambda m: rf"$F_{m.group(1)}$"),
+    (r"^liutex_axis(\d+)$", lambda m: rf"$\lambda_{m.group(1)}$"),
+    (r"^rho(\d+)$", lambda m: rf"$\rho_{m.group(1)}$"),
+    (r"^Y_(.+)$", lambda m: rf"$Y_{{\mathrm{{{m.group(1)}}}}}$"),
+    (r"^nR(\d+)$", lambda m: rf"$nR_{{{m.group(1)}}}$"),
+    (r"^nV(\d+)$", lambda m: rf"$nV_{{{m.group(1)}}}$"),
+    (r"^nP(\d+)$", lambda m: rf"$nP_{{{m.group(1)}}}$"),
+    (r"^nM(\d+)$", lambda m: rf"$nM_{{{m.group(1)}}}$"),
+    (r"^color_function(\d+)$", lambda m: rf"color $f_{m.group(1)}$"),
 ]
 
 
@@ -83,11 +84,11 @@ def _overlay_bubbles(ax, bubbles, scale: float = 1.0) -> None:
     """
     if bubbles is None or len(bubbles) == 0:
         return
-    from matplotlib.patches import Circle          # pylint: disable=import-outside-toplevel
-    from matplotlib.collections import PatchCollection  # pylint: disable=import-outside-toplevel
+    from matplotlib.collections import PatchCollection
+    from matplotlib.patches import Circle
+
     circles = [Circle((b[0], b[1]), b[3] * scale) for b in bubbles]
-    pc = PatchCollection(circles, facecolors='none', edgecolors='white',
-                         linewidths=0.5, alpha=0.8)
+    pc = PatchCollection(circles, facecolors="none", edgecolors="white", linewidths=0.5, alpha=0.8)
     ax.add_collection(pc)
 
 
@@ -102,31 +103,31 @@ def pretty_label(varname):
     return varname
 
 
-def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def render_1d(x_cc, data, varname, step, output, **opts):
     """Render a 1D line plot and save as PNG."""
-    fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 6)))
+    fig, ax = plt.subplots(figsize=opts.get("figsize", (10, 6)))
     label = pretty_label(varname)
     ax.plot(x_cc, data, linewidth=1.5)
-    ax.set_xlabel(r'$x$')
+    ax.set_xlabel(r"$x$")
     ax.set_ylabel(label)
-    ax.set_title(f'{label} (step {step})')
+    ax.set_title(f"{label} (step {step})")
     ax.grid(True, alpha=0.3)
-    ax.ticklabel_format(axis='y', style='sci', scilimits=(-3, 4), useMathText=True)
+    ax.ticklabel_format(axis="y", style="sci", scilimits=(-3, 4), useMathText=True)
 
-    log_scale = opts.get('log_scale', False)
+    log_scale = opts.get("log_scale", False)
     if log_scale:
-        ax.set_yscale('log')
-    vmin = opts.get('vmin')
-    vmax = opts.get('vmax')
+        ax.set_yscale("log")
+    vmin = opts.get("vmin")
+    vmax = opts.get("vmax")
     if vmin is not None or vmax is not None:
         ax.set_ylim(vmin, vmax)
 
     fig.tight_layout()
-    fig.savefig(output, dpi=opts.get('dpi', 150))
+    fig.savefig(output, dpi=opts.get("dpi", 150))
     plt.close(fig)
 
 
-def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=too-many-locals
+def render_1d_tiled(x_cc, variables, step, output, **opts):
     """Render all 1D variables in a tiled subplot grid and save as PNG."""
     varnames = sorted(variables.keys())
     n = len(varnames)
@@ -140,11 +141,9 @@ def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=t
     nrows = math.ceil(n / ncols)
     fig_w = 5 * ncols
     fig_h = 2.8 * nrows
-    fig, axes = plt.subplots(nrows, ncols,
-                             figsize=opts.get('figsize', (fig_w, fig_h)),
-                             sharex=True, squeeze=False)
+    fig, axes = plt.subplots(nrows, ncols, figsize=opts.get("figsize", (fig_w, fig_h)), sharex=True, squeeze=False)
 
-    log_scale = opts.get('log_scale', False)
+    log_scale = opts.get("log_scale", False)
     for idx, vn in enumerate(varnames):
         row, col = divmod(idx, ncols)
         ax = axes[row][col]
@@ -153,7 +152,7 @@ def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=t
         ax.tick_params(labelsize=8)
         ax.grid(True, alpha=0.3)
         if log_scale:
-            ax.set_yscale('log')
+            ax.set_yscale("log")
 
     # Hide unused subplots
     for idx in range(n, nrows * ncols):
@@ -163,11 +162,11 @@ def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=t
     # X-label only on bottom row
     for col in range(ncols):
         bottom_row = min(nrows - 1, (n - 1) // ncols) if col < (n % ncols or ncols) else nrows - 2
-        axes[bottom_row][col].set_xlabel(r'$x$', fontsize=9)
+        axes[bottom_row][col].set_xlabel(r"$x$", fontsize=9)
 
-    fig.suptitle(f'step {step}', fontsize=11, y=0.99)
+    fig.suptitle(f"step {step}", fontsize=11, y=0.99)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
-    fig.savefig(output, dpi=opts.get('dpi', 150))
+    fig.savefig(output, dpi=opts.get("dpi", 150))
     plt.close(fig)
 
 
@@ -184,15 +183,15 @@ def _figsize_for_domain(x_cc, y_cc, base=10):
     return (fig_w, fig_h)
 
 
-def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def render_2d(x_cc, y_cc, data, varname, step, output, **opts):
     """Render a 2D colormap via pcolormesh and save as PNG."""
     default_size = _figsize_for_domain(x_cc, y_cc)
-    fig, ax = plt.subplots(figsize=opts.get('figsize', default_size))
+    fig, ax = plt.subplots(figsize=opts.get("figsize", default_size))
 
-    cmap = opts.get('cmap', 'viridis')
-    vmin = opts.get('vmin')
-    vmax = opts.get('vmax')
-    log_scale = opts.get('log_scale', False)
+    cmap = opts.get("cmap", "viridis")
+    vmin = opts.get("vmin")
+    vmax = opts.get("vmax")
+    log_scale = opts.get("log_scale", False)
 
     norm = None
     if log_scale:
@@ -207,49 +206,45 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
         vmax = None
 
     # data shape is (nx, ny), pcolormesh expects (ny, nx) when using x_cc, y_cc
-    pcm = ax.pcolormesh(x_cc, y_cc, data.T, cmap=cmap, vmin=vmin, vmax=vmax,
-                        norm=norm, shading='auto')
+    pcm = ax.pcolormesh(x_cc, y_cc, data.T, cmap=cmap, vmin=vmin, vmax=vmax, norm=norm, shading="auto")
     label = pretty_label(varname)
     fig.colorbar(pcm, ax=ax, label=label)
-    ax.set_xlabel(r'$x$')
-    ax.set_ylabel(r'$y$')
-    ax.set_title(f'{label} (step {step})')
-    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    ax.set_title(f"{label} (step {step})")
+    ax.set_aspect("equal", adjustable="box")
 
-    _overlay_bubbles(ax, opts.get('bubbles'), scale=opts.get('bubble_scale', 1.0))
+    _overlay_bubbles(ax, opts.get("bubbles"), scale=opts.get("bubble_scale", 1.0))
 
     fig.tight_layout()
-    fig.savefig(output, dpi=opts.get('dpi', 150))
+    fig.savefig(output, dpi=opts.get("dpi", 150))
     plt.close(fig)
 
 
-def render_2d_tiled(assembled, step, output, **opts):  # pylint: disable=too-many-locals
+def render_2d_tiled(assembled, step, output, **opts):
     """Render all 2D variables in a tiled subplot grid and save as PNG."""
     varnames = sorted(assembled.variables.keys())
     n = len(varnames)
     if n == 0:
         return
     if n == 1:
-        render_2d(assembled.x_cc, assembled.y_cc,
-                  assembled.variables[varnames[0]], varnames[0], step, output, **opts)
+        render_2d(assembled.x_cc, assembled.y_cc, assembled.variables[varnames[0]], varnames[0], step, output, **opts)
         return
 
     ncols = min(n, 3)
     nrows = math.ceil(n / ncols)
     cell_w, cell_h = _figsize_for_domain(assembled.x_cc, assembled.y_cc, base=4)
-    fig, axes = plt.subplots(nrows, ncols,
-                             figsize=opts.get('figsize', (cell_w * ncols, cell_h * nrows)),
-                             squeeze=False)
+    fig, axes = plt.subplots(nrows, ncols, figsize=opts.get("figsize", (cell_w * ncols, cell_h * nrows)), squeeze=False)
 
-    cmap = opts.get('cmap', 'viridis')
-    log_scale = opts.get('log_scale', False)
+    cmap = opts.get("cmap", "viridis")
+    log_scale = opts.get("log_scale", False)
     for idx, vn in enumerate(varnames):
         row, col = divmod(idx, ncols)
         ax = axes[row][col]
         data = assembled.variables[vn]
         norm = None
-        vmin = opts.get('vmin')
-        vmax = opts.get('vmax')
+        vmin = opts.get("vmin")
+        vmax = opts.get("vmax")
         if log_scale and np.any(data > 0):
             lo = float(np.nanmin(data[data > 0]))
             hi = float(np.nanmax(data))
@@ -257,36 +252,31 @@ def render_2d_tiled(assembled, step, output, **opts):  # pylint: disable=too-man
                 norm = LogNorm(vmin=lo, vmax=hi)
                 vmin = None
                 vmax = None
-        pcm = ax.pcolormesh(assembled.x_cc, assembled.y_cc, data.T,
-                            cmap=cmap, vmin=vmin, vmax=vmax,
-                            norm=norm, shading='auto')
+        pcm = ax.pcolormesh(assembled.x_cc, assembled.y_cc, data.T, cmap=cmap, vmin=vmin, vmax=vmax, norm=norm, shading="auto")
         label = pretty_label(vn)
         fig.colorbar(pcm, ax=ax, label=label)
         ax.set_title(label, fontsize=9)
-        ax.set_aspect('equal', adjustable='box')
+        ax.set_aspect("equal", adjustable="box")
         ax.tick_params(labelsize=7)
-        _overlay_bubbles(ax, opts.get('bubbles'), scale=opts.get('bubble_scale', 1.0))
+        _overlay_bubbles(ax, opts.get("bubbles"), scale=opts.get("bubble_scale", 1.0))
 
     for idx in range(n, nrows * ncols):
         row, col = divmod(idx, ncols)
         axes[row][col].set_visible(False)
 
-    fig.suptitle(f'step {step}', fontsize=11, y=1.01)
+    fig.suptitle(f"step {step}", fontsize=11, y=1.01)
     fig.tight_layout()
-    fig.savefig(output, dpi=opts.get('dpi', 150), bbox_inches='tight')
+    fig.savefig(output, dpi=opts.get("dpi", 150), bbox_inches="tight")
     plt.close(fig)
 
 
-def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
-                    slice_index=None, slice_value=None, **opts):
+def render_3d_slice(assembled, varname, step, output, slice_axis="z", slice_index=None, slice_value=None, **opts):
     """Extract a 2D slice from 3D data and render as a colormap."""
     data_3d = assembled.variables[varname]
 
-    axis_map = {'x': 0, 'y': 1, 'z': 2}
+    axis_map = {"x": 0, "y": 1, "z": 2}
     if slice_axis not in axis_map:
-        raise ValueError(
-            f"Invalid slice_axis '{slice_axis}'. Must be one of: 'x', 'y', 'z'."
-        )
+        raise ValueError(f"Invalid slice_axis '{slice_axis}'. Must be one of: 'x', 'y', 'z'.")
     axis_idx = axis_map[slice_axis]
 
     coords = [assembled.x_cc, assembled.y_cc, assembled.z_cc]
@@ -304,23 +294,23 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     if axis_idx == 0:
         sliced = data_3d[idx, :, :]
         x_plot, y_plot = assembled.y_cc, assembled.z_cc
-        xlabel, ylabel = r'$y$', r'$z$'
+        xlabel, ylabel = r"$y$", r"$z$"
     elif axis_idx == 1:
         sliced = data_3d[:, idx, :]
         x_plot, y_plot = assembled.x_cc, assembled.z_cc
-        xlabel, ylabel = r'$x$', r'$z$'
+        xlabel, ylabel = r"$x$", r"$z$"
     else:
         sliced = data_3d[:, :, idx]
         x_plot, y_plot = assembled.x_cc, assembled.y_cc
-        xlabel, ylabel = r'$x$', r'$y$'
+        xlabel, ylabel = r"$x$", r"$y$"
 
     default_size = _figsize_for_domain(x_plot, y_plot)
-    fig, ax = plt.subplots(figsize=opts.get('figsize', default_size))
+    fig, ax = plt.subplots(figsize=opts.get("figsize", default_size))
 
-    cmap = opts.get('cmap', 'viridis')
-    vmin = opts.get('vmin')
-    vmax = opts.get('vmax')
-    log_scale = opts.get('log_scale', False)
+    cmap = opts.get("cmap", "viridis")
+    vmin = opts.get("vmin")
+    vmax = opts.get("vmax")
+    log_scale = opts.get("log_scale", False)
 
     norm = None
     if log_scale:
@@ -336,34 +326,29 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
         vmax = None
 
     # sliced shape depends on axis: need to transpose appropriately
-    pcm = ax.pcolormesh(x_plot, y_plot, sliced.T, cmap=cmap, vmin=vmin,
-                        vmax=vmax, norm=norm, shading='auto')
+    pcm = ax.pcolormesh(x_plot, y_plot, sliced.T, cmap=cmap, vmin=vmin, vmax=vmax, norm=norm, shading="auto")
     label = pretty_label(varname)
     fig.colorbar(pcm, ax=ax, label=label)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     slice_coord = coord_along[idx]
-    ax.set_title(f'{label} (step {step}, {slice_axis}={slice_coord:.4g})')
-    ax.set_aspect('equal', adjustable='box')
+    ax.set_title(f"{label} (step {step}, {slice_axis}={slice_coord:.4g})")
+    ax.set_aspect("equal", adjustable="box")
 
     # Overlay bubbles that lie within one radius of the slice plane
-    bubbles = opts.get('bubbles')
+    bubbles = opts.get("bubbles")
     if bubbles is not None and len(bubbles) > 0:
-        slice_col = {'x': 0, 'y': 1, 'z': 2}[slice_axis]
+        slice_col = {"x": 0, "y": 1, "z": 2}[slice_axis]
         plot_cols = [c for c in (0, 1, 2) if c != slice_col]
         near = np.abs(bubbles[:, slice_col] - slice_coord) <= bubbles[:, 3]
-        _overlay_bubbles(ax,
-                         bubbles[near][:, [plot_cols[0], plot_cols[1], slice_col, 3]]
-                         if near.any() else None,
-                         scale=opts.get('bubble_scale', 1.0))
+        _overlay_bubbles(ax, bubbles[near][:, [plot_cols[0], plot_cols[1], slice_col, 3]] if near.any() else None, scale=opts.get("bubble_scale", 1.0))
 
     fig.tight_layout()
-    fig.savefig(output, dpi=opts.get('dpi', 150))
+    fig.savefig(output, dpi=opts.get("dpi", 150))
     plt.close(fig)
 
 
-def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
-               read_func=None, tiled=False, bubble_func=None, **opts):
+def render_mp4(varname, steps, output, fps=10, read_func=None, tiled=False, bubble_func=None, **opts):
     """
     Generate an MP4 video by iterating over timesteps.
 
@@ -393,8 +378,8 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
 
     # Pre-compute vmin/vmax from first, middle, and last frames if not provided
     # (not needed for tiled mode — each subplot auto-scales independently)
-    auto_vmin = opts.get('vmin')
-    auto_vmax = opts.get('vmax')
+    auto_vmin = opts.get("vmin")
+    auto_vmax = opts.get("vmax")
 
     if not tiled and (auto_vmin is None or auto_vmax is None):
         sample_steps = [steps[0]]
@@ -404,7 +389,7 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             sample_steps.append(steps[len(steps) // 2])
 
         all_mins, all_maxs = [], []
-        log_scale = opts.get('log_scale', False)
+        log_scale = opts.get("log_scale", False)
         for s in sample_steps:
             ad = read_func(s)
             d = ad.variables.get(varname)
@@ -419,17 +404,17 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
                     all_maxs.append(np.nanmax(d))
 
         if auto_vmin is None and all_mins:
-            opts['vmin'] = min(all_mins)
+            opts["vmin"] = min(all_mins)
         if auto_vmax is None and all_maxs:
-            opts['vmax'] = max(all_maxs)
+            opts["vmax"] = max(all_maxs)
 
     # Write frames to a unique temp directory to avoid concurrent-run conflicts
     output_dir = os.path.dirname(os.path.abspath(output))
     os.makedirs(output_dir, exist_ok=True)
-    viz_dir = tempfile.mkdtemp(dir=output_dir, prefix='_frames_')
+    viz_dir = tempfile.mkdtemp(dir=output_dir, prefix="_frames_")
 
     def _cleanup():
-        for fname in sorted(f for f in os.listdir(viz_dir) if f.endswith('.png')):
+        for fname in sorted(f for f in os.listdir(viz_dir) if f.endswith(".png")):
             try:
                 os.remove(os.path.join(viz_dir, fname))
             except OSError:
@@ -440,15 +425,16 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             pass
 
     try:
-        from tqdm import tqdm  # pylint: disable=import-outside-toplevel
-        step_iter = tqdm(steps, desc='Rendering frames')
+        from tqdm import tqdm
+
+        step_iter = tqdm(steps, desc="Rendering frames")
     except ImportError:
         step_iter = steps
 
     try:
         for i, step in enumerate(step_iter):
             assembled = read_func(step)
-            frame_path = os.path.join(viz_dir, f'{i:06d}.png')
+            frame_path = os.path.join(viz_dir, f"{i:06d}.png")
 
             # Inject per-step bubble positions into opts if bubble_func provided
             frame_opts = opts
@@ -456,50 +442,41 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
                 try:
                     frame_opts = dict(opts, bubbles=bubble_func(step))
                 except (OSError, ValueError) as exc:
-                    import warnings  # pylint: disable=import-outside-toplevel
+                    import warnings
+
                     warnings.warn(f"Skipping bubble overlay for step {step}: {exc}", stacklevel=2)
 
             if tiled and assembled.ndim == 1:
-                render_1d_tiled(assembled.x_cc, assembled.variables,
-                                step, frame_path, **frame_opts)
+                render_1d_tiled(assembled.x_cc, assembled.variables, step, frame_path, **frame_opts)
             elif tiled and assembled.ndim == 2:
                 render_2d_tiled(assembled, step, frame_path, **frame_opts)
             elif assembled.ndim == 1:
                 var_data = assembled.variables.get(varname)
                 if var_data is None:
                     continue
-                render_1d(assembled.x_cc, var_data,
-                          varname, step, frame_path, **frame_opts)
+                render_1d(assembled.x_cc, var_data, varname, step, frame_path, **frame_opts)
             elif assembled.ndim == 2:
                 var_data = assembled.variables.get(varname)
                 if var_data is None:
                     continue
-                render_2d(assembled.x_cc, assembled.y_cc,
-                          var_data,
-                          varname, step, frame_path, **frame_opts)
+                render_2d(assembled.x_cc, assembled.y_cc, var_data, varname, step, frame_path, **frame_opts)
             elif assembled.ndim == 3:
                 var_data = assembled.variables.get(varname)
                 if var_data is None:
                     continue
                 render_3d_slice(assembled, varname, step, frame_path, **frame_opts)
             else:
-                raise ValueError(
-                    f"Unsupported dimensionality ndim={assembled.ndim} for step {step}. "
-                    "Expected 1, 2, or 3."
-                )
+                raise ValueError(f"Unsupported dimensionality ndim={assembled.ndim} for step {step}. Expected 1, 2, or 3.")
     except BaseException:
         _cleanup()
         raise
 
     # Combine frames into MP4 using imageio + imageio-ffmpeg (bundled ffmpeg)
-    frame_files = sorted(f for f in os.listdir(viz_dir) if f.endswith('.png'))
+    frame_files = sorted(f for f in os.listdir(viz_dir) if f.endswith(".png"))
 
     if not frame_files:
         _cleanup()
-        raise ValueError(
-            f"No frames were rendered for '{varname}'. "
-            "The variable may not exist in the loaded timesteps."
-        )
+        raise ValueError(f"No frames were rendered for '{varname}'. The variable may not exist in the loaded timesteps.")
 
     success = False
     try:
@@ -510,9 +487,9 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             imageio may return RGBA (4-ch) or even grayscale depending on the
             PNG source.  libx264/yuv420p requires consistent 3-channel input.
             """
-            if arr.ndim == 2:                        # grayscale → RGB
+            if arr.ndim == 2:  # grayscale → RGB
                 arr = np.stack([arr, arr, arr], axis=-1)
-            elif arr.shape[2] == 4:                  # RGBA → RGB (drop alpha)
+            elif arr.shape[2] == 4:  # RGBA → RGB (drop alpha)
                 arr = arr[:, :, :3]
             return arr.astype(np.uint8)
 
@@ -539,16 +516,19 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         # Second pass: encode.  macro_block_size=1 disables imageio's own resize
         # since we already ensured even dimensions above.
         with imageio.get_writer(
-            output, fps=fps, codec='libx264', pixelformat='yuv420p',
-            macro_block_size=1, ffmpeg_log_level='error',
+            output,
+            fps=fps,
+            codec="libx264",
+            pixelformat="yuv420p",
+            macro_block_size=1,
+            ffmpeg_log_level="error",
         ) as writer:
             for fname in frame_files:
-                writer.append_data(_uniform_frame(
-                    imageio.imread(os.path.join(viz_dir, fname))
-                ))
+                writer.append_data(_uniform_frame(imageio.imread(os.path.join(viz_dir, fname))))
         success = True
-    except Exception as exc:  # pylint: disable=broad-except
-        import warnings  # pylint: disable=import-outside-toplevel
+    except Exception as exc:
+        import warnings
+
         warnings.warn(f"MP4 encoding error: {exc}", stacklevel=2)
     finally:
         _cleanup()

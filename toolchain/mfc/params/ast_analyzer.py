@@ -11,30 +11,27 @@ from __future__ import annotations
 
 import ast
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set
-from collections import defaultdict
 
-
-# ---------------------------------------------------------------------------
 # Data structures
-# ---------------------------------------------------------------------------
+
 
 @dataclass
 class Rule:
-    method: str                      # e.g. "check_igr_simulation"
-    lineno: int                      # line number of the prohibit/warn call
-    params: List[str]                # case parameter names used in condition
-    message: str                     # user-friendly error/warning message
+    method: str  # e.g. "check_igr_simulation"
+    lineno: int  # line number of the prohibit/warn call
+    params: List[str]  # case parameter names used in condition
+    message: str  # user-friendly error/warning message
     stages: Set[str] = field(default_factory=set)  # e.g. {"simulation", "pre_process"}
-    trigger: Optional[str] = None    # param that "owns" this rule
-    severity: str = "error"          # "error" (prohibit) or "warning" (warn)
+    trigger: Optional[str] = None  # param that "owns" this rule
+    severity: str = "error"  # "error" (prohibit) or "warning" (warn)
 
 
-# ---------------------------------------------------------------------------
 # F-string message extraction
-# ---------------------------------------------------------------------------
+
 
 def _extract_message(node: ast.AST) -> Optional[str]:
     """
@@ -56,7 +53,7 @@ def _extract_message(node: ast.AST) -> Optional[str]:
                 # Unparse the expression to get a readable approximation
                 try:
                     parts.append(ast.unparse(value.value))
-                except Exception:  # pylint: disable=broad-except
+                except Exception:
                     parts.append("?")
             else:
                 parts.append("?")
@@ -77,7 +74,7 @@ def _resolve_fstring(node: ast.JoinedStr, subs: Dict[str, str]) -> Optional[str]
             else:
                 try:
                     parts.append(ast.unparse(v.value))
-                except Exception:  # pylint: disable=broad-except
+                except Exception:
                     parts.append("?")
         else:
             parts.append("?")
@@ -95,18 +92,13 @@ def _resolve_message(msg_node: ast.AST, subs: Dict[str, str]) -> Optional[str]:
 
 def _is_self_get(call: ast.Call) -> bool:
     """Check if a Call node is self.get(...)."""
-    return (isinstance(call.func, ast.Attribute)
-            and isinstance(call.func.value, ast.Name)
-            and call.func.value.id == "self"
-            and call.func.attr == "get"
-            and bool(call.args))
+    return isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name) and call.func.value.id == "self" and call.func.attr == "get" and bool(call.args)
 
 
-# ---------------------------------------------------------------------------
 # AST analysis: methods, call graph, rules
-# ---------------------------------------------------------------------------
 
-class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instance-attributes
+
+class CaseValidatorAnalyzer(ast.NodeVisitor):
     """
     Analyzes the CaseValidator class:
 
@@ -136,7 +128,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         # Line numbers of prohibit/warn calls handled by loop expansion (skip in visit_Call)
         self._expanded_prohibit_lines: Set[int] = set()
 
-    # --- top-level entrypoint ---
+    # top-level entrypoint
 
     def visit_ClassDef(self, node: ast.ClassDef):
         if node.name == "CaseValidator":
@@ -152,7 +144,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         else:
             self.generic_visit(node)
 
-    # --- per-method analysis ---
+    # per-method analysis
 
     def _analyze_method(self, func: ast.FunctionDef):
         """Analyze a single method: local param mapping, call graph, rules."""
@@ -179,15 +171,13 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         self.local_param_stack.pop()
         self.current_method = None
 
-    def _enrich_rules_with_if_guards(self, func: ast.FunctionDef,
-                                     local_param_map: Dict[str, str],
-                                     alias_map: Dict[str, List[str]]):
+    def _enrich_rules_with_if_guards(self, func: ast.FunctionDef, local_param_map: Dict[str, str], alias_map: Dict[str, List[str]]):
         """
         After rules are extracted, walk the function body for ast.If nodes.
         For each if-block, extract guard params from the test condition and add
         them to every rule whose lineno falls within the block's line range.
         """
-        for node in ast.walk(func):  # pylint: disable=too-many-nested-blocks
+        for node in ast.walk(func):
             if not isinstance(node, ast.If):
                 continue
             # Extract params from the if-test condition
@@ -215,7 +205,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                                 rule.params.append(gp)
                         break
 
-    def _build_local_param_map(self, func: ast.FunctionDef) -> Dict[str, str]:  # pylint: disable=too-many-nested-blocks
+    def _build_local_param_map(self, func: ast.FunctionDef) -> Dict[str, str]:
         """
         Look for assignments like:
             igr = self.get('igr', 'F') == 'T'
@@ -225,7 +215,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         Uses ast.walk to find assignments at any nesting depth (inside if/for/with blocks).
         """
         m: Dict[str, str] = {}
-        for node in ast.walk(func):  # pylint: disable=too-many-nested-blocks
+        for node in ast.walk(func):
             if isinstance(node, ast.Assign):
                 # Handle both direct calls and comparisons
                 value = node.value
@@ -235,7 +225,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
                 if isinstance(value, ast.Call):
                     call = value
-                    if (  # pylint: disable=too-many-boolean-expressions
+                    if (
                         isinstance(call.func, ast.Attribute)
                         and isinstance(call.func.value, ast.Name)
                         and call.func.value.id == "self"
@@ -251,8 +241,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         return m
 
     @staticmethod
-    def _build_alias_map(func: ast.FunctionDef,
-                         local_param_map: Dict[str, str]) -> Dict[str, List[str]]:
+    def _build_alias_map(func: ast.FunctionDef, local_param_map: Dict[str, str]) -> Dict[str, List[str]]:
         """
         Detect boolean alias assignments like:
             variable_dt = cfl_dt or cfl_adap_dt       # BoolOp(Or)
@@ -279,20 +268,16 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                     alias_map[target.id] = sources
         return alias_map
 
-    # --- literal-list for-loop expansion ---
+    # literal-list for-loop expansion
 
     def _expand_literal_loops(self, func: ast.FunctionDef, local_param_map: Dict[str, str]):
         """Expand `for var in [x, y, z]:` loops into concrete Rules."""
         self._expand_loop_stmts(func.body, func.name, local_param_map, {})
 
-    def _expand_loop_stmts(self, stmts: list, method_name: str,
-                            parent_map: Dict[str, str], subs: Dict[str, str]):
+    def _expand_loop_stmts(self, stmts: list, method_name: str, parent_map: Dict[str, str], subs: Dict[str, str]):
         """Recursively find literal-list for-loops and create expanded Rules."""
         for stmt in stmts:
-            if (isinstance(stmt, ast.For)
-                    and isinstance(stmt.target, ast.Name)
-                    and isinstance(stmt.iter, ast.List)
-                    and all(isinstance(e, ast.Constant) for e in stmt.iter.elts)):
+            if isinstance(stmt, ast.For) and isinstance(stmt.target, ast.Name) and isinstance(stmt.iter, ast.List) and all(isinstance(e, ast.Constant) for e in stmt.iter.elts):
                 var = stmt.target.id
                 for elt in stmt.iter.elts:
                     new_subs = {**subs, var: str(elt.value)}
@@ -318,9 +303,8 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
             if not isinstance(stmt, ast.If):
                 continue
             test = stmt.test
-            if (isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not)
-                    and isinstance(test.operand, ast.Name)):
-                if (len(stmt.body) == 1 and isinstance(stmt.body[0], ast.Continue)):
+            if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not) and isinstance(test.operand, ast.Name):
+                if len(stmt.body) == 1 and isinstance(stmt.body[0], ast.Continue):
                     var_name = test.operand.id
                     if var_name in local_map:
                         return local_map[var_name]
@@ -354,25 +338,18 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                         m[target.id] = param_name
         return m
 
-    def _create_loop_rules(self, stmts: list, method_name: str,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-                            local_map: Dict[str, str], subs: Dict[str, str],
-                            loop_guard: Optional[str] = None):
+    def _create_loop_rules(self, stmts: list, method_name: str, local_map: Dict[str, str], subs: Dict[str, str], loop_guard: Optional[str] = None):
         """Create Rules for self.prohibit()/self.warn() calls found in loop body statements."""
         for stmt in stmts:
             # Skip nested literal-list for-loops (handled by recursion)
-            if (isinstance(stmt, ast.For)
-                    and isinstance(stmt.target, ast.Name)
-                    and isinstance(stmt.iter, ast.List)
-                    and all(isinstance(e, ast.Constant) for e in stmt.iter.elts)):
+            if isinstance(stmt, ast.For) and isinstance(stmt.target, ast.Name) and isinstance(stmt.iter, ast.List) and all(isinstance(e, ast.Constant) for e in stmt.iter.elts):
                 continue
             for node in ast.walk(stmt):
                 if not isinstance(node, ast.Call):
                     continue
-                if not (isinstance(node.func, ast.Attribute)
-                        and isinstance(node.func.value, ast.Name)
-                        and node.func.value.id == "self"
-                        and node.func.attr in ("prohibit", "warn")
-                        and len(node.args) >= 2):
+                if not (
+                    isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == "self" and node.func.attr in ("prohibit", "warn") and len(node.args) >= 2
+                ):
                     continue
                 severity = "warning" if node.func.attr == "warn" else "error"
                 condition, msg_node = node.args[0], node.args[1]
@@ -385,8 +362,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                     trigger = loop_guard
                     param_set.add(loop_guard)
                 else:
-                    trigger = self._determine_trigger(
-                        sorted(param_set), condition, local_map)
+                    trigger = self._determine_trigger(sorted(param_set), condition, local_map)
                 params = sorted(param_set)
                 rule = Rule(
                     method=method_name,
@@ -399,9 +375,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                 self.rules.append(rule)
                 self._expanded_prohibit_lines.add(node.lineno)
 
-    def _extract_params_with_subs(self, condition: ast.AST,
-                                   local_map: Dict[str, str],
-                                   subs: Dict[str, str]) -> Set[str]:
+    def _extract_params_with_subs(self, condition: ast.AST, local_map: Dict[str, str], subs: Dict[str, str]) -> Set[str]:
         """Like _extract_params but also resolves JoinedStr self.get() args."""
         params: Set[str] = set()
         for node in ast.walk(condition):
@@ -417,16 +391,11 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                         params.add(resolved)
         return params
 
-    # --- visit calls to build call graph + rules ---
+    # visit calls to build call graph + rules
 
     def visit_Call(self, node: ast.Call):
         # record method call edges: self.some_method(...)
-        if (
-            isinstance(node.func, ast.Attribute)
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "self"
-            and isinstance(node.func.attr, str)
-        ):
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == "self" and isinstance(node.func.attr, str):
             callee = node.func.attr
             if self.current_method is not None:
                 # method call on self
@@ -434,7 +403,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
         # detect self.prohibit(<condition>, "<message>") and self.warn(<condition>, "<message>")
         # Skip calls already handled by loop expansion
-        if (  # pylint: disable=too-many-boolean-expressions
+        if (
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "self"
@@ -461,8 +430,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
         self.generic_visit(node)
 
-    def _determine_trigger(self, _params: List[str], condition: ast.AST,
-                           local_map: Dict[str, str]) -> Optional[str]:
+    def _determine_trigger(self, _params: List[str], condition: ast.AST, local_map: Dict[str, str]) -> Optional[str]:
         """Determine trigger param: method guard first, then condition fallback."""
         # 1. Method guard (high confidence)
         if self.current_method and self.current_method in self._method_guards:
@@ -493,7 +461,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
             # direct self.get('param_name')
             if isinstance(node, ast.Call):
-                if (  # pylint: disable=too-many-boolean-expressions
+                if (
                     isinstance(node.func, ast.Attribute)
                     and isinstance(node.func.value, ast.Name)
                     and node.func.value.id == "self"
@@ -507,9 +475,8 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         return params
 
 
-# ---------------------------------------------------------------------------
 # Trigger detection helpers
-# ---------------------------------------------------------------------------
+
 
 def _extract_method_guard(func: ast.FunctionDef, local_param_map: Dict[str, str]) -> Optional[str]:
     """
@@ -518,7 +485,7 @@ def _extract_method_guard(func: ast.FunctionDef, local_param_map: Dict[str, str]
             return
     The guarded variable's param is the trigger for all rules in that method.
     """
-    for stmt in func.body:  # pylint: disable=too-many-nested-blocks
+    for stmt in func.body:
         if not isinstance(stmt, ast.If):
             continue
 
@@ -528,9 +495,7 @@ def _extract_method_guard(func: ast.FunctionDef, local_param_map: Dict[str, str]
             if isinstance(test.operand, ast.Name):
                 var_name = test.operand.id
                 # Check body is just "return"
-                if (len(stmt.body) == 1
-                        and isinstance(stmt.body[0], ast.Return)
-                        and stmt.body[0].value is None):
+                if len(stmt.body) == 1 and isinstance(stmt.body[0], ast.Return) and stmt.body[0].value is None:
                     if var_name in local_param_map:
                         return local_param_map[var_name]
 
@@ -540,17 +505,14 @@ def _extract_method_guard(func: ast.FunctionDef, local_param_map: Dict[str, str]
             if isinstance(test.ops[0], ast.NotEq):
                 if isinstance(test.left, ast.Name):
                     var_name = test.left.id
-                    if (len(stmt.body) == 1
-                            and isinstance(stmt.body[0], ast.Return)
-                            and stmt.body[0].value is None):
+                    if len(stmt.body) == 1 and isinstance(stmt.body[0], ast.Return) and stmt.body[0].value is None:
                         if var_name in local_param_map:
                             return local_param_map[var_name]
 
     return None
 
 
-def _extract_test_params(test: ast.AST, local_param_map: Dict[str, str],
-                         alias_map: Dict[str, List[str]]) -> Set[str]:
+def _extract_test_params(test: ast.AST, local_param_map: Dict[str, str], alias_map: Dict[str, List[str]]) -> Set[str]:
     """Extract parameter names from an if-test condition, resolving aliases."""
     params: Set[str] = set()
     for node in ast.walk(test):
@@ -566,8 +528,7 @@ def _extract_test_params(test: ast.AST, local_param_map: Dict[str, str],
     return params
 
 
-def _extract_trigger_from_condition(condition: ast.AST, local_param_map: Dict[str, str],
-                                    alias_map: Optional[Dict[str, List[str]]] = None) -> Optional[str]:
+def _extract_trigger_from_condition(condition: ast.AST, local_param_map: Dict[str, str], alias_map: Optional[Dict[str, List[str]]] = None) -> Optional[str]:
     """
     Fallback trigger detection: walk the condition AST left-to-right,
     return the first parameter name found. Resolves aliases to their first source param.
@@ -582,7 +543,7 @@ def _extract_trigger_from_condition(condition: ast.AST, local_param_map: Dict[st
             if node.id in alias_map and alias_map[node.id]:
                 return alias_map[node.id][0]
         if isinstance(node, ast.Call):
-            if (  # pylint: disable=too-many-boolean-expressions
+            if (
                 isinstance(node.func, ast.Attribute)
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id == "self"
@@ -595,9 +556,7 @@ def _extract_trigger_from_condition(condition: ast.AST, local_param_map: Dict[st
     return None
 
 
-# ---------------------------------------------------------------------------
 # Stage inference from validate_* roots and call graph
-# ---------------------------------------------------------------------------
 
 STAGE_ROOTS: Dict[str, List[str]] = {
     "common": ["validate_common"],
@@ -634,9 +593,8 @@ def compute_method_stages(call_graph: Dict[str, Set[str]]) -> Dict[str, Set[str]
     return method_stages
 
 
-# ---------------------------------------------------------------------------
 # Classification of messages for nicer grouping
-# ---------------------------------------------------------------------------
+
 
 def classify_message(msg: str) -> str:
     """
@@ -646,7 +604,7 @@ def classify_message(msg: str) -> str:
     """
     text = msg.lower()
 
-    if (  # pylint: disable=too-many-boolean-expressions
+    if (
         "not compatible" in text
         or "does not support" in text
         or "cannot be used" in text
@@ -660,7 +618,7 @@ def classify_message(msg: str) -> str:
     ):
         return "incompatibility"
 
-    if (  # pylint: disable=too-many-boolean-expressions
+    if (
         "requires" in text
         or "must be set if" in text
         or "must be specified" in text
@@ -671,7 +629,7 @@ def classify_message(msg: str) -> str:
     ):
         return "requirement"
 
-    if (  # pylint: disable=too-many-boolean-expressions
+    if (
         "must be between" in text
         or "must be positive" in text
         or "must be non-negative" in text
@@ -722,9 +680,7 @@ def feature_title(param: str) -> str:
     return param
 
 
-# ---------------------------------------------------------------------------
 # Convenience: full analysis pipeline
-# ---------------------------------------------------------------------------
 
 _DEFAULT_VALIDATOR_PATH = Path(__file__).resolve().parent.parent / "case_validator.py"
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-import sys
+import argparse
 import json
 import math
+import sys
 import typing
-import argparse
 
 parser = argparse.ArgumentParser(
     prog="scaling_and_perf",

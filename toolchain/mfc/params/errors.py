@@ -139,14 +139,8 @@ def dependency_value_error(
         Formatted error message.
     """
     if condition:
-        return (
-            f"{format_param(param)}{condition} requires {format_param(required_param)} "
-            f"to be one of {expected_values}, got {format_value(got)}"
-        )
-    return (
-        f"{format_param(param)} requires {format_param(required_param)} "
-        f"to be one of {expected_values}, got {format_value(got)}"
-    )
+        return f"{format_param(param)}{condition} requires {format_param(required_param)} to be one of {expected_values}, got {format_value(got)}"
+    return f"{format_param(param)} requires {format_param(required_param)} to be one of {expected_values}, got {format_value(got)}"
 
 
 def required_error(param: str, context: Optional[str] = None) -> str:
@@ -178,10 +172,7 @@ def mutual_exclusion_error(params: List[str], active: List[str]) -> str:
     """
     formatted = [format_param(p) for p in params]
     active_formatted = [format_param(p) for p in active]
-    return (
-        f"Only one of {', '.join(formatted)} can be enabled, "
-        f"but {', '.join(active_formatted)} are all enabled"
-    )
+    return f"Only one of {', '.join(formatted)} can be enabled, but {', '.join(active_formatted)} are all enabled"
 
 
 def dimension_error(param: str, requirement: str) -> str:

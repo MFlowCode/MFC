@@ -11,16 +11,16 @@ Usage:
 """
 
 from .schema import (
+    ArgAction,
+    Argument,
     CLISchema,
     Command,
-    Argument,
-    Positional,
-    Example,
     CommonArgumentSet,
-    MutuallyExclusiveGroup,
-    ArgAction,
-    CompletionType,
     Completion,
+    CompletionType,
+    Example,
+    MutuallyExclusiveGroup,
+    Positional,
 )
 
 __all__ = [

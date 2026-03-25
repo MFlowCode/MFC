@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
-import math
 import json
+import math
 
 # FLUID PROPERTIES
 R_uni = 8314.0  # [J/kmol/K]
@@ -48,7 +48,6 @@ T0 = T0ref  # [K]
 u0 = math.sqrt(p0 / rho0)  # [m/s]
 t0 = x0 / u0  # [s]
 
-#
 cact = 1475.0
 cfl = 0.1
 Nx = 400

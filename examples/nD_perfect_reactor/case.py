@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Reference:
 # + https://doi.org/10.1063/1.1696266
-import json
 import argparse
+import json
+
 import cantera as ct
 
 from mfc.case_utils import *
@@ -119,7 +120,7 @@ if args.chemistry:
 
     for i in range(len(sol.Y)):
         case[f"chem_wrt_Y({i + 1})"] = "T"
-        case[f"patch_icpp(1)%Y({i+1})"] = sol.Y[i]
+        case[f"patch_icpp(1)%Y({i + 1})"] = sol.Y[i]
 
 case = remove_higher_dimensional_keys(case, args.ndim)
 

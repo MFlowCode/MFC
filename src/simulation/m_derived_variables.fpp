@@ -428,13 +428,7 @@ contains
         real(wp) :: tmp, tmp_out !< Temporary variable to store quantity for mpi_allreduce
         real(wp) :: dV !< Discrete cell volume
 
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_fluids
-            $:GPU_LOOP(parallelism='[seq]')
-            do j = 1, 5
-                c_m(i, j) = 0.0_wp
-            end do
-        end do
+        c_m(:, :) = 0.0_wp
 
         $:GPU_UPDATE(device='[c_m]')
 

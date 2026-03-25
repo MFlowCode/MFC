@@ -1,1 +1,0 @@
-../frontier/bench.sh

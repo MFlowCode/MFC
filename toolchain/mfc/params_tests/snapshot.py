@@ -5,12 +5,12 @@ Captures validation results from case files for regression testing.
 This allows us to verify that refactoring doesn't change validation behavior.
 """
 
-import json
 import hashlib
+import json
 import subprocess
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
 
 from ..case_validator import CaseValidator
 
@@ -18,6 +18,7 @@ from ..case_validator import CaseValidator
 @dataclass
 class ValidationResult:
     """Result of validating a single case file for a single stage."""
+
     case_path: str
     stage: str
     success: bool
@@ -29,6 +30,7 @@ class ValidationResult:
 @dataclass
 class CaseSnapshot:
     """Complete validation snapshot for a case file."""
+
     case_path: str
     param_count: int
     param_hash: str
@@ -64,31 +66,17 @@ def validate_case_for_stage(params: Dict[str, Any], stage: str) -> ValidationRes
             success=len(validator.errors) == 0,
             errors=validator.errors.copy(),
             param_hash=hash_params(params),
-            error_count=len(validator.errors)
+            error_count=len(validator.errors),
         )
     except (ValueError, KeyError, TypeError, AttributeError) as e:
         # Catch expected validation errors, not programming bugs like SystemExit
-        return ValidationResult(
-            case_path="",
-            stage=stage,
-            success=False,
-            errors=[f"Exception during validation: {type(e).__name__}: {str(e)}"],
-            param_hash=hash_params(params),
-            error_count=1
-        )
+        return ValidationResult(case_path="", stage=stage, success=False, errors=[f"Exception during validation: {type(e).__name__}: {str(e)}"], param_hash=hash_params(params), error_count=1)
 
 
 def load_case_params(case_path: Path) -> Dict[str, Any]:
     """Load parameters from a case file by running it and capturing JSON output."""
     # MFC case files print JSON to stdout when run
-    result = subprocess.run(
-        ["python3", str(case_path)],
-        capture_output=True,
-        text=True,
-        cwd=case_path.parent,
-        timeout=30,
-        check=False
-    )
+    result = subprocess.run(["python3", str(case_path)], capture_output=True, text=True, cwd=case_path.parent, timeout=30, check=False)
 
     if result.returncode != 0:
         raise ValueError(f"Case file failed: {result.stderr[:200]}")
@@ -107,16 +95,9 @@ def capture_case_snapshot(case_path: Path) -> CaseSnapshot:
 
     try:
         params = load_case_params(case_path)
-    except (ValueError, json.JSONDecodeError, subprocess.TimeoutExpired,
-            subprocess.SubprocessError, OSError, FileNotFoundError) as e:
+    except (ValueError, json.JSONDecodeError, subprocess.TimeoutExpired, subprocess.SubprocessError, OSError, FileNotFoundError) as e:
         # Catch expected case loading errors, not programming bugs
-        return CaseSnapshot(
-            case_path=str(case_path),
-            param_count=0,
-            param_hash="",
-            stages={},
-            load_error=f"{type(e).__name__}: {str(e)}"
-        )
+        return CaseSnapshot(case_path=str(case_path), param_count=0, param_hash="", stages={}, load_error=f"{type(e).__name__}: {str(e)}")
 
     stages = {}
     for stage in ["pre_process", "simulation", "post_process"]:
@@ -124,12 +105,7 @@ def capture_case_snapshot(case_path: Path) -> CaseSnapshot:
         result.case_path = str(case_path)
         stages[stage] = result
 
-    return CaseSnapshot(
-        case_path=str(case_path),
-        param_count=len(params),
-        param_hash=hash_params(params),
-        stages=stages
-    )
+    return CaseSnapshot(case_path=str(case_path), param_count=len(params), param_hash=hash_params(params), stages=stages)
 
 
 def capture_all_examples(examples_dir: Path = None) -> Dict[str, CaseSnapshot]:
@@ -162,13 +138,7 @@ def capture_all_examples(examples_dir: Path = None) -> Dict[str, CaseSnapshot]:
         except (ValueError, KeyError, TypeError, OSError, json.JSONDecodeError) as e:
             # Catch expected errors during capture, not programming bugs
             print(f"EXCEPTION: {e}")
-            snapshots[case_name] = CaseSnapshot(
-                case_path=str(case_file),
-                param_count=0,
-                param_hash="",
-                stages={},
-                load_error=f"Capture exception: {type(e).__name__}: {str(e)}"
-            )
+            snapshots[case_name] = CaseSnapshot(case_path=str(case_file), param_count=0, param_hash="", stages={}, load_error=f"Capture exception: {type(e).__name__}: {str(e)}")
 
     return snapshots
 
@@ -177,9 +147,7 @@ def snapshot_to_dict(snapshot: CaseSnapshot) -> Dict[str, Any]:
     """Convert snapshot to JSON-serializable dict."""
     result = asdict(snapshot)
     # Convert ValidationResult objects in stages
-    result["stages"] = {
-        stage: asdict(vr) for stage, vr in snapshot.stages.items()
-    }
+    result["stages"] = {stage: asdict(vr) for stage, vr in snapshot.stages.items()}
     return result
 
 
@@ -192,18 +160,12 @@ def save_snapshots(snapshots: Dict[str, CaseSnapshot], output_path: Path = None)
         "metadata": {
             "total_cases": len(snapshots),
             "load_errors": sum(1 for s in snapshots.values() if s.load_error),
-            "validation_errors": sum(
-                sum(stage.error_count for stage in s.stages.values())
-                for s in snapshots.values() if not s.load_error
-            ),
+            "validation_errors": sum(sum(stage.error_count for stage in s.stages.values()) for s in snapshots.values() if not s.load_error),
         },
-        "snapshots": {
-            name: snapshot_to_dict(snapshot)
-            for name, snapshot in snapshots.items()
-        }
+        "snapshots": {name: snapshot_to_dict(snapshot) for name, snapshot in snapshots.items()},
     }
 
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
     return output_path
@@ -211,14 +173,11 @@ def save_snapshots(snapshots: Dict[str, CaseSnapshot], output_path: Path = None)
 
 def load_snapshots(input_path: Path) -> Dict[str, Any]:
     """Load snapshots from JSON file."""
-    with open(input_path, 'r', encoding='utf-8') as f:
+    with open(input_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def compare_snapshots(
-    old_snapshots: Dict[str, Any],
-    new_snapshots: Dict[str, CaseSnapshot]
-) -> Dict[str, Any]:
+def compare_snapshots(old_snapshots: Dict[str, Any], new_snapshots: Dict[str, CaseSnapshot]) -> Dict[str, Any]:
     """Compare old and new snapshots, report differences."""
     differences = {
         "new_cases": [],
@@ -250,19 +209,18 @@ def compare_snapshots(
 
             if old_errors != new_errors:
                 changed = True
-                changes.append({
-                    "stage": stage,
-                    "old_error_count": len(old_errors),
-                    "new_error_count": len(new_errors),
-                    "added_errors": sorted(new_errors - old_errors),
-                    "removed_errors": sorted(old_errors - new_errors),
-                })
+                changes.append(
+                    {
+                        "stage": stage,
+                        "old_error_count": len(old_errors),
+                        "new_error_count": len(new_errors),
+                        "added_errors": sorted(new_errors - old_errors),
+                        "removed_errors": sorted(old_errors - new_errors),
+                    }
+                )
 
         if changed:
-            differences["changed_validation"].append({
-                "case": case_name,
-                "changes": changes
-            })
+            differences["changed_validation"].append({"case": case_name, "changes": changes})
         else:
             differences["unchanged"].append(case_name)
 
@@ -276,23 +234,23 @@ def print_comparison_report(differences: Dict[str, Any]):
     print("=" * 60)
 
     print(f"\nNew cases: {len(differences['new_cases'])}")
-    for case in differences['new_cases'][:5]:
+    for case in differences["new_cases"][:5]:
         print(f"  + {case}")
-    if len(differences['new_cases']) > 5:
+    if len(differences["new_cases"]) > 5:
         print(f"  ... and {len(differences['new_cases']) - 5} more")
 
     print(f"\nRemoved cases: {len(differences['removed_cases'])}")
-    for case in differences['removed_cases'][:5]:
+    for case in differences["removed_cases"][:5]:
         print(f"  - {case}")
 
     print(f"\nChanged validation: {len(differences['changed_validation'])}")
-    for item in differences['changed_validation'][:10]:
+    for item in differences["changed_validation"][:10]:
         print(f"\n  {item['case']}:")
-        for change in item['changes']:
+        for change in item["changes"]:
             print(f"    [{change['stage']}] {change['old_error_count']} -> {change['new_error_count']} errors")
-            for err in change['added_errors'][:2]:
+            for err in change["added_errors"][:2]:
                 print(f"      + {err[:60]}...")
-            for err in change['removed_errors'][:2]:
+            for err in change["removed_errors"][:2]:
                 print(f"      - {err[:60]}...")
 
     print(f"\nUnchanged: {len(differences['unchanged'])}")

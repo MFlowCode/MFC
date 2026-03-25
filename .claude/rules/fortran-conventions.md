@@ -23,13 +23,28 @@ Every Fortran module follows this pattern:
 
 ## Forbidden Patterns
 
-Caught by `./mfc.sh precheck` (source lint step 4/5):
+All checks below are enforced by `python3 toolchain/mfc/lint_source.py`
+(runs via `./mfc.sh precheck` and CI). See that file for the full list.
+
+Fortran/Fypp source (`src/`):
 - `dsqrt`, `dexp`, `dlog`, `dble`, `dabs`, `dcos`, `dsin`, `dtan`, etc. → use generic intrinsics
 - `1.0d0`, `2.5d-3` (Fortran `d` exponent literals) → use `1.0_wp`, `2.5e-3_wp`
 - `double precision` → use `real(wp)` or `real(stp)`
 - `real(8)`, `real(4)` → use `wp` or `stp` kind parameters
 - Raw `!$acc` or `!$omp` directives → use Fypp GPU_* macros from `parallel_macros.fpp`
-- Full list of forbidden patterns: `toolchain/bootstrap/precheck.sh`
+- `int(8._wp, ...)` hardcoded byte size → use `storage_size(0._stp)/8`
+- Bare integer kind like `2_wp` → use `2.0_wp`
+- Junk patterns (`...`, `---`, `===`) in code or comments (no separator comments)
+- Duplicate entries in Fypp `#:for ... in [...]` lists
+- Identical adjacent non-trivial lines (copy-paste bugs)
+
+Python (`examples/`, `benchmarks/`, `toolchain/`):
+- `===` separator comments → remove
+- `----` or longer separator comments → remove (3 dashes `---` is allowed for markdown)
+
+Shell (`.github/`, `toolchain/`):
+- `===` or `----` separator comments → remove
+- Echo separators longer than 20 characters → shorten
 
 Enforced by convention/code review (not automated):
 - `goto`, `COMMON` blocks, global `save` variables

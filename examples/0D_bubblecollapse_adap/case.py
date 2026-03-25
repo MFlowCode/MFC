@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import math
 import json
+import math
 
 # FLUID PROPERTIES
 # Water

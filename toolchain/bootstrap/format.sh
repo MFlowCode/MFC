@@ -43,45 +43,80 @@ done
 log "Formatting MFC:"
 
 if [[ ${#PATHS[@]} -gt 0 ]]; then
-    # Custom paths provided - format all file types in those paths
     SEARCH_PATHS="${PATHS[@]}"
-
-    # Format Fortran files (.f90, .fpp)
-    if ! find $SEARCH_PATHS -type f 2>/dev/null | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_file.sh; then
-        error "Formatting Fortran files failed."
-        exit 1
-    fi
-
-    # Format Python files
-    if ! find $SEARCH_PATHS -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting Python files failed."
-        exit 1
-    fi
+    FORTRAN_DIRS="$SEARCH_PATHS"
+    PYTHON_DIRS="$SEARCH_PATHS"
 else
-    # Default: format src/, examples/, and benchmarks/
+    FORTRAN_DIRS="src"
+    PYTHON_DIRS="toolchain/ examples/ benchmarks/"
+fi
 
-    # Format Fortran files (.f90, .fpp) in src/
-    if ! find src -type f 2>/dev/null | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_file.sh; then
-        error "Formatting MFC source failed."
-        exit 1
-    fi
+# Format Fortran files (.f90, .fpp)
+FORTRAN_FILES=$(find $FORTRAN_DIRS -type f 2>/dev/null | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' || true)
+if [[ -n "$FORTRAN_FILES" ]]; then
+    FPRETTIFY_OPTS="--silent --indent 4 --c-relations --enable-replacements --enable-decl --whitespace-comma 1 --whitespace-multdiv 0 --whitespace-plusminus 1 --case 1 1 1 1 --strict-indent --line-length 1000"
 
-    # Format Python files in examples/
-    if ! find examples -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting MFC examples failed."
-        exit 1
-    fi
+    # Skip files unchanged since last format (hash cache in build/.cache/format/)
+    CACHE_DIR="build/.cache/format"
+    mkdir -p "$CACHE_DIR"
+    DIRTY_FILES=""
+    for f in $FORTRAN_FILES; do
+        cache_key=$(echo "$f" | tr '/' '_')
+        current_hash=$(md5sum "$f" | cut -d' ' -f1)
+        cached_hash=$(cat "$CACHE_DIR/$cache_key" 2>/dev/null || true)
+        if [[ "$current_hash" != "$cached_hash" ]]; then
+            DIRTY_FILES+="$f"$'\n'
+        fi
+    done
+    DIRTY_FILES=$(echo "$DIRTY_FILES" | sed '/^$/d')
 
-    # Format Python files in benchmarks/
-    if ! find benchmarks -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting MFC benchmarks failed."
-        exit 1
+    if [[ -n "$DIRTY_FILES" ]]; then
+        for niter in 1 2 3 4; do
+            old_hash=$(echo "$DIRTY_FILES" | xargs cat | md5sum)
+
+            # Run indenter on dirty files in one process
+            if ! echo "$DIRTY_FILES" | xargs python3 toolchain/indenter.py; then
+                error "Formatting Fortran files failed: indenter.py."
+                exit 1
+            fi
+
+            # Run fprettify in parallel (one process per file)
+            if ! echo "$DIRTY_FILES" | xargs -P ${JOBS:-1} -L 1 fprettify $FPRETTIFY_OPTS; then
+                error "Formatting Fortran files failed: fprettify."
+                exit 1
+            fi
+
+            new_hash=$(echo "$DIRTY_FILES" | xargs cat | md5sum)
+            if [[ "$old_hash" == "$new_hash" ]]; then
+                break
+            fi
+            if [[ "$niter" -eq 4 ]]; then
+                error "Formatting Fortran files failed: no steady-state after $niter iterations."
+                exit 1
+            fi
+        done
+
+        # Update hash cache for formatted files
+        for f in $DIRTY_FILES; do
+            cache_key=$(echo "$f" | tr '/' '_')
+            md5sum "$f" | cut -d' ' -f1 > "$CACHE_DIR/$cache_key"
+        done
+
+        echo "$DIRTY_FILES" | while read -r f; do echo "> $f"; done
     fi
+fi
+
+# Apply safe auto-fixes (import sorting, etc.) before formatting.
+# --fix-only exits 0 even when unfixable violations remain — those are
+# caught later by `ruff check` in lint.sh.  This only errors if ruff
+# itself fails to run.
+if ! ruff check --fix-only $PYTHON_DIRS; then
+    error "ruff failed to run. Check your ruff installation."
+    exit 1
+fi
+if ! ruff format $PYTHON_DIRS; then
+    error "Formatting Python files failed."
+    exit 1
 fi
 
 ok "Done. MFC has been formatted."

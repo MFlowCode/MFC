@@ -1,1 +1,0 @@
-../frontier/test.sh

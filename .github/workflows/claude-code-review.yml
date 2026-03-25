@@ -2,71 +2,373 @@ name: Claude Code Review
 
 on:
   pull_request_target:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize, ready_for_review, reopened, labeled]
+  issue_comment:
+    types: [created]
 
 jobs:
   claude-review:
+    if: >
+      (
+        github.event_name == 'pull_request_target' &&
+        (
+          github.event.action == 'opened' ||
+          github.event.action == 'ready_for_review' ||
+          github.event.action == 'reopened' ||
+          github.event.action == 'synchronize' ||
+          (
+            github.event.action == 'labeled' &&
+            github.event.label.name == 'claude-full-review'
+          )
+        )
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        contains(github.event.comment.body, '@claude full review')
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       issues: write
       actions: read
-      id-token: write
 
     steps:
-      - name: Install unzip (required by bun setup)
+      - name: Install dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y unzip
+          sudo apt-get install -y unzip jq
 
-      # IMPORTANT: checkout BASE repo only (safe on forks)
-      - name: Checkout base repo (safe)
+      - name: Checkout base repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Determine PR number and requested review mode
+        id: mode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            case "${{ github.event.action }}" in
+              opened|ready_for_review|reopened)
+                REQUESTED_MODE="full"
+                ;;
+              synchronize)
+                REQUESTED_MODE="incremental"
+                ;;
+              labeled)
+                if [[ "${{ github.event.label.name }}" == "claude-full-review" ]]; then
+                  REQUESTED_MODE="full"
+                else
+                  REQUESTED_MODE="full"
+                fi
+                ;;
+              *)
+                REQUESTED_MODE="full"
+                ;;
+            esac
+          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+            REQUESTED_MODE="full"
+          else
+            echo "Unsupported event"
+            exit 1
+          fi
+
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "requested_mode=$REQUESTED_MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve review state
+        id: state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ steps.mode.outputs.pr_number }}"
+          REPO="${{ github.repository }}"
+          REQUESTED_MODE="${{ steps.mode.outputs.requested_mode }}"
+
+          mkdir -p .claude-review/context
+
+          CURRENT_HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq .headRefOid)"
+          echo "current_head_sha=$CURRENT_HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+          LAST_COMMENT_B64="$(
+            gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments?per_page=100" \
+              --jq '.[] | select(.body | contains("<!-- claude-review: thread=primary;")) | @base64' \
+              | tail -n1 || true
+          )"
+
+          EXISTING_COMMENT_ID=""
+          PREVIOUS_REVIEWED_SHA=""
+
+          if [[ -n "${LAST_COMMENT_B64:-}" ]]; then
+            LAST_COMMENT_JSON="$(printf '%s' "$LAST_COMMENT_B64" | base64 -d)"
+            EXISTING_COMMENT_ID="$(printf '%s' "$LAST_COMMENT_JSON" | jq -r '.id // empty')"
+            COMMENT_BODY="$(printf '%s' "$LAST_COMMENT_JSON" | jq -r '.body // empty')"
+            PREVIOUS_REVIEWED_SHA="$(printf '%s' "$COMMENT_BODY" | sed -n 's/.*reviewed_sha=\([0-9a-fA-F]\{7,\}\).*/\1/p' | tail -n1)"
+          fi
+
+          EFFECTIVE_MODE="$REQUESTED_MODE"
+          if [[ "$REQUESTED_MODE" == "incremental" && -z "${PREVIOUS_REVIEWED_SHA:-}" ]]; then
+            EFFECTIVE_MODE="full"
+          fi
+
+          echo "existing_comment_id=${EXISTING_COMMENT_ID:-}" >> "$GITHUB_OUTPUT"
+          echo "previous_reviewed_sha=${PREVIOUS_REVIEWED_SHA:-}" >> "$GITHUB_OUTPUT"
+          echo "effective_mode=$EFFECTIVE_MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Build review diff and changed-file list
+        id: review_input
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ steps.mode.outputs.pr_number }}"
+          REPO="${{ github.repository }}"
+          MODE="${{ steps.state.outputs.effective_mode }}"
+          CURRENT_SHA="${{ steps.state.outputs.current_head_sha }}"
+          PREV_SHA="${{ steps.state.outputs.previous_reviewed_sha }}"
+
+          mkdir -p .claude-review
+          : > .claude-review/review.diff
+          : > .claude-review/changed_files.txt
+
+          build_full() {
+            gh pr diff "$PR_NUMBER" --repo "$REPO" > .claude-review/review.diff
+            gh pr view "$PR_NUMBER" --repo "$REPO" --json files --jq '.files[].path' > .claude-review/changed_files.txt
+            echo "actual_mode=full" >> "$GITHUB_OUTPUT"
+          }
+
+          if [[ "$MODE" == "full" ]]; then
+            build_full
+          else
+            if gh api -H "Accept: application/vnd.github.diff" \
+              "repos/$REPO/compare/$PREV_SHA...$CURRENT_SHA" > .claude-review/review.diff.tmp 2>/dev/null \
+              && gh api "repos/$REPO/compare/$PREV_SHA...$CURRENT_SHA" --jq '.files[].filename' > .claude-review/changed_files.txt.tmp 2>/dev/null; then
+              mv .claude-review/review.diff.tmp .claude-review/review.diff
+              mv .claude-review/changed_files.txt.tmp .claude-review/changed_files.txt
+              echo "actual_mode=incremental" >> "$GITHUB_OUTPUT"
+            else
+              echo "Compare diff failed; falling back to full review."
+              build_full
+            fi
+          fi
+
+          sed -i '/^[[:space:]]*$/d' .claude-review/changed_files.txt || true
+
+          if [[ ! -s .claude-review/review.diff ]] || [[ ! -s .claude-review/changed_files.txt ]]; then
+            echo "Prepared diff or changed file list is empty; falling back to full review."
+            build_full
+            sed -i '/^[[:space:]]*$/d' .claude-review/changed_files.txt || true
+          fi
+
+          echo "review_diff_path=.claude-review/review.diff" >> "$GITHUB_OUTPUT"
+          echo "changed_files_path=.claude-review/changed_files.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Prefetch bounded context for changed files only
+        id: context
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          REPO="${{ github.repository }}"
+          HEAD_SHA="${{ steps.state.outputs.current_head_sha }}"
+          COUNT=0
+
+          mkdir -p .claude-review/context
+
+          while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+            COUNT=$((COUNT + 1))
+            [[ "$COUNT" -gt 10 ]] && break
+
+            SAFE_NAME="$(printf '%s' "$path" | tr '/ ' '__')"
+            RAW="$(gh api "repos/$REPO/contents/$path?ref=$HEAD_SHA" 2>/dev/null || true)"
+            [[ -z "$RAW" ]] && continue
+
+            ENCODING="$(printf '%s' "$RAW" | jq -r '.encoding // empty')"
+            [[ "$ENCODING" != "base64" ]] && continue
+
+            CONTENT="$(printf '%s' "$RAW" | jq -r '.content // empty' | tr -d '\n' | base64 -d 2>/dev/null || true)"
+            [[ -z "$CONTENT" ]] && continue
+
+            LINE_COUNT="$(printf '%s' "$CONTENT" | wc -l | tr -d ' ')"
+            if [[ "$LINE_COUNT" -le 400 ]]; then
+              printf '%s' "$CONTENT" > ".claude-review/context/$SAFE_NAME"
+            fi
+          done < "${{ steps.review_input.outputs.changed_files_path }}"
+
+          echo "context_dir=.claude-review/context" >> "$GITHUB_OUTPUT"
+
+      - name: Initialize review output
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .claude-review
+          : > .claude-review/output.md
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
-
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
-
-          # NOTE: do NOT use --dangerouslyDisableSandbox (it can crash the CLI).
-          # This flag is for non-interactive CI runs (bypasses approval prompts).
           claude_args: >
             --dangerously-skip-permissions
             --max-turns 90
             --allowedTools
             "Bash"
-
           prompt: |
-            You are running in pull_request_target.
-            DO NOT read or inspect any checked-out PR/fork code. Review ONLY using GitHub API/gh commands.
+            You are running in GitHub Actions review automation.
 
-            You may read local guidance ONLY from:
-            - ./CLAUDE.md (root) if present
-            - ./.claude/rules/*.md if present (max 10 files)
+            REQUESTED REVIEW MODE: ${{ steps.state.outputs.effective_mode }}
+            ACTUAL REVIEW MODE: ${{ steps.review_input.outputs.actual_mode }}
+            PR NUMBER: ${{ steps.mode.outputs.pr_number }}
+            PREVIOUS REVIEWED SHA: ${{ steps.state.outputs.previous_reviewed_sha }}
+            CURRENT HEAD SHA: ${{ steps.state.outputs.current_head_sha }}
 
-            Keep tool calls minimal and in this order:
+            Review ONLY the prepared inputs for this run.
+
+            Prepared inputs:
+            - Diff to review: ${{ steps.review_input.outputs.review_diff_path }}
+            - Changed files list: ${{ steps.review_input.outputs.changed_files_path }}
+            - Optional full-file context for small changed files: ${{ steps.context.outputs.context_dir }}
+
+            Hard scope rules:
+            - Do NOT inspect checked-out repository code except:
+              - ./CLAUDE.md
+              - ./.claude/rules/*.md (max 10 files)
+              - ${{ steps.review_input.outputs.review_diff_path }}
+              - ${{ steps.review_input.outputs.changed_files_path }}
+              - files inside ${{ steps.context.outputs.context_dir }}
+            - Do NOT fetch or inspect any other repository files.
+            - Do NOT inspect unchanged files outside the reviewed diff.
+            - Do NOT follow imports, includes, callers, callees, or related modules outside changed files.
+            - Do NOT mention any file path not present in the changed files list.
+            - Every finding must be grounded in at least one changed hunk from the reviewed diff.
+            - Other changed files may be used as supporting context only.
+            - Nearby unchanged lines in changed files may be used as supporting context only.
+            - Do NOT raise findings about code outside changed files.
+            - Do NOT provide general repo suggestions or unrelated improvement ideas.
+            - Do NOT include positive confirmations like "No issues with X".
+            - If confidence is low, omit the finding.
+
+            Allowed workflow:
             1) ls -1 .claude/rules 2>/dev/null || true
             2) cat CLAUDE.md 2>/dev/null || true
             3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
-            4) gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid
-            5) gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
-            6) Post ONE top-level PR comment titled "Claude Code Review", then STOP.
+            4) cat "${{ steps.review_input.outputs.changed_files_path }}"
+            5) cat "${{ steps.review_input.outputs.review_diff_path }}"
+            6) Optionally inspect files inside "${{ steps.context.outputs.context_dir }}" only
+            7) Write the final review markdown to .claude-review/output.md, then STOP
+            8) Do NOT post, update, or create GitHub comments yourself
 
-            Output format:
-            - Head SHA
-            - Files changed count + list up to 10 file paths
-            - Summary (3–6 bullets, minimal)
-            - Findings with file + line numbers when possible
-            - If no issues: 0–3 improvement opportunities (only if confident)
+            Review policy:
+            - In full mode, review the full PR diff.
+            - In incremental mode, review only the delta diff.
+            - In incremental mode, report only new issues introduced by that delta.
+            - Do NOT repeat earlier findings.
+            - Do NOT restate the full PR summary.
+            - If there are no high-confidence findings, leave .claude-review/output.md empty and STOP.
 
-            If posting is blocked, write the full review to the GitHub Actions job summary instead, then STOP.
+            Review standard:
+            - Prefer correctness, reliability, cleanup/finalization gaps, inconsistent behavior, edge cases, and meaningful test gaps.
+            - Avoid style nitpicks.
+            - A finding is valid only if it is supported by changed lines, with changed-file context used only to confirm it.
 
-          additional_permissions: |
-            actions: read
+            Output rules:
+            - Write markdown only to .claude-review/output.md
+            - If there are findings, use exactly one of these formats.
+
+            For full mode:
+            Claude Code Review
+
+            Head SHA: <sha>
+
+            Files changed:
+            - <count>
+            - <up to 10 paths from changed_files.txt>
+
+            Findings:
+            - <only high-confidence issues grounded in changed hunks>
+
+            <!-- claude-review: thread=primary; reviewed_sha=<current_head_sha>; mode=full -->
+
+            For incremental mode:
+            Claude Code Review
+
+            Incremental review from: <previous_sha>
+            Head SHA: <current_sha>
+
+            New findings since last Claude review:
+            - <only high-confidence issues grounded in changed hunks of the delta diff>
+
+            <!-- claude-review: thread=primary; reviewed_sha=<current_head_sha>; mode=incremental -->
+
+            - Always include the hidden marker exactly once at the end of the file.
+            - If there are no findings, write nothing.
+
+      - name: Publish review comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ steps.mode.outputs.pr_number }}"
+          REPO="${{ github.repository }}"
+          COMMENT_ID="${{ steps.state.outputs.existing_comment_id }}"
+          OUTPUT_FILE=".claude-review/output.md"
+
+          if [[ ! -f "$OUTPUT_FILE" ]]; then
+            echo "No output file; nothing to publish."
+            exit 0
+          fi
+
+          if [[ ! -s "$OUTPUT_FILE" ]] || [[ -z "$(tr -d '[:space:]' < "$OUTPUT_FILE")" ]]; then
+            echo "Review output is empty; not posting a comment."
+            exit 0
+          fi
+
+          BODY_JSON="$(jq -Rs '{body: .}' < "$OUTPUT_FILE")"
+
+          if [[ -n "${COMMENT_ID:-}" ]]; then
+            gh api \
+              --method PATCH \
+              "repos/$REPO/issues/comments/$COMMENT_ID" \
+              --input - <<< "$BODY_JSON" >/dev/null
+            echo "Updated existing primary review comment: $COMMENT_ID"
+          else
+            gh api \
+              --method POST \
+              "repos/$REPO/issues/$PR_NUMBER/comments" \
+              --input - <<< "$BODY_JSON" >/dev/null
+            echo "Created new primary review comment."
+          fi
+
+      - name: Fallback job summary on failure
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f .claude-review/output.md ]] && [[ -s .claude-review/output.md ]]; then
+            {
+              echo "## Claude Code Review"
+              echo
+              cat .claude-review/output.md
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 N = 799
 Nx = N

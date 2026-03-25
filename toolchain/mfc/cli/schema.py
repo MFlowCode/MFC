@@ -8,11 +8,12 @@ for generating argparse parsers, shell completions, and documentation.
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List, Optional, Any, Union
+from typing import Any, List, Optional, Union
 
 
 class ArgAction(Enum):
     """Supported argparse actions."""
+
     STORE = "store"
     STORE_TRUE = "store_true"
     STORE_FALSE = "store_false"
@@ -23,44 +24,47 @@ class ArgAction(Enum):
 
 class CompletionType(Enum):
     """Types of shell completion behavior."""
-    NONE = auto()           # No completion
-    FILES = auto()          # All file completion
-    FILES_PY = auto()       # Python files only (*.py)
-    FILES_PACK = auto()     # Pack files only (*.pack)
-    FILES_YAML = auto()     # YAML files only (*.yaml, *.yml)
-    DIRECTORIES = auto()    # Directory completion
-    CHOICES = auto()        # Static choices from choices list
+
+    NONE = auto()  # No completion
+    FILES = auto()  # All file completion
+    FILES_PY = auto()  # Python files only (*.py)
+    FILES_PACK = auto()  # Pack files only (*.pack)
+    FILES_YAML = auto()  # YAML files only (*.yaml, *.yml)
+    DIRECTORIES = auto()  # Directory completion
+    CHOICES = auto()  # Static choices from choices list
 
 
 @dataclass
 class Completion:
     """Completion configuration for an argument."""
+
     type: CompletionType = CompletionType.NONE
     choices: Optional[List[str]] = None
 
 
 @dataclass
-class Argument:  # pylint: disable=too-many-instance-attributes
+class Argument:
     """
     Definition of a single CLI option argument (--flag).
 
     This represents one add_argument() call for a flag-style argument.
     """
+
     # Identity
-    name: str                           # Long form without dashes (e.g., "targets")
-    short: Optional[str] = None         # Short form without dash (e.g., "t")
+    name: str  # Long form without dashes (e.g., "targets")
+    short: Optional[str] = None  # Short form without dash (e.g., "t")
 
     # Argparse configuration
     help: str = ""
     action: ArgAction = ArgAction.STORE
-    type: Optional[type] = None         # str, int, float, etc.
+    type: Optional[type] = None  # str, int, float, etc.
     default: Any = None
     choices: Optional[List[Any]] = None
     nargs: Optional[Union[str, int]] = None  # "+", "*", "?", int, or "..." for REMAINDER
     metavar: Optional[str] = None
     required: bool = False
-    dest: Optional[str] = None          # Override destination name
-    const: Any = None                   # For store_const action
+    dest: Optional[str] = None  # Override destination name
+    const: Any = None  # For store_const action
 
     # Completion
     completion: Completion = field(default_factory=Completion)
@@ -83,7 +87,8 @@ class Argument:  # pylint: disable=too-many-instance-attributes
 @dataclass
 class Positional:
     """Definition of a positional argument."""
-    name: str                           # Metavar and destination
+
+    name: str  # Metavar and destination
     help: str = ""
     type: type = str
     nargs: Optional[Union[str, int]] = None
@@ -97,6 +102,7 @@ class Positional:
 @dataclass
 class Example:
     """A usage example for documentation."""
+
     command: str
     description: str
 
@@ -104,17 +110,19 @@ class Example:
 @dataclass
 class MutuallyExclusiveGroup:
     """A group where only one argument can be specified."""
+
     arguments: List[Argument] = field(default_factory=list)
     required: bool = False
 
 
 @dataclass
-class Command:  # pylint: disable=too-many-instance-attributes
+class Command:
     """
     Definition of a CLI command/subcommand.
 
     This is the main building block for the CLI structure.
     """
+
     # Identity
     name: str
     help: str
@@ -132,12 +140,12 @@ class Command:  # pylint: disable=too-many-instance-attributes
     subcommands: List["Command"] = field(default_factory=list)
 
     # Documentation
-    description: Optional[str] = None   # Long description for docs
+    description: Optional[str] = None  # Long description for docs
     examples: List[Example] = field(default_factory=list)
     key_options: List[tuple] = field(default_factory=list)  # (option, description) pairs
 
     # Handler module path (for dispatch)
-    handler: Optional[str] = None       # Module.function path
+    handler: Optional[str] = None  # Module.function path
 
 
 @dataclass
@@ -147,7 +155,8 @@ class CommonArgumentSet:
 
     Replaces the add_common_arguments() function pattern.
     """
-    name: str                           # Identifier for include_common
+
+    name: str  # Identifier for include_common
     arguments: List[Argument] = field(default_factory=list)
     # For MFCConfig flags that need --X and --no-X pairs
     mfc_config_flags: bool = False
@@ -165,6 +174,7 @@ class CLISchema:
     - User guide help content
     - CLI reference documentation
     """
+
     prog: str = "./mfc.sh"
     description: str = ""
 

@@ -35,7 +35,6 @@ DESCRIPTIONS = {
     "loops_x": "Number of times to apply grid stretching in x",
     "loops_y": "Number of times to apply grid stretching in y",
     "loops_z": "Number of times to apply grid stretching in z",
-
     # Time stepping
     "dt": "Time step size",
     "t_step_start": "Starting time step index",
@@ -48,11 +47,9 @@ DESCRIPTIONS = {
     "cfl_adap_dt": "Enable adaptive time stepping based on CFL",
     "cfl_const_dt": "Use constant CFL for time stepping",
     "cfl_target": "Target CFL number for adaptive time stepping",
-    "cfl_max": "Maximum allowed CFL number",
     "adap_dt": "Enable adaptive time stepping",
     "adap_dt_tol": "Tolerance for adaptive time stepping",
     "adap_dt_max_iters": "Maximum iterations for adaptive time stepping",
-
     # Model equations
     "model_eqns": "Model equations",
     "num_fluids": "Number of fluid components",
@@ -60,7 +57,6 @@ DESCRIPTIONS = {
     "mpp_lim": "Enable mixture pressure positivity limiter",
     "mixture_err": "Enable mixture error checking",
     "alt_soundspeed": "Use alternative sound speed formulation",
-
     # WENO reconstruction
     "weno_order": "Order of WENO reconstruction",
     "weno_eps": "WENO epsilon parameter for smoothness",
@@ -73,18 +69,15 @@ DESCRIPTIONS = {
     "weno_Re_flux": "Enable WENO for viscous fluxes",
     "weno_avg": "Enable WENO averaging",
     "null_weights": "Allow null WENO weights",
-
     # MUSCL reconstruction
     "recon_type": "Reconstruction type",
     "muscl_order": "Order of MUSCL reconstruction",
     "muscl_lim": "MUSCL limiter type",
-
     # Riemann solver
     "riemann_solver": "Riemann solver",
     "wave_speeds": "Wave speed estimates",
     "avg_state": "Average state for Riemann solver",
     "low_Mach": "Low Mach number correction",
-
     # Boundary conditions
     "bc_x%beg": "Boundary condition at x-begin (-1=periodic, -2=reflective, -3=symmetric, etc.)",
     "bc_x%end": "Boundary condition at x-end",
@@ -93,7 +86,6 @@ DESCRIPTIONS = {
     "bc_z%beg": "Boundary condition at z-begin",
     "bc_z%end": "Boundary condition at z-end",
     "num_bc_patches": "Number of boundary condition patches",
-
     # Physics models
     "bubbles_euler": "Enable Euler-Euler bubble model",
     "bubbles_lagrange": "Enable Lagrangian bubble tracking",
@@ -116,7 +108,6 @@ DESCRIPTIONS = {
     "hyper_cleaning_speed": "Wave speed for hyperbolic divergence cleaning",
     "hyper_cleaning_tau": "Damping time constant for hyperbolic divergence cleaning",
     "relativity": "Enable special relativity",
-
     # Output
     "run_time_info": "Output run-time information",
     "prim_vars_wrt": "Write primitive variables",
@@ -138,22 +129,17 @@ DESCRIPTIONS = {
     "c_wrt": "Write sound speed field",
     "omega_wrt": "Write vorticity field",
     "cf_wrt": "Write color function field",
-
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "num_ibs": "Number of immersed boundary patches",
-
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",
-
     # Probes and integrals
     "num_probes": "Number of probe points",
     "num_integrals": "Number of integral regions",
-
     # MPI/GPU
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
-
     # Misc
     "case_dir": "Case directory path",
     "cantera_file": "Cantera mechanism file for chemistry",
@@ -161,7 +147,6 @@ DESCRIPTIONS = {
     "old_ic": "Use initial conditions from previous simulation",
     "t_step_old": "Time step to restart from",
     "fd_order": "Finite difference order for gradients",
-
     # Additional simple params
     "thermal": "Thermal model selection",
     "relax_model": "Relaxation model type",
@@ -182,7 +167,6 @@ DESCRIPTIONS = {
     "mixlayer_perturb_nk": "Number of perturbation modes for mixing layer",
     "elliptic_smoothing_iters": "Number of elliptic smoothing iterations",
     "mixlayer_vel_coef": "Velocity coefficient for mixing layer",
-    "mixlayer_domain": "Mixing layer domain size",
     "mixlayer_perturb_k0": "Base wavenumber for mixing layer perturbation",
     "perturb_flow_mag": "Magnitude of flow perturbation",
     "fluid_rho": "Reference fluid density",
@@ -208,7 +192,6 @@ DESCRIPTIONS = {
     "alf_factor": "Artificial viscosity factor",
     "ic_eps": "Interface compression epsilon",
     "ic_beta": "Interface compression beta",
-    "powell": "Enable Powell source terms for MHD",
     "igr_pres_lim": "Enable IGR pressure limiting",
     "int_comp": "Enable interface compression",
     "nv_uvm_out_of_core": "Enable NVIDIA UVM out-of-core",
@@ -218,7 +201,6 @@ DESCRIPTIONS = {
     "num_igr_warm_start_iters": "Number of IGR warm-start iterations",
     "igr_iter_solver": "IGR iterative solver type",
     "schlieren_alpha": "Schlieren alpha coefficient",
-    "t_tol": "Time tolerance",
     "flux_lim": "Flux limiter type",
     "heat_ratio_wrt": "Write heat capacity ratio field",
     "pi_inf_wrt": "Write pi_inf field",
@@ -228,9 +210,46 @@ DESCRIPTIONS = {
     "sim_data": "Enable simulation data output",
     "output_partial_domain": "Enable partial domain output",
     "fft_wrt": "Enable FFT output",
-    "kappa_wrt": "Write curvature field",
     "lag_header": "Enable Lagrangian output header",
     "chem_wrt_T": "Write temperature field for chemistry",
+    # Body force parameters
+    "bf_x": "Enable body force in x-direction",
+    "bf_y": "Enable body force in y-direction",
+    "bf_z": "Enable body force in z-direction",
+    "g_x": "Body force magnitude in x-direction",
+    "g_y": "Body force magnitude in y-direction",
+    "g_z": "Body force magnitude in z-direction",
+    "k_x": "Body force wavenumber in x-direction",
+    "k_y": "Body force wavenumber in y-direction",
+    "k_z": "Body force wavenumber in z-direction",
+    "w_x": "Body force frequency in x-direction",
+    "w_y": "Body force frequency in y-direction",
+    "w_z": "Body force frequency in z-direction",
+    "p_x": "Body force phase in x-direction",
+    "p_y": "Body force phase in y-direction",
+    "p_z": "Body force phase in z-direction",
+    # Output flags
+    "mom_wrt": "Write momentum to database",
+    "flux_wrt": "Write flux data",
+    "ib_state_wrt": "Write IB state and loads data",
+    # Lagrangian bubble output flags
+    "lag_txt_wrt": "Write Lagrangian bubble data to text files",
+    "lag_db_wrt": "Write Lagrangian bubble data to database",
+    "lag_id_wrt": "Write bubble global ID",
+    "lag_pos_wrt": "Write bubble position",
+    "lag_pos_prev_wrt": "Write previous bubble position",
+    "lag_vel_wrt": "Write bubble velocity",
+    "lag_rad_wrt": "Write bubble radius",
+    "lag_rvel_wrt": "Write bubble radial velocity",
+    "lag_r0_wrt": "Write bubble initial radius",
+    "lag_rmax_wrt": "Write bubble maximum radius",
+    "lag_rmin_wrt": "Write bubble minimum radius",
+    "lag_dphidt_wrt": "Write bubble volume change rate",
+    "lag_pres_wrt": "Write bubble pressure",
+    "lag_mv_wrt": "Write bubble vapor mass",
+    "lag_mg_wrt": "Write bubble gas mass",
+    "lag_betaT_wrt": "Write bubble heat transfer coefficient",
+    "lag_betaC_wrt": "Write bubble mass transfer coefficient",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters
@@ -287,7 +306,12 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%alpha_rho", "Partial density for patch {0}"),
     (r"patch_icpp\((\d+)\)%radii", "Radii for patch {0}"),
     (r"patch_icpp\((\d+)\)%normal", "Normal direction for patch {0}"),
-
+    (r"patch_icpp\((\d+)\)%fourier_cos\((\d+)\)", "Fourier cos mode {1} for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%fourier_sin\((\d+)\)", "Fourier sin mode {1} for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%modal_clip_r_to_min", "Clip boundary radius R(θ) to modal_r_min for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%modal_r_min", "Min r when clipping for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%modal_use_exp_form", "Use exp form for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%sph_har_coeff\((\d+),(-?\d+)\)", "Spherical harmonic coeff (l={1}, m={2}) for patch {0}"),
     # fluid_pp patterns
     (r"fluid_pp\((\d+)\)%gamma", "Specific heat ratio for fluid {0}"),
     (r"fluid_pp\((\d+)\)%pi_inf", "Stiffness pressure for fluid {0}"),
@@ -305,7 +329,6 @@ PATTERNS = [
     (r"fluid_pp\((\d+)\)%k_v", "Thermal conductivity of vapor phase for fluid {0}"),
     (r"fluid_pp\((\d+)\)%cp_v", "Specific heat capacity (const. pressure) of vapor for fluid {0}"),
     (r"fluid_pp\((\d+)\)%D_v", "Vapor mass diffusivity for fluid {0}"),
-
     # patch_ib patterns
     (r"patch_ib\((\d+)\)%geometry", "Geometry type for immersed boundary {0}"),
     (r"patch_ib\((\d+)\)%x_centroid", "X-coordinate of centroid for IB patch {0}"),
@@ -332,7 +355,6 @@ PATTERNS = [
     (r"patch_ib\((\d+)\)%model_translate\((\d+)\)", "Model translation component {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%model_scale\((\d+)\)", "Model scale component {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%model_rotate\((\d+)\)", "Model rotation component {1} for IB patch {0}"),
-
     # bc patterns
     (r"bc_([xyz])%vel_in\((\d+)\)", "Inlet velocity component {1} at {0}-boundary"),
     (r"bc_([xyz])%vel_out\((\d+)\)", "Outlet velocity component {1} at {0}-boundary"),
@@ -345,7 +367,6 @@ PATTERNS = [
     (r"bc_([xyz])%grcbc_in", "Enable GRCBC at {0}-inlet"),
     (r"bc_([xyz])%grcbc_out", "Enable GRCBC at {0}-outlet"),
     (r"bc_([xyz])%grcbc_vel_out", "Enable GRCBC velocity at {0}-outlet"),
-
     # patch_bc patterns
     (r"patch_bc\((\d+)\)%geometry", "Geometry type for BC patch {0}"),
     (r"patch_bc\((\d+)\)%type", "BC type for patch {0}"),
@@ -354,7 +375,6 @@ PATTERNS = [
     (r"patch_bc\((\d+)\)%centroid\((\d+)\)", "Centroid component {1} for BC patch {0}"),
     (r"patch_bc\((\d+)\)%length\((\d+)\)", "Length component {1} for BC patch {0}"),
     (r"patch_bc\((\d+)\)%radius", "Radius for BC patch {0}"),
-
     # acoustic patterns
     (r"acoustic\((\d+)\)%loc\((\d+)\)", "Location component {1} for acoustic source {0}"),
     (r"acoustic\((\d+)\)%mag", "Magnitude for acoustic source {0}"),
@@ -380,12 +400,10 @@ PATTERNS = [
     (r"acoustic\((\d+)\)%bb_num_freq", "Number of broadband frequencies for source {0}"),
     (r"acoustic\((\d+)\)%bb_bandwidth", "Broadband bandwidth for acoustic source {0}"),
     (r"acoustic\((\d+)\)%bb_lowest_freq", "Lowest broadband frequency for source {0}"),
-
     # probe patterns
     (r"probe\((\d+)\)%x", "X-coordinate of probe {0}"),
     (r"probe\((\d+)\)%y", "Y-coordinate of probe {0}"),
     (r"probe\((\d+)\)%z", "Z-coordinate of probe {0}"),
-
     # integral patterns
     (r"integral\((\d+)\)%xmin", "X-min of integral region {0}"),
     (r"integral\((\d+)\)%xmax", "X-max of integral region {0}"),
@@ -393,7 +411,6 @@ PATTERNS = [
     (r"integral\((\d+)\)%ymax", "Y-max of integral region {0}"),
     (r"integral\((\d+)\)%zmin", "Z-min of integral region {0}"),
     (r"integral\((\d+)\)%zmax", "Z-max of integral region {0}"),
-
     # bub_pp patterns
     (r"bub_pp%R0ref", "Reference bubble radius"),
     (r"bub_pp%p0ref", "Reference pressure for bubbles"),
@@ -416,19 +433,16 @@ PATTERNS = [
     (r"bub_pp%R_v", "Gas constant of host in vapor state"),
     (r"bub_pp%R_g", "Gas constant of gas (bubble)"),
     (r"bub_pp%(\w+)", "Bubble parameter: {0}"),
-
     # Output array patterns
     (r"schlieren_alpha\((\d+)\)", "Schlieren coefficient for fluid {0}"),
     (r"alpha_rho_wrt\((\d+)\)", "Write partial density for fluid {0}"),
     (r"alpha_wrt\((\d+)\)", "Write volume fraction for fluid {0}"),
     (r"alpha_rho_e_wrt\((\d+)\)", "Write partial energy for fluid {0}"),
-    (r"kappa_wrt\((\d+)\)", "Write curvature for fluid {0}"),
     (r"mom_wrt\((\d+)\)", "Write momentum component {0}"),
     (r"vel_wrt\((\d+)\)", "Write velocity component {0}"),
     (r"flux_wrt\((\d+)\)", "Write flux component {0}"),
     (r"omega_wrt\((\d+)\)", "Write vorticity component {0}"),
     (r"chem_wrt_Y\((\d+)\)", "Write mass fraction of species {0}"),
-
     # Lagrangian output patterns - specific fields first
     (r"lag_pos_wrt", "Write Lagrangian bubble position"),
     (r"lag_pos_prev_wrt", "Write Lagrangian bubble previous position"),
@@ -448,11 +462,9 @@ PATTERNS = [
     (r"lag_id_wrt", "Write Lagrangian bubble ID"),
     (r"lag_txt_wrt", "Write Lagrangian data to text files"),
     (r"lag_(\w+)_wrt", "Write Lagrangian {0} field"),
-
     # Body force patterns
     (r"([kgwp])_([xyz])", "Body force parameter {0} in {1}-direction"),
     (r"bf_([xyz])", "Enable body force in {0}-direction"),
-
     # simplex patterns
     (r"simplex_params%perturb_dens\((\d+)\)", "Enable density perturbation for fluid {0}"),
     (r"simplex_params%perturb_dens_freq\((\d+)\)", "Density perturbation frequency for fluid {0}"),
@@ -462,7 +474,6 @@ PATTERNS = [
     (r"simplex_params%perturb_vel_freq\((\d+)\)", "Velocity perturbation frequency for direction {0}"),
     (r"simplex_params%perturb_vel_scale\((\d+)\)", "Velocity perturbation scale for direction {0}"),
     (r"simplex_params%perturb_vel_offset\((\d+),(\d+)\)", "Velocity perturbation offset ({1}) for direction {0}"),
-
     # lag_params patterns - specific fields first
     (r"lag_params%solver_approach", "Lagrangian solver approach (1=one-way, 2=two-way coupling)"),
     (r"lag_params%cluster_type", "Cluster model for pressure at infinity"),
@@ -482,14 +493,12 @@ PATTERNS = [
     (r"lag_params%rho0", "Initial density"),
     (r"lag_params%x0", "Initial bubble position"),
     (r"lag_params%(\w+)", "Lagrangian tracking parameter: {0}"),
-
     # chem_params patterns - specific fields first
     (r"chem_params%diffusion", "Enable species diffusion for chemistry"),
     (r"chem_params%reactions", "Enable chemical reactions"),
     (r"chem_params%gamma_method", "Gamma calculation method (1=formulation, 2=cp/cv ratio)"),
     (r"chem_params%transport_model", "Transport model selection for chemistry"),
     (r"chem_params%(\w+)", "Chemistry parameter: {0}"),
-
     # fluid_rho patterns
     (r"fluid_rho\((\d+)\)", "Reference density for fluid {0}"),
 ]
@@ -511,7 +520,8 @@ def get_description(param_name: str) -> str:
             return template.format(*match.groups())
 
     # 3. Auto-generated description from registry (set by _auto_describe at registration)
-    from . import REGISTRY  # pylint: disable=import-outside-toplevel
+    from . import REGISTRY
+
     param = REGISTRY.all_params.get(param_name)
     if param and param.description:
         return param.description
@@ -520,7 +530,7 @@ def get_description(param_name: str) -> str:
     return _infer_from_naming(param_name)
 
 
-def _infer_from_naming(param_name: str) -> str:  # pylint: disable=too-many-return-statements,too-many-branches
+def _infer_from_naming(param_name: str) -> str:
     """Infer description from naming conventions."""
     name = param_name
 
@@ -644,7 +654,8 @@ def get_math_symbol(param_name: str) -> str:
     Looks up the math_symbol field from the parameter registry (single source of truth).
     Symbols are defined via math= in the _r() calls in definitions.py.
     """
-    from . import REGISTRY  # pylint: disable=import-outside-toplevel
+    from . import REGISTRY
+
     param = REGISTRY.all_params.get(param_name)
     return param.math_symbol if param else ""
 

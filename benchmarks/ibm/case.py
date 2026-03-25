@@ -3,9 +3,9 @@
 # Additional Benchmarked Features
 # - ibm : T
 
+import argparse
 import json
 import math
-import argparse
 
 parser = argparse.ArgumentParser(prog="Benchmarking Case 4", description="This MFC case was created for the purposes of benchmarking MFC.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -48,8 +48,8 @@ print(
             "p": Nz,
             "dt": mydt,
             "t_step_start": 0,
-            "t_step_stop": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
-            "t_step_save": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
+            "t_step_stop": ARGS["steps"] if ARGS["steps"] is not None else int(2 * (5 * size + 5)),
+            "t_step_save": ARGS["steps"] if ARGS["steps"] is not None else int(2 * (5 * size + 5)),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,

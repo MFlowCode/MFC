@@ -6,8 +6,8 @@ in sync with the CLI schema definitions.
 """
 
 from typing import List, Set
-from .schema import CLISchema, Command, CompletionType
 
+from .schema import CLISchema, Command, CompletionType
 
 # Mapping of completion types to bash completion expressions
 _BASH_COMPLETION_MAP = {
@@ -31,16 +31,26 @@ def _collect_all_options(cmd: Command, schema: CLISchema) -> List[str]:
 
         # MFC config flags
         if common_set.mfc_config_flags:
-            options.update([
-                "--mpi", "--no-mpi",
-                "--gpu", "--no-gpu",
-                "--debug", "--no-debug",
-                "--gcov", "--no-gcov",
-                "--unified", "--no-unified",
-                "--single", "--no-single",
-                "--mixed", "--no-mixed",
-                "--fastmath", "--no-fastmath",
-            ])
+            options.update(
+                [
+                    "--mpi",
+                    "--no-mpi",
+                    "--gpu",
+                    "--no-gpu",
+                    "--debug",
+                    "--no-debug",
+                    "--gcov",
+                    "--no-gcov",
+                    "--unified",
+                    "--no-unified",
+                    "--single",
+                    "--no-single",
+                    "--mixed",
+                    "--no-mixed",
+                    "--fastmath",
+                    "--no-fastmath",
+                ]
+            )
         else:
             for arg in common_set.arguments:
                 if arg.short:
@@ -86,9 +96,7 @@ def _generate_bash_prev_cases(cmd: Command, schema: CLISchema) -> List[str]:
     """Generate bash prev-based completion cases for a command."""
     lines = []
     has_prev_cases = False
-    completable_types = (CompletionType.CHOICES, CompletionType.FILES_PY,
-                         CompletionType.FILES_PACK, CompletionType.FILES,
-                         CompletionType.DIRECTORIES, CompletionType.FILES_YAML)
+    completable_types = (CompletionType.CHOICES, CompletionType.FILES_PY, CompletionType.FILES_PACK, CompletionType.FILES, CompletionType.DIRECTORIES, CompletionType.FILES_YAML)
 
     all_args = _collect_all_args(cmd, schema)
 
@@ -103,29 +111,29 @@ def _generate_bash_prev_cases(cmd: Command, schema: CLISchema) -> List[str]:
 
     if multivalue_args:
         # Generate backward-scanning logic for multi-value args
-        lines.append('            # Check for multi-value arguments by scanning backwards')
-        lines.append('            local i')
-        lines.append('            for ((i=COMP_CWORD-1; i>=2; i--)); do')
+        lines.append("            # Check for multi-value arguments by scanning backwards")
+        lines.append("            local i")
+        lines.append("            for ((i=COMP_CWORD-1; i>=2; i--)); do")
         lines.append('                case "${COMP_WORDS[i]}" in')
 
         for arg in multivalue_args:
-            flags = [f'-{arg.short}'] if arg.short else []
-            flags.append(f'--{arg.name}')
-            lines.append(f'                    {"|".join(flags)})')
+            flags = [f"-{arg.short}"] if arg.short else []
+            flags.append(f"--{arg.name}")
+            lines.append(f"                    {'|'.join(flags)})")
             comp_choices = arg.completion.choices or arg.choices
             completion_code = _bash_completion_for_type(arg.completion.type, comp_choices)
             if completion_code:
-                lines.append(f'                        {completion_code}')
-            lines.append('                        return 0')
-            lines.append('                        ;;')
+                lines.append(f"                        {completion_code}")
+            lines.append("                        return 0")
+            lines.append("                        ;;")
 
         # Stop scanning if we hit any other flag
-        lines.append('                    -*)')
-        lines.append('                        break')
-        lines.append('                        ;;')
-        lines.append('                esac')
-        lines.append('            done')
-        lines.append('')
+        lines.append("                    -*)")
+        lines.append("                        break")
+        lines.append("                        ;;")
+        lines.append("                esac")
+        lines.append("            done")
+        lines.append("")
 
     # Then handle single-value arguments with prev-based completion
     for arg in all_args:
@@ -139,19 +147,19 @@ def _generate_bash_prev_cases(cmd: Command, schema: CLISchema) -> List[str]:
             lines.append('            case "${prev}" in')
             has_prev_cases = True
 
-        flags = [f'-{arg.short}'] if arg.short else []
-        flags.append(f'--{arg.name}')
+        flags = [f"-{arg.short}"] if arg.short else []
+        flags.append(f"--{arg.name}")
 
-        lines.append(f'                {"|".join(flags)})')
+        lines.append(f"                {'|'.join(flags)})")
         comp_choices = arg.completion.choices or arg.choices
         completion_code = _bash_completion_for_type(arg.completion.type, comp_choices)
         if completion_code:
-            lines.append(f'                    {completion_code}')
-        lines.append('                    return 0')
-        lines.append('                    ;;')
+            lines.append(f"                    {completion_code}")
+        lines.append("                    return 0")
+        lines.append("                    ;;")
 
     if has_prev_cases:
-        lines.append('            esac')
+        lines.append("            esac")
 
     return lines
 
@@ -162,18 +170,18 @@ def _generate_bash_command_case(cmd: Command, schema: CLISchema) -> List[str]:
 
     # Include aliases in case pattern
     patterns = [cmd.name] + cmd.aliases
-    lines.append(f'        {"|".join(patterns)})')
+    lines.append(f"        {'|'.join(patterns)})")
 
     options = _collect_all_options(cmd, schema)
 
     # Handle subcommands (like packer pack, packer compare)
     if cmd.subcommands:
-        lines.append('            if [[ ${COMP_CWORD} -eq 2 ]]; then')
+        lines.append("            if [[ ${COMP_CWORD} -eq 2 ]]; then")
         subcmd_names = [sc.name for sc in cmd.subcommands]
         lines.append(f'                COMPREPLY=( $(compgen -W "{" ".join(subcmd_names)}" -- "${{cur}}") )')
-        lines.append('                return 0')
-        lines.append('            fi')
-        lines.append('            ;;')
+        lines.append("                return 0")
+        lines.append("            fi")
+        lines.append("            ;;")
         return lines
 
     # Generate prev-based completion
@@ -186,23 +194,23 @@ def _generate_bash_command_case(cmd: Command, schema: CLISchema) -> List[str]:
         lines.append('                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )')
 
         if cmd.positionals and cmd.positionals[0].completion.type != CompletionType.NONE:
-            lines.append('            else')
+            lines.append("            else")
             pos = cmd.positionals[0]
             comp_choices = pos.completion.choices or pos.choices
             completion_code = _bash_completion_for_type(pos.completion.type, comp_choices)
             if completion_code:
-                lines.append(f'                {completion_code}')
+                lines.append(f"                {completion_code}")
 
-        lines.append('            fi')
+        lines.append("            fi")
     elif cmd.positionals and cmd.positionals[0].completion.type != CompletionType.NONE:
         pos = cmd.positionals[0]
         comp_choices = pos.completion.choices or pos.choices
         completion_code = _bash_completion_for_type(pos.completion.type, comp_choices)
         if completion_code:
-            lines.append(f'            {completion_code}')
+            lines.append(f"            {completion_code}")
 
-    lines.append('            return 0')
-    lines.append('            ;;')
+    lines.append("            return 0")
+    lines.append("            ;;")
     return lines
 
 
@@ -211,26 +219,26 @@ def generate_bash_completion(schema: CLISchema) -> str:
     commands = schema.get_all_command_names()
 
     lines = [
-        '#!/usr/bin/env bash',
-        '# AUTO-GENERATED from cli/commands.py - Do not edit manually',
-        '# Regenerate with: ./mfc.sh generate',
-        '',
-        '_mfc_completions() {',
-        '    local cur prev command',
-        '    COMPREPLY=()',
+        "#!/usr/bin/env bash",
+        "# AUTO-GENERATED from cli/commands.py - Do not edit manually",
+        "# Regenerate with: ./mfc.sh generate",
+        "",
+        "_mfc_completions() {",
+        "    local cur prev command",
+        "    COMPREPLY=()",
         '    cur="${COMP_WORDS[COMP_CWORD]}"',
         '    prev="${COMP_WORDS[COMP_CWORD-1]}"',
-        '',
+        "",
         f'    local commands="{" ".join(sorted(commands))}"',
-        '',
-        '    # First argument - complete commands',
-        '    if [[ ${COMP_CWORD} -eq 1 ]]; then',
+        "",
+        "    # First argument - complete commands",
+        "    if [[ ${COMP_CWORD} -eq 1 ]]; then",
         '        COMPREPLY=( $(compgen -W "${commands}" -- "${cur}") )',
-        '        return 0',
-        '    fi',
-        '',
+        "        return 0",
+        "    fi",
+        "",
         '    local command="${COMP_WORDS[1]}"',
-        '',
+        "",
         '    case "${command}" in',
     ]
 
@@ -239,20 +247,22 @@ def generate_bash_completion(schema: CLISchema) -> str:
             continue
         lines.extend(_generate_bash_command_case(cmd, schema))
 
-    lines.extend([
-        '    esac',
-        '',
-        '    return 0',
-        '}',
-        '',
-        '# -o filenames: handle escaping/slashes for file completions',
-        '# Removed -o bashdefault to prevent unwanted directory fallback',
-        'complete -o filenames -F _mfc_completions ./mfc.sh',
-        'complete -o filenames -F _mfc_completions mfc.sh',
-        'complete -o filenames -F _mfc_completions mfc',
-    ])
+    lines.extend(
+        [
+            "    esac",
+            "",
+            "    return 0",
+            "}",
+            "",
+            "# -o filenames: handle escaping/slashes for file completions",
+            "# Removed -o bashdefault to prevent unwanted directory fallback",
+            "complete -o filenames -F _mfc_completions ./mfc.sh",
+            "complete -o filenames -F _mfc_completions mfc.sh",
+            "complete -o filenames -F _mfc_completions mfc",
+        ]
+    )
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def _zsh_completion_for_positional(pos, index: int) -> str:
@@ -264,11 +274,11 @@ def _zsh_completion_for_positional(pos, index: int) -> str:
         completion = ':_files -g "*.pack"'
     elif pos.completion.type == CompletionType.CHOICES:
         choices = pos.completion.choices or pos.choices or []
-        completion = f':({" ".join(choices)})'
+        completion = f":({' '.join(choices)})"
     elif pos.completion.type == CompletionType.DIRECTORIES:
-        completion = ':_files -/'
+        completion = ":_files -/"
     elif pos.completion.type == CompletionType.FILES:
-        completion = ':_files'
+        completion = ":_files"
 
     help_text = pos.help.replace("'", "").replace("[", "").replace("]", "")[:120]
     return f"'{index}:{help_text}{completion}'"
@@ -282,15 +292,15 @@ def _zsh_completion_for_arg(arg) -> str:
 
     if arg.completion.type == CompletionType.CHOICES:
         choices = arg.completion.choices or arg.choices or []
-        return f'{label}:({" ".join(str(c) for c in choices)})'
+        return f"{label}:({' '.join(str(c) for c in choices)})"
     if arg.completion.type == CompletionType.FILES_PY:
         return f'{label}:_files -g "*.py"'
     if arg.completion.type == CompletionType.FILES_PACK:
         return f'{label}:_files -g "*.pack"'
     if arg.completion.type == CompletionType.FILES:
-        return f'{label}:_files'
+        return f"{label}:_files"
     if arg.completion.type == CompletionType.DIRECTORIES:
-        return f'{label}:_files -/'
+        return f"{label}:_files -/"
     return ""
 
 
@@ -314,24 +324,26 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
             continue
 
         if common_set.mfc_config_flags:
-            arg_lines.extend([
-                "'--mpi[Enable MPI]'",
-                "'--no-mpi[Disable MPI]'",
-                "'--gpu[Enable GPU]:mode:(acc mp)'",
-                "'--no-gpu[Disable GPU]'",
-                "'--debug[Build with debug compiler flags (for MFC code)]'",
-                "'--no-debug[Build without debug flags]'",
-                "'--gcov[Enable gcov coverage]'",
-                "'--no-gcov[Disable gcov coverage]'",
-                "'--unified[Enable unified memory]'",
-                "'--no-unified[Disable unified memory]'",
-                "'--single[Enable single precision]'",
-                "'--no-single[Disable single precision]'",
-                "'--mixed[Enable mixed precision]'",
-                "'--no-mixed[Disable mixed precision]'",
-                "'--fastmath[Enable fast math]'",
-                "'--no-fastmath[Disable fast math]'",
-            ])
+            arg_lines.extend(
+                [
+                    "'--mpi[Enable MPI]'",
+                    "'--no-mpi[Disable MPI]'",
+                    "'--gpu[Enable GPU]:mode:(acc mp)'",
+                    "'--no-gpu[Disable GPU]'",
+                    "'--debug[Build with debug compiler flags (for MFC code)]'",
+                    "'--no-debug[Build without debug flags]'",
+                    "'--gcov[Enable gcov coverage]'",
+                    "'--no-gcov[Disable gcov coverage]'",
+                    "'--unified[Enable unified memory]'",
+                    "'--no-unified[Disable unified memory]'",
+                    "'--single[Enable single precision]'",
+                    "'--no-single[Disable single precision]'",
+                    "'--mixed[Enable mixed precision]'",
+                    "'--no-mixed[Disable mixed precision]'",
+                    "'--fastmath[Enable fast math]'",
+                    "'--no-fastmath[Disable fast math]'",
+                ]
+            )
         else:
             for arg in common_set.arguments:
                 desc = arg.help.replace("'", "").replace("[", "").replace("]", "")[:120]
@@ -360,16 +372,16 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
 def generate_zsh_completion(schema: CLISchema) -> str:
     """Generate zsh completion script from schema."""
     lines = [
-        '#compdef mfc.sh ./mfc.sh mfc',
-        '# AUTO-GENERATED from cli/commands.py - Do not edit manually',
-        '# Regenerate with: ./mfc.sh generate',
-        '',
-        '_mfc() {',
-        '    local context state state_descr line',
-        '    typeset -A opt_args',
-        '',
-        '    local -a commands',
-        '    commands=(',
+        "#compdef mfc.sh ./mfc.sh mfc",
+        "# AUTO-GENERATED from cli/commands.py - Do not edit manually",
+        "# Regenerate with: ./mfc.sh generate",
+        "",
+        "_mfc() {",
+        "    local context state state_descr line",
+        "    typeset -A opt_args",
+        "",
+        "    local -a commands",
+        "    commands=(",
     ]
 
     # Commands with descriptions
@@ -379,42 +391,46 @@ def generate_zsh_completion(schema: CLISchema) -> str:
         for alias in cmd.aliases:
             lines.append(f'        "{alias}:Alias for {cmd.name}"')
 
-    lines.extend([
-        '    )',
-        '',
-        '    _arguments -C \\',
-        "        '1: :->command' \\",
-        "        '*:: :->args'",
-        '',
-        '    case $state in',
-        '        command)',
-        "            _describe -t commands 'mfc command' commands",
-        '            ;;',
-        '        args)',
-        '            case $words[1] in',
-    ])
+    lines.extend(
+        [
+            "    )",
+            "",
+            "    _arguments -C \\",
+            "        '1: :->command' \\",
+            "        '*:: :->args'",
+            "",
+            "    case $state in",
+            "        command)",
+            "            _describe -t commands 'mfc command' commands",
+            "            ;;",
+            "        args)",
+            "            case $words[1] in",
+        ]
+    )
 
     # Generate case for each command
     for cmd in schema.commands:
         all_names = [cmd.name] + cmd.aliases
         for name in all_names:
-            lines.append(f'                {name})')
+            lines.append(f"                {name})")
             arg_lines = _generate_zsh_command_args(cmd, schema)
             if arg_lines:
-                lines.append('                    _arguments \\')
-                lines.append('                        ' + ' \\\n                        '.join(arg_lines))
+                lines.append("                    _arguments \\")
+                lines.append("                        " + " \\\n                        ".join(arg_lines))
             else:
                 # Explicitly disable default completion for commands with no args
-                lines.append('                    :')
-            lines.append('                    ;;')
+                lines.append("                    :")
+            lines.append("                    ;;")
 
-    lines.extend([
-        '            esac',
-        '            ;;',
-        '    esac',
-        '}',
-        '',
-        '_mfc "$@"',
-    ])
+    lines.extend(
+        [
+            "            esac",
+            "            ;;",
+            "    esac",
+            "}",
+            "",
+            '_mfc "$@"',
+        ]
+    )
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
