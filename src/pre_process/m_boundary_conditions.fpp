@@ -26,9 +26,9 @@ contains
     !> Apply a line-segment boundary condition patch along a domain edge in 2D.
     impure subroutine s_line_segment_bc(patch_id, bc_type)
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
-        integer, intent(in)                                            :: patch_id
-        integer                                                        :: j
+        type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
+        integer, intent(in)                                           :: patch_id
+        integer                                                       :: j
 
         ! Patch is a line segment along y on the x-boundary face
 
@@ -76,9 +76,9 @@ contains
     !> Apply a circular boundary condition patch on a domain face in 3D.
     impure subroutine s_circle_bc(patch_id, bc_type)
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
-        integer, intent(in)                                            :: patch_id
-        integer                                                        :: j, k
+        type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
+        integer, intent(in)                                           :: patch_id
+        integer                                                       :: j, k
 
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
@@ -136,9 +136,9 @@ contains
     !> Apply a rectangular boundary condition patch on a domain face in 3D.
     impure subroutine s_rectangle_bc(patch_id, bc_type)
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
-        integer, intent(in)                                            :: patch_id
-        integer                                                        :: j, k
+        type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
+        integer, intent(in)                                           :: patch_id
+        integer                                                       :: j, k
 
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
@@ -220,9 +220,9 @@ contains
     !> Iterate over all boundary condition patches and dispatch them by geometry type.
     impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size)         :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, 1:2) :: bc_type
-        integer                                         :: i
+        type(scalar_field), dimension(sys_size)        :: q_prim_vf
+        type(integer_field), dimension(1:num_dims,1:2) :: bc_type
+        integer                                        :: i
 
         !> Apply 2D patches to 3D domain
 

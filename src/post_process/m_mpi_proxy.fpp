@@ -141,7 +141,7 @@ contains
     !> Gather spatial extents from all ranks for Silo database metadata
     impure subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
-        real(wp), dimension(1:, 0:), intent(inout) :: spatial_extents
+        real(wp), dimension(1:,0:), intent(inout) :: spatial_extents
 
 #ifdef MFC_MPI
         integer  :: ierr  !< Generic flag used to identify and report MPI errors
@@ -254,8 +254,8 @@ contains
     !! @param q_sf Flow variable on a single computational sub-domain
     impure subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
-        real(wp), dimension(:,:,:), intent(in)                   :: q_sf
-        real(wp), dimension(1:2, 0:num_procs - 1), intent(inout) :: data_extents
+        real(wp), dimension(:,:,:), intent(in)                  :: q_sf
+        real(wp), dimension(1:2,0:num_procs - 1), intent(inout) :: data_extents
 
 #ifdef MFC_MPI
         integer  :: ierr  !< Generic flag used to identify and report MPI errors

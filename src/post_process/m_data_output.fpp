@@ -81,23 +81,22 @@ contains
         logical                                        :: dir_check
         integer                                        :: i
 
-        allocate (q_sf(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
+        allocate (q_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
         if (grid_geometry == 3) then
-            allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, -offset_x%beg:m + offset_x%end))
+            allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,-offset_x%beg:m + offset_x%end))
         end if
 
         if (precision == 1) then
-            allocate (q_sf_s(-offset_x%beg:m + offset_x%end, -offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end))
+            allocate (q_sf_s(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
             if (grid_geometry == 3) then
-                allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end, -offset_z%beg:p + offset_z%end, &
-                          & -offset_x%beg:m + offset_x%end))
+                allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,-offset_x%beg:m + offset_x%end))
             end if
         end if
 
         if (n == 0) then
-            allocate (q_root_sf(0:m_root, 0:0, 0:0))
+            allocate (q_root_sf(0:m_root,0:0,0:0))
             if (precision == 1) then
-                allocate (q_root_sf_s(0:m_root, 0:0, 0:0))
+                allocate (q_root_sf_s(0:m_root,0:0,0:0))
             end if
         end if
 
@@ -105,20 +104,20 @@ contains
         ! cell-boundaries in each active coordinate direction. Note that all these variables are only needed by the Silo-HDF5 format
         ! for multidimensional data.
         if (format == 1) then
-            allocate (data_extents(1:2, 0:num_procs - 1))
+            allocate (data_extents(1:2,0:num_procs - 1))
 
             if (p > 0) then
-                allocate (spatial_extents(1:6, 0:num_procs - 1))
+                allocate (spatial_extents(1:6,0:num_procs - 1))
                 allocate (lo_offset(1:3))
                 allocate (hi_offset(1:3))
                 allocate (dims(1:3))
             else if (n > 0) then
-                allocate (spatial_extents(1:4, 0:num_procs - 1))
+                allocate (spatial_extents(1:4,0:num_procs - 1))
                 allocate (lo_offset(1:2))
                 allocate (hi_offset(1:2))
                 allocate (dims(1:2))
             else
-                allocate (spatial_extents(1:2, 0:num_procs - 1))
+                allocate (spatial_extents(1:2,0:num_procs - 1))
                 allocate (lo_offset(1:1))
                 allocate (hi_offset(1:1))
                 allocate (dims(1:1))
@@ -456,14 +455,14 @@ contains
                 call s_mpi_gather_spatial_extents(spatial_extents)
             else if (p > 0) then
                 if (grid_geometry == 3) then
-                    spatial_extents(:, 0) = (/minval(y_cb), minval(z_cb), minval(x_cb), maxval(y_cb), maxval(z_cb), maxval(x_cb)/)
+                    spatial_extents(:,0) = (/minval(y_cb), minval(z_cb), minval(x_cb), maxval(y_cb), maxval(z_cb), maxval(x_cb)/)
                 else
-                    spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), minval(z_cb), maxval(x_cb), maxval(y_cb), maxval(z_cb)/)
+                    spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), minval(z_cb), maxval(x_cb), maxval(y_cb), maxval(z_cb)/)
                 end if
             else if (n > 0) then
-                spatial_extents(:, 0) = (/minval(x_cb), minval(y_cb), maxval(x_cb), maxval(y_cb)/)
+                spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), maxval(x_cb), maxval(y_cb)/)
             else
-                spatial_extents(:, 0) = (/minval(x_cb), maxval(x_cb)/)
+                spatial_extents(:,0) = (/minval(x_cb), maxval(x_cb)/)
             end if
 
             ! Next, the root processor proceeds to record all of the spatial extents in the formatted database master file. In
@@ -592,7 +591,7 @@ contains
             if (num_procs > 1) then
                 call s_mpi_gather_data_extents(q_sf, data_extents)
             else
-                data_extents(:, 0) = (/minval(q_sf), maxval(q_sf)/)
+                data_extents(:,0) = (/minval(q_sf), maxval(q_sf)/)
             end if
 
             if (proc_rank == 0) then
@@ -716,20 +715,20 @@ contains
         integer                                        :: id
 
 #ifdef MFC_MPI
-        real(wp), dimension(20)                 :: inputvals
-        real(wp)                                :: time_real
-        integer, dimension(MPI_STATUS_SIZE)     :: status
-        integer(KIND=MPI_OFFSET_KIND)           :: disp
-        integer                                 :: view
-        logical                                 :: lg_bub_file, file_exist
-        integer, dimension(2)                   :: gsizes, lsizes, start_idx_part
-        integer                                 :: ifile
-        integer                                 :: ierr
-        real(wp)                                :: file_time, file_dt
-        integer                                 :: file_num_procs, file_tot_part, tot_part
-        integer                                 :: i
-        integer, dimension(:), allocatable      :: proc_bubble_counts
-        real(wp), dimension(1:1, 1:lag_io_vars) :: lag_io_null
+        real(wp), dimension(20)                :: inputvals
+        real(wp)                               :: time_real
+        integer, dimension(MPI_STATUS_SIZE)    :: status
+        integer(KIND=MPI_OFFSET_KIND)          :: disp
+        integer                                :: view
+        logical                                :: lg_bub_file, file_exist
+        integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
+        integer                                :: ifile
+        integer                                :: ierr
+        real(wp)                               :: file_time, file_dt
+        integer                                :: file_num_procs, file_tot_part, tot_part
+        integer                                :: i
+        integer, dimension(:), allocatable     :: proc_bubble_counts
+        real(wp), dimension(1:1,1:lag_io_vars) :: lag_io_null
 
         lag_io_null = 0._wp
 
@@ -793,7 +792,7 @@ contains
                    & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_null, ierr)
 
-        allocate (MPI_IO_DATA_lg_bubbles(file_tot_part, 1:lag_io_vars))
+        allocate (MPI_IO_DATA_lg_bubbles(file_tot_part,1:lag_io_vars))
 
         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, lag_io_vars*file_tot_part, mpi_p, status, ierr)
 
@@ -825,7 +824,7 @@ contains
 
             do i = 1, file_tot_part
                 id = int(MPI_IO_DATA_lg_bubbles(i, 1))
-                inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i, 2:21)
+                inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i,2:21)
                 if (id > 0) then
                     write (29, '(100(A))', advance='no') ''
                     if (lag_id_wrt) write (29, '(I6, A)', advance='no') id, ', '
@@ -880,7 +879,7 @@ contains
         real(wp)                                        :: file_time, file_dt
         integer                                         :: file_num_procs, file_tot_part
         integer, dimension(:), allocatable              :: proc_bubble_counts
-        real(wp), dimension(1:1, 1:lag_io_vars)         :: dummy
+        real(wp), dimension(1:1,1:lag_io_vars)          :: dummy
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
         integer, dimension(num_procs)                   :: meshtypes
         real(wp)                                        :: dummy_data
@@ -959,7 +958,7 @@ contains
                 'pressure', 'mv', 'mg', 'betaT', 'betaC']
                 allocate (${VAR}$ (nBub))
             #:endfor
-            allocate (MPI_IO_DATA_lg_bubbles(nBub, 1:lag_io_vars))
+            allocate (MPI_IO_DATA_lg_bubbles(nBub,1:lag_io_vars))
 
             call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
             call MPI_TYPE_COMMIT(view, ierr)
@@ -981,7 +980,7 @@ contains
                 ('vx',8), ('vy',9), ('vz',10), ('radius',11), ('rvel',12), &
                 ('rnot',13), ('rmax',14), ('rmin',15), ('dphidt',16), &
                 ('pressure',17), ('mv',18), ('mg',19), ('betaT',20), ('betaC',21)]
-                ${VAR}$ (:) = MPI_IO_DATA_lg_bubbles(:, ${IDX}$)
+                ${VAR}$ (:) = MPI_IO_DATA_lg_bubbles(:,${IDX}$)
             #:endfor
 
             ! Next, the root processor proceeds to record all of the spatial extents in the formatted database master file. In
@@ -1259,7 +1258,7 @@ contains
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H, qv
         real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: adv
-        integer :: i, j, k, l, s  ! looping indices
+        integer :: i, j, k, l, s  !< looping indices
 
         Egk = 0._wp
         Elp = 0._wp

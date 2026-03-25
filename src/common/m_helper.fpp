@@ -11,6 +11,7 @@ module m_helper
     use m_derived_types
     use m_global_parameters
     use ieee_arithmetic  !< For checking NaN
+
     implicit none
 
     private
@@ -313,7 +314,7 @@ contains
 
         type(ic_model_parameters), intent(in)          :: param
         real(wp), dimension(1:3), optional, intent(in) :: center
-        real(wp), dimension(1:4, 1:4)                  :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
+        real(wp), dimension(1:4,1:4)                   :: sc, rz, rx, ry, tr, t_back, t_to_origin, out_matrix
 
         sc = transpose(reshape([param%scale(1), 0._wp, 0._wp, 0._wp, 0._wp, param%scale(2), 0._wp, 0._wp, 0._wp, 0._wp, &
                        & param%scale(3), 0._wp, 0._wp, 0._wp, 0._wp, 1._wp], shape(sc)))
@@ -349,9 +350,9 @@ contains
     !> Transform a vector by a matrix.
     subroutine s_transform_vec(vec, matrix)
 
-        real(wp), dimension(1:3), intent(inout)   :: vec
-        real(wp), dimension(1:4, 1:4), intent(in) :: matrix
-        real(wp), dimension(1:4)                  :: tmp
+        real(wp), dimension(1:3), intent(inout)  :: vec
+        real(wp), dimension(1:4,1:4), intent(in) :: matrix
+        real(wp), dimension(1:4)                 :: tmp
 
         tmp = matmul(matrix, [vec(1), vec(2), vec(3), 1._wp])
         vec = tmp(1:3)
@@ -361,9 +362,9 @@ contains
     !> Transform a triangle by a matrix, one vertex at a time.
     subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
-        type(t_triangle), intent(inout)           :: triangle
-        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
-        integer                                   :: i
+        type(t_triangle), intent(inout)          :: triangle
+        real(wp), dimension(1:4,1:4), intent(in) :: matrix, matrix_n
+        integer                                  :: i
 
         do i = 1, 3
             call s_transform_vec(triangle%v(i,:), matrix)
@@ -376,9 +377,9 @@ contains
     !> Transform a model by a matrix, one triangle at a time.
     subroutine s_transform_model(model, matrix, matrix_n)
 
-        type(t_model), intent(inout)              :: model
-        real(wp), dimension(1:4, 1:4), intent(in) :: matrix, matrix_n
-        integer                                   :: i
+        type(t_model), intent(inout)             :: model
+        real(wp), dimension(1:4,1:4), intent(in) :: matrix, matrix_n
+        integer                                  :: i
 
         do i = 1, size(model%trs)
             call s_transform_triangle(model%trs(i), matrix, matrix_n)
@@ -505,7 +506,7 @@ contains
     elemental function double_factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18)  ! 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  !< 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 
@@ -517,7 +518,7 @@ contains
     elemental function factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18)  ! 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  !< 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 

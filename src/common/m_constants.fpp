@@ -50,7 +50,7 @@ module m_constants
     real(wp), parameter :: dflt_ic_beta = 1.6_wp    !< Sharpness parameter's default value used in THINC
     real(wp), parameter :: moncon_cutoff = 1e-8_wp  !< Monotonicity constraint's limiter to prevent extremas in THINC
     ! Chemistry
-    real(wp), parameter :: dflt_T_guess = 1200._wp  ! Default guess for temperature (when a previous value is not available)
+    real(wp), parameter :: dflt_T_guess = 1200._wp  !< Default guess for temperature (when a previous value is not available)
 
     ! IBM+STL interpolation constants
     integer, parameter  :: num_ray = 20                        !< Default number of rays traced per cell
@@ -61,7 +61,7 @@ module m_constants
     ! Lagrange bubbles constants
     integer, parameter  :: mapCells = 3      !< Number of cells around the bubble where the smoothening function will have effect
     real(wp), parameter :: R_uni = 8314._wp  !< Universal gas constant - J/kmol/K
-    integer, parameter  :: lag_io_vars = 21  ! Number of variables per particle for MPI_IO
+    integer, parameter  :: lag_io_vars = 21  !< Number of variables per particle for MPI_IO
 
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp   !< Default tolerance for adaptive step size

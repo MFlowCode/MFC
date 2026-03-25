@@ -255,7 +255,7 @@ contains
             inquire (FILE=trim(file_path), EXIST=file_exist)
             if (file_exist) then
                 open (2, FILE=trim(file_path), form='unformatted', ACTION='read', STATUS='old')
-                read (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
+                read (2) q_cons_vf(i)%sf(0:m,0:n,0:p); close (2)
             else
                 call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
             end if
@@ -270,7 +270,7 @@ contains
                         inquire (FILE=trim(file_path), EXIST=file_exist)
                         if (file_exist) then
                             open (2, FILE=trim(file_path), form='unformatted', ACTION='read', STATUS='old')
-                            read (2) pb_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                            read (2) pb_ts(1)%sf(0:m,0:n,0:p,r, i); close (2)
                         else
                             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
                         end if
@@ -282,7 +282,7 @@ contains
                         inquire (FILE=trim(file_path), EXIST=file_exist)
                         if (file_exist) then
                             open (2, FILE=trim(file_path), form='unformatted', ACTION='read', STATUS='old')
-                            read (2) mv_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                            read (2) mv_ts(1)%sf(0:m,0:n,0:p,r, i); close (2)
                         else
                             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
                         end if
@@ -315,7 +315,7 @@ contains
         ! Downsampled data variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer :: m_glb_read, n_glb_read, p_glb_read  ! data size of read
+        integer :: m_glb_read, n_glb_read, p_glb_read  !< data size of read
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -884,7 +884,7 @@ contains
 
             allocate (q_cons_temp(1:sys_size))
             do i = 1, sys_size
-                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
+                allocate (q_cons_temp(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1))
             end do
         end if
 

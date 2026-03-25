@@ -15,3 +15,4 @@ power = false
 assignment = true
 declaration = true
 comma = true
+slice-colon = false

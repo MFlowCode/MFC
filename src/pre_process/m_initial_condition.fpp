@@ -44,19 +44,19 @@ contains
         allocate (q_cons_vf(1:sys_size))
 
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         if (chemistry) then
-            allocate (q_T_sf%sf(0:m, 0:n, 0:p))
+            allocate (q_T_sf%sf(0:m,0:n,0:p))
         end if
 
-        allocate (patch_id_fp(0:m, 0:n, 0:p))
+        allocate (patch_id_fp(0:m,0:n,0:p))
 
         if (qbmm .and. .not. polytropic) then
-            allocate (pb%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
-            allocate (mv%sf(0:m, 0:n, 0:p, 1:nnode, 1:nb))
+            allocate (pb%sf(0:m,0:n,0:p,1:nnode,1:nb))
+            allocate (mv%sf(0:m,0:n,0:p,1:nnode,1:nb))
         end if
 
         do i = 1, sys_size
@@ -64,10 +64,10 @@ contains
             q_prim_vf(i)%sf = -1.e-6_stp  ! real(dflt_real, kind=stp)
         end do
 
-        allocate (bc_type(1:num_dims, 1:2))
+        allocate (bc_type(1:num_dims,1:2))
 
-        allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
-        allocate (bc_type(1, 2)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 1)%sf(0:0,0:n,0:p))
+        allocate (bc_type(1, 2)%sf(0:0,0:n,0:p))
 
         do l = 0, p
             do k = 0, n
@@ -77,8 +77,8 @@ contains
         end do
 
         if (n > 0) then
-            allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
-            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size,0:0,0:p))
+            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size,0:0,0:p))
 
             do l = 0, p
                 do j = -buff_size, m + buff_size
@@ -88,8 +88,8 @@ contains
             end do
 
             if (p > 0) then
-                allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
-                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
 
                 do k = -buff_size, n + buff_size
                     do j = -buff_size, m + buff_size

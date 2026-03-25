@@ -403,13 +403,13 @@ contains
     !> Compute the QBMM right-hand side source terms for bubble moment transport equations
     subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
-        integer, intent(in)                                                                            :: idir
-        type(scalar_field), dimension(sys_size), intent(in)                                            :: q_cons_vf, q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout)                                         :: rhs_vf
-        type(scalar_field), dimension(sys_size), intent(in)                                            :: flux_n_vf
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
+        integer, intent(in)                                                                        :: idir
+        type(scalar_field), dimension(sys_size), intent(in)                                        :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in)                                        :: flux_n_vf
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), &
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), &
              & intent(inout) :: rhs_pb  ! TODO :: I think that this should be stp as well.
 
         integer  :: i, j, k, l, q
@@ -593,9 +593,9 @@ contains
 
         real(wp), intent(in) :: pres, rho, c
         #:if USING_AMD
-            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+            real(wp), dimension(32,0:2,0:2), intent(out) :: coeffs
         #:else
-            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+            real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeffs
         #:endif
 
         integer :: i1, i2
@@ -672,9 +672,9 @@ contains
 
         real(wp), intent(in) :: pres, rho, c
         #:if USING_AMD
-            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+            real(wp), dimension(32,0:2,0:2), intent(out) :: coeffs
         #:else
-            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+            real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeffs
         #:endif
 
         integer :: i1, i2
@@ -737,14 +737,14 @@ contains
     !> Perform moment inversion to recover quadrature weights and abscissas and evaluate bubble source terms
     subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz)
 
-        type(scalar_field), dimension(:), intent(inout)                                                :: q_cons_vf, q_prim_vf
-        type(scalar_field), dimension(:), intent(inout)                                                :: momsp
-        type(scalar_field), dimension(0:, 0:,:), intent(inout)                                         :: moms3d
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout)  :: rhs_pb
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout)  :: rhs_mv
-        type(int_bounds_info), intent(in)                                                              :: ix, iy, iz
+        type(scalar_field), dimension(:), intent(inout)                                            :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(:), intent(inout)                                            :: momsp
+        type(scalar_field), dimension(0:,0:,:), intent(inout)                                      :: moms3d
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout)  :: rhs_pb
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: mv
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout)  :: rhs_mv
+        type(int_bounds_info), intent(in)                                                          :: ix, iy, iz
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(6)    :: moms, msum
@@ -754,9 +754,9 @@ contains
             real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
         #:endif
         #:if USING_AMD
-            real(wp), dimension(32, 0:2, 0:2) :: coeff
+            real(wp), dimension(32,0:2,0:2) :: coeff
         #:else
-            real(wp), dimension(nterms, 0:2, 0:2) :: coeff
+            real(wp), dimension(nterms,0:2,0:2) :: coeff
         #:endif
         real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait
@@ -794,7 +794,7 @@ contains
                                 moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
                             end do
                             moms(1) = 1._wp
-                            call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
+                            call s_chyqmom(moms, wght(:,q), abscX(:,q), abscY(:,q))
 
                             if (polytropic) then
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -837,31 +837,31 @@ contains
                                             case (3)
                                                 if (j == 3) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
-                                                                            & q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, &
-                                                                            & q), momrhs(:, i1, i2, j, q))
+                                                                            & q))*f_quad2D(abscX(:,q), abscY(:,q), wght_pb(:,q), &
+                                                                            & momrhs(:,i1, i2, j, q))
                                                 else
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
-                                                                            & q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), &
-                                                                            & momrhs(:, i1, i2, j, q))
+                                                                            & q))*f_quad2D(abscX(:,q), abscY(:,q), wght(:,q), &
+                                                                            & momrhs(:,i1, i2, j, q))
                                                 end if
                                             case (2)
                                                 if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) &
                                                     & .or. (j >= 10 .and. j <= 11) .or. (j == 26)) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
-                                                                            & q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, &
-                                                                            & q), momrhs(:, i1, i2, j, q))
+                                                                            & q))*f_quad2D(abscX(:,q), abscY(:,q), wght_pb(:,q), &
+                                                                            & momrhs(:,i1, i2, j, q))
                                                 else if ((j >= 27 .and. j <= 29) .and. (.not. polytropic)) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
-                                                                            & q))*f_quad2D(abscX(:, q), abscY(:, q), wght_mv(:, &
-                                                                            & q), momrhs(:, i1, i2, j, q))
+                                                                            & q))*f_quad2D(abscX(:,q), abscY(:,q), wght_mv(:,q), &
+                                                                            & momrhs(:,i1, i2, j, q))
                                                 else if ((j >= 30 .and. j <= 32) .and. (.not. polytropic)) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
-                                                                            & q))*f_quad2D(abscX(:, q), abscY(:, q), wght_ht(:, &
-                                                                            & q), momrhs(:, i1, i2, j, q))
+                                                                            & q))*f_quad2D(abscX(:,q), abscY(:,q), wght_ht(:,q), &
+                                                                            & momrhs(:,i1, i2, j, q))
                                                 else
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
-                                                                            & q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), &
-                                                                            & momrhs(:, i1, i2, j, q))
+                                                                            & q))*f_quad2D(abscX(:,q), abscY(:,q), wght(:,q), &
+                                                                            & momrhs(:,i1, i2, j, q))
                                                 end if
                                             end select
                                         end do
@@ -936,9 +936,9 @@ contains
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', cray_inline=True)
             real(wp), intent(in) :: pres, rho, c
             #:if USING_AMD
-                real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
+                real(wp), dimension(32,0:2,0:2), intent(out) :: coeff
             #:else
-                real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+                real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeff
             #:endif
             logical, intent(in) :: polytropic
             if (polytropic) then
@@ -958,11 +958,11 @@ contains
             real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
 
             ! Local variables
-            real(wp), dimension(0:2, 0:2) :: moms
-            real(wp), dimension(3)        :: M1, M3
-            real(wp), dimension(2)        :: myrho, myrho3, up, up3, Vf
-            real(wp)                      :: bu, bv, d20, d11, d_02, c20, c11, c02
-            real(wp)                      :: mu2, vp21, vp22, rho21, rho22
+            real(wp), dimension(0:2,0:2) :: moms
+            real(wp), dimension(3)       :: M1, M3
+            real(wp), dimension(2)       :: myrho, myrho3, up, up3, Vf
+            real(wp)                     :: bu, bv, d20, d11, d_02, c20, c11, c02
+            real(wp)                     :: mu2, vp21, vp22, rho21, rho22
 
             ! Assign moments to 2D array for clarity
             moms(0, 0) = momin(1)

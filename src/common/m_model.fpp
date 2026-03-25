@@ -252,7 +252,7 @@ contains
 
         rewind (iunit)
 
-        allocate (vertices(nVertices, 1:3))
+        allocate (vertices(nVertices,1:3))
         allocate (model%trs(model%ntrs))
 
         i = 1
@@ -493,7 +493,7 @@ contains
         real(wp)                             :: fraction
         type(t_ray)                          :: ray
         integer                              :: i, j, k, nInOrOut, nHits
-        real(wp), dimension(1:spc, 1:3)      :: ray_origins, ray_dirs
+        real(wp), dimension(1:spc,1:3)       :: ray_origins, ray_dirs
 
         rand_seed = int(point(1)*73856093._wp) + int(point(2)*19349663._wp) + int(point(3)*83492791._wp)
         if (rand_seed == 0) rand_seed = 1
@@ -569,9 +569,9 @@ contains
         else
             ! 3D winding number: sum solid angles via Van Oosterom-Strackee formula.
             do q = 1, ntrs
-                r1 = gpu_trs_v(1,:, q, pid) - point
-                r2 = gpu_trs_v(2,:, q, pid) - point
-                r3 = gpu_trs_v(3,:, q, pid) - point
+                r1 = gpu_trs_v(1,:,q, pid) - point
+                r2 = gpu_trs_v(2,:,q, pid) - point
+                r3 = gpu_trs_v(3,:,q, pid) - point
 
                 r1_mag = sqrt(dot_product(r1, r1))
                 r2_mag = sqrt(dot_product(r2, r2))
@@ -644,9 +644,9 @@ contains
         integer, intent(out) :: boundary_vertex_count, boundary_edge_count  !< Output boundary vertex/edge count
         integer :: i, j                                                     !< Model index iterator
         integer :: edge_count, edge_index, store_index                      !< Boundary edge index iterator
-        real(wp), dimension(1:2, 1:2) :: edge                               !< Edge end points buffer
+        real(wp), dimension(1:2,1:2) :: edge                                !< Edge end points buffer
         real(wp), dimension(1:2) :: boundary_edge                           !< Boundary edge end points buffer
-        real(wp), dimension(1:(3*model%ntrs), 1:2, 1:2) :: temp_boundary_v  !< Temporary boundary vertex buffer
+        real(wp), dimension(1:(3*model%ntrs),1:2,1:2) :: temp_boundary_v    !< Temporary boundary vertex buffer
         integer, dimension(1:(3*model%ntrs)) :: edge_occurrence             !< The manifoldness of the edges
         real(wp) :: edgetan, initial, v_norm, xnormal, ynormal              !< The manifoldness of the edges
         ! Total number of edges in 2D STL
@@ -660,18 +660,18 @@ contains
         ! Collect all edges of all triangles and store them
         do i = 1, model%ntrs
             ! First edge (v1, v2)
-            edge(1, 1:2) = model%trs(i)%v(1, 1:2)
-            edge(2, 1:2) = model%trs(i)%v(2, 1:2)
+            edge(1,1:2) = model%trs(i)%v(1,1:2)
+            edge(2,1:2) = model%trs(i)%v(2,1:2)
             call s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
             ! Second edge (v2, v3)
-            edge(1, 1:2) = model%trs(i)%v(2, 1:2)
-            edge(2, 1:2) = model%trs(i)%v(3, 1:2)
+            edge(1,1:2) = model%trs(i)%v(2,1:2)
+            edge(2,1:2) = model%trs(i)%v(3,1:2)
             call s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
             ! Third edge (v3, v1)
-            edge(1, 1:2) = model%trs(i)%v(3, 1:2)
-            edge(2, 1:2) = model%trs(i)%v(1, 1:2)
+            edge(1,1:2) = model%trs(i)%v(3,1:2)
+            edge(2,1:2) = model%trs(i)%v(1,1:2)
             call s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
         end do
 
@@ -709,15 +709,15 @@ contains
         end do
 
         ! Allocate the boundary_v array based on the number of boundary edges
-        allocate (boundary_v(boundary_edge_count, 1:3, 1:2))
+        allocate (boundary_v(boundary_edge_count,1:3,1:2))
 
         ! Store boundary vertices
         store_index = 0
         do i = 1, edge_count
             if (edge_occurrence(i) == 0) then
                 store_index = store_index + 1
-                boundary_v(store_index, 1, 1:2) = temp_boundary_v(i, 1, 1:2)
-                boundary_v(store_index, 2, 1:2) = temp_boundary_v(i, 2, 1:2)
+                boundary_v(store_index, 1,1:2) = temp_boundary_v(i, 1,1:2)
+                boundary_v(store_index, 2,1:2) = temp_boundary_v(i, 2,1:2)
             end if
         end do
 
@@ -751,15 +751,15 @@ contains
     !> Append the edge end vertices to a temporary buffer.
     subroutine s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
-        integer, intent(inout)                                     :: edge_index       !< Edge index iterator
-        integer, intent(inout)                                     :: edge_count       !< Total number of edges
-        real(wp), intent(in), dimension(1:2, 1:2)                  :: edge             !< Edges end points to be registered
-        real(wp), dimension(1:edge_count, 1:2, 1:2), intent(inout) :: temp_boundary_v  !< Temporary edge end vertex buffer
+        integer, intent(inout)                                   :: edge_index       !< Edge index iterator
+        integer, intent(inout)                                   :: edge_count       !< Total number of edges
+        real(wp), intent(in), dimension(1:2,1:2)                 :: edge             !< Edges end points to be registered
+        real(wp), dimension(1:edge_count,1:2,1:2), intent(inout) :: temp_boundary_v  !< Temporary edge end vertex buffer
         ! Increment edge index and store the edge
 
         edge_index = edge_index + 1
-        temp_boundary_v(edge_index, 1, 1:2) = edge(1, 1:2)
-        temp_boundary_v(edge_index, 2, 1:2) = edge(2, 1:2)
+        temp_boundary_v(edge_index, 1,1:2) = edge(1,1:2)
+        temp_boundary_v(edge_index, 2,1:2) = edge(2,1:2)
 
     end subroutine s_register_edge
 
@@ -783,19 +783,19 @@ contains
         real(wp)                              :: u, v_bary, w
         real(wp)                              :: l00, l01, l11, l20, l21
         real(wp)                              :: edge(1:3), pe(1:3)
-        real(wp)                              :: verts(1:3, 1:3)
+        real(wp)                              :: verts(1:3,1:3)
 
         dist_min = initial_distance_buffer
         normals = 0._wp
 
         do i = 1, ntrs
             ! Triangle vertices
-            v1(:) = gpu_trs_v(1,:, i, pid)
-            v2(:) = gpu_trs_v(2,:, i, pid)
-            v3(:) = gpu_trs_v(3,:, i, pid)
+            v1(:) = gpu_trs_v(1,:,i, pid)
+            v2(:) = gpu_trs_v(2,:,i, pid)
+            v3(:) = gpu_trs_v(3,:,i, pid)
 
             ! Triangle normal
-            n(:) = gpu_trs_n(:, i, pid)
+            n(:) = gpu_trs_n(:,i, pid)
 
             ! Project point onto triangle plane
             pv(:) = point(:) - v1(:)
@@ -837,19 +837,19 @@ contains
                 end if
             else
                 ! Projection outside triangle: check edges and vertices
-                verts(:, 1) = v1(:)
-                verts(:, 2) = v2(:)
-                verts(:, 3) = v3(:)
+                verts(:,1) = v1(:)
+                verts(:,2) = v2(:)
+                verts(:,3) = v3(:)
 
                 ! Check three edges
                 do j = 1, 3
-                    edge(:) = verts(:, mod(j, 3) + 1) - verts(:, j)
-                    pe(:) = point(:) - verts(:, j)
+                    edge(:) = verts(:,mod(j, 3) + 1) - verts(:,j)
+                    pe(:) = point(:) - verts(:,j)
 
                     t = dot_product(pe, edge)/max(dot_product(edge, edge), 1.e-30_wp)
 
                     if (t >= 0._wp .and. t <= 1._wp) then
-                        proj(:) = verts(:, j) + t*edge(:)
+                        proj(:) = verts(:,j) + t*edge(:)
                         dist_e = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2 + (point(3) - proj(3))**2)
 
                         if (dist_e < dist_min) then
@@ -868,7 +868,7 @@ contains
 
                         if (dist_v < dist_min) then
                             dist_min = dist_v
-                            norm_vec(:) = verts(:, j) - point(:)
+                            norm_vec(:) = verts(:,j) - point(:)
                             norm_mag = sqrt(dot_product(norm_vec, norm_vec))
                             if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
                             normals(:) = norm_vec(:)
@@ -879,7 +879,7 @@ contains
 
                         if (dist_v < dist_min) then
                             dist_min = dist_v
-                            norm_vec(:) = verts(:, mod(j, 3) + 1) - point(:)
+                            norm_vec(:) = verts(:,mod(j, 3) + 1) - point(:)
                             norm_mag = sqrt(dot_product(norm_vec, norm_vec))
                             if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
                             normals(:) = norm_vec(:)
@@ -978,13 +978,13 @@ contains
         type(ic_model_parameters)               :: params
         real(wp)                                :: eta
         real(wp), dimension(1:3)                :: point, model_center
-        real(wp)                                :: grid_mm(1:3, 1:2)
-        real(wp), dimension(1:4, 1:4)           :: transform, transform_n
+        real(wp)                                :: grid_mm(1:3,1:2)
+        real(wp), dimension(1:4,1:4)            :: transform, transform_n
 
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
-        allocate (stl_bounding_boxes(num_ibs, 1:3, 1:3))
+        allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
 
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
@@ -1046,14 +1046,14 @@ contains
                         grid_mm(3,:) = (/0._wp, 0._wp/)
                     end if
 
-                    write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:, 1)
-                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:, 1) + grid_mm(:, 2))/2._wp
-                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
+                    write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
+                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2._wp
+                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
                 end if
 
-                stl_bounding_boxes(patch_id, 1, 1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
-                stl_bounding_boxes(patch_id, 2, 1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
-                stl_bounding_boxes(patch_id, 3, 1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
+                stl_bounding_boxes(patch_id, 1,1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
+                stl_bounding_boxes(patch_id, 2,1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
+                stl_bounding_boxes(patch_id, 3,1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
 
                 models(patch_id)%model = model
                 if (p == 0) then
@@ -1105,14 +1105,14 @@ contains
                 do pid = 1, num_ibs
                     if (allocated(models(pid)%model)) then
                         gpu_ntrs(pid) = models(pid)%ntrs
-                        gpu_trs_v(:,:, 1:models(pid)%ntrs, pid) = models(pid)%trs_v
-                        gpu_trs_n(:, 1:models(pid)%ntrs, pid) = models(pid)%trs_n
+                        gpu_trs_v(:,:,1:models(pid)%ntrs,pid) = models(pid)%trs_v
+                        gpu_trs_n(:,1:models(pid)%ntrs,pid) = models(pid)%trs_n
                         gpu_boundary_edge_count(pid) = models(pid)%boundary_edge_count
                         gpu_total_vertices(pid) = models(pid)%total_vertices
                     end if
                     if (allocated(models(pid)%boundary_v) .and. p == 0) then
-                        gpu_boundary_v(1:size(models(pid)%boundary_v, 1), 1:size(models(pid)%boundary_v, 2), &
-                                       & 1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v
+                        gpu_boundary_v(1:size(models(pid)%boundary_v, 1),1:size(models(pid)%boundary_v, 2), &
+                                       & 1:size(models(pid)%boundary_v, 3),pid) = models(pid)%boundary_v
                     end if
                 end do
 
@@ -1133,12 +1133,12 @@ contains
         integer                            :: i
 
         ma%ntrs = ma%model%ntrs
-        allocate (ma%trs_v(1:3, 1:3, 1:ma%ntrs))
-        allocate (ma%trs_n(1:3, 1:ma%ntrs))
+        allocate (ma%trs_v(1:3,1:3,1:ma%ntrs))
+        allocate (ma%trs_n(1:3,1:ma%ntrs))
 
         do i = 1, ma%ntrs
-            ma%trs_v(:,:, i) = ma%model%trs(i)%v(:,:)
-            ma%trs_n(:, i) = ma%model%trs(i)%n(:)
+            ma%trs_v(:,:,i) = ma%model%trs(i)%v(:,:)
+            ma%trs_n(:,i) = ma%model%trs(i)%n(:)
         end do
 
     end subroutine s_pack_model_for_gpu

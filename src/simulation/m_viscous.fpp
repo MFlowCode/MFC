@@ -481,8 +481,8 @@ contains
         & qL_prim, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, &
             & q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, &
-             & qR_prim_rsx_vf, qL_prim_rsy_vf, qR_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
+             & qL_prim_rsy_vf, qR_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsz_vf
 
         type(vector_field), dimension(num_dims), intent(inout)   :: qL_prim, qR_prim
         type(vector_field), intent(in)                           :: q_prim_qp
@@ -850,14 +850,13 @@ contains
 
         & vR_prim_vf, ix, iy, iz)
 
-        type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                  :: v_vf
-        type(scalar_field), dimension(iv%beg:iv%end), intent(inout)                               :: vL_prim_vf, vR_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, &
-             & vR_y, vR_z
-        integer, intent(in)               :: norm_dir
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        integer                           :: recon_dir  !< Coordinate direction of the WENO reconstruction
-        integer                           :: i, j, k, l
+        integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
+        integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
             if (recon_type == ${TYPE}$ .or. dummy) then
@@ -880,16 +879,16 @@ contains
                 $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
                 if (n > 0) then
                     if (p > 0) then
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:, iv%beg:iv%end), vL_z(:,:, &
-                                           & :, iv%beg:iv%end), vR_x(:,:,:, iv%beg:iv%end), vR_y(:,:,:, iv%beg:iv%end), vR_z(:,:, &
-                                           & :, iv%beg:iv%end), recon_dir, is1_viscous, is2_viscous, is3_viscous)
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
+                                           & iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:, &
+                                           & iv%beg:iv%end), recon_dir, is1_viscous, is2_viscous, is3_viscous)
                     else
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:, iv%beg:iv%end), vL_z(:,:, &
-                                           & :,:), vR_x(:,:,:, iv%beg:iv%end), vR_y(:,:,:, iv%beg:iv%end), vR_z(:,:,:,:), &
-                                           & recon_dir, is1_viscous, is2_viscous, is3_viscous)
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
+                                           & :), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:,:), recon_dir, &
+                                           & is1_viscous, is2_viscous, is3_viscous)
                     end if
                 else
-                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
+                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
                                        & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1_viscous, is2_viscous, &
                                        & is3_viscous)
                 end if
@@ -947,8 +946,8 @@ contains
     subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir, vL_prim_vf, &
 
         & vR_prim_vf, ix, iy, iz)
-        type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                       :: v_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, &
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                    :: v_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, &
              & vR_y, vR_z
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
         type(int_bounds_info), intent(in)                           :: ix, iy, iz
@@ -976,16 +975,16 @@ contains
                 $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
                 if (n > 0) then
                     if (p > 0) then
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:, iv%beg:iv%end), vL_z(:,:, &
-                                           & :, iv%beg:iv%end), vR_x(:,:,:, iv%beg:iv%end), vR_y(:,:,:, iv%beg:iv%end), vR_z(:,:, &
-                                           & :, iv%beg:iv%end), recon_dir, is1_viscous, is2_viscous, is3_viscous)
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
+                                           & iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:, &
+                                           & iv%beg:iv%end), recon_dir, is1_viscous, is2_viscous, is3_viscous)
                     else
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:, iv%beg:iv%end), vL_z(:,:, &
-                                           & :,:), vR_x(:,:,:, iv%beg:iv%end), vR_y(:,:,:, iv%beg:iv%end), vR_z(:,:,:,:), &
-                                           & recon_dir, is1_viscous, is2_viscous, is3_viscous)
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
+                                           & :), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:,:), recon_dir, &
+                                           & is1_viscous, is2_viscous, is3_viscous)
                     end if
                 else
-                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
+                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
                                        & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1_viscous, is2_viscous, &
                                        & is3_viscous)
                 end if
@@ -1294,14 +1293,14 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(1:3, 1:3), intent(inout)          :: viscous_stress_tensor
+        real(wp), dimension(1:3,1:3), intent(inout)           :: viscous_stress_tensor
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
         real(wp), intent(in)                                  :: dynamic_viscosity
         integer, intent(in)                                   :: i, j, k
-        real(wp), dimension(1:3, 1:3)                         :: velocity_gradient_tensor
+        real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
         real(wp), dimension(1:3)                              :: dx
         real(wp)                                              :: divergence
-        integer                                               :: l, q  ! iterators
+        integer                                               :: l, q  !< iterators
 
         ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
         viscous_stress_tensor = 0._wp

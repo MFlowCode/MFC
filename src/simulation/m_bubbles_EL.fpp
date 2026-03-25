@@ -245,19 +245,19 @@ contains
         bub_dphidt(bub_id) = 0._wp
         intfc_rad(bub_id, 1) = inputBubble(7)
         intfc_vel(bub_id, 1) = inputBubble(8)
-        mtn_pos(bub_id, 1:3, 1) = inputBubble(1:3)
-        mtn_posPrev(bub_id, 1:3, 1) = mtn_pos(bub_id, 1:3, 1)
-        mtn_vel(bub_id, 1:3, 1) = inputBubble(4:6)
+        mtn_pos(bub_id,1:3,1) = inputBubble(1:3)
+        mtn_posPrev(bub_id,1:3,1) = mtn_pos(bub_id,1:3,1)
+        mtn_vel(bub_id,1:3,1) = inputBubble(4:6)
 
         if (cyl_coord .and. p == 0) then
             mtn_pos(bub_id, 2, 1) = sqrt(mtn_pos(bub_id, 2, 1)**2._wp + mtn_pos(bub_id, 3, 1)**2._wp)
             ! Storing azimuthal angle (-Pi to Pi)) into the third coordinate variable
             mtn_pos(bub_id, 3, 1) = atan2(inputBubble(3), inputBubble(2))
-            mtn_posPrev(bub_id, 1:3, 1) = mtn_pos(bub_id, 1:3, 1)
+            mtn_posPrev(bub_id,1:3,1) = mtn_pos(bub_id,1:3,1)
         end if
 
         cell = -buff_size
-        call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
+        call s_locate_cell(mtn_pos(bub_id,1:3,1), cell, mtn_s(bub_id,1:3,1))
 
         ! Check if the bubble is located in the ghost cell of a symmetric, or wall boundary
         if ((any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
@@ -338,17 +338,17 @@ contains
         integer                              :: file_num_procs, file_tot_part, tot_part
 
 #ifdef MFC_MPI
-        real(wp), dimension(20)                 :: inputvals
-        integer, dimension(MPI_STATUS_SIZE)     :: status
-        integer(kind=MPI_OFFSET_KIND)           :: disp
-        integer                                 :: view
-        integer, dimension(3)                   :: cell
-        logical                                 :: indomain, particle_file, file_exist
-        integer, dimension(2)                   :: gsizes, lsizes, start_idx_part
-        integer                                 :: ifile, ierr, tot_data, id
-        integer                                 :: i
-        integer, dimension(:), allocatable      :: proc_bubble_counts
-        real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
+        real(wp), dimension(20)                :: inputvals
+        integer, dimension(MPI_STATUS_SIZE)    :: status
+        integer(kind=MPI_OFFSET_KIND)          :: disp
+        integer                                :: view
+        integer, dimension(3)                  :: cell
+        logical                                :: indomain, particle_file, file_exist
+        integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
+        integer                                :: ifile, ierr, tot_data, id
+        integer                                :: i
+        integer, dimension(:), allocatable     :: proc_bubble_counts
+        real(wp), dimension(1:1,1:lag_io_vars) :: dummy
 
         dummy = 0._wp
 
@@ -414,7 +414,7 @@ contains
         gsizes(2) = lag_io_vars
 
         if (bub_id > 0) then
-            allocate (MPI_IO_DATA_lag_bubbles(bub_id, 1:lag_io_vars))
+            allocate (MPI_IO_DATA_lag_bubbles(bub_id,1:lag_io_vars))
 
             call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
             call MPI_TYPE_COMMIT(view, ierr)
@@ -435,9 +435,9 @@ contains
 
             do i = 1, bub_id
                 lag_id(i, 1) = int(MPI_IO_DATA_lag_bubbles(i, 1))
-                mtn_pos(i, 1:3, 1) = MPI_IO_DATA_lag_bubbles(i, 2:4)
-                mtn_posPrev(i, 1:3, 1) = MPI_IO_DATA_lag_bubbles(i, 5:7)
-                mtn_vel(i, 1:3, 1) = MPI_IO_DATA_lag_bubbles(i, 8:10)
+                mtn_pos(i,1:3,1) = MPI_IO_DATA_lag_bubbles(i,2:4)
+                mtn_posPrev(i,1:3,1) = MPI_IO_DATA_lag_bubbles(i,5:7)
+                mtn_vel(i,1:3,1) = MPI_IO_DATA_lag_bubbles(i,8:10)
                 intfc_rad(i, 1) = MPI_IO_DATA_lag_bubbles(i, 11)
                 intfc_vel(i, 1) = MPI_IO_DATA_lag_bubbles(i, 12)
                 bub_R0(i) = MPI_IO_DATA_lag_bubbles(i, 13)
@@ -450,7 +450,7 @@ contains
                 gas_betaT(i) = MPI_IO_DATA_lag_bubbles(i, 20)
                 gas_betaC(i) = MPI_IO_DATA_lag_bubbles(i, 21)
                 cell = -buff_size
-                call s_locate_cell(mtn_pos(i, 1:3, 1), cell, mtn_s(i, 1:3, 1))
+                call s_locate_cell(mtn_pos(i,1:3,1), cell, mtn_s(i,1:3,1))
             end do
 
             deallocate (MPI_IO_DATA_lag_bubbles)
@@ -782,7 +782,7 @@ contains
         integer                                             :: smearGrid, smearGridz
         logical                                             :: celloutside
 
-        scoord = mtn_s(bub_id, 1:3, 2)
+        scoord = mtn_s(bub_id,1:3,2)
         f_pinfl = 0._wp
 
         !> Find current bubble cell
@@ -978,8 +978,8 @@ contains
                 ! u{1} = u{n} +  dt * RHS{n}
                 intfc_rad(k, 1) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                 intfc_vel(k, 1) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
+                mtn_pos(k,1:3,1) = mtn_pos(k,1:3,1) + dt*mtn_dposdt(k,1:3,1)
+                mtn_vel(k,1:3,1) = mtn_vel(k,1:3,1) + dt*mtn_dveldt(k,1:3,1)
                 gas_p(k, 1) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
             end do
@@ -1000,8 +1000,8 @@ contains
                     ! u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                    mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                    mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
+                    mtn_pos(k,1:3,2) = mtn_pos(k,1:3,1) + dt*mtn_dposdt(k,1:3,1)
+                    mtn_vel(k,1:3,2) = mtn_vel(k,1:3,1) + dt*mtn_dveldt(k,1:3,1)
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
@@ -1012,8 +1012,8 @@ contains
                     ! u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                     intfc_rad(k, 1) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2._wp
                     intfc_vel(k, 1) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/2._wp
-                    mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/2._wp
-                    mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2._wp
+                    mtn_pos(k,1:3,1) = mtn_pos(k,1:3,1) + dt*(mtn_dposdt(k,1:3,1) + mtn_dposdt(k,1:3,2))/2._wp
+                    mtn_vel(k,1:3,1) = mtn_vel(k,1:3,1) + dt*(mtn_dveldt(k,1:3,1) + mtn_dveldt(k,1:3,2))/2._wp
                     gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                 end do
@@ -1035,8 +1035,8 @@ contains
                     ! u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                    mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                    mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
+                    mtn_pos(k,1:3,2) = mtn_pos(k,1:3,1) + dt*mtn_dposdt(k,1:3,1)
+                    mtn_vel(k,1:3,2) = mtn_vel(k,1:3,1) + dt*mtn_dveldt(k,1:3,1)
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
@@ -1047,8 +1047,8 @@ contains
                     ! u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4._wp
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/4._wp
-                    mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/4._wp
-                    mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/4._wp
+                    mtn_pos(k,1:3,2) = mtn_pos(k,1:3,1) + dt*(mtn_dposdt(k,1:3,1) + mtn_dposdt(k,1:3,2))/4._wp
+                    mtn_vel(k,1:3,2) = mtn_vel(k,1:3,1) + dt*(mtn_dveldt(k,1:3,1) + mtn_dveldt(k,1:3,2))/4._wp
                     gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
@@ -1061,10 +1061,10 @@ contains
                               & 2)/4._wp + intfc_draddt(k, 3))
                     intfc_vel(k, 1) = intfc_vel(k, 1) + (2._wp/3._wp)*dt*(intfc_dveldt(k, 1)/4._wp + intfc_dveldt(k, &
                               & 2)/4._wp + intfc_dveldt(k, 3))
-                    mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dposdt(k, 1:3, 1)/4._wp + mtn_dposdt(k, 1:3, &
-                            & 2)/4._wp + mtn_dposdt(k, 1:3, 3))
-                    mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dveldt(k, 1:3, 1)/4._wp + mtn_dveldt(k, 1:3, &
-                            & 2)/4._wp + mtn_dveldt(k, 1:3, 3))
+                    mtn_pos(k,1:3,1) = mtn_pos(k,1:3,1) + (2._wp/3._wp)*dt*(mtn_dposdt(k,1:3,1)/4._wp + mtn_dposdt(k,1:3, &
+                            & 2)/4._wp + mtn_dposdt(k,1:3,3))
+                    mtn_vel(k,1:3,1) = mtn_vel(k,1:3,1) + (2._wp/3._wp)*dt*(mtn_dveldt(k,1:3,1)/4._wp + mtn_dveldt(k,1:3, &
+                            & 2)/4._wp + mtn_dveldt(k,1:3,3))
                     gas_p(k, 1) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                 end do
@@ -1143,10 +1143,10 @@ contains
             gas_mv(k, 2) = gas_mv(k, 1)
             intfc_rad(k, 2) = intfc_rad(k, 1)
             intfc_vel(k, 2) = intfc_vel(k, 1)
-            mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
-            mtn_posPrev(k, 1:3, 2) = mtn_posPrev(k, 1:3, 1)
-            mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1)
-            mtn_s(k, 1:3, 2) = mtn_s(k, 1:3, 1)
+            mtn_pos(k,1:3,2) = mtn_pos(k,1:3,1)
+            mtn_posPrev(k,1:3,2) = mtn_posPrev(k,1:3,1)
+            mtn_vel(k,1:3,2) = mtn_vel(k,1:3,1)
+            mtn_s(k,1:3,2) = mtn_s(k,1:3,1)
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -1223,9 +1223,9 @@ contains
     !> Compute the gradient of a scalar field using second-order central differences on a non-uniform grid
     subroutine s_gradient_dir(q, dq, dir)
 
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: q, dq
-        integer, intent(in)                                                                    :: dir
-        integer                                                                                :: i, j, k
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout) :: q, dq
+        integer, intent(in)                                                                  :: dir
+        integer                                                                              :: i, j, k
 
         if (dir == 1) then
             ! Gradient in x dir.
@@ -1388,20 +1388,20 @@ contains
 
 #ifdef MFC_MPI
         ! For Parallel I/O
-        integer                                 :: ifile, ierr
-        integer, dimension(MPI_STATUS_SIZE)     :: status
-        integer(KIND=MPI_OFFSET_KIND)           :: disp
-        integer                                 :: view
-        integer, dimension(2)                   :: gsizes, lsizes, start_idx_part
-        integer, allocatable                    :: proc_bubble_counts(:)
-        real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
+        integer                                :: ifile, ierr
+        integer, dimension(MPI_STATUS_SIZE)    :: status
+        integer(KIND=MPI_OFFSET_KIND)          :: disp
+        integer                                :: view
+        integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
+        integer, allocatable                   :: proc_bubble_counts(:)
+        real(wp), dimension(1:1,1:lag_io_vars) :: dummy
 
         dummy = 0._wp
 
         bub_id = 0._wp
         if (nBubs /= 0) then
             do k = 1, nBubs
-                if (particle_in_domain_physical(mtn_pos(k, 1:3, 1))) then
+                if (particle_in_domain_physical(mtn_pos(k,1:3,1))) then
                     bub_id = bub_id + 1
                 end if
             end do
@@ -1456,15 +1456,15 @@ contains
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
         if (bub_id > 0) then
-            allocate (MPI_IO_DATA_lag_bubbles(max(1, bub_id), 1:lag_io_vars))
+            allocate (MPI_IO_DATA_lag_bubbles(max(1, bub_id),1:lag_io_vars))
 
             i = 1
             do k = 1, nBubs
-                if (particle_in_domain_physical(mtn_pos(k, 1:3, 1))) then
+                if (particle_in_domain_physical(mtn_pos(k,1:3,1))) then
                     MPI_IO_DATA_lag_bubbles(i, 1) = real(lag_id(k, 1))
-                    MPI_IO_DATA_lag_bubbles(i, 2:4) = mtn_pos(k, 1:3, 1)
-                    MPI_IO_DATA_lag_bubbles(i, 5:7) = mtn_posPrev(k, 1:3, 1)
-                    MPI_IO_DATA_lag_bubbles(i, 8:10) = mtn_vel(k, 1:3, 1)
+                    MPI_IO_DATA_lag_bubbles(i,2:4) = mtn_pos(k,1:3,1)
+                    MPI_IO_DATA_lag_bubbles(i,5:7) = mtn_posPrev(k,1:3,1)
+                    MPI_IO_DATA_lag_bubbles(i,8:10) = mtn_vel(k,1:3,1)
                     MPI_IO_DATA_lag_bubbles(i, 11) = intfc_rad(k, 1)
                     MPI_IO_DATA_lag_bubbles(i, 12) = intfc_vel(k, 1)
                     MPI_IO_DATA_lag_bubbles(i, 13) = bub_R0(k)
@@ -1585,18 +1585,18 @@ contains
             gas_betaT(i) = gas_betaT(i + 1)
             gas_betaC(i) = gas_betaC(i + 1)
             bub_dphidt(i) = bub_dphidt(i + 1)
-            gas_p(i, 1:2) = gas_p(i + 1, 1:2)
-            gas_mv(i, 1:2) = gas_mv(i + 1, 1:2)
-            intfc_rad(i, 1:2) = intfc_rad(i + 1, 1:2)
-            intfc_vel(i, 1:2) = intfc_vel(i + 1, 1:2)
-            mtn_pos(i, 1:3, 1:2) = mtn_pos(i + 1, 1:3, 1:2)
-            mtn_posPrev(i, 1:3, 1:2) = mtn_posPrev(i + 1, 1:3, 1:2)
-            mtn_vel(i, 1:3, 1:2) = mtn_vel(i + 1, 1:3, 1:2)
-            mtn_s(i, 1:3, 1:2) = mtn_s(i + 1, 1:3, 1:2)
-            intfc_draddt(i, 1:lag_num_ts) = intfc_draddt(i + 1, 1:lag_num_ts)
-            intfc_dveldt(i, 1:lag_num_ts) = intfc_dveldt(i + 1, 1:lag_num_ts)
-            gas_dpdt(i, 1:lag_num_ts) = gas_dpdt(i + 1, 1:lag_num_ts)
-            gas_dmvdt(i, 1:lag_num_ts) = gas_dmvdt(i + 1, 1:lag_num_ts)
+            gas_p(i,1:2) = gas_p(i + 1,1:2)
+            gas_mv(i,1:2) = gas_mv(i + 1,1:2)
+            intfc_rad(i,1:2) = intfc_rad(i + 1,1:2)
+            intfc_vel(i,1:2) = intfc_vel(i + 1,1:2)
+            mtn_pos(i,1:3,1:2) = mtn_pos(i + 1,1:3,1:2)
+            mtn_posPrev(i,1:3,1:2) = mtn_posPrev(i + 1,1:3,1:2)
+            mtn_vel(i,1:3,1:2) = mtn_vel(i + 1,1:3,1:2)
+            mtn_s(i,1:3,1:2) = mtn_s(i + 1,1:3,1:2)
+            intfc_draddt(i,1:lag_num_ts) = intfc_draddt(i + 1,1:lag_num_ts)
+            intfc_dveldt(i,1:lag_num_ts) = intfc_dveldt(i + 1,1:lag_num_ts)
+            gas_dpdt(i,1:lag_num_ts) = gas_dpdt(i + 1,1:lag_num_ts)
+            gas_dmvdt(i,1:lag_num_ts) = gas_dmvdt(i + 1,1:lag_num_ts)
         end do
 
         nBubs = nBubs - 1

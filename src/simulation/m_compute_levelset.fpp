@@ -13,6 +13,7 @@ module m_compute_levelset
     use m_global_parameters
     use m_mpi_proxy
     use m_helper_basic
+
     implicit none
 
     private; public :: s_apply_levelset
@@ -113,7 +114,7 @@ contains
         real(wp), dimension(3)           :: dist_vec
         real(wp), dimension(1:3)         :: xy_local, offset      !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)         :: center
-        real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         integer                          :: i, j, k, ib_patch_id  !< Loop index variables
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -192,7 +193,7 @@ contains
         real(wp)                         :: lz, z_max, z_min
         real(wp), dimension(3)           :: dist_vec
         real(wp), dimension(1:3)         :: xyz_local, center, offset, normal  !< x, y, z coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         real(wp)                         :: length_z
         integer                          :: i, j, k, l, ib_patch_id            !< Loop index variables
         ib_patch_id = gp%ib_patch_id
@@ -291,7 +292,7 @@ contains
         real(wp)                         :: length_x, length_y
         real(wp), dimension(1:3)         :: xy_local, dist_vec  !< x and y coordinates in local IB frame
         real(wp), dimension(2)           :: center              !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         integer                          :: i, j, k             !< Loop index variables
         integer                          :: idx                 !< Shortest path direction indicator
         integer                          :: ib_patch_id         !< patch ID
@@ -353,12 +354,12 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-        real(wp)                         :: ellipse_coeffs(2)  ! a and b in the ellipse equation
-        real(wp)                         :: quadratic_coeffs(3)  ! A, B, C in the quadratic equation to compute levelset
+        real(wp)                         :: ellipse_coeffs(2)        !< a and b in the ellipse equation
+        real(wp)                         :: quadratic_coeffs(3)      !< A, B, C in the quadratic equation to compute levelset
         real(wp)                         :: length_x, length_y
         real(wp), dimension(1:3)         :: xy_local, normal_vector  !< x and y coordinates in local IB frame
         real(wp), dimension(2)           :: center                   !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         integer                          :: i, j, k                  !< Loop index variables
         integer                          :: idx                      !< Shortest path direction indicator
         integer                          :: ib_patch_id              !< patch ID
@@ -409,7 +410,7 @@ contains
         real(wp), dimension(3)           :: center
         real(wp)                         :: length_x, length_y, length_z
         real(wp), dimension(1:3)         :: xyz_local, dist_vec  !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         integer                          :: i, j, k              !< Loop index variables
         integer                          :: ib_patch_id          !< patch ID
         ib_patch_id = gp%ib_patch_id
@@ -533,7 +534,7 @@ contains
         integer                          :: i, j, k            !< Loop index variables
         integer                          :: ib_patch_id        !< patch ID
         real(wp), dimension(1:3)         :: xyz_local, center  !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)    :: rotation, inverse_rotation
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -604,7 +605,7 @@ contains
         real(wp), dimension(1:3)         :: center, xyz_local
         real(wp)                         :: normals(1:3)  !< Boundary normal buffer
         real(wp)                         :: distance
-        real(wp), dimension(1:3, 1:3)    :: inverse_rotation, rotation
+        real(wp), dimension(1:3,1:3)     :: inverse_rotation, rotation
 
         patch_id = gp%ib_patch_id
         i = gp%loc(1)

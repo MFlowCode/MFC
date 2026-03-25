@@ -180,8 +180,8 @@ contains
         real(wp), pointer, dimension(:)   :: s_cb => null()  !< Cell-boundary locations in the s-direction
         type(int_bounds_info)             :: bc_s            !< Boundary conditions (BC) in the s-direction
         integer                           :: i               !< Generic loop iterator
-        real(wp)                          :: w(1:8)  ! Intermediate var for ideal weights: s_cb across overall stencil
-        real(wp)                          :: y(1:4)  ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
+        real(wp)                          :: w(1:8)          !< Intermediate var for ideal weights: s_cb across overall stencil
+        real(wp)                          :: y(1:4)          !< Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
         ! Determine cell count, boundary locations, and BCs for selected WENO direction
 
@@ -347,19 +347,19 @@ contains
                     ! BC to avoid any contributions from outside of the physical domain during the WENO reconstruction
                     if (null_weights) then
                         if (bc_s%beg == BC_RIEMANN_EXTRAP) then
-                            d_cbR_${XYZ}$ (1:2, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
-                            d_cbL_${XYZ}$ (1:2, 0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
-                            d_cbR_${XYZ}$ (2, 1) = 0._wp; d_cbR_${XYZ}$ (:, 1) = d_cbR_${XYZ}$ (:, 1)/sum(d_cbR_${XYZ}$ (:, 1))
-                            d_cbL_${XYZ}$ (2, 1) = 0._wp; d_cbL_${XYZ}$ (:, 1) = d_cbL_${XYZ}$ (:, 1)/sum(d_cbL_${XYZ}$ (:, 1))
+                            d_cbR_${XYZ}$ (1:2,0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
+                            d_cbL_${XYZ}$ (1:2,0) = 0._wp; d_cbL_${XYZ}$ (0, 0) = 1._wp
+                            d_cbR_${XYZ}$ (2, 1) = 0._wp; d_cbR_${XYZ}$ (:,1) = d_cbR_${XYZ}$ (:,1)/sum(d_cbR_${XYZ}$ (:,1))
+                            d_cbL_${XYZ}$ (2, 1) = 0._wp; d_cbL_${XYZ}$ (:,1) = d_cbL_${XYZ}$ (:,1)/sum(d_cbL_${XYZ}$ (:,1))
                         end if
 
                         if (bc_s%end == BC_RIEMANN_EXTRAP) then
-                            d_cbR_${XYZ}$ (0, s - 1) = 0._wp; d_cbR_${XYZ}$ (:, s - 1) = d_cbR_${XYZ}$ (:, &
-                                           & s - 1)/sum(d_cbR_${XYZ}$ (:, s - 1))
-                            d_cbL_${XYZ}$ (0, s - 1) = 0._wp; d_cbL_${XYZ}$ (:, s - 1) = d_cbL_${XYZ}$ (:, &
-                                           & s - 1)/sum(d_cbL_${XYZ}$ (:, s - 1))
-                            d_cbR_${XYZ}$ (0:1, s) = 0._wp; d_cbR_${XYZ}$ (2, s) = 1._wp
-                            d_cbL_${XYZ}$ (0:1, s) = 0._wp; d_cbL_${XYZ}$ (2, s) = 1._wp
+                            d_cbR_${XYZ}$ (0, s - 1) = 0._wp; d_cbR_${XYZ}$ (:,s - 1) = d_cbR_${XYZ}$ (:, &
+                                           & s - 1)/sum(d_cbR_${XYZ}$ (:,s - 1))
+                            d_cbL_${XYZ}$ (0, s - 1) = 0._wp; d_cbL_${XYZ}$ (:,s - 1) = d_cbL_${XYZ}$ (:, &
+                                           & s - 1)/sum(d_cbL_${XYZ}$ (:,s - 1))
+                            d_cbR_${XYZ}$ (0:1,s) = 0._wp; d_cbR_${XYZ}$ (2, s) = 1._wp
+                            d_cbL_${XYZ}$ (0:1,s) = 0._wp; d_cbL_${XYZ}$ (2, s) = 1._wp
                         end if
                     end if
                 else  ! WENO7
@@ -861,13 +861,11 @@ contains
 
         & is2_weno_d, is3_weno_d)
 
-        type(scalar_field), dimension(1:), intent(in)                                             :: v_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
-             & vL_rs_vf_z
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, &
-             & vR_rs_vf_z
-        integer, intent(in)               :: weno_dir
-        type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
+        type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
+        integer, intent(in)                                                                    :: weno_dir
+        type(int_bounds_info), intent(in)                                                      :: is1_weno_d, is2_weno_d, is3_weno_d
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(-3:2) :: dvd
@@ -884,7 +882,7 @@ contains
             real(wp), dimension(0:weno_num_stencils)        :: beta
             real(wp), dimension(0:weno_num_stencils)        :: delta
         #:endif
-        real(wp), dimension(-3:3) :: v  ! temporary field value array for clarity (WENO7 only)
+        real(wp), dimension(-3:3) :: v  !< temporary field value array for clarity (WENO7 only)
         real(wp)                  :: tau
         integer                   :: i, j, k, l, q
 
@@ -975,7 +973,7 @@ contains
                                               & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
                                               & *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                               & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                              & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
+                                              & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils,j))))
                                     else if (wenoz) then
                                         ! Borges, et al. (2008)
 
@@ -1005,7 +1003,7 @@ contains
                                               & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
                                               & *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                               & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                              & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
+                                              & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils,j))))
                                     else if (wenoz) then
                                         alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                               & j)*(1._wp + tau/beta(0:weno_num_stencils))
@@ -1070,7 +1068,7 @@ contains
                                                   & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
                                                   & *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
+                                                  & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils,j))))
                                         else if (wenoz) then
                                             ! Borges, et al. (2008)
 
@@ -1127,7 +1125,7 @@ contains
                                                   & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
                                                   & *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
+                                                  & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils,j))))
                                         else if (wenoz) then
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
@@ -1171,7 +1169,7 @@ contains
                                         delta(:) = 0._wp
                                         beta(:) = weno_eps
 
-                                        if (teno) v = v_rs_ws_${XYZ}$ (j - 3:j + 3, k, l, &
+                                        if (teno) v = v_rs_ws_${XYZ}$ (j - 3:j + 3,k, l, &
                                             & i)  ! temporary field value array for clarity
 
                                         if (.not. teno) then
@@ -1265,7 +1263,7 @@ contains
                                                   & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
                                                   & *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
+                                                  & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils,j))))
                                         else if (wenoz) then
                                             ! Castro, et al. (2010) Don & Borges (2013) also helps
                                             tau = abs(beta(3) - beta(0))  ! Equation 50
@@ -1340,7 +1338,7 @@ contains
                                                   & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
                                                   & *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
+                                                  & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils,j))))
                                         else if (wenoz) then
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
@@ -1447,8 +1445,8 @@ contains
     !> Enforce monotonicity-preserving bounds on the WENO reconstruction
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(in) :: v_rs_ws
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf, vR_rs_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: v_rs_ws
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf, vR_rs_vf
         integer :: i, j, k, l
         real(wp), dimension(-1:1) :: d  !< Curvature measures at the zone centers
         real(wp) :: d_MD, d_LC          !< Median (md) curvature and large curvature (LC) measures

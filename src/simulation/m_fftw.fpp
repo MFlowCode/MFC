@@ -258,12 +258,12 @@ contains
         do j = 0, m
             do k = 1, sys_size
                 data_fltr_cmplx(:) = (0_dp, 0_dp)
-                data_real(1:p + 1) = q_cons_vf(k)%sf(j, 0, 0:p)
+                data_real(1:p + 1) = q_cons_vf(k)%sf(j, 0,0:p)
                 call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                 data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
                 call fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
                 data_real(:) = data_real(:)/real(real_size, dp)
-                q_cons_vf(k)%sf(j, 0, 0:p) = data_real(1:p + 1)
+                q_cons_vf(k)%sf(j, 0,0:p) = data_real(1:p + 1)
             end do
         end do
 
@@ -273,12 +273,12 @@ contains
             do j = 0, m
                 do k = 1, sys_size
                     data_fltr_cmplx(:) = (0_dp, 0_dp)
-                    data_real(1:p + 1) = q_cons_vf(k)%sf(j, i, 0:p)
+                    data_real(1:p + 1) = q_cons_vf(k)%sf(j, i,0:p)
                     call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                     data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
                     call fftw_execute_dft_c2r(bwd_plan, data_fltr_cmplx, data_real)
                     data_real(:) = data_real(:)/real(real_size, dp)
-                    q_cons_vf(k)%sf(j, i, 0:p) = data_real(1:p + 1)
+                    q_cons_vf(k)%sf(j, i,0:p) = data_real(1:p + 1)
                 end do
             end do
         end do

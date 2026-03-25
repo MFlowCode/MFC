@@ -67,9 +67,7 @@ module m_rhs
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     $:GPU_DECLARE(create='[tau_Re_vf]')
 
-    !> The gradient magnitude of the volume fractions at cell-interior Gaussian quadrature points. gm_alpha_qp is calculated from
-    !! individual first-order spatial derivatives located in dq_prim_ds_qp.
-    type(vector_field) :: gm_alpha_qp
+    type(vector_field) :: gm_alpha_qp  !< Volume fraction gradient magnitudes at cell-interior quadrature points
     $:GPU_DECLARE(create='[gm_alpha_qp]')
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell- average gradient magnitude of volume fractions,
@@ -538,18 +536,18 @@ contains
 
         & time_avg, stage)
 
-        type(scalar_field), dimension(sys_size), intent(inout)                                         :: q_cons_vf
-        type(scalar_field), intent(inout)                                                              :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout)                                         :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in)                                    :: bc_type
-        type(scalar_field), dimension(sys_size), intent(inout)                                         :: rhs_vf
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
+        type(scalar_field), intent(inout)                                                          :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_prim_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in)                                 :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: rhs_vf
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), &
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), &
              & intent(inout) &
              & :: rhs_pb  ! TODO :: I think these other two variables need to be stp as well, but it doesn't compile like that right now
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv_in
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_mv
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: mv_in
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
@@ -908,8 +906,8 @@ contains
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
         type(vector_field), intent(inout) :: flux_src_n_vf
-        integer :: j, k, l, q  ! Loop iterators from original, meaning varies
-        integer :: k_loop, l_loop, q_loop  ! Standardized spatial loop iterators 0:m, 0:n, 0:p
+        integer :: j, k, l, q              !< Loop iterators from original, meaning varies
+        integer :: k_loop, l_loop, q_loop  !< Standardized spatial loop iterators 0:m, 0:n, 0:p
         integer :: i_fluid_loop
         real(wp) :: inv_ds, flux_face1, flux_face2
         real(wp) :: advected_qty_val, pressure_val, velocity_val
@@ -1626,8 +1624,8 @@ contains
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
         integer :: recon_dir  !< Coordinate direction of the reconstruction
         integer :: i, j, k, l
@@ -1651,16 +1649,16 @@ contains
 
                 if (n > 0) then
                     if (p > 0) then
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:, iv%beg:iv%end), vL_z(:,:, &
-                                           & :, iv%beg:iv%end), vR_x(:,:,:, iv%beg:iv%end), vR_y(:,:,:, iv%beg:iv%end), vR_z(:,:, &
-                                           & :, iv%beg:iv%end), recon_dir, is1, is2, is3)
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
+                                           & iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:, &
+                                           & iv%beg:iv%end), recon_dir, is1, is2, is3)
                     else
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:, iv%beg:iv%end), vL_z(:,:, &
-                                           & :,:), vR_x(:,:,:, iv%beg:iv%end), vR_y(:,:,:, iv%beg:iv%end), vR_z(:,:,:,:), &
-                                           & recon_dir, is1, is2, is3)
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
+                                           & :), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:,:), recon_dir, &
+                                           & is1, is2, is3)
                     end if
                 else
-                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:, iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
+                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
                                        & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1, is2, is3)
                 end if
             end if
@@ -1672,8 +1670,8 @@ contains
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
         integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer :: i, j, k, l

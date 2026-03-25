@@ -22,12 +22,8 @@ module m_mpi_proxy
 
     implicit none
 
-    !> This variable is utilized to pack and send the buffer of the immersed boundary markers, for a single computational domain
-    !! boundary at the time, to the relevant neighboring processor.
-    integer, private, allocatable, dimension(:) :: ib_buff_send
-    !> q_cons_buff_recv is utilized to receive and unpack the buffer of the immersed boundary markers, for a single computational
-    !! domain boundary at the time, from the relevant neighboring processor.
-    integer, private, allocatable, dimension(:) :: ib_buff_recv
+    integer, private, allocatable, dimension(:) :: ib_buff_send  !< IB marker send buffer for halo exchange
+    integer, private, allocatable, dimension(:) :: ib_buff_recv  !< IB marker receive buffer for halo exchange
     integer                                     :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
 

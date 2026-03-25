@@ -127,7 +127,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(inout) :: pb_in, mv_in
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
         integer :: i, j, k, l, q, r                                          !< Iterator variables
         integer :: patch_id                                                  !< Patch ID of ghost point
         real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
@@ -684,13 +684,13 @@ contains
                 if (ib_markers%sf(i + 1, j + 1, k) /= 0) alpha(2, 2, 1) = 0._wp
 
                 if (p == 0) then
-                    eta(:,:, 1) = 1._wp/dist(:,:, 1)**2
-                    buf = sum(alpha(:,:, 1)*eta(:,:, 1))
+                    eta(:,:,1) = 1._wp/dist(:,:,1)**2
+                    buf = sum(alpha(:,:,1)*eta(:,:,1))
                     if (buf > 0._wp) then
-                        interp_coeffs(:,:, 1) = alpha(:,:, 1)*eta(:,:, 1)/buf
+                        interp_coeffs(:,:,1) = alpha(:,:,1)*eta(:,:,1)/buf
                     else
-                        buf = sum(eta(:,:, 1))
-                        interp_coeffs(:,:, 1) = eta(:,:, 1)/buf
+                        buf = sum(eta(:,:,1))
+                        interp_coeffs(:,:,1) = eta(:,:,1)/buf
                     end if
                 else
                     if (ib_markers%sf(i, j, k + 1) /= 0) alpha(1, 1, 2) = 0._wp
@@ -721,7 +721,7 @@ contains
         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Primitive Variables
-        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(in) :: pb_in, mv_in
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_in, mv_in
         type(ghost_point), intent(in) :: gp
         real(wp), intent(inout) :: pres_IP
         real(wp), dimension(3), intent(inout) :: vel_IP
@@ -886,7 +886,7 @@ contains
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
         integer                                                        :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3)                                :: forces, torques
-        real(wp), dimension(1:3, 1:3)                                  :: viscous_stress_div, viscous_stress_div_1, &
+        real(wp), dimension(1:3,1:3)                                   :: viscous_stress_div, viscous_stress_div_1, &
              & viscous_stress_div_2  ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp)                 :: cell_volume, dx, dy, dz, dynamic_viscosity
@@ -964,14 +964,14 @@ contains
                             ! get the linear force components first
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i - 1, j, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i + 1, j, k)
-                            viscous_stress_div(1, 1:3) = (viscous_stress_div_2(1, 1:3) - viscous_stress_div_1(1, &
+                            viscous_stress_div(1,1:3) = (viscous_stress_div_2(1,1:3) - viscous_stress_div_1(1, &
                                                & 1:3))/(2._wp*dx)  ! get x derivative of the first-row of viscous stress tensor
                             local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, &
                                                      & 1:3)  ! add the x components of the divergence to the force
 
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j - 1, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j + 1, k)
-                            viscous_stress_div(2, 1:3) = (viscous_stress_div_2(2, 1:3) - viscous_stress_div_1(2, &
+                            viscous_stress_div(2,1:3) = (viscous_stress_div_2(2,1:3) - viscous_stress_div_1(2, &
                                                & 1:3))/(2._wp*dy)  ! get y derivative of the second-row of viscous stress tensor
                             local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, &
                                                      & 1:3)  ! add the y components of the divergence to the force
@@ -981,7 +981,7 @@ contains
                                                                      & k - 1)
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j, &
                                                                      & k + 1)
-                                viscous_stress_div(3, 1:3) = (viscous_stress_div_2(3, 1:3) - viscous_stress_div_1(3, &
+                                viscous_stress_div(3,1:3) = (viscous_stress_div_2(3,1:3) - viscous_stress_div_1(3, &
                                                    & 1:3))/(2._wp*dz)  ! get z derivative of the third-row of viscous stress tensor
                                 local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, &
                                                          & 1:3)  ! add the z components of the divergence to the force

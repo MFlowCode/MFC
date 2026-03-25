@@ -90,8 +90,8 @@ contains
         & qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
             & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, &
-             & qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
+             & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in)          :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
@@ -142,8 +142,8 @@ contains
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, &
-             & qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
+             & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in)          :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
@@ -205,10 +205,10 @@ contains
         real(wp)                  :: zcoef, pcorr   !< low Mach number correction
         type(riemann_states)      :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
-        type(riemann_states)      :: Ga  ! Gamma (Lorentz factor)
+        type(riemann_states)      :: Ga             !< Gamma (Lorentz factor)
         type(riemann_states)      :: vdotB, B2
-        type(riemann_states_vec3) :: b4  ! 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm  ! Conservative momentum variables
+        type(riemann_states_vec3) :: b4             !< 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm             !< Conservative momentum variables
         integer                   :: i, j, k, l, q  !< Generic loop iterators
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
@@ -819,8 +819,8 @@ contains
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, &
-             & qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
+             & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in)          :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
@@ -884,10 +884,10 @@ contains
         real(wp)                  :: zcoef, pcorr    !< low Mach number correction
         type(riemann_states)      :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
-        type(riemann_states)      :: Ga  ! Gamma (Lorentz factor)
+        type(riemann_states)      :: Ga              !< Gamma (Lorentz factor)
         type(riemann_states)      :: vdotB, B2
-        type(riemann_states_vec3) :: b4  ! 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm  ! Conservative momentum variables
+        type(riemann_states_vec3) :: b4              !< 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm              !< Conservative momentum variables
         integer                   :: i, j, k, l, q   !< Generic loop iterators
         integer, dimension(3)     :: idx_right_phys  !< Physical (j,k,l) indices for right state.
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
@@ -1687,8 +1687,8 @@ contains
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, &
-             & qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
+             & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(in)          :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
@@ -3300,8 +3300,8 @@ contains
         & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, &
-             & qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
+             & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
 
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
@@ -3634,8 +3634,8 @@ contains
         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, &
-             & qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
+             & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
 
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
@@ -3967,7 +3967,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in)                                    :: norm_dir
-        integer                                                :: i, j, k, l  ! Generic loop iterators
+        integer                                                :: i, j, k, l  !< Generic loop iterators
 
         ! Reshaping Inputted Data in x-direction
 
@@ -4190,17 +4190,17 @@ contains
                     case (1)  ! x-face (axial face in z_cyl direction)
                         Re_s = Re_avg_rsx_vf(j, k, l, 1)
                         Re_b = Re_avg_rsx_vf(j, k, l, 2)
-                        vel_src_int = vel_src_rsx_vf(j, k, l, 1:num_dims)
+                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     case (2)  ! y-face (radial face in r_cyl direction)
                         Re_s = Re_avg_rsy_vf(k, j, l, 1)
                         Re_b = Re_avg_rsy_vf(k, j, l, 2)
-                        vel_src_int = vel_src_rsy_vf(k, j, l, 1:num_dims)
+                        vel_src_int = vel_src_rsy_vf(k, j, l,1:num_dims)
                         r_eff = y_cb(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         Re_s = Re_avg_rsz_vf(l, k, j, 1)
                         Re_b = Re_avg_rsz_vf(l, k, j, 2)
-                        vel_src_int = vel_src_rsz_vf(l, k, j, 1:num_dims)
+                        vel_src_int = vel_src_rsz_vf(l, k, j,1:num_dims)
                         r_eff = y_cc(k)
                     end select
 

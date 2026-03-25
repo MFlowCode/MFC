@@ -13,7 +13,9 @@ module m_acoustic_src
     use m_variables_conversion
     use m_helper_basic
     use m_constants
+
     implicit none
+
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
     integer, allocatable, dimension(:) :: pulse, support
@@ -336,9 +338,9 @@ contains
         real(wp), intent(in)  :: sim_time, c, sum_BB
         real(wp), intent(in)  :: frequency_local, gauss_sigma_time_local
         real(wp), intent(out) :: source
-        real(wp)              :: omega  ! angular frequency
-        real(wp)              :: sine_wave  ! sine function for square wave
-        real(wp)              :: foc_length_factor  ! Scale amplitude with radius for spherical support
+        real(wp)              :: omega              !< angular frequency
+        real(wp)              :: sine_wave          !< sine function for square wave
+        real(wp)              :: foc_length_factor  !< Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
 
@@ -412,7 +414,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                        call s_source_spatial(j, k, l, loc_acoustic(:,ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         if (abs(source_spatial) < threshold) cycle
                         count = count + 1
                     end do
@@ -434,7 +436,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                        call s_source_spatial(j, k, l, loc_acoustic(:,ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         if (abs(source_spatial) < threshold) cycle
                         count = count + 1
                         source_spatials(ai)%coord(1, count) = j
@@ -443,7 +445,7 @@ contains
                         source_spatials(ai)%val(count) = source_spatial
                         if (support(ai) >= 5) then
                             if (dim == 2) source_spatials(ai)%angle(count) = angle
-                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(1:3, count) = xyz_to_r_ratios
+                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(1:3,count) = xyz_to_r_ratios
                         end if
                     end do
                 end do

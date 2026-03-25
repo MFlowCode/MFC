@@ -152,7 +152,7 @@ contains
 #endif
             else
                 open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
-                read (2) ib_markers%sf(0:m, 0:n, 0:p)
+                read (2) ib_markers%sf(0:m,0:n,0:p)
                 close (2)
             end if
         else
@@ -168,16 +168,16 @@ contains
         integer             :: i
 
         do i = 1, sys_size
-            allocate (q_cons_vf(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
-            allocate (q_prim_vf(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            allocate (q_cons_vf(i)%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
+            allocate (q_prim_vf(i)%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
         end do
 
         if (ib) then
-            allocate (ib_markers%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            allocate (ib_markers%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
         end if
 
         if (chemistry) then
-            allocate (q_T_sf%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            allocate (q_T_sf%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
         end if
 
     end subroutine s_allocate_field_arrays
@@ -228,11 +228,11 @@ contains
 
             if (file_check) then
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
-                read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
+                read (1) q_cons_vf(i)%sf(0:m,0:n,0:p)
                 close (1)
             else if (bubbles_lagrange .and. i == beta_idx) then
                 ! beta (Lagrangian void fraction) is not written by pre_process for t_step_start; initialize to zero.
-                q_cons_vf(i)%sf(0:m, 0:n, 0:p) = 0._wp
+                q_cons_vf(i)%sf(0:m,0:n,0:p) = 0._wp
             else
                 call s_mpi_abort('File q_cons_vf' // trim(file_num) // '.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
             end if
@@ -425,7 +425,7 @@ contains
 
                 if (down_sample) then
                     do i = 1, sys_size
-                        q_cons_vf(i)%sf(0:m, 0:n, 0:p) = q_cons_temp(i)%sf(0:m, 0:n, 0:p)
+                        q_cons_vf(i)%sf(0:m,0:n,0:p) = q_cons_temp(i)%sf(0:m,0:n,0:p)
                     end do
                 end if
 
@@ -478,7 +478,7 @@ contains
                 call s_allocate_field_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
                 if (down_sample) then
                     do i = 1, sys_size
-                        allocate (q_cons_temp(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+                        allocate (q_cons_temp(i)%sf(-1:m + 1,-1:n + 1,-1:p + 1))
                     end do
                 end if
             else
@@ -488,16 +488,16 @@ contains
             call s_allocate_field_arrays(-buff_size, m + buff_size, 0, 0)
         end if
 
-        allocate (bc_type(1:num_dims, 1:2))
+        allocate (bc_type(1:num_dims,1:2))
 
-        allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
-        allocate (bc_type(1, 2)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 1)%sf(0:0,0:n,0:p))
+        allocate (bc_type(1, 2)%sf(0:0,0:n,0:p))
         if (n > 0) then
-            allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
-            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size,0:0,0:p))
+            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size,0:0,0:p))
             if (p > 0) then
-                allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
-                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
             end if
         end if
 

@@ -20,8 +20,7 @@ module m_assign_variables
 
     type(scalar_field) :: alf_sum
 
-    !> Depending on the multicomponent flow model, this variable is a pointer to either the subroutine
-    !! s_assign_patch_mixture_primitive_variables, or the subroutine s_assign_patch_species_primitive_variables
+    !> Pointer to mixture or species patch assignment routine
     procedure(s_assign_patch_xxxxx_primitive_variables), pointer :: s_assign_patch_primitive_variables => null()
     !> Abstract interface to the two subroutines that assign the patch primitive variables, either mixture or species, depending on
     !! the subroutine, to a particular cell in the computational domain
@@ -38,9 +37,9 @@ module m_assign_variables
             type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
 #ifdef MFC_MIXED_PRECISION
-            integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+            integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-            integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+            integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
@@ -56,7 +55,7 @@ contains
     impure subroutine s_initialize_assign_variables_module
 
         if (.not. igr) then
-            allocate (alf_sum%sf(0:m, 0:n, 0:p))
+            allocate (alf_sum%sf(0:m,0:n,0:p))
         end if
 
         ! Select procedure pointer based on multicomponent flow model
@@ -83,9 +82,9 @@ contains
         real(wp), intent(in)                                     :: eta
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
 
         real(wp) :: Ys(1:num_species)
@@ -215,9 +214,9 @@ contains
         integer, intent(in)  :: j, k, l
         real(wp), intent(in) :: eta
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 

@@ -8,6 +8,7 @@
 module m_compute_cbc
 
     use m_global_parameters
+
     implicit none
 
     private; public :: s_compute_slip_wall_L, s_compute_nonreflecting_subsonic_buffer_L, &

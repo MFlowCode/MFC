@@ -6,14 +6,14 @@
     ! IGR Jets Arrays to stor position and radii of jets from input file
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
     ! Variables to describe initial condition of jet
-    real(wp)                      :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
-    real(wp)                      :: rcut, xcut  ! Intermediate variables for creating smooth initial condition
-    real(wp), dimension(0:n, 0:p) :: rcut_arr
-    integer                       :: l, q, s  ! Iterators for reading input files
-    integer                       :: start, end  ! Ints to keep track of position in file
-    character(len=1000)           :: line  ! String to store line in file
-    character(len=25)             :: value  ! String to store value in line
-    integer                       :: NJet  ! Number of jets
+    real(wp)                     :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
+    real(wp)                     :: rcut, xcut  !< Intermediate variables for creating smooth initial condition
+    real(wp), dimension(0:n,0:p) :: rcut_arr
+    integer                      :: l, q, s     !< Iterators for reading input files
+    integer                      :: start, end  !< Ints to keep track of position in file
+    character(len=1000)          :: line        !< String to store line in file
+    character(len=25)            :: value       !< String to store value in line
+    integer                      :: NJet        !< Number of jets
 
     eps = 1e-9_wp
 

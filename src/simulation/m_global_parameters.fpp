@@ -141,17 +141,17 @@ module m_global_parameters
 
     !> @name Variables for our of core IGR computation on NVIDIA
     !> @{
-    logical :: nv_uvm_out_of_core  ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
-    integer :: nv_uvm_igr_temps_on_gpu  ! 0 => jac, jac_rhs, and jac_old on CPU
+    logical :: nv_uvm_out_of_core       !< Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
+    integer :: nv_uvm_igr_temps_on_gpu  !< 0 => jac, jac_rhs, and jac_old on CPU
     ! 1 => jac on GPU, jac_rhs and jac_old on CPU 2 => jac and jac_rhs on GPU, jac_old on CPU 3 => jac, jac_rhs, and jac_old on GPU
     ! (default)
-    logical :: nv_uvm_pref_gpu  ! Enable explicit gpu memory hints (default FALSE)
+    logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
     real(wp)           :: weno_eps                     !< Binding for the WENO nonlinear weights
     real(wp)           :: teno_CT                      !< Smoothness threshold for TENO
     logical            :: mp_weno                      !< Monotonicity preserving (MP) WENO
-    logical            :: weno_avg  ! Average left/right cell-boundary states
+    logical            :: weno_avg                     !< Average left/right cell-boundary states
     logical            :: weno_Re_flux                 !< WENO reconstruct velocity gradients for viscous stress tensor
     integer            :: riemann_solver               !< Riemann solver algorithm
     integer            :: low_Mach                     !< Low Mach number fix to HLLC Riemann solver
@@ -311,34 +311,24 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
 
-    !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
-    !! physical computational domain to the next time-step.
-    integer :: buff_size
+    integer :: buff_size  !< Number of ghost cells for boundary condition storage
     $:GPU_DECLARE(create='[buff_size]')
 
-    integer               :: shear_num          !< Number of shear stress components
-    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
-    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
-    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
-    !! [indices])
-    integer, dimension(3, 2) :: shear_BC_flip_indices
+    integer                  :: shear_num              !< Number of shear stress components
+    integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
+    integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 
     ! END: Simulation Algorithm Parameters
 
     ! Fluids Physical Parameters
 
-    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
-    !! equation of state parameters, and the Reynolds numbers.
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
-    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when the CoM
-    !! or flow probe data files are to be written at each time step
-    integer :: fd_order
-    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
-    !! finite-difference stencil for the selected order of accuracy.
-    integer :: fd_number
+    integer                                  :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
+    integer                                  :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt
@@ -489,9 +479,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
-    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
-    !! is false
-    logical :: dummy
+    logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star       !< Stress threshold for continuum damage modeling
@@ -1091,15 +1079,15 @@ contains
                     shear_num = 1
                     shear_indices(1) = stress_idx%beg - 1 + 2
                     shear_BC_flip_num = 1
-                    shear_BC_flip_indices(1:2, 1) = shear_indices(1)
+                    shear_BC_flip_indices(1:2,1) = shear_indices(1)
                     ! Both x-dir and y-dir: flip tau_xy only
                 else if (num_dims == 3) then
                     shear_num = 3
                     shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
                     shear_BC_flip_num = 2
-                    shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
-                    shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
-                    shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
+                    shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
+                    shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
+                    shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
                     ! x-dir: flip tau_xy and tau_xz y-dir: flip tau_xy and tau_yz z-dir: flip tau_xz and tau_yz
                 end if
                 $:GPU_UPDATE(device='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
@@ -1153,18 +1141,18 @@ contains
 
         if (.not. down_sample) then
             do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         else if (bubbles_lagrange) then
             do i = 1, sys_size + 1
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
@@ -1178,7 +1166,7 @@ contains
             wenojs = .not. (mapped_weno .or. wenoz .or. teno)
         #:endif
 
-        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
+        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
         Np = 0
 
         if (elasticity) then

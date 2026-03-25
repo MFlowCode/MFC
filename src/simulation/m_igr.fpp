@@ -115,17 +115,17 @@ contains
             @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(jac)
         else
-            allocate (jac_host(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (jac_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
 
-            jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end) => jac_host(:,:,:)
+            jac(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end) => jac_host(:,:,:)
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
             @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
             @:PREFER_GPU(jac_rhs)
         else
-            allocate (jac_rhs_host(-1:m, -1:n, -1:p))
-            jac_rhs(-1:m, -1:n, -1:p) => jac_rhs_host(:,:,:)
+            allocate (jac_rhs_host(-1:m,-1:n,-1:p))
+            jac_rhs(-1:m,-1:n,-1:p) => jac_rhs_host(:,:,:)
         end if
 
         if (igr_iter_solver == 1) then  ! Jacobi iteration
@@ -133,9 +133,9 @@ contains
                 @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                 @:PREFER_GPU(jac_old)
             else
-                allocate (jac_old_host(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                allocate (jac_old_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
 
-                jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                jac_old(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
                         & idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host(:,:,:)
             end if
         end if
@@ -212,12 +212,12 @@ contains
 #ifdef _CRAYFTN
         ! DIR$ OPTIMIZE (-haggress)
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        integer, intent(in)                                         :: t_step
-        real(wp)                                                    :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
-        real(wp)                                                    :: fd_coeff
-        integer                                                     :: num_iters
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer, intent(in)                                        :: t_step
+        real(wp)                                                   :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
+        real(wp)                                                   :: fd_coeff
+        integer                                                    :: num_iters
 
         if (t_step == t_step_start) then
             num_iters = num_igr_warm_start_iters

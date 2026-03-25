@@ -35,7 +35,7 @@ module m_global_parameters
 
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
-    integer(kind=8)       :: nGlobal  ! Total number of cells in global domain
+    integer(kind=8)       :: nGlobal  !< Total number of cells in global domain
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
@@ -66,9 +66,7 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    !> Number of cells in buffer region. For the variables which feature a buffer region, this region is used to store information
-    !! outside the computational domain based on the boundary conditions.
-    integer :: buff_size
+    integer :: buff_size     !< Number of ghost cells for boundary condition storage
     integer :: t_step_start  !< First time-step directory
     integer :: t_step_stop   !< Last time-step directory
     integer :: t_step_save   !< Interval between consecutive time-step directory
@@ -146,18 +144,16 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
 
-    integer               :: shear_num          !< Number of shear stress components
-    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
-    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
-    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
-    !! [indices])
-    integer, dimension(3, 2)           :: shear_BC_flip_indices
-    logical                            :: parallel_io       !< Format of the data files
+    integer                            :: shear_num  !< Number of shear stress components
+    integer, dimension(3)              :: shear_indices  !< Indices of the stress components that represent shear stress
+    integer                            :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2)           :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    logical                            :: parallel_io  !< Format of the data files
     logical                            :: sim_data
     logical                            :: file_per_process  !< output format
-    integer, allocatable, dimension(:) :: proc_coords       !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:) :: start_idx         !< Starting cell-center index of local processor in global grid
-    integer                            :: num_ibs           !< Number of immersed boundaries
+    integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:) :: start_idx  !< Starting cell-center index of local processor in global grid
+    integer                            :: num_ibs  !< Number of immersed boundaries
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
@@ -172,9 +168,7 @@ module m_global_parameters
     integer                 :: mpi_info_int
     !> @}
 
-    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
-    !! equation of state parameters, and the Reynolds numbers.
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     real(wp), allocatable, dimension(:)      :: adv  !< Advection variables
@@ -207,9 +201,7 @@ module m_global_parameters
     logical                            :: E_wrt
     logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
     logical                            :: fft_wrt
-    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
-    !! is false
-    logical                            :: dummy
+    logical                            :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
     logical                            :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
     logical                            :: gamma_wrt
@@ -248,16 +240,9 @@ module m_global_parameters
     logical                            :: lag_betaC_wrt
     !> @}
 
-    !> Amplitude coefficients of the numerical Schlieren function that are used to adjust the intensity of numerical Schlieren
-    !! renderings for individual fluids. This enables waves and interfaces of varying strengths and in all of the fluids to be made
-    !! simultaneously visible on a single plot.
-    real(wp), dimension(num_fluids_max) :: schlieren_alpha
-    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when
-    !! vorticity and/or the numerical Schlieren function are to be outputted to the formatted database file(s).
-    integer :: fd_order
-    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
-    !! finite-difference stencil for the selected order of accuracy.
-    integer :: fd_number
+    real(wp), dimension(num_fluids_max) :: schlieren_alpha  !< Per-fluid Schlieren intensity amplitude coefficients
+    integer                             :: fd_order         !< Finite-difference order for vorticity and Schlieren derivatives
+    integer                             :: fd_number        !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     !> @name Reference parameters for Tait EOS
     !> @{
     real(wp) :: rhoref, pref
@@ -720,15 +705,15 @@ contains
                     shear_num = 1
                     shear_indices(1) = stress_idx%beg - 1 + 2
                     shear_BC_flip_num = 1
-                    shear_BC_flip_indices(1:2, 1) = shear_indices(1)
+                    shear_BC_flip_indices(1:2,1) = shear_indices(1)
                     ! Both x-dir and y-dir: flip tau_xy only
                 else if (num_dims == 3) then
                     shear_num = 3
                     shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
                     shear_BC_flip_num = 2
-                    shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
-                    shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
-                    shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
+                    shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
+                    shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
+                    shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
                     ! x-dir: flip tau_xy and tau_xz y-dir: flip tau_xy and tau_yz z-dir: flip tau_xz and tau_yz
                 end if
             end if
@@ -809,20 +794,20 @@ contains
 
         do i = 1, sys_size
             if (down_sample) then
-                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1,-1:n + 1,-1:p + 1))
             else
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
             end if
             MPI_IO_DATA%var(i)%sf => null()
         end do
         if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
 
-        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
+        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 #endif
 
         ! Size of the ghost zone layer is non-zero only when post-processing the raw simulation data of a parallel multidimensional

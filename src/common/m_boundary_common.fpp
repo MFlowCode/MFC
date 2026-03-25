@@ -21,8 +21,8 @@ module m_boundary_common
     $:GPU_DECLARE(create='[bc_buffers]')
 
 #ifdef MFC_MPI
-    integer, dimension(1:3, 1:2) :: MPI_BC_TYPE_TYPE
-    integer, dimension(1:3, 1:2) :: MPI_BC_BUFFER_TYPE
+    integer, dimension(1:3,1:2) :: MPI_BC_TYPE_TYPE
+    integer, dimension(1:3,1:2) :: MPI_BC_BUFFER_TYPE
 #endif
 
     private; public :: s_initialize_boundary_common_module, s_populate_variables_buffers, s_create_mpi_types, &
@@ -73,10 +73,10 @@ contains
     !> Populate the buffers of the primitive variables based on the selected boundary conditions.
     impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in)
 
-        type(scalar_field), dimension(sys_size), intent(inout)                                                   :: q_prim_vf
-        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in)                                              :: bc_type
-        integer                                                                                                  :: k, l
+        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
+        integer                                                                                              :: k, l
 
         ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
 
@@ -330,11 +330,11 @@ contains
     subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                                   :: q_prim_vf
-        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                                      :: bc_dir, bc_loc
-        integer, intent(in)                                                                                      :: k, l
-        integer                                                                                                  :: j, q, i
+        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        integer, intent(in)                                                                                  :: bc_dir, bc_loc
+        integer, intent(in)                                                                                  :: k, l
+        integer                                                                                              :: j, q, i
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -553,11 +553,11 @@ contains
     subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                                   :: q_prim_vf
-        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                                      :: bc_dir, bc_loc
-        integer, intent(in)                                                                                      :: k, l
-        integer                                                                                                  :: j, q, i
+        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        integer, intent(in)                                                                                  :: bc_dir, bc_loc
+        integer, intent(in)                                                                                  :: k, l
+        integer                                                                                              :: j, q, i
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -675,10 +675,10 @@ contains
     subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                         :: q_prim_vf
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                            :: k, l
-        integer                                                                                        :: j, q, i
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_prim_vf
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        integer, intent(in)                                                                        :: k, l
+        integer                                                                                    :: j, q, i
 
         do j = 1, buff_size
             if (z_cc(l) < pi) then
@@ -971,10 +971,10 @@ contains
     subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                                      :: bc_dir, bc_loc
-        integer, intent(in)                                                                                      :: k, l
-        integer                                                                                                  :: j, q, i
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        integer, intent(in)                                                                                  :: bc_dir, bc_loc
+        integer, intent(in)                                                                                  :: k, l
+        integer                                                                                              :: j, q, i
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
@@ -1043,9 +1043,9 @@ contains
     !> Populate ghost cell buffers for the color function and its divergence used in capillary surface tension.
     impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
-        type(scalar_field), dimension(num_dims + 1), intent(inout)  :: c_divs
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        integer                                                     :: k, l
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: k, l
 
         !> x-direction
 
@@ -1367,9 +1367,9 @@ contains
     !> Populate ghost cell buffers for the Jacobian scalar field used in the IGR elliptic solver.
     impure subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        type(scalar_field), dimension(1:), intent(inout)            :: jac_sf
-        integer                                                     :: j, k, l
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), dimension(1:), intent(inout)           :: jac_sf
+        integer                                                    :: j, k, l
 
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
@@ -1534,7 +1534,7 @@ contains
     !> Create MPI derived datatypes for boundary condition type arrays and buffer arrays used in parallel I/O.
     impure subroutine s_create_mpi_types(bc_type)
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
 
 #ifdef MFC_MPI
         integer               :: dir, loc
@@ -1569,13 +1569,13 @@ contains
     !> Write boundary condition type and buffer data to serial (unformatted) restart files.
     subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in)
 
-        type(scalar_field), dimension(sys_size), intent(in)         :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        logical, intent(in)                                         :: old_grid_in
-        character(LEN=*), intent(in)                                :: step_dirpath
-        integer                                                     :: dir, loc, i
-        character(len=path_len)                                     :: file_path
-        character(len=10)                                           :: status
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        logical, intent(in)                                        :: old_grid_in
+        character(LEN=*), intent(in)                               :: step_dirpath
+        integer                                                    :: dir, loc, i
+        character(len=path_len)                                    :: file_path
+        character(len=10)                                          :: status
 
         if (old_grid_in) then
             status = 'old'
@@ -1608,11 +1608,11 @@ contains
     !> Write boundary condition type and buffer data to per-rank parallel files using MPI I/O.
     subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(in)         :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        integer                                                     :: dir, loc
-        character(len=path_len)                                     :: file_loc, file_path
-        character(len=10)                                           :: status
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: dir, loc
+        character(len=path_len)                                    :: file_loc, file_path
+        character(len=10)                                          :: status
 
 #ifdef MFC_MPI
         integer          :: ierr
@@ -1673,12 +1673,12 @@ contains
     !> Read boundary condition type and buffer data from serial (unformatted) restart files.
     subroutine s_read_serial_boundary_condition_files(step_dirpath, bc_type)
 
-        character(LEN=*), intent(in)                                   :: step_dirpath
-        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
-        integer                                                        :: dir, loc
-        logical                                                        :: file_exist
-        character(len=path_len)                                        :: file_path
-        character(len=10)                                              :: status
+        character(LEN=*), intent(in)                                  :: step_dirpath
+        type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
+        integer                                                       :: dir, loc
+        logical                                                       :: file_exist
+        character(len=path_len)                                       :: file_path
+        character(len=10)                                             :: status
 
         ! Read bc_types
 
@@ -1718,10 +1718,10 @@ contains
     !> Read boundary condition type and buffer data from per-rank parallel files using MPI I/O.
     subroutine s_read_parallel_boundary_condition_files(bc_type)
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(inout) :: bc_type
-        integer                                                        :: dir, loc
-        character(len=path_len)                                        :: file_loc, file_path
-        character(len=10)                                              :: status
+        type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
+        integer                                                       :: dir, loc
+        character(len=path_len)                                       :: file_loc, file_path
+        character(len=10)                                             :: status
 
 #ifdef MFC_MPI
         integer          :: ierr
@@ -1826,7 +1826,7 @@ contains
     !> Initialize the per-cell boundary condition type arrays with the global default BC values.
     subroutine s_assign_default_bc_type(bc_type)
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
 
         bc_type(1, 1)%sf(:,:,:) = int(min(bc_x%beg, 0), kind=1)
         bc_type(1, 2)%sf(:,:,:) = int(min(bc_x%end, 0), kind=1)

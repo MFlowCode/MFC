@@ -59,9 +59,7 @@ module m_start_up
     end interface
 
     character(LEN=path_len + name_len) :: proc_rank_dir  !< Location of the folder associated with the rank of the local processor
-    !> Possible location of time-step folder containing preexisting grid and/or conservative variables data to be used as starting
-    !! point for pre-process
-    character(LEN=path_len + 2*name_len), private :: t_step_dir
+    character(LEN=path_len + 2*name_len), private :: t_step_dir  !< Path to preexisting time-step folder for restart
     procedure(s_read_abstract_grid_data_files), pointer :: s_read_grid_data_files => null()
     procedure(s_read_abstract_ic_data_files), pointer :: s_read_ic_data_files => null()
 
@@ -294,7 +292,7 @@ contains
 
                     if (file_check) then
                         open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
-                        read (1) pb%sf(:,:,:, r, i)
+                        read (1) pb%sf(:,:,:,r, i)
                         close (1)
                     else
                         call s_mpi_abort('File pb' // trim(file_num) // '.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
@@ -310,7 +308,7 @@ contains
 
                     if (file_check) then
                         open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
-                        read (1) mv%sf(:,:,:, r, i)
+                        read (1) mv%sf(:,:,:,r, i)
                         close (1)
                     else
                         call s_mpi_abort('File mv' // trim(file_num) // '.dat is missing in ' // trim(t_step_dir) // '. Exiting.')

@@ -141,13 +141,13 @@ contains
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in), dimension(num_vels)                   :: vel
-        real(wp), intent(in)                                        :: c, rho
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout)           :: icfl_sf
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout), optional :: vcfl_sf, Rc_sf
-        real(wp), dimension(2), intent(in)                          :: Re_l
-        integer, intent(in)                                         :: j, k, l
-        real(wp)                                                    :: fltr_dtheta
+        real(wp), intent(in), dimension(num_vels)                 :: vel
+        real(wp), intent(in)                                      :: c, rho
+        real(wp), dimension(0:m,0:n,0:p), intent(inout)           :: icfl_sf
+        real(wp), dimension(0:m,0:n,0:p), intent(inout), optional :: vcfl_sf, Rc_sf
+        real(wp), dimension(2), intent(in)                        :: Re_l
+        integer, intent(in)                                       :: j, k, l
+        real(wp)                                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
         if (p > 0 .or. n > 0) then
@@ -191,13 +191,13 @@ contains
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in)         :: vel
-        real(wp), intent(in)                              :: c, rho
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt
-        real(wp), dimension(2), intent(in)                :: Re_l
-        integer, intent(in)                               :: j, k, l
-        real(wp)                                          :: icfl_dt, vcfl_dt
-        real(wp)                                          :: fltr_dtheta
+        real(wp), dimension(num_vels), intent(in)       :: vel
+        real(wp), intent(in)                            :: c, rho
+        real(wp), dimension(0:m,0:n,0:p), intent(inout) :: max_dt
+        real(wp), dimension(2), intent(in)              :: Re_l
+        integer, intent(in)                             :: j, k, l
+        real(wp)                                        :: icfl_dt, vcfl_dt
+        real(wp)                                        :: fltr_dtheta
 
         ! Inviscid CFL calculation
         if (p > 0 .or. n > 0) then

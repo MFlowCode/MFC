@@ -95,8 +95,8 @@ contains
 
         & is2_muscl_d, is3_muscl_d)
 
-        type(scalar_field), dimension(1:), intent(in)                                             :: v_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
+        type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
              & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in)               :: muscl_dir
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
@@ -222,7 +222,7 @@ contains
 
         & is1_muscl_d, is2_muscl_d, is3_muscl_d)
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
              & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in)               :: muscl_dir
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d

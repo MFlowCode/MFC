@@ -37,8 +37,8 @@ module m_data_output
 
             import :: scalar_field, integer_field, sys_size, m, n, p, pres_field, num_dims
 
-            type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
-            type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+            type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf, q_prim_vf
+            type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
 
         end subroutine s_write_abstract_data_files
     end interface
@@ -53,22 +53,22 @@ contains
     !> Writes grid and initial condition data files to the "0" time-step directory in the local processor rank folder
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
-        logical                                                      :: file_exist
-        character(LEN=15)                                            :: FMT
-        character(LEN=3)                                             :: status
-        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1)     :: file_num
-        character(LEN=len_trim(t_step_dir) + name_len)               :: file_loc
-        integer                                                      :: i, j, k, l, r, c
-        integer                                                      :: t_step
-        real(wp), dimension(nb)                                      :: nRtmp
-        real(wp)                                                     :: nbub
-        real(wp)                                                     :: gamma, lit_gamma, pi_inf, qv
-        real(wp)                                                     :: rho
-        real(wp)                                                     :: pres, T
-        real(wp)                                                     :: rhoYks(1:num_species)
-        real(wp)                                                     :: pres_mag
+        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf, q_prim_vf
+        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        logical                                                     :: file_exist
+        character(LEN=15)                                           :: FMT
+        character(LEN=3)                                            :: status
+        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1)    :: file_num
+        character(LEN=len_trim(t_step_dir) + name_len)              :: file_loc
+        integer                                                     :: i, j, k, l, r, c
+        integer                                                     :: t_step
+        real(wp), dimension(nb)                                     :: nRtmp
+        real(wp)                                                    :: nbub
+        real(wp)                                                    :: gamma, lit_gamma, pi_inf, qv
+        real(wp)                                                    :: rho
+        real(wp)                                                    :: pres, T
+        real(wp)                                                    :: rhoYks(1:num_species)
+        real(wp)                                                    :: pres_mag
 
         pres_mag = 0._wp
 
@@ -113,7 +113,7 @@ contains
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir) // '/q_cons_vf' // trim(file_num) // '.dat'
             open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
-            write (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
+            write (1) q_cons_vf(i)%sf(0:m,0:n,0:p)
             close (1)
         end do
 
@@ -123,7 +123,7 @@ contains
                     write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
                     file_loc = trim(t_step_dir) // '/pb' // trim(file_num) // '.dat'
                     open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
-                    write (1) pb%sf(:,:,:, r, i)
+                    write (1) pb%sf(:,:,:,r, i)
                     close (1)
                 end do
             end do
@@ -133,7 +133,7 @@ contains
                     write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
                     file_loc = trim(t_step_dir) // '/mv' // trim(file_num) // '.dat'
                     open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
-                    write (1) mv%sf(:,:,:, r, i)
+                    write (1) mv%sf(:,:,:,r, i)
                     close (1)
                 end do
             end do
@@ -382,8 +382,8 @@ contains
     !> Writes grid and initial condition data files in parallel to the "0" time-step directory in the local processor rank folder
     impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf, q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf, q_prim_vf
+        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size
@@ -399,7 +399,7 @@ contains
         real(wp)                             :: loc_violations, glb_violations
         integer                              :: m_ds, n_ds, p_ds
         integer                              :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer                              :: m_glb_save, n_glb_save, p_glb_save  ! Size of array being saved
+        integer                              :: m_glb_save, n_glb_save, p_glb_save  !< Size of array being saved
 
         loc_violations = 0._wp
 
@@ -659,7 +659,7 @@ contains
 
             allocate (q_cons_temp(1:sys_size))
             do i = 1, sys_size
-                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
+                allocate (q_cons_temp(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1))
             end do
         end if
 

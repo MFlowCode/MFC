@@ -150,7 +150,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf1
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf2
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf3
-        real(wp), dimension(0:m, 0:n, 0:p), intent(out)     :: q_sf
+        real(wp), dimension(0:m,0:n,0:p), intent(out)       :: q_sf
         integer                                             :: j, k, l, r  !< Generic loop iterators
         ! Computing the acceleration component in the x-coordinate direction
 
@@ -340,7 +340,7 @@ contains
     impure subroutine s_derive_center_of_mass(q_vf, c_m)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
-        real(wp), dimension(1:num_fluids, 1:5), intent(inout) :: c_m
+        real(wp), dimension(1:num_fluids,1:5), intent(inout) :: c_m
         integer :: i, j, k, l     !< Generic loop iterators
         real(wp) :: tmp, tmp_out  !< Temporary variable to store quantity for mpi_allreduce
         real(wp) :: dV            !< Discrete cell volume

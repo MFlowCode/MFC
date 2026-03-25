@@ -47,7 +47,7 @@ module m_ib_patches
     ! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
     ! necessary to lay out a particular patch on the grid.
 
-    character(len=5) :: istr  ! string to store int to string result for error checking
+    character(len=5) :: istr  !< string to store int to string result for error checking
 
 contains
 
@@ -55,8 +55,8 @@ contains
     impure subroutine s_apply_ib_patches(ib_markers)
 
         type(integer_field), intent(inout) :: ib_markers
-        integer                            :: i, xp, yp, zp  ! iterators
-        integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper  ! periodic bounds
+        integer                            :: i, xp, yp, zp                                               !< iterators
+        integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper  !< periodic bounds
 
         !  3D Patch Geometries
 
@@ -167,7 +167,7 @@ contains
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xy_local, offset  !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)           :: center            !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -320,7 +320,7 @@ contains
         integer :: Np1, Np2
         integer :: encoded_patch_id
         real(wp), dimension(1:3) :: xyz_local, center, offset  !< x, y, z coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3) :: inverse_rotation
+        real(wp), dimension(1:3,1:3) :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -476,7 +476,7 @@ contains
         real(wp)                           :: corner_distance       !< Equation of state parameters
         real(wp), dimension(1:3)           :: xy_local              !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)           :: length, center        !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
 
@@ -586,7 +586,7 @@ contains
         integer                            :: i, j, k, ir, il, jr, jl, kr, kl  !< Generic loop iterators
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xyz_local, center, length  !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation
         real(wp)                           :: corner_distance
 
         ! Transferring the cuboid's centroid and length information
@@ -655,7 +655,7 @@ contains
         integer                            :: encoded_patch_id
         real(wp)                           :: radius
         real(wp), dimension(1:3)           :: xyz_local, center, length  !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation
         real(wp)                           :: corner_distance
 
         ! Transferring the cylindrical patch's centroid, length, radius,
@@ -727,7 +727,7 @@ contains
         real(wp), dimension(1:3)           :: xy_local              !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)           :: ellipse_coeffs        !< a and b in the ellipse coefficients
         real(wp), dimension(1:2)           :: center                !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
         ! Transferring the ellipse's centroid and length information
 
@@ -783,7 +783,7 @@ contains
         real(wp)                           :: eta, threshold
         real(wp), dimension(1:3)           :: point, local_point, offset
         real(wp), dimension(1:3)           :: center, xy_local
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation, rotation
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
 
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
@@ -856,7 +856,7 @@ contains
         real(wp)                           :: eta, threshold, corner_distance
         real(wp), dimension(1:3)           :: point, local_point, offset
         real(wp), dimension(1:3)           :: center, xyz_local
-        real(wp), dimension(1:3, 1:3)      :: inverse_rotation, rotation
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
         integer                            :: cx, cy, cz
         real(wp)                           :: lx(2), ly(2), lz(2)
         real(wp), dimension(1:3)           :: bbox_min, bbox_max, local_corner, world_corner

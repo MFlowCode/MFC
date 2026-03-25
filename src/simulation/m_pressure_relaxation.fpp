@@ -11,6 +11,7 @@ module m_pressure_relaxation
 
     use m_derived_types
     use m_global_parameters
+
     implicit none
 
     private; public :: s_pressure_relaxation_procedure, s_initialize_pressure_relaxation_module, &

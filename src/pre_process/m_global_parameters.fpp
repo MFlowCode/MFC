@@ -103,28 +103,24 @@ module m_global_parameters
     type(int_bounds_info) :: idwint(1:3)
 
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
-    type(int_bounds_info) :: idwbuff(1:3)
-    type(int_bounds_info) :: bc_x, bc_y, bc_z   !< Boundary conditions in the x-, y- and z-coordinate directions
-    integer               :: shear_num          !< Number of shear stress components
-    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
-    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
-    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
-    !! [indices])
-    integer, dimension(3, 2) :: shear_BC_flip_indices
-    logical                  :: parallel_io           !< Format of the data files
-    logical                  :: file_per_process      !< type of data output
-    integer                  :: precision             !< Precision of output files
-    logical                  :: down_sample           !< Down-sample the output data
-    logical                  :: mixlayer_vel_profile  !< Set hyperbolic tangent streamwise velocity profile
-    real(wp)                 :: mixlayer_vel_coef     !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    logical                  :: mixlayer_perturb      !< Superimpose instability waves to surrounding fluid flow
-    integer                  :: mixlayer_perturb_nk   !< Number of Fourier modes for perturbation with mixlayer_perturb flag
-    !> Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag Default value (k0 = 0.4446) is most unstable mode
-    !! obtained from linear stability analysis See Michalke (1964, JFM) for details
-    real(wp)                   :: mixlayer_perturb_k0
+    type(int_bounds_info)      :: idwbuff(1:3)
+    type(int_bounds_info)      :: bc_x, bc_y, bc_z       !< Boundary conditions in the x-, y- and z-coordinate directions
+    integer                    :: shear_num              !< Number of shear stress components
+    integer, dimension(3)      :: shear_indices          !< Indices of the stress components that represent shear stress
+    integer                    :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2)   :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    logical                    :: parallel_io            !< Format of the data files
+    logical                    :: file_per_process       !< type of data output
+    integer                    :: precision              !< Precision of output files
+    logical                    :: down_sample            !< Down-sample the output data
+    logical                    :: mixlayer_vel_profile   !< Set hyperbolic tangent streamwise velocity profile
+    real(wp)                   :: mixlayer_vel_coef      !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    logical                    :: mixlayer_perturb       !< Superimpose instability waves to surrounding fluid flow
+    integer                    :: mixlayer_perturb_nk    !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    real(wp)                   :: mixlayer_perturb_k0    !< Peak wavenumber for mixlayer perturbation (default: most unstable mode)
     logical                    :: simplex_perturb
     type(simplex_noise_params) :: simplex_params
-    real(wp)                   :: pi_fac  !< Factor for artificial pi_inf
+    real(wp)                   :: pi_fac                 !< Factor for artificial pi_inf
     logical                    :: viscous
     logical                    :: bubbles_lagrange
 
@@ -146,19 +142,14 @@ module m_global_parameters
 #endif
 
     ! Initial Condition Parameters
-    integer :: num_patches  !< Number of patches composing initial condition
-    !> Database of the initial condition patch parameters (icpp) for each of the patches employed in the configuration of the
-    !! initial condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
-    !! m_derived_types.f90.
-    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp
+    integer                                                  :: num_patches     !< Number of patches composing initial condition
+    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp      !< IC patch parameters (max: num_patches_max)
     integer                                                  :: num_bc_patches  !< Number of boundary condition patches
     logical                                                  :: bc_io           !< whether or not to save BC data
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc        !< Boundary condition patch parameters
 
     ! Fluids Physical Parameters
-    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
-    !! equation of state parameters, and the Reynolds numbers.
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     real(wp)                                 :: rhoref, pref  !< Reference parameters for Tait EOS
@@ -189,8 +180,8 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     real(wp) :: poly_sigma
-    integer :: dist_type  ! 1 = binormal, 2 = lognormal-normal
-    integer :: thermal  ! 1 = adiabatic, 2 = isotherm, 3 = transfer
+    integer :: dist_type  !< 1 = binormal, 2 = lognormal-normal
+    integer :: thermal    !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
     real(wp) :: gam_m
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
@@ -219,14 +210,10 @@ module m_global_parameters
     integer, allocatable, dimension(:,:,:) :: logic_grid
     type(pres_field)                       :: pb
     type(pres_field)                       :: mv
-    real(wp)                               :: Bx0  !< Constant magnetic field in the x-direction (1D)
-    !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
-    !! physical computational domain to the next time-step.
-    integer :: buff_size
-    logical :: fft_wrt
-    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
-    !! is false
-    logical :: dummy
+    real(wp)                               :: Bx0        !< Constant magnetic field in the x-direction (1D)
+    integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
+    logical                                :: fft_wrt
+    logical                                :: dummy      !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
 contains
 
@@ -644,7 +631,7 @@ contains
 
                 if (qbmm) then
                     allocate (bub_idx%moms(nb, nmom))
-                    allocate (bub_idx%fullmom(nb, 0:nmom, 0:nmom))
+                    allocate (bub_idx%fullmom(nb,0:nmom,0:nmom))
 
                     do i = 1, nb
                         do j = 1, nmom
@@ -771,15 +758,15 @@ contains
                     shear_num = 1
                     shear_indices(1) = stress_idx%beg - 1 + 2
                     shear_BC_flip_num = 1
-                    shear_BC_flip_indices(1:2, 1) = shear_indices(1)
+                    shear_BC_flip_indices(1:2,1) = shear_indices(1)
                     ! Both x-dir and y-dir: flip tau_xy only
                 else if (num_dims == 3) then
                     shear_num = 3
                     shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
                     shear_BC_flip_num = 2
-                    shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
-                    shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
-                    shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
+                    shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
+                    shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
+                    shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
                     ! x-dir: flip tau_xy and tau_xz y-dir: flip tau_xy and tau_yz z-dir: flip tau_xz and tau_yz
                 end if
             end if
@@ -847,13 +834,13 @@ contains
 
         if (.not. down_sample) then
             do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
         if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
@@ -878,7 +865,7 @@ contains
         end if
 
         if (.not. igr) then
-            allocate (logic_grid(0:m, 0:n, 0:p))
+            allocate (logic_grid(0:m,0:n,0:p))
         end if
 
     end subroutine s_initialize_global_parameters_module

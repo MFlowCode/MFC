@@ -368,25 +368,25 @@ contains
         if (n > 0) then
             ! Simulation is 3D
             if (p > 0) then
-                allocate (rho_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
-                allocate (gamma_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
-                allocate (pi_inf_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
-                allocate (qv_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
+                allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
+                allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
+                allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
+                allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
 
                 ! Simulation is 2D
             else
-                allocate (rho_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
-                allocate (gamma_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
-                allocate (pi_inf_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
-                allocate (qv_sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
             end if
 
             ! Simulation is 1D
         else
-            allocate (rho_sf(-buff_size:m + buff_size, 0:0, 0:0))
-            allocate (gamma_sf(-buff_size:m + buff_size, 0:0, 0:0))
-            allocate (pi_inf_sf(-buff_size:m + buff_size, 0:0, 0:0))
-            allocate (qv_sf(-buff_size:m + buff_size, 0:0, 0:0))
+            allocate (rho_sf(-buff_size:m + buff_size,0:0,0:0))
+            allocate (gamma_sf(-buff_size:m + buff_size,0:0,0:0))
+            allocate (pi_inf_sf(-buff_size:m + buff_size,0:0,0:0))
+            allocate (qv_sf(-buff_size:m + buff_size,0:0,0:0))
         end if
 #endif
 
@@ -395,10 +395,10 @@ contains
     !> Initialize bubble mass-vapor values at quadrature nodes from the conserved moment statistics.
     subroutine s_initialize_mv(qK_cons_vf, mv)
 
-        type(scalar_field), dimension(sys_size), intent(in)                                         :: qK_cons_vf
-        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
-        integer                                                                                     :: i, j, k, l
-        real(wp)                                                                                    :: mu, sig, nbub_sc
+        type(scalar_field), dimension(sys_size), intent(in)                                     :: qK_cons_vf
+        real(stp), dimension(idwint(1)%beg:,idwint(2)%beg:,idwint(3)%beg:,1:,1:), intent(inout) :: mv
+        integer                                                                                 :: i, j, k, l
+        real(wp)                                                                                :: mu, sig, nbub_sc
 
         do l = idwint(3)%beg, idwint(3)%end
             do k = idwint(2)%beg, idwint(2)%end
@@ -424,11 +424,11 @@ contains
     !> Initialize bubble internal pressures at quadrature nodes using isothermal relations from the Preston model.
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
 
-        type(scalar_field), dimension(sys_size), intent(in)                                         :: qK_cons_vf
-        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in)    :: mv
-        real(stp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
-        integer                                                                                     :: i, j, k, l
-        real(wp)                                                                                    :: mu, sig, nbub_sc
+        type(scalar_field), dimension(sys_size), intent(in)                                     :: qK_cons_vf
+        real(stp), dimension(idwint(1)%beg:,idwint(2)%beg:,idwint(3)%beg:,1:,1:), intent(in)    :: mv
+        real(stp), dimension(idwint(1)%beg:,idwint(2)%beg:,idwint(3)%beg:,1:,1:), intent(inout) :: pb
+        integer                                                                                 :: i, j, k, l
+        real(wp)                                                                                :: mu, sig, nbub_sc
 
         do l = idwint(3)%beg, idwint(3)%end
             do k = idwint(2)%beg, idwint(2)%end
@@ -479,18 +479,18 @@ contains
         real(wp)               :: vftmp, nbub_sc
         real(wp)               :: G_K
         real(wp)               :: pres
-        integer                :: i, j, k, l  !< Generic loop iterators
+        integer                :: i, j, k, l               !< Generic loop iterators
         real(wp)               :: T
         real(wp)               :: pres_mag
-        real(wp)               :: Ga  ! Lorentz factor (gamma in relativity)
-        real(wp)               :: B2  ! Magnetic field magnitude squared
-        real(wp)               :: B(3)  ! Magnetic field components
-        real(wp)               :: m2  ! Relativistic momentum magnitude squared
-        real(wp)               :: S  ! Dot product of the magnetic field and the relativistic momentum
-        real(wp)               :: W, dW  ! W := rho*v*Ga**2; f = f(W) in Newton-Raphson
-        real(wp)               :: E, D  ! Prim/Cons variables within Newton-Raphson iteration
-        real(wp)               :: f, dGa_dW, dp_dW, df_dW  ! Functions within Newton-Raphson iteration
-        integer                :: iter  ! Newton-Raphson iteration counter
+        real(wp)               :: Ga                       !< Lorentz factor (gamma in relativity)
+        real(wp)               :: B2                       !< Magnetic field magnitude squared
+        real(wp)               :: B(3)                     !< Magnetic field components
+        real(wp)               :: m2                       !< Relativistic momentum magnitude squared
+        real(wp)               :: S                        !< Dot product of the magnetic field and the relativistic momentum
+        real(wp)               :: W, dW                    !< W := rho*v*Ga**2; f = f(W) in Newton-Raphson
+        real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
+        real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
+        integer                :: iter                     !< Newton-Raphson iteration counter
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
@@ -790,12 +790,12 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp)                         :: e_mix, mix_mol_weight, T
         real(wp)                         :: pres_mag
-        real(wp)                         :: Ga  ! Lorentz factor (gamma in relativity)
-        real(wp)                         :: h  ! relativistic enthalpy
-        real(wp)                         :: v2  ! Square of the velocity magnitude
-        real(wp)                         :: B2  ! Square of the magnetic field magnitude
-        real(wp)                         :: vdotB  ! Dot product of the velocity and magnetic field vectors
-        real(wp)                         :: B(3)  ! Magnetic field components
+        real(wp)                         :: Ga          !< Lorentz factor (gamma in relativity)
+        real(wp)                         :: h           !< relativistic enthalpy
+        real(wp)                         :: v2          !< Square of the velocity magnitude
+        real(wp)                         :: B2          !< Square of the magnetic field magnitude
+        real(wp)                         :: vdotB       !< Dot product of the velocity and magnetic field vectors
+        real(wp)                         :: B(3)        !< Magnetic field components
 
         pres_mag = 0._wp
 
@@ -1016,11 +1016,11 @@ contains
     !> Convert primitive variables to Eulerian flux variables.
     subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b)
 
-        integer, intent(in)                                                              :: s2b, s3b
-        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(in)        :: qK_prim_vf
-        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout)     :: FK_vf
-        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, advxb:), intent(inout) :: FK_src_vf
-        type(int_bounds_info), intent(in)                                                :: is1, is2, is3
+        integer, intent(in)                                                           :: s2b, s3b
+        real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in)        :: qK_prim_vf
+        real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout)     :: FK_vf
+        real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,advxb:), intent(inout) :: FK_src_vf
+        type(int_bounds_info), intent(in)                                             :: is1, is2, is3
 
         ! Partial densities, density, velocity, pressure, energy, advection variables, the specific heat ratio and liquid stiffness
         ! functions, the shear and volume Reynolds numbers and the Weber numbers
@@ -1299,7 +1299,7 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', parallelism='[seq]', cray_noinline=True)
 
         real(wp), intent(in)  :: B(3), rho, c
-        real(wp), intent(in)  :: h  ! only used for relativity
+        real(wp), intent(in)  :: h  !< only used for relativity
         real(wp), intent(out) :: c_fast
         integer, intent(in)   :: norm
         real(wp)              :: B2, term, disc

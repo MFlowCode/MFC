@@ -19,6 +19,7 @@ module m_cbc
     #:if USING_AMD
         use m_chemistry, only: molecular_weights_nonparameter
     #:endif
+
     implicit none
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
@@ -377,13 +378,13 @@ contains
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir_in == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
                 if (weno_order == 1) then
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (:,cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -fd_coef_${XYZ}$ (0, cbc_loc_in)
 
                     ! Computing CBC2 Coefficients
                 else if (weno_order == 3) then
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (:,cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -6._wp/(3._wp*ds(0) + 2._wp*ds(1) - ds(2))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -4._wp*fd_coef_${XYZ}$ (0, cbc_loc_in)/3._wp
                     fd_coef_${XYZ}$ (2, cbc_loc_in) = fd_coef_${XYZ}$ (0, cbc_loc_in)/3._wp
@@ -392,7 +393,7 @@ contains
 
                     ! Computing CBC4 Coefficients
                 else
-                    fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
+                    fd_coef_${XYZ}$ (:,cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, &
                                      & cbc_loc_in) = -50._wp/(25._wp*ds(0) + 2._wp*ds(1) - 1.e1_wp*ds(2) + 1.e1_wp*ds(3) &
                                      & - 3._wp*ds(4))

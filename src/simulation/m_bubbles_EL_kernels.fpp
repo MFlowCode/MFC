@@ -8,6 +8,7 @@
 module m_bubbles_EL_kernels
 
     use m_mpi_proxy
+
     implicit none
 
 contains
@@ -15,10 +16,10 @@ contains
     !> Smear the Lagrangian bubble effects onto the Eulerian grid using the selected kernel
     subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
-        integer, intent(in)                                               :: nBubs
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in)      :: lbk_rad, lbk_vel
-        type(scalar_field), dimension(:), intent(inout)                   :: updatedvar
+        integer, intent(in)                                             :: nBubs
+        real(wp), dimension(1:lag_params%nBubs_glb,1:3,1:2), intent(in) :: lbk_s, lbk_pos
+        real(wp), dimension(1:lag_params%nBubs_glb,1:2), intent(in)     :: lbk_rad, lbk_vel
+        type(scalar_field), dimension(:), intent(inout)                 :: updatedvar
 
         smoothfunc:select case(lag_params%smooth_type)
         case (1)
@@ -32,21 +33,21 @@ contains
     !> Apply the delta kernel function to map bubble effects onto the containing cell
     subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
 
-        integer, intent(in)                                               :: nBubs
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in)      :: lbk_rad, lbk_vel
-        type(scalar_field), dimension(:), intent(inout)                   :: updatedvar
-        integer, dimension(3)                                             :: cell
-        real(wp)                                                          :: strength_vel, strength_vol
-        real(wp)                                                          :: addFun1, addFun2, addFun3
-        real(wp)                                                          :: volpart, Vol
-        real(wp), dimension(3)                                            :: s_coord
-        integer                                                           :: l
+        integer, intent(in)                                             :: nBubs
+        real(wp), dimension(1:lag_params%nBubs_glb,1:3,1:2), intent(in) :: lbk_s
+        real(wp), dimension(1:lag_params%nBubs_glb,1:2), intent(in)     :: lbk_rad, lbk_vel
+        type(scalar_field), dimension(:), intent(inout)                 :: updatedvar
+        integer, dimension(3)                                           :: cell
+        real(wp)                                                        :: strength_vel, strength_vol
+        real(wp)                                                        :: addFun1, addFun2, addFun3
+        real(wp)                                                        :: volpart, Vol
+        real(wp), dimension(3)                                          :: s_coord
+        integer                                                         :: l
 
         $:GPU_PARALLEL_LOOP(private='[l, s_coord, cell]')
         do l = 1, nBubs
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
+            s_coord(1:3) = lbk_s(l,1:3,2)
             call s_get_cell(s_coord, cell)
 
             strength_vol = volpart
@@ -83,22 +84,22 @@ contains
     !> Apply the Gaussian kernel function to smear bubble effects onto surrounding cells
     subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
-        integer, intent(in)                                               :: nBubs
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in)      :: lbk_rad, lbk_vel
-        type(scalar_field), dimension(:), intent(inout)                   :: updatedvar
-        real(wp), dimension(3)                                            :: center
-        integer, dimension(3)                                             :: cell
-        real(wp)                                                          :: stddsv
-        real(wp)                                                          :: strength_vel, strength_vol
-        real(wp), dimension(3)                                            :: nodecoord
-        real(wp)                                                          :: addFun1, addFun2, addFun3
-        real(wp)                                                          :: func, func2, volpart
-        integer, dimension(3)                                             :: cellaux
-        real(wp), dimension(3)                                            :: s_coord
-        integer                                                           :: l, i, j, k
-        logical                                                           :: celloutside
-        integer                                                           :: smearGrid, smearGridz
+        integer, intent(in)                                             :: nBubs
+        real(wp), dimension(1:lag_params%nBubs_glb,1:3,1:2), intent(in) :: lbk_s, lbk_pos
+        real(wp), dimension(1:lag_params%nBubs_glb,1:2), intent(in)     :: lbk_rad, lbk_vel
+        type(scalar_field), dimension(:), intent(inout)                 :: updatedvar
+        real(wp), dimension(3)                                          :: center
+        integer, dimension(3)                                           :: cell
+        real(wp)                                                        :: stddsv
+        real(wp)                                                        :: strength_vel, strength_vol
+        real(wp), dimension(3)                                          :: nodecoord
+        real(wp)                                                        :: addFun1, addFun2, addFun3
+        real(wp)                                                        :: func, func2, volpart
+        integer, dimension(3)                                           :: cellaux
+        real(wp), dimension(3)                                          :: s_coord
+        integer                                                         :: l, i, j, k
+        logical                                                         :: celloutside
+        integer                                                         :: smearGrid, smearGridz
 
         smearGrid = mapCells - (-mapCells) + 1  ! Include the cell that contains the bubble (3+1+3)
         smearGridz = smearGrid
@@ -109,8 +110,8 @@ contains
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
-            center(1:2) = lbk_pos(l, 1:2, 2)
+            s_coord(1:3) = lbk_s(l,1:3,2)
+            center(1:2) = lbk_pos(l,1:2,2)
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)

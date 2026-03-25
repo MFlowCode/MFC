@@ -59,12 +59,12 @@ contains
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
-        type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf
-        type(scalar_field), intent(inout)                            :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout)       :: q_prim_vf
-        integer, intent(in)                                          :: t_step
-        type(scalar_field), intent(inout), optional                  :: beta
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
+        type(scalar_field), intent(inout)                           :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout)      :: q_prim_vf
+        integer, intent(in)                                         :: t_step
+        type(scalar_field), intent(inout), optional                 :: beta
+        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
 
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
@@ -300,7 +300,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the current time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
         logical :: file_exist                               !< Logical used to check existence of current time-step directory
@@ -340,7 +340,7 @@ contains
 
             open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
 
-            write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
+            write (2) q_cons_vf(i)%sf(0:m,0:n,0:p); close (2)
         end do
 
         ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to match the parallel I/O path and allow post_process to
@@ -350,7 +350,7 @@ contains
 
             open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
 
-            write (2) beta%sf(0:m, 0:n, 0:p); close (2)
+            write (2) beta%sf(0:m,0:n,0:p); close (2)
         end if
 
         if (qbmm .and. .not. polytropic) then
@@ -360,7 +360,7 @@ contains
 
                     open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
 
-                    write (2) pb_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                    write (2) pb_ts(1)%sf(0:m,0:n,0:p,r, i); close (2)
                 end do
             end do
 
@@ -370,7 +370,7 @@ contains
 
                     open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
 
-                    write (2) mv_ts(1)%sf(0:m, 0:n, 0:p, r, i); close (2)
+                    write (2) mv_ts(1)%sf(0:m,0:n,0:p,r, i); close (2)
                 end do
             end do
         end if
@@ -651,10 +651,10 @@ contains
     !> Write grid and conservative variable data files in parallel via MPI I/O
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
 
-        type(scalar_field), dimension(sys_size), intent(inout)       :: q_cons_vf
-        integer, intent(in)                                          :: t_step
-        type(scalar_field), intent(inout), optional                  :: beta
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
+        integer, intent(in)                                         :: t_step
+        type(scalar_field), intent(inout), optional                 :: beta
+        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size
@@ -672,7 +672,7 @@ contains
         ! Down sampling variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer :: m_glb_save, n_glb_save, p_glb_save  ! Global save size
+        integer :: m_glb_save, n_glb_save, p_glb_save  !< Global save size
 
         if (down_sample) then
             call s_downsample_data(q_cons_vf, q_cons_temp_ds, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
@@ -858,7 +858,7 @@ contains
         open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
-        write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+        write (2) ib_markers%sf(0:m,0:n,0:p); close (2)
 
     end subroutine s_write_serial_ib_data
 
@@ -962,7 +962,7 @@ contains
 
         integer, intent(in)                                 :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), dimension(0:m, 0:n, 0:p), intent(in)      :: accel_mag
+        real(wp), dimension(0:m,0:n,0:p), intent(in)        :: accel_mag
         real(wp), dimension(-1:m)                           :: distx
         real(wp), dimension(-1:n)                           :: disty
         real(wp), dimension(-1:p)                           :: distz
@@ -1573,7 +1573,7 @@ contains
 
             allocate (q_cons_temp_ds(1:sys_size))
             do i = 1, sys_size
-                allocate (q_cons_temp_ds(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
+                allocate (q_cons_temp_ds(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1))
             end do
         end if
 

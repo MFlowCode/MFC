@@ -27,25 +27,15 @@ module m_icpp_patches
 
     private; public :: s_apply_icpp_patches
 
-    real(wp) :: x_centroid, y_centroid, z_centroid
-    real(wp) :: length_x, length_y, length_z
-    integer  :: smooth_patch_id
-    !> These variables are analogous in both meaning and use to the similarly named components in the ic_patch_parameters type (see
-    !! m_derived_types.f90 for additional details). They are employed as a means to more concisely perform the actions necessary to
-    !! lay out a particular patch on the grid.
-    real(wp) :: smooth_coeff
-    !> In the case that smoothing of patch boundaries is enabled and the boundary between two adjacent patches is to be smeared out,
-    !! this variable's purpose is to act as a pseudo volume fraction to indicate the contribution of each patch toward the
-    !! composition of a cell's fluid state.
-    real(wp) :: eta
-    real(wp) :: cart_x, cart_y, cart_z
-    !> Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
-    real(wp) :: sph_phi
-    !> These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the
-    !! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
-    !! necessary to lay out a particular patch on the grid.
-    type(bounds_info) :: x_boundary, y_boundary, z_boundary
-    character(len=5)  :: istr  ! string to store int to string result for error checking
+    real(wp)          :: x_centroid, y_centroid, z_centroid
+    real(wp)          :: length_x, length_y, length_z
+    integer           :: smooth_patch_id
+    real(wp)          :: smooth_coeff                        !< Smoothing coefficient (mirrors ic_patch_parameters%smooth_coeff)
+    real(wp)          :: eta                                 !< Pseudo volume fraction for patch boundary smoothing
+    real(wp)          :: cart_x, cart_y, cart_z
+    real(wp)          :: sph_phi                             !< Spherical phi for Cartesian conversion in cylindrical coordinates
+    type(bounds_info) :: x_boundary, y_boundary, z_boundary  !< Patch boundary locations in x, y, z
+    character(len=5)  :: istr                                !< string to store int to string result for error checking
 
 contains
 
@@ -55,9 +45,9 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         integer :: i
 
@@ -170,9 +160,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -230,9 +220,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -295,9 +285,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: radius
@@ -349,9 +339,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -406,9 +396,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -469,9 +459,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop operators
@@ -526,9 +516,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -598,9 +588,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k                   !< generic loop iterators
@@ -668,9 +658,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop operators
@@ -725,9 +715,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k                   !< generic loop iterators
@@ -796,9 +786,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -850,9 +840,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: r, theta, R_boundary, sum_series
@@ -905,9 +895,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: dx_loc, dy_loc, dz_loc, r, theta, phi, R_surface, eta_local
@@ -969,9 +959,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -1038,9 +1028,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -1108,9 +1098,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -1203,9 +1193,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -1271,9 +1261,9 @@ contains
         integer, intent(in) :: patch_id
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -1288,10 +1278,10 @@ contains
         type(t_model) :: model
         type(ic_model_parameters) :: params
         real(wp), dimension(1:3) :: point, model_center
-        real(wp) :: grid_mm(1:3, 1:2)
+        real(wp) :: grid_mm(1:3,1:2)
         integer :: cell_num
         integer :: ncells
-        real(wp), dimension(1:4, 1:4) :: transform, transform_n
+        real(wp), dimension(1:4,1:4) :: transform, transform_n
 
         if (proc_rank == 0) then
             print *, " * Reading model: " // trim(patch_icpp(patch_id)%model_filepath)
@@ -1347,9 +1337,9 @@ contains
                 grid_mm(3,:) = (/0._wp, 0._wp/)
             end if
 
-            write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:, 1)
-            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:, 1) + grid_mm(:, 2))/2._wp
-            write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
+            write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
+            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2._wp
+            write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
         end if
 
         ncells = (m + 1)*(n + 1)*(p + 1)

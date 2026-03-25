@@ -96,8 +96,8 @@ contains
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
             ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
-            allocate (q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                      & idwbuff(3)%beg:idwbuff(3)%end, 1:sys_size))
+            allocate (q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+                      & idwbuff(3)%beg:idwbuff(3)%end,1:sys_size))
         end if
 
         do j = 1, sys_size
@@ -108,8 +108,8 @@ contains
             if (num_ts == 2) then
                 if (nv_uvm_out_of_core) then
                     ! q_cons_ts(2) lives on the host
-                    q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                              & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:, j)
+                    q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+                              & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
                 else
                     @:ALLOCATE(q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
@@ -134,11 +134,11 @@ contains
                          & %beg + 1)*sys_size
         call hipCheck(hipMalloc_(cptr_device, pool_size*2_8))
         call c_f_pointer(cptr_device, q_cons_ts_pool_device, shape=pool_dims)
-        q_cons_ts_pool_device(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:) => q_cons_ts_pool_device
+        q_cons_ts_pool_device(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_device
 
         call hipCheck(hipMallocManaged_(cptr_host, pool_size*2_8, hipMemAttachGlobal))
         call c_f_pointer(cptr_host, q_cons_ts_pool_host, shape=pool_dims)
-        q_cons_ts_pool_host(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:) => q_cons_ts_pool_host
+        q_cons_ts_pool_host(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_host
 #else
         ! Doing hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
@@ -160,12 +160,12 @@ contains
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
-            q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                      & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:, j)
+            q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+                      & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:,j)
             if (num_ts == 2) then
                 ! q_cons_ts(2) lives on the host
-                q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                          & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:, j)
+                q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+                          & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
             end if
         end do
 

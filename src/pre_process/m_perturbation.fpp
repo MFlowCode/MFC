@@ -23,7 +23,7 @@ contains
     impure subroutine s_initialize_perturbation_module()
 
         if (elliptic_smoothing) then
-            allocate (q_prim_temp(0:m, 0:n, 0:p, 1:sys_size))
+            allocate (q_prim_temp(0:m,0:n,0:p,1:sys_size))
         end if
 
     end subroutine s_initialize_perturbation_module
@@ -88,9 +88,9 @@ contains
     !> Iteratively smooth all primitive variable fields using a discrete elliptic (Laplacian) filter.
     impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        integer                                                     :: i, j, k, l, q
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_prim_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters
             ! Communication of buffer regions and apply boundary conditions
