@@ -400,12 +400,12 @@ jobs:
             echo "Coverage cache: none available — full test suite will run"
           fi
 
-      - name: Build (login node)
+      - name: Fetch Dependencies
         if:   matrix.cluster != 'phoenix'
         timeout-minutes: 60
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
-      - name: Test
+      - name: Build & Test
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
       - name: Cancel SLURM Jobs

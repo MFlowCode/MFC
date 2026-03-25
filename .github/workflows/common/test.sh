@@ -21,28 +21,28 @@ if [ "$job_cluster" = "phoenix" ]; then
     trap 'rm -rf "$currentdir" || true' EXIT
 fi
 
-# --- Build (if not pre-built on login node) ---
-# Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
-# Phoenix builds inside SLURM on heterogeneous compute nodes — always start fresh
-# to avoid SIGILL from stale binaries compiled on a different microarchitecture.
+# --- Build ---
+# Phoenix builds everything inside SLURM (no login-node build step).
+# Frontier/Frontier AMD: deps already fetched on login node via --deps-only;
+# source code is built here on the compute node.
+# Phoenix: always start fresh to avoid SIGILL from stale binaries compiled
+# on a different microarchitecture.
 if [ "$job_cluster" = "phoenix" ]; then
     source .github/scripts/clean-build.sh
     clean_build
 fi
 
-if [ ! -d "build" ]; then
-    source .github/scripts/retry-build.sh
+source .github/scripts/retry-build.sh
 
-    # Phoenix: smoke-test the syscheck binary to catch architecture mismatches
-    # (SIGILL from binaries compiled on a different compute node).
-    validate_cmd=""
-    if [ "$job_cluster" = "phoenix" ]; then
-        validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || "$syscheck_bin" > /dev/null 2>&1'
-    fi
-
-    RETRY_VALIDATE_CMD="$validate_cmd" \
-        retry_build ./mfc.sh test -v --dry-run -j 8 $build_opts || exit 1
+# Phoenix: smoke-test the syscheck binary to catch architecture mismatches
+# (SIGILL from binaries compiled on a different compute node).
+validate_cmd=""
+if [ "$job_cluster" = "phoenix" ]; then
+    validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || "$syscheck_bin" > /dev/null 2>&1'
 fi
+
+RETRY_VALIDATE_CMD="$validate_cmd" \
+    retry_build ./mfc.sh test -v --dry-run -j 8 $build_opts || exit 1
 
 # --- GPU detection and thread count ---
 device_opts=""
