@@ -42,13 +42,16 @@ if [ "$job_cluster" = "phoenix" ]; then
 fi
 
 # Frontier Cray: -j 1 to work around CCE 19.0.0 IPA SIGSEGV
+# Frontier Cray: --debug for backtrace on build/runtime errors
 build_jobs=8
+debug_opts=""
 if [ "$job_cluster" = "frontier" ]; then
     build_jobs=1
+    debug_opts="--debug"
 fi
 
 RETRY_VALIDATE_CMD="$validate_cmd" \
-    retry_build ./mfc.sh test -v --dry-run -j $build_jobs $build_opts || exit 1
+    retry_build ./mfc.sh test -v --dry-run -j $build_jobs $debug_opts $build_opts || exit 1
 
 # --- GPU detection and thread count ---
 device_opts=""
@@ -94,4 +97,4 @@ if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
     prune_flag="--only-changes"
 fi
 
-./mfc.sh test -v --max-attempts 3 $prune_flag -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
+./mfc.sh test -v --max-attempts 3 $prune_flag -a -j $n_test_threads $rdma_opts $device_opts $debug_opts $build_opts $shard_opts -- -c $job_cluster
