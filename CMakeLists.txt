@@ -191,9 +191,9 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
-                "SHELL: -K trap=fp" "SHELL: -G2"
+                "SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0"
         )
-        add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
+        add_link_options("SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0")
     endif()
 
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
