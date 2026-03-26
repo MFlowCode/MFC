@@ -1332,7 +1332,7 @@ contains
         call s_mpi_finalize()
     end subroutine s_finalize_modules
 
-    !> @brief Reads IB kinematic state from D/ib_state.dat on restart.
+    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart.
     !! Rank 0 reads the last num_ibs records and broadcasts to all ranks.
     !! Overwrites patch_ib vel, angular_vel, angles, and centroid.
     impure subroutine s_read_ib_restart_data()
@@ -1345,7 +1345,7 @@ contains
         real(wp) :: xc_read, yc_read, zc_read
 
         if (proc_rank == 0) then
-            file_loc = trim(case_dir)//'/D/ib_state.dat'
+            file_loc = trim(case_dir)//'/restart_data/ib_state.dat'
 
             open (newunit=file_unit, file=trim(file_loc), &
                   form='unformatted', access='stream', &

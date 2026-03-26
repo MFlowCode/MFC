@@ -124,7 +124,7 @@ contains
             end if
         end do
 
-        do i = 1, num_ib_patches_max
+        do i = 1, num_ibs
             #:for VAR in ['vel', 'angular_vel', 'angles']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor

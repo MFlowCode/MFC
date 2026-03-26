@@ -264,7 +264,7 @@ contains
         integer :: ios
 
         write (file_loc, '(A)') 'ib_state.dat'
-        file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+        file_loc = trim(case_dir)//'/restart_data/'//trim(file_loc)
         if (t_step_start /= 0) then
             ! On restart, append to existing file to preserve history
             open (newunit=ib_state_unit, file=trim(file_loc), &
@@ -1166,7 +1166,7 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> @brief Writes IB state records to D/ib_state.dat. Must be called only on rank 0.
+    !> @brief Writes IB state records to restart_data/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file()
 
         integer :: i
