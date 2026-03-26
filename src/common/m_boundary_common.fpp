@@ -101,8 +101,8 @@ contains
                         call s_dirichlet(q_prim_vf, 1, -1, k, l)
                     end select
 
-                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. &
-                        (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 1)%sf(0, k, &
+                        & l) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(1, -1, k, l, pb_in, mv_in)
                     end if
                 end do
@@ -131,8 +131,8 @@ contains
                         call s_dirichlet(q_prim_vf, 1, 1, k, l)
                     end select
 
-                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. &
-                        (bc_type(1, 2)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 2)%sf(0, k, &
+                        & l) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(1, 1, k, l, pb_in, mv_in)
                     end if
                 end do
@@ -168,9 +168,8 @@ contains
                             call s_dirichlet(q_prim_vf, 2, -1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. &
-                            (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. &
-                            (bc_type(2, 1)%sf(k, 0, l) /= BC_AXIS)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 1)%sf(k, 0, &
+                            & l) <= BC_GHOST_EXTRAP) .and. (bc_type(2, 1)%sf(k, 0, l) /= BC_AXIS)) then
                             call s_qbmm_extrapolation(2, -1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -199,8 +198,8 @@ contains
                             call s_dirichlet(q_prim_vf, 2, 1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. &
-                            (bc_type(2, 2)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 2)%sf(k, 0, &
+                            & l) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(2, 1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -235,8 +234,8 @@ contains
                             call s_dirichlet(q_prim_vf, 3, -1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. &
-                            (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 1)%sf(k, l, &
+                            & 0) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(3, -1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -265,8 +264,8 @@ contains
                             call s_dirichlet(q_prim_vf, 3, 1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. &
-                            (bc_type(3, 2)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 2)%sf(k, l, &
+                            & 0) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(3, 1, k, l, pb_in, mv_in)
                         end if
                     end do
