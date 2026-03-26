@@ -182,7 +182,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm"
         "SHELL: -munsafe-fp-atomics" # Not unsafe for operations we do
-        "SHELL: -h ipa0" # Work around CCE 19.0.0 IPA SIGSEGV in optcg
     )
 
     add_link_options("SHELL:-hkeepfiles")

@@ -36,13 +36,7 @@ case "$job_interface" in
     *)   echo "ERROR: prebuild requires gpu interface (acc or omp)"; exit 1 ;;
 esac
 
-# Frontier Cray: --debug for backtrace on build/runtime errors
-debug_opts=""
-if [ "$cluster" = "frontier" ]; then
-    debug_opts="--debug"
-fi
-
 for case in benchmarks/*/case.py; do
     echo "=== Pre-building: $case ==="
-    ./mfc.sh build -i "$case" --case-optimization $debug_opts $gpu_opts -j 8
+    ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
 done

@@ -24,20 +24,23 @@ benchmarks=(
 # For Frontier/Frontier AMD: deps were fetched on the login node via --deps-only;
 # build case-optimized binaries here on the compute node before running.
 # For Phoenix: prebuild-case-optimization.sh already built everything in a prior SLURM job.
-# Frontier Cray: -j 1 to work around CCE 19.0.0 IPA SIGSEGV
-# Frontier Cray: --debug for backtrace on build/runtime errors
-build_jobs=8
-debug_opts=""
-if [ "$job_cluster" = "frontier" ]; then
-    build_jobs=1
-    debug_opts="--debug"
-fi
-
+#
+# Clean stale MFC target staging before building. On self-hosted CI runners,
+# corrupted intermediate files from a prior failed build (e.g. CCE optcg crash)
+# can persist and poison subsequent builds. Each case-opt config gets its own
+# hash-named staging dir, but install dirs and other artifacts may be stale.
 if [ "$job_cluster" != "phoenix" ]; then
+    # Clean stale MFC target dirs (hash-named) from prior builds, but
+    # preserve dependency dirs (hipfort, fftw, etc.) since the compute
+    # node has no internet to re-fetch them.
+    echo "=== Cleaning stale MFC target staging/install ==="
+    find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+
     echo "=== Building case-optimized binaries on compute node ==="
     for case in "${benchmarks[@]}"; do
         echo "--- Building: $case ---"
-        ./mfc.sh build -i "$case" --case-optimization $debug_opts $gpu_opts -j $build_jobs
+        ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
     done
     echo "=== All case-optimized binaries built ==="
 fi
@@ -58,7 +61,7 @@ for case in "${benchmarks[@]}"; do
     rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
 
     # Build + run with --case-optimization, small grid, 10 timesteps
-    if ./mfc.sh run "$case" --case-optimization $debug_opts $gpu_opts -n "$ngpus" -j 8 -- --gbpp 1 --steps 10; then
+    if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -- --gbpp 1 --steps 10; then
         # Validate output
         if build/venv/bin/python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
             echo "PASS: $case_name"
