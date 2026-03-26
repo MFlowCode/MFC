@@ -1038,11 +1038,11 @@ def _load():
         "mixture_err",
         "rdma_mpi",
         "igr_pres_lim",
-        "int_comp",
         "nv_uvm_out_of_core",
         "nv_uvm_pref_gpu",
     ]:
         _r(n, LOG)
+    _r("int_comp", INT)
     _r("case_dir", STR)
 
     # Body force

@@ -34,7 +34,7 @@ print(
             # "weno_eps": 1e-16,
             "muscl_order": 2,
             "muscl_lim": 1,
-            "int_comp": "T",
+            "int_comp": 1,
             "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,
