@@ -309,6 +309,12 @@ module m_derived_types
         real(wp) :: R_g      !< gas constant of gas (bubble)
     end type subgrid_bubble_physical_parameters
 
+    !> Physical parameters for Lagrangian solid particles
+    type subgrid_particle_physical_parameters
+        real(wp) :: rho0ref_particle  !< Reference particle density
+        real(wp) :: cp_particle       !< Specific heat capacity of particle
+    end type subgrid_particle_physical_parameters
+
     type mpi_io_airfoil_ib_var
         integer, dimension(2)                    :: view
         type(vec3_dt), allocatable, dimension(:) :: var
