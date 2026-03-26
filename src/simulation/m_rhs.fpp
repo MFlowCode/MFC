@@ -19,6 +19,7 @@ module m_rhs
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use m_qbmm
     use m_hypoelastic
     use m_hyperelastic
@@ -554,7 +555,6 @@ contains
         real(wp) :: t_start, t_finish
         integer :: id
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
-
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
         call nvtxStartRange("COMPUTE-RHS")
@@ -673,7 +673,6 @@ contains
                 end if
             end if
             if ((.not. igr) .or. dummy) then  ! Finite volume solve
-
                 ! Reconstructing Primitive/Conservative Variables
                 call nvtxStartRange("RHS-WENO")
 
@@ -751,6 +750,7 @@ contains
                     irx%beg = 0; iry%beg = 0; irz%beg = -1
                 end if
                 irx%end = m; iry%end = n; irz%end = p
+
                 ! Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
                 call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, &
@@ -848,14 +848,31 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            ! RHS additions for sub-grid bubbles_lagrange
-            call nvtxStartRange("RHS-EL-BUBBLES-SRC")
-            call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
-            call nvtxEndRange
-            ! Compute bubble dynamics
+            ! RHS additions for sub-grid bubbles_lagrange Compute bubble dynamics
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
-                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), stage)
+                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+                call nvtxEndRange
+            end if
+
+            if (lag_params%solver_approach == 2) then
+                call nvtxStartRange("RHS-EL-BUBBLES-SRC")
+                call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
+                call nvtxEndRange
+            end if
+        end if
+
+        if (particles_lagrange) then
+            ! Compute particle dynamics, forces, dvdt
+            call nvtxStartRange("RHS-EL-PARTICLES-DYN")
+            call s_compute_particle_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, rhs_vf)
+            call nvtxEndRange
+
+            ! RHS additions for sub-grid particles_lagrange
+            if (lag_params%solver_approach == 2) then
+                call nvtxStartRange("RHS-EL-PARTICLES-SRC")
+                call s_compute_particles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf, stage)
                 call nvtxEndRange
             end if
         end if
@@ -870,7 +887,7 @@ contains
 
         ! END: Additional physics and source terms
 
-        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange .or. particles_lagrange) then
             if (.not. igr .or. dummy) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
                 do i = 1, sys_size
@@ -1010,7 +1027,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             if (model_eqns == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do l = 0, p
                     do k = 0, n
@@ -1106,7 +1123,7 @@ contains
             end if
 
             if (model_eqns == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do k = 0, p
                     do q = 0, n
@@ -1133,7 +1150,6 @@ contains
 
         !> Add the advection source flux-difference terms for a single coordinate direction to the RHS
         subroutine s_add_directional_advection_source_terms(current_idir, rhs_vf_arg, q_cons_vf_arg, q_prim_vf_arg, &
-
             & flux_src_n_vf_arg, Kterm_arg)
             integer, intent(in)                                    :: current_idir
             type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf_arg

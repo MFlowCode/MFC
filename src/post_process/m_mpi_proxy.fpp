@@ -34,7 +34,6 @@ contains
         ! Allocating and configuring the receive counts and the displacement vector variables used in variable-gather communication
         ! procedures. Note that these are only needed for either multidimensional runs that utilize the Silo database file format or
         ! for 1D simulations.
-
         if ((format == 1 .and. n > 0) .or. n == 0) then
             allocate (recvcounts(0:num_procs - 1))
             allocate (displs(0:num_procs - 1))
@@ -65,7 +64,6 @@ contains
         integer :: i     !< Generic loop iterator
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Logistics
-
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',               &
@@ -87,11 +85,22 @@ contains
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
             & 'output_partial_domain', 'relativity', 'cont_damage', 'bc_io',   &
-            & 'down_sample','fft_wrt', 'hyper_cleaning', 'ib_state_wrt']
+            & 'down_sample','fft_wrt', 'hyper_cleaning', 'ib_state_wrt',   &
+            & 'particles_lagrange' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
         if (bubbles_lagrange) then
+            #:for VAR in ['lag_header', 'lag_txt_wrt', 'lag_db_wrt', 'lag_id_wrt',         &
+                & 'lag_pos_wrt', 'lag_pos_prev_wrt', 'lag_vel_wrt', 'lag_rad_wrt', &
+                & 'lag_rvel_wrt', 'lag_r0_wrt', 'lag_rmax_wrt', 'lag_rmin_wrt',    &
+                & 'lag_dphidt_wrt', 'lag_pres_wrt', 'lag_mv_wrt', 'lag_mg_wrt',    &
+                & 'lag_betaT_wrt', 'lag_betaC_wrt']
+                call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
+
+        if (particles_lagrange) then
             #:for VAR in ['lag_header', 'lag_txt_wrt', 'lag_db_wrt', 'lag_id_wrt',         &
                 & 'lag_pos_wrt', 'lag_pos_prev_wrt', 'lag_vel_wrt', 'lag_rad_wrt', &
                 & 'lag_rvel_wrt', 'lag_r0_wrt', 'lag_rmax_wrt', 'lag_rmin_wrt',    &
@@ -127,6 +136,13 @@ contains
             #:endfor
         end if
 
+        ! Subgrid particle parameters
+        if (particles_lagrange) then
+            #:for VAR in ['rho0ref_particle','cp_particle']
+                call MPI_BCAST(particle_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
+
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
             & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop',   &
             & 'x_output%beg', 'x_output%end', 'y_output%beg', &
@@ -148,7 +164,6 @@ contains
         real(wp) :: ext_temp(0:num_procs - 1)
 
         ! Simulation is 3D
-
         if (p > 0) then
             if (grid_geometry == 3) then
                 ! Minimum spatial extent in the r-direction
@@ -236,7 +251,6 @@ contains
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Silo-HDF5 database format
-
         if (format == 1) then
             call MPI_GATHERV(x_cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
@@ -296,7 +310,6 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Gathering the sub-domain flow variable data from all the processes and putting it back together for the entire
         ! computational domain on the process with rank 0
-
         call MPI_GATHERV(q_sf(0), m + 1, mpi_p, q_root_sf(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 

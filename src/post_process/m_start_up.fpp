@@ -70,7 +70,8 @@ contains
             & bubbles_lagrange, sim_data, hyperelasticity, Bx0, relativity, cont_damage, hyper_cleaning, num_bc_patches, igr, &
             & igr_order, down_sample, recon_type, muscl_order, lag_header, lag_txt_wrt, lag_db_wrt, lag_id_wrt, lag_pos_wrt, &
             & lag_pos_prev_wrt, lag_vel_wrt, lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, lag_rmin_wrt, lag_dphidt_wrt, &
-            & lag_pres_wrt, lag_mv_wrt, lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, alpha_rho_e_wrt, ib_state_wrt
+            & lag_pres_wrt, lag_mv_wrt, lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, alpha_rho_e_wrt, ib_state_wrt, &
+            & particles_lagrange, particle_pp
 
         file_loc = 'post_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -724,8 +725,7 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) then
-            ! Void fraction field
+        if (bubbles_lagrange .or. particles_lagrange) then
             q_sf(:,:,:) = 1._wp - q_cons_vf(beta_idx)%sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
                  & -offset_z%beg:p + offset_z%end)
             write (varname, '(A)') 'voidFraction'
@@ -838,6 +838,9 @@ contains
         call s_initialize_global_parameters_module()
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
+        end if
+        if (particles_lagrange) then
+            call s_initialize_particles_model()
         end if
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()

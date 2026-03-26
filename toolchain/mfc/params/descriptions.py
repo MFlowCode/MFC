@@ -250,6 +250,14 @@ DESCRIPTIONS = {
     "lag_mg_wrt": "Write bubble gas mass",
     "lag_betaT_wrt": "Write bubble heat transfer coefficient",
     "lag_betaC_wrt": "Write bubble mass transfer coefficient",
+    # Interfacial flow parameters
+    "interface_file": "Path to interface geometry data file",
+    "normFac": "Interface normalization factor",
+    "normMag": "Interface normal magnitude",
+    "g0_ic": "Initial gas volume fraction for interfacial IC",
+    "p0_ic": "Initial pressure for interfacial IC",
+    # Particle parameters
+    "particles_lagrange": "Enable Lagrangian solid particle solver",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters

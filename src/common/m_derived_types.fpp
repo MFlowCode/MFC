@@ -396,18 +396,31 @@ module m_derived_types
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
 
-        integer  :: solver_approach      !< 1: One-way coupling, 2: two-way coupling
-        integer  :: cluster_type         !< Cluster model to find p_inf
-        logical  :: pressure_corrector   !< Cell pressure correction term
-        integer  :: smooth_type          !< Smoothing function. 1: Gaussian, 2:Delta 3x3
-        logical  :: heatTransfer_model   !< Activate HEAT transfer model at the bubble-liquid interface
-        logical  :: massTransfer_model   !< Activate MASS transfer model at the bubble-liquid interface
-        logical  :: write_bubbles        !< Write files to track the bubble evolution each time step
-        logical  :: write_bubbles_stats  !< Write the maximum and minimum radius of each bubble
-        integer  :: nBubs_glb            !< Global number of bubbles
-        real(wp) :: epsilonb             !< Standard deviation scaling for the gaussian function
-        real(wp) :: charwidth            !< Domain virtual depth (z direction, for 2D simulations)
-        real(wp) :: valmaxvoid           !< Maximum void fraction permitted
+        integer                    :: solver_approach      !< 1: One-way coupling, 2: two-way coupling
+        integer                    :: cluster_type         !< Cluster model to find p_inf
+        logical                    :: pressure_corrector   !< Cell pressure correction term
+        integer                    :: smooth_type          !< Smoothing function. 1: Gaussian, 2:Delta 3x3
+        logical                    :: heatTransfer_model   !< Activate HEAT transfer model at the bubble-liquid interface
+        logical                    :: massTransfer_model   !< Activate MASS transfer model at the bubble-liquid interface
+        logical                    :: write_bubbles        !< Write files to track the bubble evolution each time step
+        logical                    :: write_bubbles_stats  !< Write the maximum and minimum radius of each bubble
+        integer                    :: nBubs_glb            !< Global number of bubbles
+        real(wp)                   :: epsilonb             !< Standard deviation scaling for the gaussian function
+        real(wp)                   :: charwidth            !< Domain virtual depth (z direction, for 2D simulations)
+        real(wp)                   :: valmaxvoid           !< Maximum void fraction permitted
+        logical                    :: write_void_evol      !< Write files to track evolution of void fraction at each time step
+        integer                    :: nParticles_glb       !< Global number of particles
+        integer                    :: vel_model            !< Particle velocity model
+        integer                    :: drag_model           !< Particle drag model
+        logical                    :: pressure_force       !< Include pressure force translational motion
+        logical                    :: gravity_force        !< Include gravity force in translational motion
+        integer                    :: qs_drag_model        !< Particle QS drag model
+        integer                    :: stokes_drag          !< Particle stokes drag
+        integer                    :: added_mass_model     !< Particle added mass model
+        integer                    :: interpolation_order  !< Fluid-to-Particle barycentric interpolation order
+        logical                    :: collision_force      !< Include collision forces
+        character(LEN=pathlen_max) :: input_path           !< Path to lag_bubbles.dat
+        integer                    :: charNz               !< Number of grid cells in characteristic depth
     end type bubbles_lagrange_parameters
 
     !> Max and min number of cells in a direction of each combination of x-,y-, and z-

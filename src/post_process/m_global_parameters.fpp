@@ -26,6 +26,7 @@ module m_global_parameters
     ! Computational Domain Parameters
 
     integer :: proc_rank  !< Rank of the local processor
+
     !> @name Number of cells in the x-, y- and z-coordinate directions
     !> @{
     integer :: m, m_root
@@ -50,6 +51,7 @@ module m_global_parameters
 
     integer :: num_dims  !< Number of spatial dimensions
     integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
+
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
@@ -66,10 +68,14 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    integer :: buff_size     !< Number of ghost cells for boundary condition storage
-    integer :: t_step_start  !< First time-step directory
-    integer :: t_step_stop   !< Last time-step directory
-    integer :: t_step_save   !< Interval between consecutive time-step directory
+    !> Number of cells in buffer region. For the variables which feature a buffer region, this region is used to store information
+    !! outside the computational domain based on the boundary conditions.
+    integer              :: buff_size     !< Number of ghost cells for boundary condition storage
+    integer, allocatable :: beta_vars(:)  !< Indices of variables to communicate for bubble/particle coupling
+    integer              :: t_step_start  !< First time-step directory
+    integer              :: t_step_stop   !< Last time-step directory
+    integer              :: t_step_save   !< Interval between consecutive time-step directory
+
     !> @name IO options for adaptive time-stepping
     !> @{
     logical  :: cfl_adap_dt, cfl_const_dt, cfl_dt
@@ -80,7 +86,8 @@ module m_global_parameters
     integer  :: n_start
     !> @}
 
-    ! NOTE: m_root, x_root_cb, x_root_cc = defragmented grid (1D only; equals m, x_cb, x_cc in serial)
+    ! NOTE: The variables m_root, x_root_cb and x_root_cc contain the grid data of the defragmented computational domain. They are
+    ! only used in 1D. For serial simulations, they are equal to m, x_cb and x_cc, respectively.
 
     !> @name Simulation Algorithm Parameters
     !> @{
@@ -110,6 +117,7 @@ module m_global_parameters
     !> @}
 
     integer :: avg_state  !< Average state evaluation method
+
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
@@ -135,7 +143,8 @@ module m_global_parameters
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
-    ! Cell indices (InDices With BUFFer): includes buffer in simulation only
+    ! Cell Indices for the entire (local) domain. In simulation, this includes the buffer region. idwbuff and idwint are the same
+    ! otherwise. Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
     integer               :: num_bc_patches
     logical               :: bc_io
@@ -144,16 +153,23 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
 
-    integer                            :: shear_num  !< Number of shear stress components
-    integer, dimension(3)              :: shear_indices  !< Indices of the stress components that represent shear stress
-    integer                            :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2)           :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
-    logical                            :: parallel_io  !< Format of the data files
-    logical                            :: sim_data
-    logical                            :: file_per_process  !< output format
-    integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    integer               :: shear_num          !< Number of shear stress components
+    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
+    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
+    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
+    !! [indices])
+    integer, dimension(3, 2)               :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    logical                                :: parallel_io  !< Format of the data files
+    logical                                :: sim_data
+    logical                                :: file_per_process  !< output format
+    integer, allocatable, dimension(:)     :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    type(int_bounds_info), dimension(3)    :: nidx
+    integer, allocatable, dimension(:,:,:) :: neighbor_ranks
+    !! Neighbor processor ranks
+
     integer, allocatable, dimension(:) :: start_idx  !< Starting cell-center index of local processor in global grid
-    integer                            :: num_ibs  !< Number of immersed boundaries
+    integer                            :: num_ibs    !< Number of immersed boundaries
+
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
@@ -168,10 +184,17 @@ module m_global_parameters
     integer                 :: mpi_info_int
     !> @}
 
+    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
+    !! equation of state parameters, and the Reynolds numbers.
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
+
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
-    real(wp), allocatable, dimension(:)      :: adv  !< Advection variables
+
+    ! Subgrid Particle Parameters
+    type(subgrid_particle_physical_parameters) :: particle_pp
+    real(wp), allocatable, dimension(:)        :: adv  !< Advection variables
+
     ! Formatted Database File(s) Structure Parameters
 
     integer               :: format                                    !< Format of the database file(s)
@@ -180,6 +203,7 @@ module m_global_parameters
     logical               :: output_partial_domain                     !< Specify portion of domain to output for post-processing
     type(bounds_info)     :: x_output, y_output, z_output              !< Portion of domain to output for post-processing
     type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx  !< Indices of domain to output for post-processing
+
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions. The definition of the ghost zone layers is only
     !! necessary when using the Silo database file format in multidimensions. These zones provide VisIt with the subdomain
     !! connectivity information that it requires in order to produce smooth plots.
@@ -201,6 +225,8 @@ module m_global_parameters
     logical                            :: E_wrt
     logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
     logical                            :: fft_wrt
+    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
+    !! is false
     logical                            :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
     logical                            :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
@@ -240,9 +266,19 @@ module m_global_parameters
     logical                            :: lag_betaC_wrt
     !> @}
 
+    !> Amplitude coefficients of the numerical Schlieren function that are used to adjust the intensity of numerical Schlieren
+    !! renderings for individual fluids. This enables waves and interfaces of varying strengths and in all of the fluids to be made
+    !! simultaneously visible on a single plot.
     real(wp), dimension(num_fluids_max) :: schlieren_alpha  !< Per-fluid Schlieren intensity amplitude coefficients
-    integer                             :: fd_order         !< Finite-difference order for vorticity and Schlieren derivatives
-    integer                             :: fd_number        !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+
+    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when
+    !! vorticity and/or the numerical Schlieren function are to be outputted to the formatted database file(s).
+    integer :: fd_order  !< Finite-difference order for vorticity and Schlieren derivatives
+
+    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
+    !! finite-difference stencil for the selected order of accuracy.
+    integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+
     !> @name Reference parameters for Tait EOS
     !> @{
     real(wp) :: rhoref, pref
@@ -271,6 +307,11 @@ module m_global_parameters
     integer :: nmom
     !> @}
 
+    !> @name Particle modeling variables and parameters
+    !> @{
+    real(wp) :: cp_particle, rho0ref_particle
+    !> @}
+
     !> @name surface tension coefficient
     !> @{
     real(wp) :: sigma
@@ -292,6 +333,7 @@ module m_global_parameters
     !> @name Lagrangian bubbles
     !> @{
     logical :: bubbles_lagrange
+    logical :: particles_lagrange
     !> @}
 
     real(wp) :: Bx0                       !< Constant magnetic field in the x-direction (1D)
@@ -304,6 +346,7 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i  !< Generic loop iterator
+
         ! Logistics
 
         case_dir = '.'
@@ -398,6 +441,10 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
+        ! Subgrid particle parameters
+        particle_pp%rho0ref_particle = dflt_real
+        particle_pp%cp_particle = dflt_real
+
         ! Formatted database file(s) structure parameters
         format = dflt_int
 
@@ -477,6 +524,7 @@ contains
 
         ! Lagrangian bubbles modeling
         bubbles_lagrange = .false.
+        particles_lagrange = .false.
 
         ! IBM
         num_ibs = dflt_int
@@ -606,10 +654,9 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange) then
-                beta_idx = sys_size + 1
-                sys_size = beta_idx
-            end if
+            ! if (bubbles_lagrange) then beta_idx = sys_size + 1 sys_size = beta_idx end if
+
+            ! if (particles_lagrange) then beta_idx = sys_size + 1 sys_size = beta_idx end if
 
             if (mhd) then
                 B_idx%beg = sys_size + 1
@@ -733,6 +780,16 @@ contains
                 sys_size = c_idx
             end if
 
+            if (bubbles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
+            end if
+
+            if (particles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
+            end if
+
             if (cont_damage) then
                 damage_idx = sys_size + 1
                 sys_size = damage_idx
@@ -746,6 +803,14 @@ contains
             else
                 psi_idx = dflt_int
             end if
+        end if
+
+        if (bubbles_lagrange) then
+            allocate (beta_vars(1:3))
+            beta_vars(1:3) = [1, 2, 5]
+        else if (particles_lagrange) then
+            allocate (beta_vars(1:8))
+            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
         end if
 
         if (chemistry) then
@@ -967,6 +1032,9 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
+        if (allocated(beta_vars)) deallocate (beta_vars)
 
     end subroutine s_finalize_global_parameters_module
 

@@ -33,7 +33,7 @@ contains
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
             & 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
             & 'num_bc_patches', 'mixlayer_perturb_nk', 'recon_type',           &
-            & 'muscl_order', 'igr_order' ]
+            & 'muscl_order', 'igr_order', 'fd_order']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -45,7 +45,8 @@ contains
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
             & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
-            & 'igr', 'down_sample', 'simplex_perturb','fft_wrt', 'hyper_cleaning' ]
+            & 'igr', 'down_sample', 'simplex_perturb','fft_wrt', 'hyper_cleaning',&
+            & 'particles_lagrange' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -133,6 +134,21 @@ contains
             #:endfor
         end do
 
+        ! Variables from input files for hardcoded patches
+        call MPI_BCAST(interface_file, len(interface_file), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normFac, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normMag, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(g0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(p0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+        if (bubbles_euler .or. bubbles_lagrange) then
+            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
+                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
+                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
+                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
+
         ! Simplex noise  and fluid physical parameters
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf', 'G', 'cv', 'qv', 'qvp' ]
@@ -147,15 +163,7 @@ contains
                 call MPI_BCAST(simplex_params%perturb_dens_offset(i, j), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             end do
         end do
-
         ! Subgrid bubble parameters
-        if (bubbles_euler .or. bubbles_lagrange) then
-            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
-                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
-                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
-                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-        end if
 
         do i = 1, 3
             call MPI_BCAST(simplex_params%perturb_vel(i), 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

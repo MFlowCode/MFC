@@ -14,6 +14,7 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
+
     ! $:USE_GPU_MODULE()
 
     implicit none
@@ -26,8 +27,10 @@ module m_global_parameters
     character(LEN=path_len) :: case_dir       !< Case folder location
     logical                 :: run_time_info  !< Run-time output flag
     integer                 :: t_step_old     !< Existing IC/grid folder
+
     ! Computational Domain Parameters
     integer :: proc_rank  !< Rank of the local processor
+
     !> @name Number of cells in the x-, y- and z-directions, respectively
     !> @{
     integer :: m, n, p
@@ -51,20 +54,22 @@ module m_global_parameters
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+    type(bounds_info), dimension(3)             :: glb_bounds
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-    ! type(bounds_info) :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
+
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
     real(wp) :: dt  !< Size of the time-step
-    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p]')
+
+    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p, glb_bounds]')
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number of time-step iterations between successive
     !! solution backups, respectively
@@ -81,6 +86,7 @@ module m_global_parameters
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     integer :: t_step_print  !< Number of time-steps between printouts
+
     ! Simulation Algorithm Parameters
     integer :: model_eqns  !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
@@ -206,10 +212,12 @@ module m_global_parameters
     integer  :: relax_model   !< Relaxation model
     real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
     real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
+
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
 
-    integer :: num_bc_patches
-    logical :: bc_io
+    integer               :: num_bc_patches
+    logical               :: bc_io
+    logical, dimension(3) :: periodic_bc
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -221,18 +229,27 @@ module m_global_parameters
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
 #endif
-    type(bounds_info) :: x_domain, y_domain, z_domain
-    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
-    real(wp) :: x_a, y_a, z_a
-    real(wp) :: x_b, y_b, z_b
-    logical  :: parallel_io       !< Format of the data files
-    logical  :: file_per_process  !< shared file or not when using parallel io
-    integer  :: precision         !< Precision of output files
-    logical  :: down_sample       !< down sample the output files
+
+    logical :: parallel_io       !< Format of the data files
+    logical :: file_per_process  !< shared file or not when using parallel io
+    integer :: precision         !< Precision of output files
+    logical :: down_sample       !< down sample the output files
     $:GPU_DECLARE(create='[down_sample]')
 
-    integer, allocatable, dimension(:)            :: proc_coords  !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:)            :: start_idx    !< Starting cell-center index of local processor in global grid
+    integer, allocatable, dimension(:)           :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    type(bounds_info), allocatable, dimension(:) :: pcomm_coords
+    $:GPU_DECLARE(create='[pcomm_coords]')
+    !! Coordinates for EL particle transfer
+
+    type(bounds_info), allocatable, dimension(:) :: pcomm_coords_ghost
+    $:GPU_DECLARE(create='[pcomm_coords_ghost]')
+    !! Coordinates for EL particle transfer
+
+    type(int_bounds_info), dimension(3)    :: nidx  !< Indices for neighboring processors
+    integer, allocatable, dimension(:,:,:) :: neighbor_ranks
+    !! Neighbor ranks
+
+    integer, allocatable, dimension(:)            :: start_idx  !< Starting cell-center index of local processor in global grid
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
     type(mpi_io_airfoil_ib_var), public           :: MPI_IO_airfoil_IB_DATA
@@ -293,7 +310,9 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
 
-    ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values
+    ! The WENO average (WA) flag regulates whether the calculation of any cell- average spatial derivatives is carried out in each
+    ! cell by utilizing the arithmetic mean of the left and right, WENO-reconstructed, cell-boundary values or simply, the unaltered
+    ! left and right, WENO-reconstructed, cell- boundary values.
     !> @{
     real(wp) :: wa_flg
     !> @}
@@ -311,24 +330,46 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
 
+    !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
+    !! physical computational domain to the next time-step.
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
+
     $:GPU_DECLARE(create='[buff_size]')
 
-    integer                  :: shear_num              !< Number of shear stress components
-    integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
-    integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
+    integer, allocatable :: beta_vars(:)  !< Indices of variables to communicate for bubble/particle coupling
+
+    $:GPU_DECLARE(create='[beta_vars]')
+
+    integer               :: shear_num          !< Number of shear stress components
+    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
+    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
+    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
+    !! [indices])
     integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 
     ! END: Simulation Algorithm Parameters
 
     ! Fluids Physical Parameters
 
+    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
+    !! equation of state parameters, and the Reynolds numbers.
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
+
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
-    integer                                  :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
-    integer                                  :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+
+    ! Subgrid Particle Parameters
+    type(subgrid_particle_physical_parameters) :: particle_pp
+
+    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when the CoM
+    !! or flow probe data files are to be written at each time step
+    integer :: fd_order  !< Finite-difference order for CoM and flow probe derivatives
+
+    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
+    !! finite-difference stencil for the selected order of accuracy.
+    integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt
@@ -352,6 +393,9 @@ module m_global_parameters
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
     integer                                               :: Np
+    !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
+    !! condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
+    !! m_derived_types.f90.
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
     !> @}
@@ -429,6 +473,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
     !> @}
 
+    !> @name Solid particle physical parameters
+    !> @{
+    real(wp) :: cp_particle, rho0ref_particle
+    $:GPU_DECLARE(create='[rho0ref_particle, cp_particle]')
+    !> @}
+
     !> @name Acoustic acoustic_source parameters
     !> @{
     logical                                              :: acoustic_source  !< Acoustic source switch
@@ -470,16 +520,31 @@ module m_global_parameters
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
-    logical                           :: bubbles_lagrange  !< Lagrangian subgrid bubble model switch
-    type(bubbles_lagrange_parameters) :: lag_params        !< Lagrange bubbles' parameters
-    $:GPU_DECLARE(create='[bubbles_lagrange, lag_params]')
+    logical                           :: bubbles_lagrange                        !< Lagrangian subgrid bubble model switch
+    logical                           :: particles_lagrange                      !< Lagrangian subgrid particle model switch
+    type(bubbles_lagrange_parameters) :: lag_params                              !< Lagrange bubbles' parameters
+    integer                           :: n_el_bubs_loc, n_el_bubs_glb            !< Number of Lagrangian bubbles (local and global)
+    integer                           :: n_el_particles_loc, n_el_particles_glb  !< Number of Lagrangian bubbles (local and global)
+    logical                           :: moving_lag_bubbles
+    logical                           :: moving_lag_particles
+    logical                           :: lag_pressure_force
+    logical                           :: lag_gravity_force
+    integer                           :: lag_vel_model, lag_drag_model
+    $:GPU_DECLARE(create='[bubbles_lagrange, lag_params, n_el_bubs_loc, n_el_bubs_glb]')
+    $:GPU_DECLARE(create='[particles_lagrange, n_el_particles_loc, n_el_particles_glb]')
+    $:GPU_DECLARE(create='[moving_lag_particles]')
+    $:GPU_DECLARE(create='[moving_lag_bubbles, lag_vel_model, lag_drag_model]')
+    $:GPU_DECLARE(create='[lag_pressure_force, lag_gravity_force]')
     !> @}
 
     real(wp) :: Bx0  !< Constant magnetic field in the x-direction (1D)
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
+    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
+    !! is false
     logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
+
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star       !< Stress threshold for continuum damage modeling
@@ -502,6 +567,7 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i, j  !< Generic loop iterator
+
         ! Logistics
 
         case_dir = '.'
@@ -596,6 +662,7 @@ contains
 
         num_bc_patches = 0
         bc_io = .false.
+        periodic_bc = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -608,9 +675,9 @@ contains
             #:endfor
         #:endfor
 
-        x_domain%beg = dflt_real; x_domain%end = dflt_real
-        y_domain%beg = dflt_real; y_domain%end = dflt_real
-        z_domain%beg = dflt_real; z_domain%end = dflt_real
+        glb_bounds(1)%beg = dflt_real; glb_bounds(1)%end = dflt_real
+        glb_bounds(2)%beg = dflt_real; glb_bounds(2)%end = dflt_real
+        glb_bounds(3)%beg = dflt_real; glb_bounds(3)%end = dflt_real
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -644,6 +711,10 @@ contains
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
+
+        ! Subgrid particle parameters
+        particle_pp%rho0ref_particle = dflt_real
+        particle_pp%cp_particle = dflt_real
 
         ! Tait EOS
         rhoref = dflt_real
@@ -774,10 +845,29 @@ contains
         lag_params%massTransfer_model = .false.
         lag_params%write_bubbles = .false.
         lag_params%write_bubbles_stats = .false.
+        lag_params%write_void_evol = .false.
         lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%pressure_force = .true.
+        lag_params%gravity_force = .false.
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
         lag_params%valmaxvoid = dflt_real
+        lag_params%input_path = 'input/lag_bubbles.dat'
+        lag_params%nParticles_glb = dflt_int
+        lag_params%qs_drag_model = dflt_int
+        lag_params%stokes_drag = dflt_int
+        lag_params%added_mass_model = dflt_int
+        lag_params%interpolation_order = dflt_int
+        lag_params%collision_force = .false.
+
+        moving_lag_bubbles = .false.
+        lag_vel_model = dflt_int
+
+        particles_lagrange = .false.
+        moving_lag_particles = .false.
 
         ! Continuum damage model
         tau_star = dflt_real
@@ -837,7 +927,8 @@ contains
 
     end subroutine s_assign_default_values_to_user_inputs
 
-    !> Initialize the global parameters module
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, k
@@ -845,7 +936,6 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
-
             if (recon_type == WENO_TYPE) then
                 weno_polyn = (weno_order - 1)/2
                 if (teno) then
@@ -863,7 +953,9 @@ contains
             $:GPU_UPDATE(device='[igr, igr_order, igr_iter_solver]')
         #:endif
 
-        ! Initialize counts: viscous fluids, surface-tension interfaces, curvature interfaces
+        ! Initializing the number of fluids for which viscous effects will be non-negligible, the number of distinctive material
+        ! interfaces for which surface tension will be important and also, the number of fluids for which the physical and geometric
+        ! curvatures of the interfaces will be computed
         Re_size = 0
         Re_size_max = 0
 
@@ -894,7 +986,9 @@ contains
                 E_idx = mom_idx%end + 1
 
                 if (igr) then
-                    ! IGR: volume fractions after energy (N-1 for N fluids; skipped when num_fluids=1)
+                    ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of
+                    ! (N-1) volume fractions for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1 then adv_idx%end <
+                    ! adv_idx%beg, which skips all loops over the volume fractions since there is no volume fraction to track
                     adv_idx%beg = E_idx + 1  ! Alpha for fluid 1
                     adv_idx%end = E_idx + num_fluids - 1
                 else
@@ -1029,7 +1123,8 @@ contains
                 end if
             end if
 
-            ! Count fluids with non-negligible viscous effects (Re > 0)
+            ! Determining the number of fluids for which the shear and the volume Reynolds numbers, e.g. viscous effects, are
+            ! important
             do i = 1, num_fluids
                 if (fluid_pp(i)%Re(1) > 0) Re_size(1) = Re_size(1) + 1
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
@@ -1122,6 +1217,16 @@ contains
 
         ! END: Volume Fraction Model
 
+        if (bubbles_lagrange) then
+            @:ALLOCATE(beta_vars(1:3))
+            beta_vars(1:3) = [1, 2, 5]
+            $:GPU_UPDATE(device='[beta_vars]')
+        else if (particles_lagrange) then
+            @:ALLOCATE(beta_vars(1:8))
+            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
+            $:GPU_UPDATE(device='[beta_vars]')
+        end if
+
         if (chemistry) then
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
@@ -1132,6 +1237,9 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
         else if (bubbles_lagrange) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
+        else if (particles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
@@ -1155,9 +1263,16 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+        else if (particles_lagrange) then
+            do i = 1, sys_size + 1
+                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
         end if
 
-        ! Configure WENO averaging flag (arithmetic mean vs. unaltered values)
+        ! Configuring the WENO average flag that will be used to regulate whether any spatial derivatives are to computed in each
+        ! cell by using the arithmetic mean of left and right, WENO-reconstructed, cell-boundary values or otherwise, the unaltered
+        ! left and right, WENO-reconstructed, cell-boundary values
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
         $:GPU_UPDATE(device='[wa_flg]')
 
@@ -1169,20 +1284,16 @@ contains
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
         Np = 0
 
-        if (elasticity) then
-            fd_number = max(1, fd_order/2)
-        end if
-
+        if (elasticity) fd_number = max(1, fd_order/2)
         if (mhd) then  ! TODO merge with above; waiting for hyperelasticity PR
             fd_number = max(1, fd_order/2)
         end if
-
-        if (probe_wrt) then
-            fd_number = max(1, fd_order/2)
-        end if
+        if (probe_wrt) fd_number = max(1, fd_order/2)
+        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+        if (particles_lagrange) fd_number = max(1, fd_order/2)
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                           & bubbles_lagrange, particles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1295,6 +1406,8 @@ contains
         #:endif
 
         allocate (proc_coords(1:num_dims))
+        @:ALLOCATE(pcomm_coords(1:num_dims))
+        @:ALLOCATE(pcomm_coords_ghost(1:num_dims))
 
         if (parallel_io .neqv. .true.) return
 
@@ -1327,10 +1440,22 @@ contains
         end if
 
         deallocate (proc_coords)
+
+        @:DEALLOCATE(pcomm_coords)
+        @:DEALLOCATE(pcomm_coords_ghost)
+
+        if (bubbles_lagrange .or. particles_lagrange) then
+            @:DEALLOCATE(beta_vars)
+        end if
+
         if (parallel_io) then
             deallocate (start_idx)
 
             if (bubbles_lagrange) then
+                do i = 1, sys_size + 1
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            else if (particles_lagrange) then
                 do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
@@ -1354,6 +1479,10 @@ contains
 
         if (p == 0) return
         @:DEALLOCATE(z_cb, z_cc, dz)
+
+        if (allocated(neighbor_ranks)) then
+            @:DEALLOCATE(neighbor_ranks)
+        end if
 
     end subroutine s_finalize_global_parameters_module
 

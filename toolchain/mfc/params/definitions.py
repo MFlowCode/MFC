@@ -627,8 +627,8 @@ CONSTRAINTS = {
     },
     # Bubbles
     "bubble_model": {
-        "choices": [1, 2, 3],
-        "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+        "choices": [0, 1, 2, 3],
+        "value_labels": {0: "Particle", 1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
     },
     # Output
     "format": {
@@ -880,6 +880,10 @@ def _load():
     for n in ["polytropic", "bubbles_euler", "polydisperse", "qbmm", "bubbles_lagrange"]:
         _r(n, LOG, {"bubbles"})
 
+    # Particles
+    for n in ["particles_lagrange"]:
+        _r(n, LOG, {"particles"})
+
     # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
@@ -1053,6 +1057,13 @@ def _load():
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
+    # Interfacial flow inputs
+    _r("normMag", REAL)
+    _r("p0_ic", REAL)
+    _r("g0_ic", REAL)
+    _r("normFac", REAL)
+    _r("interface_file", STR)
+
     # INDEXED PARAMETERS
 
     # patch_icpp (10 patches)
@@ -1149,10 +1160,12 @@ def _load():
     ]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
+    # particle_pp (particle properties)
+    for a in ["rho0ref_particle", "cp_particle"]:
+        _r(f"particle_pp%{a}", REAL, {"particles"})
+
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
-    # max_index is None so the parameter registry stays compact (no enumeration).
-    # The Fortran-side upper bound (num_patches_max in m_constants.fpp) is parsed
-    # and enforced by the case_validator, not by max_index here.
+    # max_index is sourced from Fortran's num_patches_max in m_constants.fpp.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm"]:
@@ -1260,12 +1273,20 @@ def _load():
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # lag_params (Lagrangian bubbles)
-    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
+    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
+    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
+    _r("lag_params%input_path", STR, {"bubbles"})
+
+    # --- lag_params (Lagrangian particles) ---
+    for a in ["nParticles_glb", "stokes_drag", "qs_drag_model", "added_mass_model", "interpolation_order"]:
+        _r(f"lag_params%{a}", INT, {"particles"})
+
+    for a in ["collision_force"]:
+        _r(f"lag_params%{a}", LOG, {"particles"})
 
     # chem_params
     for a in ["diffusion", "reactions"]:

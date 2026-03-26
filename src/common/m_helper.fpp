@@ -18,7 +18,7 @@ module m_helper
     public :: s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, s_simpson, s_transcoeff, &
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
-        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data
+        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_initialize_particles_model
 
 contains
 
@@ -83,6 +83,13 @@ contains
     end subroutine s_print_2D_array
 
     !> Initialize bubble model arrays for Euler or Lagrangian bubbles with polytropic or non-polytropic gas.
+    impure subroutine s_initialize_particles_model()
+
+        rho0ref_particle = particle_pp%rho0ref_particle
+        cp_particle = particle_pp%cp_particle
+
+    end subroutine s_initialize_particles_model
+
     impure subroutine s_initialize_bubbles_model()
 
         ! Allocate memory
