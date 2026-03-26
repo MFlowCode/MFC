@@ -91,10 +91,14 @@ jobs:
       labels: ${{ matrix.labels }}
     timeout-minutes: 480
     steps:
+      - name: Clean stale output files
+        run: rm -f *.out
+
       - name: Clone - PR
         uses: actions/checkout@v4
         with:
           path: pr
+          clean: false
 
       - name: Clone - Master
         uses: actions/checkout@v4
@@ -102,6 +106,7 @@ jobs:
           repository: MFlowCode/MFC
           ref: master
           path: master
+          clean: false
 
       - name: Fetch Dependencies
         if: matrix.build_script != ''
