@@ -1182,6 +1182,7 @@ contains
                 patch_ib(i)%y_centroid, &
                 patch_ib(i)%z_centroid
         end do
+        flush (ib_state_unit)
 
     end subroutine s_write_ib_state_file
 
