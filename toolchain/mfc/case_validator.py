@@ -27,7 +27,7 @@ from .state import CFG
 # to auto-generate docs/documentation/physics_constraints.md.
 # See the contributing guide for how to add entries.
 PHYSICS_DOCS = {
-    # Thermodynamic Constraints
+    # --- Thermodynamic Constraints ---
     "check_stiffened_eos": {
         "title": "Stiffened EOS Positivity",
         "category": "Thermodynamic Constraints",
@@ -48,7 +48,7 @@ PHYSICS_DOCS = {
         "math": r"p > 0, \quad \alpha_i \rho_i \geq 0, \quad 0 \leq \alpha_i \leq 1",
         "explanation": ("All initial patch pressures must be strictly positive. Partial densities must be non-negative. Volume fractions must be in [0,1]."),
     },
-    # Mixture Constraints
+    # --- Mixture Constraints ---
     "check_volume_fraction_sum": {
         "title": "Volume Fraction Sum",
         "category": "Mixture Constraints",
@@ -68,7 +68,7 @@ PHYSICS_DOCS = {
         "math": r"\alpha_j = 0 \Rightarrow \alpha_j \rho_j = 0, \quad \alpha_j > 0 \Rightarrow \alpha_j \rho_j > 0",
         "explanation": ("Warns about physically inconsistent combinations: density assigned to an absent phase, or a present phase with zero density."),
     },
-    # Domain and Geometry
+    # --- Domain and Geometry ---
     "check_domain_bounds": {
         "title": "Domain Bounds",
         "category": "Domain and Geometry",
@@ -86,7 +86,7 @@ PHYSICS_DOCS = {
         "category": "Domain and Geometry",
         "explanation": ("For patches with centroid + length geometry, the bounding box must not be entirely outside the computational domain. Skipped when grid stretching is active."),
     },
-    # Velocity and Dimensional Consistency
+    # --- Velocity and Dimensional Consistency ---
     "check_velocity_components": {
         "title": "Velocity Components in Inactive Dimensions",
         "category": "Velocity and Dimensional Consistency",
@@ -94,20 +94,20 @@ PHYSICS_DOCS = {
         "explanation": "Setting velocity components in dimensions that do not exist is almost certainly a mistake.",
         "exceptions": ["MHD simulations (transverse velocity couples to magnetic field in 1D)"],
     },
-    # Model Equations
+    # --- Model Equations ---
     "check_model_eqns_and_num_fluids": {
         "title": "Model Equation Selection",
         "category": "Model Equations",
         "explanation": ("Model 1: gamma-law single-fluid. Model 2: five-equation (Allaire). Model 3: six-equation (Saurel). Model 4: four-equation (single-component with bubbles)."),
         "references": ["Wilfong26", "Allaire02", "Saurel09"],
     },
-    # Boundary Conditions
+    # --- Boundary Conditions ---
     "check_boundary_conditions": {
         "title": "Boundary Condition Compatibility",
         "category": "Boundary Conditions",
         "explanation": ("Periodicity must match on both ends. Valid BC values range from -1 to -17. Cylindrical coordinates have specific BC requirements at the axis."),
     },
-    # Bubble Physics
+    # --- Bubble Physics ---
     "check_bubbles_euler": {
         "title": "Euler-Euler Bubble Model",
         "category": "Bubble Physics",
@@ -124,7 +124,7 @@ PHYSICS_DOCS = {
         "category": "Bubble Physics",
         "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3.",
     },
-    # Numerical Schemes
+    # --- Numerical Schemes ---
     "check_weno": {
         "title": "WENO Reconstruction",
         "category": "Numerical Schemes",
@@ -146,7 +146,22 @@ PHYSICS_DOCS = {
         "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
         "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
     },
-    # Feature Compatibility
+    "check_non_newtonian": {
+        "title": "Non-Newtonian Viscosity (Herschel-Bulkley)",
+        "category": "Physics Models",
+        "math": r"\mu(\dot\gamma) = \frac{\tau_0}{\dot\gamma}(1 - e^{-m\dot\gamma}) + K\dot\gamma^{n-1}",
+        "explanation": (
+            "Herschel-Bulkley model with Papanastasiou regularization for "
+            "non-Newtonian viscosity. The yield stress tau0 introduces a "
+            "threshold below which the fluid resists deformation; the "
+            "Papanastasiou parameter m smooths the transition (higher m = "
+            "sharper yield). K is the consistency index, nn the flow behavior "
+            "index (nn < 1: shear-thinning, nn = 1: Bingham, nn > 1: "
+            "shear-thickening). Viscosity is clamped to [mu_min, mu_max] for "
+            "numerical stability. Requires viscous = T."
+        ),
+    },
+    # --- Feature Compatibility ---
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
         "category": "Feature Compatibility",
@@ -177,13 +192,13 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
-    # Acoustic Sources
+    # --- Acoustic Sources ---
     "check_acoustic_source": {
         "title": "Acoustic Sources",
         "category": "Acoustic Sources",
         "explanation": ("Dimension-specific support types. Pulse type in {1,2,3,4}. Non-planar sources require foc_length and aperture."),
     },
-    # Post-Processing
+    # --- Post-Processing ---
     "check_vorticity": {
         "title": "Vorticity Output",
         "category": "Post-Processing",
@@ -557,8 +572,6 @@ class CaseValidator:
         n = self.get("n", 0)
         num_ibs = self.get("num_ibs", 0)
 
-        ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
-
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
         self.prohibit(ib and num_ibs <= 0, "num_ibs must be >= 1 when ib is enabled")
         num_patches_max = get_fortran_constants().get("num_patches_max", 1000)
@@ -567,7 +580,6 @@ class CaseValidator:
             f"num_ibs must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
-        self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
@@ -831,9 +843,31 @@ class CaseValidator:
             # Check Re(1) requirement
             self.prohibit(Re1 is None and viscous, f"viscous is set to true, but fluid_pp({i})%Re(1) is not specified")
 
-        # weno_Re_flux requires viscous
-        weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
-        self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+    def check_non_newtonian(self):
+        """Checks constraints on non-Newtonian fluid parameters"""
+        viscous = self.get("viscous", "F") == "T"
+        num_fluids = self.get("num_fluids", 1)
+
+        for i in range(1, num_fluids + 1):
+            nn_flag = self.get(f"fluid_pp({i})%non_newtonian", "F") == "T"
+            if not nn_flag:
+                continue
+
+            self.prohibit(not viscous, f"fluid_pp({i})%non_newtonian requires viscous = T")
+
+            K = self.get(f"fluid_pp({i})%K")
+            nn = self.get(f"fluid_pp({i})%nn")
+            tau0 = self.get(f"fluid_pp({i})%tau0")
+            mu_min = self.get(f"fluid_pp({i})%mu_min")
+            mu_max = self.get(f"fluid_pp({i})%mu_max")
+            hb_m = self.get(f"fluid_pp({i})%hb_m")
+
+            self.prohibit(K is not None and K <= 0, f"fluid_pp({i})%K (consistency index) must be > 0")
+            self.prohibit(nn is not None and nn <= 0, f"fluid_pp({i})%nn (flow behavior index) must be > 0")
+            self.prohibit(tau0 is not None and tau0 < 0, f"fluid_pp({i})%tau0 (yield stress) must be >= 0")
+            self.prohibit(mu_min is not None and mu_min < 0, f"fluid_pp({i})%mu_min must be >= 0")
+            self.prohibit(mu_max is not None and mu_min is not None and mu_max <= mu_min, f"fluid_pp({i})%mu_max must be > mu_min")
+            self.prohibit(hb_m is not None and hb_m <= 0, f"fluid_pp({i})%hb_m (Papanastasiou parameter) must be > 0")
 
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""

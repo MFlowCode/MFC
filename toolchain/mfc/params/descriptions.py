@@ -329,6 +329,15 @@ PATTERNS = [
     (r"fluid_pp\((\d+)\)%k_v", "Thermal conductivity of vapor phase for fluid {0}"),
     (r"fluid_pp\((\d+)\)%cp_v", "Specific heat capacity (const. pressure) of vapor for fluid {0}"),
     (r"fluid_pp\((\d+)\)%D_v", "Vapor mass diffusivity for fluid {0}"),
+    # Non-Newtonian viscosity (Herschel-Bulkley model)
+    (r"fluid_pp\((\d+)\)%non_newtonian", "Enable non-Newtonian viscosity for fluid {0}"),
+    (r"fluid_pp\((\d+)\)%tau0", "Yield stress for fluid {0} (Herschel-Bulkley)"),
+    (r"fluid_pp\((\d+)\)%K", "Consistency index for fluid {0} (Herschel-Bulkley)"),
+    (r"fluid_pp\((\d+)\)%nn", "Flow behavior index for fluid {0} (Herschel-Bulkley)"),
+    (r"fluid_pp\((\d+)\)%mu_min", "Minimum viscosity limit for fluid {0}"),
+    (r"fluid_pp\((\d+)\)%mu_max", "Maximum viscosity limit for fluid {0}"),
+    (r"fluid_pp\((\d+)\)%mu_bulk", "Bulk viscosity for non-Newtonian fluid {0}"),
+    (r"fluid_pp\((\d+)\)%hb_m", "Papanastasiou regularization parameter for fluid {0}"),
     # patch_ib patterns
     (r"patch_ib\((\d+)\)%geometry", "Geometry type for immersed boundary {0}"),
     (r"patch_ib\((\d+)\)%x_centroid", "X-coordinate of centroid for IB patch {0}"),

@@ -19,6 +19,7 @@ module m_riemann_solvers
     use m_surface_tension
     use m_helper_basic
     use m_chemistry
+    use m_re_visc  !< Dynamic Re_visc (Newtonian/non-Newtonian)
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
         & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass
 
@@ -78,17 +79,13 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:) :: Gs_rs
     $:GPU_DECLARE(create='[Gs_rs]')
 
-    real(wp), allocatable, dimension(:,:) :: Res_gs
-    $:GPU_DECLARE(create='[Res_gs]')
-
 contains
 
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
     !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_exact_riemann_solver 4) s_hlld_riemann_solver
     subroutine s_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
-
-        & qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
-            & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                & qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
+                                & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -116,7 +113,6 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-
         & dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
@@ -138,9 +134,9 @@ contains
 
     !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                    & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                    & dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, &
+                                    & norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -170,26 +166,33 @@ contains
             real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
             real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
         #:endif
-        real(wp)                  :: rho_L, rho_R
-        real(wp)                  :: pres_L, pres_R
-        real(wp)                  :: E_L, E_R
-        real(wp)                  :: H_L, H_R
-        real(wp)                  :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
-        real(wp)                  :: T_L, T_R
-        real(wp)                  :: Y_L, Y_R
-        real(wp)                  :: MW_L, MW_R
-        real(wp)                  :: R_gas_L, R_gas_R
-        real(wp)                  :: Cp_L, Cp_R
-        real(wp)                  :: Cv_L, Cv_R
-        real(wp)                  :: Gamm_L, Gamm_R
-        real(wp)                  :: gamma_L, gamma_R
-        real(wp)                  :: pi_inf_L, pi_inf_R
-        real(wp)                  :: qv_L, qv_R
-        real(wp)                  :: c_L, c_R
-        real(wp), dimension(6)    :: tau_e_L, tau_e_R
-        real(wp)                  :: G_L, G_R
-        real(wp), dimension(2)    :: Re_L, Re_R
-        real(wp), dimension(3)    :: xi_field_L, xi_field_R
+        real(wp)               :: rho_L, rho_R
+        real(wp)               :: pres_L, pres_R
+        real(wp)               :: E_L, E_R
+        real(wp)               :: H_L, H_R
+        real(wp)               :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
+        real(wp)               :: T_L, T_R
+        real(wp)               :: Y_L, Y_R
+        real(wp)               :: MW_L, MW_R
+        real(wp)               :: R_gas_L, R_gas_R
+        real(wp)               :: Cp_L, Cp_R
+        real(wp)               :: Cv_L, Cv_R
+        real(wp)               :: Gamm_L, Gamm_R
+        real(wp)               :: gamma_L, gamma_R
+        real(wp)               :: pi_inf_L, pi_inf_R
+        real(wp)               :: qv_L, qv_R
+        real(wp)               :: c_L, c_R
+        real(wp), dimension(6) :: tau_e_L, tau_e_R
+        real(wp)               :: G_L, G_R
+        real(wp), dimension(2) :: Re_L, Re_R
+        real(wp), dimension(3) :: xi_field_L, xi_field_R
+        ! Non-Newtonian per-phase Re arrays
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:else
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:endif
+
         real(wp)                  :: rho_avg
         real(wp)                  :: H_avg
         real(wp)                  :: qv_avg
@@ -211,7 +214,6 @@ contains
         type(riemann_states_vec3) :: cm             !< Conservative momentum variables
         integer                   :: i, j, k, l, q  !< Generic loop iterators
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
-
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -228,7 +230,8 @@ contains
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
                                     & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, Re_visc_per_phase_L, &
+                                    & Re_visc_per_phase_R]', copyin='[norm_dir]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -320,23 +323,19 @@ contains
                             end do
 
                             if (viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real
-                                    Re_R(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, Re_size(i)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                    Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                end do
+                                ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                #:if NORM_DIR == 1
+                                    call s_compute_re_visc(q_prim_vf, alpha_L, j, k, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                #:elif NORM_DIR == 2
+                                    call s_compute_re_visc(q_prim_vf, alpha_L, k, j, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                #:else
+                                    call s_compute_re_visc(q_prim_vf, alpha_L, l, k, j, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                #:endif
+                                call s_compute_mixture_re(alpha_L, Re_visc_per_phase_L, Re_L)
+                                call s_compute_mixture_re(alpha_R, Re_visc_per_phase_R, Re_R)
                             end if
 
                             if (chemistry) then
@@ -486,6 +485,11 @@ contains
                                 call s_compute_fast_magnetosonic_speed(rho_R, c_R, B%R, norm_dir, c_fast%R, H_R)
                             end if
 
+                            if (hyper_cleaning) then
+                                c_fast%L = min(c_fast%L, -hyper_cleaning_speed)
+                                c_fast%R = max(c_fast%R, hyper_cleaning_speed)
+                            end if
+
                             if (viscous) then
                                 if (chemistry) then
                                     call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
@@ -522,12 +526,7 @@ contains
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
                                 end if
 
-                                if (hyper_cleaning) then
-                                    ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
-                                    s_L = min(s_L, -hyper_cleaning_speed)
-                                    s_R = max(s_R, hyper_cleaning_speed)
-                                end if
-
+                                ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
                                 s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
                                        & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) &
                                        & - rho_R*(s_R - vel_R(dir_idx(1))))
@@ -815,9 +814,9 @@ contains
 
     !> Lax-Friedrichs (Rusanov) approximate Riemann solver
     subroutine s_lf_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                   & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                   & dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, &
+                                   & norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -850,26 +849,33 @@ contains
             !> Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
             real(wp), dimension(num_dims, num_dims) :: vel_grad_L, vel_grad_R
         #:endif
-        real(wp)                  :: rho_L, rho_R
-        real(wp)                  :: pres_L, pres_R
-        real(wp)                  :: E_L, E_R
-        real(wp)                  :: H_L, H_R
-        real(wp)                  :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
-        real(wp)                  :: T_L, T_R
-        real(wp)                  :: Y_L, Y_R
-        real(wp)                  :: MW_L, MW_R
-        real(wp)                  :: R_gas_L, R_gas_R
-        real(wp)                  :: Cp_L, Cp_R
-        real(wp)                  :: Cv_L, Cv_R
-        real(wp)                  :: Gamm_L, Gamm_R
-        real(wp)                  :: gamma_L, gamma_R
-        real(wp)                  :: pi_inf_L, pi_inf_R
-        real(wp)                  :: qv_L, qv_R
-        real(wp)                  :: c_L, c_R
-        real(wp), dimension(6)    :: tau_e_L, tau_e_R
-        real(wp)                  :: G_L, G_R
-        real(wp), dimension(2)    :: Re_L, Re_R
-        real(wp), dimension(3)    :: xi_field_L, xi_field_R
+        real(wp)               :: rho_L, rho_R
+        real(wp)               :: pres_L, pres_R
+        real(wp)               :: E_L, E_R
+        real(wp)               :: H_L, H_R
+        real(wp)               :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
+        real(wp)               :: T_L, T_R
+        real(wp)               :: Y_L, Y_R
+        real(wp)               :: MW_L, MW_R
+        real(wp)               :: R_gas_L, R_gas_R
+        real(wp)               :: Cp_L, Cp_R
+        real(wp)               :: Cv_L, Cv_R
+        real(wp)               :: Gamm_L, Gamm_R
+        real(wp)               :: gamma_L, gamma_R
+        real(wp)               :: pi_inf_L, pi_inf_R
+        real(wp)               :: qv_L, qv_R
+        real(wp)               :: c_L, c_R
+        real(wp), dimension(6) :: tau_e_L, tau_e_R
+        real(wp)               :: G_L, G_R
+        real(wp), dimension(2) :: Re_L, Re_R
+        real(wp), dimension(3) :: xi_field_L, xi_field_R
+        ! Non-Newtonian per-phase Re arrays
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:else
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:endif
+
         real(wp)                  :: rho_avg
         real(wp)                  :: H_avg
         real(wp)                  :: gamma_avg
@@ -891,7 +897,6 @@ contains
         integer                   :: i, j, k, l, q   !< Generic loop iterators
         integer, dimension(3)     :: idx_right_phys  !< Physical (j,k,l) indices for right state.
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
-
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -908,7 +913,8 @@ contains
                                     & vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, &
                                     & rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, H_L, &
                                     & H_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, &
-                                    & Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]')
+                                    & Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R, &
+                                    & Re_visc_per_phase_L, Re_visc_per_phase_R]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -1000,23 +1006,19 @@ contains
                             end do
 
                             if (viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real
-                                    Re_R(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, Re_size(i)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                    Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                end do
+                                ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                #:if NORM_DIR == 1
+                                    call s_compute_re_visc(q_prim_vf, alpha_L, j, k, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                #:elif NORM_DIR == 2
+                                    call s_compute_re_visc(q_prim_vf, alpha_L, k, j, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                #:else
+                                    call s_compute_re_visc(q_prim_vf, alpha_L, l, k, j, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                #:endif
+                                call s_compute_mixture_re(alpha_L, Re_visc_per_phase_L, Re_L)
+                                call s_compute_mixture_re(alpha_R, Re_visc_per_phase_R, Re_R)
                             end if
 
                             if (chemistry) then
@@ -1395,7 +1397,7 @@ contains
 
         if (viscous .or. dummy) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, &
-                                & vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]')
+                                & vel_L, vel_R, Re_L, Re_R, Re_visc_per_phase_L, Re_visc_per_phase_R]', copyin='[norm_dir]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -1441,23 +1443,11 @@ contains
                             end do
                         end if
 
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, 2
-                            Re_L(i) = dflt_real
-                            Re_R(i) = dflt_real
-
-                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                            if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, Re_size(i)
-                                Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                            end do
-
-                            Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                            Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                        end do
+                        call s_compute_re_visc(q_prim_vf, alpha_L, j, k, l, Re_visc_per_phase_L)
+                        call s_compute_re_visc(q_prim_vf, alpha_R, idx_right_phys(1), idx_right_phys(2), idx_right_phys(3), &
+                                               & Re_visc_per_phase_R)
+                        call s_compute_mixture_re(alpha_L, Re_visc_per_phase_L, Re_L)
+                        call s_compute_mixture_re(alpha_R, Re_visc_per_phase_R, Re_R)
 
                         if (shear_stress) then
                             $:GPU_LOOP(parallelism='[seq]')
@@ -1683,9 +1673,9 @@ contains
 
     !> HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                     & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
+                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                     & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -1733,15 +1723,22 @@ contains
         real(wp)               :: qv_L, qv_R
         real(wp)               :: c_L, c_R
         real(wp), dimension(2) :: Re_L, Re_R
-        real(wp)               :: rho_avg
-        real(wp)               :: H_avg
-        real(wp)               :: gamma_avg
-        real(wp)               :: qv_avg
-        real(wp)               :: c_avg
-        real(wp)               :: s_L, s_R, s_M, s_P, s_S
-        real(wp)               :: xi_L, xi_R  !< Left and right wave speeds functions
-        real(wp)               :: xi_M, xi_P
-        real(wp)               :: xi_MP, xi_PP
+        ! Non-Newtonian per-phase Re arrays
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:else
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:endif
+
+        real(wp) :: rho_avg
+        real(wp) :: H_avg
+        real(wp) :: gamma_avg
+        real(wp) :: qv_avg
+        real(wp) :: c_avg
+        real(wp) :: s_L, s_R, s_M, s_P, s_S
+        real(wp) :: xi_L, xi_R  !< Left and right wave speeds functions
+        real(wp) :: xi_M, xi_P
+        real(wp) :: xi_MP, xi_PP
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: R0_L, R0_R
             real(wp), dimension(3) :: V0_L, V0_R
@@ -1797,7 +1794,7 @@ contains
                                         & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
                                         & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
                                         & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP]')
+                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, Re_visc_per_phase_L, Re_visc_per_phase_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1875,20 +1872,19 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_L(i) = dflt_real
-                                        Re_R(i) = dflt_real
-                                        if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                        if (Re_size(i) > 0) Re_R(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                            Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                        end do
-                                        Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                        Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                    end do
+                                    ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                    #:if NORM_DIR == 1
+                                        call s_compute_re_visc(q_prim_vf, alpha_L, j, k, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                    #:elif NORM_DIR == 2
+                                        call s_compute_re_visc(q_prim_vf, alpha_L, k, j, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                    #:else
+                                        call s_compute_re_visc(q_prim_vf, alpha_L, l, k, j, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                    #:endif
+                                    call s_compute_mixture_re(alpha_L, Re_visc_per_phase_L, Re_L)
+                                    call s_compute_mixture_re(alpha_R, Re_visc_per_phase_R, Re_R)
                                 end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
@@ -2205,7 +2201,7 @@ contains
                                         & G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
                                         & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
                                         & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP]')
+                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, Re_visc_per_phase_L, Re_visc_per_phase_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2423,7 +2419,7 @@ contains
                                         & qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, &
                                         & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, &
                                         & xi_P, xi_L, xi_R, xi_MP, xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, &
-                                        & R3V2Lbar, R3V2Rbar]')
+                                        & R3V2Lbar, R3V2Rbar, Re_visc_per_phase_L, Re_visc_per_phase_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2487,25 +2483,19 @@ contains
 
                                 if (viscous) then
                                     if (num_fluids == 1) then  ! Need to consider case with num_fluids >= 2
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, 2
-                                            Re_L(i) = dflt_real
-                                            Re_R(i) = dflt_real
-
-                                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                            if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 1, Re_size(i)
-                                                Re_L(i) = (1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res_gs(i, &
-                                                     & q) + Re_L(i)
-                                                Re_R(i) = (1._wp - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, &
-                                                     & q)))/Res_gs(i, q) + Re_R(i)
-                                            end do
-
-                                            Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                            Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                        end do
+                                        ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                        #:if NORM_DIR == 1
+                                            call s_compute_re_visc(q_prim_vf, alpha_L, j, k, l, Re_visc_per_phase_L)
+                                            call s_compute_re_visc(q_prim_vf, alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                        #:elif NORM_DIR == 2
+                                            call s_compute_re_visc(q_prim_vf, alpha_L, k, j, l, Re_visc_per_phase_L)
+                                            call s_compute_re_visc(q_prim_vf, alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                        #:else
+                                            call s_compute_re_visc(q_prim_vf, alpha_L, l, k, j, Re_visc_per_phase_L)
+                                            call s_compute_re_visc(q_prim_vf, alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                        #:endif
+                                        call s_compute_mixture_re(alpha_L, Re_visc_per_phase_L, Re_L)
+                                        call s_compute_mixture_re(alpha_R, Re_visc_per_phase_R, Re_R)
                                     end if
                                 end if
 
@@ -2818,7 +2808,8 @@ contains
                                         & s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, &
                                         & alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, &
                                         & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, &
-                                        & xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]')
+                                        & xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, Re_visc_per_phase_L, &
+                                        & Re_visc_per_phase_R]', copyin='[is1, is2, is3]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2887,20 +2878,19 @@ contains
                                 if (Re_size(2) > 0) Re_max = 2
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, Re_max
-                                        Re_L(i) = 0._wp
-                                        Re_R(i) = 0._wp
-
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                            Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                        end do
-
-                                        Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                        Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                    end do
+                                    ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                    #:if NORM_DIR == 1
+                                        call s_compute_re_visc(q_prim_vf, alpha_L, j, k, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                    #:elif NORM_DIR == 2
+                                        call s_compute_re_visc(q_prim_vf, alpha_L, k, j, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                    #:else
+                                        call s_compute_re_visc(q_prim_vf, alpha_L, l, k, j, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                    #:endif
+                                    call s_compute_mixture_re(alpha_L, Re_visc_per_phase_L, Re_L)
+                                    call s_compute_mixture_re(alpha_R, Re_visc_per_phase_R, Re_R)
                                 end if
 
                                 if (chemistry) then
@@ -3296,9 +3286,9 @@ contains
 
     !> HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
     subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                     & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
+                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                     & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -3561,16 +3551,7 @@ contains
         $:GPU_UPDATE(device='[Gs_rs]')
 
         if (viscous) then
-            @:ALLOCATE(Res_gs(1:2, 1:Re_size_max))
-        end if
-
-        if (viscous) then
-            do i = 1, 2
-                do j = 1, Re_size(i)
-                    Res_gs(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
-                end do
-            end do
-            $:GPU_UPDATE(device='[Res_gs, Re_idx, Re_size]')
+            $:GPU_UPDATE(device='[Re_idx, Re_size]')
         end if
 
         $:GPU_ENTER_DATA(copyin='[is1, is2, is3, isx, isy, isz]')
@@ -3630,9 +3611,8 @@ contains
 
     !> Populate the left and right Riemann state variable buffers based on boundary conditions
     subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-
         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
+        & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -4113,7 +4093,6 @@ contains
 
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-
         & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_dims), intent(in)    :: velL_vf, velR_vf
@@ -4132,18 +4111,23 @@ contains
             real(wp), dimension(3) :: avg_dvdy_int  !< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
             real(wp), dimension(3) :: avg_dvdz_int  !< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
             real(wp), dimension(3) :: vel_src_int   !< Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
-
             !> Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
-            real(wp), dimension(3) :: stress_vector_shear
+            real(wp), &
+                 & dimension(3) &
+                 & :: stress_vector_shear !!< Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
         #:else
-            real(wp), dimension(num_dims) :: avg_v_int     !< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
+            real(wp), &
+                 & dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
             real(wp), dimension(num_dims) :: avg_dvdx_int  !< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
             real(wp), dimension(num_dims) :: avg_dvdy_int  !< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
             real(wp), dimension(num_dims) :: avg_dvdz_int  !< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
             !> Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
-            real(wp), dimension(num_dims) :: vel_src_int
             !> Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
-            real(wp), dimension(num_dims) :: stress_vector_shear
+            real(wp), &
+                 & dimension(num_dims) :: vel_src_int !!< Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
+            real(wp), &
+                 & dimension(num_dims) &
+                 & :: stress_vector_shear !!< Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
         #:endif
         real(wp) :: stress_normal_bulk  !< Normal bulk stress component \f$\sigma_{NN}\f$ on N-face.
         real(wp) :: Re_s, Re_b  !< Effective interface shear and bulk Reynolds numbers.
@@ -4284,7 +4268,6 @@ contains
 
     !> Compute Cartesian viscous source flux contributions for momentum and energy
     subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
-
         & dvelR_dz_vf, flux_src_vf, norm_dir)
 
         ! Arguments

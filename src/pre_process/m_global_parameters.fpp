@@ -100,9 +100,7 @@ module m_global_parameters
     integer               :: damage_idx            !< Index of damage state variable (D) for continuum damage model
     integer               :: psi_idx               !< Index of hyperbolic cleaning state variable for MHD
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
-    type(int_bounds_info) :: idwint(1:3)
-
-    ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
+    type(int_bounds_info)      :: idwint(1:3)
     type(int_bounds_info)      :: idwbuff(1:3)
     type(int_bounds_info)      :: bc_x, bc_y, bc_z       !< Boundary conditions in the x-, y- and z-coordinate directions
     integer                    :: shear_num              !< Number of shear stress components
@@ -222,6 +220,7 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i  !< Generic loop operator
+
         ! Logistics
 
         case_dir = '.'
@@ -514,6 +513,14 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%non_newtonian = .false.
+            fluid_pp(i)%tau0 = 0._wp
+            fluid_pp(i)%K = 0._wp
+            fluid_pp(i)%nn = 1._wp
+            fluid_pp(i)%mu_max = dflt_real
+            fluid_pp(i)%mu_min = 0._wp
+            fluid_pp(i)%mu_bulk = 0._wp
+            fluid_pp(i)%hb_m = 1000._wp
         end do
 
         Bx0 = dflt_real

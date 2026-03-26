@@ -26,6 +26,7 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
+    use m_re_visc  !< Non-Newtonian viscosity computations
 
     implicit none
 
@@ -33,6 +34,7 @@ module m_time_steppers
     type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< Cell-average primitive variables at the current time-stage
     type(scalar_field), allocatable, dimension(:)    :: rhs_vf     !< Cell-average RHS variables at the current time-stage
     type(integer_field), allocatable, dimension(:,:) :: bc_type    !< Boundary condition identifiers
+
     !> Cell-average primitive variables at consecutive TIMESTEPS
     type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2
     real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_pb
@@ -59,7 +61,8 @@ module m_time_steppers
 
 contains
 
-    !> Initialize the time steppers module
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_time_steppers_module
 
 #ifdef FRONTIER_UNIFIED
@@ -71,8 +74,8 @@ contains
 #endif
 #endif
         integer :: i, j  !< Generic loop iterators
-        ! Setting number of time-stages for selected time-stepping scheme
 
+        ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
             num_ts = 1
         else if (any(time_stepper == (/2, 3/))) then
@@ -394,11 +397,6 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        ! Opening and writing the header of the ib state data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
-            call s_open_ib_state_file()
-        end if
-
         if (cfl_dt) then
             @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
         end if
@@ -452,7 +450,7 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
-    !> Advance the solution one full step using a TVD Runge-Kutta time integrator
+    !> @brief Advances the solution one full step using a TVD Runge-Kutta time integrator.
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 
 #ifdef _CRAYFTN
@@ -558,14 +556,6 @@ contains
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
-                    ! compute ib forces for fixed immersed boundaries if requested for output
-                else if (ib_state_wrt .and. s == nstage) then
-                    call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                end if
-
-                ! Write IB state to file if requested and at the RK final stage
-                if (proc_rank == 0 .and. ib_state_wrt .and. s == nstage) then
-                    call s_write_ib_state_file()
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -596,6 +586,7 @@ contains
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
+    !! @param stage Current time-stage
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
@@ -623,17 +614,19 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
-    !> Compute the global time step size from CFL stability constraints across all cells
+    !> @brief Computes the global time step size from CFL stability constraints across all cells.
     impure subroutine s_compute_dt()
 
         real(wp) :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: vel    !< Cell-avg. velocity
-            real(wp), dimension(3) :: alpha  !< Cell-avg. volume fraction
+            real(wp), dimension(3)    :: vel                !< Cell-avg. velocity
+            real(wp), dimension(3)    :: alpha              !< Cell-avg. volume fraction
+            real(wp), dimension(3, 2) :: Re_visc_per_phase  !< Per-phase Re_visc
         #:else
-            real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
-            real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
+            real(wp), dimension(num_vels)      :: vel                !< Cell-avg. velocity
+            real(wp), dimension(num_fluids)    :: alpha              !< Cell-avg. volume fraction
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase  !< Per-phase Re_visc
         #:endif
         real(wp)               :: vel_sum  !< Cell-avg. velocity sum
         real(wp)               :: pres     !< Cell-avg. pressure
@@ -647,11 +640,11 @@ contains
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
 
-        if (.not. igr .or. dummy) then
+        if (.not. igr .or. dummy .or. any_non_newtonian) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, Re_visc_per_phase, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -659,6 +652,13 @@ contains
                         call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
                     else
                         call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    end if
+
+                    ! For non-Newtonian fluids, compute variable Re based on shear rate Always use q_prim_vf (velocities), not
+                    ! q_cons (momenta)
+                    if (any_non_newtonian) then
+                        call s_compute_re_visc(q_prim_vf, alpha, j, k, l, Re_visc_per_phase)
+                        call s_compute_mixture_re(alpha, Re_visc_per_phase, Re)
                     end if
 
                     ! Compute mixture sound speed
@@ -684,7 +684,10 @@ contains
 
     end subroutine s_compute_dt
 
-    !> Apply the body forces source term at each Runge-Kutta stage
+    !> This subroutine applies the body forces source term at each Runge-Kutta stage
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf_in Primitive variables
+    !! @param rhs_vf_in Right-hand side variables
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
@@ -712,7 +715,7 @@ contains
 
     end subroutine s_apply_bodyforces
 
-    !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
+    !> @brief Updates immersed boundary positions and velocities at the current Runge-Kutta stage.
     subroutine s_propagate_immersed_boundaries(s)
 
         integer, intent(in) :: s
@@ -754,8 +757,9 @@ contains
                     ! update the angular velocity with the torque value
                     patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, &
                              & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
-                    call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
-                    ! update the moment of inertia to be based on the direction of the angular momentum
+                    call s_compute_moment_of_inertia(i, &
+                                                     & patch_ib(i)%angular_vel) &
+                                                     &  ! update the moment of inertia to be based on the direction of the angular momentum
                     patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i) &
                              & %moment  ! convert back to angular velocity with the new moment of inertia
                 end if
@@ -780,7 +784,8 @@ contains
 
     end subroutine s_propagate_immersed_boundaries
 
-    !> Save the temporary q_prim_vf vector into q_prim_ts for use in p_main
+    !> This subroutine saves the temporary q_prim_vf vector into the q_prim_ts vector that is then used in p_main
+    !! @param t_step current time-step
     subroutine s_time_step_cycling(t_step)
 
         integer, intent(in) :: t_step
@@ -862,6 +867,7 @@ contains
         use hipfort_check
 #endif
         integer :: i, j  !< Generic loop iterators
+
         ! Deallocating the cell-average conservative variables
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         do j = 1, sys_size
@@ -973,11 +979,6 @@ contains
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_close_run_time_information_file()
-        end if
-
-        ! Writing the footer of and closing the IB data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
-            call s_close_ib_state_file()
         end if
 
     end subroutine s_finalize_time_steppers_module

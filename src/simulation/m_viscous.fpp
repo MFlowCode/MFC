@@ -13,6 +13,7 @@ module m_viscous
     use m_muscl
     use m_helper
     use m_finite_differences
+    use m_re_visc
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
         & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
@@ -21,24 +22,12 @@ module m_viscous
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
     $:GPU_DECLARE(create='[is1_viscous, is2_viscous, is3_viscous, iv]')
 
-    real(wp), allocatable, dimension(:,:) :: Res_viscous
-    $:GPU_DECLARE(create='[Res_viscous]')
-
 contains
 
     !> Initialize the viscous module
     impure subroutine s_initialize_viscous_module
 
-        integer :: i, j  !< generic loop iterators
-
-        @:ALLOCATE(Res_viscous(1:2, 1:Re_size_max))
-
-        do i = 1, 2
-            do j = 1, Re_size(i)
-                Res_viscous(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
-            end do
-        end do
-        $:GPU_UPDATE(device='[Res_viscous, Re_idx, Re_size]')
+        $:GPU_UPDATE(device='[Re_idx, Re_size]')
         $:GPU_ENTER_DATA(copyin='[is1_viscous, is2_viscous, is3_viscous, iv]')
 
     end subroutine s_initialize_viscous_module
@@ -56,9 +45,11 @@ contains
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
             real(wp), dimension(3, 3) :: tau_Re
+            real(wp), dimension(3, 2) :: Re_visc_nn
         #:else
             real(wp), dimension(num_fluids)         :: alpha_visc, alpha_rho_visc
             real(wp), dimension(num_dims, num_dims) :: tau_Re
+            real(wp), dimension(num_fluids, 2)      :: Re_visc_nn
         #:endif
 
         integer :: i, j, k, l, q  !< Generic loop iterator
@@ -82,7 +73,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then  ! Shear stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum , &
                                     & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
@@ -147,18 +138,9 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, alpha_visc, j, k, l, Re_visc_nn, grad_x_vf, grad_y_vf, &
+                                                           & grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -184,7 +166,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then  ! Bulk stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum , &
                                     & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
@@ -249,18 +231,9 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, alpha_visc, j, k, l, Re_visc_nn, grad_x_vf, grad_y_vf, &
+                                                           & grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -281,8 +254,7 @@ contains
         if (p == 0) return
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (shear_stress) then  ! Shear stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -346,18 +318,9 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, alpha_visc, j, k, l, Re_visc_nn, grad_x_vf, grad_y_vf, &
+                                                           & grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -380,8 +343,7 @@ contains
             end if
 
             if (bulk_stress) then  ! Bulk stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -445,18 +407,9 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, alpha_visc, j, k, l, Re_visc_nn, grad_x_vf, grad_y_vf, &
+                                                           & grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -477,9 +430,8 @@ contains
 
     !> Computes viscous terms
     subroutine s_get_viscous(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-
-        & qL_prim, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, &
-            & q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, iy, iz)
+                             & qL_prim, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_n, dqR_prim_dy_n, &
+                             & dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
              & qL_prim_rsy_vf, qR_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsz_vf
@@ -847,7 +799,6 @@ contains
 
     !> Reconstruct left and right cell-boundary values of viscous primitive variables
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir, vL_prim_vf, &
-
         & vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
@@ -944,7 +895,6 @@ contains
 
     !> Reconstruct left and right cell-boundary values of viscous primitive variable derivatives
     subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir, vL_prim_vf, &
-
         & vR_prim_vf, ix, iy, iz)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                    :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, &
@@ -1355,8 +1305,6 @@ contains
 
     !> Finalize the viscous module
     impure subroutine s_finalize_viscous_module()
-
-        @:DEALLOCATE(Res_viscous)
 
     end subroutine s_finalize_viscous_module
 
