@@ -680,10 +680,10 @@ contains
     subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_prim_vf
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                        :: k, l
-        integer                                                                                    :: j, q, i
+        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
+        integer, intent(in)                                                                                  :: k, l
+        integer                                                                                              :: j, q, i
 
         do j = 1, buff_size
             if (z_cc(l) < pi) then
