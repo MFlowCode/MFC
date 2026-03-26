@@ -212,8 +212,6 @@ contains
 
     end subroutine s_muscl
 
-    !> Apply THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces
-    ! Left reconstruction Right reconstruction
     !> Reshape cell-averaged variable data into direction-local work arrays for MUSCL reconstruction
     subroutine s_initialize_muscl(v_vf, muscl_dir)
 
