@@ -931,17 +931,23 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `solver_approach`                | Integer | 1: One-way coupling, 2: Two-way coupling                       |
 | `smooth_type`                    | Integer | Smoothing function. 1: Gaussian, 2: Delta 3x3                  |
 | `stokes_drag`                    | Integer | Stokes drag model flag                                          |
-| `qs_drag_model`                  | Integer | Quasi-steady drag model (0: off, 1: Parmar, 2: Modified Parmar, 3: Osnes, 4: Gidaspow) |
+| `qs_drag_model`                  | Integer | Quasi-steady drag model (0: off, 1: Parmar, 2: Osnes, 3: Modified Parmar, 4: Gidaspow) |
 | `added_mass_model`               | Integer | Added mass model (0: off, >0: active)                           |
 | `interpolation_order`            | Integer | Polynomial order for barycentric field interpolation            |
 | `collision_force`                | Logical | Enable soft-sphere DEM particle-particle collisions             |
+| `qs_fluct_force`                 | Logical | Enable quasi-steady drag force fluctuation contribution         |
 | `pressure_force`                 | Logical | Enable pressure gradient force on particles                     |
 | `gravity_force`                  | Logical | Enable gravitational force on particles                         |
 | `write_void_evol`                | Logical | Write void fraction evolution data                              |
 | `epsilonb`                       | Real    | Standard deviation scaling for the Gaussian kernel              |
 | `valmaxvoid`                     | Real    | Maximum void fraction permitted                                 |
+| `mu_ref`                         | Real    | Fluid reference dynamic viscosity                               |
 | `particle_pp%%rho0ref_particle`  | Real    | Reference particle material density                             |
 | `particle_pp%%cp_particle`       | Real    | Particle specific heat capacity                                 |
+| `particle_pp%%ksp_col`           | Real    | Spring stiffness multiplier for collisions                      |
+| `particle_pp%%nu_col`            | Real    | Poisson's ratio used for collisions                             |
+| `particle_pp%%E_col`             | Real    | Young's modulus [Pa] used for collisions                        |
+| `particle_pp%%cor_col`           | Real    | Coefficient of restitution of particles                         |  
 
 - `particles_lagrange` activates the Euler-Lagrange solid particle solver. Particle initial conditions are read from `./input/lag_particles.dat`. The solver tracks non-deformable spherical particles in a compressible carrier flow using volume-averaged source terms (\cite Maeda18).
 
@@ -949,11 +955,13 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `solver_approach` specifies the coupling method: [1] one-way coupling where particles are advected by the flow but do not influence it, [2] two-way coupling where particle forces are projected back onto the Eulerian grid as source terms.
 
-- `qs_drag_model` selects the quasi-steady drag correlation: [1] Parmar et al. (2010) with Sangani volume fraction correction, [2] Modified Parmar with Osnes et al. (2023) volume fraction correction, [3] Osnes et al. (2023) full correlation with Loth et al. (2021) rarefied regime, [4] Gidaspow (1994) correlation for dense particle suspensions.
+- `qs_drag_model` selects the quasi-steady drag correlation: [1] Parmar et al. (2010) with Sangani volume fraction correction, [2] Osnes et al. (2023) full correlation with Loth et al. (2021) rarefied regime, [3] Modified Parmar with Osnes et al. (2023) volume fraction correction, [4] Gidaspow (1994) correlation for dense particle suspensions.
 
 - `collision_force` activates soft-sphere DEM collisions using a spring-dashpot contact model with Hertzian stiffness. Collision forces between particles on different MPI ranks are communicated via non-blocking point-to-point messaging.
 
 - `interpolation_order` sets the order of the barycentric Lagrange polynomial used to interpolate Eulerian field quantities (pressure, velocity, density) to particle positions. Must be even; the interpolation stencil uses `N/2` points in each direction.
+
+- `mu_ref` is the fluids reference dynamic viscosity at 273.15 K. Used for particle drag if "viscous" is turned off. Only the air sutherland model is currently implemented. If "viscous" is enabled, the true fluid's viscosity is used.
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 

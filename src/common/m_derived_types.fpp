@@ -313,6 +313,10 @@ module m_derived_types
     type subgrid_particle_physical_parameters
         real(wp) :: rho0ref_particle  !< Reference particle density
         real(wp) :: cp_particle       !< Specific heat capacity of particle
+        real(wp) :: ksp_col           !< number of timesteps over which collision occurs
+        real(wp) :: nu_col            !< Poisson's ratio of particle for collision
+        real(wp) :: E_col             !< Young's modulus of particle for collision
+        real(wp) :: cor_col           !< coefficient of restituion for collision
     end type subgrid_particle_physical_parameters
 
     type mpi_io_airfoil_ib_var
@@ -425,8 +429,10 @@ module m_derived_types
         integer                    :: added_mass_model     !< Particle added mass model
         integer                    :: interpolation_order  !< Fluid-to-Particle barycentric interpolation order
         logical                    :: collision_force      !< Include collision forces
+        logical                    :: qs_fluct_force       !< QS Fluctuations
         character(LEN=pathlen_max) :: input_path           !< Path to lag_bubbles.dat
         integer                    :: charNz               !< Number of grid cells in characteristic depth
+        real(wp)                   :: mu_ref               !< Reference Viscosity for particle drag
     end type bubbles_lagrange_parameters
 
     !> Max and min number of cells in a direction of each combination of x-,y-, and z-

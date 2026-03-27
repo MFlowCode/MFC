@@ -444,6 +444,10 @@ contains
         ! Subgrid particle parameters
         particle_pp%rho0ref_particle = dflt_real
         particle_pp%cp_particle = dflt_real
+        particle_pp%ksp_col = dflt_real
+        particle_pp%nu_col = dflt_real
+        particle_pp%E_col = dflt_real
+        particle_pp%cor_col = dflt_real
 
         ! Formatted database file(s) structure parameters
         format = dflt_int
@@ -809,8 +813,8 @@ contains
             allocate (beta_vars(1:3))
             beta_vars(1:3) = [1, 2, 5]
         else if (particles_lagrange) then
-            allocate (beta_vars(1:8))
-            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
+            allocate (beta_vars(1:7))
+            beta_vars(1:7) = [1, 2, 3, 4, 5, 6, 7]
         end if
 
         if (chemistry) then

@@ -1160,8 +1160,8 @@ def _load():
     ]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
-    # particle_pp (particle properties)
-    for a in ["rho0ref_particle", "cp_particle"]:
+    # --- particle_pp (particle properties) ---
+    for a in ["rho0ref_particle", "cp_particle", "ksp_col", "nu_col", "E_col", "cor_col"]:
         _r(f"particle_pp%{a}", REAL, {"particles"})
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
@@ -1285,8 +1285,11 @@ def _load():
     for a in ["nParticles_glb", "stokes_drag", "qs_drag_model", "added_mass_model", "interpolation_order"]:
         _r(f"lag_params%{a}", INT, {"particles"})
 
-    for a in ["collision_force"]:
-        _r(f"lag_params%{a}", LOG, {"particles"})
+    for a in ["collision_force", "qs_fluct_force"]:
+        _r(f"lag_params%{a}", LOG, {'particles'})
+
+    for a in ["mu_ref"]:
+        _r(f"lag_params%{a}", REAL, {'particles'})
 
     # chem_params
     for a in ["diffusion", "reactions"]:

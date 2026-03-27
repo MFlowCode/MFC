@@ -113,8 +113,8 @@ contains
 #ifdef MFC_MPI
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
-        nReal = 7 + 13*2 + 7*lag_num_ts
-        p_var_size = (nReal*real_size + int_size)
+        nReal = 10 + 13*2 + 7*lag_num_ts
+        p_var_size = (nReal*real_size + 2*int_size)
         p_buff_size = lag_params%nParticles_glb*p_var_size
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, &
@@ -220,7 +220,7 @@ contains
         if (particles_lagrange) then
             #:for VAR in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector', &
                 & 'write_bubbles', 'write_bubbles_stats', 'write_void_evol', 'pressure_force', &
-                & 'gravity_force', 'collision_force']
+                & 'gravity_force', 'collision_force', 'qs_fluct_force']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -229,7 +229,7 @@ contains
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in ['epsilonb','charwidth','valmaxvoid']
+            #:for VAR in ['epsilonb','charwidth','valmaxvoid','mu_ref']
                 call MPI_BCAST(lag_params%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -292,7 +292,7 @@ contains
         end if
 
         if (particles_lagrange) then
-            #:for VAR in [ 'rho0ref_particle','cp_particle']
+            #:for VAR in [ 'rho0ref_particle','cp_particle','ksp_col','nu_col','E_col','cor_col']
                 call MPI_BCAST(particle_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
@@ -989,12 +989,14 @@ contains
     !! @param dvel Time derivative of velocity of each particle
     !! @param lag_num_ts Number of stages in time-stepping scheme
     !! @param nParticles Local number of particles
-    impure subroutine s_mpi_sendrecv_solid_particles(p_owner_rank, particle_R0, Rmax_stats, Rmin_stats, particle_mass, f_p, &
-        & lag_id, rad, pos, posPrev, vel, scoord, drad, dpos, dvel, lag_num_ts, nParticles, dest)
+    impure subroutine s_mpi_sendrecv_solid_particles(p_owner_rank, particle_R0, Rmax_stats, Rmin_stats, particle_mass, &
+        & particle_seed, f_p, fqs_fluct, lag_id, rad, pos, posPrev, vel, scoord, drad, dpos, dvel, lag_num_ts, nParticles, dest)
 
         integer, dimension(:) :: p_owner_rank
         real(wp), dimension(:) :: particle_R0, Rmax_stats, Rmin_stats, particle_mass
+        integer, dimension(:) :: particle_seed
         real(wp), dimension(:,:) :: f_p
+        real(wp), dimension(:,:) :: fqs_fluct
         integer, dimension(:,:) :: lag_id
         real(wp), dimension(:,:) :: rad, drad
         real(wp), dimension(:,:,:) :: pos, posPrev, vel, scoord, dpos, dvel
@@ -1092,8 +1094,12 @@ contains
                                   & MPI_COMM_WORLD, ierr)
                     call MPI_Pack(particle_mass(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, &
                                   & MPI_COMM_WORLD, ierr)
+                    call MPI_Pack(particle_seed(particle_id), 1, MPI_INTEGER, p_send_buff(send_offset), p_buff_size, position, &
+                                  & MPI_COMM_WORLD, ierr)
                     call MPI_Pack(f_p(particle_id,:), 3, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, &
                                   & ierr)
+                    call MPI_Pack(fqs_fluct(particle_id,:), 3, mpi_p, p_send_buff(send_offset), p_buff_size, position, &
+                                  & MPI_COMM_WORLD, ierr)
                     do r = 1, 2
                         call MPI_Pack(rad(particle_id, r), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, &
                                       & MPI_COMM_WORLD, ierr)
@@ -1143,7 +1149,6 @@ contains
                     particle_id = nParticles
 
                     p_owner_rank(particle_id) = neighbor_ranks(i, j, k)
-
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, lag_id(particle_id, 1), 1, MPI_INTEGER, &
                                     & MPI_COMM_WORLD, ierr)
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, particle_R0(particle_id), 1, mpi_p, &
@@ -1154,7 +1159,11 @@ contains
                                     & MPI_COMM_WORLD, ierr)
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, particle_mass(particle_id), 1, mpi_p, &
                                     & MPI_COMM_WORLD, ierr)
+                    call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, particle_seed(particle_id), 1, MPI_INTEGER, &
+                                    & MPI_COMM_WORLD, ierr)
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, f_p(particle_id,:), 3, mpi_p, &
+                                    & MPI_COMM_WORLD, ierr)
+                    call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, fqs_fluct(particle_id,:), 3, mpi_p, &
                                     & MPI_COMM_WORLD, ierr)
                     do r = 1, 2
                         call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, rad(particle_id, r), 1, mpi_p, &
@@ -1193,150 +1202,6 @@ contains
         end if
 
     end subroutine s_mpi_sendrecv_solid_particles
-
-    !> This resets the collision force buffers
-    impure subroutine s_reset_force_buffers()
-
-        force_send_counts = 0
-        force_recv_counts = 0
-        force_send_ids = 0
-        force_send_vals = 0._wp
-
-        $:GPU_UPDATE(device='[force_send_counts, force_send_ids, force_send_vals]')
-
-    end subroutine s_reset_force_buffers
-
-    !> This adds the forces to the buffer arrays for mpi transfer
-    impure subroutine s_add_force_to_send_buffer(dest_rank, gid, force)
-
-        $:GPU_ROUTINE(function_name='s_add_force_to_send_buffer', parallelism='[seq]')
-
-        integer, intent(in)                :: dest_rank, gid
-        real(wp), intent(in), dimension(3) :: force
-        integer                            :: idx
-
-        $:GPU_ATOMIC(atomic='capture')
-        force_send_counts(dest_rank) = force_send_counts(dest_rank) + 1
-        idx = force_send_counts(dest_rank)
-        $:END_GPU_ATOMIC_CAPTURE()
-
-        force_send_ids(dest_rank, idx) = gid
-        force_send_vals(dest_rank, idx, 1) = force(1)
-        force_send_vals(dest_rank, idx, 2) = force(2)
-        force_send_vals(dest_rank, idx, 3) = force(3)
-
-    end subroutine s_add_force_to_send_buffer
-
-    !> This communicates the collision forces across neighbor mpi ranks
-    impure subroutine s_transfer_collision_forces(total_recv, force_recv_ids, force_recv_vals)
-
-        integer, intent(inout)  :: total_recv
-        integer, intent(inout)  :: force_recv_ids(:)
-        real(wp), intent(inout) :: force_recv_vals(:)
-
-#ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-        integer :: i, j, k, l, idx, total_send, recv_tag, send_tag, partner, recv_count, send_count
-        integer :: send_displs(0:num_procs - 1), recv_displs(0:num_procs - 1)
-        integer :: sendcounts_vals(0:num_procs - 1), recvcounts_vals(0:num_procs - 1)
-        integer :: senddispls_vals(0:num_procs - 1), recvdispls_vals(0:num_procs - 1)
-        ! Local request arrays sized for 2 requests per neighbor (IDs + values)
-        integer :: coll_send_requests(2*MAX_NEIGHBORS), coll_recv_requests(2*MAX_NEIGHBORS)
-
-        $:GPU_UPDATE(host='[force_send_counts, force_send_ids, force_send_vals]')
-
-        ! Phase 1: Exchange force counts with neighbors only
-        send_count = 0
-        recv_count = 0
-
-        do l = 1, n_neighbors
-            i = neighbor_list(l, 1)
-            j = neighbor_list(l, 2)
-            k = neighbor_list(l, 3)
-            partner = neighbor_ranks(i, j, k)
-            recv_tag = neighbor_tag(i, j, k)
-            send_tag = neighbor_tag(-i, -j, -k)
-
-            recv_count = recv_count + 1
-            call MPI_Irecv(force_recv_counts(partner), 1, MPI_INTEGER, partner, recv_tag, MPI_COMM_WORLD, &
-                           & recv_requests(recv_count), ierr)
-
-            send_count = send_count + 1
-            call MPI_Isend(force_send_counts(partner), 1, MPI_INTEGER, partner, send_tag, MPI_COMM_WORLD, &
-                           & send_requests(send_count), ierr)
-        end do
-
-        call MPI_Waitall(recv_count, recv_requests(1:recv_count), MPI_STATUSES_IGNORE, ierr)
-        call MPI_Waitall(send_count, send_requests(1:send_count), MPI_STATUSES_IGNORE, ierr)
-
-        ! Compute displacements
-        send_displs(0) = 0
-        recv_displs(0) = 0
-        do i = 1, num_procs - 1
-            send_displs(i) = send_displs(i - 1) + force_send_counts(i - 1)
-            recv_displs(i) = recv_displs(i - 1) + force_recv_counts(i - 1)
-        end do
-
-        do i = 0, num_procs - 1
-            sendcounts_vals(i) = 3*force_send_counts(i)
-            recvcounts_vals(i) = 3*force_recv_counts(i)
-            senddispls_vals(i) = 3*send_displs(i)
-            recvdispls_vals(i) = 3*recv_displs(i)
-        end do
-
-        total_send = sum(force_send_counts)
-        total_recv = sum(force_recv_counts)
-
-        ! Flatten send buffers
-        idx = 1
-        do i = 0, num_procs - 1
-            do j = 1, force_send_counts(i)
-                flat_send_ids(idx) = force_send_ids(i, j)
-                flat_send_vals(3*(idx - 1) + 1) = force_send_vals(i, j, 1)
-                flat_send_vals(3*(idx - 1) + 2) = force_send_vals(i, j, 2)
-                flat_send_vals(3*(idx - 1) + 3) = force_send_vals(i, j, 3)
-                idx = idx + 1
-            end do
-        end do
-
-        ! Phase 2: Exchange force data with neighbors only
-        send_count = 0
-        recv_count = 0
-
-        do l = 1, n_neighbors
-            i = neighbor_list(l, 1)
-            j = neighbor_list(l, 2)
-            k = neighbor_list(l, 3)
-            partner = neighbor_ranks(i, j, k)
-            recv_tag = neighbor_tag(i, j, k)
-            send_tag = neighbor_tag(-i, -j, -k)
-
-            if (force_recv_counts(partner) > 0) then
-                recv_count = recv_count + 1
-                call MPI_Irecv(force_recv_ids(recv_displs(partner) + 1), force_recv_counts(partner), MPI_INTEGER, partner, &
-                               & recv_tag, MPI_COMM_WORLD, coll_recv_requests(recv_count), ierr)
-                recv_count = recv_count + 1
-                call MPI_Irecv(force_recv_vals(recvdispls_vals(partner) + 1), recvcounts_vals(partner), mpi_p, partner, &
-                               & recv_tag + 1, MPI_COMM_WORLD, coll_recv_requests(recv_count), ierr)
-            end if
-
-            if (force_send_counts(partner) > 0) then
-                send_count = send_count + 1
-                call MPI_Isend(flat_send_ids(send_displs(partner) + 1), force_send_counts(partner), MPI_INTEGER, partner, &
-                               & send_tag, MPI_COMM_WORLD, coll_send_requests(send_count), ierr)
-                send_count = send_count + 1
-                call MPI_Isend(flat_send_vals(senddispls_vals(partner) + 1), sendcounts_vals(partner), mpi_p, partner, &
-                               & send_tag + 1, MPI_COMM_WORLD, coll_send_requests(send_count), ierr)
-            end if
-        end do
-
-        call MPI_Waitall(recv_count, coll_recv_requests(1:recv_count), MPI_STATUSES_IGNORE, ierr)
-        call MPI_Waitall(send_count, coll_send_requests(1:send_count), MPI_STATUSES_IGNORE, ierr)
-#else
-        total_recv = 0
-#endif
-
-    end subroutine s_transfer_collision_forces
 
     !! @param i, j, k Indices of the neighbor in the range [-1, 1]
     !! @return tag Unique integer tag for the neighbor
