@@ -95,6 +95,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: pr
+          clean: false
 
       - name: Clone - Master
         uses: actions/checkout@v4
@@ -102,6 +103,7 @@ jobs:
           repository: MFlowCode/MFC
           ref: master
           path: master
+          clean: false
 
       - name: Setup & Build
         if: matrix.build_script != ''
