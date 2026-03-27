@@ -485,12 +485,6 @@ contains
                                 call s_compute_fast_magnetosonic_speed(rho_R, c_R, B%R, norm_dir, c_fast%R, H_R)
                             end if
 
-                            if (hyper_cleaning) then
-                                ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
-                                s_L = min(s_L, -hyper_cleaning_speed)
-                                s_R = max(s_R, hyper_cleaning_speed)
-                            end if
-
                             if (viscous) then
                                 if (chemistry) then
                                     call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
@@ -527,7 +521,12 @@ contains
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
                                 end if
 
-                                ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
+                                if (hyper_cleaning) then
+                                    ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
+                                    s_L = min(s_L, -hyper_cleaning_speed)
+                                    s_R = max(s_R, hyper_cleaning_speed)
+                                end if
+
                                 s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
                                        & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) &
                                        & - rho_R*(s_R - vel_R(dir_idx(1))))
