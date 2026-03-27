@@ -486,8 +486,9 @@ contains
                             end if
 
                             if (hyper_cleaning) then
-                                c_fast%L = min(c_fast%L, -hyper_cleaning_speed)
-                                c_fast%R = max(c_fast%R, hyper_cleaning_speed)
+                                ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
+                                s_L = min(s_L, -hyper_cleaning_speed)
+                                s_R = max(s_R, hyper_cleaning_speed)
                             end if
 
                             if (viscous) then
