@@ -1325,6 +1325,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "lag_betaC_wrt": "T",
                             "lag_params%write_bubbles": "T",
                             "lag_params%write_bubbles_stats": "T",
+                            "lag_params%write_void_evol": "T",
                             "polytropic": "F",
                             "bub_pp%R0ref": 1.0,
                             "bub_pp%p0ref": 1.0,
