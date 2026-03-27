@@ -12,8 +12,8 @@ module m_global_parameters
     use mpi  !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types  !< Definitions of the derived types
-    use m_helper_basic   !< Functions to compare floating point numbers
+    use m_derived_types
+    use m_helper_basic
 
     ! $:USE_GPU_MODULE()
 
@@ -147,17 +147,17 @@ module m_global_parameters
 
     !> @name Variables for our of core IGR computation on NVIDIA
     !> @{
-    logical :: nv_uvm_out_of_core  ! Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
-    integer :: nv_uvm_igr_temps_on_gpu  ! 0 => jac, jac_rhs, and jac_old on CPU
+    logical :: nv_uvm_out_of_core       !< Enable out-of-core storage of q_cons_ts(2) in timestepping (default FALSE)
+    integer :: nv_uvm_igr_temps_on_gpu  !< 0 => jac, jac_rhs, and jac_old on CPU
     ! 1 => jac on GPU, jac_rhs and jac_old on CPU 2 => jac and jac_rhs on GPU, jac_old on CPU 3 => jac, jac_rhs, and jac_old on GPU
     ! (default)
-    logical :: nv_uvm_pref_gpu  ! Enable explicit gpu memory hints (default FALSE)
+    logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
     real(wp)           :: weno_eps                     !< Binding for the WENO nonlinear weights
     real(wp)           :: teno_CT                      !< Smoothness threshold for TENO
     logical            :: mp_weno                      !< Monotonicity preserving (MP) WENO
-    logical            :: weno_avg  ! Average left/right cell-boundary states
+    logical            :: weno_avg                     !< Average left/right cell-boundary states
     logical            :: weno_Re_flux                 !< WENO reconstruct velocity gradients for viscous stress tensor
     integer            :: riemann_solver               !< Riemann solver algorithm
     integer            :: low_Mach                     !< Low Mach number fix to HLLC Riemann solver
@@ -322,23 +322,23 @@ module m_global_parameters
     !> @{
     integer, dimension(3)  :: dir_idx
     real(wp), dimension(3) :: dir_flg
-    integer, dimension(3)  :: dir_idx_tau !!used for hypoelasticity=true
+    integer, dimension(3)  :: dir_idx_tau  !< used for hypoelasticity=true
     !> @}
 
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
 
     !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
     !! physical computational domain to the next time-step.
-    integer :: buff_size
+    integer :: buff_size  !< Number of ghost cells for boundary condition storage
 
     $:GPU_DECLARE(create='[buff_size]')
 
-    integer               :: shear_num !! Number of shear stress components
+    integer               :: shear_num          !< Number of shear stress components
     integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
     integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
     !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
     !! [indices])
-    integer, dimension(3, 2) :: shear_BC_flip_indices
+    integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
 
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 
@@ -348,18 +348,18 @@ module m_global_parameters
 
     !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
     !! equation of state parameters, and the Reynolds numbers.
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
 
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
 
     !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when the CoM
     !! or flow probe data files are to be written at each time step
-    integer :: fd_order
+    integer :: fd_order  !< Finite-difference order for CoM and flow probe derivatives
 
     !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
     !! finite-difference stencil for the selected order of accuracy.
-    integer :: fd_number
+    integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt
@@ -380,7 +380,7 @@ module m_global_parameters
     logical                                               :: ib
     integer                                               :: num_ibs
     logical                                               :: ib_state_wrt
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
     integer                                               :: Np
     !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
@@ -522,7 +522,7 @@ module m_global_parameters
     logical :: fft_wrt
     !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
     !! is false
-    logical :: dummy
+    logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
     !> @name Continuum damage model parameters
     !> @{!

@@ -9,17 +9,17 @@
 !! physical source terms
 module m_rhs
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-    use m_variables_conversion  !< State variables type conversion procedures
-    use m_weno                  !< Weighted and essentially non-oscillatory (WENO) schemes for spatial reconstruction of variables
-    use m_muscl                 !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
-    use m_riemann_solvers       !< Exact and approximate Riemann problem solvers
-    use m_cbc                   !< Characteristic boundary conditions (CBC)
-    use m_bubbles_EE            !< Ensemble-averaged bubble dynamics routines
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_variables_conversion
+    use m_weno
+    use m_muscl
+    use m_riemann_solvers
+    use m_cbc
+    use m_bubbles_EE
     use m_bubbles_EL
-    use m_qbmm                  !< Moment inversion
+    use m_qbmm
     use m_hypoelastic
     use m_hyperelastic
     use m_acoustic_src
@@ -40,12 +40,12 @@ module m_rhs
 
     !! This variable contains the WENO-reconstructed values of the cell-average conservative variables, which are located in
     !! q_cons_vf, at cell-interior Gaussian quadrature points (QP).
-    type(vector_field) :: q_cons_qp
+    type(vector_field) :: q_cons_qp  !< WENO-reconstructed cell-average conservative variables at quadrature points
     $:GPU_DECLARE(create='[q_cons_qp]')
 
     !! The primitive variables at cell-interior Gaussian quadrature points. These are calculated from the conservative variables and
     !! gradient magnitude (GM) of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
-    type(vector_field) :: q_prim_qp
+    type(vector_field) :: q_prim_qp  !< Primitive variables at cell-interior quadrature points
     $:GPU_DECLARE(create='[q_prim_qp]')
 
     !> @name The first-order spatial derivatives of the primitive variables at cell- interior Gaussian quadrature points. These are
@@ -73,7 +73,7 @@ module m_rhs
 
     !> The gradient magnitude of the volume fractions at cell-interior Gaussian quadrature points. gm_alpha_qp is calculated from
     !! individual first-order spatial derivatives located in dq_prim_ds_qp.
-    type(vector_field) :: gm_alpha_qp
+    type(vector_field) :: gm_alpha_qp  !< Volume fraction gradient magnitudes at cell-interior quadrature points
 
     $:GPU_DECLARE(create='[gm_alpha_qp]')
 
@@ -927,8 +927,8 @@ contains
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
         type(vector_field), intent(inout) :: flux_src_n_vf
-        integer :: j, k, l, q  ! Loop iterators from original, meaning varies
-        integer :: k_loop, l_loop, q_loop  ! Standardized spatial loop iterators 0:m, 0:n, 0:p
+        integer :: j, k, l, q              !< Loop iterators from original, meaning varies
+        integer :: k_loop, l_loop, q_loop  !< Standardized spatial loop iterators 0:m, 0:n, 0:p
         integer :: i_fluid_loop
         real(wp) :: inv_ds, flux_face1, flux_face2
         real(wp) :: advected_qty_val, pressure_val, velocity_val

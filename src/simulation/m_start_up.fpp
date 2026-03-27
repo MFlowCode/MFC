@@ -8,31 +8,31 @@
 !> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
     use m_mpi_common
-    use m_variables_conversion  !< State variables type conversion procedures
-    use m_weno                  !< Weighted and essentially non-oscillatory (WENO) schemes for spatial reconstruction of variables
-    use m_muscl                 !< Monotonic Upstream-centered (MUSCL) schemes for convservation laws
-    use m_riemann_solvers       !< Exact and approximate Riemann problem solvers
-    use m_cbc                   !< Characteristic boundary conditions (CBC)
+    use m_variables_conversion
+    use m_weno
+    use m_muscl
+    use m_riemann_solvers
+    use m_cbc
     use m_boundary_common
-    use m_acoustic_src          !< Acoustic source calculations
-    use m_rhs                   !< Right-hand-side (RHS) evaluation procedures
-    use m_chemistry             !< Chemistry module
-    use m_data_output           !< Run-time info & solution data output procedures
-    use m_time_steppers         !< Time-stepping algorithms
-    use m_qbmm                  !< Quadrature MOM
-    use m_derived_variables     !< Procedures used to compute quantities derived from the conservative and primitive variables
+    use m_acoustic_src
+    use m_rhs
+    use m_chemistry
+    use m_data_output
+    use m_time_steppers
+    use m_qbmm
+    use m_derived_variables
     use m_hypoelastic
     use m_hyperelastic
-    use m_phase_change          !< Phase-change module
+    use m_phase_change
     use m_viscous
-    use m_bubbles_EE            !< Ensemble-averaged bubble dynamics routines
-    use m_bubbles_EL            !< Lagrange bubble dynamics routines
+    use m_bubbles_EE
+    use m_bubbles_EL
     use ieee_arithmetic
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_helper_basic
     use m_helper
 
     $:USE_GPU_MODULE()
@@ -193,7 +193,7 @@ contains
         logical :: file_exist
         ! Logical used to check the existence of the data files
 
-        integer :: i, r  !< Generic loop iterator
+        integer :: i, r
 
         ! Confirming that the directory from which the initial condition and the grid data files are to be read in exists and
         ! exiting otherwise
@@ -341,7 +341,7 @@ contains
         ! Downsampled data variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer :: m_glb_read, n_glb_read, p_glb_read  ! data size of read
+        integer :: m_glb_read, n_glb_read, p_glb_read  !< data size of read
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))

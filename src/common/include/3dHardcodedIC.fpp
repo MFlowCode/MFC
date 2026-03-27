@@ -7,13 +7,13 @@
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
     ! Variables to describe initial condition of jet
     real(wp)                              :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
-    real(wp)                              :: rcut, xcut  ! Intermediate variables for creating smooth initial condition
+    real(wp)                              :: rcut, xcut  !< Intermediate variables for creating smooth initial condition
     real(wp), dimension(0:n,0:p)          :: rcut_arr
-    integer                               :: l, q, s  ! Iterators for reading input files
-    integer                               :: start, end  ! Ints to keep track of position in file
+    integer                               :: l, q, s     !< Iterators for reading input files
+    integer                               :: start, end  !< Ints to keep track of position in file
     character(len=100000)                 :: line  ! String to store line in file
-    character(len=25)                     :: value  ! String to store value in line
-    integer                               :: NJet  ! Number of jets
+    character(len=25)                     :: value       !< String to store value in line
+    integer                               :: NJet        !< Number of jets
     real(wp), allocatable, dimension(:,:) :: ih  ! Array to store interface height in
     logical                               :: file_exist  ! Flag to check if file exists
 
@@ -261,10 +261,10 @@
                   & k))*g0_ic*(ih(start_idx(1) + i, start_idx(3) + k) - y_cc(j))
 
         if (surface_tension) q_prim_vf(c_idx)%sf(i, j, k) = alph
-    case (370)
+    case (370)  ! 3D extrusion of 2D profile from external data
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
-    case (380)
+    case (380)  ! Taylor-Green vortex
         ! This is patch is hard-coded for test suite optimization used in the 3D_TaylorGreenVortex case: This analytic patch used
         ! geometry 9
         Mach = 0.1

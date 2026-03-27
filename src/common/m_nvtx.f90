@@ -18,13 +18,13 @@ module m_nvtx
         integer(c_int16_t) :: version = 1
         integer(c_int16_t) :: size = 48  !
         integer(c_int)     :: category = 0
-        integer(c_int)     :: colorType = 1  ! NVTX_COLOR_ARGB = 1
+        integer(c_int)     :: colorType = 1    !< NVTX_COLOR_ARGB = 1
         integer(c_int)     :: color
-        integer(c_int)     :: payloadType = 0  ! NVTX_PAYLOAD_UNKNOWN = 0
+        integer(c_int)     :: payloadType = 0  !< NVTX_PAYLOAD_UNKNOWN = 0
         integer(c_int)     :: reserved0
-        integer(c_int64_t) :: payload  ! union uint,int,double
-        integer(c_int)     :: messageType = 1  ! NVTX_MESSAGE_TYPE_ASCII = 1
-        type(c_ptr)        :: message  ! ascii char
+        integer(c_int64_t) :: payload          !< union uint,int,double
+        integer(c_int)     :: messageType = 1  !< NVTX_MESSAGE_TYPE_ASCII = 1
+        type(c_ptr)        :: message          !< ascii char
     end type nvtxEventAttributes
 
 #if defined(MFC_GPU) && defined(__PGI)

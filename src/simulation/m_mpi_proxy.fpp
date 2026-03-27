@@ -12,10 +12,10 @@ module m_mpi_proxy
     use mpi  !< Message passing interface (MPI) module
 #endif
 
-    use m_helper_basic       !< Functions to compare floating point numbers
+    use m_helper_basic
     use m_helper
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_mpi_common
     use m_nvtx
     use ieee_arithmetic
@@ -24,11 +24,11 @@ module m_mpi_proxy
 
     !> This variable is utilized to pack and send the buffer of the immersed boundary markers, for a single computational domain
     !! boundary at the time, to the relevant neighboring processor.
-    integer, private, allocatable, dimension(:) :: ib_buff_send
+    integer, private, allocatable, dimension(:) :: ib_buff_send  !< IB marker send buffer for halo exchange
 
     !> q_cons_buff_recv is utilized to receive and unpack the buffer of the immersed boundary markers, for a single computational
     !! domain boundary at the time, from the relevant neighboring processor.
-    integer, private, allocatable, dimension(:) :: ib_buff_recv
+    integer, private, allocatable, dimension(:) :: ib_buff_recv  !< IB marker receive buffer for halo exchange
     integer                                     :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
 

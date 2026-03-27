@@ -14,8 +14,8 @@ module m_ib_patches
 
     use m_model  ! Subroutine(s) related to STL files
     use m_derived_types  ! Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
-    use m_helper_basic       !< Functions to compare floating point numbers
+    use m_global_parameters
+    use m_helper_basic
     use m_helper
     use m_mpi_common
 
@@ -47,7 +47,7 @@ module m_ib_patches
     !! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
     !! necessary to lay out a particular patch on the grid.
 
-    character(len=5) :: istr  ! string to store int to string result for error checking
+    character(len=5) :: istr  !< string to store int to string result for error checking
 
 contains
 
@@ -55,8 +55,8 @@ contains
     impure subroutine s_apply_ib_patches(ib_markers)
 
         type(integer_field), intent(inout) :: ib_markers
-        integer                            :: i, xp, yp, zp  ! iterators
-        integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper  ! periodic bounds
+        integer                            :: i, xp, yp, zp                                               !< iterators
+        integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper  !< periodic bounds
 
         !  3D Patch Geometries
 

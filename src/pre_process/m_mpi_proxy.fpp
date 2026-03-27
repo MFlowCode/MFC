@@ -6,12 +6,12 @@
 module m_mpi_proxy
 
 #ifdef MFC_MPI
-    use mpi  !< Message passing interface (MPI) module
+    use mpi
 #endif
 
     use m_helper
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Global parameters for the code
+    use m_derived_types
+    use m_global_parameters
     use m_mpi_common
 
     implicit none

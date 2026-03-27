@@ -5,16 +5,16 @@
 !> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
 
-    use m_derived_types  ! Definitions of the derived types
-    use m_global_parameters  ! Global parameters for the code
-    use m_mpi_proxy  !< Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
     use m_helper
-    use m_variables_conversion  ! Subroutines to change the state variables from
+    use m_variables_conversion
     ! one form to another
 
     use m_icpp_patches
     use m_assign_variables
-    use m_perturbation  ! Subroutines to perturb initial flow fields
+    use m_perturbation
     use m_chemistry
     use m_boundary_conditions
 
@@ -43,7 +43,7 @@ contains
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_initial_condition_module
 
-        integer :: i, j, k, l  !< generic loop iterators
+        integer :: i, j, k, l
 
         ! Allocating the primitive and conservative variables
 
@@ -172,7 +172,7 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_initial_condition_module
 
-        integer :: i  !< Generic loop iterator
+        integer :: i
 
         ! Dellocating the primitive and conservative variables
 

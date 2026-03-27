@@ -7,12 +7,12 @@
 !> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
 module m_acoustic_src
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_bubbles               !< Bubble dynamic routines
-    use m_variables_conversion  !< State variables type conversion procedures
-    use m_helper_basic          !< Functions to compare floating point numbers
-    use m_constants             !< Definitions of the constants
+    use m_derived_types
+    use m_global_parameters
+    use m_bubbles
+    use m_variables_conversion
+    use m_helper_basic
+    use m_constants
 
     implicit none
 
@@ -349,9 +349,9 @@ contains
         real(wp), intent(in)  :: sim_time, c, sum_BB
         real(wp), intent(in)  :: frequency_local, gauss_sigma_time_local
         real(wp), intent(out) :: source
-        real(wp)              :: omega  ! angular frequency
-        real(wp)              :: sine_wave  ! sine function for square wave
-        real(wp)              :: foc_length_factor  ! Scale amplitude with radius for spherical support
+        real(wp)              :: omega              !< angular frequency
+        real(wp)              :: sine_wave          !< sine function for square wave
+        real(wp)              :: foc_length_factor  !< Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
 

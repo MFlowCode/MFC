@@ -8,10 +8,10 @@
 !> @brief Conservative-to-primitive variable conversion, mixture property evaluation, and pressure computation
 module m_variables_conversion
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
-    use m_mpi_proxy          !< Message passing interface (MPI) module proxy
-    use m_helper_basic       !< Functions to compare floating point numbers
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_helper_basic
     use m_helper
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
@@ -189,7 +189,7 @@ contains
         rho = q_vf(1)%sf(i, j, k)
         gamma = q_vf(gamma_idx)%sf(i, j, k)
         pi_inf = q_vf(pi_inf_idx)%sf(i, j, k)
-        qv = 0._wp  ! keep this value nill for now. For future adjustment
+        qv = 0._wp  ! keep this value nil for now. For future adjustment
 
         ! Post process requires rho_sf/gamma_sf/pi_inf_sf/qv_sf to also be updated
 #ifdef MFC_POST_PROCESS
@@ -527,18 +527,18 @@ contains
         real(wp)               :: vftmp, nbub_sc
         real(wp)               :: G_K
         real(wp)               :: pres
-        integer                :: i, j, k, l  !< Generic loop iterators
+        integer                :: i, j, k, l               !< Generic loop iterators
         real(wp)               :: T
         real(wp)               :: pres_mag
-        real(wp)               :: Ga  ! Lorentz factor (gamma in relativity)
-        real(wp)               :: B2  ! Magnetic field magnitude squared
-        real(wp)               :: B(3)  ! Magnetic field components
-        real(wp)               :: m2  ! Relativistic momentum magnitude squared
-        real(wp)               :: S  ! Dot product of the magnetic field and the relativistic momentum
-        real(wp)               :: W, dW  ! W := rho*v*Ga**2; f = f(W) in Newton-Raphson
-        real(wp)               :: E, D  ! Prim/Cons variables within Newton-Raphson iteration
-        real(wp)               :: f, dGa_dW, dp_dW, df_dW  ! Functions within Newton-Raphson iteration
-        integer                :: iter  ! Newton-Raphson iteration counter
+        real(wp)               :: Ga                       !< Lorentz factor (gamma in relativity)
+        real(wp)               :: B2                       !< Magnetic field magnitude squared
+        real(wp)               :: B(3)                     !< Magnetic field components
+        real(wp)               :: m2                       !< Relativistic momentum magnitude squared
+        real(wp)               :: S                        !< Dot product of the magnetic field and the relativistic momentum
+        real(wp)               :: W, dW                    !< W := rho*v*Ga**2; f = f(W) in Newton-Raphson
+        real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
+        real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
+        integer                :: iter                     !< Newton-Raphson iteration counter
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
@@ -608,7 +608,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do iter = 1, relativity_cons_to_prim_max_iter
                             Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
-                            pres = (W - D*Ga)/((gamma_K + 1)*Ga**2)  ! Thermal pressure from EOS
+                            pres = (W - D*Ga)/((gamma_K + 1)*Ga**2)
                             f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
 
                             ! The first equation below corrects a typo in (Mignone & Bodo, 2006) m2*W**2 -> 2*m2*W**2, which would
@@ -622,7 +622,7 @@ contains
 
                             dW = -f/df_dW
                             W = W + dW
-                            if (abs(dW) < 1.e-12_wp*W) exit
+                            if (abs(dW) < 1.e-12_wp*W) exit  ! Relative convergence criterion
                         end do
 
                         ! Recalculate pressure using converged W
@@ -832,12 +832,12 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp)                         :: e_mix, mix_mol_weight, T
         real(wp)                         :: pres_mag
-        real(wp)                         :: Ga  ! Lorentz factor (gamma in relativity)
-        real(wp)                         :: h  ! relativistic enthalpy
-        real(wp)                         :: v2  ! Square of the velocity magnitude
-        real(wp)                         :: B2  ! Square of the magnetic field magnitude
-        real(wp)                         :: vdotB  ! Dot product of the velocity and magnetic field vectors
-        real(wp)                         :: B(3)  ! Magnetic field components
+        real(wp)                         :: Ga          !< Lorentz factor (gamma in relativity)
+        real(wp)                         :: h           !< relativistic enthalpy
+        real(wp)                         :: v2          !< Square of the velocity magnitude
+        real(wp)                         :: B2          !< Square of the magnetic field magnitude
+        real(wp)                         :: vdotB       !< Dot product of the velocity and magnetic field vectors
+        real(wp)                         :: B(3)        !< Magnetic field components
 
         pres_mag = 0._wp
 
@@ -1299,21 +1299,21 @@ contains
         real(wp)              :: blkmod1, blkmod2
         integer               :: q
 
-        if (chemistry) then
+        if (chemistry) then  ! Reacting mixture sound speed
             if (avg_state == 1 .and. abs(c_c) > verysmall) then
                 c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
             end if
-        else if (relativity) then
+        else if (relativity) then  ! Relativistic sound speed
             ! Only supports perfect gas for now
             c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
         else
-            if (alt_soundspeed) then
+            if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
                 blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-            else if (model_eqns == 3) then
+            else if (model_eqns == 3) then  ! Six-equation model sound speed
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
@@ -1349,7 +1349,7 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', parallelism='[seq]', cray_noinline=True)
 
         real(wp), intent(in)  :: B(3), rho, c
-        real(wp), intent(in)  :: h  ! only used for relativity
+        real(wp), intent(in)  :: h  !< only used for relativity
         real(wp), intent(out) :: c_fast
         integer, intent(in)   :: norm
         real(wp)              :: B2, term, disc

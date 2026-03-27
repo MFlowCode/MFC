@@ -9,12 +9,12 @@
 module m_phase_change
 
 #ifndef MFC_POST_PROCESS
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-    use m_variables_conversion  !< State variables type conversion procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_variables_conversion
     use ieee_arithmetic
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_helper_basic
 
     implicit none
 
@@ -24,9 +24,9 @@ module m_phase_change
     !> @name Parameters for the first order transition phase change
     !> @{
     integer, parameter  :: max_iter = 1e8_wp            !< max # of iterations
-    real(wp), parameter :: pCr = 4.94e7_wp              !< Critical water pressure
-    real(wp), parameter :: TCr = 385.05_wp + 273.15_wp  !< Critical water temperature
-    real(wp), parameter :: mixM = 1.0e-8_wp             !< threshold for 'mixture cell'. If Y < mixM, phase change does not happen
+    real(wp), parameter :: pCr = 4.94e7_wp              !< Critical pressure of water [Pa]
+    real(wp), parameter :: TCr = 385.05_wp + 273.15_wp  !< Critical temperature of water [K]
+    real(wp), parameter :: mixM = 1.0e-8_wp             !< Mixture mass fraction threshold for triggering phase change
     integer, parameter  :: lp = 1                       !< index for the liquid phase of the reacting fluid
     integer, parameter  :: vp = 2                       !< index for the vapor phase of the reacting fluid
     !> @}
@@ -75,10 +75,10 @@ contains
         real(wp) :: pS, pSOV, pSSL  !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
         !> equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor
         !! and subcooled liquid
-        real(wp) :: TS, TSOV, TSSL, TSatOV, TSatSL
-        real(wp) :: rhoe, dynE, rhos      !< total internal energy, kinetic energy, and total entropy
-        real(wp) :: rho, rM, m1, m2, MCT  !< total density, total reacting mass, individual reacting masses
-        real(wp) :: TvF                   !< total volume fraction
+        real(wp) :: TS, TSOV, TSSL, TSatOV, TSatSL  !< Equilibrium and saturation temperatures
+        real(wp) :: rhoe, dynE, rhos                !< total internal energy, kinetic energy, and total entropy
+        real(wp) :: rho, rM, m1, m2, MCT            !< total density, total reacting mass, individual reacting masses
+        real(wp) :: TvF                             !< total volume fraction
 
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
@@ -385,10 +385,10 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: p_infpTg  !< stiffness for the participating fluids for pTg-equilibrium
         #:endif
-        real(wp), dimension(2, 2) :: Jac, InvJac, TJac  !< matrices for the Newton Solver
-        real(wp), dimension(2)    :: R2D, DeltamP       !< residual and correction array
-        real(wp)                  :: Om  ! underrelaxation factor
-        real(wp)                  :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD  ! auxiliary variables for the pTg-solver
+        real(wp), dimension(2, 2) :: Jac, InvJac, TJac                  !< matrices for the Newton Solver
+        real(wp), dimension(2)    :: R2D, DeltamP                       !< residual and correction array
+        real(wp)                  :: Om                                 !< underrelaxation factor
+        real(wp)                  :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD  !< auxiliary variables for the pTg-solver
         real(wp)                  :: ml, mT, dFdT, dTdm, dTdp
 
         !> Generic loop iterators

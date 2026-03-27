@@ -13,7 +13,7 @@ module m_precision_select
     implicit none
 
     ! Define the available precision types
-    integer, parameter :: half_precision = 2  ! selected_real_kind(3, 4)
+    integer, parameter :: half_precision = 2  !< selected_real_kind(3, 4)
     integer, parameter :: single_precision = selected_real_kind(6, 37)
     integer, parameter :: double_precision = selected_real_kind(15, 307)
     integer, parameter :: hp = half_precision
@@ -22,7 +22,7 @@ module m_precision_select
 
     ! Set the working precision (wp) to single or double
 #ifdef MFC_SINGLE_PRECISION
-    integer, parameter :: wp = single_precision  ! Change to single_precision if needed
+    integer, parameter :: wp = single_precision  !< Change to single_precision if needed
 #else
     integer, parameter :: wp = double_precision
 #endif
@@ -42,7 +42,7 @@ module m_precision_select
     ! MPI types per element. IE Real(kind=2) <=> 2 MPI_BYTE
     integer, parameter :: mpi_io_type = merge(2, 1, stp == half_precision)
 #else
-    integer, parameter :: mpi_p = -100  ! Default value when MPI is not used
+    integer, parameter :: mpi_p = -100  !< Default value when MPI is not used
     integer, parameter :: mpi_2p = -100
     integer, parameter :: mpi_io_p = -100
     integer, parameter :: mpi_io_type = -100

@@ -8,7 +8,7 @@
 !> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
 
-    use m_derived_types  !< Definitions of the derived types
+    use m_derived_types
     use m_global_parameters
     use m_variables_conversion
 
@@ -183,15 +183,15 @@ contains
         real(wp)                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then  ! 2D/3D
+        if (p > 0 .or. n > 0) then
             icfl = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
-        else  ! 1D
+        else
             icfl = (dt/dx(j))*(abs(vel(1)) + c)
         end if
 
         ! Viscous calculations
         if (viscous) then
-            if (p > 0) then  ! 3D
+            if (p > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
@@ -202,10 +202,10 @@ contains
                         Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     end if
                 #:endif
-            else if (n > 0) then  ! 2D
+            else if (n > 0) then
                 vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
                 Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c))/maxval(1._wp/Re_l)
-            else  ! 1D
+            else
                 vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
                 Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
@@ -234,24 +234,24 @@ contains
         real(wp)                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then  ! 2D/3D cases
+        if (p > 0 .or. n > 0) then
             icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
-        else  ! 1D cases
+        else
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if
 
         ! Viscous calculations
         if (viscous) then
-            if (p > 0) then  ! 3D
+            if (p > 0) then
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
                 else
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)/maxval(1/(rho*Re_l))
                 end if
-            else if (n > 0) then  ! 2D
+            else if (n > 0) then
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
-            else  ! 1D
+            else
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
         end if

@@ -8,13 +8,13 @@
 !> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
 module m_data_output
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
-    use m_variables_conversion  !< State variables type conversion procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_variables_conversion
     use m_compile_specific
     use m_helper
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_helper_basic
     use m_sim_helpers
     use m_delay_file_access
     use m_ibm
@@ -712,7 +712,7 @@ contains
         ! Down sampling variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer :: m_glb_save, n_glb_save, p_glb_save  ! Global save size
+        integer :: m_glb_save, n_glb_save, p_glb_save  !< Global save size
 
         if (down_sample) then
             call s_downsample_data(q_cons_vf, q_cons_temp_ds, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
@@ -801,13 +801,13 @@ contains
                 end if
             else
                 if (down_sample) then
-                    do i = 1, sys_size  ! TODO: check if correct (sys_size
+                    do i = 1, sys_size  ! TODO: check if sys_size is correct
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, q_cons_temp_ds(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 else
-                    do i = 1, sys_size  ! TODO: check if correct (sys_size
+                    do i = 1, sys_size  ! TODO: check if sys_size is correct
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -871,7 +871,7 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size  ! TODO: check if correct (sys_size
+                do i = 1, sys_size  ! TODO: check if sys_size is correct
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -1015,16 +1015,16 @@ contains
         end if
 
         if (proc_rank == 0) then
-            if (n == 0) then  ! 1D simulation
-                do i = 1, num_fluids  ! Loop through fluids
+            if (n == 0) then
+                do i = 1, num_fluids
                     write (i + 120, '(6X,4F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 5)
                 end do
-            else if (p == 0) then  ! 2D simulation
-                do i = 1, num_fluids  ! Loop through fluids
+            else if (p == 0) then
+                do i = 1, num_fluids
                     write (i + 120, '(6X,5F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 3), c_mass_in(i, 5)
                 end do
-            else  ! 3D simulation
-                do i = 1, num_fluids  ! Loop through fluids
+            else
+                do i = 1, num_fluids
                     write (i + 120, '(6X,6F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 3), c_mass_in(i, &
                            & 4), c_mass_in(i, 5)
                 end do
@@ -1123,7 +1123,7 @@ contains
             damage_state = 0._wp
 
             ! Find probe location in terms of indices on a specific processor
-            if (n == 0) then  ! 1D simulation
+            if (n == 0) then
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     do s = -1, m
                         distx(s) = x_cb(s) - probe(i)%x
@@ -1226,7 +1226,7 @@ contains
 
                     accel = accel_mag(j - 2, k, l)
                 end if
-            else if (p == 0) then  ! 2D simulation
+            else if (p == 0) then
                 if (chemistry) then
                     do d = 1, num_species
                         rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
@@ -1307,7 +1307,7 @@ contains
                                                       & 0._wp, 0._wp, c, qv)
                     end if
                 end if
-            else  ! 3D
+            else
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
@@ -1456,7 +1456,7 @@ contains
         end do
 
         if (integral_wrt .and. bubbles_euler) then
-            if (n == 0) then  ! 1D simulation
+            if (n == 0) then
                 do i = 1, num_integrals
                     int_pres = 0._wp
                     max_pres = 0._wp

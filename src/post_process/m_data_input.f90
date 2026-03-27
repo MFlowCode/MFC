@@ -6,12 +6,12 @@
 module m_data_input
 
 #ifdef MFC_MPI
-    use mpi  !< Message passing interface (MPI) module
+    use mpi
 #endif
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Global parameters for the code
-    use m_mpi_proxy          !< Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
     use m_mpi_common
     use m_compile_specific
     use m_boundary_common
@@ -214,17 +214,17 @@ contains
     impure subroutine s_read_serial_data_files(t_step)
 
         integer, intent(in)                            :: t_step
-        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir  !< Location of the time-step directory associated with t_step
-        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc  !< Generic string used to store the location of a particular file
+        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_dir
+        character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
 
         !> Used to store the variable position, in character form, of the currently manipulated conservative variable file
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
 
         !> Location of the time-step directory associated with t_step
         character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir
-        logical :: dir_check   !< Generic logical used to test the existence of a particular folder
-        logical :: file_check  !< Generic logical used to test the existence of a particular file
-        integer :: i           !< Generic loop iterator
+        logical                                        :: dir_check
+        logical                                        :: file_check
+        integer                                        :: i
 
         ! Setting location of time-step folder based on current time-step
 
@@ -533,7 +533,7 @@ contains
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_input_module
 
-        integer :: i  !< Generic loop iterator
+        integer :: i
 
         ! Allocating the parts of the conservative and primitive variables that do not require the direct knowledge of the
         ! dimensionality of the simulation
@@ -589,7 +589,7 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_data_input_module
 
-        integer :: i  !< Generic loop iterator
+        integer :: i
 
         ! Deallocating the conservative and primitive variables
 

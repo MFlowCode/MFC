@@ -23,11 +23,11 @@ module m_constants
     integer, parameter  :: fourier_rings = 5                   !< Fourier filter ring limit
     integer, parameter  :: num_fluids_max = 10                 !< Maximum number of fluids in the simulation
     integer, parameter  :: num_probes_max = 10                 !< Maximum number of flow probes in the simulation
-    integer, parameter  :: num_patches_max = 1000
-    integer, parameter  :: num_bc_patches_max = 10
+    integer, parameter  :: num_patches_max = 1000              !< Maximum number of IC patches
+    integer, parameter  :: num_bc_patches_max = 10             !< Maximum number of boundary condition patches
     integer, parameter  :: max_2d_fourier_modes = 10           !< Max Fourier mode index for 2D modal patch (geometry 13)
     integer, parameter  :: max_sph_harm_degree = 5             !< Max degree L for 3D spherical harmonic patch (geometry 14)
-    integer, parameter  :: pathlen_max = 400
+    integer, parameter  :: pathlen_max = 400                   !< Maximum path length for STL/OBJ model files
     integer, parameter  :: nnode = 4                           !< Number of QBMM nodes
     integer, parameter  :: dflt_num_igr_iters = 2              !< number of iterations for IGR elliptic solve
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
@@ -53,7 +53,7 @@ module m_constants
     real(wp), parameter :: moncon_cutoff = 1e-8_wp  !< Monotonicity constraint's limiter to prevent extremas in THINC
 
     ! Chemistry
-    real(wp), parameter :: dflt_T_guess = 1200._wp  ! Default guess for temperature (when a previous value is not available)
+    real(wp), parameter :: dflt_T_guess = 1200._wp  !< Default guess for temperature (when a previous value is not available)
 
     ! IBM+STL interpolation constants
     integer, parameter  :: num_ray = 20                        !< Default number of rays traced per cell
@@ -75,24 +75,24 @@ module m_constants
 
     ! Constants of the algorithm described by Heirer, E. Hairer, S. P.Norsett, G. Wanner, Solving Ordinary Differential Equations I,
     ! Chapter II.4 to choose the initial time step size for the adaptive time stepping routine
-    real(wp), parameter :: threshold_first_guess = 1.e-5_wp
-    real(wp), parameter :: threshold_second_guess = 1.e-15_wp
-    real(wp), parameter :: scale_first_guess = 1.e-3_wp
-    real(wp), parameter :: scale_guess = 1.e-2_wp
-    real(wp), parameter :: small_guess = 1.e-6_wp
+    real(wp), parameter :: threshold_first_guess = 1.e-5_wp    !< Threshold for initial step size estimate
+    real(wp), parameter :: threshold_second_guess = 1.e-15_wp  !< Threshold for refined step size estimate
+    real(wp), parameter :: scale_first_guess = 1.e-3_wp        !< Scale factor for initial step size
+    real(wp), parameter :: scale_guess = 1.e-2_wp              !< Scale factor for step size adjustment
+    real(wp), parameter :: small_guess = 1.e-6_wp              !< Minimum initial step size
 
     ! Relativity
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
 
     ! Pseudo-random number generator
-    integer, parameter  :: modulus = 2**30 - 1
-    integer, parameter  :: multiplier = 1664525
-    integer, parameter  :: increment = 1013904223
-    integer, parameter  :: amplifier = 3**13
-    real(wp), parameter :: decimal_trim = 1.e5_wp
+    integer, parameter  :: modulus = 2**30 - 1     !< PRNG modulus
+    integer, parameter  :: multiplier = 1664525    !< PRNG multiplier
+    integer, parameter  :: increment = 1013904223  !< PRNG increment
+    integer, parameter  :: amplifier = 3**13       !< PRNG amplifier for mixing
+    real(wp), parameter :: decimal_trim = 1.e5_wp  !< PRNG decimal truncation factor
 
     ! System constants
-    integer, parameter :: CASE_FILE_ERROR_CODE = 22
+    integer, parameter :: CASE_FILE_ERROR_CODE = 22  !< Exit code for case file validation errors
 
     ! Boundary condition enumeration Abbreviations CHAR - Characteristic NR - Non-reflecting SUB - subsonic SUP - supersonic FF -
     ! Force-free CP - Constant pressure

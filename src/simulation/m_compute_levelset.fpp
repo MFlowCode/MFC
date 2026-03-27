@@ -7,12 +7,12 @@
 !> @brief Computes signed-distance level-set fields and surface normals for immersed-boundary patch geometries
 module m_compute_levelset
 
-    use m_ib_patches         !< The IB patch parameters
-    use m_model              !< Subroutine(s) related to STL files
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
-    use m_mpi_proxy          !< Message passing interface (MPI) module proxy
-    use m_helper_basic       !< Functions to compare floating point numbers
+    use m_ib_patches
+    use m_model
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_helper_basic
 
     implicit none
 
@@ -362,8 +362,8 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-        real(wp)                         :: ellipse_coeffs(2)  ! a and b in the ellipse equation
-        real(wp)                         :: quadratic_coeffs(3)  ! A, B, C in the quadratic equation to compute levelset
+        real(wp)                         :: ellipse_coeffs(2)        !< a and b in the ellipse equation
+        real(wp)                         :: quadratic_coeffs(3)      !< A, B, C in the quadratic equation to compute levelset
         real(wp)                         :: length_x, length_y
         real(wp), dimension(1:3)         :: xy_local, normal_vector  !< x and y coordinates in local IB frame
         real(wp), dimension(2)           :: center                   !< x and y coordinates in local IB frame

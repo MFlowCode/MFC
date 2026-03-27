@@ -7,8 +7,8 @@
 !> @brief Computes hypoelastic stress-rate source terms and damage-state evolution
 module m_hypoelastic
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_finite_differences
     use m_helper
 
@@ -353,7 +353,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp)                                               :: tau_p  ! principal stress
+        real(wp)                                               :: tau_p  !< principal stress
         real(wp)                                               :: tau_xx, tau_xy, tau_yy, tau_zz, tau_yz, tau_xz
         real(wp)                                               :: I1, I2, I3, argument, phi, sqrt_term_1, sqrt_term_2, temp
         integer                                                :: q, l, k

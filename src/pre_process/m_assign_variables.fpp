@@ -8,10 +8,10 @@
 !> @brief Assigns initial primitive variables to computational cells based on patch geometry
 module m_assign_variables
 
-    use m_derived_types  ! Definitions of the derived types
-    use m_global_parameters  ! Global parameters for the code
-    use m_variables_conversion  ! Subroutines to change the state variables from
-    use m_helper_basic  !< Functions to compare floating point numbers
+    use m_derived_types
+    use m_global_parameters
+    use m_variables_conversion
+    use m_helper_basic
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
 
     implicit none
@@ -106,7 +106,7 @@ contains
 
         real(wp) :: Ys(1:num_species)
         integer  :: smooth_patch_id
-        integer  :: i  !< generic loop operator
+        integer  :: i
 
         ! Assigning the mixture primitive variables of a uniform state patch
 
@@ -277,7 +277,7 @@ contains
         real(wp), dimension(3)         :: xi_cart
         real(wp)                       :: Ys(1:num_species)
         real(stp), dimension(sys_size) :: orig_prim_vf  !< Vector to hold original values of cell for smoothing purposes
-        integer                        :: i             !< Generic loop iterator
+        integer                        :: i
         integer                        :: smooth_patch_id
 
         ! Transferring the identity of the smoothing patch

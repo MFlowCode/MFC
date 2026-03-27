@@ -29,9 +29,9 @@ module m_model
 #endif
 
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
-    type(t_model_array), allocatable, target :: models(:)
-    !! GPU-friendly flat arrays for STL model data
-    integer, allocatable                      :: gpu_ntrs(:)
+    !> STL/OBJ models for IB markers and levelset GPU-friendly flat arrays for STL model data
+    type(t_model_array), allocatable, target  :: models(:)
+    integer, allocatable                      :: gpu_ntrs(:)  !< GPU-friendly flat arrays for STL model data
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_trs_v
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_boundary_v

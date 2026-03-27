@@ -7,10 +7,10 @@
 !> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_weno
-    use m_muscl              !< Monotonic Upstream-centered (MUSCL) schemes for conservation laws
+    use m_muscl
     use m_helper
     use m_finite_differences
 
@@ -542,7 +542,7 @@ contains
                                                            & buff_size)
                 end if
             end do
-        else  ! Compute velocity gradient at cell centers using finite differences
+        else  ! Compute velocity gradients at cell centers using central finite differences
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
             $:GPU_UPDATE(device='[iv]')
 
@@ -1337,7 +1337,7 @@ contains
         real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
         real(wp), dimension(1:3)                              :: dx
         real(wp)                                              :: divergence
-        integer                                               :: l, q  ! iterators
+        integer                                               :: l, q  !< iterators
 
         ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
         viscous_stress_tensor = 0._wp

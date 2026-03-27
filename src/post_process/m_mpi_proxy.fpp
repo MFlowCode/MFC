@@ -9,8 +9,8 @@ module m_mpi_proxy
     use mpi  !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Global parameters for the code
+    use m_derived_types
+    use m_global_parameters
     use m_mpi_common
     use ieee_arithmetic
 

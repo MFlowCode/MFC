@@ -7,23 +7,23 @@
 !> @brief Reads and validates user inputs, loads existing grid/IC data, and initializes pre-process modules
 module m_start_up
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Global parameters for the code
-    use m_mpi_proxy             !< Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
     use m_mpi_common
-    use m_variables_conversion  !< Subroutines to change the state variables from one form to another
-    use m_grid                  !< Procedures to generate (non-)uniform grids
-    use m_initial_condition     !< Procedures to generate initial condition
-    use m_data_output           !< Procedures to write the grid data and the conservative variables to files
-    use m_compile_specific      !< Compile-specific procedures
+    use m_variables_conversion
+    use m_grid
+    use m_initial_condition
+    use m_data_output
+    use m_compile_specific
     use m_icpp_patches
     use m_assign_variables
-    use m_phase_change          !< Phase-change module
-    use m_helper_basic          !< Functions to compare floating point numbers
+    use m_phase_change
+    use m_helper_basic
     use m_helper
 
 #ifdef MFC_MPI
-    use mpi  !< Message passing interface (MPI) module
+    use mpi
 #endif
 
     use m_check_patches
@@ -63,7 +63,7 @@ module m_start_up
 
     !> Possible location of time-step folder containing preexisting grid and/or conservative variables data to be used as starting
     !! point for pre-process
-    character(LEN=path_len + 2*name_len), private :: t_step_dir
+    character(LEN=path_len + 2*name_len), private :: t_step_dir  !< Path to preexisting time-step folder for restart
 
     procedure(s_read_abstract_grid_data_files), pointer :: s_read_grid_data_files => null()
     procedure(s_read_abstract_ic_data_files), pointer :: s_read_ic_data_files => null()
@@ -74,7 +74,7 @@ contains
     !! user provided inputs
     impure subroutine s_read_input_file
 
-        character(LEN=name_len) :: file_loc  !< Generic string used to store the address of a particular file
+        character(LEN=name_len) :: file_loc
 
         !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
         logical :: file_check
@@ -138,8 +138,8 @@ contains
     !! the combination of these choices results into a valid configuration for the pre-process
     impure subroutine s_check_input_file
 
-        character(LEN=len_trim(case_dir)) :: file_loc   !< Generic string used to store the address of a particular file
-        logical                           :: dir_check  !< Logical variable used to test the existence of folders
+        character(LEN=len_trim(case_dir)) :: file_loc
+        logical                           :: dir_check
 
         ! Checking the existence of the case folder
 
@@ -329,7 +329,7 @@ contains
 
         !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
         logical :: file_check
-        integer :: i, r  !< Generic loop iterator
+        integer :: i, r
 
         ! Reading the Conservative Variables Data Files
 

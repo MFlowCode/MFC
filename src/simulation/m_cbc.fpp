@@ -8,9 +8,9 @@
 
 module m_cbc
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_variables_conversion  !< State variables type conversion procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_variables_conversion
     use m_compute_cbc
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
@@ -57,7 +57,7 @@ module m_cbc
     real(wp), allocatable, dimension(:,:) :: fd_coef_y  !< Finite diff. coefficients y-dir
     !> Finite diff. coefficients z-dir The first dimension identifies the location of a coefficient in the FD formula, while the
     !! last dimension denotes the location of the CBC.
-    real(wp), allocatable, dimension(:,:) :: fd_coef_z
+    real(wp), allocatable, dimension(:,:) :: fd_coef_z  !< Finite diff. coefficients, z-direction
 
     ! Bug with NVHPC when using nullified pointers in a declare create real(wp), pointer, dimension(:, :) :: fd_coef => null()
 

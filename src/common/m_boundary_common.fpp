@@ -8,8 +8,8 @@
 
 module m_boundary_common
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_mpi_proxy
     use m_constants
     use m_delay_file_access
@@ -261,7 +261,7 @@ contains
 
             if (bc_z%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in)
-            else
+            else  !< bc_x%end
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
@@ -308,7 +308,7 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
@@ -322,7 +322,7 @@ contains
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                     end do
                 end do
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
@@ -336,7 +336,7 @@ contains
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                     end do
                 end do
-            else  !< bc_z%end
+            else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
@@ -393,7 +393,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do j = 1, buff_size
                     do i = 1, contxe
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
@@ -462,7 +462,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do j = 1, buff_size
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
@@ -532,7 +532,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_z%end
+            else  !< bc_x%end
                 do j = 1, buff_size
                     do i = 1, momxb + 1
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
@@ -599,7 +599,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
@@ -635,7 +635,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, j - 1, l)
@@ -671,7 +671,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_z%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, j - 1)
@@ -759,12 +759,12 @@ contains
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
-                        else
+                        else  !< bc_x%end
                             q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                         end if
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -781,12 +781,12 @@ contains
                     do j = 1, buff_size
                         if (i == momxb + 1) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
-                        else
+                        else  !< bc_y%end
                             q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                         end if
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb + 1) then
@@ -803,12 +803,12 @@ contains
                     do j = 1, buff_size
                         if (i == momxe) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
-                        else
+                        else  !< bc_z%end
                             q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                         end if
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxe) then
@@ -843,12 +843,12 @@ contains
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb3
-                        else
+                        else  !< bc_x%end
                             q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                         end if
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -873,12 +873,12 @@ contains
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb3
-                        else
+                        else  !< bc_y%end
                             q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                         end if
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -903,12 +903,12 @@ contains
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
-                        else
+                        else  !< bc_z%end
                             q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                         end if
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -917,7 +917,7 @@ contains
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve3
-                        else
+                        else  !< bc_x%end
                             q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
                         end if
                     end do
@@ -944,7 +944,7 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)
@@ -959,7 +959,7 @@ contains
                             q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)
                         end do
                     end do
-                else  !< bc_y%end
+                else  !< bc_z%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)
@@ -975,7 +975,7 @@ contains
                             q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)
                         end do
                     end do
-                else  !< bc_z%end
+                else  !< bc_x%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)
@@ -1009,7 +1009,7 @@ contains
                         end do
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1029,7 +1029,7 @@ contains
                         end do
                     end do
                 end do
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1049,7 +1049,7 @@ contains
                         end do
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1219,7 +1219,7 @@ contains
                         q_beta(beta_vars(i))%sf(j, k, l) = t_kahan
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, nvar
                     do j = -mapcells, mapcells + 1
                         q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(j - 1, k, l)
@@ -1238,7 +1238,7 @@ contains
                         q_beta(beta_vars(i))%sf(k, j, l) = t_kahan
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, nvar
                     do j = -mapcells, mapcells + 1
                         q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, j - 1, l)
@@ -1257,7 +1257,7 @@ contains
                         q_beta(beta_vars(i))%sf(k, l, j) = t_kahan
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, nvar
                     do j = -mapcells, mapcells + 1
                         q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, j - 1)
@@ -1287,7 +1287,7 @@ contains
                         q_beta(beta_vars(i))%sf(-j, k, l) = 0._wp
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, nvar
                     do j = 1, buff_size
                         q_beta(beta_vars(i))%sf(m + j, k, l) = 0._wp
@@ -1301,7 +1301,7 @@ contains
                         q_beta(beta_vars(i))%sf(k, -j, l) = 0._wp
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, nvar
                     do j = 1, buff_size
                         q_beta(beta_vars(i))%sf(k, n + j, l) = 0._wp
@@ -1315,7 +1315,7 @@ contains
                         q_beta(beta_vars(i))%sf(k, l, -j) = 0._wp
                     end do
                 end do
-            else  !< bc_z%end
+            else  !< bc_x%end
                 do i = 1, nvar
                     do j = 1, buff_size
                         q_beta(beta_vars(i))%sf(k, l, p + j) = 0._wp
@@ -1341,7 +1341,7 @@ contains
         ! ghost cells = mirror of (now-folded) interior values
 
         if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  !< bc_x%beg
+            if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, nvar
                     do j = 1, mapCells + 1
                         y_kahan = real(q_beta(beta_vars(i))%sf(-j, k, l), kind=wp) + kahan_comp(beta_vars(i))%sf(-j, k, &
@@ -1355,7 +1355,7 @@ contains
                         kahan_comp(beta_vars(i))%sf(-j, k, l) = kahan_comp(beta_vars(i))%sf(j - 1, k, l)
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, nvar
                     do j = 1, mapCells + 1
                         y_kahan = real(q_beta(beta_vars(i))%sf(m + j, k, l), kind=wp) + kahan_comp(beta_vars(i))%sf(m + j, k, &
@@ -1386,7 +1386,7 @@ contains
                         kahan_comp(beta_vars(i))%sf(k, -j, l) = kahan_comp(beta_vars(i))%sf(k, j - 1, l)
                     end do
                 end do
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do i = 1, nvar
                     do j = 1, mapCells + 1
                         y_kahan = real(q_beta(beta_vars(i))%sf(k, n + j, l), kind=wp) + kahan_comp(beta_vars(i))%sf(k, n + j, &
@@ -1417,7 +1417,7 @@ contains
                         kahan_comp(beta_vars(i))%sf(k, l, -j) = kahan_comp(beta_vars(i))%sf(k, l, j - 1)
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, nvar
                     do j = 1, mapCells + 1
                         y_kahan = real(q_beta(beta_vars(i))%sf(k, l, p + j), kind=wp) + kahan_comp(beta_vars(i))%sf(k, l, &
@@ -1448,7 +1448,7 @@ contains
 
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
-        else
+        else  !< bc_x%end
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
             do l = 0, p
                 do k = 0, n
@@ -1509,7 +1509,7 @@ contains
 
             if (bc_y%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
-            else
+            else  !< bc_y%end
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = 0, p
                     do k = -buff_size, m + buff_size
@@ -1588,7 +1588,7 @@ contains
                         c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_z%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(j - 1, k, l)
@@ -1602,7 +1602,7 @@ contains
                         c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, n - (j - 1), l)
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, j - 1, l)
@@ -1616,7 +1616,7 @@ contains
                         c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, p - (j - 1))
                     end do
                 end do
-            else  !< bc_z%end
+            else  !< bc_x%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, j - 1)
@@ -1642,12 +1642,12 @@ contains
                     do j = 1, buff_size
                         if (i == bc_dir) then
                             c_divs(i)%sf(-j, k, l) = -c_divs(i)%sf(j - 1, k, l)
-                        else
+                        else  !< bc_y%end
                             c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(j - 1, k, l)
                         end if
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_z%end
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1669,7 +1669,7 @@ contains
                         end if
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1691,7 +1691,7 @@ contains
                         end if
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -2250,7 +2250,7 @@ contains
     !! locations and cell-width distributions, based on the boundary conditions.
     subroutine s_populate_grid_variables_buffers
 
-        integer :: i  !< Generic loop iterator
+        integer :: i
 
 #ifdef MFC_SIMULATION
         ! Required for compatibility between codes

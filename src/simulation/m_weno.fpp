@@ -7,14 +7,14 @@
 !> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
 module m_weno
 
-    use m_derived_types         !< Definitions of the derived types
-    use m_global_parameters     !< Definitions of the global parameters
-    use m_variables_conversion  !< State variables type conversion procedures
+    use m_derived_types
+    use m_global_parameters
+    use m_variables_conversion
 
     ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
-    use m_muscl  !< For Interface Compression
+    use m_muscl
 
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
@@ -184,8 +184,8 @@ contains
         real(wp), pointer, dimension(:)   :: s_cb => null()  !< Cell-boundary locations in the s-direction
         type(int_bounds_info)             :: bc_s            !< Boundary conditions (BC) in the s-direction
         integer                           :: i               !< Generic loop iterator
-        real(wp)                          :: w(1:8)  ! Intermediate var for ideal weights: s_cb across overall stencil
-        real(wp)                          :: y(1:4)  ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
+        real(wp)                          :: w(1:8)          !< Intermediate var for ideal weights: s_cb across overall stencil
+        real(wp)                          :: y(1:4)          !< Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
         ! Determining the number of cells, the cell-boundary locations and the boundary conditions in the coordinate direction
         ! selected for the WENO reconstruction
@@ -880,7 +880,7 @@ contains
             real(wp), dimension(0:weno_num_stencils)        :: beta
             real(wp), dimension(0:weno_num_stencils)        :: delta
         #:endif
-        real(wp), dimension(-3:3) :: v  ! temporary field value array for clarity (WENO7 only)
+        real(wp), dimension(-3:3) :: v  !< temporary field value array for clarity (WENO7 only)
         real(wp)                  :: tau
         integer                   :: i, j, k, l, q
 
@@ -1462,18 +1462,19 @@ contains
 
         ! The left and right upper bounds (UL), medians, large curvatures, minima, and maxima of the WENO-reconstructed values of
         ! the cell- average variables.
-        real(wp)            :: vL_UL, vR_UL
-        real(wp)            :: vL_MD, vR_MD
-        real(wp)            :: vL_LC, vR_LC
-        real(wp)            :: vL_min, vR_min
-        real(wp)            :: vL_max, vR_max
-        real(wp), parameter :: alpha = 2._wp !>
-        !! Determines the maximum Courant-Friedrichs-Lewy (CFL) number that may be utilized with the scheme. In theory, for
-        !! stability, a CFL number less than 1/(1+alpha) is necessary. The default value for alpha is 2.
+        real(wp) :: vL_UL, vR_UL
+        real(wp) :: vL_MD, vR_MD
+        real(wp) :: vL_LC, vR_LC
+        real(wp) :: vL_min, vR_min
+        real(wp) :: vL_max, vR_max
+        !> Max CFL stability parameter (CFL < 1/(1+alpha)) Determines the maximum Courant-Friedrichs-Lewy (CFL) number that may be
+        !! utilized with the scheme. In theory, for stability, a CFL number less than 1/(1+alpha) is necessary. The default value
+        !! for alpha is 2.
+        real(wp), parameter :: alpha = 2._wp
 
         !> Determines the amount of freedom available from utilizing a large value for the local curvature. The default value for
         !! beta is 4/3.
-        real(wp), parameter :: beta = 4._wp/3._wp
+        real(wp), parameter :: beta = 4._wp/3._wp  !< Local curvature freedom parameter
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
 

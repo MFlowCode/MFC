@@ -8,9 +8,9 @@
 !> @brief Utility routines for bubble model setup, coordinate transforms, array sampling, and special functions
 module m_helper
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
-    use ieee_arithmetic      !< For checking NaN
+    use m_derived_types
+    use m_global_parameters
+    use ieee_arithmetic  !< For checking NaN
 
     implicit none
 
@@ -542,7 +542,7 @@ contains
     elemental function double_factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18)  ! 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  !< 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 
@@ -556,7 +556,7 @@ contains
     elemental function factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18)  ! 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  !< 18 bytes for 64-bit integer
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 

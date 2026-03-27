@@ -10,7 +10,7 @@
 !! fraction model.
 program p_main
 
-    use m_global_parameters  !< Definitions of the global parameters
+    use m_global_parameters
     use m_start_up
     use m_time_steppers
     use m_nvtx

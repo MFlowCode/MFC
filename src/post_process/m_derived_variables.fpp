@@ -6,10 +6,10 @@
 
 module m_derived_variables
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Global parameters for the code
-    use m_mpi_proxy          !< Message passing interface (MPI) module proxy
-    use m_helper_basic       !< Functions to compare floating point numbers
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_helper_basic
     use m_variables_conversion
 
     implicit none
@@ -20,7 +20,7 @@ module m_derived_variables
 
     !> Gradient magnitude (gm) of the density for each cell of the computational sub-domain. This variable is employed in the
     !! calculation of the numerical Schlieren function.
-    real(wp), allocatable, dimension(:,:,:) :: gm_rho_sf
+    real(wp), allocatable, dimension(:,:,:) :: gm_rho_sf  !< Density gradient magnitude for numerical Schlieren
 
     !> @name Finite-difference (fd) coefficients in x-, y- and z-coordinate directions. Note that because sufficient boundary
     !! information is available for all the active coordinate directions, the centered family of the finite-difference schemes is
@@ -36,7 +36,7 @@ module m_derived_variables
     !! avoid cycling through the third dimension of the flow variable(s) when the simulation is not 3D and the size of the buffer is
     !! non-zero. Note that a similar procedure does not have to be applied to the second dimension since in 1D, the buffer size is
     !! always zero.
-    integer, private :: flg
+    integer, private :: flg  !< Dimensionality flag: 1 = 3D dataset, 0 = otherwise
 
 contains
 
@@ -87,7 +87,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: i, j, k  !< Generic loop iterators
+        integer :: i, j, k
 
         ! Computing specific heat ratio from specific heat ratio function
         do k = -offset_z%beg, p + offset_z%end
@@ -109,7 +109,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: i, j, k  !< Generic loop iterators
+        integer :: i, j, k
 
         ! Calculating the values of the liquid stiffness from those of the specific heat ratio function and the liquid stiffness
         ! function
@@ -135,7 +135,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: i, j, k  !< Generic loop iterators
+        integer :: i, j, k
 
         ! Fluid bulk modulus for alternate sound speed
         real(wp) :: blkmod1, blkmod2
@@ -181,8 +181,8 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        real(wp) :: top, bottom, slope  !< Flux limiter calcs
-        integer  :: j, k, l             !< Generic loop iterators
+        real(wp) :: top, bottom, slope
+        integer  :: j, k, l
 
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
@@ -306,7 +306,7 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), &
              & intent(inout) :: q_sf
 
-        integer :: j, k, l, r  !< Generic loop iterators
+        integer :: j, k, l, r
 
         ! Computing the vorticity component in the x-coordinate direction
         if (i == 1) then
@@ -380,7 +380,7 @@ contains
 
         real(wp), dimension(1:3,1:3) :: q_jacobian_sf, S, S2, O, O2
         real(wp)                     :: trS, Q, IIS
-        integer                      :: j, k, l, r, jj, kk  !< Generic loop iterators
+        integer                      :: j, k, l, r, jj, kk
 
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
@@ -438,6 +438,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         !> Liutex magnitude
+
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), &
              & intent(out) :: liutex_mag
 
@@ -445,20 +446,20 @@ contains
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,nm), &
              & intent(out) :: liutex_axis
 
-        character, parameter        :: ivl = 'N'      !< compute left eigenvectors
-        character, parameter        :: ivr = 'V'      !< compute right eigenvectors
-        real(wp), dimension(nm, nm) :: vgt            !< velocity gradient tensor
-        real(wp), dimension(nm)     :: lr, li         !< real and imaginary parts of eigenvalues
-        real(wp), dimension(nm, nm) :: vl, vr         !< left and right eigenvectors
-        integer, parameter          :: lwork = 4*nm   !< size of work array (4*nm recommended)
-        real(wp), dimension(lwork)  :: work           !< work array
+        character, parameter        :: ivl = 'N'     !< compute left eigenvectors
+        character, parameter        :: ivr = 'V'     !< compute right eigenvectors
+        real(wp), dimension(nm, nm) :: vgt           !< velocity gradient tensor
+        real(wp), dimension(nm)     :: lr, li        !< real and imaginary parts of eigenvalues
+        real(wp), dimension(nm, nm) :: vl, vr        !< left and right eigenvectors
+        integer, parameter          :: lwork = 4*nm  !< size of work array (4*nm recommended)
+        real(wp), dimension(lwork)  :: work          !< work array
         integer                     :: info
-        real(wp), dimension(nm)     :: eigvec         !< real eigenvector
-        real(wp)                    :: eigvec_mag     !< magnitude of real eigenvector
-        real(wp)                    :: omega_proj     !< projection of vorticity on real eigenvector
-        real(wp)                    :: lci            !< imaginary part of complex eigenvalue
+        real(wp), dimension(nm)     :: eigvec        !< real eigenvector
+        real(wp)                    :: eigvec_mag    !< magnitude of real eigenvector
+        real(wp)                    :: omega_proj    !< projection of vorticity on real eigenvector
+        real(wp)                    :: lci           !< imaginary part of complex eigenvalue
         real(wp)                    :: alpha
-        integer                     :: j, k, l, r, i  !< Generic loop iterators
+        integer                     :: j, k, l, r, i
         integer                     :: idx
 
         do l = -offset_z%beg, p + offset_z%end
@@ -516,7 +517,7 @@ contains
                     lci = li(mod(idx, 3) + 1)
 
                     ! Compute Liutex magnitude
-                    alpha = omega_proj**2._wp - 4._wp*lci**2._wp  ! (2*alpha)^2
+                    alpha = omega_proj**2._wp - 4._wp*lci**2._wp
                     if (alpha > 0._wp) then
                         liutex_mag(j, k, l) = omega_proj - sqrt(alpha)
                     else
@@ -549,8 +550,8 @@ contains
         !> Maximum value of the gradient magnitude (gm) of the density field in entire computational domain and not just the local
         !! sub-domain. The first position in the variable contains the maximum value and the second contains the rank of the
         !! processor on which it occurred.
-        real(wp), dimension(2) :: gm_rho_max
-        integer                :: i, j, k, l  !< Generic loop iterators
+        real(wp), dimension(2) :: gm_rho_max  !< Global (max gradient magnitude, rank) pair for density
+        integer                :: i, j, k, l
 
         ! Computing Gradient Magnitude of Density
 

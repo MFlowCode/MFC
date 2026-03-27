@@ -5,13 +5,13 @@
 !> @brief Writes grid and initial condition data to serial or parallel output files
 module m_data_output
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Global parameters for the code
+    use m_derived_types
+    use m_global_parameters
     use m_helper
-    use m_mpi_proxy          !< Message passing interface (MPI) module proxy
+    use m_mpi_proxy
 
 #ifdef MFC_MPI
-    use mpi  !< Message passing interface (MPI) module
+    use mpi
 #endif
 
     use m_compile_specific
@@ -64,22 +64,22 @@ contains
 
         ! BC types
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
-        logical                                                     :: file_exist  !< checks if file exists
+        logical                                                     :: file_exist
         character(LEN=15)                                           :: FMT
         character(LEN=3)                                            :: status
 
         !> Used to store the number, in character form, of the currently manipulated conservative variable data file
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-        character(LEN=len_trim(t_step_dir) + name_len) :: file_loc  !< Generic string used to store the address of a particular file
-        integer :: i, j, k, l, r, c                                 !< Generic loop iterator
-        integer :: t_step
-        real(wp), dimension(nb) :: nRtmp                            !< Temporary bubble concentration
-        real(wp) :: nbub                                            !< Temporary bubble number density
-        real(wp) :: gamma, lit_gamma, pi_inf, qv                    !< Temporary EOS params
-        real(wp) :: rho                                             !< Temporary density
-        real(wp) :: pres, T                                         !< Temporary pressure
-        real(wp) :: rhoYks(1:num_species)                           !< Temporary species mass fractions
-        real(wp) :: pres_mag
+        character(LEN=len_trim(t_step_dir) + name_len)           :: file_loc
+        integer                                                  :: i, j, k, l, r, c
+        integer                                                  :: t_step
+        real(wp), dimension(nb)                                  :: nRtmp
+        real(wp)                                                 :: nbub
+        real(wp)                                                 :: gamma, lit_gamma, pi_inf, qv
+        real(wp)                                                 :: rho
+        real(wp)                                                 :: pres, T
+        real(wp)                                                 :: rhoYks(1:num_species)
+        real(wp)                                                 :: pres_mag
 
         pres_mag = 0._wp
 
@@ -429,7 +429,7 @@ contains
         ! Downsample variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
-        integer :: m_glb_save, n_glb_save, p_glb_save  ! Size of array being saved
+        integer :: m_glb_save, n_glb_save, p_glb_save  !< Size of array being saved
 
         loc_violations = 0._wp
 
@@ -505,7 +505,7 @@ contains
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size  ! adv_idx%end
+                do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -565,7 +565,7 @@ contains
 
             ! Write the data for each variable
             if (bubbles_euler) then
-                do i = 1, sys_size  ! adv_idx%end
+                do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -587,7 +587,7 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size  ! TODO: check if this is right
+                do i = 1, sys_size
                     !            do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -624,7 +624,7 @@ contains
         ! Generic logical used to check the existence of directories
         logical :: dir_check
         integer :: i
-        integer :: m_ds, n_ds, p_ds  !< down sample dimensions
+        integer :: m_ds, n_ds, p_ds
 
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory

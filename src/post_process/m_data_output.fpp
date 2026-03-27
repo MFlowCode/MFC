@@ -5,10 +5,10 @@
 !> @brief Writes post-processed grid and flow-variable data to Silo-HDF5 or binary database files
 module m_data_output
 
-    use m_derived_types  ! Definitions of the derived types
-    use m_global_parameters  ! Global parameters
-    use m_derived_variables  !< Procedures used to compute quantities derived
-    use m_mpi_proxy  ! Message passing interface (MPI) module proxy
+    use m_derived_types
+    use m_global_parameters
+    use m_derived_variables
+    use m_mpi_proxy
     use m_compile_specific
     use m_helper
     use m_variables_conversion
@@ -414,7 +414,7 @@ contains
 
         ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
-        integer                                        :: ierr  !< Generic flag used to identify and report database errors
+        integer                                        :: ierr
 
         ! Silo-HDF5 Database Format
 
@@ -499,7 +499,7 @@ contains
     !> @brief Open the interface data file for appending extracted interface coordinates.
     impure subroutine s_open_intf_data_file()
 
-        character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to a file in the case directory
+        character(LEN=path_len + 3*name_len) :: file_path
 
         write (file_path, '(A)') '/intf_data.dat'
         file_path = trim(case_dir) // trim(file_path)
@@ -512,7 +512,7 @@ contains
     !> @brief Open the energy data file for appending volume-integrated energy budget quantities.
     impure subroutine s_open_energy_data_file()
 
-        character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to a file in the case directory
+        character(LEN=path_len + 3*name_len) :: file_path
 
         write (file_path, '(A)') '/eng_data.dat'
         file_path = trim(case_dir) // trim(file_path)
@@ -545,7 +545,7 @@ contains
 
         ! Generic loop iterator
         integer :: i
-        integer :: ierr  !< Generic flag used to identify and report database errors
+        integer :: ierr
 
         ! Silo-HDF5 Database Format
 
@@ -703,7 +703,7 @@ contains
 
         ! Generic loop iterator
         integer :: i, j, k
-        integer :: ierr  !< Generic flag used to identify and report database errors
+        integer :: ierr
 
         ! Silo-HDF5 Database Format
 
@@ -852,7 +852,7 @@ contains
         logical                                :: lg_bub_file, file_exist
         integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
         integer                                :: ifile
-        integer                                :: ierr  !< Generic flag used to identify and report MPI errors
+        integer                                :: ierr
         real(wp)                               :: file_time, file_dt
         integer                                :: file_num_procs, file_tot_part, tot_part
         integer                                :: i
@@ -1206,7 +1206,7 @@ contains
         character(len=64), dimension(num_procs)       :: var_names
         integer, dimension(num_procs)                 :: var_types
         real(wp)                                      :: dummy_data
-        integer                                       :: ierr  !< Generic flag used to identify and report database errors
+        integer                                       :: ierr
         integer                                       :: i
 
         dummy_data = 0._wp
@@ -1296,8 +1296,8 @@ contains
     impure subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer :: i, j, k, l, cent  !< Generic loop iterators
-        integer :: counter, root     !< number of data points extracted to fit shape to SH perturbations
+        integer :: i, j, k, l, cent
+        integer :: counter, root  !< number of data points extracted to fit shape to SH perturbations
         real(wp), allocatable :: x_td(:), y_td(:), x_d1(:), y_d1(:), y_d(:), x_d(:)
         real(wp) :: axp, axm, ayp, aym, tgp, euc_d, thres, maxalph_loc, maxalph_glb
 
@@ -1387,7 +1387,7 @@ contains
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H, qv
         real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: adv
-        integer :: i, j, k, l, s  ! looping indices
+        integer :: i, j, k, l, s  !< looping indices
 
         Egk = 0._wp
         Elp = 0._wp
@@ -1480,7 +1480,7 @@ contains
         ! the local sub-domain. Note that for the Binary data- base format and multidimensional data, the root process only has to
         ! close the file associated with the local sub- domain, because one associated with the entire domain is not generated.
 
-        integer :: ierr  !< Generic flag used to identify and report database errors
+        integer :: ierr
 
         ! Silo-HDF5 database format
 

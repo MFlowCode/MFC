@@ -12,8 +12,8 @@ module m_mpi_common
     use mpi  !< Message passing interface (MPI) module
 #endif
 
-    use m_derived_types      !< Definitions of the derived types
-    use m_global_parameters  !< Definitions of the global parameters
+    use m_derived_types
+    use m_global_parameters
     use m_helper
     use ieee_arithmetic
     use m_nvtx
@@ -26,11 +26,11 @@ module m_mpi_common
 
     !> This variable is utilized to pack and send the buffer of the cell-average primitive variables, for a single computational
     !! domain boundary at the time, to the relevant neighboring processor.
-    real(wp), private, allocatable, dimension(:) :: buff_send
+    real(wp), private, allocatable, dimension(:) :: buff_send  !< Primitive variable send buffer for halo exchange
 
     !> buff_recv is utilized to receive and unpack the buffer of the cell- average primitive variables, for a single computational
     !! domain boundary at the time, from the relevant neighboring processor.
-    real(wp), private, allocatable, dimension(:) :: buff_recv
+    real(wp), private, allocatable, dimension(:) :: buff_recv  !< Primitive variable receive buffer for halo exchange
     type(int_bounds_info)                        :: comm_coords(3)
     integer                                      :: comm_size(3)
     $:GPU_DECLARE(create='[comm_coords, comm_size]')
@@ -250,12 +250,12 @@ contains
     !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
-        integer, intent(in)                     :: counts  ! Array of vector lengths for each process
-        real(wp), intent(in), dimension(counts) :: my_vector  ! Input vector on each process
-        integer, intent(in)                     :: root  ! Rank of the root process
-        real(wp), allocatable, intent(out)      :: gathered_vector(:)  ! Gathered vector on the root process
+        integer, intent(in)                     :: counts              !< Array of vector lengths for each process
+        real(wp), intent(in), dimension(counts) :: my_vector           !< Input vector on each process
+        integer, intent(in)                     :: root                !< Rank of the root process
+        real(wp), allocatable, intent(out)      :: gathered_vector(:)  !< Gathered vector on the root process
         integer                                 :: i
-        integer                                 :: ierr  !< Generic flag used to identify and report MPI errors
+        integer                                 :: ierr                !< Generic flag used to identify and report MPI errors
         integer, allocatable                    :: recounts(:), displs(:)
 
 #ifdef MFC_MPI
@@ -523,7 +523,7 @@ contains
 
         !> Temporary storage variable that holds the reduced maximum value and the rank of the processor with which the value is
         !! associated
-        real(wp), dimension(2) :: var_glb
+        real(wp), dimension(2) :: var_glb  !< Reduced (max value, rank) pair
 
         ! Performing reduction procedure and eventually storing its result into the variable that was initially inputted into the
         ! subroutine
@@ -1070,7 +1070,7 @@ contains
         beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
         grid_dims = (/m, n, p/)
 
-        if (pbc_loc == -1) then
+        if (pbc_loc == -1) then  ! PBC at the beginning
             ! Phase 1: Rightward accumulation Send END buffer to right neighbor, recv from left into BEG, ADD
             pack_offset = grid_dims(mpi_dir) + 1
             unpack_offset = 0
@@ -1287,7 +1287,7 @@ contains
 
         !> Remaining number of cells, in a particular coordinate direction, after the majority is divided up among the available
         !! processors
-        integer :: rem_cells
+        integer :: rem_cells    !< Remaining cells after distribution among processors
         integer :: recon_order  !< WENO or MUSCL reconstruction order
         integer :: i, j, k      !< Generic loop iterators
         integer :: ierr         !< Generic flag used to identify and report MPI errors
@@ -1677,7 +1677,7 @@ contains
         ! Ghost zone at the end
         if (proc_coords(1) < num_procs_x - 1 .and. format == 1) then
             offset_x%end = 2
-        else
+        else  ! PBC at the beginning only
             offset_x%end = 0
         end if
 #endif
@@ -1686,10 +1686,10 @@ contains
         if (parallel_io) then
             if (proc_coords(1) < rem_cells) then
                 start_idx(1) = (m + 1)*proc_coords(1)
-            else
+            else  ! PBC at the end
                 start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
             end if
-        else
+        else  ! PBC at the end only
 #ifdef MFC_PRE_PROCESS
             if (old_grid .neqv. .true.) then
                 dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
@@ -1697,7 +1697,7 @@ contains
                 if (proc_coords(1) < rem_cells) then
                     x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1))
                     x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1) - (num_procs_x - rem_cells))
-                else
+                else  ! PBC at the beginning only
                     x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1) + rem_cells)
                     x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1))
                 end if
@@ -1745,18 +1745,18 @@ contains
                     ! Send/receive buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
                                       & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
+                else  ! PBC at the end
                     ! Send/receive buffer to/from bc_x%beg/bc_x%beg
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
-            else  ! PBC at the end
+            else  ! PBC at the end only
                 if (bc_x%beg >= 0) then  ! PBC at the end and beginning
 
                     ! Send/receive buffer to/from bc_x%beg/bc_x%end
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
+                else
                     ! Send/receive buffer to/from bc_x%end/bc_x%end
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
                                       & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)

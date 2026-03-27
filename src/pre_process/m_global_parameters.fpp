@@ -127,26 +127,26 @@ module m_global_parameters
     !> @}
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z   !< Boundary conditions in the x-, y- and z-coordinate directions
-    integer               :: shear_num !! Number of shear stress components
+    integer               :: shear_num          !< Number of shear stress components
     integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
     integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
     !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
     !! [indices])
-    integer, dimension(3, 2) :: shear_BC_flip_indices
-    logical                  :: parallel_io           !< Format of the data files
-    logical                  :: file_per_process      !< type of data output
-    integer                  :: precision             !< Precision of output files
-    logical                  :: down_sample           !< Down-sample the output data
-    logical                  :: mixlayer_vel_profile  !< Set hyperbolic tangent streamwise velocity profile
-    real(wp)                 :: mixlayer_vel_coef     !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    logical                  :: mixlayer_perturb      !< Superimpose instability waves to surrounding fluid flow
-    integer                  :: mixlayer_perturb_nk   !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    logical                  :: parallel_io            !< Format of the data files
+    logical                  :: file_per_process       !< type of data output
+    integer                  :: precision              !< Precision of output files
+    logical                  :: down_sample            !< Down-sample the output data
+    logical                  :: mixlayer_vel_profile   !< Set hyperbolic tangent streamwise velocity profile
+    real(wp)                 :: mixlayer_vel_coef      !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    logical                  :: mixlayer_perturb       !< Superimpose instability waves to surrounding fluid flow
+    integer                  :: mixlayer_perturb_nk    !< Number of Fourier modes for perturbation with mixlayer_perturb flag
     !> Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag Default value (k0 = 0.4446) is most unstable mode
     !! obtained from linear stability analysis See Michalke (1964, JFM) for details
-    real(wp)                   :: mixlayer_perturb_k0
+    real(wp)                   :: mixlayer_perturb_k0  !< Peak wavenumber for mixlayer perturbation (default: most unstable mode)
     logical                    :: simplex_perturb
     type(simplex_noise_params) :: simplex_params
-    real(wp)                   :: pi_fac  !< Factor for artificial pi_inf
+    real(wp)                   :: pi_fac               !< Factor for artificial pi_inf
     logical                    :: viscous
     logical                    :: bubbles_lagrange
 
@@ -178,17 +178,17 @@ module m_global_parameters
     !> Database of the initial condition patch parameters (icpp) for each of the patches employed in the configuration of the
     !! initial condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
     !! m_derived_types.f90.
-    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp
-    integer                                                  :: num_bc_patches  !< Number of boundary condition patches
-    logical                                                  :: bc_io           !< whether or not to save BC data
+    type(ic_patch_parameters), dimension(num_patches_max) :: patch_icpp      !< IC patch parameters (max: num_patches_max)
+    integer                                               :: num_bc_patches  !< Number of boundary condition patches
+    logical                                               :: bc_io           !< whether or not to save BC data
+    !> Boundary condition patch parameters Database of the boundary condition patch parameters for each of the patches employed in
+    !! the configuration of the boundary conditions
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
-    !! Database of the boundary condition patch parameters for each of the patches employed in the configuration of the boundary
-    !! conditions
 
     ! Fluids Physical Parameters
     !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
     !! equation of state parameters, and the Reynolds numbers.
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp
+    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
 
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
@@ -208,10 +208,10 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                               :: ib       !< Turn immersed boundaries on
-    integer                                               :: num_ibs  !< Number of immersed boundaries
+    logical                                               :: ib        !< Turn immersed boundaries on
+    integer                                               :: num_ibs   !< Number of immersed boundaries
     integer                                               :: Np
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
+    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
     !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
     !! condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
@@ -223,8 +223,8 @@ module m_global_parameters
     logical :: polytropic
     logical :: polydisperse
     real(wp) :: poly_sigma
-    integer :: dist_type  ! 1 = binormal, 2 = lognormal-normal
-    integer :: thermal  ! 1 = adiabatic, 2 = isotherm, 3 = transfer
+    integer :: dist_type  !< 1 = binormal, 2 = lognormal-normal
+    integer :: thermal    !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
     real(wp) :: gam_m
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
@@ -257,11 +257,11 @@ module m_global_parameters
 
     !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
     !! physical computational domain to the next time-step.
-    integer :: buff_size
+    integer :: buff_size  !< Number of ghost cells for boundary condition storage
     logical :: fft_wrt
     !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
     !! is false
-    logical :: dummy
+    logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
     ! Variables for hardcoded initial conditions that are read from input files
     character(LEN=2*path_len) :: interface_file
@@ -681,7 +681,7 @@ contains
                 bub_idx%beg = sys_size + 1
                 if (qbmm) then
                     if (nnode == 4) then
-                        nmom = 6 !! Already set as a parameter
+                        nmom = 6  !< Already set as a parameter
                     end if
                     bub_idx%end = adv_idx%end + nb*nmom
                 else
