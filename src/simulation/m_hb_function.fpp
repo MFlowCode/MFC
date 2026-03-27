@@ -41,7 +41,8 @@ contains
         power_law_term = K_val*(shear_rate**(nn_val - 1._wp))
 
         mu = yield_term + power_law_term
-        mu = min(max(mu, mu_min_val), mu_max_val)
+        mu = max(mu, mu_min_val)
+        if (mu_max_val > 0._wp) mu = min(mu, mu_max_val)
 
     end function f_compute_hb_viscosity
 
