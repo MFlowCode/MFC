@@ -520,11 +520,11 @@ module m_global_parameters
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
-    logical                           :: bubbles_lagrange                        !< Lagrangian subgrid bubble model switch
-    logical                           :: particles_lagrange                      !< Lagrangian subgrid particle model switch
-    type(bubbles_lagrange_parameters) :: lag_params                              !< Lagrange bubbles' parameters
-    integer                           :: n_el_bubs_loc, n_el_bubs_glb            !< Number of Lagrangian bubbles (local and global)
-    integer                           :: n_el_particles_loc, n_el_particles_glb  !< Number of Lagrangian bubbles (local and global)
+    logical                           :: bubbles_lagrange  !< Lagrangian subgrid bubble model switch
+    logical                           :: particles_lagrange  !< Lagrangian subgrid particle model switch
+    type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters
+    integer                           :: n_el_bubs_loc, n_el_bubs_glb  !< Number of Lagrangian bubbles (local and global)
+    integer                           :: n_el_particles_loc, n_el_particles_glb  !< Number of Lagrangian particles (local and global)
     logical                           :: moving_lag_bubbles
     logical                           :: moving_lag_particles
     logical                           :: lag_pressure_force

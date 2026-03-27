@@ -1426,6 +1426,13 @@ contains
         if (ib) then
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
+
+        if (particles_lagrange) then
+            @:DEALLOCATE(p_send_buff, p_recv_buff, p_send_ids)
+            @:DEALLOCATE(force_send_counts, force_recv_counts)
+            @:DEALLOCATE(force_send_ids, force_send_vals)
+            @:DEALLOCATE(flat_send_ids, flat_send_vals)
+        end if
 #endif
 
     end subroutine s_finalize_mpi_proxy_module

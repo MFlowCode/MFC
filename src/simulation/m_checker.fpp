@@ -37,6 +37,8 @@ contains
         call s_check_inputs_time_stepping
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
+        @:PROHIBIT(particles_lagrange .and. bubbles_lagrange, "particles_lagrange and bubbles_lagrange cannot both be enabled")
+        @:PROHIBIT(particles_lagrange .and. n == 0, "particles_lagrange requires at least 2D (n > 0)")
 
     end subroutine s_check_inputs
 
