@@ -8,7 +8,7 @@
 
 #:def OMP_MAP_STR(map_type, var_list)
     #:assert map_type is not None
-    #:assert isinstance(map_type, str)
+    #:assert isinstance(map_type, str) 
     #:if var_list is not None
         #:set map_clause = 'map(' + map_type + ':'
         #:set map_val = GEN_CLAUSE(map_clause, var_list)
@@ -85,13 +85,13 @@
 #:enddef
 
 #! #:def OMP_ATTACH_STR(attach)
-#! #:set attach_val = OMP_MAP_STR('always,to', attach)
-#! $:attach_val
+    #! #:set attach_val = OMP_MAP_STR('always,to', attach)
+    #! $:attach_val
 #! #:enddef
 
 #! #:def OMP_DETACH_STR(detach)
-#! #:set detach_val = OMP_MAP_STR('always,from', detach)
-#! $:detach_val
+    #! #:set detach_val = OMP_MAP_STR('always,from', detach)
+    #! $:detach_val
 #! #:enddef
 
 #:def OMP_TO_STR(to)
@@ -110,13 +110,13 @@
 #:enddef
 
 #:def OMP_USE_DEVICE_ADDR_STR(use_device_addr)
-    #:set use_device_addr_val = GEN_PARENTHESES_CLAUSE('use_device_addr', use_device_addr)
-    $:use_device_addr_val
+      #:set use_device_addr_val = GEN_PARENTHESES_CLAUSE('use_device_addr', use_device_addr)
+      $:use_device_addr_val
 #:enddef
 
 #:def OMP_USE_DEVICE_PTR_STR(use_device_ptr)
-    #:set use_device_ptr_val = GEN_PARENTHESES_CLAUSE('use_device_ptr', use_device_ptr)
-    $:use_device_ptr_val
+      #:set use_device_ptr_val = GEN_PARENTHESES_CLAUSE('use_device_ptr', use_device_ptr)
+      $:use_device_ptr_val
 #:enddef
 
 #:def OMP_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
@@ -139,7 +139,7 @@
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
-
+    
     #:set omp_clause_val = omp_clause_val.strip('\n')
     #:set omp_directive = '!$omp target teams ' + omp_clause_val + extraOmpArgs_val.strip('\n')
 
@@ -153,7 +153,7 @@
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraOmpArgs=None)
-
+    
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
     #:set parallelism_val = OMP_PARALLELISM_STR(parallelism)
     #:set default_val = OMP_DEFAULT_STR(default)
@@ -191,6 +191,7 @@
 #:enddef
 
 #:def END_OMP_PARALLEL_LOOP()
+    
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_end_directive = '!$omp end target teams loop'
     #:elif MFC_COMPILER == CCE_COMPILER_ID
@@ -217,7 +218,7 @@
     #:else
         #:set function_name_val = ''
     #:endif
-
+    
     #:if MFC_COMPILER == AMD_COMPILER_ID
         #:set clause_val = ''
     #:else
@@ -241,8 +242,7 @@
 #:enddef
 
 #! Not fully implemented yet (ignores most args right now)
-#:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, &
-               & extraOmpArgs=None)
+#:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraOmpArgs=None)
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_directive = '!$omp loop bind(thread)'
     #:elif MFC_COMPILER == CCE_COMPILER_ID or MFC_COMPILER == AMD_COMPILER_ID
@@ -253,8 +253,7 @@
     $:omp_directive
 #:enddef
 
-#:def OMP_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, &
-               & deviceptr=None, attach=None, default=None, extraOmpArgs=None)
+#:def OMP_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraOmpArgs=None)
     #:assert code is not None
     #:assert isinstance(code, str)
     #:if code == '' or code.isspace()
@@ -272,7 +271,7 @@
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
-        & no_create_val.strip('\n') + present_val.strip('\n') + &
+        & no_create_val.strip('\n') + present_val.strip('\n') + & 
         & deviceptr_val.strip('\n') + attach_val.strip('\n') + &
         & default_val.strip('\n')
     #:set omp_directive = '!$omp target data ' + clause_val + extraOmpArgs_val.strip('\n')

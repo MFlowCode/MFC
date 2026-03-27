@@ -51,10 +51,59 @@ else
     PYTHON_DIRS="toolchain/ examples/ benchmarks/"
 fi
 
-# Format Fortran files with ffmt (single-pass, idempotent)
-if ! ffmt -j ${JOBS:-1} $FORTRAN_DIRS 2>/dev/null; then
-    error "Formatting Fortran files failed: ffmt."
-    exit 1
+# Format Fortran files (.f90, .fpp)
+FORTRAN_FILES=$(find $FORTRAN_DIRS -type f 2>/dev/null | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' || true)
+if [[ -n "$FORTRAN_FILES" ]]; then
+    FPRETTIFY_OPTS="--silent --indent 4 --c-relations --enable-replacements --enable-decl --whitespace-comma 1 --whitespace-multdiv 0 --whitespace-plusminus 1 --case 1 1 1 1 --strict-indent --line-length 1000"
+
+    # Skip files unchanged since last format (hash cache in build/.cache/format/)
+    CACHE_DIR="build/.cache/format"
+    mkdir -p "$CACHE_DIR"
+    DIRTY_FILES=""
+    for f in $FORTRAN_FILES; do
+        cache_key=$(echo "$f" | tr '/' '_')
+        current_hash=$(md5sum "$f" | cut -d' ' -f1)
+        cached_hash=$(cat "$CACHE_DIR/$cache_key" 2>/dev/null || true)
+        if [[ "$current_hash" != "$cached_hash" ]]; then
+            DIRTY_FILES+="$f"$'\n'
+        fi
+    done
+    DIRTY_FILES=$(echo "$DIRTY_FILES" | sed '/^$/d')
+
+    if [[ -n "$DIRTY_FILES" ]]; then
+        for niter in 1 2 3 4; do
+            old_hash=$(echo "$DIRTY_FILES" | xargs cat | md5sum)
+
+            # Run indenter on dirty files in one process
+            if ! echo "$DIRTY_FILES" | xargs python3 toolchain/indenter.py; then
+                error "Formatting Fortran files failed: indenter.py."
+                exit 1
+            fi
+
+            # Run fprettify in parallel (one process per file)
+            if ! echo "$DIRTY_FILES" | xargs -P ${JOBS:-1} -L 1 fprettify $FPRETTIFY_OPTS; then
+                error "Formatting Fortran files failed: fprettify."
+                exit 1
+            fi
+
+            new_hash=$(echo "$DIRTY_FILES" | xargs cat | md5sum)
+            if [[ "$old_hash" == "$new_hash" ]]; then
+                break
+            fi
+            if [[ "$niter" -eq 4 ]]; then
+                error "Formatting Fortran files failed: no steady-state after $niter iterations."
+                exit 1
+            fi
+        done
+
+        # Update hash cache for formatted files
+        for f in $DIRTY_FILES; do
+            cache_key=$(echo "$f" | tr '/' '_')
+            md5sum "$f" | cut -d' ' -f1 > "$CACHE_DIR/$cache_key"
+        done
+
+        echo "$DIRTY_FILES" | while read -r f; do echo "> $f"; done
+    fi
 fi
 
 # Apply safe auto-fixes (import sorting, etc.) before formatting.

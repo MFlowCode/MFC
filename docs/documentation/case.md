@@ -266,6 +266,16 @@ Setup: Only requires specifying `init_dir` and filename pattern via `zeros_defau
 Implementation: All variables and file handling are managed in `src/common/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
 Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
 
+The following parameters support hardcoded initial conditions that read interface data from files:
+
+| Parameter        | Type    | Description                                               |
+| ---:             | :---:   | :---                                                      |
+| `interface_file` | String  | Path to interface geometry data file                      |
+| `normFac`        | Real    | Interface normalization factor                            |
+| `normMag`        | Real    | Interface normal magnitude                                |
+| `g0_ic`          | Real    | Initial gas volume fraction for interfacial IC            |
+| `p0_ic`          | Real    | Initial pressure for interfacial IC                       |
+
 #### Parameter Descriptions
 
 - `num_patches` defines the total number of patches defined in the domain.
@@ -349,7 +359,7 @@ Definitions for currently implemented immersed boundary patch types are listed i
 
 - `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil.
 `m` is the maximum camber, `p` is the location of maximum camber, `c` is the coord length, and `t` is the thickness.
-Additional details on this specification can be found in [NACA airfoil](https://en.wikipedia.org/wiki/NACA_airfoil).
+Additional details on this specification can be found in [The Naca Airfoil Series](https://web.stanford.edu/~cantwell/AA200_Course_Material/The%20NACA%20airfoil%20series.pdf)
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 

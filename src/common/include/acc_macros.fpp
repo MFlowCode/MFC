@@ -173,8 +173,7 @@
     $:acc_directive
 #:enddef
 
-#:def ACC_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, &
-                  & link=None, extraAccArgs=None)
+#:def ACC_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None)
     #:set copy_val = GEN_COPY_STR(copy)
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')
     #:set copyout_val = GEN_COPYOUT_STR(copyout)
@@ -191,14 +190,13 @@
     $:acc_directive
 #:enddef
 
-#:def ACC_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, &
-               & extraAccArgs=None)
+#:def ACC_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None)
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
     #:if data_dependency is not None
         #:assert isinstance(data_dependency, str)
         #:assert (data_dependency == 'auto' or data_dependency == 'independent')
-        #:set data_dependency_val = data_dependency
+        #:set data_dependency_val = data_dependency 
     #:else
         #:set data_dependency_val = ''
     #:endif
@@ -213,8 +211,7 @@
     $:acc_directive
 #:enddef
 
-#:def ACC_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, &
-               & deviceptr=None, attach=None, default=None, extraAccArgs=None)
+#:def ACC_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None)
     #:assert code is not None
     #:assert isinstance(code, str)
     #:if code == '' or code.isspace()
@@ -232,7 +229,7 @@
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
-        & no_create_val.strip('\n') + present_val.strip('\n') + &
+        & no_create_val.strip('\n') + present_val.strip('\n') + & 
         & deviceptr_val.strip('\n') + attach_val.strip('\n') + &
         & default_val.strip('\n')
     #:set acc_directive = '!$acc data ' + clause_val + extraAccArgs_val.strip('\n')

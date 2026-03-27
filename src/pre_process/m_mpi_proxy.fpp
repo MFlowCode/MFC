@@ -6,25 +6,35 @@
 module m_mpi_proxy
 
 #ifdef MFC_MPI
-    use mpi
+    use mpi                    !< Message passing interface (MPI) module
 #endif
 
     use m_helper
-    use m_derived_types
-    use m_global_parameters
+
+    use m_derived_types         !< Definitions of the derived types
+
+    use m_global_parameters     !< Global parameters for the code
+
     use m_mpi_common
 
     implicit none
 
 contains
-    !> Since only processor with rank 0 is in charge of reading and checking the consistency of the user provided inputs, these are
-    !! not available to the remaining processors. This subroutine is then in charge of broadcasting the required information.
+    !> Since only processor with rank 0 is in charge of reading
+            !!       and checking the consistency of the user provided inputs,
+            !!       these are not available to the remaining processors. This
+            !!       subroutine is then in charge of broadcasting the required
+            !!       information.
     impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
+
+        ! Generic loop iterator
         integer :: i, j
+        ! Generic flag used to identify and report MPI errors
         integer :: ierr
 
+        ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['t_step_old', 't_step_start', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
@@ -33,7 +43,7 @@ contains
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
             & 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
             & 'num_bc_patches', 'mixlayer_perturb_nk', 'recon_type',           &
-            & 'muscl_order', 'igr_order' ]
+            & 'muscl_order', 'igr_order', 'fd_order']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -112,8 +122,8 @@ contains
             if (chemistry) then
                 call MPI_BCAST(patch_icpp(i)%Y, size(patch_icpp(i)%Y), mpi_p, 0, MPI_COMM_WORLD, ierr)
             end if
-            ! Broadcast IB variables: patch_ib is indexed 1:num_patches_max, not 1:num_bc_patches_max, so these must live in the
-            ! num_patches_max loop.
+            ! Broadcast IB variables: patch_ib is indexed 1:num_patches_max,
+            ! not 1:num_bc_patches_max, so these must live in the num_patches_max loop.
             #:for VAR in ['vel', 'angular_vel', 'angles']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
@@ -132,6 +142,13 @@ contains
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
+
+        ! Variables from input files for hardcoded patches
+        call MPI_BCAST(interface_file, len(interface_file), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normFac, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normMag, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(g0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(p0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
         ! Simplex noise  and fluid physical parameters
         do i = 1, num_fluids_max
@@ -166,6 +183,7 @@ contains
                 call MPI_BCAST(simplex_params%perturb_vel_offset(i, j), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             end do
         end do
+
 #endif
 
     end subroutine s_mpi_bcast_user_inputs

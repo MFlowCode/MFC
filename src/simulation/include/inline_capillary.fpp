@@ -1,4 +1,5 @@
 #:def compute_capillary_stress_tensor()
+
     Omega(1, 1) = -sigma*(w2*w2 + w3*w3)/normW
     #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
         Omega(2, 1) = sigma*w1*w2/normW
@@ -17,5 +18,7 @@
 
             Omega(3, 3) = -sigma*(w1*w1 + w2*w2)/normW
         #:endif
+
     end if
+
 #:enddef compute_capillary_stress_tensor

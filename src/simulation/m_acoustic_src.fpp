@@ -4,73 +4,70 @@
 
 #:include 'macros.fpp'
 
-!> @brief One-way acoustic source injection, Maeda and Colonius JCP (2017)
+!> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
 module m_acoustic_src
 
-    use m_derived_types
-    use m_global_parameters
-    use m_bubbles
-    use m_variables_conversion
-    use m_helper_basic
-    use m_constants
+    use m_derived_types        !< Definitions of the derived types
+
+    use m_global_parameters    !< Definitions of the global parameters
+
+    use m_bubbles              !< Bubble dynamic routines
+
+    use m_variables_conversion !< State variables type conversion procedures
+
+    use m_helper_basic         !< Functions to compare floating point numbers
+
+    use m_constants            !< Definitions of the constants
 
     implicit none
-
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
     integer, allocatable, dimension(:) :: pulse, support
-    $:GPU_DECLARE(create='[pulse, support]')
+    $:GPU_DECLARE(create='[pulse,support]')
 
     logical, allocatable, dimension(:) :: dipole
     $:GPU_DECLARE(create='[dipole]')
 
-    real(wp), allocatable, target, dimension(:,:) :: loc_acoustic
+    real(wp), allocatable, target, dimension(:, :) :: loc_acoustic
     $:GPU_DECLARE(create='[loc_acoustic]')
 
     real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency
     real(wp), allocatable, dimension(:) :: gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
-    $:GPU_DECLARE(create='[mag, length, height, wavelength, frequency]')
-    $:GPU_DECLARE(create='[gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay]')
+    $:GPU_DECLARE(create='[mag,length,height,wavelength,frequency]')
+    $:GPU_DECLARE(create='[gauss_sigma_dist,gauss_sigma_time,npulse,dir,delay]')
 
     real(wp), allocatable, dimension(:) :: foc_length, aperture
-    $:GPU_DECLARE(create='[foc_length, aperture]')
+    $:GPU_DECLARE(create='[foc_length,aperture]')
 
     real(wp), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
-    $:GPU_DECLARE(create='[element_spacing_angle, element_polygon_ratio, rotate_angle]')
+    $:GPU_DECLARE(create='[element_spacing_angle,element_polygon_ratio,rotate_angle]')
 
     real(wp), allocatable, dimension(:) :: bb_bandwidth, bb_lowest_freq
-    $:GPU_DECLARE(create='[bb_bandwidth, bb_lowest_freq]')
+    $:GPU_DECLARE(create='[bb_bandwidth,bb_lowest_freq]')
 
     integer, allocatable, dimension(:) :: num_elements, element_on, bb_num_freq
-    $:GPU_DECLARE(create='[num_elements, element_on, bb_num_freq]')
+    $:GPU_DECLARE(create='[num_elements,element_on,bb_num_freq]')
 
     !> @name Acoustic source terms
     !> @{
-    real(wp), allocatable, dimension(:,:,:)   :: mass_src, e_src
-    real(wp), allocatable, dimension(:,:,:,:) :: mom_src
+    real(wp), allocatable, dimension(:, :, :) :: mass_src, e_src
+    real(wp), allocatable, dimension(:, :, :, :) :: mom_src
     !> @}
-    $:GPU_DECLARE(create='[mass_src, e_src, mom_src]')
+    $:GPU_DECLARE(create='[mass_src,e_src,mom_src]')
 
-    integer, dimension(:), allocatable :: source_spatials_num_points  !< Number of non-zero source grid points for each source
+    integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
     $:GPU_DECLARE(create='[source_spatials_num_points]')
 
-    type(source_spatial_type), dimension(:), allocatable :: source_spatials  !< Data of non-zero source grid points for each source
+    type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
     $:GPU_DECLARE(create='[source_spatials]')
 
 contains
 
-    !> Initialize the acoustic source module
+    !> This subroutine initializes the acoustic source module
     impure subroutine s_initialize_acoustic_src
+        integer :: i, j !< generic loop variables
 
-        integer :: i, j  !< generic loop variables
-
-        @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), &
-                   & length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), &
-                   & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), &
-                   & aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), &
-                   & element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), &
-                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), &
-                                  & bb_lowest_freq(1:num_source))
+        @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
 
         do i = 1, num_source
             do j = 1, 3
@@ -107,15 +104,18 @@ contains
             else
                 rotate_angle(i) = acoustic(i)%rotate_angle
             end if
-            if (f_is_default(acoustic(i)%delay)) then  ! m_checker guarantees acoustic(i)%delay is set for pulse = 2 (Gaussian)
-                delay(i) = 0._wp  ! Defaults to zero for sine and square waves
+            if (f_is_default(acoustic(i)%delay)) then ! m_checker guarantees acoustic(i)%delay is set for pulse = 2 (Gaussian)
+                delay(i) = 0._wp ! Defaults to zero for sine and square waves
             else
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        $:GPU_UPDATE(device='[loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, &
-                     & gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, &
-                     & element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq]')
+        $:GPU_UPDATE(device='[loc_acoustic,mag,dipole,support,length, &
+            & height,wavelength,frequency,gauss_sigma_dist, &
+            & gauss_sigma_time,foc_length,aperture,npulse,pulse, &
+            & dir,delay,element_polygon_ratio,rotate_angle, &
+            & element_spacing_angle,num_elements,element_on, &
+            & bb_num_freq,bb_bandwidth,bb_lowest_freq]')
 
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
@@ -123,11 +123,15 @@ contains
 
     end subroutine s_initialize_acoustic_src
 
-    !> Compute mass, momentum, and energy acoustic source terms and add to the RHS
+    !> This subroutine updates the rhs by computing the mass, mom, energy sources
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
     impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Conservative variables
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !< Conservative variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf !< Primitive variables
+
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -135,25 +139,28 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         #:endif
-        real(wp)                            :: myRho, B_tait
-        real(wp)                            :: sim_time, c, small_gamma
-        real(wp)                            :: frequency_local, gauss_sigma_time_local
-        real(wp)                            :: mass_src_diff, mom_src_diff
-        real(wp)                            :: source_temporal
-        real(wp)                            :: period_BB      !< period of each sine wave in broadband source
-        real(wp)                            :: sl_BB          !< spectral level at each frequency
-        real(wp)                            :: ffre_BB        !< source term corresponding to each frequency
-        real(wp)                            :: sum_BB         !< total source term for the broadband wave
-        real(wp), allocatable, dimension(:) :: phi_rn         !< random phase shift for each frequency
-        integer                             :: i, j, k, l, q  !< generic loop variables
-        integer                             :: ai             !< acoustic source index
-        integer                             :: num_points
-        logical                             :: freq_conv_flag, gauss_conv_flag
-        integer, parameter                  :: mass_label = 1, mom_label = 2
+        real(wp) :: myRho, B_tait
+        real(wp) :: sim_time, c, small_gamma
+        real(wp) :: frequency_local, gauss_sigma_time_local
+        real(wp) :: mass_src_diff, mom_src_diff
+        real(wp) :: source_temporal
+        real(wp) :: period_BB !< period of each sine wave in broadband source
+        real(wp) :: sl_BB !< spectral level at each frequency
+        real(wp) :: ffre_BB !< source term corresponding to each frequency
+        real(wp) :: sum_BB !< total source term for the broadband wave
+        real(wp), allocatable, dimension(:) :: phi_rn !< random phase shift for each frequency
 
-        sim_time = mytime  ! Accumulated time, correct under adaptive dt
+        integer :: i, j, k, l, q !< generic loop variables
+        integer :: ai !< acoustic source index
+        integer :: num_points
 
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+        logical :: freq_conv_flag, gauss_conv_flag
+
+        integer, parameter :: mass_label = 1, mom_label = 2
+
+        sim_time = mytime ! Accumulated time, correct under adaptive dt
+
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -171,11 +178,12 @@ contains
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
             if (.not. (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3))) then
+
                 ! Decide if frequency need to be converted from wavelength
                 freq_conv_flag = f_is_default(frequency(ai))
                 gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
-                num_points = source_spatials_num_points(ai)  ! Use scalar to force firstprivate to prevent GPU bug
+                num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
 
                 ! Calculate the broadband source
                 period_BB = 0._wp
@@ -206,9 +214,7 @@ contains
 
                 deallocate (phi_rn)
 
-                $:GPU_PARALLEL_LOOP(private='[myalpha, myalpha_rho, myRho, B_tait, c, small_gamma, frequency_local, &
-                                    & gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q]', &
-                                    & copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
+                $:GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho, myRho, B_tait,c,  small_gamma, frequency_local, gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q ]', copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
                 do i = 1, num_points
                     j = source_spatials(ai)%coord(1, i)
                     k = source_spatials(ai)%coord(2, i)
@@ -257,28 +263,29 @@ contains
                     if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
 
                     ! Update momentum source term
-                    call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, &
-                                           & sum_BB)
+                    call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
                     mom_src_diff = source_temporal*source_spatials(ai)%val(i)
 
-                    if (dipole(ai)) then  ! Double amplitude & No momentum source term (only works for Planar)
+                    if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
                         mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
                         if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
                         cycle
                     end if
 
-                    if (n == 0) then  ! 1D
-                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai))  ! Left or right-going wave
-                    else if (p == 0) then  ! 2D
-                        if (support(ai) < 5) then  ! Planar
+                    if (n == 0) then ! 1D
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai)) ! Left or right-going wave
+
+                    elseif (p == 0) then ! 2D
+                        if (support(ai) < 5) then ! Planar
                             mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
                             mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
                         else
                             mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(source_spatials(ai)%angle(i))
                             mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(source_spatials(ai)%angle(i))
                         end if
-                    else  ! 3D
-                        if (support(ai) < 5) then  ! Planar
+
+                    else ! 3D
+                        if (support(ai) < 5) then ! Planar
                             mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
                             mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
                         else
@@ -289,13 +296,11 @@ contains
                     end if
 
                     ! Update mass source term
-                    if (support(ai) < 5) then  ! Planar
+                    if (support(ai) < 5) then ! Planar
                         mass_src_diff = mom_src_diff/c
-                    else  ! Spherical or cylindrical support
-                        ! Mass source term must be calculated differently using a correction term for spherical and cylindrical
-                        ! support
-                        call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, &
-                                               & source_temporal, sum_BB)
+                    else ! Spherical or cylindrical support
+                        ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
+                        call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
                         mass_src_diff = source_temporal*source_spatials(ai)%val(i)
                     end if
                     mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
@@ -304,13 +309,14 @@ contains
                     if (model_eqns /= 4) then
                         E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp/(small_gamma - 1._wp)
                     end if
+
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
         end do
 
         ! Update the rhs variables
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]',collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]',collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -327,35 +333,41 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-
     end subroutine s_acoustic_src_calculations
 
-    !> Compute the temporally varying amplitude of the pulse
+    !> This subroutine gives the temporally varying amplitude of the pulse
+    !! @param sim_time Simulation time
+    !! @param c Sound speed
+    !! @param ai Acoustic source index
+    !! @param term_index Index of the term to be calculated (1: mass source, 2: momentum source)
+    !! @param frequency_local Frequency at the spatial location for sine and square waves
+    !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
+    !! @param source Source term amplitude
+    !! @param sum_bb Sum of basis functions
     elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
-
         $:GPU_ROUTINE(parallelism='[seq]')
-        integer, intent(in)   :: ai, term_index
-        real(wp), intent(in)  :: sim_time, c, sum_BB
-        real(wp), intent(in)  :: frequency_local, gauss_sigma_time_local
+        integer, intent(in) :: ai, term_index
+        real(wp), intent(in) :: sim_time, c, sum_BB
+        real(wp), intent(in) :: frequency_local, gauss_sigma_time_local
         real(wp), intent(out) :: source
-        real(wp)              :: omega              !< angular frequency
-        real(wp)              :: sine_wave          !< sine function for square wave
-        real(wp)              :: foc_length_factor  !< Scale amplitude with radius for spherical support
+
+        real(wp) :: omega ! angular frequency
+        real(wp) :: sine_wave ! sine function for square wave
+        real(wp) :: foc_length_factor ! Scale amplitude with radius for spherical support
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
 
         if (n == 0) then
             foc_length_factor = 1._wp
-        else if (p == 0 .and. (.not. cyl_coord)) then  ! 2D axisymmetric case is physically 3D
-            foc_length_factor = foc_length(ai)**(-0.85_wp)  ! Empirical correction
+        elseif (p == 0 .and. (.not. cyl_coord)) then ! 2D axisymmetric case is physically 3D
+            foc_length_factor = foc_length(ai)**(-0.85_wp); ! Empirical correction
         else
-            foc_length_factor = 1/foc_length(ai)
+            foc_length_factor = 1/foc_length(ai); 
         end if
 
         source = 0._wp
 
-        ! Temporal waveform: sine, Gaussian pulse, square wave, or broadband
-        if (pulse(ai) == 1) then  ! Sine wave
+        if (pulse(ai) == 1) then ! Sine wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
             omega = 2._wp*pi*frequency_local
@@ -364,14 +376,17 @@ contains
             if (term_index == mass_label) then
                 source = source/c + foc_length_factor*mag(ai)*(cos((sim_time - delay(ai))*omega) - 1._wp)/omega
             end if
-        else if (pulse(ai) == 2) then  ! Gaussian pulse
+
+        elseif (pulse(ai) == 2) then ! Gaussian pulse
             source = mag(ai)*exp(-0.5_wp*((sim_time - delay(ai))**2._wp)/(gauss_sigma_time_local**2._wp))
 
             if (term_index == mass_label) then
-                source = source/c - foc_length_factor*mag(ai)*sqrt(pi/2)*gauss_sigma_time_local*(erf((sim_time - delay(ai)) &
-                    & /(sqrt(2._wp)*gauss_sigma_time_local)) + 1)
+                source = source/c - &
+                         foc_length_factor*mag(ai)*sqrt(pi/2)*gauss_sigma_time_local* &
+                         (erf((sim_time - delay(ai))/(sqrt(2._wp)*gauss_sigma_time_local)) + 1)
             end if
-        else if (pulse(ai) == 3) then  ! Square wave
+
+        elseif (pulse(ai) == 3) then ! Square wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
             omega = 2._wp*pi*frequency_local
@@ -382,24 +397,23 @@ contains
             if (abs(sine_wave) < 1.e-2_wp) then
                 source = mag(ai)*sine_wave*1.e2_wp
             end if
-        else if (pulse(ai) == 4) then  ! Broadband wave
+
+        elseif (pulse(ai) == 4) then ! Broadband wave
             source = sum_BB
         end if
-
     end subroutine s_source_temporal
 
-    !> Pre-compute non-zero spatial source weights before time-stepping
+    !> This subroutine identifies and precalculates the non-zero acoustic spatial sources before time-stepping
     impure subroutine s_precalculate_acoustic_spatial_sources
-
-        integer             :: j, k, l, ai
-        integer             :: count
-        integer             :: dim
-        real(wp)            :: source_spatial, angle, xyz_to_r_ratios(3)
+        integer :: j, k, l, ai
+        integer :: count
+        integer :: dim
+        real(wp) :: source_spatial, angle, xyz_to_r_ratios(3)
         real(wp), parameter :: threshold = 1.e-10_wp
 
         if (n == 0) then
             dim = 1
-        else if (p == 0) then
+        elseif (p == 0) then
             dim = 2
         else
             dim = 3
@@ -414,7 +428,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        call s_source_spatial(j, k, l, loc_acoustic(:,ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         if (abs(source_spatial) < threshold) cycle
                         count = count + 1
                     end do
@@ -432,11 +446,11 @@ contains
             @:ACC_SETUP_source_spatials(source_spatials(ai))
 
             ! Second pass: Store the values
-            count = 0  ! Reset counter
+            count = 0 ! Reset counter
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        call s_source_spatial(j, k, l, loc_acoustic(:,ai), ai, source_spatial, angle, xyz_to_r_ratios)
+                        call s_source_spatial(j, k, l, loc_acoustic(:, ai), ai, source_spatial, angle, xyz_to_r_ratios)
                         if (abs(source_spatial) < threshold) cycle
                         count = count + 1
                         source_spatials(ai)%coord(1, count) = j
@@ -445,7 +459,7 @@ contains
                         source_spatials(ai)%val(count) = source_spatial
                         if (support(ai) >= 5) then
                             if (dim == 2) source_spatials(ai)%angle(count) = angle
-                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(1:3,count) = xyz_to_r_ratios
+                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(1:3, count) = xyz_to_r_ratios
                         end if
                     end do
                 end do
@@ -465,30 +479,38 @@ contains
                     $:GPU_UPDATE(device='[source_spatials(ai)%xyz_to_r_ratios]')
                 end if
             end if
+
         end do
 
 #ifdef MFC_DEBUG
         do ai = 1, num_source
             write (*, '(A,I2,A,I8,A)') 'Acoustic source ', ai, ' has ', source_spatials_num_points(ai), &
-                   & ' grid points with non-zero source term'
+                ' grid points with non-zero source term'
         end do
 #endif
 
     end subroutine s_precalculate_acoustic_spatial_sources
 
-    !> Compute the spatial support of the acoustic source
+    !> This subroutine gives the spatial support of the acoustic source
+    !! @param j x-index
+    !! @param k y-index
+    !! @param l z-index
+    !! @param loc Nominal source term location
+    !! @param ai Acoustic source index
+    !! @param source Source term amplitude
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
-
-        integer, intent(in)                :: j, k, l, ai
+        integer, intent(in) :: j, k, l, ai
         real(wp), dimension(3), intent(in) :: loc
-        real(wp), intent(out)              :: source, angle, xyz_to_r_ratios(3)
-        real(wp)                           :: sig, r(3)
+        real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
+
+        real(wp) :: sig, r(3)
 
         ! Calculate sig spatial support width
-
         if (n == 0) then
             sig = dx(j)
-        else if (p == 0) then
+        elseif (p == 0) then
             sig = maxval((/dx(j), dy(k)/))
         else
             sig = maxval((/dx(j), dy(k), dz(l)/))
@@ -502,53 +524,60 @@ contains
 
         if (any(support(ai) == (/1, 2, 3, 4/))) then
             call s_source_spatial_planar(ai, sig, r, source)
-        else if (any(support(ai) == (/5, 6, 7/))) then
+        elseif (any(support(ai) == (/5, 6, 7/))) then
             call s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
-        else if (any(support(ai) == (/9, 10, 11/))) then
+        elseif (any(support(ai) == (/9, 10, 11/))) then
             call s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
         end if
-
     end subroutine s_source_spatial
 
-    !> Compute the spatial support for planar acoustic sources in 1D, 2D, and 3D
+    !> This subroutine calculates the spatial support for planar acoustic sources in 1D, 2D, and 3D
+    !! @param ai Acoustic source index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
     subroutine s_source_spatial_planar(ai, sig, r, source)
-
-        integer, intent(in)   :: ai
-        real(wp), intent(in)  :: sig, r(3)
+        integer, intent(in) :: ai
+        real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source
-        real(wp)              :: dist
+
+        real(wp) :: dist
 
         source = 0._wp
 
-        ! Gaussian spatial pulse profile: exp(-0.5 * (d / sigma)^2) / (sqrt(2*pi) * sigma)
-        if (support(ai) == 1) then  ! 1D
+        if (support(ai) == 1) then ! 1D
             source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(r(1)/(sig/2._wp))**2._wp)
-        else if (support(ai) == 2 .or. support(ai) == 3) then  ! 2D or 3D
+
+        elseif (support(ai) == 2 .or. support(ai) == 3) then ! 2D or 3D
             ! If we let unit vector e = (cos(dir), sin(dir)),
-            dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai))  ! dot(r,e)
-            if ((r(1) - dist*cos(dir(ai)))**2._wp + (r(2) - dist*sin(dir(ai)))**2._wp < 0.25_wp*length(ai)**2._wp) &
-                & then  ! |r - dist*e| < length/2
-                if (support(ai) /= 3 .or. abs(r(3)) < 0.25_wp*height(ai)) then  ! additional height constraint for 3D
+            dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai)) ! dot(r,e)
+            if ((r(1) - dist*cos(dir(ai)))**2._wp + (r(2) - dist*sin(dir(ai)))**2._wp < 0.25_wp*length(ai)**2._wp) then ! |r - dist*e| < length/2
+                if (support(ai) /= 3 .or. abs(r(3)) < 0.25_wp*height(ai)) then ! additional height constraint for 3D
                     source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
                 end if
             end if
         end if
-
     end subroutine s_source_spatial_planar
 
-    !> Compute the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
+    !> This subroutine calculates the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
+    !! @param ai Acoustic source index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
-
-        integer, intent(in)   :: ai
-        real(wp), intent(in)  :: sig, r(3)
+        integer, intent(in) :: ai
+        real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
-        real(wp)              :: current_angle, angle_half_aperture, dist, norm
 
-        source = 0._wp  ! If not affected by transducer
+        real(wp) :: current_angle, angle_half_aperture, dist, norm
+
+        source = 0._wp ! If not affected by transducer
         angle = 0._wp
         xyz_to_r_ratios = 0._wp
 
-        if (support(ai) == 5 .or. support(ai) == 6) then  ! 2D or 2D axisymmetric
+        if (support(ai) == 5 .or. support(ai) == 6) then ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
 
@@ -557,7 +586,8 @@ contains
                 source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
                 angle = -atan(r(2)/(foc_length(ai) - r(1)))
             end if
-        else if (support(ai) == 7) then  ! 3D
+
+        elseif (support(ai) == 7) then ! 3D
             current_angle = -atan(sqrt(r(2)**2 + r(3)**2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
 
@@ -570,35 +600,41 @@ contains
                 xyz_to_r_ratios(2) = -r(2)/norm
                 xyz_to_r_ratios(3) = -r(3)/norm
             end if
-        end if
 
+        end if
     end subroutine s_source_spatial_transducer
 
-    !> Compute the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
+    !> This subroutine calculates the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
+    !! @param ai Acoustic source index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
-
-        integer, intent(in)   :: ai
-        real(wp), intent(in)  :: sig, r(3)
+        integer, intent(in) :: ai
+        real(wp), intent(in) :: sig, r(3)
         real(wp), intent(out) :: source, angle, xyz_to_r_ratios(3)
-        integer               :: elem, elem_min, elem_max
-        real(wp)              :: current_angle, angle_half_aperture, angle_per_elem, dist
-        real(wp)              :: angle_min, angle_max, norm
-        real(wp)              :: poly_side_length, aperture_element_3D, angle_elem
-        real(wp)              :: x2, y2, z2, x3, y3, z3, C, f, half_apert, dist_interp_to_elem_center
 
-        if (element_on(ai) == 0) then  ! Full transducer
+        integer :: elem, elem_min, elem_max
+        real(wp) :: current_angle, angle_half_aperture, angle_per_elem, dist
+        real(wp) :: angle_min, angle_max, norm
+        real(wp) :: poly_side_length, aperture_element_3D, angle_elem
+        real(wp) :: x2, y2, z2, x3, y3, z3, C, f, half_apert, dist_interp_to_elem_center
+
+        if (element_on(ai) == 0) then ! Full transducer
             elem_min = 1
             elem_max = num_elements(ai)
-        else  ! Transducer element specified
+        else ! Transducer element specified
             elem_min = element_on(ai)
             elem_max = element_on(ai)
         end if
 
-        source = 0._wp  ! If not affected by any transducer element
+        source = 0._wp ! If not affected by any transducer element
         angle = 0._wp
         xyz_to_r_ratios = 0._wp
 
-        if (support(ai) == 9 .or. support(ai) == 10) then  ! 2D or 2D axisymmetric
+        if (support(ai) == 9 .or. support(ai) == 10) then ! 2D or 2D axisymmetric
             current_angle = -atan(r(2)/(foc_length(ai) - r(1)))
             angle_half_aperture = asin((aperture(ai)/2._wp)/(foc_length(ai)))
             angle_per_elem = (2._wp*angle_half_aperture - (num_elements(ai) - 1._wp)*element_spacing_angle(ai))/num_elements(ai)
@@ -611,10 +647,11 @@ contains
                 if (current_angle > angle_min .and. current_angle < angle_max .and. r(1) < foc_length(ai)) then
                     source = exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)/(sqrt(2._wp*pi)*sig/2._wp)
                     angle = current_angle
-                    exit  ! Assume elements don't overlap
+                    exit ! Assume elements don't overlap
                 end if
             end do
-        else if (support(ai) == 11) then  ! 3D
+
+        elseif (support(ai) == 11) then ! 3D
             poly_side_length = aperture(ai)*sin(pi/num_elements(ai))
             aperture_element_3D = poly_side_length*element_polygon_ratio(ai)
             f = foc_length(ai)
@@ -628,9 +665,9 @@ contains
                 y2 = half_apert*cos(angle_elem)
                 z2 = half_apert*sin(angle_elem)
 
-                ! Construct a plane normal to the line from the focal point to the elem center, Point 3 is the intercept of the
-                ! plane and the line from the focal point to the current location
-                C = f**2._wp/((r(1) - f)*(x2 - f) + r(2)*y2 + r(3)*z2)  ! Constant for intermediate step
+                ! Construct a plane normal to the line from the focal point to the elem center,
+                ! Point 3 is the intercept of the plane and the line from the focal point to the current location
+                C = f**2._wp/((r(1) - f)*(x2 - f) + r(2)*y2 + r(3)*z2) ! Constant for intermediate step
                 x3 = C*(r(1) - f) + f
                 y3 = C*r(2)
                 z3 = C*r(3)
@@ -645,43 +682,48 @@ contains
                     xyz_to_r_ratios(2) = -r(2)/norm
                     xyz_to_r_ratios(3) = -r(3)/norm
                 end if
-            end do
-        end if
 
+            end do
+
+        end if
     end subroutine s_source_spatial_transducer_array
 
-    !> Convert wavelength to frequency
+    !> This function performs wavelength to frequency conversion
+    !! @param freq_conv_flag Determines if frequency is given or wavelength
+    !! @param ai Acoustic source index
+    !! @param c Speed of sound
+    !! @return frequency_local Converted frequency
     elemental function f_frequency_local(freq_conv_flag, ai, c)
-
         $:GPU_ROUTINE(parallelism='[seq]')
-        logical, intent(in)  :: freq_conv_flag
-        integer, intent(in)  :: ai
+        logical, intent(in) :: freq_conv_flag
+        integer, intent(in) :: ai
         real(wp), intent(in) :: c
-        real(wp)             :: f_frequency_local
+        real(wp) :: f_frequency_local
 
         if (freq_conv_flag) then
             f_frequency_local = c/wavelength(ai)
         else
             f_frequency_local = frequency(ai)
         end if
-
     end function f_frequency_local
 
-    !> Convert Gaussian sigma from distance to time
+    !> This function performs Gaussian sigma dist to time conversion
+    !! @param gauss_conv_flag Determines if sigma_dist is given or sigma_time
+    !! @param c Speed of sound
+    !! @param ai Acoustic source index
+    !! @return gauss_sigma_time_local Converted Gaussian sigma time
     function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
-
         $:GPU_ROUTINE(parallelism='[seq]')
-        logical, intent(in)  :: gauss_conv_flag
-        integer, intent(in)  :: ai
+        logical, intent(in) :: gauss_conv_flag
+        integer, intent(in) :: ai
         real(wp), intent(in) :: c
-        real(wp)             :: f_gauss_sigma_time_local
+        real(wp) :: f_gauss_sigma_time_local
 
         if (gauss_conv_flag) then
             f_gauss_sigma_time_local = gauss_sigma_dist(ai)/c
         else
             f_gauss_sigma_time_local = gauss_sigma_time(ai)
         end if
-
     end function f_gauss_sigma_time_local
 
 end module m_acoustic_src

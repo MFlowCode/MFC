@@ -5,7 +5,7 @@
 
 #:def Hardcoded1D()
     select case (patch_icpp(patch_id)%hcid)
-    case (150)  ! 1D Smooth Alfven Case for MHD
+    case (150) ! 1D Smooth Alfven Case for MHD
         ! velocity
         q_prim_vf(momxb + 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
         q_prim_vf(momxb + 2)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
@@ -13,21 +13,24 @@
         ! magnetic field
         q_prim_vf(B_idx%end - 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
         q_prim_vf(B_idx%end)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
-    case (170)  ! 1D profile from external data (e.g. Cantera, SDtoolbox)
-        ! This hardcoded case can be used to start a simulation with initial conditions given from a known 1D profile (e.g. Cantera,
-        ! SDtoolbox)
+
+    case (170)
+        ! This hardcoded case can be used to start a simulation with initial conditions given from a known 1D profile (e.g. Cantera, SDtoolbox)
         @: HardcodedReadValues()
-    case (180)  ! Shu-Osher problem
-        ! This is patch is hard-coded for test suite optimization used in the 1D_shuoser cases: "patch_icpp(2)%alpha_rho(1)": "1 +
-        ! 0.2*sin(5*x)"
+
+    case (180)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 1D_shuoser cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.2*sin(5*x)"
         if (patch_id == 2) then
             q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
         end if
-    case (181)  ! Titarev-Torro problem
-        ! This is patch is hard-coded for test suite optimization used in the 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)":
-        ! "1 + 0.1*sin(20*x*pi)"
+
+    case (181)
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.1*sin(20*x*pi)"
         q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*pi)
-    case (182)  ! Multi-component diffusion
+
+    case (182)
         ! This patch is a hard-coded for test suite optimization (multiple component diffusion)
         x_mid_diffu = 0.05_wp/2.0_wp
         width_sq = (2.5_wp*10.0_wp**(-3.0_wp))**2
@@ -48,11 +51,16 @@
 
         temp = (320.0_wp - 1350.0_wp)*profile_shape + 1350.0_wp
 
-        molar_mass_inv = y1/31.998_wp + y2/18.01508_wp + y3/16.04256_wp + y4/28.0134_wp
+        molar_mass_inv = y1/31.998_wp + &
+                         y2/18.01508_wp + &
+                         y3/16.04256_wp + &
+                         y4/28.0134_wp
 
         q_prim_vf(contxb)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5/(temp*8.3144626_wp*1000.0_wp*molar_mass_inv)
+
     case default
         call s_int_to_str(patch_id, iStr)
-        call s_mpi_abort("Invalid hcid specified for patch " // trim(iStr))
+        call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
     end select
+
 #:enddef

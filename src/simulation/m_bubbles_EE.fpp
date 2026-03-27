@@ -7,27 +7,31 @@
 !> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE
 
-    use m_derived_types
-    use m_global_parameters
-    use m_mpi_proxy
-    use m_variables_conversion
-    use m_bubbles
+    use m_derived_types        !< Definitions of the derived types
+
+    use m_global_parameters    !< Definitions of the global parameters
+
+    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+
+    use m_variables_conversion !< State variables type conversion procedures
+
+    use m_bubbles              !< General bubble dynamics procedures
 
     implicit none
 
-    real(wp), allocatable, dimension(:,:,:)   :: bub_adv_src
-    real(wp), allocatable, dimension(:,:,:,:) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
-    $:GPU_DECLARE(create='[bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src]')
+    real(wp), allocatable, dimension(:, :, :) :: bub_adv_src
+    real(wp), allocatable, dimension(:, :, :, :) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
+    $:GPU_DECLARE(create='[bub_adv_src,bub_r_src,bub_v_src,bub_p_src,bub_m_src]')
 
-    type(scalar_field) :: divu  !< matrix for div(u)
+    type(scalar_field) :: divu !< matrix for div(u)
     $:GPU_DECLARE(create='[divu]')
 
     integer, allocatable, dimension(:) :: rs, vs, ms, ps
-    $:GPU_DECLARE(create='[rs, vs, ms, ps]')
+    $:GPU_DECLARE(create='[rs,vs,ms,ps]')
 
 contains
 
-    !> Initialize the Euler-Euler bubble module
+    !> @brief Allocates and initializes arrays for the Euler-Euler bubble model.
     impure subroutine s_initialize_bubbles_EE_module
 
         integer :: l
@@ -65,14 +69,14 @@ contains
 
     end subroutine s_initialize_bubbles_EE_module
 
-    !> Compute the bubble volume fraction alpha from the bubble number density
+    !> @brief Computes the bubble volume fraction alpha from the bubble number density.
+        !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
-
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(wp)                                               :: nR3bar
-        integer(wp)                                            :: i, j, k, l
+        real(wp) :: nR3bar
+        integer(wp) :: i, j, k, l
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, nR3bar]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,l,nR3bar]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -89,81 +93,101 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
-    !> Compute the right-hand side for Euler-Euler bubble transport
+    !>  Compute the right-hand side for Euler-Euler bubble transport
+        !! @param idir Direction index
+        !! @param q_prim_vf Primitive variables
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
-        integer, intent(in)                                 :: idir
+        integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), intent(inout)                   :: divu_in  !< matrix for div(u)
-        integer                                             :: j, k, l
+        type(scalar_field), intent(inout) :: divu_in !< matrix for div(u)
+
+        integer :: j, k, l
 
         if (idir == 1) then
+
             if (.not. qbmm) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
                             divu_in%sf(j, k, l) = 0._wp
-                            divu_in%sf(j, k, l) = 5.e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, &
-                                       & l) - q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+                            divu_in%sf(j, k, l) = &
+                                5.e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, l) - &
+                                                q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
-        else if (idir == 2) then
-            $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+
+        elseif (idir == 2) then
+
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, &
-                                   & l) - q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + &
+                                              5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, l) - &
+                                                              q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-        else if (idir == 3) then
-            $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+
+        elseif (idir == 3) then
+
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, &
-                                   & l + 1) - q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + &
+                                              5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, l + 1) - &
+                                                              q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
         end if
 
     end subroutine s_compute_bubbles_EE_rhs
 
-    !> Compute the Euler-Euler bubble source terms
+    !>  The purpose of this procedure is to compute the source terms
+        !!      that are needed for the bubble modeling
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_cons_vf Conservative variables
+        !!  @param rhs_vf Right-hand side variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
-
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), intent(in)                         :: divu_in  !< matrix for div(u)
-        real(wp)                                               :: rddot
-        real(wp)                                               :: pb_local, mv_local, vflux, pbdot
-        real(wp)                                               :: n_tait, B_tait
+        type(scalar_field), intent(in) :: divu_in !< matrix for div(u)
 
+        real(wp) :: rddot
+        real(wp) :: pb_local, mv_local, vflux, pbdot
+        real(wp) :: n_tait, B_tait
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: Rtmp, Vtmp
             real(wp), dimension(3) :: myalpha, myalpha_rho
         #:else
-            real(wp), dimension(nb)         :: Rtmp, Vtmp
+            real(wp), dimension(nb) :: Rtmp, Vtmp
             real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         #:endif
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
-        real(wp) :: nbub                            !< Bubble number density
+        real(wp) :: nbub !< Bubble number density
         real(wp) :: my_divu
-        integer  :: i, j, k, l, q, ii               !< Loop variables
-        integer  :: adap_dt_stop_max, adap_dt_stop  !< Fail-safe exit if max iteration count reached
-        integer  :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
+
+        integer :: i, j, k, l, q, ii !< Loop variables
+
+        integer :: adap_dt_stop_sum, adap_dt_stop !< Fail-safe exit if max iteration count reached
+        integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
-        $:GPU_PARALLEL_LOOP(private='[j, k, l, q]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l,q]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -181,13 +205,13 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
-                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu]', collapse=3, &
-                            & reduction = '[[adap_dt_stop_max]]', reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
+        adap_dt_stop_sum = 0
+        $:GPU_PARALLEL_LOOP(private='[j,k,l,Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu, adap_dt_stop]', collapse=3, &
+            & copy='[adap_dt_stop_sum]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+
                     if (adv_n) then
                         nbub = q_prim_vf(n_idx)%sf(j, k, l)
                     else
@@ -220,6 +244,7 @@ contains
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
+
                         $:GPU_LOOP(parallelism='[seq]')
                         do ii = 1, num_fluids
                             myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
@@ -243,8 +268,8 @@ contains
                             end do
                         end if
 
-                        n_tait = 1._wp/n_tait + 1._wp  ! make this the usual little 'gamma'
-                        B_tait = B_tait*(n_tait - 1)/n_tait  ! make this the usual pi_inf
+                        n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
+                        B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
@@ -272,24 +297,31 @@ contains
                                 pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
                             end if
 
+                            adap_dt_stop = 0
+
                             ! Adaptive time stepping
                             if (adap_dt) then
-                                adap_dt_stop = 0
 
-                                call s_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, &
-                                                    & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, dmMass_n, &
-                                                    & dmBeta_c, dmBeta_t, dmCson, adap_dt_stop)
+                                adap_dt_stop = f_advance_step(myRho, myP, myR, myV, R0(q), &
+                                                              pb_local, pbdot, alf, n_tait, B_tait, &
+                                                              bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                                              dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
+                                                              dmBeta_t, dmCson)
 
                                 q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                                 q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
 
-                                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
                             else
-                                rddot = f_rddot(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, bub_adv_src(j, &
-                                                & k, l), divu_in%sf(j, k, l), dmCson)
+                                rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
+                                                pb_local, pbdot, alf, n_tait, B_tait, &
+                                                bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                                dmCson)
                                 bub_v_src(j, k, l, q) = nbub*rddot
                                 bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                             end if
+
+                            $:GPU_ATOMIC(atomic='update')
+                            adap_dt_stop_sum = adap_dt_stop_sum + adap_dt_stop
                         end if
                     end do
                 end do
@@ -297,15 +329,16 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
+        if (adap_dt .and. adap_dt_stop_sum > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
-            $:GPU_PARALLEL_LOOP(private='[i, k, l, q]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,k,l,q]', collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
-                        if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
+                        if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
+                            rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
                         $:GPU_LOOP(parallelism='[seq]')
                         do k = 1, nb
                             rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
@@ -320,7 +353,6 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-
     end subroutine s_compute_bubble_EE_source
 
 end module m_bubbles_EE
