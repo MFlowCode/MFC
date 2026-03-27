@@ -405,7 +405,10 @@ jobs:
         timeout-minutes: 60
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
-      - name: Build & Test
+      - name: Build
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
+
+      - name: Test
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
       - name: Cancel SLURM Jobs
@@ -421,23 +424,29 @@ jobs:
         if:   always()
         id:   log
         run:  |
-          SLUG="test-${{ matrix.device }}-${{ matrix.interface }}"
+          SHARD_SUFFIX=""
           SHARD="${{ matrix.shard }}"
           if [ -n "$SHARD" ]; then
-            SLUG="${SLUG}-$(echo "$SHARD" | sed 's|/|-of-|')"
+            SHARD_SUFFIX="-$(echo "$SHARD" | sed 's|/|-of-|')"
           fi
-          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
+          echo "build_slug=build-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
+          echo "test_slug=test-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Print Logs
         if:   always()
-        run:  cat ${{ steps.log.outputs.slug }}.out
+        run:  |
+          for f in ${{ steps.log.outputs.build_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
+            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          done
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   matrix.cluster != 'phoenix'
         with:
-          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
-          path: ${{ steps.log.outputs.slug }}.out
+          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
+          path: |
+            ${{ steps.log.outputs.build_slug }}.out
+            ${{ steps.log.outputs.test_slug }}.out
 
   case-optimization:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"

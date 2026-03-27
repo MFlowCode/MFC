@@ -1,6 +1,7 @@
 #!/bin/bash
-# Unified test script for all clusters.
+# Test-only script for all clusters.
 # Runs inside a SLURM job via submit-slurm-job.sh.
+# Assumes MFC is already built (by a prior build.sh SLURM job).
 # Expects env vars: $job_device, $job_interface, $job_shard, $job_cluster
 
 set -euo pipefail
@@ -9,9 +10,6 @@ source .github/scripts/gpu-opts.sh
 build_opts="$gpu_opts"
 
 # --- Phoenix TMPDIR setup ---
-# Phoenix compute nodes have a small /tmp. With 8 parallel test threads each
-# spawning MPI processes, it fills up and ORTE session dir creation fails.
-# Redirect TMPDIR to project storage, same as bench.sh.
 if [ "$job_cluster" = "phoenix" ]; then
     tmpbuild=/storage/project/r-sbryngelson3-0/sbryngelson3/mytmp_build
     currentdir=$tmpbuild/run-$(( RANDOM % 9000 ))
@@ -20,38 +18,6 @@ if [ "$job_cluster" = "phoenix" ]; then
     export TMPDIR=$currentdir
     trap 'rm -rf "$currentdir" || true' EXIT
 fi
-
-# --- Build ---
-# Phoenix builds everything inside SLURM (no login-node build step).
-# Frontier/Frontier AMD: deps already fetched on login node via --deps-only;
-# source code is built here on the compute node.
-# Phoenix: always start fresh to avoid SIGILL from stale binaries compiled
-# on a different microarchitecture.
-if [ "$job_cluster" = "phoenix" ]; then
-    source .github/scripts/clean-build.sh
-    clean_build
-fi
-
-source .github/scripts/retry-build.sh
-
-# Phoenix: smoke-test the syscheck binary to catch architecture mismatches
-# (SIGILL from binaries compiled on a different compute node).
-validate_cmd=""
-if [ "$job_cluster" = "phoenix" ]; then
-    validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || "$syscheck_bin" > /dev/null 2>&1'
-fi
-
-# Frontier Cray: -j 1 to work around CCE 19.0.0 IPA SIGSEGV
-# Frontier Cray: --debug for backtrace on build/runtime errors
-build_jobs=8
-debug_opts=""
-if [ "$job_cluster" = "frontier" ]; then
-    build_jobs=1
-    debug_opts="--debug"
-fi
-
-RETRY_VALIDATE_CMD="$validate_cmd" \
-    retry_build ./mfc.sh test -v --dry-run -j $build_jobs $debug_opts $build_opts || exit 1
 
 # --- GPU detection and thread count ---
 device_opts=""
@@ -97,4 +63,4 @@ if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
     prune_flag="--only-changes"
 fi
 
-./mfc.sh test -v --max-attempts 3 $prune_flag -a -j $n_test_threads $rdma_opts $device_opts $debug_opts $build_opts $shard_opts -- -c $job_cluster
+./mfc.sh test -v --max-attempts 3 --no-build $prune_flag -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
