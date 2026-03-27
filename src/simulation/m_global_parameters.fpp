@@ -326,6 +326,7 @@ module m_global_parameters
     ! Fluids Physical Parameters
 
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
+    $:GPU_DECLARE(create='[fluid_pp]')
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     integer                                  :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
@@ -1057,6 +1058,7 @@ contains
             end do
 
             $:GPU_UPDATE(device='[Re_size, Re_size_max, shear_stress, bulk_stress, any_non_newtonian]')
+            $:GPU_UPDATE(device='[fluid_pp]')
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of fluids whose interface will support effects of surface
             ! tension
