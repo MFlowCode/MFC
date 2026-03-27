@@ -472,9 +472,7 @@ def parse_fortran_constants(filepath: Path) -> Dict[str, int]:
     a dict mapping constant names to their integer values.
     """
     constants: Dict[str, int] = {}
-    pattern = re.compile(
-        r"integer\s*,\s*parameter\s*::\s*(\w+)\s*=\s*(\d+)", re.IGNORECASE
-    )
+    pattern = re.compile(r"integer\s*,\s*parameter\s*::\s*(\w+)\s*=\s*(\d+)", re.IGNORECASE)
     try:
         text = filepath.read_text()
     except FileNotFoundError:

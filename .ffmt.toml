@@ -1,0 +1,18 @@
+# MFC Fortran formatting configuration
+# These are the defaults — this file makes them explicit.
+
+indent-width = 4
+keyword-case = "lower"
+normalize-keywords = true
+indent-fypp = true
+
+[whitespace]
+relational = true
+logical = true
+plusminus = true
+multdiv = false
+power = false
+assignment = true
+declaration = true
+comma = true
+slice-colon = false

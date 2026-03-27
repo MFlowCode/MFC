@@ -15,7 +15,6 @@ SSH_OPTS="-o ConnectTimeout=5"
 
 # Parent directories containing actions-runner-*/ installations on shared storage.
 RUNNER_PARENT_DIRS=(
-    /storage/scratch1/6/sbryngelson3/mfc-runners
     /storage/project/r-sbryngelson3-0/sbryngelson3/mfc-runners-2
 )
 
