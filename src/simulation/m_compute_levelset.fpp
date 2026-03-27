@@ -7,17 +7,12 @@
 !> @brief Computes signed-distance level-set fields and surface normals for immersed-boundary patch geometries
 module m_compute_levelset
 
-    use m_ib_patches           !< The IB patch parameters
-
-    use m_model                !< Subroutine(s) related to STL files
-
-    use m_derived_types        !< Definitions of the derived types
-
-    use m_global_parameters    !< Definitions of the global parameters
-
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
-    use m_helper_basic         !< Functions to compare floating point numbers
+    use m_ib_patches         !< The IB patch parameters
+    use m_model              !< Subroutine(s) related to STL files
+    use m_derived_types      !< Definitions of the derived types
+    use m_global_parameters  !< Definitions of the global parameters
+    use m_mpi_proxy          !< Message passing interface (MPI) module proxy
+    use m_helper_basic       !< Functions to compare floating point numbers
 
     implicit none
 
@@ -29,56 +24,51 @@ contains
     impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), dimension(:), intent(inout) :: gps
-        integer, intent(in) :: num_gps
-
-        integer :: i, patch_id, patch_geometry
+        integer, intent(in)                            :: num_gps
+        integer                                        :: i, patch_id, patch_geometry
 
         !  3D Patch Geometries
+
         if (p > 0) then
-
-            $:GPU_PARALLEL_LOOP(private='[i,patch_id,patch_geometry]', copy='[gps]', copyin='[patch_ib(1:num_ibs),Np]')
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
             do i = 1, num_gps
-
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
 
                 if (patch_geometry == 8) then
                     call s_sphere_levelset(gps(i))
-                elseif (patch_geometry == 9) then
+                else if (patch_geometry == 9) then
                     call s_cuboid_levelset(gps(i))
-                elseif (patch_geometry == 10) then
+                else if (patch_geometry == 10) then
                     call s_cylinder_levelset(gps(i))
-                elseif (patch_geometry == 11) then
+                else if (patch_geometry == 11) then
                     call s_3d_airfoil_levelset(gps(i))
-                elseif (patch_geometry == 12) then
+                else if (patch_geometry == 12) then
                     call s_model_levelset(gps(i))
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
 
             ! 2D Patch Geometries
-        elseif (n > 0) then
-
-            $:GPU_PARALLEL_LOOP(private='[i,patch_id,patch_geometry]', copy='[gps]', copyin='[Np,patch_ib(1:num_ibs)]')
+        else if (n > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
             do i = 1, num_gps
-
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
 
                 if (patch_geometry == 2) then
                     call s_circle_levelset(gps(i))
-                elseif (patch_geometry == 3) then
+                else if (patch_geometry == 3) then
                     call s_rectangle_levelset(gps(i))
-                elseif (patch_geometry == 4) then
+                else if (patch_geometry == 4) then
                     call s_airfoil_levelset(gps(i))
-                elseif (patch_geometry == 5) then
+                else if (patch_geometry == 5) then
                     call s_model_levelset(gps(i))
-                elseif (patch_geometry == 6) then
+                else if (patch_geometry == 6) then
                     call s_ellipse_levelset(gps(i))
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
-
         end if
 
     end subroutine s_apply_levelset
@@ -89,12 +79,10 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: radius, dist
-        real(wp), dimension(2) :: center
-        real(wp), dimension(3) :: dist_vec
-
-        integer :: i, j, ib_patch_id !< Loop index variables
+        real(wp)                         :: radius, dist
+        real(wp), dimension(2)           :: center
+        real(wp), dimension(3)           :: dist_vec
+        integer                          :: i, j, ib_patch_id  !< Loop index variables
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -102,8 +90,10 @@ contains
 
         radius = patch_ib(ib_patch_id)%radius
 
-        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
-        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, &
+                 & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, &
+                 & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
@@ -122,16 +112,13 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: dist, global_dist
-        integer :: global_id
-        real(wp), dimension(3) :: dist_vec
-
-        real(wp), dimension(1:3) :: xy_local, offset !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2) :: center
-        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
-
-        integer :: i, j, k, ib_patch_id !< Loop index variables
+        real(wp)                         :: dist, global_dist
+        integer                          :: global_id
+        real(wp), dimension(3)           :: dist_vec
+        real(wp), dimension(1:3)         :: xy_local, offset      !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2)         :: center
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
+        integer                          :: i, j, k, ib_patch_id  !< Loop index variables
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -139,13 +126,13 @@ contains
 
         center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
-        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
+        rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
-        xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
-        xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinate
-        xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
+        xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
+        xy_local = matmul(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinate
+        xy_local = xy_local - offset  ! airfoils are a patch that require a centroid offset
 
         if (xy_local(2) >= 0._wp) then
             ! finds the location on the airfoil grid with the minimum distance (closest)
@@ -194,29 +181,26 @@ contains
         if (f_approx_equal(dist, 0._wp)) then
             gp%levelset_norm = 0._wp
         else
-            gp%levelset_norm = matmul(rotation, dist_vec(:))/dist ! convert the normal vector back to global grid coordinates
+            gp%levelset_norm = matmul(rotation, dist_vec(:))/dist  ! convert the normal vector back to global grid coordinates
         end if
 
     end subroutine s_airfoil_levelset
 
-    !> @brief Computes the signed distance and outward normal from a ghost point to a 3D extruded airfoil surface including spanwise end caps.
+    !> @brief Computes the signed distance and outward normal from a ghost point to a 3D extruded airfoil surface including spanwise
+    !! end caps.
     subroutine s_3d_airfoil_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: dist, dist_surf, dist_side, global_dist
-        integer :: global_id
-        real(wp) :: lz, z_max, z_min
-        real(wp), dimension(3) :: dist_vec
-
-        real(wp), dimension(1:3) :: xyz_local, center, offset, normal !< x, y, z coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
-
-        real(wp) :: length_z
-
-        integer :: i, j, k, l, ib_patch_id !< Loop index variables
+        real(wp)                         :: dist, dist_surf, dist_side, global_dist
+        integer                          :: global_id
+        real(wp)                         :: lz, z_max, z_min
+        real(wp), dimension(3)           :: dist_vec
+        real(wp), dimension(1:3)         :: xyz_local, center, offset, normal  !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
+        real(wp)                         :: length_z
+        integer                          :: i, j, k, l, ib_patch_id            !< Loop index variables
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -227,16 +211,16 @@ contains
         center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         lz = patch_ib(ib_patch_id)%length_z
-        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
+        rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
         z_max = lz/2
         z_min = -lz/2
 
         xyz_local = [x_cc(i), y_cc(j), z_cc(l)] - center
-        xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
-        xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
+        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+        xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
         if (xyz_local(2) >= 0._wp) then
             do k = 1, Np
@@ -302,25 +286,22 @@ contains
 
     end subroutine s_3d_airfoil_levelset
 
-    !>  Subroutine for computing the levelset values at a ghost point belonging to the rectangle IB
+    !> Subroutine for computing the levelset values at a ghost point belonging to the rectangle IB
     subroutine s_rectangle_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: top_right(2), bottom_left(2)
-        real(wp) :: min_dist
-        real(wp) :: side_dists(4)
-
-        real(wp) :: length_x, length_y
-        real(wp), dimension(1:3) :: xy_local, dist_vec !< x and y coordinates in local IB frame
-        real(wp), dimension(2) :: center !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
-
-        integer :: i, j, k !< Loop index variables
-        integer :: idx !< Shortest path direction indicator
-        integer :: ib_patch_id !< patch ID
+        real(wp)                         :: top_right(2), bottom_left(2)
+        real(wp)                         :: min_dist
+        real(wp)                         :: side_dists(4)
+        real(wp)                         :: length_x, length_y
+        real(wp), dimension(1:3)         :: xy_local, dist_vec  !< x and y coordinates in local IB frame
+        real(wp), dimension(2)           :: center              !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
+        integer                          :: i, j, k             !< Loop index variables
+        integer                          :: idx                 !< Shortest path direction indicator
+        integer                          :: ib_patch_id         !< patch ID
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -330,8 +311,8 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
-        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
+        rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
         top_right(1) = length_x/2
         top_right(2) = length_y/2
@@ -374,24 +355,22 @@ contains
 
     end subroutine s_rectangle_levelset
 
-    !> @brief Computes the signed distance and outward normal from a ghost point to an elliptical immersed boundary via a quadratic projection.
+    !> @brief Computes the signed distance and outward normal from a ghost point to an elliptical immersed boundary via a quadratic
+    !! projection.
     subroutine s_ellipse_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: ellipse_coeffs(2) ! a and b in the ellipse equation
-        real(wp) :: quadratic_coeffs(3) ! A, B, C in the quadratic equation to compute levelset
-
-        real(wp) :: length_x, length_y
-        real(wp), dimension(1:3) :: xy_local, normal_vector !< x and y coordinates in local IB frame
-        real(wp), dimension(2) :: center !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
-
-        integer :: i, j, k !< Loop index variables
-        integer :: idx !< Shortest path direction indicator
-        integer :: ib_patch_id !< patch ID
+        real(wp)                         :: ellipse_coeffs(2)  ! a and b in the ellipse equation
+        real(wp)                         :: quadratic_coeffs(3)  ! A, B, C in the quadratic equation to compute levelset
+        real(wp)                         :: length_x, length_y
+        real(wp), dimension(1:3)         :: xy_local, normal_vector  !< x and y coordinates in local IB frame
+        real(wp), dimension(2)           :: center                   !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
+        integer                          :: i, j, k                  !< Loop index variables
+        integer                          :: idx                      !< Shortest path direction indicator
+        integer                          :: ib_patch_id              !< patch ID
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -401,8 +380,8 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
-        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
+        rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
         ellipse_coeffs(1) = 0.5_wp*length_x
         ellipse_coeffs(2) = 0.5_wp*length_y
@@ -411,17 +390,20 @@ contains
         xy_local = matmul(inverse_rotation, xy_local)
 
         normal_vector = xy_local
-        normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp ! get the normal direction via the coordinate transformation method
-        normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
-        gp%levelset_norm = matmul(rotation, normal_vector) ! save after rotating the vector to the global frame
+        normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2)) &
+                      & **2._wp  ! get the normal direction via the coordinate transformation method
+        normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector))  ! normalize the vector
+        gp%levelset_norm = matmul(rotation, normal_vector)  ! save after rotating the vector to the global frame
 
         ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
         quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
-        quadratic_coeffs(2) = 2._wp*((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2)/(ellipse_coeffs(2)**2)))
+        quadratic_coeffs(2) = 2._wp*((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2) &
+                         & /(ellipse_coeffs(2)**2)))
         quadratic_coeffs(3) = (xy_local(1)/ellipse_coeffs(1))**2._wp + (xy_local(2)/ellipse_coeffs(2))**2._wp - 1._wp
 
         ! compute the levelset with the quadratic equation [ -B + sqrt(B^2 - 4AC) ] / 2A
-        gp%levelset = -0.5_wp*(-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp*quadratic_coeffs(1)*quadratic_coeffs(3)))/quadratic_coeffs(1)
+        gp%levelset = -0.5_wp*(-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp*quadratic_coeffs(1) &
+                               & *quadratic_coeffs(3)))/quadratic_coeffs(1)
 
     end subroutine s_ellipse_levelset
 
@@ -431,18 +413,15 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: Right, Left, Bottom, Top, Front, Back
-        real(wp) :: min_dist
-        real(wp) :: dist_left, dist_right, dist_bottom, dist_top, dist_back, dist_front
-
-        real(wp), dimension(3) :: center
-        real(wp) :: length_x, length_y, length_z
-        real(wp), dimension(1:3) :: xyz_local, dist_vec !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
-
-        integer :: i, j, k !< Loop index variables
-        integer :: ib_patch_id !< patch ID
+        real(wp)                         :: Right, Left, Bottom, Top, Front, Back
+        real(wp)                         :: min_dist
+        real(wp)                         :: dist_left, dist_right, dist_bottom, dist_top, dist_back, dist_front
+        real(wp), dimension(3)           :: center
+        real(wp)                         :: length_x, length_y, length_z
+        real(wp), dimension(1:3)         :: xyz_local, dist_vec  !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
+        integer                          :: i, j, k              !< Loop index variables
+        integer                          :: ib_patch_id          !< patch ID
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -457,8 +436,8 @@ contains
         center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
 
-        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
+        rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
         Right = length_x/2
         Left = -length_x/2
@@ -467,8 +446,8 @@ contains
         Front = length_z/2
         Back = -length_z/2
 
-        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
-        xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinate
+        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinate
 
         dist_left = Left - xyz_local(1)
         dist_right = xyz_local(1) - Right
@@ -477,8 +456,7 @@ contains
         dist_back = Back - xyz_local(3)
         dist_front = xyz_local(3) - Front
 
-        min_dist = min(abs(dist_left), abs(dist_right), abs(dist_bottom), &
-                       abs(dist_top), abs(dist_back), abs(dist_front))
+        min_dist = min(abs(dist_left), abs(dist_right), abs(dist_bottom), abs(dist_top), abs(dist_back), abs(dist_front))
         dist_vec = 0._wp
 
         if (f_approx_equal(min_dist, abs(dist_left))) then
@@ -523,11 +501,9 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: radius, dist
-        real(wp), dimension(3) :: dist_vec, center, periodicity
-
-        integer :: i, j, k, ib_patch_id !< Loop index variables
+        real(wp)                         :: radius, dist
+        real(wp), dimension(3)           :: dist_vec, center, periodicity
+        integer                          :: i, j, k, ib_patch_id  !< Loop index variables
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -556,22 +532,21 @@ contains
 
     end subroutine s_sphere_levelset
 
-    !> @brief Computes the signed distance and outward normal from a ghost point to a cylindrical immersed boundary surface and end caps.
+    !> @brief Computes the signed distance and outward normal from a ghost point to a cylindrical immersed boundary surface and end
+    !! caps.
     subroutine s_cylinder_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        real(wp) :: radius
-        real(wp), dimension(3) :: dist_sides_vec, dist_surface_vec, length
-        real(wp), dimension(2) :: boundary
-        real(wp) :: dist_side, dist_surface, side_pos
-        integer :: i, j, k !< Loop index variables
-        integer :: ib_patch_id !< patch ID
-
-        real(wp), dimension(1:3) :: xyz_local, center !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
+        real(wp)                         :: radius
+        real(wp), dimension(3)           :: dist_sides_vec, dist_surface_vec, length
+        real(wp), dimension(2)           :: boundary
+        real(wp)                         :: dist_side, dist_surface, side_pos
+        integer                          :: i, j, k            !< Loop index variables
+        integer                          :: ib_patch_id        !< patch ID
+        real(wp), dimension(1:3)         :: xyz_local, center  !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -586,8 +561,8 @@ contains
         length(2) = patch_ib(ib_patch_id)%length_y
         length(3) = patch_ib(ib_patch_id)%length_z
 
-        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
+        rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
         if (.not. f_approx_equal(length(1), 0._wp)) then
             boundary(1) = -0.5_wp*length(1)
@@ -606,16 +581,14 @@ contains
             dist_surface_vec = (/1, 1, 0/)
         end if
 
-        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
-        xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
+        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
         ! get distance to flat edge of cylinder
         side_pos = dot_product(xyz_local, dist_sides_vec)
-        dist_side = min(abs(side_pos - boundary(1)), &
-                        abs(boundary(2) - side_pos))
+        dist_side = min(abs(side_pos - boundary(1)), abs(boundary(2) - side_pos))
         ! get distance to curved side of cylinder
-        dist_surface = norm2(xyz_local*dist_surface_vec) &
-                       - radius
+        dist_surface = norm2(xyz_local*dist_surface_vec) - radius
 
         if (dist_side < abs(dist_surface)) then
             ! if the closest edge is flat
@@ -641,12 +614,11 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-
-        integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
-        real(wp), dimension(1:3) :: center, xyz_local
-        real(wp) :: normals(1:3) !< Boundary normal buffer
-        real(wp) :: distance
-        real(wp), dimension(1:3, 1:3) :: inverse_rotation, rotation
+        integer                          :: i, j, k, patch_id, boundary_edge_count, total_vertices
+        real(wp), dimension(1:3)         :: center, xyz_local
+        real(wp)                         :: normals(1:3)  !< Boundary normal buffer
+        real(wp)                         :: distance
+        real(wp), dimension(1:3,1:3)     :: inverse_rotation, rotation
 
         patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -658,14 +630,17 @@ contains
         total_vertices = gpu_total_vertices(patch_id)
 
         center = 0._wp
-        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
-        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid + real(gp%x_periodicity, &
+            & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid + real(gp%y_periodicity, &
+            & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         if (p > 0) then
-            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid &
+                & + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         end if
 
-        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
+        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
+        rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
 
         ! determine where we are located in space
         xyz_local = (/x_cc(i) - center(1), y_cc(j) - center(2), 0._wp/)
@@ -687,9 +662,7 @@ contains
             gp%levelset_norm = matmul(rotation, normals(1:3))
         else
             ! 2D models
-            call s_distance_normals_2D(patch_id, &
-                                       boundary_edge_count, &
-                                       xyz_local, normals, distance)
+            call s_distance_normals_2D(patch_id, boundary_edge_count, xyz_local, normals, distance)
             gp%levelset = -abs(distance)
             gp%levelset_norm = matmul(rotation, normals(1:3))
         end if

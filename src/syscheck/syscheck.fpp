@@ -102,7 +102,6 @@ program syscheck
 
     @:LOG("")
     @:LOG("Syscheck: PASSED.")
-
 end program syscheck
 
 subroutine assert(condition)

@@ -44,6 +44,8 @@ COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_cover
 #     are conservatively included (not in cache -> always runs).
 #   - definitions.py: adding a parameter doesn't affect tests that don't use it;
 #     the PR's .fpp changes trigger the relevant tests via coverage overlap.
+#   - case_validator.py: validation only affects user-facing error messages for
+#     invalid configs, not test outputs (tests use valid configs).
 ALWAYS_RUN_ALL = frozenset(
     [
         "CMakeLists.txt",
@@ -56,7 +58,6 @@ ALWAYS_RUN_ALL = frozenset(
         "toolchain/mfc/test/case.py",
         "toolchain/mfc/test/coverage.py",
         "toolchain/mfc/run/input.py",
-        "toolchain/mfc/case_validator.py",
     ]
 )
 
