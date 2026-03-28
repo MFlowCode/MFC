@@ -4,7 +4,7 @@
 
 #:include 'case.fpp'
 
-!> Defines global parameters for the computational domain, simulation algorithm, and initial conditions
+!> @brief Defines global parameters for the computational domain, simulation algorithm, and initial conditions
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -112,32 +112,31 @@ module m_global_parameters
     ! Cell Indices for the entire (local) domain. In simulation and post_process, this includes the buffer region. idwbuff and
     ! idwint are the same otherwise. Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
-
-    integer :: fd_order   !< Finite-difference order for CoM/probe derivative approximations
-    integer :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
+    integer               :: fd_order   !< Finite-difference order for CoM/probe derivative approximations
+    integer               :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
     type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters
     !> @}
 
-    type(int_bounds_info) :: bc_x, bc_y, bc_z   !< Boundary conditions in the x-, y- and z-coordinate directions
-    integer               :: shear_num          !< Number of shear stress components
-    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
-    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
-    logical                  :: parallel_io            !< Format of the data files
-    logical                  :: file_per_process       !< type of data output
-    integer                  :: precision              !< Precision of output files
-    logical                  :: down_sample            !< Down-sample the output data
-    logical                  :: mixlayer_vel_profile   !< Set hyperbolic tangent streamwise velocity profile
-    real(wp)                 :: mixlayer_vel_coef      !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    logical                  :: mixlayer_perturb       !< Superimpose instability waves to surrounding fluid flow
-    integer                  :: mixlayer_perturb_nk    !< Number of Fourier modes for perturbation with mixlayer_perturb flag
-    real(wp)                   :: mixlayer_perturb_k0  !< Peak wavenumber for mixlayer perturbation (default: most unstable mode)
+    type(int_bounds_info)      :: bc_x, bc_y, bc_z       !< Boundary conditions in the x-, y- and z-coordinate directions
+    integer                    :: shear_num              !< Number of shear stress components
+    integer, dimension(3)      :: shear_indices          !< Indices of the stress components that represent shear stress
+    integer                    :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2)   :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    logical                    :: parallel_io            !< Format of the data files
+    logical                    :: file_per_process       !< type of data output
+    integer                    :: precision              !< Precision of output files
+    logical                    :: down_sample            !< Down-sample the output data
+    logical                    :: mixlayer_vel_profile   !< Set hyperbolic tangent streamwise velocity profile
+    real(wp)                   :: mixlayer_vel_coef      !< Coefficient for the hyperbolic tangent streamwise velocity profile
+    logical                    :: mixlayer_perturb       !< Superimpose instability waves to surrounding fluid flow
+    integer                    :: mixlayer_perturb_nk    !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    real(wp)                   :: mixlayer_perturb_k0    !< Peak wavenumber for mixlayer perturbation (default: most unstable mode)
     logical                    :: simplex_perturb
     type(simplex_noise_params) :: simplex_params
-    real(wp)                   :: pi_fac               !< Factor for artificial pi_inf
+    real(wp)                   :: pi_fac                 !< Factor for artificial pi_inf
     logical                    :: viscous
     logical                    :: bubbles_lagrange
 
@@ -152,9 +151,8 @@ module m_global_parameters
     integer                                :: elliptic_smoothing_iters
     integer, allocatable, dimension(:)     :: proc_coords         !< Processor coordinates in MPI_CART_COMM
     type(int_bounds_info), dimension(3)    :: nidx
-    integer, allocatable, dimension(:,:,:) :: neighbor_ranks  !< Neighbor ranks
-
-    integer, allocatable, dimension(:) :: start_idx  !< Starting cell-center index of local processor in global grid
+    integer, allocatable, dimension(:,:,:) :: neighbor_ranks      !< Neighbor ranks
+    integer, allocatable, dimension(:)     :: start_idx           !< Starting cell-center index of local processor in global grid
 
 #ifdef MFC_MPI
     type(mpi_io_var), public :: MPI_IO_DATA
@@ -164,12 +162,10 @@ module m_global_parameters
 
     ! Initial Condition Parameters
     integer :: num_patches  !< Number of patches composing initial condition
-
-    type(ic_patch_parameters), dimension(num_patches_max) :: patch_icpp      !< IC patch parameters (max: num_patches_max)
-    integer                                               :: num_bc_patches  !< Number of boundary condition patches
-    logical                                               :: bc_io           !< whether or not to save BC data
+    type(ic_patch_parameters), dimension(num_patches_max) :: patch_icpp  !< IC patch parameters (max: num_patches_max)
+    integer :: num_bc_patches  !< Number of boundary condition patches
+    logical :: bc_io  !< whether or not to save BC data
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc  !< BC patch parameters
-
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
 
     ! Subgrid Bubble Parameters
@@ -233,11 +229,10 @@ module m_global_parameters
     integer, allocatable, dimension(:,:,:) :: logic_grid
     type(pres_field)                       :: pb
     type(pres_field)                       :: mv
-    real(wp)                               :: Bx0  !< Constant magnetic field in the x-direction (1D)
-
-    integer :: buff_size  !< Number of ghost cells for boundary condition storage
-    logical :: fft_wrt
-    logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
+    real(wp)                               :: Bx0        !< Constant magnetic field in the x-direction (1D)
+    integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
+    logical                                :: fft_wrt
+    logical                                :: dummy      !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
     ! Variables for hardcoded initial conditions that are read from input files
     character(LEN=2*path_len) :: interface_file

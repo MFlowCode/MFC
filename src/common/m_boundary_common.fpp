@@ -2,7 +2,7 @@
 !! @file
 !! Contains module m_boundary_common
 
-!> Noncharacteristic and processor boundary condition application for ghost cells and buffer regions
+!> @brief Noncharacteristic and processor boundary condition application for ghost cells and buffer regions
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
@@ -97,7 +97,6 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
         integer                                                                                              :: k, l
 
-
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)
         else
@@ -155,7 +154,6 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-
 
         if (n == 0) return
 
@@ -221,7 +219,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         #:endif
-
 
         if (p == 0) return
 
@@ -342,7 +339,8 @@ contains
 
     end subroutine s_ghost_cell_extrapolation
 
-    !> Applies reflective (symmetry) boundary conditions by mirroring primitive variables and flipping the normal velocity component.
+    !> Applies reflective (symmetry) boundary conditions by mirroring primitive variables and flipping the normal velocity
+    !! component.
     subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -2278,7 +2276,6 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-
         ! Populating cell-width distribution buffer at bc_x%beg
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_grid_variables_buffers(1, -1)
@@ -2330,7 +2327,6 @@ contains
         do i = 1, buff_size
             x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
-
 
         ! Populating cell-width distribution buffer at bc_y%beg
         if (n == 0) then
@@ -2385,7 +2381,6 @@ contains
         do i = 1, buff_size
             y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
         end do
-
 
         ! Populating cell-width distribution buffer at bc_z%beg
         if (p == 0) then

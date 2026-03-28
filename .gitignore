@@ -114,3 +114,4 @@ cce_*/
 cce_*.log
 run_cce_*.sh
 .ffmt_cache/
+**/.ffmt_cache/

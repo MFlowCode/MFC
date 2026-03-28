@@ -9,7 +9,7 @@
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
-!> Immersed boundary patch geometry constructors for 2D and 3D shapes
+!> @brief Immersed boundary patch geometry constructors for 2D and 3D shapes
 module m_ib_patches
 
     use m_model  ! Subroutine(s) related to STL files
@@ -119,7 +119,6 @@ contains
         integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: encoded_patch_id
 
-
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         radius = patch_ib(patch_id)%radius
@@ -134,7 +133,6 @@ contains
         jr = n + gp_layers + 1
         call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
-
 
         $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[encoded_patch_id, center, radius]', collapse=2)
         do j = jl, jr
@@ -472,7 +470,6 @@ contains
         real(wp), dimension(1:2)           :: length, center        !< x and y coordinates in local IB frame
         real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
-
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         length(1) = patch_ib(patch_id)%length_x
@@ -528,7 +525,6 @@ contains
         !! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al.
         !! (2013)
 
-
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
@@ -581,7 +577,6 @@ contains
         real(wp), dimension(1:3)           :: xyz_local, center, length  !< x and y coordinates in local IB frame
         real(wp), dimension(1:3,1:3)       :: inverse_rotation
         real(wp)                           :: corner_distance
-
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
@@ -649,7 +644,6 @@ contains
         real(wp), dimension(1:3,1:3)       :: inverse_rotation
         real(wp)                           :: corner_distance
 
-
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
@@ -716,7 +710,6 @@ contains
         real(wp), dimension(1:2)           :: ellipse_coeffs        !< a and b in the ellipse coefficients
         real(wp), dimension(1:2)           :: center                !< x and y coordinates in local IB frame
         real(wp), dimension(1:3,1:3)       :: inverse_rotation
-
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)

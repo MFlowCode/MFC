@@ -5,7 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
+!> @brief Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -19,9 +19,8 @@ module m_global_parameters
 
     implicit none
 
-    real(wp) :: wall_time = 0
-    real(wp) :: wall_time_avg = 0
-
+    real(wp)                :: wall_time = 0
+    real(wp)                :: wall_time_avg = 0
     integer                 :: num_procs      !< Number of processors
     character(LEN=path_len) :: case_dir       !< Case folder location
     logical                 :: run_time_info  !< Run-time output flag
@@ -330,9 +329,9 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[buff_size]')
 
-    integer               :: shear_num          !< Number of shear stress components
-    integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
-    integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
+    integer                  :: shear_num              !< Number of shear stress components
+    integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
+    integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
     integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
 
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
@@ -345,9 +344,8 @@ module m_global_parameters
 
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
-
-    integer :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
-    integer :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
+    integer                                  :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
+    integer                                  :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt

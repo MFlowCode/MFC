@@ -5,7 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
+!> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
 module m_data_output
 
     use m_derived_types
@@ -304,7 +304,6 @@ contains
         character(LEN=15) :: FMT
         integer :: i, j, k, l, r
         real(wp) :: gamma, lit_gamma, pi_inf, qv            !< Temporary EOS params
-
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
 
@@ -779,7 +778,6 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers)
             else if (present(beta)) then
@@ -863,7 +861,6 @@ contains
         character(LEN=path_len + 2*name_len) :: file_path
         character(LEN=path_len + 2*name_len) :: t_step_dir
 
-
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', time_step
         write (file_path, '(A,I0,A)') trim(t_step_dir) // '/ib_data.dat'
@@ -945,7 +942,6 @@ contains
         integer                                        :: i            !< Generic loop iterator
         real(wp)                                       :: nondim_time  !< Non-dimensional time
 
-
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, wp)*dt
         else
@@ -980,39 +976,38 @@ contains
         real(wp), dimension(-1:m)                           :: distx
         real(wp), dimension(-1:n)                           :: disty
         real(wp), dimension(-1:p)                           :: distz
-
-        real(wp)                        :: lit_gamma, nbub
-        real(wp)                        :: rho
-        real(wp), dimension(num_vels)   :: vel
-        real(wp)                        :: pres
-        real(wp)                        :: ptilde
-        real(wp)                        :: ptot
-        real(wp)                        :: alf
-        real(wp)                        :: alfgr
-        real(wp), dimension(num_fluids) :: alpha
-        real(wp)                        :: gamma
-        real(wp)                        :: pi_inf
-        real(wp)                        :: qv
-        real(wp)                        :: c
-        real(wp)                        :: M00, M10, M01, M20, M11, M02
-        real(wp)                        :: varR, varV
-        real(wp), dimension(Nb)         :: nR, R, nRdot, Rdot
-        real(wp)                        :: nR3
-        real(wp)                        :: accel
-        real(wp)                        :: int_pres
-        real(wp)                        :: max_pres
-        real(wp), dimension(2)          :: Re
-        real(wp), dimension(6)          :: tau_e
-        real(wp)                        :: G_local
-        real(wp)                        :: dyn_p, T
-        real(wp)                        :: damage_state
-        integer                         :: i, j, k, l, s, d  !< Generic loop iterator
-        real(wp)                        :: nondim_time       !< Non-dimensional time
-        real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
-        integer                         :: npts              !< Number of included integral points
-        real(wp)                        :: rad, thickness    !< For integral quantities
-        logical                         :: trigger           !< For integral quantities
-        real(wp)                        :: rhoYks(1:num_species)
+        real(wp)                                            :: lit_gamma, nbub
+        real(wp)                                            :: rho
+        real(wp), dimension(num_vels)                       :: vel
+        real(wp)                                            :: pres
+        real(wp)                                            :: ptilde
+        real(wp)                                            :: ptot
+        real(wp)                                            :: alf
+        real(wp)                                            :: alfgr
+        real(wp), dimension(num_fluids)                     :: alpha
+        real(wp)                                            :: gamma
+        real(wp)                                            :: pi_inf
+        real(wp)                                            :: qv
+        real(wp)                                            :: c
+        real(wp)                                            :: M00, M10, M01, M20, M11, M02
+        real(wp)                                            :: varR, varV
+        real(wp), dimension(Nb)                             :: nR, R, nRdot, Rdot
+        real(wp)                                            :: nR3
+        real(wp)                                            :: accel
+        real(wp)                                            :: int_pres
+        real(wp)                                            :: max_pres
+        real(wp), dimension(2)                              :: Re
+        real(wp), dimension(6)                              :: tau_e
+        real(wp)                                            :: G_local
+        real(wp)                                            :: dyn_p, T
+        real(wp)                                            :: damage_state
+        integer                                             :: i, j, k, l, s, d  !< Generic loop iterator
+        real(wp)                                            :: nondim_time  !< Non-dimensional time
+        real(wp)                                            :: tmp  !< Temporary variable to store quantity for mpi_allreduce
+        integer                                             :: npts  !< Number of included integral points
+        real(wp)                                            :: rad, thickness  !< For integral quantities
+        logical                                             :: trigger  !< For integral quantities
+        real(wp)                                            :: rhoYks(1:num_species)
 
         T = dflt_T_guess
 
