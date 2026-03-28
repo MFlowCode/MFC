@@ -1,11 +1,11 @@
 !>
 !! @file
-!! @brief Contains module m_global_parameters
+!! Contains module m_global_parameters
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
+!> Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -22,7 +22,6 @@ module m_global_parameters
     real(wp) :: wall_time = 0
     real(wp) :: wall_time_avg = 0
 
-    ! Logistics
     integer                 :: num_procs      !< Number of processors
     character(LEN=path_len) :: case_dir       !< Case folder location
     logical                 :: run_time_info  !< Run-time output flag
@@ -327,8 +326,6 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
 
-    !> The number of cells that are necessary to be able to store enough boundary conditions data to march the solution in the
-    !! physical computational domain to the next time-step.
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
 
     $:GPU_DECLARE(create='[buff_size]')
@@ -336,8 +333,6 @@ module m_global_parameters
     integer               :: shear_num          !< Number of shear stress components
     integer, dimension(3) :: shear_indices      !< Indices of the stress components that represent shear stress
     integer               :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
-    !> Indices of shear stress components to reflect for boundary conditions. Size: (1:3, 1:shear_BC_flip_num) for (x/y/z,
-    !! [indices])
     integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
 
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
@@ -346,20 +341,13 @@ module m_global_parameters
 
     ! Fluids Physical Parameters
 
-    !> Database of the physical parameters of each of the fluids that is present in the flow. These include the stiffened gas
-    !! equation of state parameters, and the Reynolds numbers.
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
 
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
 
-    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when the CoM
-    !! or flow probe data files are to be written at each time step
-    integer :: fd_order  !< Finite-difference order for CoM and flow probe derivatives
-
-    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
-    !! finite-difference stencil for the selected order of accuracy.
-    integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+    integer :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
+    integer :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt
@@ -383,9 +371,6 @@ module m_global_parameters
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
     integer                                               :: Np
-    !! Database of the immersed boundary patch parameters for each of the patches employed in the configuration of the initial
-    !! condition. Note that the maximum allowable number of patches, num_patches_max, may be changed in the module
-    !! m_derived_types.f90.
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
     !> @}
@@ -520,8 +505,6 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
-    !> AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional
-    !! is false
     logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
     !> @name Continuum damage model parameters
@@ -546,8 +529,6 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i, j  !< Generic loop iterator
-
-        ! Logistics
 
         case_dir = '.'
         run_time_info = .false.
@@ -918,9 +899,7 @@ contains
             $:GPU_UPDATE(device='[igr, igr_order, igr_iter_solver]')
         #:endif
 
-        ! Initializing the number of fluids for which viscous effects will be non-negligible, the number of distinctive material
-        ! interfaces for which surface tension will be important and also, the number of fluids for which the physical and geometric
-        ! curvatures of the interfaces will be computed
+        ! Initialize viscous fluid count and curvature tracking
         Re_size = 0
         Re_size_max = 0
 

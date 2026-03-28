@@ -1154,8 +1154,7 @@ contains
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
             moment = 0._wp
-            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0)) &
-                           &  ! computed without grid stretching. Update in the loop to perform with stretching
+            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
             if (p /= 0) then
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
