@@ -84,7 +84,7 @@ if (MFC_SILO)
 
         ExternalProject_Add(silo
             GIT_REPOSITORY "https://github.com/LLNL/Silo"
-            GIT_TAG        0cddaa6865fb49ae7b2110fa1b6f2709592abe0b
+            GIT_TAG        4.12.0
             GIT_SHALLOW    ON
             GIT_PROGRESS   ON
             PATCH_COMMAND  "${GIT_EXECUTABLE}" stash

@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_global_parameters
+!! @brief Contains module m_global_parameters (simulation)
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
