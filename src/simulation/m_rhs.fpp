@@ -1665,12 +1665,6 @@ contains
                     call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
                                        & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1, is2, is3)
                 end if
-
-                if (int_comp > 0 .and. iv%beg <= advxb .and. iv%end >= advxe) then
-                    call nvtxStartRange("RHS-RECONSTRUCTION-COMPRESSION")
-                    call s_thinc_compression(q_prim_qp%vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, recon_dir, is1, is2, is3)
-                    call nvtxEndRange()
-                end if
             end if
         #:endfor
 

@@ -16,6 +16,7 @@ module m_muscl
 
     use m_mpi_proxy
     use m_helper
+    use m_thinc, only: s_thinc_compression
 
     private; public :: s_initialize_muscl_module, s_muscl, s_finalize_muscl_module
 
@@ -206,6 +207,15 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                end if
+            #:endfor
+        end if
+
+        if (int_comp > 0 .and. v_size >= advxe) then
+            #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (muscl_dir == ${MUSCL_DIR}$) then
+                    call s_thinc_compression(v_rs_ws_${XYZ}$_muscl, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, &
+                                             & vR_rs_vf_z, muscl_dir, is1_muscl, is2_muscl, is3_muscl)
                 end if
             #:endfor
         end if

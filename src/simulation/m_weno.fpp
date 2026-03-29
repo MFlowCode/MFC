@@ -13,6 +13,7 @@ module m_weno
     ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
+    use m_thinc, only: s_thinc_compression
 
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
@@ -1371,6 +1372,15 @@ contains
                     end if
                 #:endfor
             #:endif
+        end if
+
+        if (int_comp > 0 .and. v_size >= advxe) then
+            #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (weno_dir == ${WENO_DIR}$) then
+                    call s_thinc_compression(v_rs_ws_${XYZ}$, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, &
+                                             & vR_rs_vf_z, weno_dir, is1_weno, is2_weno, is3_weno)
+                end if
+            #:endfor
         end if
 
     end subroutine s_weno

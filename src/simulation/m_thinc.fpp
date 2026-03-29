@@ -205,7 +205,7 @@ contains
         if (int_comp == 2) then
             @:ALLOCATE(mthinc_nhat(1:3, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
-            @:ALLOCATE(mthinc_d( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(mthinc_d(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
     end subroutine s_initialize_thinc_module
@@ -218,6 +218,7 @@ contains
         type(scalar_field), dimension(:), intent(in) :: v_vf
         integer                                      :: j, k, l
         real(wp)                                     :: nr_x, nr_y, nr_z, nmag, ac
+        type(int_bounds_info), dimension(3)          :: id_norm
 
         ! Zero arrays so boundary cells default to invalid (skipped)
 
@@ -234,12 +235,22 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        id_norm(1)%beg = idwbuff(1)%beg + 1; id_norm(1)%end = idwbuff(1)%end - 1
+        id_norm(2)%beg = 0; id_norm(2)%end = 0
+        id_norm(3)%beg = 0; id_norm(3)%end = 0
+        if (n > 0) then
+            id_norm(2)%beg = idwbuff(2)%beg + 1; id_norm(2)%end = idwbuff(2)%end - 1
+        end if
+        if (p > 0) then
+            id_norm(3)%beg = idwbuff(3)%beg + 1; id_norm(3)%end = idwbuff(3)%end - 1
+        end if
+
         ! Compute unit normal and solve for d at interior cells where central differences are valid. Only shrink bounds in active
         ! dimensions (n>0, p>0).
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, nr_x, nr_y, nr_z, nmag, ac]')
-        do l = idwbuff(3)%beg + min(1, p), idwbuff(3)%end - min(1, p)
-            do k = idwbuff(2)%beg + min(1, n), idwbuff(2)%end - min(1, n)
-                do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, nr_x, nr_y, nr_z, nmag, ac]', copyin='[id_norm]')
+        do l = id_norm(3)%beg, id_norm(3)%end
+            do k = id_norm(2)%beg, id_norm(2)%end
+                do j = id_norm(1)%beg, id_norm(1)%end
                     ac = v_vf(advxb)%sf(j, k, l)
 
                     if (ac >= ic_eps .and. ac <= 1._wp - ic_eps) then
@@ -283,10 +294,10 @@ contains
     !!
     !! THINC: 1D tanh profile with constant sharpness ic_beta. MTHINC: Multi-dimensional tanh profile using precomputed unit normal
     !! and interface position d; face values are obtained by integrating the profile over the cell face with Gauss quadrature.
-    subroutine s_thinc_compression(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, recon_dir, &
+    subroutine s_thinc_compression(v_rs_ws, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, recon_dir, &
                                    & is1_d, is2_d, is3_d)
 
-        type(scalar_field), dimension(:), intent(in)                                           :: v_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in)    :: v_rs_ws
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
              & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
         integer, intent(in)               :: recon_dir
@@ -304,22 +315,11 @@ contains
                 do l = is3_d%beg, is3_d%end
                     do k = is2_d%beg, is2_d%end
                         do j = is1_d%beg, is1_d%end
-                            ! Read cell-averaged volume fractions from physical (x,y,z) space. The mapping from reshaped (j,k,l) to
-                            ! physical depends on recon_dir: dir=1 (x): (x,y,z) = (j,k,l) dir=2 (y): (x,y,z) = (k,j,l) dir=3 (z):
-                            ! (x,y,z) = (l,k,j)
-                            #:if REC_DIR == 1
-                                aCL = v_vf(advxb)%sf(j - 1, k, l)
-                                aC = v_vf(advxb)%sf(j, k, l)
-                                aCR = v_vf(advxb)%sf(j + 1, k, l)
-                            #:elif REC_DIR == 2
-                                aCL = v_vf(advxb)%sf(k, j - 1, l)
-                                aC = v_vf(advxb)%sf(k, j, l)
-                                aCR = v_vf(advxb)%sf(k, j + 1, l)
-                            #:else
-                                aCL = v_vf(advxb)%sf(l, k, j - 1)
-                                aC = v_vf(advxb)%sf(l, k, j)
-                                aCR = v_vf(advxb)%sf(l, k, j + 1)
-                            #:endif
+                            ! Read cell-averaged volume fractions from the reshaped cell-center workspace array. The first spatial
+                            ! index is always the reconstruction direction, so no per-direction index swizzling is needed.
+                            aCL = v_rs_ws(j - 1, k, l, advxb)
+                            aC = v_rs_ws(j, k, l, advxb)
+                            aCR = v_rs_ws(j + 1, k, l, advxb)
 
                             if (aC >= ic_eps .and. aC <= 1._wp - ic_eps) then
                                 if (int_comp == 2 .and. n > 0) then
@@ -342,8 +342,8 @@ contains
                                     ! Skip if no valid normal was computed
                                     if (nh1*nh1 + nh2*nh2 + nh3*nh3 > 5e-1_wp) then
                                         ! Pure fluid densities from cell-averaged values. Safe: aC is bounded by [ic_eps, 1-ic_eps].
-                                        rho1 = v_vf(contxb)%sf(ix, iy, iz)/aC
-                                        rho2 = v_vf(contxe)%sf(ix, iy, iz)/(1._wp - aC)
+                                        rho1 = v_rs_ws(j, k, l, contxb)/aC
+                                        rho2 = v_rs_ws(j, k, l, contxe)/(1._wp - aC)
 
                                         ! Left face (face_pos = -0.5)
                                         aTHINC = f_mthinc_face_average(nh1, nh2, nh3, d_local, ic_beta, ${REC_DIR}$, -5e-1_wp, &
@@ -386,9 +386,9 @@ contains
                                         B = exp(sgn*beta_eff*(2._wp*C - 1._wp))
                                         A = (B/cosh(beta_eff) - 1._wp)/tanh(beta_eff)
 
-                                        ! Save original density ratios before THINC overwrites them
-                                        rho_b = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, l, advxb)
-                                        rho_e = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))
+                                        ! Pure fluid densities from cell-averaged values
+                                        rho_b = v_rs_ws(j, k, l, contxb)/aC
+                                        rho_e = v_rs_ws(j, k, l, contxe)/(1._wp - aC)
 
                                         ! Left reconstruction
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*A)
