@@ -38,12 +38,6 @@ module m_mpi_proxy
     integer            :: neighbor_list(MAX_NEIGHBORS, 3)
     integer            :: n_neighbors
     $:GPU_DECLARE(create='[p_send_counts]')
-    integer, allocatable  :: force_send_counts(:), force_recv_counts(:)
-    integer, allocatable  :: force_send_ids(:,:)
-    integer, allocatable  :: flat_send_ids(:)
-    real(wp), allocatable :: force_send_vals(:,:,:)
-    real(wp), allocatable :: flat_send_vals(:)
-    $:GPU_DECLARE(create='[force_send_counts, force_send_ids, force_send_vals]')
 
 contains
 
@@ -133,12 +127,6 @@ contains
                 end do
             end do
         end do
-        @:ALLOCATE(force_send_counts(0:num_procs-1))
-        @:ALLOCATE(force_recv_counts(0:num_procs-1))
-        @:ALLOCATE(force_send_ids(0:num_procs-1, 1:lag_params%nParticles_glb))
-        @:ALLOCATE(force_send_vals(0:num_procs-1, 1:lag_params%nParticles_glb, 1:3))
-        @:ALLOCATE(flat_send_ids(1:lag_params%nParticles_glb))
-        @:ALLOCATE(flat_send_vals(1:3*lag_params%nParticles_glb))
 #endif
 
     end subroutine s_initialize_solid_particles_mpi
@@ -1292,11 +1280,8 @@ contains
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
 
-        if (particles_lagrange) then
+        if (particles_lagrange .and. num_procs > 1) then
             @:DEALLOCATE(p_send_buff, p_recv_buff, p_send_ids)
-            @:DEALLOCATE(force_send_counts, force_recv_counts)
-            @:DEALLOCATE(force_send_ids, force_send_vals)
-            @:DEALLOCATE(flat_send_ids, flat_send_vals)
         end if
 #endif
 
