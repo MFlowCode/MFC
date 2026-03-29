@@ -31,11 +31,6 @@ if [ "$job_cluster" = "phoenix" ]; then
     clean_build
 fi
 
-# Frontier Cray: -j 1 to work around CCE 19.0.0 IPA SIGSEGV
-if [ "$job_cluster" = "frontier" ]; then
-    n_jobs=1
-fi
-
 source .github/scripts/retry-build.sh
 retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 
