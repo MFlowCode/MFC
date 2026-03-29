@@ -553,16 +553,16 @@ contains
     subroutine s_initialize_internal_energy_equations(v_vf)
 
         type(scalar_field), dimension(:), intent(inout) :: v_vf
-        real(wp)                                               :: rho
-        real(wp)                                               :: dyn_pres
-        real(wp)                                               :: gamma
-        real(wp)                                               :: pi_inf
-        real(wp)                                               :: qv
-        real(wp), dimension(2)                                 :: Re
-        real(wp)                                               :: pres, T
-        integer                                                :: i, j, k, l, c
-        real(wp), dimension(num_species)                       :: rhoYks
-        real(wp)                                               :: pres_mag
+        real(wp)                                        :: rho
+        real(wp)                                        :: dyn_pres
+        real(wp)                                        :: gamma
+        real(wp)                                        :: pi_inf
+        real(wp)                                        :: qv
+        real(wp), dimension(2)                          :: Re
+        real(wp)                                        :: pres, T
+        integer                                         :: i, j, k, l, c
+        real(wp), dimension(num_species)                :: rhoYks
+        real(wp)                                        :: pres_mag
 
         pres_mag = 0._wp
 
