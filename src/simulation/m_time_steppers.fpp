@@ -625,6 +625,9 @@ contains
 
     !> Compute the global time step size from CFL stability constraints across all cells
     impure subroutine s_compute_dt()
+#ifdef __NVCOMPILER
+        !dir$ noinline
+#endif
 
         real(wp) :: rho  !< Cell-avg. density
 
