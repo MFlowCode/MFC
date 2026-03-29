@@ -221,6 +221,10 @@ jobs:
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: ${{ matrix.nvhpc && '1' || '' }}
 
     steps:
+      - name: Git safe directory
+        if:   matrix.nvhpc
+        run:  git config --global --add safe.directory /__w/MFC/MFC
+
       - name: Clone
         uses: actions/checkout@v4
 
@@ -302,7 +306,6 @@ jobs:
           apt-get update -y
           apt-get install -y cmake python3 python3-venv python3-pip \
                              libfftw3-dev libhdf5-dev hdf5-tools git
-          git config --global --add safe.directory /__w/MFC/MFC
 
       # --- Standard build + test ---
       - name: Build
