@@ -552,7 +552,7 @@ contains
     !> Initialize internal-energy equations from phase mass, mixture momentum, and total energy
     subroutine s_initialize_internal_energy_equations(v_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
+        type(scalar_field), dimension(:), intent(inout) :: v_vf
         real(wp)                                               :: rho
         real(wp)                                               :: dyn_pres
         real(wp)                                               :: gamma
