@@ -1343,15 +1343,20 @@ contains
         real(wp), dimension(3) :: force_read, torque_read
         real(wp), dimension(3) :: vel_read, angular_vel_read, angles_read
         real(wp) :: xc_read, yc_read, zc_read
+        logical :: file_exist
 
         if (proc_rank == 0) then
             file_loc = trim(case_dir)//'/restart_data/ib_state.dat'
-
-            open (newunit=file_unit, file=trim(file_loc), &
-                  form='unformatted', access='stream', &
-                  status='old', iostat=ios)
-            if (ios /= 0) call s_mpi_abort( &
-                'Cannot open IB state file for restart: '//trim(file_loc))
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            print *, "IB Restart File Exists: ", file_exist
+            if (file_exist) then
+                open (newunit=file_unit, file=trim(file_loc), &
+                      form='unformatted', access='stream', &
+                      status='old', iostat=ios)
+                print *, "iostat ", ios
+            else
+                call s_mpi_abort('Cannot open IB state file for restart: '//trim(file_loc))
+            end if
 
             ! Read all records; the last num_ibs records are the final state
             do
