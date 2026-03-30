@@ -1375,12 +1375,14 @@ contains
         end if
 
         if (int_comp > 0 .and. v_size >= advxe) then
+            call nvtxStartRange("WENO-INTCOMP")
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
                     call s_thinc_compression(v_rs_ws_${XYZ}$, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, &
                                              & vR_rs_vf_z, weno_dir, is1_weno, is2_weno, is3_weno)
                 end if
             #:endfor
+            call nvtxEndRange()
         end if
 
     end subroutine s_weno

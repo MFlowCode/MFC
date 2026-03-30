@@ -212,12 +212,14 @@ contains
         end if
 
         if (int_comp > 0 .and. v_size >= advxe) then
+            call nvtxStartRange("WENO-INTCOMP")
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then
                     call s_thinc_compression(v_rs_ws_${XYZ}$_muscl, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, &
                                              & vR_rs_vf_z, muscl_dir, is1_muscl, is2_muscl, is3_muscl)
                 end if
             #:endfor
+            call nvtxEndRange()
         end if
 
     end subroutine s_muscl
