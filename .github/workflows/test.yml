@@ -226,6 +226,12 @@ jobs:
             target: gpu-acc
           - nvhpc: '26.1'
             target: gpu-omp
+          - nvhpc: '26.3'
+            target: cpu
+          - nvhpc: '26.3'
+            target: gpu-acc
+          - nvhpc: '26.3'
+            target: gpu-omp
 
       fail-fast: false
     continue-on-error: true
