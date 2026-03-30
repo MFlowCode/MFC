@@ -448,7 +448,7 @@ function(MFC_SETUP_TARGET)
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort)
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str)
         list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
     endif()
 
