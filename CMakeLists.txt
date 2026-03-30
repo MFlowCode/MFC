@@ -665,17 +665,16 @@ if (MFC_SIMULATION)
     # Disabling IPA per-file avoids the crashes while preserving IPA for
     # the rest of simulation (needed for thermochem INLINEALWAYS inlining).
     # Applied to Cray+OpenACC and Cray CPU, but NOT Cray+OpenMP: on OpenMP,
-    # m_thermochem uses !DIR$ INLINEALWAYS (requires IPA), so disabling IPA
-    # for these files breaks thermochem on-device calls. On OpenACC the
-    # pyrometheus patch emits !$acc routine seq instead (no IPA needed).
-    # See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
-        set_source_files_properties(
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
-            PROPERTIES COMPILE_OPTIONS "-Oipa0"
-        )
-    endif()
+    # CCE 19.0.0 IPA workaround: disable interprocedural analysis for files
+    # that trigger compiler SIGSEGV during IPA (Bug 3: m_phase_change,
+    # Bug 4: m_bubbles_EL). See PR #1286. Test removal on future CCE versions.
+    # if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
+    #     set_source_files_properties(
+    #         "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
+    #         "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
+    #         PROPERTIES COMPILE_OPTIONS "-Oipa0"
+    #     )
+    # endif()
 endif()
 
 if (MFC_POST_PROCESS)
