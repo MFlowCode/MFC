@@ -225,7 +225,7 @@ jobs:
         if:   matrix.os == 'macos'
         run:  |
           brew update
-          brew upgrade
+          brew upgrade || true
           brew install coreutils python fftw hdf5 gcc@15 boost open-mpi lapack
           echo "FC=gfortran-15" >> $GITHUB_ENV
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
