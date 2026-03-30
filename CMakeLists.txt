@@ -448,7 +448,16 @@ function(MFC_SETUP_TARGET)
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers,except:s_check_patches)
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers)
+
+        # Exclude m_start_up from cross-file inlining: it is initialization code that
+        # triggers NVHPC 25.x fort2 ICE when too many functions are cross-inlined into it.
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/m_start_up.fpp.f90"
+            TARGET_DIRECTORY ${ARGS_TARGET}
+            PROPERTIES COMPILE_OPTIONS "-Mnoinline"
+        )
+
         list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
     endif()
 
