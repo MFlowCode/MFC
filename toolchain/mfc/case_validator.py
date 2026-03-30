@@ -1085,10 +1085,7 @@ class CaseValidator:
         self.prohibit(model_eqns is not None and model_eqns != 2, "5-equation model (model_eqns = 2) is required for alt_soundspeed")
         self.prohibit(bubbles_euler, "alt_soundspeed is not compatible with bubbles_euler")
         self.prohibit(avg_state is not None and avg_state != 2, "alt_soundspeed requires avg_state = 2")
-        self.prohibit(
-            riemann_solver is not None and riemann_solver not in [1, 2, 4],
-            "alt_soundspeed requires HLL (1), HLLC (2), or HLLD (4) Riemann solver"
-        )
+        self.prohibit(riemann_solver is not None and riemann_solver not in [1, 2, 4], "alt_soundspeed requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
         self.prohibit(num_fluids is not None and num_fluids not in [2, 3], "alt_soundspeed requires num_fluids = 2 or 3")
 
     def check_bubbles_lagrange(self):

@@ -459,6 +459,10 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
 | `pre_stress`               | Logical | Enable pre-stress initialization for hypoelasticity |
+| `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD |
+| `ADC_kappa`                | Real    | ADC sensor scaling parameter |
+| `hypo_hll_interface_rhs`   | Logical | HLL uses interface-consistent hypo RHS |
+| `hll_u_interface`          | Logical | HLL Method 2 (u-interface) selector |
 | `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |

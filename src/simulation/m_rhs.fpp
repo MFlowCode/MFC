@@ -134,7 +134,7 @@ module m_rhs
     !> @}
 
     type(vector_field), allocatable, dimension(:) :: nc_iface_vel_n
-    !$acc declare create(nc_iface_vel_n)
+    $:GPU_DECLARE(create='[nc_iface_vel_n]')
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
 #if defined(MFC_OpenACC)

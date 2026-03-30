@@ -336,16 +336,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def add_hll_u_interface_cases(trace_prefix: str):
-        cases.append(define_case_d(
-            stack,
-            f"{trace_prefix} -> u-interface",
-            {'riemann_solver': 1, 'hll_u_interface': 'T'}
-        ))
-        cases.append(define_case_d(
-            stack,
-            f"{trace_prefix} -> u-interface -> alt_soundspeed",
-            {'riemann_solver': 1, 'hll_u_interface': 'T', 'alt_soundspeed': 'T'}
-        ))
+        cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface", {"riemann_solver": 1, "hll_u_interface": "T"}))
+        cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface -> alt_soundspeed", {"riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T"}))
 
     def alter_low_Mach_correction():
         stack.push("", {"fluid_pp(1)%gamma": 0.16, "fluid_pp(1)%pi_inf": 3515.0, "dt": 1e-7})
@@ -1514,23 +1506,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 solver_mods = solver_spec["mods"]
                 for alt_soundspeed in ["F", "T"]:
                     # 2D axisymmetric HLL Method 1 + alt_soundspeed remains intentionally unsupported.
-                    if (base_trace == "2D -> Axisymmetric -> Hypoelasticity" and
-                            solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T"):
+                    if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T":
                         continue
 
                     # 2D axisymmetric HLLD + alt_soundspeed=T is unstable across build
                     # configurations (exceeds 1e-7 tolerance). Needs investigation.
-                    if (base_trace == "2D -> Axisymmetric -> Hypoelasticity" and
-                            solver_trace == "HLLD" and alt_soundspeed == "T"):
+                    if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLLD" and alt_soundspeed == "T":
                         continue
 
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
-                    cases.append(define_case_f(
-                        trace,
-                        path,
-                        mods={},
-                        functor=lambda case, solver_mods=solver_mods, alt_soundspeed=alt_soundspeed: modify_hypo_example_case(case, solver_mods, alt_soundspeed)
-                    ))
+                    cases.append(
+                        define_case_f(trace, path, mods={}, functor=lambda case, solver_mods=solver_mods, alt_soundspeed=alt_soundspeed: modify_hypo_example_case(case, solver_mods, alt_soundspeed))
+                    )
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():

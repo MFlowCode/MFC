@@ -391,7 +391,8 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,q,alpha_rho_L,alpha_rho_R,vel_L,vel_R,alpha_L,alpha_R,tau_e_L,tau_e_R,Re_L,Re_R,s_L,s_R,s_S,Ys_L,Ys_R,xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, rho_HLL_ex, rhou_n_HLL_ex, rhou_t_HLL_ex, rhou_t2_HLL_ex, u_n_iface, u_t_iface, u_t2_iface, pTot_L_ex, pTot_R_ex]', copyin='[norm_dir]')
+                #:set _hll_privates = 'i,j,k,l,q,alpha_rho_L,alpha_rho_R,vel_L,vel_R,alpha_L,alpha_R,tau_e_L,tau_e_R,Re_L,Re_R,s_L,s_R,s_S,Ys_L,Ys_R,xi_field_L,xi_field_R,Cp_iL,Cp_iR,Xs_L,Xs_R,Gamma_iL,Gamma_iR,Yi_avg,Phi_avg,h_iL,h_iR,h_avg_2,c_fast,pres_mag,B,Ga,vdotB,B2,b4,cm,pcorr,zcoef,vel_L_tmp,vel_R_tmp,rho_L,rho_R,pres_L,pres_R,E_L,E_R,H_L,H_R,Cp_avg,Cv_avg,T_avg,eps,c_sum_Yi_Phi,T_L,T_R,Y_L,Y_R,MW_L,MW_R,R_gas_L,R_gas_R,Cp_L,Cp_R,Cv_L,Cv_R,Gamm_L,Gamm_R,gamma_L,gamma_R,pi_inf_L,pi_inf_R,qv_L,qv_R,qv_avg,c_L,c_R,G_L,G_R,rho_avg,H_avg,c_avg,gamma_avg,ptilde_L,ptilde_R,vel_L_rms,vel_R_rms,vel_avg_rms,Ms_L,Ms_R,pres_SL,pres_SR,alpha_L_sum,alpha_R_sum,flux_tau_L,flux_tau_R,rho_HLL_ex,rhou_n_HLL_ex,rhou_t_HLL_ex,rhou_t2_HLL_ex,u_n_iface,u_t_iface,u_t2_iface,pTot_L_ex,pTot_R_ex'
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[${_hll_privates}$]', copyin='[norm_dir]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -2145,7 +2146,7 @@ contains
 
         integer :: Re_max, i, j, k, l, q !< Generic loop iterators
 
-        ! --- HLLC star-state helpers / aliases (new) ---
+        ! HLLC star-state helpers / aliases (new)
         real(wp), dimension(sys_size) :: U_L, U_R, U_star_L, U_star_R
         real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
         real(wp) :: u_n_HLLC, u_t_HLLC, u_t2_HLLC
@@ -2170,7 +2171,7 @@ contains
         integer :: mom_n, mom_t1, mom_t2
         integer :: itnn, itnt1, itnt2, itss1, itss2, itt12
 
-        ! --- ADC (HLL -> HLLC) ---
+        ! ADC (HLL -> HLLC)
         real(wp), dimension(sys_size) :: F_HLL, U_HLL
         real(wp) :: u_n_HLL_trace, u_t_HLL_trace
         real(wp) :: u_t2_HLL_trace
@@ -3300,7 +3301,9 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 else
                     ! 5-EQUATION MODEL WITH HLLC
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, flux_ene_e, U_L, U_R, U_star_L, U_star_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, denom_L, denom_R, fac_L, fac_R, rho_L_star, rho_R_star, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star, E_L_star, E_R_star, S_Mid, mom_n, mom_t1, mom_t2, itnn, itnt1, itnt2, itss1, itss2, itt12]', copyin='[is1, is2, is3]')
+                    #:set _hllc_hypo_privates = 'Re_max,i,q,T_L,T_R,vel_L_rms,vel_R_rms,pres_L,pres_R,rho_L,gamma_L,pi_inf_L,qv_L,rho_R,gamma_R,pi_inf_R,qv_R,alpha_L_sum,alpha_R_sum,E_L,E_R,MW_L,MW_R,R_gas_L,R_gas_R,Cp_L,Cp_R,Cv_L,Cv_R,Gamm_L,Gamm_R,Y_L,Y_R,H_L,H_R,qv_avg,rho_avg,gamma_avg,H_avg,c_L,c_R,c_avg,s_P,s_M,xi_P,xi_M,xi_L,xi_R,Ms_L,Ms_R,pres_SL,pres_SR,vel_L,vel_R,Re_L,Re_R,alpha_L,alpha_R,alpha_rho_L,alpha_rho_R,s_L,s_R,s_S,vel_avg_rms,pcorr,zcoef,vel_L_tmp,vel_R_tmp,Ys_L,Ys_R,Xs_L,Xs_R,Gamma_iL,Gamma_iR,Cp_iL,Cp_iR,tau_e_L,tau_e_R,xi_field_L,xi_field_R,Yi_avg,Phi_avg,h_iL,h_iR,h_avg_2,G_L,G_R,flux_ene_e'
+                    #:set _hllc_hypo_privates2 = 'U_L,U_R,U_star_L,U_star_R,F_L,F_R,F_star_L,F_star_R,F_HLLC,u_n_HLLC,u_t_HLLC,u_t2_HLLC,pres_tot_L,pres_tot_R,u_n_L,u_n_R,u_t_L,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nn_R,tau_nt_L,tau_nt_R,tau_tt_L,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,p_face,tau_qq_face,A_L,A_R,denom_A,denom_L,denom_R,fac_L,fac_R,rho_L_star,rho_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,pres_tot_star,E_L_star,E_R_star,S_Mid,mom_n,mom_t1,mom_t2,itnn,itnt1,itnt2,itss1,itss2,itt12'
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[${_hllc_hypo_privates}$,${_hllc_hypo_privates2}$]', copyin='[is1, is2, is3]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -3945,10 +3948,10 @@ contains
                                     end do
                                 end if
 
-                                ! ===== HLLC-ADC blending for hypoelasticity =====
+                                ! HLLC-ADC blending for hypoelasticity
                                 if (riemann_hypo_ADC .and. hypoelasticity) then
 
-                                    ! --- Build U_L, U_R and F_L, F_R in local-basis layout ---
+                                    ! Build U_L, U_R and F_L, F_R in local-basis layout
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         U_L(i) = alpha_rho_L(i)
@@ -4018,7 +4021,7 @@ contains
                                         F_R(strxe) = rho_R*u_n_R*tau_qq_R
                                     end if
 
-                                    ! --- Compute F_HLL and U_HLL ---
+                                    ! Compute F_HLL and U_HLL
                                     if (s_L >= 0._wp) then
                                         !$acc loop seq
                                         do i = 1, sys_size
@@ -4057,7 +4060,7 @@ contains
                                         if (p > 0) u_t2_HLL_trace = (s_R*u_t2_L - s_L*u_t2_R)/(s_R - s_L + verysmall)
                                     end if
 
-                                    ! --- ADC sensor ---
+                                    ! ADC sensor
                                     Sigma_L = pres_tot_L
                                     Sigma_R = pres_tot_R
                                     dSigma = Sigma_R - Sigma_L
@@ -4079,7 +4082,7 @@ contains
                                     sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
                                     phi = exp(-(sensor_combined**ADC_power))
 
-                                    ! --- Blend selected flux components ---
+                                    ! Blend selected flux components
                                     ! Partial densities: blend (same indices in local and physical basis)
                                     !$acc loop seq
                                     do i = 1, contxe
@@ -4133,7 +4136,7 @@ contains
                                             F_HLL(strxe) + phi*(flux_rs${XYZ}$_vf(j, k, l, strxe) - F_HLL(strxe))
                                     end if
 
-                                    ! --- Blend interface velocities (scalar HLL traces) ---
+                                    ! Blend interface velocities (scalar HLL traces)
                                     u_n_HLLC = u_n_HLL_trace + phi*(u_n_HLLC - u_n_HLL_trace)
                                     u_t_HLLC = u_t_HLL_trace + phi*(u_t_HLLC - u_t_HLL_trace)
                                     u_t2_HLLC = u_t2_HLL_trace + phi*(u_t2_HLLC - u_t2_HLL_trace)
@@ -4174,9 +4177,9 @@ contains
                                     end if
 
                                 end if
-                                ! ===== END HLLC-ADC =====
+                                ! END HLLC-ADC
 
-                                ! ! ===== Direct HLLC hypo star-state path =====
+                                ! ! Direct HLLC hypo star-state path
                                 ! if (.false. .and. hypoelasticity) then
                                 !     eps = 1e-12
 
@@ -4328,7 +4331,7 @@ contains
                                 !         u_t_HLLC = u_t_star
                                 !     end if
 
-                                !     ! === ADC BLENDING ===
+                                !     ! ADC BLENDING
 
                                 !     if (riemann_hypo_ADC) then
 
@@ -4375,7 +4378,7 @@ contains
 
                                 !     end if
 
-                                !     ! === END ADC BLENDING ===
+                                !     ! END ADC BLENDING
 
                                 !     ! Assign flux_rs to F_HLLC with the right indexing order
                                 !     do i = 1, num_fluids
@@ -4416,7 +4419,7 @@ contains
                                 !         flux_rs${XYZ}$_vf(j, k, l, strxe) = F_HLLC(strxe)
                                 !     end if
                                 ! end if
-                                ! ! ===== END HLLC hypo star-state path =====
+                                ! ! END HLLC hypo star-state path
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
@@ -4966,7 +4969,7 @@ contains
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
 
-                            ! ==================== Extract left/right primitive states ====================
+                            ! Extract left/right primitive states
 
                             do i = 1, contxe
                                 alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
@@ -5182,7 +5185,7 @@ contains
                             H%L = (E%L + pres%L)/rho%L
                             H%R = (E%R + pres%R)/rho%R
 
-                            ! ==================== Compute Riemann states ====================
+                            ! Compute Riemann states
 
                             call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H%L, alpha_L, vel_rms%L, 0._wp, c%L, qv%L)
                             call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R, qv%R)
@@ -5416,7 +5419,7 @@ contains
                                 alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - C_hat_2*(S_M - u_n_L))/(S_L - S_M)
                                 alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - C_hat_2*(S_M - u_n_R))/(S_R - S_M)
 
-                                ! ==================== Compute U ====================
+                                ! Compute U
 
                                 if (p > 0 .and. .not. cyl_coord) then
                                     ! 3D Cartesian: 14-state
@@ -5530,7 +5533,7 @@ contains
                                     U_starstarR(11) = rhoR_star*tau_qq_R_star
                                 end if
 
-                                ! ==================== Compute F and select F_HLLD ====================
+                                ! Compute F and select F_HLLD
 
                                 F_starL(1:ncomp) = F_L(1:ncomp) + S_L*(U_starL(1:ncomp) - U_L(1:ncomp))
                                 F_starR(1:ncomp) = F_R(1:ncomp) + S_R*(U_starR(1:ncomp) - U_R(1:ncomp))
@@ -5549,7 +5552,7 @@ contains
                                     F_hlld(1:ncomp) = F_R(1:ncomp)
                                 end if
 
-                                ! ==================== ADC blending (HLLD ↔ HLL) ====================
+                                ! ADC blending (HLLD / HLL)
 
                                 if (riemann_hypo_ADC) then
 
@@ -5613,7 +5616,7 @@ contains
 
                             end if
 
-                            ! ==================== Reorder F_HLLD for output ====================
+                            ! Reorder F_HLLD for output
                             if (p > 0 .and. .not. cyl_coord) then
                                 ! 3D Cartesian: 14-state → physical indices
                                 flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1)
