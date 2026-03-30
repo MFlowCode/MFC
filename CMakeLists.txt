@@ -450,13 +450,17 @@ function(MFC_SETUP_TARGET)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
         target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers)
 
-        # Exclude m_start_up from cross-file inlining: it is initialization code that
-        # triggers NVHPC 25.x fort2 ICE when too many functions are cross-inlined into it.
-        set_source_files_properties(
-            "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/m_start_up.fpp.f90"
-            TARGET_DIRECTORY ${ARGS_TARGET}
-            PROPERTIES COMPILE_OPTIONS "-Mnoinline"
-        )
+        # Exclude m_start_up and m_cbc from cross-file inlining: these are
+        # initialization/boundary code that trigger NVHPC 25.x fort2 ICE when
+        # too many functions are cross-inlined into them. GPU hot-path files
+        # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.
+        foreach(_no_inline_file m_start_up m_cbc)
+            set_source_files_properties(
+                "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
+                TARGET_DIRECTORY ${ARGS_TARGET}
+                PROPERTIES COMPILE_OPTIONS "-Mnoinline"
+            )
+        endforeach()
 
         list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
     endif()
