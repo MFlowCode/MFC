@@ -347,14 +347,12 @@ class CaseValidator:
         self.prohibit(p is not None and p > 0 and p + 1 < weno_order, f"For 3D simulation, p must be at least weno_order - 1 (= {weno_order - 1})")
 
         int_comp = self.get("int_comp", 0)
-        self.prohibit(weno_order == 1 and int_comp > 0, "int_comp requires weno_order > 1")
+        self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
+        self.prohibit(weno_order == 1 and int_comp != 0, "int_comp must be 0 (off) when weno_order = 1")
 
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
         recon_type = self.get("recon_type", 1)
-        int_comp = self.get("int_comp", 0)
-
-        self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
 
         # MUSCL_TYPE = 2
         if recon_type != 2:
@@ -373,7 +371,9 @@ class CaseValidator:
         self.prohibit(n is not None and n > 0 and n + 1 < muscl_order, f"For 2D simulation, n must be at least muscl_order - 1 (= {muscl_order - 1})")
         self.prohibit(p is not None and p > 0 and p + 1 < muscl_order, f"For 3D simulation, p must be at least muscl_order - 1 (= {muscl_order - 1})")
 
-        self.prohibit(muscl_order == 1 and int_comp > 0, "int_comp requires muscl_order > 1")
+        int_comp = self.get("int_comp", 0)
+        self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
+        self.prohibit(muscl_order == 1 and int_comp != 0, "int_comp must be 0 (off) when muscl_order = 1")
 
     def check_boundary_conditions(self):
         """Checks constraints on boundary conditions"""

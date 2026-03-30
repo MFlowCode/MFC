@@ -602,6 +602,10 @@ CONSTRAINTS = {
         "choices": [1, 2, 3, 4, 5],
         "value_labels": {1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
     },
+    "int_comp": {
+        "choices": [0, 1, 2],
+        "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
+    },
     # Time stepping
     "time_stepper": {
         "choices": [1, 2, 3],

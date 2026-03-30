@@ -308,8 +308,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0})
 
             if muscl_order == 1:
-                for int_comp in [0, 1, 2]:
-                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {"int_comp": int_comp}))
+                cases.append(define_case_d(stack, "int_comp=0", {"int_comp": 0}))
             elif muscl_order == 2:
                 for int_comp in [0, 1, 2]:
                     stack.push(f"int_comp={int_comp}", {"int_comp": int_comp})
