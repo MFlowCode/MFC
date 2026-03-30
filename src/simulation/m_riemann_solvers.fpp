@@ -5120,6 +5120,19 @@ contains
                             pTot_L = pres%L - tau_nn_L
                             pTot_R = pres%R - tau_nn_R
 
+                            ! Symmetrize total pressure when it differs only by
+                            ! floating-point roundoff. WENO reconstruction of a
+                            ! uniform field can produce slightly different L/R
+                            ! values at material interfaces due to different
+                            ! smoothness indicators. With stiff materials (G~1e9),
+                            ! even 1e-12 relative pTot asymmetry creates O(1)
+                            ! spurious stress through the HLLD star-state.
+                            if (abs(pTot_R - pTot_L) < &
+                                1e-12_wp*max(abs(pTot_L), abs(pTot_R), 1._wp)) then
+                                pTot_L = 5e-1_wp*(pTot_L + pTot_R)
+                                pTot_R = pTot_L
+                            end if
+
                             ! Sum properties of all fluid components
                             rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
                             rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
@@ -5297,6 +5310,16 @@ contains
                             denomA = (A_R - A_L)
 
                             S_M = ((pTot_R - pTot_L) + A_L*u_n_L - A_R*u_n_R)/(A_L - A_R + verysmall)
+
+                            ! Threshold S_M when it is indistinguishable from (u_n_L+u_n_R)/2
+                            ! within roundoff. Without this, the star-state stress computation
+                            ! amplifies the roundoff in S_M by O(G_hat) ≈ 1e9, producing
+                            ! O(1) spurious stress fluxes from O(1e-13) velocity differences.
+                            ! The threshold is relative to the wave speed scale |S_L|+|S_R|.
+                            if (abs(S_M - 5e-1_wp*(u_n_L + u_n_R)) < &
+                                1e-12_wp*(abs(S_L) + abs(S_R) + abs(u_n_L) + abs(u_n_R))) then
+                                S_M = 5e-1_wp*(u_n_L + u_n_R)
+                            end if
 
                             ! Degenerate wave structure: denom ~ 0 or S_M not in [S_L,S_R]
                             if (abs(denomA) < verysmall .or. &
