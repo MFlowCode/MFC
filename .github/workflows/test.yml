@@ -213,7 +213,9 @@ jobs:
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.nvhpc && 'ubuntu-22.04' || format('{0}-latest', matrix.os) }}
-    container: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda_multi-ubuntu22.04', matrix.nvhpc) || '' }}
+    container:
+      image: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda_multi-ubuntu22.04', matrix.nvhpc) || '' }}
+      options: ${{ matrix.nvhpc && '--security-opt seccomp=unconfined' || '' }}
     env:
       CC:  ${{ matrix.nvhpc && 'nvc' || '' }}
       CXX: ${{ matrix.nvhpc && 'nvc++' || '' }}
