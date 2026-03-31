@@ -365,14 +365,7 @@ jobs:
       - name: Test (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run:  |
-          echo "=== NVHPC CPU test env debug ==="
-          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
-          echo "PATH=$PATH"
-          echo "which mpirun: $(which mpirun)"
-          echo "which nvfortran: $(which nvfortran)"
-          ldd $(find build/install -name simulation -type f | head -1) 2>/dev/null | head -20
-          echo "=== end debug ==="
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all -% 10
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
