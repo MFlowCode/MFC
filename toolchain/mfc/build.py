@@ -455,7 +455,17 @@ class MFCTarget:
     def build(self, case: input.MFCInputFile):
         case.generate_fpp(self)
 
-        command = ["cmake", "--build", self.get_staging_dirpath(case), "--target", self.name, "--parallel", ARG("jobs"), "--config", "Debug" if ARG("debug") else "RelDebug" if ARG("reldebug") else "Release"]
+        command = [
+            "cmake",
+            "--build",
+            self.get_staging_dirpath(case),
+            "--target",
+            self.name,
+            "--parallel",
+            ARG("jobs"),
+            "--config",
+            "Debug" if ARG("debug") else "RelDebug" if ARG("reldebug") else "Release",
+        ]
 
         verbosity = ARG("verbose")
         # -vv or higher: add cmake --verbose flag for full compiler commands
