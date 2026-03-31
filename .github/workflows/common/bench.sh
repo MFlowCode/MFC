@@ -21,18 +21,18 @@ if [ "$job_cluster" = "phoenix" ]; then
     trap 'rm -rf "$currentdir" || true' EXIT
 fi
 
-# --- Build (if not pre-built on login node) ---
-# Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
+# --- Build ---
+# Phoenix builds everything inside SLURM (no login-node build step).
+# Frontier/Frontier AMD: deps already fetched on login node via --deps-only;
+# source code is built here on the compute node.
 # Phoenix: always nuke stale builds (heterogeneous compute nodes → ISA mismatch risk).
 if [ "$job_cluster" = "phoenix" ]; then
     source .github/scripts/clean-build.sh
     clean_build
 fi
 
-if [ ! -d "build" ]; then
-    source .github/scripts/retry-build.sh
-    retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
-fi
+source .github/scripts/retry-build.sh
+retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 
 # --- Bench cluster flag ---
 if [ "$job_cluster" = "phoenix" ]; then
