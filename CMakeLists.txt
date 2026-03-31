@@ -221,6 +221,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
                 "SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O1"
+                "SHELL: -h msgs" "SHELL: -h msglevel_0" "SHELL: -h style"
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O1")
     endif()
@@ -231,13 +232,21 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
         $<$<COMPILE_LANGUAGE:Fortran>:-Mpreprocess>
         $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
     )
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wunused>
+        )
+    endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-g -Og -traceback -debug -check all)
+        add_compile_options(-g -Og -traceback -debug -check all -warn all)
     elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
-        add_compile_options(-g -Og -traceback -check bounds)
+        add_compile_options(-g -Og -traceback -check bounds -warn all)
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
@@ -262,6 +271,8 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
             $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mstandard>
         )
     endif()
 
