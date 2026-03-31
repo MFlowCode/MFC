@@ -21,7 +21,7 @@ gh_list_runners() {
 
 # Get a registration token for new runners.
 gh_registration_token() {
-    gh api "orgs/$ORG/actions/runners/registration-token" --jq .token
+    gh api "orgs/$ORG/actions/runners/registration-token" -X POST --jq .token
 }
 
 # Get the latest runner binary version.
@@ -65,6 +65,7 @@ find_pids() {
     ssh $SSH_OPTS "$1" '
         for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
             exe=$(readlink -f /proc/$p/exe 2>/dev/null || true)
+            exe=${exe% (deleted)}
             [ "$exe" = "'"$2"'/bin/Runner.Listener" ] && echo "$p"
         done
     ' 2>/dev/null | grep -E '^[0-9]+$' | tr '\n' ' ' || true
