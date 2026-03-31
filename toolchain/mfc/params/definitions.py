@@ -216,6 +216,8 @@ _SIMPLE_DESCS = {
     "ib_state_wrt": "Write IB state and load data",
     # Misc
     "case_dir": "Case directory path",
+    "files_dir": "The relative path to the directory containing the extrusion IC files",
+    "file_extension": "The last 6 digits of the extrusion IC files prim.XX.YY.123456.dat",
     "cantera_file": "Cantera mechanism file",
     "num_ibs": "Number of immersed boundaries",
     "num_source": "Number of acoustic sources",
@@ -1031,6 +1033,8 @@ def _load():
     ]:
         _r(n, LOG)
     _r("case_dir", STR)
+    _r("file_extension",STR)
+    _r("files_dir",STR)
 
     # Body force
     for d in ["x", "y", "z"]:

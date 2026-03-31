@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # Reference: An improved high-order scheme for DNS of low Mach number turbulent reacting flows based on stiff chemistry solver, 4.3
-import json
 import argparse
+import json
 import math
 import os
+
 import cantera as ct
 
 current_dir = os.path.dirname(os.path.abspath(__file__))

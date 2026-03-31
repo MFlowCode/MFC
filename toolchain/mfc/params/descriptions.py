@@ -143,6 +143,8 @@ DESCRIPTIONS = {
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
     # Misc
     "case_dir": "Case directory path",
+    "files_dir": "The relative path to the directory containing the extrusion IC files",
+    "file_extension": "The last 6 digits of the extrusion files prim.XX.YY.123456.dat",
     "cantera_file": "Cantera mechanism file for chemistry",
     "old_grid": "Use grid from previous simulation",
     "old_ic": "Use initial conditions from previous simulation",

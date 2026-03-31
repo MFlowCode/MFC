@@ -42,6 +42,8 @@ _FALLBACK_PARAMS = {
         "down_sample",
         "elliptic_smoothing",
         "elliptic_smoothing_iters",
+        "files_dir",
+        "files_extention",
         "fft_wrt",
         "file_per_process",
         "fluid_pp",

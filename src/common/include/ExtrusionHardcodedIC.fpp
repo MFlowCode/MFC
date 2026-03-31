@@ -61,7 +61,7 @@
         max_files = merge(sys_size, sys_size - 1, num_dims == 1)
         do f = 1, max_files
             write (file_num_str, '(I0)') f
-            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
+            fileNames(f) = trim(files_dir)//"/"//"prim."//trim(file_num_str)//".00."//trim(file_extension)//".dat"
         end do
 
         ! Common file reading setup
@@ -100,7 +100,7 @@
             ! Calculate offsets
             domain_xstart = x_coords(1)
             x_step = x_cc(1) - x_cc(0)
-            delta_x = merge(x_cc(0) - domain_xstart + x_step/2.0, &
+            delta_x = merge(x_cc(0) - domain_xstart, &
                             x_cc(index_x) - domain_xstart + x_step/2.0, num_dims == 1)
             global_offset_x = nint(abs(delta_x)/x_step)
 

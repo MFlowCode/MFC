@@ -309,7 +309,7 @@
         @: HardcodedReadValues()
 
     case (271)
-       !2D Premixed flame vortex interaction
+        !2D Premixed flame vortex interaction
 
         @: HardcodedReadValues()
         x1c = 0.0027_wp
@@ -328,7 +328,7 @@
         v2c = -cvortex*((x_cc(i) - x2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
         q_prim_vf(momxb)%sf(i, j, 0) = q_prim_vf(momxb)%sf(i, j, 0) + u1c + u2c
         q_prim_vf(momxe)%sf(i, j, 0) = v1c + v2c
-    
+
     case (272)
         !2D Premixed Flame Instabillity
 
@@ -364,12 +364,12 @@
                 end if
             end do
 
-        interp_wt = (x_mapped - x_coords(idx_lo))/(x_coords(idx_hi) - x_coords(idx_lo))   
+            interp_wt = (x_mapped - x_coords(idx_lo))/(x_coords(idx_hi) - x_coords(idx_lo))
 
-        do v = 1, sys_size - 1
+            do v = 1, sys_size - 1
                 q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = (1.0_wp - interp_wt)*stored_values(idx_lo, 1, v) &
                                                                      + interp_wt*stored_values(idx_hi, 1, v)
-        end do
+            end do
             q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
         end if
 
