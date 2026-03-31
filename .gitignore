@@ -51,6 +51,7 @@ docs/simulation/readme.md
 docs/post_process/readme.md
 docs/api/readme.md
 
+examples/**/IC/*.dat
 examples/*batch/*/
 examples/**/D/*
 examples/**/p*
