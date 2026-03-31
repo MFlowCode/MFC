@@ -204,13 +204,20 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
 
     add_link_options("SHELL:-hkeepfiles")
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
                 "SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0"
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0")
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(
+                "SHELL:-h acc_model=auto_async_none"
+                "SHELL: -h acc_model=no_fast_addr"
+                "SHELL: -g" "SHELL: -O1"
+        )
+        add_link_options("SHELL: -g" "SHELL: -O1")
     endif()
 
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
@@ -222,8 +229,10 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
-        add_compile_options(-g -Og -traceback -debug)
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(-g -Og -traceback -debug -check all)
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(-g -Og -traceback -check bounds)
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
@@ -233,13 +242,20 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
             $<$<COMPILE_LANGUAGE:Fortran>:-C>
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
             $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
+        )
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
+            $<$<COMPILE_LANGUAGE:Fortran>:-g>
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
     endif()
