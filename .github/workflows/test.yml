@@ -346,7 +346,7 @@ jobs:
       - name: Test (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run:  |
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all -% 10
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
