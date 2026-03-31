@@ -178,12 +178,25 @@ jobs:
             intel: false
 
           # NVHPC compiler matrix (CPU build+test, GPU build-only)
+          # Every release from 23.11 through 26.3 (current)
           - { nvhpc: '23.11', target: cpu }
           - { nvhpc: '23.11', target: gpu-acc }
           - { nvhpc: '23.11', target: gpu-omp }
+          - { nvhpc: '24.1',  target: cpu }
+          - { nvhpc: '24.1',  target: gpu-acc }
+          - { nvhpc: '24.1',  target: gpu-omp }
+          - { nvhpc: '24.3',  target: cpu }
+          - { nvhpc: '24.3',  target: gpu-acc }
+          - { nvhpc: '24.3',  target: gpu-omp }
           - { nvhpc: '24.5',  target: cpu }
           - { nvhpc: '24.5',  target: gpu-acc }
           - { nvhpc: '24.5',  target: gpu-omp }
+          - { nvhpc: '24.7',  target: cpu }
+          - { nvhpc: '24.7',  target: gpu-acc }
+          - { nvhpc: '24.7',  target: gpu-omp }
+          - { nvhpc: '24.9',  target: cpu }
+          - { nvhpc: '24.9',  target: gpu-acc }
+          - { nvhpc: '24.9',  target: gpu-omp }
           - { nvhpc: '24.11', target: cpu }
           - { nvhpc: '24.11', target: gpu-acc }
           - { nvhpc: '24.11', target: gpu-omp }
@@ -199,6 +212,12 @@ jobs:
           - { nvhpc: '25.7',  target: cpu }
           - { nvhpc: '25.7',  target: gpu-acc }
           - { nvhpc: '25.7',  target: gpu-omp }
+          - { nvhpc: '25.9',  target: cpu }
+          - { nvhpc: '25.9',  target: gpu-acc }
+          - { nvhpc: '25.9',  target: gpu-omp }
+          - { nvhpc: '25.11', target: cpu }
+          - { nvhpc: '25.11', target: gpu-acc }
+          - { nvhpc: '25.11', target: gpu-omp }
           - { nvhpc: '26.1',  target: cpu }
           - { nvhpc: '26.1',  target: gpu-acc }
           - { nvhpc: '26.1',  target: gpu-omp }
