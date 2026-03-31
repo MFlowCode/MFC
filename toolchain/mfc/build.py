@@ -383,9 +383,9 @@ class MFCTarget:
             # build the configured targets. This is mostly useful for debugging.
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html.
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-            # Set build type (e.g Debug, Release, etc.).
+            # Set build type (Debug, RelDebug, or Release).
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
-            f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'Release'}",
+            f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'RelDebug' if ARG('reldebug') else 'Release'}",
             # Used by FIND_PACKAGE (/FindXXX) to search for packages, with the
             # second highest level of priority, still letting users manually
             # specify <PackageName>_ROOT, which has precedence over CMAKE_PREFIX_PATH.
@@ -455,7 +455,7 @@ class MFCTarget:
     def build(self, case: input.MFCInputFile):
         case.generate_fpp(self)
 
-        command = ["cmake", "--build", self.get_staging_dirpath(case), "--target", self.name, "--parallel", ARG("jobs"), "--config", "Debug" if ARG("debug") else "Release"]
+        command = ["cmake", "--build", self.get_staging_dirpath(case), "--target", self.name, "--parallel", ARG("jobs"), "--config", "Debug" if ARG("debug") else "RelDebug" if ARG("reldebug") else "Release"]
 
         verbosity = ARG("verbose")
         # -vv or higher: add cmake --verbose flag for full compiler commands

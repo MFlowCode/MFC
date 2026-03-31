@@ -38,6 +38,12 @@ if (MFC_ALL)
     set(MFC_DOCUMENTATION ON FORCE)
 endif()
 
+# RelDebug: a lighter debug mode for CI. Compiler-specific blocks below add the
+# actual flags; these defaults just tell CMake it is a recognised build type.
+set(CMAKE_C_FLAGS_RELDEBUG       "-g" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_RELDEBUG     "-g" CACHE STRING "")
+set(CMAKE_Fortran_FLAGS_RELDEBUG "-g" CACHE STRING "")
+
 if (MFC_SINGLE_PRECISION)
     add_compile_definitions(MFC_SINGLE_PRECISION)
 else()
@@ -83,7 +89,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         message(FATAL_ERROR "ERROR: When using NVHPC, v21.7 or newer is required to build MFC.\n${__err_msg}")
     endif()
 
-    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 24.5) AND (CMAKE_BUILD_TYPE STREQUAL "Debug") AND MFC_OpenACC)
+    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 24.5) AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug") AND MFC_OpenACC)
         message(FATAL_ERROR "ERROR: When using NVHPC, MFC with Debug and GPU options requires NVHPC v24.5 or newer.\n${__err_msg}")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
@@ -151,10 +157,9 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
-            -Og
             -Wall
             -Wextra
-            -fcheck=bounds
+            -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
             -fsignaling-nans
@@ -165,6 +170,18 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -Wunderflow
             -Wrealloc-lhs
             -Wsurprising
+	    )
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(
+            -Og
+            -Wall
+            -Wextra
+            -fcheck=bounds
+            -fbacktrace
+            -fimplicit-none
+            -fsignaling-nans
+            -finit-real=snan
+            -finit-integer=-99999999
 	    )
     endif()
 
@@ -186,7 +203,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
 
     add_link_options("SHELL:-hkeepfiles")
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
@@ -204,7 +221,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
         add_compile_options(-g -Og -traceback -debug)
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
@@ -215,7 +232,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
             $<$<COMPILE_LANGUAGE:Fortran>:-C>
@@ -282,7 +299,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
     add_compile_definitions(MFC_DEBUG)
 endif()
 
@@ -596,7 +613,7 @@ function(MFC_SETUP_TARGET)
                     )
                 endif()
 
-                if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+                if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
                     target_compile_options(${a_target}
                         PRIVATE -gpu=debug
                     )
