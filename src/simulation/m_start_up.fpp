@@ -830,9 +830,8 @@ contains
     !> Initialize all simulation sub-modules in the required dependency order
     impure subroutine s_initialize_modules
 
-        integer  :: m_ds, n_ds, p_ds
-        integer  :: i, j, k, l, x_id, y_id, z_id, ix, iy, iz
-        real(wp) :: temp1, temp2, temp3, temp4
+        integer :: m_ds, n_ds, p_ds
+        integer :: i
 
         call s_initialize_global_parameters_module()
         #:if USING_AMD

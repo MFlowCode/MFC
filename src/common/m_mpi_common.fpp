@@ -101,7 +101,6 @@ contains
         type(integer_field), optional, intent(in)           :: ib_markers
         type(scalar_field), intent(in), optional            :: beta
         integer, dimension(num_dims)                        :: sizes_glb, sizes_loc
-        integer, dimension(1)                               :: airfoil_glb, airfoil_loc, airfoil_start
 
 #ifdef MFC_MPI
         integer :: i, j
@@ -180,11 +179,11 @@ contains
     subroutine s_initialize_mpi_data_ds(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, dimension(num_dims)                        :: sizes_glb, sizes_loc
+        integer, dimension(num_dims)                        :: sizes_loc
         integer, dimension(3)                               :: sf_start_idx
 
 #ifdef MFC_MPI
-        integer :: i, j, q, k, l, m_ds, n_ds, p_ds, ierr
+        integer :: i, m_ds, n_ds, p_ds, ierr
 
         sf_start_idx = (/0, 0, 0/)
 
