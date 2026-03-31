@@ -14,7 +14,8 @@ This guide covers debugging tools, common issues, and troubleshooting workflows 
 | `-vv` | build, run, test | Full compiler/cmake output |
 | `-vvv` | build | Add cmake dependency debugging |
 | `-d` | all | Write debug log to file |
-| `--debug` | build | Build with debug symbols |
+| `--debug` | build | Full debug: all runtime checks, `-O0` |
+| `--reldebug` | build | Lightweight debug: bounds+pointer checks, `-Og`/`-O1` |
 | `--gcov` | build | Build with code coverage |
 | `--no-gpu` | build | Disable GPU to isolate issues |
 | `--no-mpi` | build | Disable MPI to isolate issues |
@@ -126,17 +127,38 @@ MFC supports three verbosity levels for builds:
 
 ### Debug Builds
 
-Build with debug symbols for better error messages and debugging:
+MFC has two debug build modes:
+
+**Full Debug** (`--debug`) — for local development and deep investigation:
 
 ```bash
 ./mfc.sh build --debug
 ```
 
-This sets `CMAKE_BUILD_TYPE=Debug`, which:
-- Adds `-g` debug symbols
-- Reduces optimization (`-O0` or `-O1`)
-- Enables runtime checks in some compilers
-- Makes stack traces more readable
+Sets `CMAKE_BUILD_TYPE=Debug`. Enables all runtime checks (`-fcheck=all` on gfortran,
+`-C` on NVHPC, `-K trap=fp` on Cray, `-check all` on Intel), disables optimization
+(`-O0`), and adds debug symbols. Catches the widest range of bugs but runs ~5x slower
+than Release.
+
+**RelDebug** (`--reldebug`) — lightweight debug used by CI:
+
+```bash
+./mfc.sh build --reldebug
+```
+
+Sets `CMAKE_BUILD_TYPE=RelDebug`. Keeps the most valuable runtime checks (bounds,
+pointer, FP traps) and compile-time warnings, but uses `-Og`/`-O1` instead of `-O0`
+and drops the expensive `do`, `mem`, and `recursion` checks. Runs ~2x faster than
+full Debug while catching most real bugs.
+
+| Compiler | Full Debug (`--debug`) | RelDebug (`--reldebug`) |
+|----------|----------------------|------------------------|
+| gfortran | `-O0 -fcheck=all,no-array-temps` | `-Og -fcheck=bounds,pointer` |
+| Intel ifx | `-Og -check all` | `-Og -check bounds` |
+| NVHPC | `-O0 -C -Mbounds` | `-O1 -Mbounds` |
+| Cray ftn | `-O0 -K trap=fp` | `-O1 -K trap=fp` |
+
+Both modes define `MFC_DEBUG` and enable debug logging via `@:LOG()`.
 
 ### Code Coverage
 
