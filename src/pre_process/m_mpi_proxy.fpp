@@ -36,7 +36,7 @@ contains
 
         ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-        
+
         call MPI_BCAST(files_dir, len(files_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(file_extension, len(file_extension), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
