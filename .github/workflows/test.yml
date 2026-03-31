@@ -178,60 +178,33 @@ jobs:
             intel: false
 
           # NVHPC compiler matrix (CPU build+test, GPU build-only)
-          - nvhpc: '23.11'
-            target: cpu
-          - nvhpc: '23.11'
-            target: gpu-acc
-          - nvhpc: '23.11'
-            target: gpu-omp
-          - nvhpc: '24.5'
-            target: cpu
-          - nvhpc: '24.5'
-            target: gpu-acc
-          - nvhpc: '24.5'
-            target: gpu-omp
-          - nvhpc: '24.11'
-            target: cpu
-          - nvhpc: '24.11'
-            target: gpu-acc
-          - nvhpc: '24.11'
-            target: gpu-omp
-          - nvhpc: '25.1'
-            target: cpu
-          - nvhpc: '25.1'
-            target: gpu-acc
-          - nvhpc: '25.1'
-            target: gpu-omp
-          - nvhpc: '25.3'
-            target: cpu
-          - nvhpc: '25.3'
-            target: gpu-acc
-          - nvhpc: '25.3'
-            target: gpu-omp
-          - nvhpc: '25.5'
-            target: cpu
-          - nvhpc: '25.5'
-            target: gpu-acc
-          - nvhpc: '25.5'
-            target: gpu-omp
-          - nvhpc: '25.7'
-            target: cpu
-          - nvhpc: '25.7'
-            target: gpu-acc
-          - nvhpc: '25.7'
-            target: gpu-omp
-          - nvhpc: '26.1'
-            target: cpu
-          - nvhpc: '26.1'
-            target: gpu-acc
-          - nvhpc: '26.1'
-            target: gpu-omp
-          - nvhpc: '26.3'
-            target: cpu
-          - nvhpc: '26.3'
-            target: gpu-acc
-          - nvhpc: '26.3'
-            target: gpu-omp
+          - { nvhpc: '23.11', target: cpu }
+          - { nvhpc: '23.11', target: gpu-acc }
+          - { nvhpc: '23.11', target: gpu-omp }
+          - { nvhpc: '24.5',  target: cpu }
+          - { nvhpc: '24.5',  target: gpu-acc }
+          - { nvhpc: '24.5',  target: gpu-omp }
+          - { nvhpc: '24.11', target: cpu }
+          - { nvhpc: '24.11', target: gpu-acc }
+          - { nvhpc: '24.11', target: gpu-omp }
+          - { nvhpc: '25.1',  target: cpu }
+          - { nvhpc: '25.1',  target: gpu-acc }
+          - { nvhpc: '25.1',  target: gpu-omp }
+          - { nvhpc: '25.3',  target: cpu }
+          - { nvhpc: '25.3',  target: gpu-acc }
+          - { nvhpc: '25.3',  target: gpu-omp }
+          - { nvhpc: '25.5',  target: cpu }
+          - { nvhpc: '25.5',  target: gpu-acc }
+          - { nvhpc: '25.5',  target: gpu-omp }
+          - { nvhpc: '25.7',  target: cpu }
+          - { nvhpc: '25.7',  target: gpu-acc }
+          - { nvhpc: '25.7',  target: gpu-omp }
+          - { nvhpc: '26.1',  target: cpu }
+          - { nvhpc: '26.1',  target: gpu-acc }
+          - { nvhpc: '26.1',  target: gpu-omp }
+          - { nvhpc: '26.3',  target: cpu }
+          - { nvhpc: '26.3',  target: gpu-acc }
+          - { nvhpc: '26.3',  target: gpu-omp }
 
       fail-fast: false
     continue-on-error: true
