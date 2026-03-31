@@ -222,6 +222,8 @@ jobs:
       FC:  ${{ matrix.nvhpc && 'nvfortran' || '' }}
       OMPI_ALLOW_RUN_AS_ROOT:         ${{ matrix.nvhpc && '1' || '' }}
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: ${{ matrix.nvhpc && '1' || '' }}
+      PMIX_MCA_gds:                   ${{ matrix.nvhpc && 'hash' || '' }}
+      OMPI_MCA_hwloc_base_binding_policy: ${{ matrix.nvhpc && 'none' || '' }}
 
     steps:
       - name: Git safe directory
