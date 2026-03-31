@@ -21,6 +21,8 @@ module m_thinc
     use openacc
 #endif
 
+    implicit none
+
     private; public :: s_initialize_thinc_module, s_thinc_compression, s_compute_mthinc_normals, s_finalize_thinc_module
 
     !> 3-point Gauss-Legendre quadrature on [-1/2, 1/2]
@@ -162,9 +164,9 @@ contains
         do iter = 1, 30
             V = f_mthinc_volume_integral(n1, n2, n3, d, beta, ndim)
             residual = V - alpha_cell
-            if (abs(residual) < 1e-14_wp) exit
+            if (abs(residual) < verysmall) exit
             dV = f_mthinc_volume_integral_dd(n1, n2, n3, d, beta, ndim)
-            if (abs(dV) < 1e-14_wp) exit
+            if (abs(dV) < verysmall) exit
             d = d - residual/dV
         end do
 
@@ -289,7 +291,7 @@ contains
                             mthinc_nhat(2, j, k, l) = nr_y
                             mthinc_nhat(3, j, k, l) = nr_z
 
-                            mthinc_d(j, k, l) = f_mthinc_solve_d(nr_x, nr_y, nr_z, ic_beta, real(ac, wp), num_dims)
+                            mthinc_d(j, k, l) = f_mthinc_solve_d(nr_x, nr_y, nr_z, ic_beta, ac, num_dims)
                         end if
                     end if
                 end do

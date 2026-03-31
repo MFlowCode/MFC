@@ -346,10 +346,6 @@ class CaseValidator:
         self.prohibit(n is not None and n > 0 and n + 1 < weno_order, f"For 2D simulation, n must be at least weno_order - 1 (= {weno_order - 1})")
         self.prohibit(p is not None and p > 0 and p + 1 < weno_order, f"For 3D simulation, p must be at least weno_order - 1 (= {weno_order - 1})")
 
-        int_comp = self.get("int_comp", 0)
-        self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
-        self.prohibit(weno_order == 1 and int_comp != 0, "int_comp must be 0 (off) when weno_order = 1")
-
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
         recon_type = self.get("recon_type", 1)
@@ -371,9 +367,20 @@ class CaseValidator:
         self.prohibit(n is not None and n > 0 and n + 1 < muscl_order, f"For 2D simulation, n must be at least muscl_order - 1 (= {muscl_order - 1})")
         self.prohibit(p is not None and p > 0 and p + 1 < muscl_order, f"For 3D simulation, p must be at least muscl_order - 1 (= {muscl_order - 1})")
 
+    def check_interface_compression(self):
+        """Check constraints regarding interface compression"""
         int_comp = self.get("int_comp", 0)
+        n = self.get("n", 0)
         self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
-        self.prohibit(muscl_order == 1 and int_comp != 0, "int_comp must be 0 (off) when muscl_order = 1")
+        self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
+
+        recon_type = self.get("recon_type", 1)
+        if recon_type == 1:  # WENO
+            weno_order = self.get("weno_order")
+            self.prohibit(weno_order == 1 and int_comp != 0, "int_comp must be 0 (off) when weno_order = 1")
+        elif recon_type == 2:  # MUSCL
+            muscl_order = self.get("muscl_order")
+            self.prohibit(muscl_order == 1 and int_comp != 0, "int_comp must be 0 (off) when muscl_order = 1")
 
     def check_boundary_conditions(self):
         """Checks constraints on boundary conditions"""
@@ -880,6 +887,7 @@ class CaseValidator:
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         probe_wrt = self.get("probe_wrt", "F") == "T"
+        int_comp = self.get("int_comp", 0)
 
         self.prohibit(num_igr_iters is not None and num_igr_iters < 0, "num_igr_iters must be greater than or equal to 0")
         self.prohibit(num_igr_warm_start_iters is not None and num_igr_warm_start_iters < 0, "num_igr_warm_start_iters must be greater than or equal to 0")
@@ -898,6 +906,7 @@ class CaseValidator:
         self.prohibit(hyperelasticity, "IGR does not support hyperelasticity")
         self.prohibit(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt, "IGR does not support probe writes")
+        self.prohibit(int_comp > 0, "IGR does not support int_comp > 0")
 
         # Check BCs - IGR does not support characteristic BCs
         # Characteristic BCs are BC_CHAR_SLIP_WALL (-5) through BC_CHAR_SUP_OUTFLOW (-12)
@@ -2002,6 +2011,7 @@ class CaseValidator:
         self.check_riemann_solver()
         self.check_weno_simulation()
         self.check_muscl_simulation()
+        self.check_interface_compression()
         self.check_model_eqns_simulation()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
