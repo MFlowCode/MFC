@@ -14,7 +14,6 @@ esac
 
 job_device=$1
 job_interface=$2
-run_bench=$3
 source .github/scripts/gpu-opts.sh
 build_opts="$gpu_opts"
 
@@ -24,8 +23,4 @@ source .github/scripts/clean-build.sh
 clean_build
 
 source .github/scripts/retry-build.sh
-if [ "$run_bench" == "bench" ]; then
-    retry_build ./mfc.sh build -j 8 $build_opts || exit 1
-else
-    retry_build ./mfc.sh test -v -a --dry-run $([ "$cluster_name" = "frontier" ] && echo "--rdma-mpi") -j 8 $build_opts || exit 1
-fi
+retry_build ./mfc.sh build --deps-only -j 8 $build_opts || exit 1
