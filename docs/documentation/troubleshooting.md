@@ -14,8 +14,8 @@ This guide covers debugging tools, common issues, and troubleshooting workflows 
 | `-vv` | build, run, test | Full compiler/cmake output |
 | `-vvv` | build | Add cmake dependency debugging |
 | `-d` | all | Write debug log to file |
-| `--debug` | build | Full debug: all runtime checks, `-O0` |
-| `--reldebug` | build | Lightweight debug: bounds+pointer checks, `-Og`/`-O1` |
+| `--debug` | build | Full debug: all runtime checks, minimal optimization |
+| `--reldebug` | build | Lightweight debug: key runtime checks, `-Og`/`-O1` |
 | `--gcov` | build | Build with code coverage |
 | `--no-gpu` | build | Disable GPU to isolate issues |
 | `--no-mpi` | build | Disable MPI to isolate issues |
@@ -136,9 +136,9 @@ MFC has two debug build modes:
 ```
 
 Sets `CMAKE_BUILD_TYPE=Debug`. Enables all runtime checks (`-fcheck=all` on gfortran,
-`-C` on NVHPC, `-K trap=fp` on Cray, `-check all` on Intel), disables optimization
-(`-O0`), and adds debug symbols. Catches the widest range of bugs but runs ~5x slower
-than Release.
+`-C` on NVHPC, `-K trap=fp` on Cray, `-check all` on Intel), minimizes optimization
+(`-O0` or `-Og`), and adds debug symbols. Catches the widest range of bugs but runs
+~5x slower than Release.
 
 **RelDebug** (`--reldebug`) — lightweight debug used by CI:
 
@@ -146,10 +146,11 @@ than Release.
 ./mfc.sh build --reldebug
 ```
 
-Sets `CMAKE_BUILD_TYPE=RelDebug`. Keeps the most valuable runtime checks (bounds,
-pointer, FP traps) and compile-time warnings, but uses `-Og`/`-O1` instead of `-O0`
-and drops the expensive `do`, `mem`, and `recursion` checks. Runs ~2x faster than
-full Debug while catching most real bugs.
+Sets `CMAKE_BUILD_TYPE=RelDebug`. Keeps key runtime checks (compiler-dependent: bounds
+and/or pointer checking, FP traps) and compile-time warnings, but uses `-Og`/`-O1`
+and drops expensive checks like `do`, `mem`, and `recursion`. Runs ~2x faster than
+full Debug while catching most real bugs. See the table below for exact flags per
+compiler.
 
 | Compiler | Full Debug (`--debug`) | RelDebug (`--reldebug`) |
 |----------|----------------------|------------------------|
