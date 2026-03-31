@@ -5,43 +5,37 @@
 !> @brief Perturbs initial mean flow fields with random noise, mixing-layer instabilities, or simplex noise
 module m_perturbation
 
-    use m_derived_types         ! Definitions of the derived types
-
-    use m_global_parameters     ! Global parameters for the code
-
-    use m_mpi_proxy              !< Message passing interface (MPI) module proxy
-
-    use m_boundary_common   ! Boundary conditions module
-
+    use m_derived_types
+    use m_global_parameters
+    use m_mpi_proxy
+    use m_boundary_common
     use m_helper
-
     use m_simplex_noise
-
     use ieee_arithmetic
 
     implicit none
 
-    real(wp), allocatable, dimension(:, :, :, :) :: q_prim_temp
+    real(wp), allocatable, dimension(:,:,:,:) :: q_prim_temp
 
 contains
 
-    !> @brief Allocates the temporary primitive variable array used by elliptic smoothing.
+    !> Allocate the temporary primitive variable array used by elliptic smoothing.
     impure subroutine s_initialize_perturbation_module()
 
         if (elliptic_smoothing) then
-            allocate (q_prim_temp(0:m, 0:n, 0:p, 1:sys_size))
+            allocate (q_prim_temp(0:m,0:n,0:p,1:sys_size))
         end if
 
     end subroutine s_initialize_perturbation_module
 
-    !> @brief Randomly perturbs partial density fields at the interface of a spherical volume fraction region.
+    !> Randomly perturb partial density fields at the interface of a spherical volume fraction region.
     impure subroutine s_perturb_sphere(q_prim_vf)
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer :: i, j, k, l !< generic loop operators
+        integer                                                :: i, j, k, l
+        real(wp)                                               :: perturb_alpha
+        real(wp)                                               :: rand_real
 
-        real(wp) :: perturb_alpha
-
-        real(wp) :: rand_real
         call random_seed()
 
         do k = 0, p
@@ -51,15 +45,12 @@ contains
 
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
-                    ! Perturb partial density fields to match perturbed volume fraction fields
-                    !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
+                    ! Perturb partial density fields to match perturbed volume fraction fields when the volume fraction is not near
+                    ! 0 or 1
                     if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
-
-                        ! Derive new partial densities
                         do l = 1, num_fluids
                             q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
                         end do
-
                     end if
                 end do
             end do
@@ -67,16 +58,16 @@ contains
 
     end subroutine s_perturb_sphere
 
-    !> @brief Adds random noise to the velocity and void fraction of the surrounding flow field.
+    !> Add random noise to the velocity and void fraction of the surrounding flow field.
     impure subroutine s_perturb_surrounding_flow(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer :: i, j, k !<  generic loop iterators
 
-        real(wp) :: perturb_alpha
-        real(wp) :: rand_real
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer                                                :: i, j, k
+        real(wp)                                               :: perturb_alpha
+        real(wp)                                               :: rand_real
+
         call random_seed()
 
-        ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -91,17 +82,17 @@ contains
                 end do
             end do
         end do
+
     end subroutine s_perturb_surrounding_flow
 
-    !> @brief Iteratively smooths all primitive variable fields using a discrete elliptic (Laplacian) filter.
+    !> Iteratively smooth all primitive variable fields using a discrete elliptic (Laplacian) filter.
     impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        integer :: i, j, k, l, q
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_prim_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters
-
             ! Communication of buffer regions and apply boundary conditions
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf)
 
@@ -109,19 +100,17 @@ contains
             if (n == 0) then
                 do j = 0, m
                     do i = 1, sys_size
-                        q_prim_temp(j, 0, 0, i) = (1._wp/4._wp)* &
-                                                  (q_prim_vf(i)%sf(j + 1, 0, 0) + q_prim_vf(i)%sf(j - 1, 0, 0) + &
-                                                   2._wp*q_prim_vf(i)%sf(j, 0, 0))
+                        q_prim_temp(j, 0, 0, i) = (1._wp/4._wp)*(q_prim_vf(i)%sf(j + 1, 0, 0) + q_prim_vf(i)%sf(j - 1, 0, &
+                                    & 0) + 2._wp*q_prim_vf(i)%sf(j, 0, 0))
                     end do
                 end do
             else if (p == 0) then
                 do k = 0, n
                     do j = 0, m
                         do i = 1, sys_size
-                            q_prim_temp(j, k, 0, i) = (1._wp/8._wp)* &
-                                                      (q_prim_vf(i)%sf(j + 1, k, 0) + q_prim_vf(i)%sf(j - 1, k, 0) + &
-                                                       q_prim_vf(i)%sf(j, k + 1, 0) + q_prim_vf(i)%sf(j, k - 1, 0) + &
-                                                       4._wp*q_prim_vf(i)%sf(j, k, 0))
+                            q_prim_temp(j, k, 0, i) = (1._wp/8._wp)*(q_prim_vf(i)%sf(j + 1, k, 0) + q_prim_vf(i)%sf(j - 1, k, &
+                                        & 0) + q_prim_vf(i)%sf(j, k + 1, 0) + q_prim_vf(i)%sf(j, k - 1, &
+                                        & 0) + 4._wp*q_prim_vf(i)%sf(j, k, 0))
                         end do
                     end do
                 end do
@@ -130,11 +119,10 @@ contains
                     do k = 0, n
                         do j = 0, m
                             do i = 1, sys_size
-                                q_prim_temp(j, k, l, i) = (1._wp/12._wp)* &
-                                                          (q_prim_vf(i)%sf(j + 1, k, l) + q_prim_vf(i)%sf(j - 1, k, l) + &
-                                                           q_prim_vf(i)%sf(j, k + 1, l) + q_prim_vf(i)%sf(j, k - 1, l) + &
-                                                           q_prim_vf(i)%sf(j, k, l + 1) + q_prim_vf(i)%sf(j, k, l - 1) + &
-                                                           6._wp*q_prim_vf(i)%sf(j, k, l))
+                                q_prim_temp(j, k, l, i) = (1._wp/12._wp)*(q_prim_vf(i)%sf(j + 1, k, l) + q_prim_vf(i)%sf(j - 1, &
+                                            & k, l) + q_prim_vf(i)%sf(j, k + 1, l) + q_prim_vf(i)%sf(j, k - 1, &
+                                            & l) + q_prim_vf(i)%sf(j, k, l + 1) + q_prim_vf(i)%sf(j, k, &
+                                            & l - 1) + 6._wp*q_prim_vf(i)%sf(j, k, l))
                             end do
                         end do
                     end do
@@ -155,16 +143,15 @@ contains
 
     end subroutine s_elliptic_smoothing
 
-    !> @brief Perturbs velocity and volume fraction fields using multi-octave simplex noise.
+    !> Perturb velocity and volume fraction fields using multi-octave simplex noise.
     subroutine s_perturb_simplex(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp) :: mag, freq, scale, vel_rsm
-        real(wp), dimension(:, :), allocatable :: ofs
-        integer :: nOffsets
-        real(wp) :: xl, yl, zl
-
-        integer :: i, j, k, l, q
+        real(wp)                                               :: mag, freq, scale, vel_rsm
+        real(wp), dimension(:,:), allocatable                  :: ofs
+        integer                                                :: nOffsets
+        real(wp)                                               :: xl, yl, zl
+        integer                                                :: i, j, k, l, q
 
         nOffsets = max(num_dims, num_fluids)
 
@@ -189,7 +176,7 @@ contains
                             yl = freq*(y_cc(k) + ofs(i, 2))
                             if (num_dims == 2) then
                                 mag = f_simplex2d(xl, yl)
-                            elseif (num_dims == 3) then
+                            else if (num_dims == 3) then
                                 zl = freq*(z_cc(l) + ofs(i, 3))
                                 mag = f_simplex3d(xl, yl, zl)
                             end if
@@ -200,8 +187,7 @@ contains
                             end do
                             vel_rsm = sqrt(vel_rsm)
 
-                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = q_prim_vf(momxb + i - 1)%sf(j, k, l) + &
-                                                                   vel_rsm*scale*mag
+                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = q_prim_vf(momxb + i - 1)%sf(j, k, l) + vel_rsm*scale*mag
                         end do
                     end do
                 end do
@@ -227,12 +213,12 @@ contains
                             yl = freq*(y_cc(k) + ofs(i, 2))
                             if (num_dims == 2) then
                                 mag = f_simplex2d(xl, yl)
-                            elseif (num_dims == 3) then
+                            else if (num_dims == 3) then
                                 zl = freq*(z_cc(l) + ofs(i, 3))
                                 mag = f_simplex3d(xl, yl, zl)
                             end if
-                            q_prim_vf(contxb + i - 1)%sf(j, k, l) = q_prim_vf(contxb + i - 1)%sf(j, k, l) + &
-                                                                    q_prim_vf(contxb + i - 1)%sf(j, k, l)*scale*mag
+                            q_prim_vf(contxb + i - 1)%sf(j, k, l) = q_prim_vf(contxb + i - 1)%sf(j, k, &
+                                      & l) + q_prim_vf(contxb + i - 1)%sf(j, k, l)*scale*mag
                         end do
                     end do
                 end do
@@ -243,20 +229,17 @@ contains
 
     end subroutine s_perturb_simplex
 
-    !>  This subroutine computes velocity perturbations for a temporal mixing
-        !!              layer with a hyperbolic tangent mean streamwise velocity
-        !!              profile, using an inverted version of the spectrum-based
-        !!              synthetic turbulence generation method proposed by
-        !!              Guo et al. (2023, JFM).
+    !> Compute velocity perturbations for a temporal mixing layer with a hyperbolic tangent mean streamwise velocity profile, using
+    !! an inverted version of the spectrum-based synthetic turbulence generation method proposed by Guo et al. (2023, JFM).
     subroutine s_perturb_mixlayer(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        real(wp), dimension(mixlayer_perturb_nk) :: k, Ek
-        real(wp), dimension(3, 3) :: Rij, Lmat
-        real(wp), dimension(3) :: velfluc, sig_tmp, sig, khat, xi
-        real(wp) :: dk, alpha, Eksum, q, uu0, phi
-        integer :: i, j, l, r, ierr
 
-        ! Initialize parameters
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(wp), dimension(mixlayer_perturb_nk)               :: k, Ek
+        real(wp), dimension(3, 3)                              :: Rij, Lmat
+        real(wp), dimension(3)                                 :: velfluc, sig_tmp, sig, khat, xi
+        real(wp)                                               :: dk, alpha, Eksum, q, uu0, phi
+        integer                                                :: i, j, l, r, ierr
+
         dk = 1._wp/mixlayer_perturb_nk
 
         ! Compute prescribed energy spectra
@@ -269,11 +252,9 @@ contains
 
         ! Main loop
         do r = 0, n
-            ! Compute prescribed Reynolds stress tensor with about half
-            ! magnitude of its self-similar value
-            Rij(:, :) = 0._wp
-            uu0 = patch_icpp(1)%vel(1)**2._wp &
-                  *(1._wp - tanh(y_cc(r)*mixlayer_vel_coef)**2._wp)
+            ! Compute prescribed Reynolds stress tensor with about half magnitude of its self-similar value
+            Rij(:,:) = 0._wp
+            uu0 = patch_icpp(1)%vel(1)**2._wp*(1._wp - tanh(y_cc(r)*mixlayer_vel_coef)**2._wp)
             Rij(1, 1) = 0.05_wp*uu0
             Rij(2, 2) = 0.03_wp*uu0
             Rij(3, 3) = 0.03_wp*uu0
@@ -293,8 +274,7 @@ contains
 
             ! Compute perturbation for each Fourier component
             do i = 1, mixlayer_perturb_nk
-                ! Generate random numbers for unit wavevector khat,
-                ! random unit vector xi, and random mode phase phi
+                ! Generate random numbers for unit wavevector khat, random unit vector xi, and random mode phase phi
                 if (proc_rank == 0) then
                     call s_generate_random_perturbation(khat, xi, phi, i, y_cc(r))
                 end if
@@ -327,14 +307,15 @@ contains
 
     end subroutine s_perturb_mixlayer
 
-    !> @brief Generates deterministic pseudo-random wave vector, polarization, and phase for a perturbation mode.
+    !> Generate deterministic pseudo-random wave vector, polarization, and phase for a perturbation mode.
     subroutine s_generate_random_perturbation(khat, xi, phi, ik, yloc)
-        integer, intent(in) :: ik
-        real(wp), intent(in) :: yloc
+
+        integer, intent(in)                 :: ik
+        real(wp), intent(in)                :: yloc
         real(wp), dimension(3), intent(out) :: khat, xi
-        real(wp), intent(out) :: phi
-        real(wp) :: theta, eta
-        integer :: seed, kfac, yfac
+        real(wp), intent(out)               :: phi
+        real(wp)                            :: theta, eta
+        integer                             :: seed, kfac, yfac
 
         kfac = ik*amplifier
         yfac = nint((sin(yloc) + 1._wp)*amplifier)
@@ -352,10 +333,11 @@ contains
 
     end subroutine s_generate_random_perturbation
 
-    !> @brief Generates a unit vector uniformly distributed on the sphere from two random parameters.
+    !> Generate a unit vector uniformly distributed on the sphere from two random parameters.
     function f_unit_vector(theta, eta) result(vec)
-        real(wp), intent(in) :: theta, eta
-        real(wp) :: zeta, xi
+
+        real(wp), intent(in)   :: theta, eta
+        real(wp)               :: zeta, xi
         real(wp), dimension(3) :: vec
 
         xi = 2._wp*pi*theta
@@ -366,23 +348,24 @@ contains
 
     end function f_unit_vector
 
-    !>  This function generates a pseudo-random number between 0 and 1 based on
-    !!  linear congruential generator.
+    !> Generate a pseudo-random number between 0 and 1 using a linear congruential generator.
     subroutine s_prng(var, seed)
+
         integer, intent(inout) :: seed
-        real(wp), intent(out) :: var
-        integer :: i
+        real(wp), intent(out)  :: var
+        integer                :: i
 
         seed = mod(modmul(seed), modulus)
         var = seed/real(modulus, wp)
 
     end subroutine s_prng
 
-    !> @brief Computes a modular multiplication step for the linear congruential pseudo-random number generator.
+    !> Compute a modular multiplication step for the linear congruential pseudo-random number generator.
     function modmul(a) result(val)
+
         integer, intent(in) :: a
-        integer :: val
-        real(wp) :: x, y
+        integer             :: val
+        real(wp)            :: x, y
 
         x = (multiplier/real(modulus, wp))*a + (increment/real(modulus, wp))
         y = nint((x - floor(x))*decimal_trim)/decimal_trim
@@ -390,7 +373,7 @@ contains
 
     end function modmul
 
-    !> @brief Deallocates the temporary primitive variable array used by elliptic smoothing.
+    !> Deallocate the temporary primitive variable array used by elliptic smoothing.
     impure subroutine s_finalize_perturbation_module()
 
         if (elliptic_smoothing) then
