@@ -311,8 +311,10 @@ jobs:
           HPCX_DIR=$(dirname "$(find /opt/nvidia/hpc_sdk -path "*/hpcx/hpcx-*/ompi/bin/mpirun" | head -1)")/../..
           MPI_LIB=$(mpifort --showme:link | grep -oP '(?<=-L)\S+' | head -1)
           echo "LD_LIBRARY_PATH=${MPI_LIB}:${HPCX_DIR}/ucx/lib:${HPCX_DIR}/ucc/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-          # Fix PMIx shared-memory permissions in containers
+          # Container MPI fixes: PMIx shared-memory, hwloc binding
           echo "PMIX_MCA_gds=hash" >> $GITHUB_ENV
+          echo "OMPI_MCA_hwloc_base_binding_policy=none" >> $GITHUB_ENV
+          echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
 
       # --- Standard build + test ---
       - name: Build
@@ -346,6 +348,7 @@ jobs:
       - name: Test (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run:  |
+          ulimit -s unlimited || ulimit -s 65536 || true
           /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
 
   self:
