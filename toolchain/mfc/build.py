@@ -365,6 +365,9 @@ class MFCTarget:
         return True
 
     def configure(self, case: Case):
+        if ARG("debug") and ARG("reldebug"):
+            raise MFCException("--debug and --reldebug are mutually exclusive.")
+
         build_dirpath = self.get_staging_dirpath(case)
         cmake_dirpath = self.get_cmake_dirpath()
         install_dirpath = self.get_install_dirpath(case)

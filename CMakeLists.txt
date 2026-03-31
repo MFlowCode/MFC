@@ -38,6 +38,12 @@ if (MFC_ALL)
     set(MFC_DOCUMENTATION ON FORCE)
 endif()
 
+# Validate CMAKE_BUILD_TYPE to catch typos (CMake is case-sensitive).
+set(_VALID_BUILD_TYPES "Debug" "Release" "RelDebug" "")
+if (NOT CMAKE_BUILD_TYPE IN_LIST _VALID_BUILD_TYPES)
+    message(FATAL_ERROR "Unknown CMAKE_BUILD_TYPE '${CMAKE_BUILD_TYPE}'. Valid: Debug, RelDebug, Release")
+endif()
+
 # RelDebug: a lighter debug mode for CI. Compiler-specific blocks below add the
 # actual flags; these defaults just tell CMake it is a recognised build type.
 set(CMAKE_C_FLAGS_RELDEBUG       "-g" CACHE STRING "")
@@ -230,6 +236,10 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
         $<$<COMPILE_LANGUAGE:Fortran>:-Mpreprocess>
         $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
     )
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
+    endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
