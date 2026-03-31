@@ -552,6 +552,12 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
 
     history.add(target.name)
 
+    # Dependencies are pinned to fixed versions. If already configured
+    # (built & installed by a prior --deps-only step), skip entirely
+    # to avoid re-entering the superbuild (which may access the network).
+    if target.isDependency and target.is_configured(case):
+        return
+
     for dep in target.requires.compute():
         # If we have already built and installed this target,
         # do not do so again. This can be inferred by whether
@@ -593,6 +599,25 @@ def build(targets=None, case: input.MFCInputFile = None, history: typing.Set[str
     targets = get_targets(list(REQUIRED_TARGETS) + targets)
     case = case or input.load(ARG("input"), ARG("--"), {})
     case.validate_params()
+
+    if ARG("deps_only", False) and len(history) == 0:
+        all_deps = set()
+        for t in targets:
+            resolved = get_target(t)
+            for dep in resolved.requires.compute():
+                all_deps.add(dep)
+
+        cons.print(f"[bold]Fetch Dependencies | {format_list_to_string([d.name for d in all_deps], 'magenta', 'None')}[/bold]")
+        cons.print(no_indent=True)
+
+        if not all_deps:
+            cons.print("[yellow]No dependencies to build for the requested targets.[/yellow]")
+            return
+
+        for dep in all_deps:
+            __build_target(dep, case, history)
+
+        return
 
     if len(history) == 0:
         cons.print(__generate_header(case, targets))
