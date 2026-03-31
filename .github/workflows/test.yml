@@ -162,7 +162,7 @@ jobs:
         os:    ['ubuntu', 'macos']
         mpi:   ['mpi']
         precision: ['']
-        debug: ['debug', 'no-debug']
+        debug: ['reldebug', 'no-debug']
         intel: [true, false]
         exclude:
           - os:    macos
@@ -266,7 +266,7 @@ jobs:
           /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $ONLY_CHANGES $TEST_ALL $TEST_PCT
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
           ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
 
   self:
