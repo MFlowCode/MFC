@@ -1542,6 +1542,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "3D_rayleigh_taylor_muscl",  # segfaults with nvfortran+MPI in Docker (seccomp/mprotect)
             ]
             if path in casesToSkip:
                 continue
