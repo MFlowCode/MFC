@@ -1587,14 +1587,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-10),
                 )
             )
-        
-        cases.append(define_case_f(
-           f'1D -> Chemistry -> Flamelet','examples/1D_flamelet/case.py',
-           mods={
-               **common_mods
-           },
-           override_tol= 10**(-10)
-        ))
+
+        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={**common_mods}, override_tol=10 ** (-10)))
 
         stack.push(
             "1D -> Chemistry -> MultiComponent Diffusion",

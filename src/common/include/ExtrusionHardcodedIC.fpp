@@ -37,7 +37,7 @@
 
 #:def HardcodedDimensionsExtrusion()
     integer :: xRows, yRows, nRows, iix, iiy, max_files
-    integer :: f, iter unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
+    integer :: f, iter, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
     real(wp) :: x_len, x_step, y_len, y_step
     real(wp) :: dummy_x, dummy_y, dummy_z, x0, y0
     integer :: global_offset_x, global_offset_y           ! MPI subdomain offset
