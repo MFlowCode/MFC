@@ -260,6 +260,14 @@ contains
         real(wp), optional, intent(out)     :: G_K
         real(wp)                            :: alpha_K_sum
         integer                             :: i, j  !< Generic loop iterators
+
+        rho_K = 0._wp
+        gamma_K = 0._wp
+        pi_inf_K = 0._wp
+        qv_K = 0._wp
+        Re_K = dflt_real
+        if (present(G_K)) G_K = 0._wp
+
 #ifdef MFC_SIMULATION
         ! Constrain partial densities and volume fractions within physical bounds
         if (num_fluids == 1 .and. bubbles_euler) then
