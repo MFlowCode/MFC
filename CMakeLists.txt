@@ -176,12 +176,17 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -Og
             -Wall
             -Wextra
-            -fcheck=bounds
+            -fcheck=bounds,pointer
             -fbacktrace
             -fimplicit-none
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
+            -Wconversion
+            -Wintrinsic-shadow
+            -Wunderflow
+            -Wrealloc-lhs
+            -Wsurprising
 	    )
     endif()
 
@@ -214,9 +219,9 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
-                "SHELL: -g" "SHELL: -O1"
+                "SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O1"
         )
-        add_link_options("SHELL: -g" "SHELL: -O1")
+        add_link_options("SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O1")
     endif()
 
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
