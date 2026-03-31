@@ -330,7 +330,7 @@
         q_prim_vf(momxe)%sf(i, j, 0) = v1c + v2c
 
     case (272)
-        !2D Premixed Flame Instabillity
+        !2D Premixed Flame Instability
 
         @: HardcodedReadValues()
 
