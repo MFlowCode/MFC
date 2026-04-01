@@ -311,11 +311,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         if (MFC_Unified)
             message(STATUS "LTO/IPO is not available with NVHPC using Unified Memory")
-        elseif (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER "24.11" AND CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "25.9")
-            message(STATUS "LTO/IPO is not supported in NVHPC Version 24.11 to 25.9. Use >=25.9 or (<=24.11 && > 23.11) Performance will be degraded.")
-            set(NVHPC_USE_TWO_PASS_IPO FALSE)
-        elseif(CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "23.11")
-            message(STATUS "LTO/IPO is not supported in NVHPC Version < 23.11. Use a newer version of NVHPC for best performance.")
         else()
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
             set(NVHPC_USE_TWO_PASS_IPO TRUE)
@@ -502,7 +497,20 @@ function(MFC_SETUP_TARGET)
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers)
+
+        # Exclude m_start_up and m_cbc from cross-file inlining: these are
+        # initialization/boundary code that trigger NVHPC 25.x fort2 ICE when
+        # too many functions are cross-inlined into them. GPU hot-path files
+        # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.
+        foreach(_no_inline_file m_start_up m_cbc)
+            set_source_files_properties(
+                "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
+                TARGET_DIRECTORY ${ARGS_TARGET}
+                PROPERTIES COMPILE_OPTIONS "-Mnoinline"
+            )
+        endforeach()
+
         list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
     endif()
 
@@ -708,15 +716,13 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 IPA workaround: two files trigger IPA crashes:
+    # CCE 19.0.0 IPA workaround: disable interprocedural analysis for files
+    # that trigger compiler crashes during IPA:
     #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
     #   m_phase_change: bring_routine_resident SIGSEGV
-    # Disabling IPA per-file avoids the crashes while preserving IPA for
-    # the rest of simulation (needed for thermochem INLINEALWAYS inlining).
-    # Applied to Cray+OpenACC and Cray CPU, but NOT Cray+OpenMP: on OpenMP,
-    # CCE 19.0.0 IPA workaround: disable interprocedural analysis for files
-    # that trigger compiler SIGSEGV during IPA (Bug 3: m_phase_change,
-    # Bug 4: m_bubbles_EL). See PR #1286.
+    # Not applied to Cray+OpenMP because thermochem uses !DIR$ INLINEALWAYS,
+    # which requires IPA to inline device calls. On OpenACC the pyrometheus
+    # patch emits !$acc routine seq instead (no IPA needed). See PR #1286.
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
         set_source_files_properties(
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
