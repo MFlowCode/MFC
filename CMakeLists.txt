@@ -501,7 +501,22 @@ function(MFC_SETUP_TARGET)
         # exist. We use a wrapper script as RULE_LAUNCH_COMPILE that runs
         # the compiler and then touches the expected .o output file.
         set(_ipo_wrapper "${CMAKE_BINARY_DIR}/${ARGS_TARGET}_extract_wrapper.sh")
-        file(WRITE "${_ipo_wrapper}" "#!/bin/sh\n\"$@\"\nfor arg; do :; done\ntouch \"$arg\"\n")
+        file(WRITE "${_ipo_wrapper}" [=[#!/bin/sh
+# Find the -o argument (the object file CMake expects)
+out=
+prev=
+for arg do
+  if [ "$prev" = "-o" ]; then out="$arg"; break; fi
+  prev="$arg"
+done
+# Run the compiler; propagate its exit status on failure
+"$@"
+status=$?
+[ "$status" -eq 0 ] || exit "$status"
+# Touch the .o so CMake's dependency tracking sees it
+[ -n "$out" ] && touch "$out"
+exit 0
+]=])
         file(CHMOD "${_ipo_wrapper}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
         add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
         set_target_properties(${ARGS_TARGET}_lib PROPERTIES
