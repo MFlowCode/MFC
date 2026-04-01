@@ -258,7 +258,6 @@ contains
         integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND)        :: MOK
         integer(kind=MPI_OFFSET_KIND)        :: offset
-        real(wp)                             :: delx, dely, delz
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
         character(len=10)                    :: t_step_string
