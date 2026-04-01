@@ -187,6 +187,15 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 
+    # Skip Lagrange Bubbles tests under nvfortran in Docker: NaN on 24.1/24.3
+    # due to unresolved Docker-specific numerical issue (passes natively/Apptainer).
+    if os.environ.get("FC") == "nvfortran" and os.path.exists("/.dockerenv"):
+        nvhpc_skip_uuids = {"B9553426", "4A1BD9B8", "0D1FA5C5", "2122A4F6"}
+        for case in cases[:]:
+            if case.get_uuid() in nvhpc_skip_uuids:
+                cases.remove(case)
+                skipped_cases.append(case)
+
     if ARG("no_examples"):
         example_cases = [case for case in cases if "Example" in case.trace]
         skipped_cases += example_cases
