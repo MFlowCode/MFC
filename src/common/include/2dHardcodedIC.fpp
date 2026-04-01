@@ -325,8 +325,8 @@
                       & 0) = 0.0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*pi))*exp(0.5*(1.0 - (x_cc(i) - patch_icpp(1) &
                       & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
         end if
-    case(284) &
-         &  ! 2D riemann test with IGR with an entropy wave that introduces fluctuations in density and energy at constant pressure
+    case(284)  ! 2D IGR riemann test
+        ! Modified initial condition to include entropy wave with fluctuations in density and energy
         if (patch_id == 1) then
             gam = 1.4_wp
             ux_tl = 1.206_wp
@@ -363,7 +363,7 @@
             call symm_2d_blending(q_prim_vf(E_idx)%sf(i, j, 0), p_tl, p_tr, p_bl, p_br, 0.75_wp, 0.75_wp, 0.0025_wp, i, j)
         end if
     case (285)
-        ! This is patch is hard-coded for 2D_IGR_double_mach case with Mach number set to 10
+        ! This patch is hard-coded for 2D_IGR_double_mach case with Mach number set to 10
         gam = 1._wp + 1._wp/fluid_pp(1)%gamma
 
         if (patch_id == 1) then

@@ -495,7 +495,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
     !> @}
 
-    !> @name Double Mach parameters
+    !! Double Mach parameters
     logical  :: double_mach
     real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm
     $:GPU_DECLARE(create='[double_mach, xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, &

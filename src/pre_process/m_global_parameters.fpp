@@ -195,6 +195,10 @@ module m_global_parameters
     logical  :: surface_tension
     !> @}
 
+    ! Double Mach parameters
+    logical  :: double_mach
+    real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm
+
     !> @name Index variables used for m_variables_conversion
     !> @{
     integer :: momxb, momxe
@@ -214,10 +218,6 @@ module m_global_parameters
     integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
     logical                                :: fft_wrt
     logical                                :: dummy      !< AMDFlang workaround for case-optimization + GPU-kernel bug
-
-    !> @name Double Mach parameters
-    logical  :: double_mach
-    real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm
 
 contains
 

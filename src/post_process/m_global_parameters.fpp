@@ -289,6 +289,10 @@ module m_global_parameters
     integer :: chemxb, chemxe
     !> @}
 
+    ! Double Mach parameters
+    logical  :: double_mach
+    real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm, dt
+
     !> @name Lagrangian bubbles
     !> @{
     logical :: bubbles_lagrange
@@ -296,10 +300,6 @@ module m_global_parameters
 
     real(wp) :: Bx0                       !< Constant magnetic field in the x-direction (1D)
     real(wp) :: wall_time, wall_time_avg  !< Wall time measurements
-
-    !> Double Mach
-    logical  :: double_mach
-    real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm, dt
 
 contains
 
