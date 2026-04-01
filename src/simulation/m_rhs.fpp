@@ -67,19 +67,6 @@ module m_rhs
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     $:GPU_DECLARE(create='[tau_Re_vf]')
 
-    type(vector_field) :: gm_alpha_qp  !< Volume fraction gradient magnitudes at cell-interior quadrature points
-    $:GPU_DECLARE(create='[gm_alpha_qp]')
-
-    !> @name The left and right WENO-reconstructed cell-boundary values of the cell- average gradient magnitude of volume fractions,
-    !! located in gm_alpha_qp.
-    !> @{
-    type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
-    type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
-#if defined(MFC_OpenACC)
-    $:GPU_DECLARE(create='[gm_alphaL_n, gm_alphaR_n]')
-#endif
-    !> @}
-
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical source). These are computed by applying the
     !! chosen Riemann problem solver .on the left and right cell-boundary values of the primitive variables
     !> @{
@@ -121,9 +108,6 @@ module m_rhs
     $:GPU_DECLARE(create='[blkmod1, blkmod2, alpha1, alpha2, Kterm]')
     $:GPU_DECLARE(create='[qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf]')
     $:GPU_DECLARE(create='[dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf]')
-
-    real(wp), allocatable, dimension(:,:,:) :: nbub  !< Bubble number density
-    $:GPU_DECLARE(create='[nbub]')
 
 contains
 
@@ -513,21 +497,12 @@ contains
         if (mpp_lim .and. bubbles_euler) then
             @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
-        if (.not. igr) then
-            @:ALLOCATE(gm_alphaL_n(1:num_dims))
-            @:ALLOCATE(gm_alphaR_n(1:num_dims))
-        end if
-
         if (alt_soundspeed) then
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, &
                        & 0:n, 0:p))
         end if
 
         call s_initialize_pressure_relaxation_module
-
-        if (bubbles_euler) then
-            @:ALLOCATE(nbub(0:m, 0:n, 0:p))
-        end if
 
     end subroutine s_initialize_rhs_module
 
