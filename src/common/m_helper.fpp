@@ -297,7 +297,6 @@ contains
 
     end function f_cross
 
-    < < < < < < < HEAD
     !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
 

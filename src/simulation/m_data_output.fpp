@@ -170,6 +170,7 @@ contains
         character(len=path_len + 2*name_len) :: file_loc
         integer                              :: ios
 
+        call s_create_directory(trim(case_dir) // '/restart_data')
         write (file_loc, '(A)') 'ib_state.dat'
         file_loc = trim(case_dir) // '/restart_data/' // trim(file_loc)
         if (t_step_start /= 0) then

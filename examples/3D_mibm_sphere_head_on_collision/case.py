@@ -15,11 +15,11 @@ gam_a = 1.4
 # lead-up-properties
 velocity = 3.9
 dt = 5.0e-6
-collision_time = 200.0 * dt
+collision_time = 20.0 * dt
 
 # parerticle properties
 radius = 5e-3
-collision_angle_degrees = 60.0
+collision_angle_degrees = 30.0
 collision_angle_radians = collision_angle_degrees * math.pi / 180.0
 domain_size = 3.0 * radius
 lead_distance = 0.02 * radius
@@ -117,10 +117,10 @@ print(
             "patch_ib(1)%vel(2)": -velocity * math.cos(collision_angle_radians),
             "patch_ib(1)%moving_ibm": 2,
             # Collisions
-            "collision_model": 1,
+            "collision_model": 1, # soft-sphere collision model
             "ib_coefficient_of_friction": 0.092,
             "collision_time": collision_time,
-            "coefficient_of_restitution": 0.98,
+            "coefficient_of_restitution": 0.98, # almost perfectly elastic
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,

@@ -171,7 +171,7 @@ module m_global_parameters
     logical                                               :: ib        !< Turn immersed boundaries on
     integer                                               :: num_ibs   !< Number of immersed boundaries
     integer                                               :: Np
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
+    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
     !> @}
 
