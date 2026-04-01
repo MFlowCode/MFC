@@ -1403,17 +1403,6 @@ contains
 
     end function f_convert_cyl_to_cart
 
-    !> Compute the spherical azimuthal angle from cylindrical (x, r) coordinates.
-    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in) :: cyl_x, cyl_y
-
-        sph_phi = atan(cyl_y/cyl_x)
-
-    end subroutine s_convert_cylindrical_to_spherical_coord
-
     !> Archimedes spiral function
     elemental function f_r(myth, offset, a)
 

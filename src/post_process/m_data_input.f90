@@ -190,7 +190,6 @@ contains
         character(LEN=len_trim(case_dir) + 2*name_len)           :: t_step_dir
         character(LEN=len_trim(case_dir) + 3*name_len)           :: file_loc
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-        character(LEN=len_trim(case_dir) + 2*name_len)           :: t_step_ib_dir
         logical                                                  :: dir_check
         logical                                                  :: file_check
         integer                                                  :: i

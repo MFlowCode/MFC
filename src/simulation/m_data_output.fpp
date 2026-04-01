@@ -979,7 +979,7 @@ contains
         real(wp)                        :: pi_inf
         real(wp)                        :: qv
         real(wp)                        :: c
-        real(wp)                        :: M00, M10, M01, M20, M11, M02
+        real(wp)                        :: M00, M10, M01, M20, M02
         real(wp)                        :: varR, varV
         real(wp), dimension(Nb)         :: nR, R, nRdot, Rdot
         real(wp)                        :: nR3
@@ -1029,7 +1029,6 @@ contains
             M10 = 0._wp
             M01 = 0._wp
             M20 = 0._wp
-            M11 = 0._wp
             M02 = 0._wp
             varR = 0._wp; varV = 0._wp
             alf = 0._wp
@@ -1116,13 +1115,11 @@ contains
                             M10 = q_cons_vf(bub_idx%moms(1, 2))%sf(j - 2, k, l)/nbub
                             M01 = q_cons_vf(bub_idx%moms(1, 3))%sf(j - 2, k, l)/nbub
                             M20 = q_cons_vf(bub_idx%moms(1, 4))%sf(j - 2, k, l)/nbub
-                            M11 = q_cons_vf(bub_idx%moms(1, 5))%sf(j - 2, k, l)/nbub
                             M02 = q_cons_vf(bub_idx%moms(1, 6))%sf(j - 2, k, l)/nbub
 
                             M10 = M10/M00
                             M01 = M01/M00
                             M20 = M20/M00
-                            M11 = M11/M00
                             M02 = M02/M00
 
                             varR = M20 - M10**2._wp

@@ -981,17 +981,6 @@ contains
 
     end function f_convert_cyl_to_cart
 
-    !> Convert cylindrical coordinates (x, r) to the spherical azimuthal angle phi
-    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in) :: cyl_x, cyl_y
-
-        sph_phi = atan(cyl_y/cyl_x)
-
-    end subroutine s_convert_cylindrical_to_spherical_coord
-
     subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
 
         real(wp), intent(in)                         :: left_bound, right_bound
