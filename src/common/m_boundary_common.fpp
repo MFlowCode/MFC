@@ -92,7 +92,8 @@ contains
             ! Shock Angle in radian
             theta_dm = (pi/180._wp)*60._wp
 
-            $:GPU_UPDATE(device='[cf, double_mach, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm]')
+            $:GPU_UPDATE(device='[cf, double_mach, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, &
+                         & theta_dm, gam_dm]')
         end if
 
     end subroutine s_initialize_boundary_common_module
