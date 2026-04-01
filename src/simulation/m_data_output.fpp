@@ -1107,7 +1107,7 @@ contains
 
                             nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
                         end if
-#ifdef DEBUG
+#ifdef MFC_DEBUG
                         print *, 'In probe, nbub: ', nbub
 #endif
                         if (qbmm) then

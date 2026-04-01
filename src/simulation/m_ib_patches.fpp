@@ -25,8 +25,7 @@ module m_ib_patches
         & s_decode_patch_periodicity
 
     real(wp) :: cart_y, cart_z
-    real(wp) :: sph_phi
-    $:GPU_DECLARE(create='[cart_y, cart_z, sph_phi]')
+    $:GPU_DECLARE(create='[cart_y, cart_z]')
     ! Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
 
 contains

@@ -33,7 +33,6 @@ module m_icpp_patches
     real(wp)          :: smooth_coeff                        !< Smoothing coefficient (mirrors ic_patch_parameters%smooth_coeff)
     real(wp)          :: eta                                 !< Pseudo volume fraction for patch boundary smoothing
     real(wp)          :: cart_y, cart_z
-    real(wp)          :: sph_phi                             !< Spherical phi for Cartesian conversion in cylindrical coordinates
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !< Patch boundary locations in x, y, z
     character(len=5)  :: istr                                !< string to store int to string result for error checking
 

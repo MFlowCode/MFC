@@ -1323,7 +1323,7 @@ contains
             disc = term**2 - 4*c**2*B(norm)**2/(rho*h + B2)
         end if
 
-#ifdef DEBUG
+#ifdef MFC_DEBUG
         if (disc < 0._wp) then
             print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, B(1), B(2), B(3), h, term, disc
             call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')
