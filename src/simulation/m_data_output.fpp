@@ -171,14 +171,16 @@ contains
         integer                              :: ios
 
         write (file_loc, '(A)') 'ib_state.dat'
-        file_loc = trim(case_dir)//'/restart_data/'//trim(file_loc)
+        file_loc = trim(case_dir) // '/restart_data/' // trim(file_loc)
         if (t_step_start /= 0) then
             ! On restart, append to existing file to preserve history
-            open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', position='append', iostat=ios)
+            open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', &
+                  & position='append', iostat=ios)
         else
             open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
         end if
-        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: '//trim(file_loc))
+        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
+
     end subroutine s_open_ib_state_file
 
     !> Write stability criteria extrema to the run-time information file at the given time step

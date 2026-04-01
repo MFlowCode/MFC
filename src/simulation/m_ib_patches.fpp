@@ -541,12 +541,9 @@ contains
         radius = patch_ib(patch_id)%radius
 
         ! completely skip particles no in the domain
-        if (center(1) - radius > x_cc(m + gp_layers + 1) .or. &
-            center(1) + radius < x_cc(-gp_layers - 1) .or. &
-            center(2) - radius > y_cc(n + gp_layers + 1) .or. &
-            center(2) + radius < y_cc(-gp_layers - 1) .or. &
-            center(3) - radius > z_cc(p + gp_layers + 1) .or. &
-            center(3) + radius < z_cc(-gp_layers - 1)) then
+        if (center(1) - radius > x_cc(m + gp_layers + 1) .or. center(1) + radius < x_cc(-gp_layers - 1) .or. center(2) &
+            & - radius > y_cc(n + gp_layers + 1) .or. center(2) + radius < y_cc(-gp_layers - 1) .or. center(3) - radius > z_cc(p &
+            & + gp_layers + 1) .or. center(3) + radius < z_cc(-gp_layers - 1)) then
             return
         end if
 

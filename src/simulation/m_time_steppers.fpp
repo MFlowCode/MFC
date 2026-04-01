@@ -570,7 +570,7 @@ contains
             end if
         end do
 
-        ! 
+        !
         if (ib) then
             if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
             if (ib_state_wrt .and. (.not. moving_immersed_boundary_flag)) then

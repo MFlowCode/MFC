@@ -19,7 +19,6 @@ module m_ibm
     use m_ib_patches
     use m_viscous
     use m_model
-
     use m_collisions
 
     implicit none
@@ -1026,8 +1025,8 @@ contains
 
         ! apply the summed forces
         do i = 1, num_ibs
-            patch_ib(i)%force(:) = forces(i, :)
-            patch_ib(i)%torque(:) = torques(i, :)
+            patch_ib(i)%force(:) = forces(i,:)
+            patch_ib(i)%torque(:) = torques(i,:)
         end do
 
         call nvtxEndRange

@@ -1128,38 +1128,33 @@ contains
 
     end subroutine s_finalize_modules
 
-    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart.
-    !! Rank 0 reads the last num_ibs records and broadcasts to all ranks.
-    !! Overwrites patch_ib vel, angular_vel, angles, and centroid.
+    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart. Rank 0 reads the last num_ibs records and
+    !! broadcasts to all ranks. Overwrites patch_ib vel, angular_vel, angles, and centroid.
     impure subroutine s_read_ib_restart_data()
 
         character(len=path_len + 2*name_len) :: file_loc
-        integer :: i, ios, file_unit, ib_id, ierr
-        real(wp) :: time_read
-        real(wp), dimension(3) :: force_read, torque_read
-        real(wp), dimension(3) :: vel_read, angular_vel_read, angles_read
-        real(wp) :: xc_read, yc_read, zc_read
-        logical :: file_exist
+        integer                              :: i, ios, file_unit, ib_id, ierr
+        real(wp)                             :: time_read
+        real(wp), dimension(3)               :: force_read, torque_read
+        real(wp), dimension(3)               :: vel_read, angular_vel_read, angles_read
+        real(wp)                             :: xc_read, yc_read, zc_read
+        logical                              :: file_exist
 
         if (proc_rank == 0) then
-            file_loc = trim(case_dir)//'/restart_data/ib_state.dat'
+            file_loc = trim(case_dir) // '/restart_data/ib_state.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             print *, "IB Restart File Exists: ", file_exist
             if (file_exist) then
-                open (newunit=file_unit, file=trim(file_loc), &
-                      form='unformatted', access='stream', &
-                      status='old', iostat=ios)
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
                 print *, "iostat ", ios
             else
-                call s_mpi_abort('Cannot open IB state file for restart: '//trim(file_loc))
+                call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
             end if
 
             ! Read all records; the last num_ibs records are the final state
             do
-                read (file_unit, iostat=ios) time_read, ib_id, &
-                    force_read, torque_read, &
-                    vel_read, angular_vel_read, angles_read, &
-                    xc_read, yc_read, zc_read
+                read (file_unit, iostat=ios) time_read, ib_id, force_read, torque_read, vel_read, angular_vel_read, angles_read, &
+                      & xc_read, yc_read, zc_read
                 if (ios /= 0) exit
                 patch_ib(ib_id)%vel = vel_read
                 patch_ib(ib_id)%angular_vel = angular_vel_read
