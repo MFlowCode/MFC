@@ -498,7 +498,8 @@ module m_global_parameters
     !> @name Double Mach parameters
     logical  :: double_mach
     real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm
-    $:GPU_DECLARE(create='[double_mach, xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm]')
+    $:GPU_DECLARE(create='[double_mach, xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, &
+                  & theta_dm, gam_dm]')
 
 contains
 
@@ -805,9 +806,9 @@ contains
         rhoshock = dflt_real
         pshock = dflt_real
         velshock = dflt_real
-        u0_dm = dflt_real 
+        u0_dm = dflt_real
         v0_dm = dflt_real
-        p0_dm = dflt_real 
+        p0_dm = dflt_real
         rho0_dm = dflt_real
         theta_dm = dflt_real
         xr_dm = dflt_real

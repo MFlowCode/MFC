@@ -543,16 +543,16 @@ contains
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
-        
+
         double_mach = .false.
         xshock = dflt_real
         cf = dflt_real
         rhoshock = dflt_real
         pshock = dflt_real
         velshock = dflt_real
-        u0_dm = dflt_real 
+        u0_dm = dflt_real
         v0_dm = dflt_real
-        p0_dm = dflt_real 
+        p0_dm = dflt_real
         rho0_dm = dflt_real
         theta_dm = dflt_real
         gam_dm = dflt_real

@@ -374,7 +374,8 @@
 
             q_prim_vf(contxb)%sf(i, j, 0) = 0.5_wp*(1._wp + tanh(cf*sb))*rhoshock + 0.5_wp*(1._wp - tanh(cf*sb))*rho0_dm
             q_prim_vf(E_idx)%sf(i, j, 0) = 0.5_wp*(1._wp + tanh(cf*sb))*pshock + 0.5_wp*(1._wp - tanh(cf*sb))*p0_dm
-            q_prim_vf(momxb)%sf(i, j, 0) = 0.5_wp*(1._wp + tanh(cf*sb))*(velshock*tan(theta_dm)) + 0.5_wp*(1._wp - tanh(cf*sb))*u0_dm
+            q_prim_vf(momxb)%sf(i, j, &
+                      & 0) = 0.5_wp*(1._wp + tanh(cf*sb))*(velshock*tan(theta_dm)) + 0.5_wp*(1._wp - tanh(cf*sb))*u0_dm
             q_prim_vf(momxb + 1)%sf(i, j, 0) = 0.5_wp*(1._wp + tanh(cf*sb))*(-velshock) + 0.5_wp*(1._wp - tanh(cf*sb))*v0_dm
         end if
     case default

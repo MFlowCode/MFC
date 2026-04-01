@@ -70,27 +70,27 @@ contains
 
         if (double_mach) then
             ! Smoothing parameter
-            cf = 20._wp 
+            cf = 20._wp
             ! Mach number
-            Mach = 10._wp 
+            Mach = 10._wp
 
-            !Pre shock
-            rho0_dm = 1.4_wp 
+            ! Pre shock
+            rho0_dm = 1.4_wp
             p0_dm = 1._wp
             u0_dm = 0._wp
             v0_dm = 0._wp
 
-            gam_dm = 1._wp + 1._wp / fluid_pp(1)%gamma
+            gam_dm = 1._wp + 1._wp/fluid_pp(1)%gamma
 
-            !Post shock
+            ! Post shock
             pshock = (2._wp*gam_dm*Mach**2 - (gam_dm - 1._wp))/(1._wp + gam_dm)
             rhoshock = ((1._wp + gam_dm)*Mach**2)*rho0_dm/((gam_dm - 1._wp)*Mach**2 + 2._wp)
-            velshock = (Mach - (Mach*rho0_dm/rhoshock))/2._wp    
+            velshock = (Mach - (Mach*rho0_dm/rhoshock))/2._wp
 
             ! Reflecting wall location
-            xr_dm = 1._wp/6._wp 
+            xr_dm = 1._wp/6._wp
             ! Shock Angle in radian
-            theta_dm = (pi/180_wp)*60_wp
+            theta_dm = (pi/180._wp)*60._wp
 
             $:GPU_UPDATE(device='[double_mach, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm]')
         end if
@@ -483,8 +483,9 @@ contains
                         if (igr) then
                             q_prim_vf(momxb)%sf(k, -j, l) = q_prim_vf(contxb)%sf(k, -j, l)*q_prim_vf(momxb)%sf(k, -j, l)
                             q_prim_vf(momxb + 1)%sf(k, -j, l) = q_prim_vf(contxb)%sf(k, -j, l)*q_prim_vf(momxb + 1)%sf(k, -j, l)
-                            q_prim_vf(E_idx)%sf(k, -j, l) = (gam_dm + 1._wp)*q_prim_vf(E_idx)%sf(k, -j, l) + 0.5_wp*(q_prim_vf(momxb)%sf(k, &
-                                      & -j, l)**2 + q_prim_vf(momxb + 1)%sf(k, -j, l)**2)/q_prim_vf(contxb)%sf(k, -j, l)
+                            q_prim_vf(E_idx)%sf(k, -j, l) = (gam_dm + 1._wp)*q_prim_vf(E_idx)%sf(k, -j, &
+                                      & l) + 0.5_wp*(q_prim_vf(momxb)%sf(k, -j, l)**2 + q_prim_vf(momxb + 1)%sf(k, -j, &
+                                      & l)**2)/q_prim_vf(contxb)%sf(k, -j, l)
                         end if
 #endif
                         if (.not. igr) then
