@@ -18,15 +18,16 @@ module m_global_parameters
     implicit none
 
     ! Logistics
-    integer                 :: num_procs                 !< Number of processors
-    character(LEN=path_len) :: case_dir                  !< Case folder location
-    character(len=255)      :: files_dir                 !< Location of IC extrusion files
-    character(len=10)       :: file_extension            !< The last 6 digits on the files which are used for the IC extrustion (prim.XX.YY.123456.dat)
-    logical                 :: old_grid                  !< Use existing grid data
-    logical                 :: old_ic, non_axis_sym      !< Use existing IC data
-    integer                 :: t_step_old, t_step_start  !< Existing IC/grid folder
-    logical                 :: cfl_adap_dt, cfl_const_dt, cfl_dt
-    integer                 :: n_start, n_start_old
+    integer                 :: num_procs  !< Number of processors
+    character(LEN=path_len) :: case_dir   !< Case folder location
+    character(len=255)      :: files_dir  !< Location of IC extrusion files
+    !> The last 6 digits on the files which are used for the IC extrustion (prim.XX.YY.123456.dat)
+    character(len=10) :: file_extension
+    logical           :: old_grid                  !< Use existing grid data
+    logical           :: old_ic, non_axis_sym      !< Use existing IC data
+    integer           :: t_step_old, t_step_start  !< Existing IC/grid folder
+    logical           :: cfl_adap_dt, cfl_const_dt, cfl_dt
+    integer           :: n_start, n_start_old
 
     ! Computational Domain Parameters
 

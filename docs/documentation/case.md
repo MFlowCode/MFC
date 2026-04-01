@@ -262,7 +262,7 @@ The code provides three pre-built patches for dimensional extrusion of initial c
 - `case(270)`: Extrude 1D data to 2D domain
 - `case(370)`: Extrude 2D data to 3D domain
 
-etup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/2D_case/IC`, and their format is `prim.XX.YY.files_extension.dat`.
+etup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/1D_flamelet/IC`, and their format is `prim.XX.YY.files_extension.dat`.
 Implementation: All variables and file handling are managed in the `case.py` file of the simulation.
 Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
 

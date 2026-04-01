@@ -40,18 +40,18 @@
     integer                                 :: f, iter, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
     real(wp)                                :: x_len, x_step, y_len, y_step
     real(wp)                                :: dummy_x, dummy_y, dummy_z, x0, y0
-    integer                                 :: global_offset_x, global_offset_y       !< MPI subdomain offset
+    integer                                 :: global_offset_x, global_offset_y  !< MPI subdomain offset
     real(wp)                                :: delta_x, delta_y
-    character(len=100), dimension(sys_size) :: fileNames                              !< Arrays to store all data from files
+    character(len=100), dimension(sys_size) :: fileNames                         !< Arrays to store all data from files
     character(len=200)                      :: errmsg
     real(wp), allocatable                   :: stored_values(:,:,:)
     real(wp), allocatable                   :: x_coords(:), y_coords(:)
     logical                                 :: files_loaded = .false.
     real(wp)                                :: domain_xstart, domain_xend, domain_ystart, domain_yend
-    character(len=20)                       :: file_num_str                           !< For storing the file number as a string
-    character(len=20)                       :: zeros_part                             !< For the trailing zeros part
-    integer :: ios = 0
-    integer :: ios2 = 0   
+    character(len=20)                       :: file_num_str                      !< For storing the file number as a string
+    character(len=20)                       :: zeros_part                        !< For the trailing zeros part
+    integer                                 :: ios = 0
+    integer                                 :: ios2 = 0
 #:enddef
 
 #:def HardcodedReadValues()
@@ -59,7 +59,7 @@
         max_files = merge(sys_size, sys_size - 1, num_dims == 1)
         do f = 1, max_files
             write (file_num_str, '(I0)') f
-            fileNames(f) = trim(files_dir)//"/"//"prim."//trim(file_num_str)//".00."//trim(file_extension)//".dat"
+            fileNames(f) = trim(files_dir) // "/" // "prim." // trim(file_num_str) // ".00." // trim(file_extension) // ".dat"
         end do
 
         ! Common file reading setup
@@ -98,8 +98,7 @@
             ! Calculate offsets
             domain_xstart = x_coords(1)
             x_step = x_cc(1) - x_cc(0)
-            delta_x = merge(x_cc(0) - domain_xstart, &
-                            x_cc(index_x) - domain_xstart + x_step/2.0, num_dims == 1)
+            delta_x = merge(x_cc(0) - domain_xstart, x_cc(index_x) - domain_xstart + x_step/2.0, num_dims == 1)
             global_offset_x = nint(abs(delta_x)/x_step)
         case (3)  ! 3D case - determine grid structure
             ! Find yRows by counting rows with same x
