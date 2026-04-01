@@ -252,13 +252,10 @@ jobs:
           printenv | sort > /tmp/env_before
           source /opt/intel/oneapi/setvars.sh
           printenv | sort > /tmp/env_after
-          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
+          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' \
+            | grep -v '^CC=' | grep -v '^CXX=' >> $GITHUB_ENV
           echo "FC=ifx" >> $GITHUB_ENV
-          echo "CC=icx" >> $GITHUB_ENV
-          echo "CXX=icpx" >> $GITHUB_ENV
           echo "MPIFC=mpiifx" >> $GITHUB_ENV
-          echo "MPICC=mpiicx" >> $GITHUB_ENV
-          echo "MPICXX=mpiicpx" >> $GITHUB_ENV
 
       - name: Build
         run:  |
