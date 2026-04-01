@@ -15,6 +15,7 @@ class MFCConfig:
     mpi: bool = True
     gpu: str = gpuConfigOptions.NONE.value
     debug: bool = False
+    reldebug: bool = False
     gcov: bool = False
     unified: bool = False
     single: bool = False
@@ -43,10 +44,11 @@ class MFCConfig:
         Example: --no-debug --mpi --no-gpu --no-gcov --no-unified"""
         options = []
         for k, v in self.items():
+            cli_k = k.replace("_", "-")
             if k == "gpu":
-                options.append(f"--{v}-{k}")
+                options.append(f"--{v}-{cli_k}")
             else:
-                options.append(f"--{'no-' if not v else ''}{k}")
+                options.append(f"--{'no-' if not v else ''}{cli_k}")
         return options
 
     def make_slug(self) -> str:
@@ -54,10 +56,11 @@ class MFCConfig:
         identifies the configuration. Example: no-debug_no-gpu_no_mpi_no-gcov"""
         options = []
         for k, v in sorted(self.items(), key=lambda x: x[0]):
+            cli_k = k.replace("_", "-")
             if k == "gpu":
-                options.append(f"--{v}-{k}")
+                options.append(f"--{v}-{cli_k}")
             else:
-                options.append(f"--{'no-' if not v else ''}{k}")
+                options.append(f"--{'no-' if not v else ''}{cli_k}")
         return "_".join(options)
 
     def __eq__(self, other) -> bool:
