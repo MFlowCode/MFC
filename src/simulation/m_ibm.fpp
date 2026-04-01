@@ -904,7 +904,7 @@ contains
 
         if (viscous) then
             do fluid_idx = 1, num_fluids
-                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) then
+                if (fluid_pp(fluid_idx)%Re(1) > 0._wp) then
                     dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
                 else
                     dynamic_viscosities(fluid_idx) = 0._wp
@@ -1110,7 +1110,7 @@ contains
 
         if (p == 0) then
             normal_axis = [0, 0, 1]
-        else if (sqrt(sum(axis**2)) == 0) then
+        else if (sqrt(sum(axis**2)) < sgm_eps) then
             ! if the object is not actually rotating at this time, return a dummy value and exit
             patch_ib(ib_marker)%moment = 1._wp
             return
