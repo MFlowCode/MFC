@@ -26,7 +26,6 @@ module m_thinc
     private; public :: s_initialize_thinc_module, s_thinc_compression, s_compute_mthinc_normals, s_finalize_thinc_module
 
     !> 3-point Gauss-Legendre quadrature on [-1/2, 1/2]
-#if defined(MFC_OpenMP)
     !> Node locations: +-sqrt(3/5)/2, 0
     real(wp) :: gq3_pts(3) = [-5e-1_wp*0.7745966692414834_wp, 0._wp, 5e-1_wp*0.7745966692414834_wp]
     !> Weights: 5/18, 8/18, 5/18
@@ -34,14 +33,6 @@ module m_thinc
     !> ln(2)
     real(wp) :: ln2 = 0.6931471805599453_wp
     $:GPU_DECLARE(create='[gq3_pts, gq3_wts, ln2]')
-#else
-    !> Node locations: +-sqrt(3/5)/2, 0
-    real(wp), parameter :: gq3_pts(3) = [-5e-1_wp*0.7745966692414834_wp, 0._wp, 5e-1_wp*0.7745966692414834_wp]
-    !> Weights: 5/18, 8/18, 5/18
-    real(wp), parameter :: gq3_wts(3) = [5._wp/18._wp, 8._wp/18._wp, 5._wp/18._wp]
-    !> ln(2)
-    real(wp), parameter :: ln2 = 0.6931471805599453_wp
-#endif
 
     !> MTHINC precomputed data: unit normal components and interface position parameter d, computed before the dimensional splitting
     !! loop so multi-dimensional information is available per-direction.

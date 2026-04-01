@@ -1071,22 +1071,20 @@ contains
                                                   & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils,j))))
                                         else if (wenoz) then
                                             ! Borges, et al. (2008)
-
                                             tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 0, weno_num_stencils
-                                                alpha(q) = d_cbL_${XYZ}$ (q, &
-                                                      & j)*(1._wp + (tau/beta(q))) &
-                                                      &  ! Equation 28 (note: weno_eps was already added to beta)
+                                            do q = 0, weno_num_stencils  ! Equation 28 (note: weno_eps was already added to beta)
+                                                alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q)))
                                             end do
                                         else if (teno) then
                                             ! Fu, et al. (2016) Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                             tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = 1._wp + tau/beta(q)  ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
-                                                alpha(q) = (alpha(q)**3._wp) &
-                                                      & **2._wp  ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                                ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                                alpha(q) = 1._wp + tau/beta(q)
+                                                ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                                alpha(q) = (alpha(q)**3._wp)**2._wp
                                             end do
                                             omega = alpha/sum(alpha)
 
