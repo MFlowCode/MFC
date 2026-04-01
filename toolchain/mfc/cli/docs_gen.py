@@ -94,7 +94,8 @@ def _generate_options_table(cmd: Command, schema: CLISchema) -> List[str]:
         if "mfc_config" in cmd.include_common:
             lines.append("| `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |")
             lines.append("| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |")
-            lines.append("| `--debug`, `--no-debug` | Build with debug compiler flags | `false` |")
+            lines.append("| `--debug`, `--no-debug` | Build with full debug compiler flags | `false` |")
+            lines.append("| `--reldebug`, `--no-reldebug` | Build with lightweight debug flags (CI) | `false` |")
 
         lines.append("")
 
@@ -278,7 +279,8 @@ def generate_cli_reference(schema: CLISchema) -> str:
             "|------|-------------|",
             "| `--mpi` / `--no-mpi` | Enable/disable MPI support |",
             "| `--gpu [acc/mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
-            "| `--debug` / `--no-debug` | Build with debug compiler flags |",
+            "| `--debug` / `--no-debug` | Build with full debug compiler flags |",
+            "| `--reldebug` / `--no-reldebug` | Build with lightweight debug flags (CI) |",
             "| `--gcov` / `--no-gcov` | Enable code coverage |",
             "| `--single` / `--no-single` | Single precision |",
             "| `--mixed` / `--no-mixed` | Mixed precision |",
