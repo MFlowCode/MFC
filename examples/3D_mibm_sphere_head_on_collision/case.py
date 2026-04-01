@@ -117,10 +117,10 @@ print(
             "patch_ib(1)%vel(2)": -velocity * math.cos(collision_angle_radians),
             "patch_ib(1)%moving_ibm": 2,
             # Collisions
-            "collision_model": 1, # soft-sphere collision model
+            "collision_model": 1,  # soft-sphere collision model
             "ib_coefficient_of_friction": 0.092,
             "collision_time": collision_time,
-            "coefficient_of_restitution": 0.98, # almost perfectly elastic
+            "coefficient_of_restitution": 0.98,  # almost perfectly elastic
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
