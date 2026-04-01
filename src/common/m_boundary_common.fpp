@@ -1068,7 +1068,7 @@ contains
         !> x-direction
 
         if (bc_x%beg < 0) then
-            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     select case (bc_x%beg)
@@ -1087,7 +1087,7 @@ contains
         end if
 
         if (bc_x%end < 0) then
-            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     select case (bc_x%end)
@@ -1107,7 +1107,7 @@ contains
 
         !> y-direction
         if (bc_y%beg < 0) then
-            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                     select case (bc_y%beg)
@@ -1126,7 +1126,7 @@ contains
         end if
 
         if (bc_y%end < 0) then
-            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                     select case (bc_y%end)
@@ -1149,7 +1149,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             !> z-direction
             if (bc_z%beg < 0) then
-                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
+                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
                 do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                         select case (bc_type(3, 1)%sf(k, l, 0))
@@ -1168,7 +1168,7 @@ contains
             end if
 
             if (bc_z%end < 0) then
-                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
+                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
                 do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                         select case (bc_type(3, 2)%sf(k, l, 0))
