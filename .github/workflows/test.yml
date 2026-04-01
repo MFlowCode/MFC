@@ -224,6 +224,9 @@ jobs:
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: ${{ matrix.nvhpc && '1' || '' }}
       PMIX_MCA_gds:                   ${{ matrix.nvhpc && 'hash' || '' }}
       OMPI_MCA_hwloc_base_binding_policy: ${{ matrix.nvhpc && 'none' || '' }}
+      FFLAGS:  ${{ matrix.nvhpc && '-tp=px -Kieee -noswitcherror' || '' }}
+      CFLAGS:  ${{ matrix.nvhpc && '-tp=px' || '' }}
+      CXXFLAGS: ${{ matrix.nvhpc && '-tp=px' || '' }}
 
     steps:
       - name: Git safe directory
@@ -319,6 +322,13 @@ jobs:
           echo "PMIX_MCA_gds=hash" >> $GITHUB_ENV
           echo "OMPI_MCA_hwloc_base_binding_policy=none" >> $GITHUB_ENV
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+          # Debug: confirm compiler flags are set
+          echo "=== NVHPC Environment ==="
+          echo "FFLAGS=$FFLAGS"
+          echo "CFLAGS=$CFLAGS"
+          echo "CXXFLAGS=$CXXFLAGS"
+          nvfortran --version
+          cat /proc/cpuinfo | grep "model name" | head -1
 
       # --- Standard build + test ---
       - name: Build
@@ -341,19 +351,19 @@ jobs:
       # --- NVHPC build + test ---
       - name: Build (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
-        run:  /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all
+        run:  /bin/bash mfc.sh test -vv --dry-run -j $(nproc) --test-all
 
       - name: Build (NVHPC GPU)
         if:   matrix.nvhpc && matrix.target == 'gpu'
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu acc
-          /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu mp
+          /bin/bash mfc.sh test -vv --dry-run -j 2 --test-all --gpu acc
+          /bin/bash mfc.sh test -vv --dry-run -j 2 --test-all --gpu mp
 
       - name: Test (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run:  |
           ulimit -s unlimited || ulimit -s 65536 || true
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
+          /bin/bash mfc.sh test -vv --max-attempts 3 -j $(nproc) --test-all
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
