@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_data_output
+!! Contains module m_data_output
 
 #:include 'macros.fpp'
 #:include 'case.fpp'
@@ -69,9 +69,7 @@ contains
 
     end subroutine s_write_data_files
 
-    !> The purpose of this subroutine is to open a new or pre- existing run-time information file and append to it the basic header
-    !! information relevant to current simulation. In general, this requires generating a table header for those stability criteria
-    !! which will be written at every time-step.
+    !> Open the run-time information file and write the stability criteria table header.
     impure subroutine s_open_run_time_information_file
 
         character(LEN=name_len), parameter :: file_name = 'run_time.inf'  !< Name of the run-time information file
@@ -184,11 +182,7 @@ contains
 
     end subroutine s_open_ib_state_file
 
-    !> The goal of the procedure is to output to the run-time information file the stability criteria extrema in the entire
-    !! computational domain and at the given time-step. Moreover, the subroutine is also in charge of tracking these stability
-    !! criteria extrema over all time-steps.
-    !! @param q_prim_vf Cell-average primitive variables
-    !! @param t_step Current time step
+    !> Write stability criteria extrema to the run-time information file and track them over all time-steps.
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -305,13 +299,7 @@ contains
 
     end subroutine s_write_run_time_information
 
-    !> The goal of this subroutine is to output the grid and conservative variables data files for given time-step.
-    !! @param q_cons_vf Cell-average conservative variables
-    !! @param q_T_sf Temperature scalar field
-    !! @param q_prim_vf Cell-average primitive variables
-    !! @param t_step Current time-step
-    !! @param bc_type Boundary condition type
-    !! @param beta Eulerian void fraction from lagrangian bubbles
+    !> Output the grid and conservative variables data files for the given time-step (serial).
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -331,7 +319,6 @@ contains
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
 
-        ! Creating or overwriting the current time-step directory
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step
 
         file_path = trim(t_step_dir) // '/.'
@@ -683,11 +670,7 @@ contains
 
     end subroutine s_write_serial_data_files
 
-    !> The goal of this subroutine is to output the grid and conservative variables data files for given time-step.
-    !! @param q_cons_vf Cell-average conservative variables
-    !! @param t_step Current time-step
-    !! @param bc_type Boundary condition type
-    !! @param beta Eulerian void fraction from lagrangian bubbles
+    !> Output the grid and conservative variables data files for the given time-step (parallel).
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
@@ -913,7 +896,7 @@ contains
 
     end subroutine s_write_parallel_data_files
 
-    !> @brief Writes immersed boundary marker data to a serial (per-processor) unformatted file.
+    !> Writes immersed boundary marker data to a serial (per-processor) unformatted file.
     subroutine s_write_serial_ib_data(time_step)
 
         integer, intent(in)                  :: time_step
@@ -933,7 +916,7 @@ contains
 
     end subroutine s_write_serial_ib_data
 
-    !> @brief Writes immersed boundary marker data in parallel using MPI I/O.
+    !> Writes immersed boundary marker data in parallel using MPI I/O.
     subroutine s_write_parallel_ib_data(time_step)
 
         integer, intent(in) :: time_step
@@ -971,7 +954,7 @@ contains
 
     end subroutine s_write_parallel_ib_data
 
-    !> @brief Dispatches immersed boundary data output to the serial or parallel writer.
+    !> Dispatches immersed boundary data output to the serial or parallel writer.
     subroutine s_write_ib_data_file(time_step)
 
         integer, intent(in) :: time_step
@@ -984,7 +967,7 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> @brief Writes IB state records to D/ib_state.dat. Must be called only on rank 0.
+    !> Writes IB state records to D/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file()
 
         integer :: i
@@ -996,9 +979,7 @@ contains
 
     end subroutine s_write_ib_state_file
 
-    !> This writes a formatted data file where the root processor can write out the CoM information
-    !! @param t_step Current time-step
-    !! @param c_mass_in Center of mass information
+    !> Write center-of-mass data to formatted file (root processor only).
     impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in)                            :: t_step
@@ -1033,10 +1014,7 @@ contains
 
     end subroutine s_write_com_files
 
-    !> This writes a formatted data file for the flow probe information
-    !! @param t_step Current time-step
-    !! @param q_cons_vf Conservative variables
-    !! @param accel_mag Acceleration magnitude information
+    !> Write flow probe data to formatted files.
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in)                                 :: t_step
@@ -1045,41 +1023,38 @@ contains
         real(wp), dimension(-1:m)                           :: distx
         real(wp), dimension(-1:n)                           :: disty
         real(wp), dimension(-1:p)                           :: distz
-
-        ! The cell-averaged partial densities, density, velocity, pressure, volume fractions, specific heat ratio function, liquid
-        ! stiffness function, and sound speed.
-        real(wp)                        :: lit_gamma, nbub
-        real(wp)                        :: rho
-        real(wp), dimension(num_vels)   :: vel
-        real(wp)                        :: pres
-        real(wp)                        :: ptilde
-        real(wp)                        :: ptot
-        real(wp)                        :: alf
-        real(wp)                        :: alfgr
-        real(wp), dimension(num_fluids) :: alpha
-        real(wp)                        :: gamma
-        real(wp)                        :: pi_inf
-        real(wp)                        :: qv
-        real(wp)                        :: c
-        real(wp)                        :: M00, M10, M01, M20, M11, M02
-        real(wp)                        :: varR, varV
-        real(wp), dimension(Nb)         :: nR, R, nRdot, Rdot
-        real(wp)                        :: nR3
-        real(wp)                        :: accel
-        real(wp)                        :: int_pres
-        real(wp)                        :: max_pres
-        real(wp), dimension(2)          :: Re
-        real(wp), dimension(6)          :: tau_e
-        real(wp)                        :: G_local
-        real(wp)                        :: dyn_p, T
-        real(wp)                        :: damage_state
-        integer                         :: i, j, k, l, s, d  !< Generic loop iterator
-        real(wp)                        :: nondim_time       !< Non-dimensional time
-        real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
-        integer                         :: npts              !< Number of included integral points
-        real(wp)                        :: rad, thickness    !< For integral quantities
-        logical                         :: trigger           !< For integral quantities
-        real(wp)                        :: rhoYks(1:num_species)
+        real(wp)                                            :: lit_gamma, nbub
+        real(wp)                                            :: rho
+        real(wp), dimension(num_vels)                       :: vel
+        real(wp)                                            :: pres
+        real(wp)                                            :: ptilde
+        real(wp)                                            :: ptot
+        real(wp)                                            :: alf
+        real(wp)                                            :: alfgr
+        real(wp), dimension(num_fluids)                     :: alpha
+        real(wp)                                            :: gamma
+        real(wp)                                            :: pi_inf
+        real(wp)                                            :: qv
+        real(wp)                                            :: c
+        real(wp)                                            :: M00, M10, M01, M20, M11, M02
+        real(wp)                                            :: varR, varV
+        real(wp), dimension(Nb)                             :: nR, R, nRdot, Rdot
+        real(wp)                                            :: nR3
+        real(wp)                                            :: accel
+        real(wp)                                            :: int_pres
+        real(wp)                                            :: max_pres
+        real(wp), dimension(2)                              :: Re
+        real(wp), dimension(6)                              :: tau_e
+        real(wp)                                            :: G_local
+        real(wp)                                            :: dyn_p, T
+        real(wp)                                            :: damage_state
+        integer                                             :: i, j, k, l, s, d  !< Generic loop iterator
+        real(wp)                                            :: nondim_time  !< Non-dimensional time
+        real(wp)                                            :: tmp  !< Temporary variable to store quantity for mpi_allreduce
+        integer                                             :: npts  !< Number of included integral points
+        real(wp)                                            :: rad, thickness  !< For integral quantities
+        logical                                             :: trigger  !< For integral quantities
+        real(wp)                                            :: rhoYks(1:num_species)
 
         T = dflt_T_guess
 
@@ -1576,9 +1551,7 @@ contains
 
     end subroutine s_write_probe_files
 
-    !> The goal of this subroutine is to write to the run-time information file basic footer information applicable to the current
-    !! computation and to close the file when done. The footer contains the stability criteria extrema over all of the time-steps
-    !! and the simulation run-time.
+    !> Write stability criteria extrema footer to the run-time information file and close it.
     impure subroutine s_close_run_time_information_file
 
         real(wp) :: run_time  !< Run-time of the simulation
@@ -1629,8 +1602,7 @@ contains
 
     end subroutine s_close_ib_state_file
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the data output module.
     impure subroutine s_initialize_data_output_module
 
         integer :: i, m_ds, n_ds, p_ds

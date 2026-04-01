@@ -22,9 +22,12 @@ contains
     impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
+        ! Generic loop iterator
         integer :: i, j
+        ! Generic flag used to identify and report MPI errors
         integer :: ierr
 
+        ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['t_step_old', 't_step_start', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
@@ -140,14 +143,6 @@ contains
         call MPI_BCAST(normMag, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(g0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(p0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-
-        if (bubbles_euler .or. bubbles_lagrange) then
-            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
-                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
-                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
-                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-        end if
 
         ! Simplex noise  and fluid physical parameters
         do i = 1, num_fluids_max

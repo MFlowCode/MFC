@@ -20,17 +20,18 @@ module m_boundary_conditions
     real(wp)          :: length_x, length_y, length_z
     real(wp)          :: radius
     type(bounds_info) :: x_boundary, y_boundary, z_boundary
+
     private; public :: s_apply_boundary_patches
 
 contains
-    !> Apply a line-segment boundary condition patch along a domain edge in 2D.
+    !> @brief Applies a line-segment boundary condition patch along a domain edge in 2D.
     impure subroutine s_line_segment_bc(patch_id, bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
         integer, intent(in)                                           :: patch_id
         integer                                                       :: j
 
-        ! Patch is a line segment along y on the x-boundary face
+        ! Patch is a vertical line at x_beg or x_end
 
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
@@ -39,7 +40,7 @@ contains
             y_boundary%beg = y_centroid - 0.5_wp*length_y
             y_boundary%end = y_centroid + 0.5_wp*length_y
 
-            ! Apply patch if x boundary is a domain boundary
+            ! Patch is a vertical line at x_beg and x_beg is a domain boundary
             #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do j = 0, n
@@ -51,7 +52,7 @@ contains
             #:endfor
         end if
 
-        ! Patch is a line segment along x on the y-boundary face
+        ! Patch is a vertical line at y_beg or y_end
         if (patch_bc(patch_id)%dir == 2) then
             x_centroid = patch_bc(patch_id)%centroid(1)
             length_x = patch_bc(patch_id)%length(1)
@@ -59,7 +60,7 @@ contains
             x_boundary%beg = x_centroid - 0.5_wp*length_x
             x_boundary%end = x_centroid + 0.5_wp*length_x
 
-            ! Apply patch if y boundary is a domain boundary
+            ! Patch is a vertical line at x_beg and x_beg is a domain boundary
             #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do j = 0, m
@@ -73,7 +74,7 @@ contains
 
     end subroutine s_line_segment_bc
 
-    !> Apply a circular boundary condition patch on a domain face in 3D.
+    !> @brief Applies a circular boundary condition patch on a domain face in 3D.
     impure subroutine s_circle_bc(patch_id, bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
@@ -133,7 +134,7 @@ contains
 
     end subroutine s_circle_bc
 
-    !> Apply a rectangular boundary condition patch on a domain face in 3D.
+    !> @brief Applies a rectangular boundary condition patch on a domain face in 3D.
     impure subroutine s_rectangle_bc(patch_id, bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
@@ -151,7 +152,7 @@ contains
 
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
-            ! Patch is a rectangle on the x-boundary face
+            ! Patch is a circle at x_beg and x_beg is a domain boundary
             #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
@@ -176,7 +177,7 @@ contains
 
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
-            ! Patch is a rectangle on the y-boundary face
+            ! Patch is a circle at y_beg and y_beg is a domain boundary
             #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
@@ -217,7 +218,7 @@ contains
 
     end subroutine s_rectangle_bc
 
-    !> Iterate over all boundary condition patches and dispatch them by geometry type.
+    !> @brief Iterates over all boundary condition patches and dispatches them by geometry type.
     impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size)        :: q_prim_vf

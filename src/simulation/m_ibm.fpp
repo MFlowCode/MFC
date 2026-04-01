@@ -112,7 +112,6 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
-        ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
 
@@ -123,7 +122,9 @@ contains
 
     end subroutine s_ibm_setup
 
-    !> Update the conservative variables at the ghost points
+    !> Subroutine that updates the conservative variables at the ghost points
+    !! @param pb_in Internal bubble pressure
+    !! @param mv_in Mass of vapor in bubble
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
@@ -152,7 +153,7 @@ contains
             real(wp), dimension(nb*nmom)    :: nmom_IP
             real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
         #:endif
-        ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
+        !! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
         real(wp), dimension(3) :: physical_loc       !< Physical loc of GP
@@ -240,7 +241,8 @@ contains
                     q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
-                        ! Pressure correction for moving IB: accounts for acceleration of IB surface
+                        ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point.
+                        ! acceleration, and normal vector direction
                         q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, &
                                   & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
                                   & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
@@ -371,7 +373,8 @@ contains
 
     end subroutine s_ibm_correct_state
 
-    !> Compute the image points for each ghost point
+    !> Function that computes the image points for each ghost point
+    !! @param ghost_points_in Ghost Points
     impure subroutine s_compute_image_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
@@ -480,7 +483,7 @@ contains
 
     end subroutine s_compute_image_points
 
-    !> Count the number of ghost points for memory allocation
+    !> Subroutine that finds the number of ghost points, used for allocating memory.
     subroutine s_find_num_ghost_points(num_gps_out)
 
         integer, intent(out) :: num_gps_out
@@ -525,7 +528,7 @@ contains
 
     end subroutine s_find_num_ghost_points
 
-    !> Locate all ghost points in the domain
+    !> Function that finds the ghost points
     subroutine s_find_ghost_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
@@ -609,7 +612,7 @@ contains
 
     end subroutine s_find_ghost_points
 
-    !> Compute the interpolation coefficients for image points
+    !> Function that computes the interpolation coefficients of image points
     subroutine s_compute_interpolation_coeffs(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
@@ -714,10 +717,27 @@ contains
 
     end subroutine s_compute_interpolation_coeffs
 
-    !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
+    !> Function that uses the interpolation coefficients and the current state at the cell centers in order to estimate the state at
+    !! the image point
+    !! @param gp Ghost point data structure
+    !> @brief Interpolates primitive variables from the fluid domain to a ghost point's image point using bilinear or trilinear
+    !! interpolation.
+    !! @param alpha_rho_IP Partial density at image point
+    !! @param alpha_IP Volume fraction at image point
+    !! @param pres_IP Pressure at image point
+    !! @param vel_IP Velocity at image point
+    !! @param c_IP Speed of sound at image point
+    !! @param r_IP Bubble radius at image point
+    !! @param v_IP Bubble radial velocity at image point
+    !! @param pb_IP Bubble pressure at image point
+    !! @param mv_IP Bubble vapor mass at image point
+    !! @param nmom_IP Bubble moment at image point
+    !! @param pb_in Internal bubble pressure array
+    !! @param mv_in Mass of vapor in bubble array
+    !! @param presb_IP Bubble node pressure at image point
+    !! @param massv_IP Bubble node vapor mass at image point
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
-
-        & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Primitive Variables
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_in, mv_in
@@ -878,9 +898,11 @@ contains
 
     end subroutine s_update_mib
 
-    !> Compute pressure and viscous forces and torques on immersed bodies via volume integration
+    !> @brief Computes pressure and viscous forces and torques on immersed bodies via a volume integration method.
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
+        ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, & idwbuff(2)%beg:idwbuff(2)%end, & idwbuff(3)%beg:idwbuff(3)%end),
+        ! intent(in) :: pressure
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
         integer                                                        :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
@@ -1030,7 +1052,7 @@ contains
 
     end subroutine s_compute_ib_forces
 
-    !> Finalize the IBM module
+    !> Subroutine to deallocate memory reserved for the IBM module
     impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
@@ -1099,6 +1121,7 @@ contains
     end subroutine s_compute_centroid_offset
 
     !> Computes the moment of inertia for an immersed boundary
+    !! @param ib_marker Immersed boundary marker index
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
         real(wp), dimension(3), intent(in) :: axis  !< the axis about which we compute the moment. Only required in 3D.
@@ -1131,8 +1154,7 @@ contains
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
             moment = 0._wp
-            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0)) &
-                           &  ! computed without grid stretching. Update in the loop to perform with stretching
+            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
             if (p /= 0) then
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
@@ -1176,7 +1198,7 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
-    !> Wrap immersed boundary positions across periodic domain boundaries
+    !> @brief Checks for periodic boundary conditions in all directions, and if so, moves patch location if it left the domain
     subroutine s_wrap_periodic_ibs()
 
         integer :: patch_id
@@ -1185,24 +1207,26 @@ contains
             ! check domain wraps in x, y,
             #:for X, ID in [('x', 1), ('y', 2), ('z',3)]
                 if (num_dims >= ${ID}$) then
+                    ! check for periodicity
                     if (bc_${X}$%beg == BC_PERIODIC) then
+                        ! check if the boundary has left the domain, and then correct
                         if (patch_ib(patch_id)%${X}$_centroid < glb_bounds(${ID}$)%beg) then
+                            ! if the boundary exited "left", wrap it back around to the "right"
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${ID}$)%end &
                                      & - glb_bounds(${ID}$)%beg)
                         else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${ID}$)%end) then
+                            ! if the boundary exited "right", wrap it back around to the "left"
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${ID}$)%end &
                                      & - glb_bounds(${ID}$)%beg)
                         end if
                     end if
                 end if
             #:endfor
-            ! check for periodicity check if the boundary has left the domain, and then correct if the boundary exited "left", wrap
-            ! it back around to the "right" if the boundary exited "right", wrap it back around to the "left"
         end do
 
     end subroutine s_wrap_periodic_ibs
 
-    !> Compute the cross product c = a x b of two 3D vectors
+    !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')

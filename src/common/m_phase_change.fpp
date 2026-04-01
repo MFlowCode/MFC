@@ -40,7 +40,8 @@ module m_phase_change
 
 contains
 
-    !> Dispatch to the correct relaxation solver. Replaces the procedure pointer, which CCE is breaking on.
+    !> This subroutine should dispatch to the correct relaxation solver based some parameter. It replaces the procedure pointer,
+    !! which CCE is breaking on.
     impure subroutine s_relaxation_solver(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -50,10 +51,11 @@ contains
 
     end subroutine s_relaxation_solver
 
-    !> Initialize the phase change module by setting saturation curve coefficients for pT- or pTg-equilibrium
+    !> The purpose of this subroutine is to initialize the phase change module by setting the parameters needed for phase change and
+    !! selecting the phase change module that will be used (pT- or pTg-equilibrium)
     impure subroutine s_initialize_phasechange_module
 
-        ! Saturation curve coefficients via stiffened gas EOS. Saurel et al. JCP (2008), Le Metayer et al. JFE (2004)
+        ! variables used in the calculation of the saturation curves for fluids 1 and 2
         A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
 
         B = (qvs(lp) - qvs(vp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
@@ -64,15 +66,20 @@ contains
 
     end subroutine s_initialize_phasechange_module
 
-    !> Apply pT- or pTg-equilibrium relaxation with mass depletion based on the incoming state conditions.
+    !> This subroutine is created to activate either the pT- (N fluids) or the pTg-equilibrium (2 fluids for g-equilibrium) model,
+    !! also considering mass depletion, depending on the incoming state conditions.
+    !! @param q_cons_vf Cell-average conservative variables
     subroutine s_infinite_relaxation_k(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(wp) :: pS, pSOV, pSSL                  !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
+        real(wp) :: pS, pSOV, pSSL  !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
+        !> equilibrium temperature for mixture, overheated vapor, and subcooled liquid. Saturation Temperatures at overheated vapor
+        !! and subcooled liquid
         real(wp) :: TS, TSOV, TSSL, TSatOV, TSatSL  !< Equilibrium and saturation temperatures
         real(wp) :: rhoe, dynE, rhos                !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT            !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF                             !< total volume fraction
+
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
 
@@ -94,7 +101,6 @@ contains
 #endif
 
         ! starting equilibrium solver
-
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok, pS, pSOV, pSSL, &
                             & TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
         do j = 0, m
@@ -139,7 +145,9 @@ contains
                     ! case, MFL cannot be either 0 or 1, so I chose it to be 2
                     call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
 
-                    ! Check if pTg-equilibrium needed; only partial densities require updating
+                    ! check if pTg-equilibrium is required NOTE that NOTHING else needs to be updated OTHER than the individual
+                    ! partial densities given the outputs from the pT- and pTg-equilibrium solvers are just p and one of the partial
+                    ! masses (pTg- case)
                     if ((relax_model == 6) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, &
                         & l) > mixM*rM) .and. (q_cons_vf(vp + contxb - 1)%sf(j, k, &
                         & l) > mixM*rM)) .and. (pS < pCr) .and. (TS < TCr)) then
@@ -249,8 +257,16 @@ contains
 
     end subroutine s_infinite_relaxation_k
 
-    !> Apply pT-equilibrium relaxation for N fluids
-    !! @param MFL flag: 0=gas, 1=liquid, 2=mixture
+    !> This auxiliary subroutine is created to activate the pT-equilibrium for N fluids
+    !! @param j generic loop iterator for x direction
+    !! @param k generic loop iterator for y direction
+    !! @param l generic loop iterator for z direction
+    !! @param MFL flag that tells whether the fluid is gas (0), liquid (1), or a mixture (2)
+    !! @param pS equilibrium pressure at the interface
+    !! @param p_infpT stiffness for the participating fluids under pT-equilibrium
+    !! @param q_cons_vf Cell-average conservative variables
+    !! @param rhoe mixture energy
+    !! @param TS equilibrium temperature at the interface
     subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, q_cons_vf, rhoe, TS)
 
         $:GPU_ROUTINE(function_name='s_infinite_pt_relaxation_k', parallelism='[seq]', cray_noinline=True)
@@ -265,6 +281,7 @@ contains
         real(wp)                                            :: gp, gpp, hp, pO, mCP, mQ  !< variables for the Newton Solver
         real(wp)                                            :: p_infpT_sum
         integer                                             :: i, ns                     !< generic loop iterators
+
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0_wp; mQ = 0.0_wp; p_infpT_sum = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
@@ -343,8 +360,16 @@ contains
 
     end subroutine s_infinite_pt_relaxation_k
 
-    !> Apply pTg-equilibrium relaxation for N fluids under pT and 2 fluids under pTg-equilibrium. There is a final common p and T
-    !! during relaxation
+    !> This auxiliary subroutine is created to activate the pTg-equilibrium for N fluids under pT and 2 fluids under
+    !! pTg-equilibrium. There is a final common p and T during relaxation
+    !! @param j generic loop iterator for x direction
+    !! @param k generic loop iterator for y direction
+    !! @param l generic loop iterator for z direction
+    !! @param pS equilibrium pressure at the interface
+    !! @param p_infpT stiffness for the participating fluids under pT-equilibrium
+    !! @param rhoe mixture energy
+    !! @param q_cons_vf Cell-average conservative variables
+    !! @param TS equilibrium temperature at the interface
     subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
 
         $:GPU_ROUTINE(function_name='s_infinite_ptg_relaxation_k', parallelism='[seq]', cray_noinline=True)
@@ -514,8 +539,14 @@ contains
 
     end subroutine s_infinite_ptg_relaxation_k
 
-    !> Correct the partial densities of the reacting fluids in case one of them is negative but their sum is positive. Inert phases
-    !! are not corrected at this moment
+    !> This auxiliary subroutine corrects the partial densities of the REACTING fluids in case one of them is negative but their sum
+    !! is positive. Inert phases are not corrected at this moment
+    !! @param MCT partial density correction parameter
+    !! @param q_cons_vf Cell-average conservative variables
+    !! @param rM sum of the reacting masses
+    !! @param j generic loop iterator for x direction
+    !! @param k generic loop iterator for y direction
+    !! @param l generic loop iterator for z direction
     subroutine s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
 
         $:GPU_ROUTINE(function_name='s_correct_partial_densities', parallelism='[seq]', cray_noinline=True)
@@ -538,7 +569,8 @@ contains
             end if
         end if
 
-        ! TODO: Consider partitioning partial densities instead of absolute-value correction
+        ! Defining the correction in terms of an absolute value might not be the best practice. Maybe a good way to do this is to
+        ! partition the partial densities, giving a small percentage of the total reacting density
         MCT = 2*mixM
 
         ! correcting the partial densities of the reacting fluids. What to do for the nonreacting ones?
@@ -554,7 +586,10 @@ contains
 
     end subroutine s_correct_partial_densities
 
-    !> Find the saturation temperature for a given saturation pressure using a Newton solver
+    !> This auxiliary subroutine finds the Saturation temperature for a given saturation pressure through a newton solver
+    !! @param pSat Saturation Pressure
+    !! @param TSat Saturation Temperature
+    !! @param TSIn equilibrium Temperature
     elemental subroutine s_TSat(pSat, TSat, TSIn)
 
         $:GPU_ROUTINE(function_name='s_TSat',parallelism='[seq]', cray_noinline=True)
@@ -563,6 +598,7 @@ contains
         real(wp), intent(out) :: TSat
         real(wp), intent(in)  :: TSIn
         real(wp)              :: dFdT, FT, Om  !< auxiliary variables
+
         ! Generic loop iterators
         integer :: ns
 
@@ -605,7 +641,7 @@ contains
 
     end subroutine s_TSat
 
-    !> Finalize the phase change module
+    !> This subroutine finalizes the phase change module
     impure subroutine s_finalize_relaxation_solver_module
 
     end subroutine s_finalize_relaxation_solver_module

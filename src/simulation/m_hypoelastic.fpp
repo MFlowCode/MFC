@@ -35,7 +35,7 @@ module m_hypoelastic
 
 contains
 
-    !> Initialize the hypoelastic module
+    !> @brief Allocates arrays and computes finite-difference coefficients for the hypoelastic stress model.
     impure subroutine s_initialize_hypoelastic_module
 
         integer :: i
@@ -78,7 +78,10 @@ contains
 
     end subroutine s_initialize_hypoelastic_module
 
-    !> Compute the hypoelastic stress source terms
+    !> The purpose of this procedure is to compute the source terms that are needed for the elastic stress equations
+    !! @param idir Dimension splitting index
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
     subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
 
         integer, intent(in)                                    :: idir
@@ -191,7 +194,6 @@ contains
                             G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs_hypo(i)  ! alpha_K(1) * Gs_hypo(1)
                         end do
 
-                        ! Continuum damage: (1-D) scales effective stiffness, D in [0,1]
                         if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
 
                         rho_K_field(k, l, q) = rho_K
@@ -328,7 +330,7 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs
 
-    !> Finalize the hypoelastic module
+    !> @brief Deallocates arrays used by the hypoelastic stress module.
     impure subroutine s_finalize_hypoelastic_module()
 
         @:DEALLOCATE(Gs_hypo)
@@ -346,7 +348,7 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
-    !> Compute the continuum damage source term from the principal stress state
+    !> @brief Computes the continuum damage source term from the principal stress state.
     subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf

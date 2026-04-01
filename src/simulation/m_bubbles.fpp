@@ -24,7 +24,20 @@ module m_bubbles
 
 contains
 
-    !> Compute the bubble radial acceleration based on the selected bubble model
+    !> Function that computes the bubble radial acceleration based on bubble models
+    !! @param fRho Current density
+    !! @param fP Current driving pressure
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fpb Internal bubble pressure
+    !! @param fpbdot Time-derivative of internal bubble pressure
+    !! @param alf bubble volume fraction
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
+    !! @param f_bub_adv_src Source for bubble volume fraction
+    !! @param f_divu Divergence of velocity
+    !! @param fCson Speed of sound from fP (EL)
     function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -64,7 +77,11 @@ contains
 
     end function f_rddot
 
-    !> Bubble wall pressure: stiffened gas with Laplace pressure and viscous stress
+    !> Function that computes that bubble wall pressure for Gilmore bubbles
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fpb Internal bubble pressure
     function f_cpbw(fR0, fR, fV, fpb)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -79,7 +96,11 @@ contains
 
     end function f_cpbw
 
-    !> Compute the bubble enthalpy
+    !> Function that computes the bubble enthalpy
+    !! @param fCpbw Bubble wall pressure
+    !! @param fCpinf Driving bubble pressure
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
     function f_H(fCpbw, fCpinf, fntait, fBtait)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -95,7 +116,11 @@ contains
 
     end function f_H
 
-    !> Compute the sound speed for the bubble
+    !> Function that computes the sound speed for the bubble
+    !! @param fCpinf Driving bubble pressure
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
+    !! @param fH Bubble enthalpy
     function f_cgas(fCpinf, fntait, fBtait, fH)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -111,7 +136,14 @@ contains
 
     end function f_cgas
 
-    !> Compute the time derivative of the driving pressure
+    !> Function that computes the time derivative of the driving pressure
+    !! @param fRho Local liquid density
+    !! @param fP Local pressure
+    !! @param falf Local void fraction
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
+    !! @param advsrc Advection equation source term
+    !! @param divu Divergence of velocity
     function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -131,7 +163,16 @@ contains
 
     end function f_cpinfdot
 
-    !> Enthalpy derivative for Gilmore bubble model, Gilmore (1952)
+    !> Function that computes the time derivative of the enthalpy
+    !! @param fCpbw Bubble wall pressure
+    !! @param fCpinf Driving bubble pressure
+    !! @param fCpinf_dot Time derivative of the driving pressure
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fpbdot Time derivative of the internal bubble pressure
     function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -151,20 +192,42 @@ contains
         f_Hdot = (fCpbw/(1._wp + fBtait) + 1._wp)**(-1._wp/fntait)*(tmp1 + tmp2) - (fCpinf/(1._wp + fBtait) + 1._wp) &
                   & **(-1._wp/fntait)*fCpinf_dot
 
+        ! Hdot = (Cpbw/(1+B) + 1)^(-1/n_tait)*(-3 gam)*(R0/R)^(3gam) V/R f_Hdot =
+        ! ((fCpbw/(1._wp+fBtait)+1._wp)**(-1._wp/fntait))*(-3._wp)*gam * & ( (fR0/fR)**(3._wp*gam ))*(fV/fR)
+
+        ! Hdot = Hdot - (Cpinf/(1+B) + 1)^(-1/n_tait) Cpinfdot f_Hdot = f_Hdot -
+        ! ((fCpinf/(1._wp+fBtait)+1._wp)**(-1._wp/fntait))*fCpinf_dot
+
     end function f_Hdot
 
-    !> Rayleigh-Plesset bubble radial acceleration
+    !> Function that computes the bubble radial acceleration for Rayleigh-Plesset bubbles
+    !! @param fCp Driving pressure
+    !! @param fRho Current density
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fCpbw Boundary wall pressure
     function f_rddot_RP(fCp, fRho, fR, fV, fCpbw)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fCp, fRho, fR, fV, fCpbw
         real(wp)             :: f_rddot_RP
 
+        !! rddot = (1/r) ( -3/2 rdot^2 + ((r0/r)^3\gamma - Cp)/rho ) rddot = (1/r) ( -3/2 rdot^2 + (tmp1 - Cp)/rho ) rddot = (1/r) (
+        !! tmp2 )
+
         f_rddot_RP = (-1.5_wp*(fV**2._wp) + (fCpbw - fCp)/fRho)/fR
 
     end function f_rddot_RP
 
-    !> Compute the Gilmore bubble radial acceleration
+    !> Function that computes the bubble radial acceleration
+    !! @param fCpbw Bubble wall pressure
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fH Current enthalpy
+    !! @param fHdot Current time derivative of the enthalpy
+    !! @param fcgas Current gas sound speed
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
     function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -181,7 +244,11 @@ contains
 
     end function f_rddot_G
 
-    !> Keller-Miksis bubble wall pressure
+    !> Function that computes the bubble wall pressure for Keller--Miksis bubbles
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fpb Internal bubble pressure
     function f_cpbw_KM(fR0, fR, fV, fpb)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -200,7 +267,15 @@ contains
 
     end function f_cpbw_KM
 
-    !> Keller-Miksis bubble radial acceleration
+    !> Function that computes the bubble radial acceleration for Keller--Miksis bubbles
+    !! @param fpbdot Time-derivative of internal bubble pressure
+    !! @param fCp Driving pressure
+    !! @param fCpbw Bubble wall pressure
+    !! @param fRho Current density
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fC Current sound speed
     function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -229,7 +304,9 @@ contains
 
     end function f_rddot_KM
 
-    !> Compute bubble wall properties for vapor bubbles
+    !> Subroutine that computes bubble wall properties for vapor bubbles
+    !! @param pb_in Internal bubble pressure
+    !! @param iR0 Current bubble size index
     subroutine s_bwproperty(pb_in, iR0, chi_vw_out, k_mw_out, rho_mw_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -250,7 +327,17 @@ contains
 
     end subroutine s_bwproperty
 
-    !> Compute the vapour flux
+    !> Function that computes the vapour flux
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fpb
+    !! @param fmass_v Current mass of vapour
+    !! @param iR0 Bubble size index (EE) or bubble identifier (EL)
+    !! @param vflux Computed vapour flux
+    !! @param fmass_g Current gas mass (EL)
+    !! @param fbeta_c Mass transfer coefficient (EL)
+    !! @param fR_m Mixture gas constant (EL)
+    !! @param fgamma_m Mixture gamma (EL)
     subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_g, fbeta_c, fR_m, fgamma_m)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -298,7 +385,16 @@ contains
 
     end subroutine s_vflux
 
-    !> Compute the time derivative of the internal bubble pressure
+    !> Function that computes the time derivative of the internal bubble pressure
+    !! @param fvflux Vapour flux
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fpb Current internal bubble pressure
+    !! @param fmass_v Current mass of vapour
+    !! @param iR0 Bubble size index (EE) or bubble identifier (EL)
+    !! @param fbeta_t Mass transfer coefficient (EL)
+    !! @param fR_m Mixture gas constant (EL)
+    !! @param fgamma_m Mixture gamma (EL)
     function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
 
         !$DIR INLINENEVER f_bpres_dot
@@ -334,6 +430,25 @@ contains
 
     !> Adaptive time stepping routine for subgrid bubbles (See Heirer, E. Hairer S.P.Norsett G. Wanner, Solving Ordinary
     !! Differential Equations I, Chapter II.4)
+    !! @param fRho Current density
+    !! @param fP Current driving pressure
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble radial velocity
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fpb Internal bubble pressure
+    !! @param fpbdot Time-derivative of internal bubble pressure
+    !! @param alf bubble volume fraction
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
+    !! @param f_bub_adv_src Source for bubble volume fraction
+    !! @param f_divu Divergence of velocity
+    !! @param bub_id Bubble identifier (EL)
+    !! @param fmass_v Current mass of vapour (EL)
+    !! @param fmass_g Current mass of gas (EL)
+    !! @param fbeta_c Mass transfer coefficient (EL)
+    !! @param fbeta_t Heat transfer coefficient (EL)
+    !! @param fCson Speed of sound (EL)
+    !! @param adap_dt_stop Fail-safe exit if max iteration count reached
     function f_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, fmass_v, &
                             & fmass_g, fbeta_c, fbeta_t, fCson, fRe, fPos, fVel, cell, q_prim_vf) result(adap_dt_stop)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -452,11 +567,6 @@ contains
                                 fVel(l) = fVel(l) + h*aTemp(l)
                                 fPos(l) = fPos(l) + h*fVel(l)
                             end do
-                        case default
-                            do l = 1, num_dims
-                                fVel(l) = fVel(l)
-                                fPos(l) = fPos(l)
-                            end do
                         end select
                     end if
 
@@ -484,6 +594,20 @@ contains
 
     !> Choose the initial time step size for the adaptive time stepping routine (See Heirer, E. Hairer S.P.Norsett G. Wanner,
     !! Solving Ordinary Differential Equations I, Chapter II.4)
+    !! @param fRho Current density
+    !! @param fP Current driving pressure
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fpb Internal bubble pressure
+    !! @param fpbdot Time-derivative of internal bubble pressure
+    !! @param alf bubble volume fraction
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
+    !! @param f_bub_adv_src Source for bubble volume fraction
+    !! @param f_divu Divergence of velocity
+    !! @param fCson Speed of sound (EL)
+    !! @param h Time step size
     subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson, h)
 
         $:GPU_ROUTINE(function_name='s_initial_substep_h',parallelism='[seq]', cray_inline=True)
@@ -495,6 +619,7 @@ contains
         real(wp), dimension(2) :: h_size                     !< Time step size (h0, h1)
         real(wp), dimension(3) :: d_norms                    !< norms (d_0, d_1, d_2)
         real(wp), dimension(2) :: myR_tmp, myV_tmp, myA_tmp  !< Bubble radius, radial velocity, and radial acceleration
+
         ! Determine the starting time step Evaluate f(x0,y0)
         myR_tmp(1) = fR
         myV_tmp(1) = fV
@@ -529,9 +654,32 @@ contains
     end subroutine s_initial_substep_h
 
     !> Integrate bubble variables over the given time step size, h, using a third-order accurate embedded Runge-Kutta scheme.
+    !! @param err Estimated error
+    !! @param fRho Current density
+    !! @param fP Current driving pressure
+    !! @param fR Current bubble radius
+    !! @param fV Current bubble velocity
+    !! @param fR0 Equilibrium bubble radius
+    !! @param fpb Internal bubble pressure
+    !! @param fpbdot Time-derivative of internal bubble pressure
+    !! @param alf bubble volume fraction
+    !! @param fntait Tait EOS parameter
+    !! @param fBtait Tait EOS parameter
+    !! @param f_bub_adv_src Source for bubble volume fraction
+    !! @param f_divu Divergence of velocity
+    !! @param bub_id Bubble identifier (EL)
+    !! @param fmass_v Current mass of vapour (EL)
+    !! @param fmass_g Current mass of gas (EL)
+    !! @param fbeta_c Mass transfer coefficient (EL)
+    !! @param fbeta_t Heat transfer coefficient (EL)
+    !! @param fCson Speed of sound (EL)
+    !! @param h Time step size
+    !! @param myR_tmp Bubble radius at each stage
+    !! @param myV_tmp Bubble radial velocity at each stage
+    !! @param myPb_tmp Internal bubble pressure at each stage (EL)
+    !! @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
     subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, &
-
-        & fmass_v, fmass_g, fbeta_c, fbeta_t, fCson, h, myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+                                 & fmass_v, fmass_g, fbeta_c, fbeta_t, fCson, h, myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
         $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(out)               :: err
@@ -619,7 +767,17 @@ contains
     end subroutine s_advance_substep
 
     !> Changes of pressure and vapor mass in the lagrange bubbles.
+    !! @param fR_tmp Bubble radius
+    !! @param fV_tmp Bubble radial velocity
+    !! @param fPb_tmp Internal bubble pressure
+    !! @param fMv_tmp Mass of vapor in the bubble
+    !! @param bub_id Bubble identifier
+    !! @param fmass_g Current mass of gas
+    !! @param fbeta_c Mass transfer coefficient
+    !! @param fbeta_t Heat transfer coefficient
+    !! @param fdPbdt_tmp Rate of change of the internal bubble pressure
     !! @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
+    !! @param advance_EL Rate of change of the mass of vapor in the bubble
     subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fmass_g, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
 
         $:GPU_ROUTINE(parallelism='[seq]')

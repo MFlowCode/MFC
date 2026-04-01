@@ -658,10 +658,6 @@ contains
                 end if
             end if
 
-            ! if (bubbles_lagrange) then beta_idx = sys_size + 1 sys_size = beta_idx end if
-
-            ! if (particles_lagrange) then beta_idx = sys_size + 1 sys_size = beta_idx end if
-
             if (mhd) then
                 B_idx%beg = sys_size + 1
                 if (n == 0) then

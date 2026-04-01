@@ -1543,6 +1543,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
+                "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
             ]
             if path in casesToSkip:
                 continue

@@ -50,7 +50,8 @@ module m_riemann_solvers
     $:GPU_DECLARE(create='[flux_gsrc_rsx_vf, flux_gsrc_rsy_vf, flux_gsrc_rsz_vf]')
     !> @}
 
-    ! Cell-boundary velocity from Riemann solution; used for source flux
+    ! The cell-boundary values of the velocity. vel_src_rs_vf is determined as part of Riemann problem solution and is used to
+    ! evaluate the source flux.
 
     real(wp), allocatable, dimension(:,:,:,:) :: vel_src_rsx_vf
     real(wp), allocatable, dimension(:,:,:,:) :: vel_src_rsy_vf
@@ -85,10 +86,31 @@ contains
 
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
     !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_exact_riemann_solver 4) s_hlld_riemann_solver
+    !! @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
+    !! @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
+    !! @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
+    !! @param dqL_prim_dx_vf The left WENO-reconstructed cell-boundary values of the first-order x-dir spatial derivatives
+    !! @param dqL_prim_dy_vf The left WENO-reconstructed cell-boundary values of the first-order y-dir spatial derivatives
+    !! @param dqL_prim_dz_vf The left WENO-reconstructed cell-boundary values of the first-order z-dir spatial derivatives
+    !! @param qL_prim_vf The left WENO-reconstructed cell-boundary values of the cell-average primitive variables
+    !! @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
+    !! @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
+    !! @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
+    !! @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the first-order x-dir spatial derivatives
+    !! @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the first-order y-dir spatial derivatives
+    !! @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the first-order z-dir spatial derivatives
+    !! @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the cell-average primitive variables
+    !! @param q_prim_vf Cell-averaged primitive variables
+    !! @param flux_vf Intra-cell fluxes
+    !! @param flux_src_vf Intra-cell fluxes sources
+    !! @param flux_gsrc_vf Intra-cell geometric fluxes sources
+    !! @param norm_dir Dir. splitting direction
+    !! @param ix Index bounds in the x-dir
+    !! @param iy Index bounds in the y-dir
+    !! @param iz Index bounds in the z-dir
     subroutine s_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
-
-        & qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
-            & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                & qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
+                                & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -116,7 +138,6 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-
         & dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
@@ -136,11 +157,11 @@ contains
 
     end subroutine s_compute_viscous_source_flux
 
-    !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
+    !> @brief Computes intercell fluxes using the Harten-Lax-van Leer (HLL) approximate Riemann solver.
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                    & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                    & dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, &
+                                    & norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -210,8 +231,8 @@ contains
         type(riemann_states_vec3) :: b4             !< 4-magnetic field components (spatial: b4x, b4y, b4z)
         type(riemann_states_vec3) :: cm             !< Conservative momentum variables
         integer                   :: i, j, k, l, q  !< Generic loop iterators
-        ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
+        ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -467,6 +488,18 @@ contains
                                 end do
                             end if
 
+                            ! elastic energy update if ( hyperelasticity ) then G_L = 0._wp G_R = 0._wp
+                            !
+                            ! $:GPU_LOOP(parallelism='[seq]') do i = 1, num_fluids G_L = G_L + alpha_L(i)*Gs_rs(i) G_R = G_R +
+                            ! alpha_R(i)*Gs_rs(i) end do ! Elastic contribution to energy if G large enough if ((G_L > 1.e-3_wp)
+                            ! .and. (G_R > 1.e-3_wp)) then E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1) E_R = E_R +
+                            ! G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1) $:GPU_LOOP(parallelism='[seq]') do i = 1, b_size-1
+                            ! tau_e_L(i) = G_L*qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i) tau_e_R(i) = G_R*qR_prim_rs${XYZ}$_vf(j
+                            ! + 1, k, l, strxb - 1 + i) end do $:GPU_LOOP(parallelism='[seq]') do i = 1, b_size-1 tau_e_L(i) = 0._wp
+                            ! tau_e_R(i) = 0._wp end do $:GPU_LOOP(parallelism='[seq]') do i = 1, num_dims xi_field_L(i) =
+                            ! qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i) xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg -
+                            ! 1 + i) end do end if end if
+
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms, 0._wp, c_L, &
@@ -496,14 +529,11 @@ contains
                                 end do
                             end if
 
-                            ! Wave speed estimates (wave_speeds=1: direct, wave_speeds=2: pressure-based)
                             if (wave_speeds == 1) then
                                 if (mhd) then
-                                    ! MHD: use fast magnetosonic speed
                                     s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
-                                    ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1))) &
                                               & /rho_L), &
                                               & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1))) &
@@ -523,7 +553,7 @@ contains
                                 end if
 
                                 if (hyper_cleaning) then
-                                    ! Dedner GLM divergence cleaning, Dedner et al. JCP (2002)
+                                    ! Dedner GLM: (B_n, psi) subsystem has eigenvalues +/- c_h in the lab frame.
                                     s_L = min(s_L, -hyper_cleaning_speed)
                                     s_R = max(s_R, hyper_cleaning_speed)
                                 end if
@@ -536,7 +566,6 @@ contains
 
                                 pres_SR = pres_SL
 
-                                ! Low Mach correction: Thornber et al. JCP (2008)
                                 Ms_L = max(1._wp, &
                                            & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                            & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -557,7 +586,7 @@ contains
                             xi_P = (5.e-1_wp - sign(5.e-1_wp, s_R)) + (5.e-1_wp - sign(5.e-1_wp, s_L))*(5.e-1_wp + sign(5.e-1_wp, &
                                     & s_R))
 
-                            ! HLL intercell flux: F* = (s_R*F_L - s_L*F_R + s_L*s_R*(U_R - U_L)) / (s_R - s_L) Low Mach correction
+                            ! Low Mach correction
                             if (low_Mach == 1) then
                                 @:compute_low_Mach_correction()
                             else
@@ -687,7 +716,7 @@ contains
                                 end do
                             end if
 
-                            ! Advection flux and source: interface velocity for volume fraction transport
+                            ! Advection
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = (qL_prim_rs${XYZ}$_vf(j, k, l, i) - qR_prim_rs${XYZ}$_vf(j + 1, &
@@ -716,7 +745,6 @@ contains
                                 end do
                             end if
 
-                            ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
                                 if (n == 0) then  ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
@@ -813,11 +841,11 @@ contains
 
     end subroutine s_hll_riemann_solver
 
-    !> Lax-Friedrichs (Rusanov) approximate Riemann solver
+    !> @brief Computes intercell fluxes using the Lax-Friedrichs (LF) approximate Riemann solver.
     subroutine s_lf_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                   & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                   & dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, &
+                                   & norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -890,8 +918,8 @@ contains
         type(riemann_states_vec3) :: cm              !< Conservative momentum variables
         integer                   :: i, j, k, l, q   !< Generic loop iterators
         integer, dimension(3)     :: idx_right_phys  !< Physical (j,k,l) indices for right state.
-        ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
+        ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -1302,7 +1330,7 @@ contains
                                 end do
                             end if
 
-                            ! Advection flux and source: interface velocity for volume fraction transport
+                            ! Advection
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = (qL_prim_rs${XYZ}$_vf(j, k, l, i) - qR_prim_rs${XYZ}$_vf(j + 1, &
@@ -1331,7 +1359,6 @@ contains
                                 end do
                             end if
 
-                            ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
                                 if (n == 0) then  ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
@@ -1681,11 +1708,35 @@ contains
 
     end subroutine s_lf_riemann_solver
 
-    !> HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
+    !> This procedure is the implementation of the Harten, Lax, van Leer, and contact (HLLC) approximate Riemann solver, see Toro
+    !! (1999) and Johnsen (2007). The viscous and the surface tension effects have been included by modifying the exact Riemann
+    !! solver of Perigaud and Saurel (2005).
+    !! @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
+    !! @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
+    !! @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
+    !! @param dqL_prim_dx_vf The left WENO-reconstructed cell-boundary values of the first-order x-dir spatial derivatives
+    !! @param dqL_prim_dy_vf The left WENO-reconstructed cell-boundary values of the first-order y-dir spatial derivatives
+    !! @param dqL_prim_dz_vf The left WENO-reconstructed cell-boundary values of the first-order z-dir spatial derivatives
+    !! @param qL_prim_vf The left WENO-reconstructed cell-boundary values of the cell-average primitive variables
+    !! @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
+    !! @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
+    !! @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
+    !! @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the first-order x-dir spatial derivatives
+    !! @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the first-order y-dir spatial derivatives
+    !! @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the first-order z-dir spatial derivatives
+    !! @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the cell-average primitive variables
+    !! @param q_prim_vf Cell-averaged primitive variables
+    !! @param flux_vf Intra-cell fluxes
+    !! @param flux_src_vf Intra-cell fluxes sources
+    !! @param flux_gsrc_vf Intra-cell geometric fluxes sources
+    !! @param norm_dir Dir. splitting direction
+    !! @param ix Index bounds in the x-dir
+    !! @param iy Index bounds in the y-dir
+    !! @param iz Index bounds in the z-dir
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                     & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
+                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                     & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -1773,6 +1824,7 @@ contains
         real(wp) :: flux_ene_e
         real(wp) :: zcoef, pcorr           !< low Mach number correction
         integer  :: Re_max, i, j, k, l, q  !< Generic loop iterators
+
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
@@ -1785,9 +1837,9 @@ contains
 
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
-                ! 6-EQUATION MODEL WITH HLLC HLLC star-state flux with contact wave speed s_S
+                ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
-                    ! 6-equation model (model_eqns=3): separate phasic internal energies
+                    ! ME3
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, &
                                         & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, &
                                         & h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, rho_L, &
@@ -1922,7 +1974,7 @@ contains
                                     end do
                                 end if
 
-                                ! Hyperelastic stress contribution: strain energy added to total energy
+                                ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -1979,7 +2031,6 @@ contains
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
-                                        ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
                                                   & ))/rho_L), &
                                                   & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
@@ -2004,7 +2055,6 @@ contains
 
                                     pres_SR = pres_SL
 
-                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -2098,7 +2148,7 @@ contains
                                                       & i)*s_S + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*s_S
                                 end do
 
-                                ! Advection velocity source: interface velocity for volume fraction transport
+                                ! SOURCE TERM FOR VOLUME FRACTION ADVECTION FLUX.
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, &
@@ -2141,7 +2191,7 @@ contains
                                     end do
                                 end if
 
-                                ! Hyperelastic reference map flux for material deformation tracking
+                                ! REFERENCE MAP FLUX.
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -2197,7 +2247,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else if (model_eqns == 4) then
-                    ! 4-equation model (model_eqns=4): single pressure, velocity equilibrium
+                    ! ME4
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
                                         & nbub_L, nbub_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, &
                                         & T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, &
@@ -2288,7 +2338,6 @@ contains
 
                                     pres_SR = pres_SL
 
-                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -2351,7 +2400,7 @@ contains
                                                       & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! Advection velocity source: interface velocity for volume fraction transport
+                                ! Source for volume fraction advection equation
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = 0._wp
@@ -2416,7 +2465,6 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else if (model_eqns == 2 .and. bubbles_euler) then
-                    ! 5-equation model with Euler-Euler bubble dynamics
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, &
                                         & vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, Re_L, Re_R, pcorr, zcoef, rho_L, &
                                         & rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, &
@@ -2641,7 +2689,6 @@ contains
 
                                     pres_SR = pres_SL
 
-                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -2731,7 +2778,7 @@ contains
                                                       & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end do
 
-                                ! Advection velocity source: interface velocity for volume fraction transport
+                                ! Source for volume fraction advection equation
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, &
@@ -2810,7 +2857,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else
-                    ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection
+                    ! 5-EQUATION MODEL WITH HLLC
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, &
                                         & rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, &
                                         & alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, &
@@ -2993,7 +3040,7 @@ contains
                                     end do
                                 end if
 
-                                ! Hyperelastic stress contribution: strain energy added to total energy
+                                ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -3053,7 +3100,6 @@ contains
 
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
-                                        ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
                                                   & ))/rho_L), &
                                                   & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
@@ -3078,7 +3124,6 @@ contains
 
                                     pres_SR = pres_SL
 
-                                    ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
                                                & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
                                                & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
@@ -3194,7 +3239,7 @@ contains
                                                       & c_idx)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end if
 
-                                ! Hyperelastic reference map flux for material deformation tracking
+                                ! REFERENCE MAP FLUX.
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -3294,11 +3339,11 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
-    !> HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
+    !> HLLD Riemann solver resolves 5 of the 7 waves of MHD equations: 1 entropy wave, 2 Alfven waves, 2 fast magnetosonic waves.
     subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                     & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
+                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                     & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -3465,13 +3510,13 @@ contains
                             F_R(3:4) = U_R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
                             F_R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
                             F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
-                            ! HLLD star-state fluxes via HLL jump relation
+                            ! Compute the star flux using HLL relation
                             F_starL = F_L + s_L*(U_starL - U_L)
                             F_starR = F_R + s_R*(U_starR - U_R)
-                            ! Alfven wave speeds bounding the rotational discontinuities
+                            ! Compute the rotational (Alfven) speeds
                             s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
                             s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
-                            ! HLLD double-star (intermediate) states across rotational discontinuities
+                            ! Compute the double-star states [Miyoshi Eqns. (59)-(62)]
                             sqrt_rhoL_star = sqrt(rhoL_star); sqrt_rhoR_star = sqrt(rhoR_star)
                             vL_star = vel%L(2); wL_star = vel%L(3)
                             vR_star = vel%R(2); wR_star = vel%R(3)
@@ -3497,7 +3542,7 @@ contains
                             U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, Bz_double, &
                                 & E_double]
 
-                            ! Select HLLD flux region
+                            ! (11) Choose HLLD flux based on wave-speed regions
                             if (0.0_wp <= s_L) then
                                 F_hlld = F_L
                             else if (0.0_wp <= s_starL) then
@@ -3512,7 +3557,7 @@ contains
                                 F_hlld = F_R
                             end if
 
-                            ! (12) Write HLLD flux to output arrays
+                            ! (12) Reorder and write temporary variables to the flux array Mass
                             flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1)  ! TODO multi-component
                             ! Momentum
                             flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = F_hlld(2)
@@ -3528,7 +3573,7 @@ contains
                             end if
                             ! Energy
                             flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_hlld(7)
-                            ! Volume fractions
+                            ! Partial fraction
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
                                 flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp  ! TODO multi-component (zero for now)
@@ -3546,7 +3591,8 @@ contains
 
     end subroutine s_hlld_riemann_solver
 
-    !> Initialize the Riemann solvers module
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_riemann_solvers_module
 
         ! Allocating the variables that will be utilized to formulate the left, right, and average states of the Riemann problem, as
@@ -3628,11 +3674,27 @@ contains
 
     end subroutine s_initialize_riemann_solvers_module
 
-    !> Populate the left and right Riemann state variable buffers based on boundary conditions
+    !> The purpose of this subroutine is to populate the buffers of the left and right Riemann states variables, depending on the
+    !! boundary conditions.
+    !! @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
+    !! @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
+    !! @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
+    !! @param dqL_prim_dx_vf The left WENO-reconstructed cell-boundary values of the first-order x-dir spatial derivatives
+    !! @param dqL_prim_dy_vf The left WENO-reconstructed cell-boundary values of the first-order y-dir spatial derivatives
+    !! @param dqL_prim_dz_vf The left WENO-reconstructed cell-boundary values of the first-order z-dir spatial derivatives
+    !! @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
+    !! @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
+    !! @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
+    !! @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the first-order x-dir spatial derivatives
+    !! @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the first-order y-dir spatial derivatives
+    !! @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the first-order z-dir spatial derivatives
+    !! @param norm_dir Dir. splitting direction
+    !! @param ix Index bounds in the x-dir
+    !! @param iy Index bounds in the y-dir
+    !! @param iz Index bounds in the z-dir
     subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
-
         & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
+        & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, &
              & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
@@ -3962,7 +4024,10 @@ contains
 
     end subroutine s_populate_riemann_states_variables_buffers
 
-    !> Set up the chosen Riemann solver algorithm for the current direction
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures needed to configure the chosen Riemann solver algorithm.
+    !! @param flux_src_vf Intra-cell fluxes sources
+    !! @param norm_dir Dir. splitting direction
     subroutine s_initialize_riemann_solver(flux_src_vf, norm_dir)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
@@ -4111,9 +4176,23 @@ contains
 
     end subroutine s_initialize_riemann_solver
 
-    !> Compute cylindrical viscous source flux contributions for momentum and energy
+    !> @brief Computes cylindrical viscous source flux contributions for momentum and energy. Calculates Cartesian components of the
+    !! stress tensor using averaged velocity derivatives and cylindrical geometric factors, then updates `flux_src_vf`. Assumes
+    !! x-dir is axial (z_cyl), y-dir is radial (r_cyl), z-dir is azimuthal (theta_cyl for derivatives).
+    !! @param[in] velL_vf Left boundary velocity (\f$v_x, v_y, v_z\f$) (num_dims scalar_field).
+    !! @param[in] dvelL_dx_vf Left boundary \f$\partial v_i/\partial x\f$ (num_dims scalar_field).
+    !! @param[in] dvelL_dy_vf Left boundary \f$\partial v_i/\partial y\f$ (num_dims scalar_field).
+    !! @param[in] dvelL_dz_vf Left boundary \f$\partial v_i/\partial z\f$ (num_dims scalar_field).
+    !! @param[in] velR_vf Right boundary velocity (\f$v_x, v_y, v_z\f$) (num_dims scalar_field).
+    !! @param[in] dvelR_dx_vf Right boundary \f$\partial v_i/\partial x\f$ (num_dims scalar_field).
+    !! @param[in] dvelR_dy_vf Right boundary \f$\partial v_i/\partial y\f$ (num_dims scalar_field).
+    !! @param[in] dvelR_dz_vf Right boundary \f$\partial v_i/\partial z\f$ (num_dims scalar_field).
+    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+    !! @param[in] norm_dir Interface normal direction (1=x-face, 2=y-face, 3=z-face).
+    !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
+    !! @param[in] iy Global Y-direction loop bounds (int_bounds_info).
+    !! @param[in] iz Global Z-direction loop bounds (int_bounds_info).
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-
         & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_dims), intent(in)    :: velL_vf, velR_vf
@@ -4132,18 +4211,20 @@ contains
             real(wp), dimension(3) :: avg_dvdy_int  !< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
             real(wp), dimension(3) :: avg_dvdz_int  !< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
             real(wp), dimension(3) :: vel_src_int   !< Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
-
-            !> Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
-            real(wp), dimension(3) :: stress_vector_shear
+            real(wp), &
+                 & dimension(3) &
+                 & :: stress_vector_shear !!< Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
         #:else
-            real(wp), dimension(num_dims) :: avg_v_int     !< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
+            real(wp), &
+                 & dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
             real(wp), dimension(num_dims) :: avg_dvdx_int  !< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
             real(wp), dimension(num_dims) :: avg_dvdy_int  !< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
             real(wp), dimension(num_dims) :: avg_dvdz_int  !< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
-            !> Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
-            real(wp), dimension(num_dims) :: vel_src_int
-            !> Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
-            real(wp), dimension(num_dims) :: stress_vector_shear
+            real(wp), &
+                 & dimension(num_dims) :: vel_src_int !!< Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
+            real(wp), &
+                 & dimension(num_dims) &
+                 & :: stress_vector_shear !!< Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
         #:endif
         real(wp) :: stress_normal_bulk  !< Normal bulk stress component \f$\sigma_{NN}\f$ on N-face.
         real(wp) :: Re_s, Re_b  !< Effective interface shear and bulk Reynolds numbers.
@@ -4282,9 +4363,17 @@ contains
 
     end subroutine s_compute_cylindrical_viscous_source_flux
 
-    !> Compute Cartesian viscous source flux contributions for momentum and energy
+    !> @brief Computes Cartesian viscous source flux contributions for momentum and energy. Calculates averaged velocity gradients,
+    !! gets Re and interface velocities, calls helpers for shear/bulk stress, then updates `flux_src_vf`.
+    !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
+    !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
+    !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
+    !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
+    !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
     subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
-
         & dvelR_dz_vf, flux_src_vf, norm_dir)
 
         ! Arguments
@@ -4406,7 +4495,11 @@ contains
 
     end subroutine s_compute_cartesian_viscous_source_flux
 
-    !> Compute shear stress tensor components
+    !> @brief Calculates shear stress tensor components. tau_ij_shear = ( (dui/dxj + duj/dxi) - (2/3)*(div_v)*delta_ij ) / Re_shear
+    !! @param[in] vel_grad_avg Averaged velocity gradient tensor (d(vel_i)/d(coord_j)).
+    !! @param[in] Re_shear Shear Reynolds number.
+    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+    !! @param[out] tau_shear_out Calculated shear stress tensor (stress on i-face, j-direction).
     subroutine s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, tau_shear_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -4425,6 +4518,7 @@ contains
         ! Local variables
         integer :: i_dim  !< Loop iterator for face normal.
         integer :: j_dim  !< Loop iterator for force component direction.
+
         tau_shear_out = 0.0_wp
 
         do i_dim = 1, num_dims
@@ -4438,7 +4532,10 @@ contains
 
     end subroutine s_calculate_shear_stress_tensor
 
-    !> Compute bulk stress tensor components (diagonal only)
+    !> @brief Calculates bulk stress tensor components (diagonal only). tau_ii_bulk = (div_v) / Re_bulk. Off-diagonals are zero.
+    !! @param[in] Re_bulk Bulk Reynolds number.
+    !! @param[in] divergence_v Velocity divergence (du/dx + dv/dy + dw/dz).
+    !! @param[out] tau_bulk_out Calculated bulk stress tensor (stress on i-face, i-direction).
     subroutine s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, tau_bulk_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -4454,6 +4551,7 @@ contains
 
         ! Local variables
         integer :: i_dim  !< Loop iterator for diagonal components.
+
         tau_bulk_out = 0.0_wp
 
         do i_dim = 1, num_dims
@@ -4463,11 +4561,16 @@ contains
     end subroutine s_calculate_bulk_stress_tensor
 
     !> Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver
+    !! @param flux_vf Intercell fluxes
+    !! @param flux_src_vf Intercell source fluxes
+    !! @param flux_gsrc_vf Intercell geometric source fluxes
+    !! @param norm_dir Dimensional splitting coordinate direction
     subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
         integer, intent(in)                                    :: norm_dir
         integer                                                :: i, j, k, l  !< Generic loop iterators
+
         ! Reshaping Outputted Data in y-direction
 
         if (norm_dir == 2) then

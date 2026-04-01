@@ -1,4 +1,4 @@
-!> Allocate memory and read initial condition data for IC extrusion.
+!> @brief Allocate memory and read initial condition data for IC extrusion.
 !>
 !> @details
 !> This macro handles the complete initialization process for IC extrusion by:

@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_global_parameters
+!! Contains module m_global_parameters
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
@@ -19,10 +19,8 @@ module m_global_parameters
 
     implicit none
 
-    real(wp) :: wall_time = 0
-    real(wp) :: wall_time_avg = 0
-
-    ! Logistics
+    real(wp)                :: wall_time = 0
+    real(wp)                :: wall_time_avg = 0
     integer                 :: num_procs      !< Number of processors
     character(LEN=path_len) :: case_dir       !< Case folder location
     logical                 :: run_time_info  !< Run-time output flag
@@ -362,14 +360,8 @@ module m_global_parameters
 
     ! Subgrid Particle Parameters
     type(subgrid_particle_physical_parameters) :: particle_pp
-
-    !> The order of the finite-difference (fd) approximations of the first-order derivatives that need to be evaluated when the CoM
-    !! or flow probe data files are to be written at each time step
-    integer :: fd_order  !< Finite-difference order for CoM and flow probe derivatives
-
-    !> The finite-difference number is given by MAX(1, fd_order/2). Essentially, it is a measure of the half-size of the
-    !! finite-difference stencil for the selected order of accuracy.
-    integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+    integer                                    :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
+    integer                                    :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt
@@ -567,8 +559,6 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i, j  !< Generic loop iterator
-
-        ! Logistics
 
         case_dir = '.'
         run_time_info = .false.
@@ -959,9 +949,7 @@ contains
             $:GPU_UPDATE(device='[igr, igr_order, igr_iter_solver]')
         #:endif
 
-        ! Initializing the number of fluids for which viscous effects will be non-negligible, the number of distinctive material
-        ! interfaces for which surface tension will be important and also, the number of fluids for which the physical and geometric
-        ! curvatures of the interfaces will be computed
+        ! Initialize viscous fluid count and curvature tracking
         Re_size = 0
         Re_size_max = 0
 

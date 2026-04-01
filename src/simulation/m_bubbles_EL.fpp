@@ -61,7 +61,7 @@ module m_bubbles_EL
 
     $:GPU_DECLARE(create='[lag_num_ts]')
 
-    real(wp) :: Rmax_glb, Rmin_glb  !< Maximum and minimum bubble size in the local domain
+    real(wp) :: Rmax_glb, Rmin_glb  !< Maximum and minimum bubbe size in the local domain
     !> Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
     type(scalar_field), dimension(:), allocatable :: kahan_comp  !< Kahan compensation for q_beta accumulation
@@ -828,7 +828,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end do
-        call nvtxEndRange  ! LAGRANGE-BUBBLE-EL-SOURCE
+        call nvtxEndRange
 
     end subroutine s_compute_bubbles_EL_source
 
@@ -1002,7 +1002,7 @@ contains
                     ! Z-direction basis functions
                     psi_z(1) = 1._wp - psi_pos(3)  ! Left basis function
                     psi_z(2) = psi_pos(3)  ! Right basis function
-                else
+                else  ! 3D
                     psi_z(1) = 1._wp
                     psi_z(2) = 0._wp
                 end if
@@ -1010,13 +1010,13 @@ contains
                 !> Perform bilinear interpolation
                 f_pinfl = 0._wp
 
-                if (p == 0) then  ! 2D - 4 point interpolation (2x2)
+                if (p == 0) then
                     do j = 1, 2
                         do i = 1, 2
                             f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3))*psi_x(i)*psi_y(j)
                         end do
                     end do
-                else  ! 3D - 8 point interpolation (2x2x2)
+                else
                     do k = 1, 2
                         do j = 1, 2
                             do i = 1, 2
@@ -1082,13 +1082,13 @@ contains
                 !> Perform biquadratic interpolation
                 f_pinfl = 0._wp
 
-                if (p == 0) then  ! 2D - 9 point interpolation (3x3)
+                if (p == 0) then  ! 2D
                     do j = 1, 3
                         do i = 1, 3
                             f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3))*psi_x(i)*psi_y(j)
                         end do
                     end do
-                else  ! 3D - 27 point interpolation (3x3x3)
+                else
                     do k = 1, 3
                         do j = 1, 3
                             do i = 1, 3

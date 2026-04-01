@@ -22,7 +22,12 @@ module m_mpi_proxy
 
     implicit none
 
+    !> This variable is utilized to pack and send the buffer of the immersed boundary markers, for a single computational domain
+    !! boundary at the time, to the relevant neighboring processor.
     integer, private, allocatable, dimension(:) :: ib_buff_send  !< IB marker send buffer for halo exchange
+
+    !> q_cons_buff_recv is utilized to receive and unpack the buffer of the immersed boundary markers, for a single computational
+    !! domain boundary at the time, from the relevant neighboring processor.
     integer, private, allocatable, dimension(:) :: ib_buff_recv  !< IB marker receive buffer for halo exchange
     integer                                     :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
@@ -41,7 +46,7 @@ module m_mpi_proxy
 
 contains
 
-    !> Initialize the MPI proxy module
+    !> @brief Allocates immersed boundary communication buffers for MPI halo exchanges.
     subroutine s_initialize_mpi_proxy_module()
 
 #ifdef MFC_MPI
@@ -64,12 +69,14 @@ contains
 
     end subroutine s_initialize_mpi_proxy_module
 
+    !! This subroutine initializes the MPI buffers and variables required for the particle communication.
     !! @param lag_num_ts Number of stages in time-stepping scheme
     subroutine s_initialize_particles_mpi(lag_num_ts)
 
-        integer :: i, j, k
-        integer :: real_size, int_size, nReal, lag_num_ts
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
+        integer, intent(in) :: lag_num_ts
+        integer             :: i, j, k
+        integer             :: real_size, int_size, nReal
+        integer             :: ierr  !< Generic flag used to identify and report MPI errors
 
 #ifdef MFC_MPI
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
@@ -346,7 +353,6 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    !> Broadcast random phase numbers from rank 0 to all MPI processes
     !> @brief Packs, exchanges, and unpacks immersed boundary marker buffers between neighboring MPI ranks.
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, mpi_dir, pbc_loc)
 
@@ -372,6 +378,10 @@ contains
         boundary_conditions = (/bc_x, bc_y, bc_z/)
         beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
         beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
+
+        ! Implements: pbc_loc bc_x >= 0 -> [send/recv]_tag [dst/src]_proc -1 (=0) 0 -> [1,0] [0,0] | 0 0 [1,0] [beg,beg] -1 (=0) 1
+        ! -> [0,0] [1,0] | 0 1 [0,0] [end,beg] +1 (=1) 0 -> [0,1] [1,1] | 1 0 [0,1] [end,end] +1 (=1) 1 -> [1,1] [0,1] | 1 1 [1,1]
+        ! [beg,end]
 
         send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
         recv_tag = f_logical_to_int(pbc_loc == 1)
@@ -506,16 +516,18 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
-    !! @param nPart Current LOCAL number of particles
-    !! @param pos Current position of each particle
-    !! @param posPrev Previous position of each particle (optional, not used
+    !> This subroutine adds particles to the transfer list for the MPI communication.
+    !! @param nBub Current LOCAL number of bubbles
+    !! @param pos Current position of each bubble
+    !! @param posPrev Previous position of each bubble (optional, not used
     !!                for communication of initial condition)
     impure subroutine s_add_particles_to_transfer_list(nBub, pos, posPrev, include_ghost)
 
-        real(wp), dimension(:,:)      :: pos, posPrev
-        integer                       :: bubID, nbub
-        integer                       :: i, j, k
-        logical, optional, intent(in) :: include_ghost
+        integer, intent(in)                  :: nBub
+        real(wp), dimension(:,:), intent(in) :: pos, posPrev
+        integer                              :: bubID
+        integer                              :: i, j, k
+        logical, optional, intent(in)        :: include_ghost
 
         do k = nidx(3)%beg, nidx(3)%end
             do j = nidx(2)%beg, nidx(2)%end
@@ -709,6 +721,7 @@ contains
 
     end subroutine s_add_particles_to_transfer_list
 
+    !> This subroutine performs the MPI communication for lagrangian particles/ bubbles.
     !! @param bub_R0 Initial radius of each bubble
     !! @param Rmax_stats Maximum radius of each bubble
     !! @param Rmin_stats Minimum radius of each bubble
@@ -1260,6 +1273,7 @@ contains
 
     end subroutine s_wrap_particle_positions
 
+    !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
 
         integer, intent(in)                            :: num_freq
@@ -1272,7 +1286,7 @@ contains
 
     end subroutine s_mpi_send_random_number
 
-    !> Finalize the MPI proxy module
+    !> @brief Deallocates immersed boundary MPI communication buffers.
     subroutine s_finalize_mpi_proxy_module()
 
 #ifdef MFC_MPI
@@ -1280,8 +1294,10 @@ contains
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
 
-        if (particles_lagrange .and. num_procs > 1) then
-            @:DEALLOCATE(p_send_buff, p_recv_buff, p_send_ids)
+        ! Particle MPI buffers are only allocated when num_procs > 1
+        if (allocated(p_send_buff)) then
+            @:DEALLOCATE(p_send_buff, p_recv_buff)
+            @:DEALLOCATE(p_send_ids)
         end if
 #endif
 

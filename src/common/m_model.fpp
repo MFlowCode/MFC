@@ -28,7 +28,9 @@ module m_model
     public :: s_instantiate_STL_models
 #endif
 
-    type(t_model_array), allocatable, target  :: models(:)    !< STL/OBJ models for IB markers and levelset
+    !! array of STL models that can be allocated and then used in IB marker and levelset compute
+    !> STL/OBJ models for IB markers and levelset GPU-friendly flat arrays for STL model data
+    type(t_model_array), allocatable, target  :: models(:)
     integer, allocatable                      :: gpu_ntrs(:)  !< GPU-friendly flat arrays for STL model data
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_trs_v
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
@@ -40,7 +42,9 @@ module m_model
 
 contains
 
-    !> Read a binary STL file.
+    !> This procedure reads a binary STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model The binary of the STL file.
     impure subroutine s_read_stl_binary(filepath, model)
 
         character(LEN=*), intent(in)   :: filepath
@@ -84,7 +88,9 @@ contains
 
     end subroutine s_read_stl_binary
 
-    !> Read an ASCII STL file.
+    !> This procedure reads an ASCII STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model the STL file.
     impure subroutine s_read_stl_ascii(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -192,7 +198,9 @@ contains
 
     end subroutine s_read_stl_ascii
 
-    !> Read an STL file.
+    !> This procedure reads an STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model the STL file.
     impure subroutine s_read_stl(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -220,7 +228,9 @@ contains
 
     end subroutine s_read_stl
 
-    !> Read an OBJ file.
+    !> This procedure reads an OBJ file.
+    !! @param filepath Path to the obj file.
+    !! @param model The obj file.
     impure subroutine s_read_obj(filepath, model)
 
         character(LEN=*), intent(in)          :: filepath
@@ -289,7 +299,9 @@ contains
 
     end subroutine s_read_obj
 
-    !> Read a mesh from a file.
+    !> This procedure reads a mesh from a file.
+    !! @param filepath Path to the file to read.
+    !! @return The model read from the file.
     impure function f_model_read(filepath) result(model)
 
         character(LEN=*), intent(in) :: filepath
@@ -308,7 +320,9 @@ contains
 
     end function f_model_read
 
-    !> Write a binary STL file.
+    !> This procedure writes a binary STL file.
+    !! @param filepath Path to the STL file.
+    !! @param model STL to write
     impure subroutine s_write_stl(filepath, model)
 
         character(LEN=*), intent(in)              :: filepath
@@ -353,7 +367,9 @@ contains
 
     end subroutine s_write_stl
 
-    !> Write an OBJ file.
+    !> This procedure writes an OBJ file.
+    !! @param filepath Path to the obj file.
+    !! @param model obj to write.
     impure subroutine s_write_obj(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -384,7 +400,9 @@ contains
 
     end subroutine s_write_obj
 
-    !> Write a mesh to a file.
+    !> This procedure writes a binary STL file.
+    !! @param filepath  Path to the file to write.
+    !! @param model Model to write.
     impure subroutine s_model_write(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -403,7 +421,7 @@ contains
 
     end subroutine s_model_write
 
-    !> Free the memory allocated for an STL mesh.
+    !> This procedure frees the memory allocated for an STL mesh.
     subroutine s_model_free(model)
 
         type(t_model), intent(inout) :: model
@@ -412,7 +430,6 @@ contains
 
     end subroutine s_model_free
 
-    !> Read the next non-blank, non-comment line from an STL or OBJ model file.
     impure function f_read_line(iunit, line) result(bIsLine)
 
         integer, intent(in)        :: iunit
@@ -441,7 +458,7 @@ contains
 
     end function f_read_line
 
-    !> Read the next non-comment line from a model file, using a buffered look-ahead mechanism.
+    !> @brief Reads the next non-comment line from a model file, using a buffered look-ahead mechanism.
     impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
 
         integer, intent(in)          :: iunit
@@ -461,8 +478,8 @@ contains
 
     end subroutine s_skip_ignored_lines
 
-    !> Generate a pseudo-random number using a seed-based xorshift, replacing the Fortran intrinsic which is incompatible with GPU
-    !! routines
+    !> This function is used to replace the fortran random number generator because the native generator is not compatible being
+    !! called from GPU routines/functions
     function f_model_random_number(seed) result(rval)
 
         ! $:GPU_ROUTINE(parallelism='[seq]')
@@ -478,8 +495,12 @@ contains
 
     end function f_model_random_number
 
-    !> Determine whether a point is inside a model using stochastic ray casting.
+    !> This procedure, recursively, finds whether a point is inside an octree.
+    !! @param model    Model to search in.
+    !! @param point    Point to test.
+    !! @param spacing  Space around the point to search in (grid spacing).
     !! @param spc      Number of samples per cell.
+    !! @return True if the point is inside the octree, false otherwise.
     impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
         ! $:GPU_ROUTINE(parallelism='[seq]')
@@ -531,10 +552,13 @@ contains
 
     end function f_model_is_inside
 
-    !> Determine if a point is inside a surface using the generalized winding number (Jacobson et al., SIGGRAPH 2013). In 3D, sums
-    !! the solid angle subtended by each triangle (Van Oosterom-Strackee formula). In 2D (p==0), sums the signed angle subtended by
-    !! each boundary edge. Returns ~1.0 inside, ~0.0 outside. Unlike ray casting, this is robust to small triangles/edges and vertex
-    !! winding order.
+    !> This procedure determines if a point is inside a surface using the generalized winding number (Jacobson et al., SIGGRAPH
+    !! 2013). In 3D, sums the solid angle subtended by each triangle (Van Oosterom-Strackee formula). In 2D (p==0), sums the signed
+    !! angle subtended by each boundary edge. Returns ~1.0 inside, ~0.0 outside. Unlike ray casting, this is robust to small
+    !! triangles/edges and vertex winding order.
+    !! @param ntrs     Number of triangles in the model.
+    !! @param pid      Patch ID of this model.
+    !! @param point    Point to test.
     !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
     function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
 
@@ -596,9 +620,11 @@ contains
 
     end function f_model_is_inside_flat
 
-    !> Check if a ray intersects a triangle using the Moller-Trumbore algorithm (barycentric coordinates). Unlike the previous
-    !! cross-product sign test, this is vertex winding-order independent.
-    !! @return 1 if the ray intersects the triangle, 0 otherwise.
+    !> This procedure checks if a ray intersects a triangle using the Moller-Trumbore algorithm (barycentric coordinates). Unlike
+    !! the previous cross-product sign test, this is vertex winding-order independent.
+    !! @param ray      Ray.
+    !! @param triangle Triangle.
+    !! @return         1 if the ray intersects the triangle, 0 otherwise.
     function f_intersects_triangle(ray, triangle) result(intersects)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -636,7 +662,9 @@ contains
 
     end function f_intersects_triangle
 
-    !> Check and label edges shared by two or more triangle facets of the 2D STL model.
+    !> This procedure checks and labels edges shared by two or more triangles facets of the 2D STL model.
+    !! @param model                      Model to search in.
+    !! @param boundary_vertex_count      Output total boundary vertex count
     subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
         type(t_model), intent(in) :: model
@@ -649,6 +677,7 @@ contains
         real(wp), dimension(1:(3*model%ntrs),1:2,1:2) :: temp_boundary_v    !< Temporary boundary vertex buffer
         integer, dimension(1:(3*model%ntrs)) :: edge_occurrence             !< The manifoldness of the edges
         real(wp) :: edgetan, initial, v_norm, xnormal, ynormal              !< The manifoldness of the edges
+
         ! Total number of edges in 2D STL
 
         edge_count = 3*model%ntrs
@@ -748,13 +777,14 @@ contains
 
     end subroutine s_check_boundary
 
-    !> Append the edge end vertices to a temporary buffer.
+    !> This procedure appends the edge end vertices to a temporary buffer.
     subroutine s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
         integer, intent(inout)                                   :: edge_index       !< Edge index iterator
         integer, intent(inout)                                   :: edge_count       !< Total number of edges
         real(wp), intent(in), dimension(1:2,1:2)                 :: edge             !< Edges end points to be registered
         real(wp), dimension(1:edge_count,1:2,1:2), intent(inout) :: temp_boundary_v  !< Temporary edge end vertex buffer
+
         ! Increment edge index and store the edge
 
         edge_index = edge_index + 1
@@ -763,8 +793,15 @@ contains
 
     end subroutine s_register_edge
 
-    !> Determine the levelset distance and normals of 3D models by computing the exact closest point via projection onto triangle
-    !! surfaces.
+    !> This procedure determines the levelset distance and normals of 3D models by computing the exact closest point via projection
+    !! onto triangle surfaces.
+    !! @param ntrs                  Number of triangles for this patch
+    !! @param trs_v                 Flat GPU array of triangle vertices for all patches
+    !! @param trs_n                 Flat GPU array of triangle normals for all patches
+    !! @param pid                   Patch index into the arrays
+    !! @param point                 The cell center of the current levelset cell
+    !! @param normals               Output levelset normals
+    !! @param distance              Output levelset distance
     subroutine s_distance_normals_3D(ntrs, pid, point, normals, distance)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -893,8 +930,14 @@ contains
 
     end subroutine s_distance_normals_3D
 
-    !> Determine the levelset distance and normals of 2D models by computing the exact closest point via projection onto boundary
-    !! edges.
+    !> This procedure determines the levelset distance and normals of 2D models by computing the exact closest point via projection
+    !! onto boundary edges.
+    !! @param boundary_v            Flat GPU array of boundary vertices/normals for all patches
+    !! @param pid                   Patch index into the boundary_v array
+    !! @param boundary_edge_count   Total number of boundary edges for this patch
+    !! @param point                 The cell center of the current levelset cell
+    !! @param normals               Output levelset normals
+    !! @param distance              Output levelset distance
     subroutine s_distance_normals_2D(pid, boundary_edge_count, point, normals, distance)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -963,7 +1006,6 @@ contains
     end subroutine s_distance_normals_2D
 
 #ifdef MFC_SIMULATION
-    !> Load, transform, and register STL/OBJ immersed-boundary models onto the simulation grid.
     subroutine s_instantiate_STL_models()
 
         ! Variables for IBM+STL
@@ -1126,7 +1168,6 @@ contains
     end subroutine s_instantiate_STL_models
 #endif
 
-    !> Pack triangle vertices and normals from a model into flat arrays for GPU transfer.
     subroutine s_pack_model_for_gpu(ma)
 
         type(t_model_array), intent(inout) :: ma
