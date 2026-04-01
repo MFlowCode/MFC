@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 
+# Intel ifx/icx CI support
 # Developer's note:
 #  CMake has extensive documentation available online. Searching "cmake <variable>"
 #  or "cmake <function_name>" will return a cmake.org page with more information
