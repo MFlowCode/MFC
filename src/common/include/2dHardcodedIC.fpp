@@ -288,8 +288,8 @@
 
         u2c = cvortex*((y_cc(j) - y2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
         v2c = -cvortex*((x_cc(i) - x2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
-        q_prim_vf(2)%sf(i, j, 0) = q_prim_vf(2)%sf(i, j, 0) + u1c + u2c
-        q_prim_vf(3)%sf(i, j, 0) = v1c + v2c
+        q_prim_vf(momxb)%sf(i, j, 0) = q_prim_vf(momxb)%sf(i, j, 0) + u1c + u2c
+        q_prim_vf(momxe)%sf(i, j, 0) = v1c + v2c
     case (272)  ! Prexmied flame instability
         @: HardcodedReadValues()
 
