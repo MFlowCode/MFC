@@ -3952,7 +3952,7 @@ contains
                                 if (riemann_hypo_ADC .and. hypoelasticity) then
 
                                     ! Build U_L, U_R and F_L, F_R in local-basis layout
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         U_L(i) = alpha_rho_L(i)
                                         U_R(i) = alpha_rho_R(i)
@@ -4023,7 +4023,7 @@ contains
 
                                     ! Compute F_HLL and U_HLL
                                     if (s_L >= 0._wp) then
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, sys_size
                                             F_HLL(i) = F_L(i)
                                             U_HLL(i) = U_L(i)
@@ -4032,7 +4032,7 @@ contains
                                         u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L; u_t2_HLL_trace = u_t2_L
                                         u_n_HLL_cons = u_n_L
                                     elseif (s_R <= 0._wp) then
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, sys_size
                                             F_HLL(i) = F_R(i)
                                             U_HLL(i) = U_R(i)
@@ -4041,7 +4041,7 @@ contains
                                         u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R; u_t2_HLL_trace = u_t2_R
                                         u_n_HLL_cons = u_n_R
                                     else
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, sys_size
                                             F_HLL(i) = (s_R*F_L(i) - s_L*F_R(i) + s_L*s_R*(U_R(i) - U_L(i))) &
                                                        /(s_R - s_L + verysmall)
@@ -4049,7 +4049,7 @@ contains
                                                        /(s_R - s_L + verysmall)
                                         end do
                                         rho_HLL = 0._wp
-                                        !$acc loop seq
+                                        $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, contxe
                                             rho_HLL = rho_HLL + U_HLL(i)
                                         end do
@@ -4084,7 +4084,7 @@ contains
 
                                     ! Blend selected flux components
                                     ! Partial densities: blend (same indices in local and physical basis)
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, contxe
                                         flux_rs${XYZ}$_vf(j, k, l, i) = &
                                             F_HLL(i) + phi*(flux_rs${XYZ}$_vf(j, k, l, i) - F_HLL(i))
@@ -4095,7 +4095,7 @@ contains
                                         F_HLL(E_idx) + phi*(flux_rs${XYZ}$_vf(j, k, l, E_idx) - F_HLL(E_idx))
 
                                     ! Volume fractions: blend
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = advxb, advxe
                                         flux_rs${XYZ}$_vf(j, k, l, i) = &
                                             F_HLL(i) + phi*(flux_rs${XYZ}$_vf(j, k, l, i) - F_HLL(i))
@@ -4928,8 +4928,8 @@ contains
             if (norm_dir == ${NORM_DIR}$) then
 
                 ! Fill q_hat_prim with cell-centered primitives at the interface location.
-                !$acc data create(q_hat_prim_${XYZ}$_vf)
-                !$acc parallel loop collapse(4) gang vector default(present)
+                $:GPU_ENTER_DATA(create='[q_hat_prim_${XYZ}$_vf]')
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -4957,14 +4957,10 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                !$acc parallel loop collapse(3) gang vector default(present) &
-                !$acc private(alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, &
-                !$acc rho, pres, E, H, gamma, pi_inf, qv, vel_rms, c, &
-                !$acc U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR, &
-                !$acc F_L, F_R, F_starL, F_starR, F_hlld, F_HLL, &
-                !$acc tau_e_L, tau_e_R, tau_e_hat, &
-                !$acc alpha_hat, alpha_rho_hat, vel_hat)
+                #:set _hlld_privates = 'alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,U_L,U_R,U_starL,U_starR,U_starstarL,U_starstarR,F_L,F_R,F_starL,F_starR,F_hlld,F_HLL,tau_e_L,tau_e_R,tau_e_hat,alpha_hat,alpha_rho_hat,vel_hat'
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[${_hlld_privates}$]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -5023,7 +5019,7 @@ contains
                             pres%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
                             ! Hypoelasticity
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, strxe - strxb + 1
                                 tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
                                 tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
@@ -5140,7 +5136,7 @@ contains
                             rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
                             rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
                             rho_hat = 0._wp
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
                                 rho%L = rho%L + alpha_rho_L(i)
                                 gamma%L = gamma%L + alpha_L(i)*gammas(i)
@@ -5156,7 +5152,7 @@ contains
                             end do
 
                             G_L = 0._wp; G_R = 0._wp; G_hat = 0._wp
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
                                 G_L = G_L + alpha_L(i)*Gs_rs(i)
                                 G_R = G_R + alpha_R(i)*Gs_rs(i)
@@ -5167,7 +5163,7 @@ contains
                             E%L = gamma%L*pres%L + pi_inf%L + 5e-1*rho%L*vel_rms%L + qv%L
                             E%R = gamma%R*pres%R + pi_inf%R + 5e-1*rho%R*vel_rms%R + qv%R
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, strxe - strxb + 1
                                 ! Elastic contribution to energy if G large enough
                                 if ((G_L > verysmall) .and. (G_R > verysmall)) then
@@ -5704,7 +5700,7 @@ contains
                             ! Radial geometric source flux for cylindrical coordinates
                             #:if (NORM_DIR == 2)
                                 if (cyl_coord) then
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, sys_size
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
@@ -5725,7 +5721,7 @@ contains
                                     end if
                                     flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
                                         flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) - p_face + tau_qq_face
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do i = advxb, advxe
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                     end do
@@ -5736,8 +5732,8 @@ contains
                         end do
                     end do
                 end do
-                !$acc end parallel loop
-                !$acc end data
+                $:END_GPU_PARALLEL_LOOP()
+                $:GPU_EXIT_DATA(delete='[q_hat_prim_${XYZ}$_vf]')
             end if
         #:endfor
 
@@ -7036,7 +7032,7 @@ contains
         integer :: i, j, k, l
 
         if (norm_dir == 2) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, num_dims
                 do l = is3%beg, is3%end
                     do j = is1%beg, is1%end
@@ -7047,8 +7043,9 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (norm_dir == 1) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, num_dims
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -7059,8 +7056,9 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (norm_dir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, num_dims
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -7071,6 +7069,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_finalize_nc_iface_vel
