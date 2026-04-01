@@ -658,7 +658,7 @@ contains
         end if
 
         if (double_mach) then
-            xshock = xr_dm + 1._wp/tan(theta_dm) + Mach*t_step*dt/sin(theta_dm)
+            xshock = xr_dm + 1._wp/tan(theta_dm) + Mach*mytime/sin(theta_dm)
             $:GPU_UPDATE(device='[xshock]')
         end if
 

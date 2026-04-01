@@ -512,6 +512,7 @@ contains
         gam_dm = dflt_real
         xr_dm = dflt_real
         dt = dflt_real
+        Mach = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 

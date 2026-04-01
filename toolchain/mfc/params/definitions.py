@@ -914,7 +914,7 @@ def _load():
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("schlieren_alpha", REAL, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "double_mach","ib_state_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
@@ -1042,6 +1042,7 @@ def _load():
         "int_comp",
         "nv_uvm_out_of_core",
         "nv_uvm_pref_gpu",
+        "double_mach",
     ]:
         _r(n, LOG)
     _r("case_dir", STR)

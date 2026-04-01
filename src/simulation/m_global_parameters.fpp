@@ -813,6 +813,7 @@ contains
         theta_dm = dflt_real
         xr_dm = dflt_real
         gam_dm = dflt_real
+        Mach = dflt_real
 
         do i = 1, num_patches_max
             patch_ib(i)%geometry = dflt_int

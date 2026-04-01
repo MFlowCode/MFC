@@ -92,7 +92,7 @@ contains
             ! Shock Angle in radian
             theta_dm = (pi/180._wp)*60._wp
 
-            $:GPU_UPDATE(device='[double_mach, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm]')
+            $:GPU_UPDATE(device='[cf, double_mach, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm]')
         end if
 
     end subroutine s_initialize_boundary_common_module
@@ -354,7 +354,7 @@ contains
                             q_prim_vf(momxb)%sf(k, n + j, l) = q_prim_vf(contxb)%sf(k, n + j, l)*q_prim_vf(momxb)%sf(k, n + j, l)
                             q_prim_vf(momxb + 1)%sf(k, n + j, l) = q_prim_vf(contxb)%sf(k, n + j, l)*q_prim_vf(momxb + 1)%sf(k, &
                                       & n + j, l)
-                            q_prim_vf(E_idx)%sf(k, n + j, l) = (gam_dm + 1._wp)*q_prim_vf(E_idx)%sf(k, n + j, &
+                            q_prim_vf(E_idx)%sf(k, n + j, l) = (1._wp/(gam_dm - 1._wp))*q_prim_vf(E_idx)%sf(k, n + j, &
                                       & l) + 0.5_wp*(q_prim_vf(momxb)%sf(k, n + j, l)**2 + q_prim_vf(momxb + 1)%sf(k, n + j, &
                                       & l)**2)/q_prim_vf(contxb)%sf(k, n + j, l)
                         end if
@@ -483,7 +483,7 @@ contains
                         if (igr) then
                             q_prim_vf(momxb)%sf(k, -j, l) = q_prim_vf(contxb)%sf(k, -j, l)*q_prim_vf(momxb)%sf(k, -j, l)
                             q_prim_vf(momxb + 1)%sf(k, -j, l) = q_prim_vf(contxb)%sf(k, -j, l)*q_prim_vf(momxb + 1)%sf(k, -j, l)
-                            q_prim_vf(E_idx)%sf(k, -j, l) = (gam_dm + 1._wp)*q_prim_vf(E_idx)%sf(k, -j, &
+                            q_prim_vf(E_idx)%sf(k, -j, l) = (1._wp/(gam_dm - 1._wp))*q_prim_vf(E_idx)%sf(k, -j, &
                                       & l) + 0.5_wp*(q_prim_vf(momxb)%sf(k, -j, l)**2 + q_prim_vf(momxb + 1)%sf(k, -j, &
                                       & l)**2)/q_prim_vf(contxb)%sf(k, -j, l)
                         end if
