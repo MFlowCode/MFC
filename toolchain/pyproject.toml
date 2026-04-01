@@ -24,7 +24,7 @@ dependencies = [
     # Code Health
     "typos",
     "ruff",
-    "fprettify",
+    "ffmt",
     "ansi2txt",
 
     # Profiling
