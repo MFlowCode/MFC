@@ -179,42 +179,44 @@ jobs:
 
           # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
           # Every release from 23.11 through 26.3 (current)
-          - { nvhpc: '23.11', target: cpu }
-          - { nvhpc: '23.11', target: gpu }
-          - { nvhpc: '24.1',  target: cpu }
-          - { nvhpc: '24.1',  target: gpu }
-          - { nvhpc: '24.3',  target: cpu }
-          - { nvhpc: '24.3',  target: gpu }
-          - { nvhpc: '24.5',  target: cpu }
-          - { nvhpc: '24.5',  target: gpu }
-          - { nvhpc: '24.7',  target: cpu }
-          - { nvhpc: '24.7',  target: gpu }
-          - { nvhpc: '24.9',  target: cpu }
-          - { nvhpc: '24.9',  target: gpu }
-          - { nvhpc: '24.11', target: cpu }
-          - { nvhpc: '24.11', target: gpu }
-          - { nvhpc: '25.1',  target: cpu }
-          - { nvhpc: '25.1',  target: gpu }
-          - { nvhpc: '25.3',  target: cpu }
-          - { nvhpc: '25.3',  target: gpu }
-          - { nvhpc: '25.5',  target: cpu }
-          - { nvhpc: '25.5',  target: gpu }
-          - { nvhpc: '25.7',  target: cpu }
-          - { nvhpc: '25.7',  target: gpu }
-          - { nvhpc: '25.9',  target: cpu }
-          - { nvhpc: '25.9',  target: gpu }
-          - { nvhpc: '25.11', target: cpu }
-          - { nvhpc: '25.11', target: gpu }
-          - { nvhpc: '26.1',  target: cpu }
-          - { nvhpc: '26.1',  target: gpu }
-          - { nvhpc: '26.3',  target: cpu }
-          - { nvhpc: '26.3',  target: gpu }
+          # Using single-CUDA tags instead of cuda_multi to fit GitHub runner disk.
+          #   nvhpc  -> highest bundled CUDA 12.x (from release notes)
+          - { nvhpc: '23.11', target: cpu, cuda: '12.3' }
+          - { nvhpc: '23.11', target: gpu, cuda: '12.3' }
+          - { nvhpc: '24.1',  target: cpu, cuda: '12.3' }
+          - { nvhpc: '24.1',  target: gpu, cuda: '12.3' }
+          - { nvhpc: '24.3',  target: cpu, cuda: '12.3' }
+          - { nvhpc: '24.3',  target: gpu, cuda: '12.3' }
+          - { nvhpc: '24.5',  target: cpu, cuda: '12.4' }
+          - { nvhpc: '24.5',  target: gpu, cuda: '12.4' }
+          - { nvhpc: '24.7',  target: cpu, cuda: '12.5' }
+          - { nvhpc: '24.7',  target: gpu, cuda: '12.5' }
+          - { nvhpc: '24.9',  target: cpu, cuda: '12.6' }
+          - { nvhpc: '24.9',  target: gpu, cuda: '12.6' }
+          - { nvhpc: '24.11', target: cpu, cuda: '12.6' }
+          - { nvhpc: '24.11', target: gpu, cuda: '12.6' }
+          - { nvhpc: '25.1',  target: cpu, cuda: '12.6' }
+          - { nvhpc: '25.1',  target: gpu, cuda: '12.6' }
+          - { nvhpc: '25.3',  target: cpu, cuda: '12.8' }
+          - { nvhpc: '25.3',  target: gpu, cuda: '12.8' }
+          - { nvhpc: '25.5',  target: cpu, cuda: '12.8' }
+          - { nvhpc: '25.5',  target: gpu, cuda: '12.8' }
+          - { nvhpc: '25.7',  target: cpu, cuda: '12.8' }
+          - { nvhpc: '25.7',  target: gpu, cuda: '12.8' }
+          - { nvhpc: '25.9',  target: cpu, cuda: '12.9' }
+          - { nvhpc: '25.9',  target: gpu, cuda: '12.9' }
+          - { nvhpc: '25.11', target: cpu, cuda: '12.9' }
+          - { nvhpc: '25.11', target: gpu, cuda: '12.9' }
+          - { nvhpc: '26.1',  target: cpu, cuda: '12.9' }
+          - { nvhpc: '26.1',  target: gpu, cuda: '12.9' }
+          - { nvhpc: '26.3',  target: cpu, cuda: '12.9' }
+          - { nvhpc: '26.3',  target: gpu, cuda: '12.9' }
 
       fail-fast: false
     continue-on-error: true
     runs-on: ${{ matrix.nvhpc && 'ubuntu-22.04' || format('{0}-latest', matrix.os) }}
     container:
-      image: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda_multi-ubuntu22.04', matrix.nvhpc) || '' }}
+      image: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda{1}-ubuntu22.04', matrix.nvhpc, matrix.cuda) || '' }}
       options: ${{ matrix.nvhpc && '--security-opt seccomp=unconfined' || '' }}
     env:
       CC:  ${{ matrix.nvhpc && 'nvc' || '' }}
