@@ -1539,6 +1539,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_forward_facing_step",
                 "1D_convergence",
                 "3D_IGR_33jet",
+                "2D_IGR_double_mach",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12

@@ -297,6 +297,10 @@ module m_global_parameters
     real(wp) :: Bx0                       !< Constant magnetic field in the x-direction (1D)
     real(wp) :: wall_time, wall_time_avg  !< Wall time measurements
 
+    !> Double Mach
+    logical  :: double_mach
+    real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm, dt
+
 contains
 
     !> Assigns default values to user inputs prior to reading them in. This allows for an easier consistency check of these
@@ -492,6 +496,22 @@ contains
 
         ! MHD
         Bx0 = dflt_real
+
+        ! Double Mach
+        double_mach = .false.
+        xshock = dflt_real
+        cf = dflt_real
+        rhoshock = dflt_real
+        pshock = dflt_real
+        velshock = dflt_real
+        u0_dm = dflt_real 
+        v0_dm = dflt_real
+        p0_dm = dflt_real 
+        rho0_dm = dflt_real
+        theta_dm = dflt_real
+        gam_dm = dflt_real
+        xr_dm = dflt_real
+        dt = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 

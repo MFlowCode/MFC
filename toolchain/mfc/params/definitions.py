@@ -256,6 +256,7 @@ _SIMPLE_DESCS = {
     "Re_inv": "Inverse Reynolds number",
     "format": "Output format",
     "precision": "Output precision",
+    "double_mach": "Enable double mach test case",
     # Body forces
     "bf_x": "Enable body force in x",
     "bf_y": "Enable body force in y",
@@ -913,7 +914,7 @@ def _load():
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("schlieren_alpha", REAL, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "double_mach","ib_state_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",

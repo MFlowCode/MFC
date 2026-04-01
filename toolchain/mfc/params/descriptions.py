@@ -210,6 +210,7 @@ DESCRIPTIONS = {
     "sim_data": "Enable simulation data output",
     "output_partial_domain": "Enable partial domain output",
     "fft_wrt": "Enable FFT output",
+    "double_mach": "Enable double mach test case",
     "lag_header": "Enable Lagrangian output header",
     "chem_wrt_T": "Write temperature field for chemistry",
     # Body force parameters

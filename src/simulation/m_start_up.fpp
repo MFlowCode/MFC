@@ -97,7 +97,7 @@ contains
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles_euler, bubble_model, &
-            R0ref, chem_params, &
+            R0ref, chem_params, double_mach, &
         #:if not MFC_CASE_OPTIMIZATION
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
             num_fluids, mhd, relativity, igr_order, viscous, &
@@ -655,6 +655,11 @@ contains
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_cons_ts(1)%vf(i)%sf]')
             end do
+        end if
+
+        if (double_mach) then
+            xshock = xr_dm + 1._wp/tan(theta_dm) + Mach*t_step*dt/sin(theta_dm)
+            $:GPU_UPDATE(device='[xshock]')
         end if
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers

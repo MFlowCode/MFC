@@ -39,6 +39,34 @@ module m_icpp_patches
 
 contains
 
+    !> Entropy wave fluctuations to be used in Riemann test problem with IGR
+    subroutine symm_2d_blending(vout, vtl, vtr, vbl, vbr, x_0, y_0, eps_smooth, i1, j1)
+
+        real(wp), intent(out) :: vout
+        real(wp), intent(in)  :: vtl, vtr, vbl, vbr, x_0, y_0, eps_smooth
+        integer, intent(in)   :: i1, j1
+        real(wp)              :: x_blend_b, x_blend_t, y_blend_r, y_blend_l, x_wise, y_wise
+
+        call blend(x_blend_t, vtl, vtr, x_0, eps_smooth, x_cc(i1))
+        call blend(x_blend_b, vbl, vbr, x_0, eps_smooth, x_cc(i1))
+        call blend(y_blend_l, vbl, vtl, y_0, eps_smooth, y_cc(j1))
+        call blend(y_blend_r, vbr, vtr, y_0, eps_smooth, y_cc(j1))
+
+        call blend(y_wise, x_blend_b, x_blend_t, y_0, eps_smooth, y_cc(j1))
+        call blend(x_wise, y_blend_l, y_blend_r, x_0, eps_smooth, x_cc(i1))
+        vout = (y_wise + x_wise)/2
+
+    end subroutine symm_2d_blending
+
+    subroutine blend(vout, vl, vr, center, eps, s_cc)
+
+        real(wp), intent(out) :: vout
+        real(wp), intent(in)  :: vl, vr, center, eps, s_cc
+
+        vout = (tanh((s_cc - center)/eps) + 1)/2*(vr - vl) + vl
+
+    end subroutine blend
+
     !> Dispatch each initial condition patch to its geometry-specific initialization routine.
     impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
