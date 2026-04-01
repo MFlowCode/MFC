@@ -314,9 +314,6 @@ contains
     !> This procedure swaps two real numbers.
     !! @param lhs Left-hand side.
     !! @param rhs Right-hand side.
-    == == == =
-    !> Swap two real numbers.
-    > > > > > > > master
     elemental subroutine s_swap(lhs, rhs)
 
         real(wp), intent(inout) :: lhs, rhs
