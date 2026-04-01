@@ -1046,8 +1046,8 @@ def _load():
     ]:
         _r(n, LOG)
     _r("case_dir", STR)
-    _r("file_extension",STR)
-    _r("files_dir",STR)
+    _r("file_extension", STR)
+    _r("files_dir", STR)
 
     # Body force
     for d in ["x", "y", "z"]:

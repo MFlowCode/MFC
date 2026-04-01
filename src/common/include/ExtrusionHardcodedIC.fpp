@@ -42,7 +42,7 @@
     real(wp)                                :: dummy_x, dummy_y, dummy_z, x0, y0
     integer                                 :: global_offset_x, global_offset_y  !< MPI subdomain offset
     real(wp)                                :: delta_x, delta_y
-    character(len=100), dimension(sys_size) :: fileNames                         !< Arrays to store all data from files
+    character(len=150), dimension(sys_size) :: fileNames                         !< Arrays to store all data from files
     character(len=200)                      :: errmsg
     real(wp), allocatable                   :: stored_values(:,:,:)
     real(wp), allocatable                   :: x_coords(:), y_coords(:)
