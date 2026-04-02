@@ -403,8 +403,8 @@ HINTS = {
         "ve3": "Boundary velocity component 3 at domain end",
         "isothermal_in": "Enable Isothermal Wall in",
         "isothermal_out": "Enable Isothermal Wall out",
-            "Twall_in"      : "Hehe1",
-    "Twall_out"    : "hehe2",
+         "Twall_in"      : "Hehe1",
+        "Twall_out"    : "hehe2",
     },
     "patch_bc": {
         "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
@@ -1243,7 +1243,7 @@ def _load():
             _r(f"{px}vel_in({j})", REAL, {"bc"})
             _r(f"{px}vel_out({j})", REAL, {"bc"})
         
-        for a in ["Twall_in, Twall_out"]:
+        for a in ["Twall_in", "Twall_out"]:
             _r(f"{px}{a}", REAL, {"bc"})
         for a in ["isothermal_in", "isothermal_out"]:
             _r(f"{px}{a}", LOG, {"bc"})

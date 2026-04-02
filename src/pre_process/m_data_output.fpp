@@ -70,8 +70,7 @@ contains
         real(wp)                                                    :: pres, T
         real(wp)                                                    :: rhoYks(1:num_species)
         real(wp)                                                    :: pres_mag
-        type(scalar_field), intent(inout), optional      :: q_T_sf
-
+        type(scalar_field), intent(inout), optional                 :: q_T_sf
 
         pres_mag = 0._wp
 
@@ -387,7 +386,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf, q_prim_vf
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
-        type(scalar_field), optional, intent(inout)      :: q_T_sf
+        type(scalar_field), optional, intent(inout)                 :: q_T_sf
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size

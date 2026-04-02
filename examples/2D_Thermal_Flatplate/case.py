@@ -29,8 +29,8 @@ case =     {
             "p": 0,
             "dt": 4.0e-08,
             "t_step_start": 0,
-            "t_step_stop": 10,
-            "t_step_save": 2,
+            "t_step_stop": 100,
+            "t_step_save": 20,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
@@ -50,10 +50,10 @@ case =     {
             "avg_state": 2,
             "bc_x%beg": -7,
             "bc_x%end": -3,
-            "bc_y%beg": -3,
+            "bc_y%beg": -16,
             "bc_y%end": -3,
             "bc_y%isothermal_in": "T",
-            "bc_x%Twall_out" : 600.0,
+            "bc_y%Twall_in" : 600.0,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,

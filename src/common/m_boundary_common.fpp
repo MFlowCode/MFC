@@ -45,6 +45,7 @@ contains
         integer :: i, j, sys_size_alloc
 
         @:ALLOCATE(bc_buffers(1:3, 1:2))
+        
 
         if (bc_io) then
             sys_size_alloc = sys_size
@@ -123,15 +124,15 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)  ! Ghost-cell extrap. BC at end
                         call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l, q_T_sf)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in,  q_T_sf)
+                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in,  q_T_sf)
+                        call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, 1, 1, k, l, q_T_sf)
                     case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, 1, 1, k, l, q_T_sf)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, 1, 1, k, l,  q_T_sf)
+                        call s_dirichlet(q_prim_vf, 1, 1, k, l, q_T_sf)
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. (bc_type(1, 2)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
@@ -159,15 +160,15 @@ contains
                         case (BC_AXIS)
                             call s_axis(q_prim_vf, pb_in, mv_in, k, l)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SLIP_WALL)
                             call s_slip_wall(q_prim_vf, 2, -1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
                             call s_no_slip_wall(q_prim_vf, 2, -1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, -1, k, l,  q_T_sf)
+                            call s_dirichlet(q_prim_vf, 2, -1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. (bc_type(2, &
@@ -189,15 +190,15 @@ contains
                         case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                             call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l, q_T_sf)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SLIP_WALL)
                             call s_slip_wall(q_prim_vf, 2, 1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
                             call s_no_slip_wall(q_prim_vf, 2, 1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, 1, k, l,  q_T_sf)
+                            call s_dirichlet(q_prim_vf, 2, 1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. (bc_type(2, 2)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
@@ -224,15 +225,15 @@ contains
                         case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                             call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l, q_T_sf)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SLIP_WALL)
                             call s_slip_wall(q_prim_vf, 3, -1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
                             call s_no_slip_wall(q_prim_vf, 3, -1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, -1, k, l,  q_T_sf)
+                            call s_dirichlet(q_prim_vf, 3, -1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
@@ -253,15 +254,15 @@ contains
                         case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                             call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l, q_T_sf)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in,  q_T_sf)
+                            call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SlIP_WALL)
                             call s_slip_wall(q_prim_vf, 3, 1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
                             call s_no_slip_wall(q_prim_vf, 3, 1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, 1, k, l,  q_T_sf)
+                            call s_dirichlet(q_prim_vf, 3, 1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. (bc_type(3, 2)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
@@ -372,7 +373,6 @@ contains
         integer, intent(in)                                                                                  :: k, l
         integer                                                                                              :: j, q, i
         type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
-
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -630,12 +630,11 @@ contains
                     end do
                 end do
 
-               if (chemistry .and. chem_params%diffusion) then 
-                  do j = 1, buff_size
-                      q_T_sf%sf(-j,k,l) = &
-                          q_T_sf%sf(m - (j - 1), k, l)
-                  end do
-               end if
+                if (chemistry .and. chem_params%diffusion) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                    end do
+                end if
 
                 if (qbmm .and. .not. polytropic) then
                     do i = 1, nb
@@ -654,11 +653,10 @@ contains
                     end do
                 end do
 
-              if (chemistry .and. chem_params%diffusion) then 
-                  do j = 1, buff_size
-                      q_T_sf%sf(m + j,k,l) = &
-                          q_T_sf%sf(j - 1, k, l)
-                  end do
+                if (chemistry .and. chem_params%diffusion) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(j - 1, k, l)
+                    end do
                 end if
 
                 if (qbmm .and. .not. polytropic) then
@@ -680,11 +678,10 @@ contains
                     end do
                 end do
 
-               if (chemistry .and. chem_params%diffusion) then 
-                  do j = 1, buff_size
-                      q_T_sf%sf(k,-j,l) = &
-                          q_T_sf%sf(k, n - (j - 1), l)
-                  end do
+                if (chemistry .and. chem_params%diffusion) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                    end do
                 end if
 
                 if (qbmm .and. .not. polytropic) then
@@ -704,11 +701,10 @@ contains
                     end do
                 end do
 
-             if (chemistry .and. chem_params%diffusion) then 
-                  do j = 1, buff_size
-                      q_T_sf%sf(k, n + j, l) = &
-                          q_T_sf%sf(k, j - 1, l)
-                  end do
+                if (chemistry .and. chem_params%diffusion) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, j - 1, l)
+                    end do
                 end if
 
                 if (qbmm .and. .not. polytropic) then
@@ -730,11 +726,10 @@ contains
                     end do
                 end do
 
-              if (chemistry .and. chem_params%diffusion) then 
-                  do j = 1, buff_size
-                      q_T_sf%sf(k, l, -j) = &
-                          q_T_sf%sf(k, l, p - (j - 1))
-                  end do
+                if (chemistry .and. chem_params%diffusion) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, p - (j - 1))
+                    end do
                 end if
 
                 if (qbmm .and. .not. polytropic) then
@@ -754,11 +749,10 @@ contains
                     end do
                 end do
 
-               if (chemistry .and. chem_params%diffusion) then 
-                  do j = 1, buff_size
-                      q_T_sf%sf(k, l, p + j) = &
-                          q_T_sf%sf(k, l, j - 1)
-                  end do
+                if (chemistry .and. chem_params%diffusion) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, j - 1)
+                    end do
                 end if
 
                 if (qbmm .and. .not. polytropic) then
@@ -1006,9 +1000,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if ((bc_x%isothermal_in) ) then
+                    if ((bc_x%isothermal_in)) then
                         do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in  - q_T_sf%sf(j - 1, k, l)
+                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
                         end do
                     end if
                 else
@@ -1032,7 +1026,7 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (bc_x%isothermal_out ) then
+                    if (bc_x%isothermal_out) then
                         do j = 1, buff_size
                             q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
                         end do
@@ -1138,7 +1132,7 @@ contains
                 if (chemistry) then
                     if (bc_z%isothermal_out) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out- q_T_sf%sf(k, l, p - (j - 1))
+                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
                         end do
                     end if
                 else
@@ -1169,22 +1163,22 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)
                     end do
                 end do
-            if (chemistry) then
+                if (chemistry) then
                     do j = 1, buff_size
                         q_T_sf%sf(-j, k, l) = bc_buffers(1, 1)%sf(sys_size + 1, k, l)
                     end do
-            end if
+                end if
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)
                     end do
                 end do
-            if (chemistry) then
+                if (chemistry) then
                     do j = 1, buff_size
                         q_T_sf%sf(m + j, k, l) = bc_buffers(1, 2)%sf(sys_size + 1, k, l)
                     end do
-            end if
+                end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
@@ -1194,10 +1188,10 @@ contains
                             q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)
                         end do
                     end do
-                    if (chemistry ) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, sys_size + 1, l)
-                    end do
+                    if (chemistry) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, sys_size + 1, l)
+                        end do
                     end if
                 else  !< bc_y%end
                     do i = 1, sys_size
@@ -1206,9 +1200,9 @@ contains
                         end do
                     end do
                     if (chemistry) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, sys_size + 1, l)
-                    end do
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, sys_size + 1, l)
+                        end do
                     end if
                 end if
             #:endif
@@ -1854,7 +1848,7 @@ contains
         integer                                                    :: dir, loc, i
         character(len=path_len)                                    :: file_path
         character(len=10)                                          :: status
-        type(scalar_field), optional, intent(in)                             :: q_T_sf
+        type(scalar_field), optional, intent(in)                   :: q_T_sf
 
         if (old_grid_in) then
             status = 'old'
@@ -1892,8 +1886,7 @@ contains
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_loc, file_path
         character(len=10)                                          :: status
-           type(scalar_field), intent(in) , optional                     :: q_T_sf
-
+        type(scalar_field), intent(in), optional                   :: q_T_sf
 
 #ifdef MFC_MPI
         integer          :: ierr
@@ -2066,7 +2059,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer                                             :: i, j, k
-        type(scalar_field), intent(in) , optional                     :: q_T_sf
+        type(scalar_field), intent(in), optional            :: q_T_sf
 
         do k = 0, p
             do j = 0, n
