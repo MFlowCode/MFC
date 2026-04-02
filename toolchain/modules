@@ -106,7 +106,3 @@ h-gpu NVCOMPILER_COMM_LIBS_HOME=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/com
 t     WPI Turing
 t-all slurm
 t-cpu gcc/12.1.0/i6yk33f openmpi/4.1.3/ebae7zc python/3.13.5/6anz4qy
-t-gpu nvhpc/24.3/m4bujn7 python/3.13.5/6anz4qy
-t-gpu CC=nvc CXX=nvc++ FC=nvfortran
-t-gpu MFC_CUDA_CC=80,86
-t-gpu MPI_HOME=/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-13.2.0/nvhpc-24.3-m4bujn7c3a4or53dloraad6pcqfxyqul/Linux_x86_64/24.3/comm_libs/openmpi/openmpi-3.1.5
