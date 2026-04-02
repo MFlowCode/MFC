@@ -310,6 +310,11 @@ jobs:
             apt-get install -y cmake python3 python3-venv python3-pip \
                                libfftw3-dev libhdf5-dev hdf5-tools git
 
+            # The repo is bind-mounted from the host so git sees a different
+            # owner.  Mark it safe to suppress "dubious ownership" errors that
+            # otherwise spam 80 000+ lines into the CI log.
+            git config --global --add safe.directory /workspace
+
             # Set up NVHPC HPC-X MPI runtime paths
             HPCX_DIR=$(dirname "$(find /opt/nvidia/hpc_sdk -path "*/hpcx/hpcx-*/ompi/bin/mpirun" | head -1)")/../..
             MPI_LIB=$(mpifort --showme:link | grep -oP "(?<=-L)\S+" | head -1)
