@@ -365,6 +365,9 @@ class MFCTarget:
         return True
 
     def configure(self, case: Case):
+        if ARG("debug") and ARG("reldebug"):
+            raise MFCException("--debug and --reldebug are mutually exclusive.")
+
         build_dirpath = self.get_staging_dirpath(case)
         cmake_dirpath = self.get_cmake_dirpath()
         install_dirpath = self.get_install_dirpath(case)
@@ -383,9 +386,9 @@ class MFCTarget:
             # build the configured targets. This is mostly useful for debugging.
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html.
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-            # Set build type (e.g Debug, Release, etc.).
+            # Set build type (Debug, RelDebug, or Release).
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
-            f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'Release'}",
+            f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'RelDebug' if ARG('reldebug') else 'Release'}",
             # Used by FIND_PACKAGE (/FindXXX) to search for packages, with the
             # second highest level of priority, still letting users manually
             # specify <PackageName>_ROOT, which has precedence over CMAKE_PREFIX_PATH.
@@ -455,7 +458,17 @@ class MFCTarget:
     def build(self, case: input.MFCInputFile):
         case.generate_fpp(self)
 
-        command = ["cmake", "--build", self.get_staging_dirpath(case), "--target", self.name, "--parallel", ARG("jobs"), "--config", "Debug" if ARG("debug") else "Release"]
+        command = [
+            "cmake",
+            "--build",
+            self.get_staging_dirpath(case),
+            "--target",
+            self.name,
+            "--parallel",
+            ARG("jobs"),
+            "--config",
+            "Debug" if ARG("debug") else "RelDebug" if ARG("reldebug") else "Release",
+        ]
 
         verbosity = ARG("verbose")
         # -vv or higher: add cmake --verbose flag for full compiler commands
@@ -552,6 +565,12 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
 
     history.add(target.name)
 
+    # Dependencies are pinned to fixed versions. If already configured
+    # (built & installed by a prior --deps-only step), skip entirely
+    # to avoid re-entering the superbuild (which may access the network).
+    if target.isDependency and target.is_configured(case):
+        return
+
     for dep in target.requires.compute():
         # If we have already built and installed this target,
         # do not do so again. This can be inferred by whether
@@ -593,6 +612,25 @@ def build(targets=None, case: input.MFCInputFile = None, history: typing.Set[str
     targets = get_targets(list(REQUIRED_TARGETS) + targets)
     case = case or input.load(ARG("input"), ARG("--"), {})
     case.validate_params()
+
+    if ARG("deps_only", False) and len(history) == 0:
+        all_deps = set()
+        for t in targets:
+            resolved = get_target(t)
+            for dep in resolved.requires.compute():
+                all_deps.add(dep)
+
+        cons.print(f"[bold]Fetch Dependencies | {format_list_to_string([d.name for d in all_deps], 'magenta', 'None')}[/bold]")
+        cons.print(no_indent=True)
+
+        if not all_deps:
+            cons.print("[yellow]No dependencies to build for the requested targets.[/yellow]")
+            return
+
+        for dep in all_deps:
+            __build_target(dep, case, history)
+
+        return
 
     if len(history) == 0:
         cons.print(__generate_header(case, targets))

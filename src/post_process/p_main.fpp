@@ -2,31 +2,21 @@
 !! @file
 !! @brief Contains program p_main
 
-!> @brief The post-process restructures raw unformatted data, outputted by
-!!              the simulation, into a formatted database, Silo-HDF5 or Binary,
-!!              chosen by the user. The user may also specify which variables to
-!!              include in the database. The choices range from any one of the
-!!              primitive and conservative variables, as well as quantities that
-!!              can be derived from those such as the unadvected volume fraction,
-!!              specific heat ratio, liquid stiffness, speed of sound, vorticity
-!!              and the numerical Schlieren function.
+!> Post-process raw simulation data into formatted database files (Silo-HDF5 or Binary)
 program p_main
 
-    use m_global_parameters     !< Global parameters for the code
+    use m_global_parameters
     use m_start_up
 
     implicit none
 
-    integer :: t_step !< Iterator for the main time-stepping loop
-
-    character(LEN=name_len) :: varname !<
-    !! Generic storage for the name(s) of the flow variable(s) that will be added
-    !! to the formatted database file(s)
-
-    real(wp) :: pres
-    real(wp) :: c
-    real(wp) :: H
-    real(wp) :: start, finish
+    integer :: t_step  !< Iterator for the main time-stepping loop
+    !> Generic storage for the name(s) of the flow variable(s) that will be added to the formatted database file(s)
+    character(LEN=name_len) :: varname
+    real(wp)                :: pres
+    real(wp)                :: c
+    real(wp)                :: H
+    real(wp)                :: start, finish
 
     call s_initialize_mpi_domain()
 
@@ -42,12 +32,9 @@ program p_main
 
     ! Time-Marching Loop
     do
-
-        ! If all time-steps are not ready to be post-processed and one rank is
-        ! faster than another, the slower rank processing the last available
-        ! step might be killed when the faster rank attempts to process the
-        ! first missing step, before the slower rank finishes writing the last
-        ! available step. To avoid this, we force synchronization here.
+        ! If all time-steps are not ready to be post-processed and one rank is faster than another, the slower rank processing the
+        ! last available step might be killed when the faster rank attempts to process the first missing step, before the slower
+        ! rank finishes writing the last available step. To avoid this, we force synchronization here.
         call s_mpi_barrier()
 
         call cpu_time(start)
@@ -71,14 +58,10 @@ program p_main
                 exit
             end if
         else
-            ! Modifies the time-step iterator so that it may reach the final time-
-            ! step to be post-processed, in the case that this one is not originally
-            ! attainable through constant incrementation from the first time-step.
-            ! This modification is performed upon reaching the final time-step. In
-            ! case that it is not needed, the post-processor is done and may exit.
+            ! Adjust time-step iterator to reach final step if needed, else exit
             if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
                 t_step = t_step_stop - t_step_save
-            elseif (t_step == t_step_stop) then
+            else if (t_step == t_step_stop) then
                 exit
             end if
         end if
@@ -89,7 +72,6 @@ program p_main
             ! Incrementing time-step iterator to next time-step to be post-processed
             t_step = t_step + t_step_save
         end if
-
     end do
     ! END: Time-Marching Loop
 
@@ -100,5 +82,4 @@ program p_main
     close (11)
 
     call s_finalize_modules()
-
 end program p_main
