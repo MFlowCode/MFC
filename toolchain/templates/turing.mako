@@ -19,7 +19,7 @@
 #SBATCH --export=ALL
 % if email:
 #SBATCH --mail-user=${email}
-#SBATCH --mail-type="BEGIN, END, FAIL"
+#SBATCH --mail-type=BEGIN,END,FAIL
 % endif
 % endif
 
