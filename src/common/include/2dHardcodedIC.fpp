@@ -314,7 +314,7 @@
         end if
     case (291)
         ! Setup Values
-        T_wall = 600.0_wp
+        T_wall = 1125.0_wp
         T_inf = 1125.0_wp
         P_atm = 101325.0_wp  ! 1 atm in Pa
         delta_th = 0.0003_wp  ! Thermal BL thickness (e.g., 2mm - ADJUST THIS)

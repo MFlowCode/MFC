@@ -849,9 +849,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_x%isothermal_in) then
                         do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = 2._wp*T_wall - q_T_sf%sf(j - 1, k, l)
+                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
                         end do
                     end if
                 else
@@ -871,9 +871,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_x%isothermal_out) then
                         do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = 2._wp*T_wall - q_T_sf%sf(m - (j - 1), k, l)
+                            q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
                         end do
                     end if
                 else
@@ -895,9 +895,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_y%isothermal_in) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = 2._wp*T_wall - q_T_sf%sf(k, j - 1, l)
+                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
                         end do
                     end if
                 else
@@ -917,9 +917,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_y%isothermal_out) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = 2._wp*T_wall - q_T_sf%sf(k, n - (j - 1), l)
+                            q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
                         end do
                     end if
                 else
@@ -941,9 +941,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_z%isothermal_in) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = 2._wp*T_wall - q_T_sf%sf(k, l, j - 1)
+                            q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
                         end do
                     end if
                 else
@@ -963,9 +963,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_z%isothermal_out) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = 2._wp*T_wall - q_T_sf%sf(k, l, p - (j - 1))
+                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
                         end do
                     end if
                 else
@@ -1006,9 +1006,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if ((bc_x%isothermal_in) ) then
                         do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = 2._wp*T_wall - q_T_sf%sf(j - 1, k, l)
+                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in  - q_T_sf%sf(j - 1, k, l)
                         end do
                     end if
                 else
@@ -1032,9 +1032,9 @@ contains
                 end do
 
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_x%isothermal_out ) then
                         do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = 2._wp*T_wall - q_T_sf%sf(m - (j - 1), k, l)
+                            q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
                         end do
                     end if
                 else
@@ -1059,9 +1059,9 @@ contains
                     end do
                 end do
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_y%isothermal_in) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = 2._wp*T_wall - q_T_sf%sf(k, j - 1, l)
+                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
                         end do
                     end if
                 else
@@ -1084,9 +1084,9 @@ contains
                     end do
                 end do
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_y%isothermal_out) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = 2._wp*T_wall - q_T_sf%sf(k, n - (j - 1), l)
+                            q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
                         end do
                     end if
                 else
@@ -1111,9 +1111,9 @@ contains
                     end do
                 end do
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_z%isothermal_in) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = 2._wp*T_wall - q_T_sf%sf(k, l, j - 1)
+                            q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
                         end do
                     end if
                 else
@@ -1136,9 +1136,9 @@ contains
                     end do
                 end do
                 if (chemistry) then
-                    if (isothermal_bc) then
+                    if (bc_z%isothermal_out) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = 2._wp*T_wall - q_T_sf%sf(k, l, p - (j - 1))
+                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out- q_T_sf%sf(k, l, p - (j - 1))
                         end do
                     end if
                 else
@@ -1184,7 +1184,7 @@ contains
                     do j = 1, buff_size
                         q_T_sf%sf(m + j, k, l) = bc_buffers(1, 2)%sf(sys_size + 1, k, l)
                     end do
-                end if
+            end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
@@ -1198,6 +1198,7 @@ contains
                     do j = 1, buff_size
                         q_T_sf%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, sys_size + 1, l)
                     end do
+                    end if
                 else  !< bc_y%end
                     do i = 1, sys_size
                         do j = 1, buff_size
@@ -1208,6 +1209,7 @@ contains
                     do j = 1, buff_size
                         q_T_sf%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, sys_size + 1, l)
                     end do
+                    end if
                 end if
             #:endif
         else if (bc_dir == 3) then  !< z-direction
@@ -1843,7 +1845,7 @@ contains
     end subroutine s_create_mpi_types
 
     !> Write boundary condition type and buffer data to serial (unformatted) restart files.
-    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in)
+    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -1852,6 +1854,7 @@ contains
         integer                                                    :: dir, loc, i
         character(len=path_len)                                    :: file_path
         character(len=10)                                          :: status
+        type(scalar_field), optional, intent(in)                             :: q_T_sf
 
         if (old_grid_in) then
             status = 'old'
@@ -1882,13 +1885,15 @@ contains
     end subroutine s_write_serial_boundary_condition_files
 
     !> Write boundary condition type and buffer data to per-rank parallel files using MPI I/O.
-    subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+    subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_loc, file_path
         character(len=10)                                          :: status
+           type(scalar_field), intent(in) , optional                     :: q_T_sf
+
 
 #ifdef MFC_MPI
         integer          :: ierr
@@ -2061,7 +2066,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer                                             :: i, j, k
-        type(scalar_field), intent(in)                      :: q_T_sf
+        type(scalar_field), intent(in) , optional                     :: q_T_sf
 
         do k = 0, p
             do j = 0, n

@@ -116,6 +116,10 @@ _ATTR_DESCS = {
     "grcbc_in": "Enable GRCBC inlet",
     "grcbc_out": "Enable GRCBC outlet",
     "grcbc_vel_out": "Enable GRCBC velocity outlet",
+    "isothermal_in": "Enable Isothermal Wall in",
+    "isothermal_out": "Enable Isothermal Wall out",
+    "Twall_in"      : "Hehe1",
+    "Twall_out"    : "hehe2",
     # Acoustic
     "loc": "Location",
     "mag": "Magnitude",
@@ -397,6 +401,10 @@ HINTS = {
         "ve1": "Boundary velocity component 1 at domain end",
         "ve2": "Boundary velocity component 2 at domain end",
         "ve3": "Boundary velocity component 3 at domain end",
+        "isothermal_in": "Enable Isothermal Wall in",
+        "isothermal_out": "Enable Isothermal Wall out",
+            "Twall_in"      : "Hehe1",
+    "Twall_out"    : "hehe2",
     },
     "patch_bc": {
         "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
@@ -1234,6 +1242,11 @@ def _load():
         for j in range(1, 4):
             _r(f"{px}vel_in({j})", REAL, {"bc"})
             _r(f"{px}vel_out({j})", REAL, {"bc"})
+        
+        for a in ["Twall_in, Twall_out"]:
+            _r(f"{px}{a}", REAL, {"bc"})
+        for a in ["isothermal_in", "isothermal_out"]:
+            _r(f"{px}{a}", LOG, {"bc"})
 
     # patch_bc (10 BC patches)
     for i in range(1, NB + 1):
@@ -1244,7 +1257,7 @@ def _load():
             _r(f"{px}centroid({j})", REAL, {"bc"})
             _r(f"{px}length({j})", REAL, {"bc"})
         _r(f"{px}radius", REAL, {"bc"})
-
+            
     # simplex_params
     for f in range(1, NF + 1):
         _r(f"simplex_params%perturb_dens({f})", LOG)
