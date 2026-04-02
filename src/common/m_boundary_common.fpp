@@ -91,15 +91,15 @@ contains
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                         call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l, q_T_sf)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
+                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
+                        call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_SLIP_WALL)
                         call s_slip_wall(q_prim_vf, 1, -1, k, l, q_T_sf)
                     case (BC_NO_SLIP_WALL)
                         call s_no_slip_wall(q_prim_vf, 1, -1, k, l, q_T_sf)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, 1, -1, k, l)
+                        call s_dirichlet(q_prim_vf, 1, -1, k, l, q_T_sf)
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
@@ -289,22 +289,20 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                     end do
                 end do
-             if (chemistry) then
+                if (chemistry) then
                     do j = 1, buff_size
-                        q_T_sf%sf(-j, k, l) = &
-                            q_T_sf%sf(0, k, l)
+                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
                     end do
-              end if
+                end if
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
                     end do
                 end do
-             if (chemistry) then
+                if (chemistry) then
                     do j = 1, buff_size
-                        q_T_sf%sf(m+j, k, l) = &
-                            q_T_sf%sf(m, k, l)
+                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
                     end do
                 end if
             end if
@@ -316,27 +314,23 @@ contains
                     end do
                 end do
 
-              if (chemistry) then
+                if (chemistry) then
                     do j = 1, buff_size
-                        q_T_sf%sf(k, -j, l) = &
-                            q_T_sf%sf(k, 0, l)
+                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
                     end do
                 end if
-                
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
                     end do
                 end do
-               if (chemistry) then
+                if (chemistry) then
                     do j = 1, buff_size
-                        q_T_sf%sf(k, n+j, l) = &
-                            q_T_sf%sf(k, n, l)
+                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
                     end do
                 end if
             end if
-
         else if (bc_dir == 3) then  !< z-direction
             if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, sys_size
@@ -344,10 +338,9 @@ contains
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                     end do
                 end do
-               if (chemistry) then
+                if (chemistry) then
                     do j = 1, buff_size
-                        q_T_sf%sf(k, l, -j) = &
-                            q_T_sf%sf(k, l, 0)
+                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
                     end do
                 end if
             else  !< bc_z%end
@@ -358,8 +351,7 @@ contains
                 end do
                 if (chemistry) then
                     do j = 1, buff_size
-                        q_T_sf%sf(k, l, p+j) = &
-                            q_T_sf%sf(k, l, p)
+                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
                     end do
                 end if
             end if
@@ -591,7 +583,7 @@ contains
     end subroutine s_symmetry
 
     !> Apply periodic boundary conditions by copying values from the opposite domain boundary.
-    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
+    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
@@ -599,6 +591,7 @@ contains
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
         integer, intent(in)                                                                                  :: k, l
         integer                                                                                              :: j, q, i
+        type(scalar_field), intent(inout)                                                                    :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -607,6 +600,13 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
                 end do
+
+               if (chemistry .and. chem_params%diffusion) then 
+                  do j = 1, buff_size
+                      q_T_sf%sf(-j,k,l) = &
+                          q_T_sf%sf(m - (j - 1), k, l)
+                  end do
+               end if
 
                 if (qbmm .and. .not. polytropic) then
                     do i = 1, nb
@@ -624,6 +624,13 @@ contains
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
                     end do
                 end do
+
+              if (chemistry .and. chem_params%diffusion) then 
+                  do j = 1, buff_size
+                      q_T_sf%sf(m + j,k,l) = &
+                          q_T_sf%sf(j - 1, k, l)
+                  end do
+                end if
 
                 if (qbmm .and. .not. polytropic) then
                     do i = 1, nb
@@ -644,6 +651,13 @@ contains
                     end do
                 end do
 
+               if (chemistry .and. chem_params%diffusion) then 
+                  do j = 1, buff_size
+                      q_T_sf%sf(k,-j,l) = &
+                          q_T_sf%sf(k, n - (j - 1), l)
+                  end do
+                end if
+
                 if (qbmm .and. .not. polytropic) then
                     do i = 1, nb
                         do q = 1, nnode
@@ -660,6 +674,13 @@ contains
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, j - 1, l)
                     end do
                 end do
+
+             if (chemistry .and. chem_params%diffusion) then 
+                  do j = 1, buff_size
+                      q_T_sf%sf(k, n + j, l) = &
+                          q_T_sf%sf(k, j - 1, l)
+                  end do
+                end if
 
                 if (qbmm .and. .not. polytropic) then
                     do i = 1, nb
@@ -680,6 +701,13 @@ contains
                     end do
                 end do
 
+              if (chemistry .and. chem_params%diffusion) then 
+                  do j = 1, buff_size
+                      q_T_sf%sf(k, l, -j) = &
+                          q_T_sf%sf(k, l, p - (j - 1))
+                  end do
+                end if
+
                 if (qbmm .and. .not. polytropic) then
                     do i = 1, nb
                         do q = 1, nnode
@@ -696,6 +724,13 @@ contains
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, j - 1)
                     end do
                 end do
+
+               if (chemistry .and. chem_params%diffusion) then 
+                  do j = 1, buff_size
+                      q_T_sf%sf(k, l, p + j) = &
+                          q_T_sf%sf(k, l, j - 1)
+                  end do
+                end if
 
                 if (qbmm .and. .not. polytropic) then
                     do i = 1, nb
@@ -784,18 +819,17 @@ contains
                     end do
                 end do
 
-                 if (chemistry) then 
-                  if (isothermal_bc) then
-                          do j = 1, buff_size
-                             q_T_sf%sf(-j, k, l) = 2._wp * T_wall - q_T_sf%sf(j - 1, k, l)
-                         end do
-                  end if
-                else 
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = 2._wp*T_wall - q_T_sf%sf(j - 1, k, l)
+                        end do
+                    end if
+                else
                     do j = 1, buff_size
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
                     end do
                 end if
-
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -807,17 +841,17 @@ contains
                     end do
                 end do
 
-              if (chemistry) then 
-              if (isothermal_bc) then
-            do j = 1, buff_size
-                q_T_sf%sf(m + j, k, l) = 2._wp * T_wall - q_T_sf%sf(m - (j - 1), k, l)
-            end do
-            end if
-            else 
-               do j = 1, buff_size
-                q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
-            end do
-            end if
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = 2._wp*T_wall - q_T_sf%sf(m - (j - 1), k, l)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                    end do
+                end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             if (bc_loc == -1) then  !< bc_y%beg
@@ -831,20 +865,17 @@ contains
                     end do
                 end do
 
-                       if (chemistry) then 
-                       if (isothermal_bc) then
-                            do j = 1, buff_size
-                q_T_sf%sf(k, -j, l) = 2._wp * T_wall - q_T_sf%sf(k, j - 1, l)
-            end do
-            end if
-
-            else 
-
-                                  do j = 1, buff_size
-                q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
-            end do
-
-            end if
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = 2._wp*T_wall - q_T_sf%sf(k, j - 1, l)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
+                    end do
+                end if
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -856,17 +887,17 @@ contains
                     end do
                 end do
 
-                            if (chemistry) then 
-                            if (isothermal_bc) then
-              do j = 1, buff_size
-                q_T_sf%sf(k, n + j, l) = 2._wp * T_wall - q_T_sf%sf(k, n - (j - 1), l)
-            end do
-            end if
-            else 
-               do j = 1, buff_size
-                q_T_sf%sf(k, n + j, l) =  q_T_sf%sf(k, n - (j - 1), l)
-            end do
-              end if
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = 2._wp*T_wall - q_T_sf%sf(k, n - (j - 1), l)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                    end do
+                end if
             end if
         else if (bc_dir == 3) then  !< z-direction
             if (bc_loc == -1) then  !< bc_z%beg
@@ -880,18 +911,17 @@ contains
                     end do
                 end do
 
-
                 if (chemistry) then
-                if (isothermal_bc) then
-                do j = 1, buff_size
-                q_T_sf%sf(k, l, -j) = 2._wp * T_wall - q_T_sf%sf(k, l, j - 1)
-             end do
-             end if
-             else 
-                 do j = 1, buff_size
-                q_T_sf%sf(k, l, -j) =  q_T_sf%sf(k, l, j - 1)
-             end do
-                end if 
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = 2._wp*T_wall - q_T_sf%sf(k, l, j - 1)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
+                    end do
+                end if
             else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -903,25 +933,24 @@ contains
                     end do
                 end do
 
-                             if (chemistry) then 
-                             if (isothermal_bc) then
-                do j = 1, buff_size
-                q_T_sf%sf(k, l, p + j) = 2._wp * T_wall - q_T_sf%sf(k, l, p - (j - 1))
-             end do
-             end if 
-             else 
-               do j = 1, buff_size
-                q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
-             end do
-             end if
-
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = 2._wp*T_wall - q_T_sf%sf(k, l, p - (j - 1))
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
+                    end do
+                end if
             end if
         end if
 
     end subroutine s_slip_wall
 
     !> Apply no-slip wall boundary conditions by reflecting and negating all velocity components at the wall.
-    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l,  q_T_sf)
+    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_no_slip_wall',parallelism='[seq]', cray_inline=True)
 
@@ -947,19 +976,17 @@ contains
                     end do
                 end do
 
-                               if (chemistry) then 
-                  if (isothermal_bc) then
-                          do j = 1, buff_size
-                             q_T_sf%sf(-j, k, l) = 2._wp * T_wall - q_T_sf%sf(j - 1, k, l)
-                         end do
-                  end if
-                else 
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = 2._wp*T_wall - q_T_sf%sf(j - 1, k, l)
+                        end do
+                    end if
+                else
                     do j = 1, buff_size
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
                     end do
                 end if
-
-
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -975,17 +1002,17 @@ contains
                     end do
                 end do
 
-                             if (chemistry) then 
-            if (isothermal_bc) then
-            do j = 1, buff_size
-                q_T_sf%sf(m + j, k, l) = 2._wp * T_wall - q_T_sf%sf(m - (j - 1), k, l)
-            end do
-            end if
-            else 
-               do j = 1, buff_size
-                q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
-            end do
-            end if
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = 2._wp*T_wall - q_T_sf%sf(m - (j - 1), k, l)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                    end do
+                end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             if (bc_loc == -1) then  !< bc_y%beg
@@ -1002,20 +1029,17 @@ contains
                         end if
                     end do
                 end do
-                                       if (chemistry) then 
-                       if (isothermal_bc) then
-                            do j = 1, buff_size
-                q_T_sf%sf(k, -j, l) = 2._wp * T_wall - q_T_sf%sf(k, j - 1, l)
-            end do
-            end if
-
-            else 
-
-             do j = 1, buff_size
-                q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
-            end do
-
-            end if
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = 2._wp*T_wall - q_T_sf%sf(k, j - 1, l)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
+                    end do
+                end if
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -1030,17 +1054,17 @@ contains
                         end if
                     end do
                 end do
-                                            if (chemistry) then 
-                            if (isothermal_bc) then
-              do j = 1, buff_size
-                q_T_sf%sf(k, n + j, l) = 2._wp * T_wall - q_T_sf%sf(k, n - (j - 1), l)
-            end do
-            end if
-            else 
-               do j = 1, buff_size
-                q_T_sf%sf(k, n + j, l) =  q_T_sf%sf(k, n - (j - 1), l)
-            end do
-              end if
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = 2._wp*T_wall - q_T_sf%sf(k, n - (j - 1), l)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                    end do
+                end if
             end if
         else if (bc_dir == 3) then  !< z-direction
             if (bc_loc == -1) then  !< bc_z%beg
@@ -1057,17 +1081,17 @@ contains
                         end if
                     end do
                 end do
-             if (chemistry) then
-                if (isothermal_bc) then
-                do j = 1, buff_size
-                q_T_sf%sf(k, l, -j) = 2._wp * T_wall - q_T_sf%sf(k, l, j - 1)
-                end do
-             end if
-             else 
-             do j = 1, buff_size
-                q_T_sf%sf(k, l, -j) =  q_T_sf%sf(k, l, j - 1)
-             end do
-              end if 
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = 2._wp*T_wall - q_T_sf%sf(k, l, j - 1)
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
+                    end do
+                end if
             else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -1082,18 +1106,17 @@ contains
                         end if
                     end do
                 end do
-                    if (chemistry) then 
-                             if (isothermal_bc) then
-                do j = 1, buff_size
-                q_T_sf%sf(k, l, p + j) = 2._wp * T_wall - q_T_sf%sf(k, l, p - (j - 1))
-             end do
-             end if 
-             else 
-               do j = 1, buff_size
-                q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
-             end do
-             end if
-
+                if (chemistry) then
+                    if (isothermal_bc) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = 2._wp*T_wall - q_T_sf%sf(k, l, p - (j - 1))
+                        end do
+                    end if
+                else
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
+                    end do
+                end if
             end if
         end if
 
