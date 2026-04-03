@@ -243,6 +243,7 @@ module m_global_parameters
     real(wp), dimension(num_fluids_max) :: schlieren_alpha  !< Per-fluid Schlieren intensity amplitude coefficients
     integer                             :: fd_order         !< Finite-difference order for vorticity and Schlieren derivatives
     integer                             :: fd_number        !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+
     !> @name Reference parameters for Tait EOS
     !> @{
     real(wp) :: rhoref, pref
@@ -304,6 +305,7 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i  !< Generic loop iterator
+
         ! Logistics
 
         case_dir = '.'
@@ -374,6 +376,14 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = dflt_real
+            fluid_pp(i)%non_newtonian = .false.
+            fluid_pp(i)%tau0 = 0._wp
+            fluid_pp(i)%K = 0._wp
+            fluid_pp(i)%nn = 1._wp
+            fluid_pp(i)%mu_max = dflt_real
+            fluid_pp(i)%mu_min = 0._wp
+            fluid_pp(i)%mu_bulk = 0._wp
+            fluid_pp(i)%hb_m = 1000._wp
         end do
 
         ! Subgrid bubble parameters

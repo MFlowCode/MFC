@@ -1123,6 +1123,9 @@ def _load():
         _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
+        _r(f"{px}non_newtonian", LOG, {"viscosity"})
+        for a in ["tau0", "K", "nn", "mu_max", "mu_min", "mu_bulk", "hb_m"]:
+            _r(f"{px}{a}", REAL, {"viscosity"})
 
     # bub_pp (bubble properties)
     for a, sym in [

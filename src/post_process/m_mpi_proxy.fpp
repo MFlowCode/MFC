@@ -34,7 +34,6 @@ contains
         ! Allocating and configuring the receive counts and the displacement vector variables used in variable-gather communication
         ! procedures. Note that these are only needed for either multidimensional runs that utilize the Silo database file format or
         ! for 1D simulations.
-
         if ((format == 1 .and. n > 0) .or. n == 0) then
             allocate (recvcounts(0:num_procs - 1))
             allocate (displs(0:num_procs - 1))
@@ -65,7 +64,6 @@ contains
         integer :: i     !< Generic loop iterator
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Logistics
-
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',               &
@@ -116,6 +114,10 @@ contains
             call MPI_BCAST(fluid_pp(i)%qv, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%qvp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%G, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:for VAR in ['tau0', 'K', 'nn', 'mu_max', 'mu_min', 'mu_bulk', 'hb_m']
+                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
         end do
 
         ! Subgrid bubble parameters
@@ -148,7 +150,6 @@ contains
         real(wp) :: ext_temp(0:num_procs - 1)
 
         ! Simulation is 3D
-
         if (p > 0) then
             if (grid_geometry == 3) then
                 ! Minimum spatial extent in the r-direction
@@ -236,7 +237,6 @@ contains
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Silo-HDF5 database format
-
         if (format == 1) then
             call MPI_GATHERV(x_cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
@@ -296,7 +296,6 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Gathering the sub-domain flow variable data from all the processes and putting it back together for the entire
         ! computational domain on the process with rank 0
-
         call MPI_GATHERV(q_sf(0), m + 1, mpi_p, q_root_sf(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 

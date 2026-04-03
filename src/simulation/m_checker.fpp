@@ -35,6 +35,7 @@ contains
         end if
 
         call s_check_inputs_time_stepping
+        call s_check_inputs_non_newtonian
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
 
@@ -56,13 +57,11 @@ contains
 
         call s_int_to_str(num_stcls_min*weno_order, numStr)
         @:PROHIBIT(m + 1 < num_stcls_min*weno_order, &
-                   & "m must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " // trim(numStr))
+                   & "m must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*weno_order, &
-                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*weno_order, &
-                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
 
     end subroutine s_check_inputs_weno
 
@@ -73,13 +72,11 @@ contains
 
         call s_int_to_str(num_stcls_min*muscl_order, numStr)
         @:PROHIBIT(m + 1 < num_stcls_min*muscl_order, &
-                   & "m must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " // trim(numStr))
+                   & "m must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*muscl_order, &
-                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
-                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
 
     end subroutine s_check_inputs_muscl
 
@@ -103,5 +100,25 @@ contains
 #endif
 
     end subroutine s_check_inputs_nvidia_uvm
+
+    !> Checks constraints on non-Newtonian fluid parameters
+    impure subroutine s_check_inputs_non_newtonian
+
+        integer :: i
+
+        do i = 1, num_fluids
+            if (fluid_pp(i)%non_newtonian) then
+                @:PROHIBIT(.not. viscous, "Non-Newtonian fluid requires viscosity to be enabled")
+                @:PROHIBIT(fluid_pp(i)%K <= 0._wp, "Non-Newtonian fluid consistency index K must be > 0")
+                @:PROHIBIT(fluid_pp(i)%nn <= 0._wp, "Non-Newtonian fluid flow behavior index nn must be > 0")
+                @:PROHIBIT(fluid_pp(i)%tau0 < 0._wp, "Non-Newtonian fluid yield stress tau0 must be >= 0")
+                @:PROHIBIT(fluid_pp(i)%mu_min < 0._wp, "Non-Newtonian fluid mu_min must be >= 0")
+                @:PROHIBIT(fluid_pp(i)%mu_max < dflt_real .and. fluid_pp(i)%mu_max <= fluid_pp(i)%mu_min, &
+                           & "Non-Newtonian fluid mu_max must be > mu_min when set")
+                @:PROHIBIT(fluid_pp(i)%hb_m <= 0._wp, "Non-Newtonian Papanastasiou parameter hb_m must be > 0")
+            end if
+        end do
+
+    end subroutine s_check_inputs_non_newtonian
 
 end module m_checker

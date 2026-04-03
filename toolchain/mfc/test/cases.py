@@ -401,6 +401,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
+            if num_fluids == 1:
+                # Non-Newtonian viscosity (Herschel-Bulkley)
+                stack.push(
+                    "Non-Newtonian",
+                    {
+                        "viscous": "T",
+                        "dt": 1e-11,
+                        "patch_icpp(1)%vel(1)": 1.0,
+                        "fluid_pp(1)%Re(1)": 10.0,
+                        "fluid_pp(1)%non_newtonian": "T",
+                        "fluid_pp(1)%tau0": 0.0,
+                        "fluid_pp(1)%K": 0.1,
+                        "fluid_pp(1)%nn": 0.5,
+                        "fluid_pp(1)%hb_m": 1000.0,
+                        "fluid_pp(1)%mu_min": 1e-4,
+                        "fluid_pp(1)%mu_max": 10.0,
+                    },
+                )
+                cases.append(define_case_d(stack, "shear-thinning", {}))
+                cases.append(define_case_d(stack, "Bingham", {"fluid_pp(1)%tau0": 0.1, "fluid_pp(1)%nn": 1.0, "fluid_pp(1)%K": 0.01}))
+                stack.pop()
+
             if num_fluids == 2:
                 stack.push(
                     "Viscous",
@@ -1541,7 +1563,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
-                "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "2D_lid_driven_cavity_nn",
+                "2D_poiseuille_nn",
             ]
             if path in casesToSkip:
                 continue
