@@ -6,6 +6,7 @@
 #SBATCH --nodes=${nodes}
 #SBATCH --tasks-per-node=${tasks_per_node}
 #SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=4g
 #SBATCH --job-name="${name}"
 #SBATCH --time=${walltime}
 % if partition:
