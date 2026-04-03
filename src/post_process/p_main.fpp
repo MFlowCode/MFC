@@ -27,6 +27,7 @@ program p_main
     real(wp) :: c
     real(wp) :: H
     real(wp) :: start, finish
+    integer :: nt_step
 
     call s_initialize_mpi_domain()
 
@@ -60,8 +61,13 @@ program p_main
 
         wall_time = abs(finish - start)
 
-        if (t_step >= 2) then
-            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        if (cfl_dt) then
+            nt_step = t_step - n_start + 1
+        else
+            nt_step = (t_step - t_step_start)/t_step_save + 1
+        end if
+        if (nt_step >= 2) then
+            wall_time_avg = (wall_time + (nt_step - 2)*wall_time_avg)/(nt_step - 1)
         else
             wall_time_avg = 0._wp
         end if

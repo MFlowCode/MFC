@@ -652,10 +652,18 @@ contains
 
         wall_time = abs(finish - start)
 
-        if (t_step >= 2) then
-            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        if (cfl_dt) then
+            if (t_step >= 2) then
+                wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+            else
+                wall_time_avg = 0._wp
+            end if
         else
-            wall_time_avg = 0._wp
+            if (t_step - t_step_start >= 2) then
+                wall_time_avg = (wall_time + (t_step - t_step_start - 2)*wall_time_avg)/(t_step - t_step_start - 1)
+            else
+                wall_time_avg = 0._wp
+            end if
         end if
 
     end subroutine s_tvd_rk
