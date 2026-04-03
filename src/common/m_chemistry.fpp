@@ -325,7 +325,7 @@ contains
             else if (chem_params%transport_model == 2) then
                 ! Note: Added ALL scalars and 'i'/'eqn' to private list to prevent race conditions.
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, dYk_dxi, Mass_Diffu_Flux, &
-                                    & grid_spacing, MW_L, MW_R, MW_cell, , P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, &
+                                    & grid_spacing, MW_L, MW_R, MW_cell,  P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, &
                                     & Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, &
                                     & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end

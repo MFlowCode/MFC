@@ -1057,7 +1057,7 @@ contains
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
 
         $:GPU_UPDATE(device='[bc_x%isothermal_in, bc_x%isothermal_out]')
-        $:GPU_UPDATE(device='[bc_y%gisothermal_in, bc_y%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')
         $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')
         $:GPU_UPDATE(device='[bc_x%Twall_in, bc_x%Twall_out, bc_y%Twall_in, bc_y%Twall_out, bc_z%Twall_in, bc_z%Twall_out]')
 
