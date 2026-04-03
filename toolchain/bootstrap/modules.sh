@@ -46,7 +46,8 @@ if [ -v $u_c ]; then
     log   "$BR""Brown$W:   Oscar (o)"
     log   "$B""DoD$W:     Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
     log   "$OR""Florida$W: HiPerGator (h)"
-    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$B""tuo$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""cc$CR/$B""c$CR/$B""n$CR/$BR""o"$CR"/$OR""h"$CR"): "
+    log   "$C""WPI $W:   Turing   (t)"
+    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$B""tuo$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""cc$CR/$B""c$CR/$B""n$CR/$BR""o"$CR"/$OR""h"$CR/$C""t""$CR"): "
     read u_c
     log
 fi
