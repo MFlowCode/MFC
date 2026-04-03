@@ -1,6 +1,9 @@
-import os, typing, dataclasses
+import dataclasses
+import os
+import typing
 
-from     mfc import common
+from mfc import common
+
 from ..state import ARG
 
 
@@ -26,7 +29,7 @@ class InteractiveSystem(QueueSystem):
         return True
 
     def gen_submit_cmd(self, filepath: str) -> typing.List[str]:
-        if os.name == 'nt':
+        if os.name == "nt":
             return [filepath]
 
         return ["/bin/bash", filepath]
@@ -78,7 +81,8 @@ class SLURMSystem(QueueSystem):
         return cmd + [filepath]
 
 
-BATCH_SYSTEMS = [ LSFSystem(), SLURMSystem(), PBSSystem() ]
+BATCH_SYSTEMS = [LSFSystem(), SLURMSystem(), PBSSystem()]
+
 
 def get_system() -> QueueSystem:
     if ARG("engine") == "interactive":

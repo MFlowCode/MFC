@@ -2,12 +2,15 @@
 #:include 'omp_macros.fpp'
 #:include 'acc_macros.fpp'
 
+! GPU parallel region (scalar reductions, maxval/minval)
 #:def GPU_PARALLEL(code, private=None, default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
 
-    #:set acc_code = ACC_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_code = OMP_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set acc_code = ACC_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, &
+                                  & copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_code = OMP_PARALLEL(code, private, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, &
+                                  & copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -16,27 +19,30 @@
 #else
     $:code
 #endif
-
 #:enddef
 
+! GPU parallel loop over threads (most common GPU macro)
 #:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
 
-    #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
+                                            & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
+                                            & extraAccArgs)
+    #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
+                                            & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
+                                            & extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_directive
 #elif defined(MFC_OpenMP)
     $:omp_directive
 #endif
-
 #:enddef
 
+! Required closing for GPU_PARALLEL_LOOP
 #:def END_GPU_PARALLEL_LOOP()
-
     #:set acc_end_directive = '!$acc end parallel loop'
     #:set omp_end_directive = END_OMP_PARALLEL_LOOP()
 
@@ -45,21 +51,51 @@
 #elif defined(MFC_OpenMP)
     $:omp_end_directive
 #endif
-
 #:enddef
 
-#:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, extraAccArgs=None, extraOmpArgs=None)
+! Mark routine for device compilation
+#:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, cray_noinline=False, extraAccArgs=None, &
+                  & extraOmpArgs=None)
     #:assert isinstance(cray_inline, bool)
-    #:set acc_directive = ACC_ROUTINE(function_name=function_name, parallelism=parallelism, nohost=nohost, extraAccArgs=extraAccArgs)
+    #:assert isinstance(cray_noinline, bool)
+    #:assert not (cray_inline and cray_noinline), "cray_inline and cray_noinline are mutually exclusive"
+    #:set acc_directive = ACC_ROUTINE(function_name=function_name, parallelism=parallelism, nohost=nohost, &
+                                      & extraAccArgs=extraAccArgs)
     #:set omp_directive = OMP_ROUTINE(function_name=function_name, nohost=nohost, extraOmpArgs=extraOmpArgs)
 
-    #:if cray_inline == True
+    #:if cray_noinline == True
+        #:if not isinstance(function_name, str)
+            #:stop "When using cray_noinline, function name must be given and given as a string"
+        #:endif
+        #:set cray_noinline_directive = ('!DIR$ NOINLINE ' + function_name).strip('\n')
+#ifdef _CRAYFTN
+#if MFC_OpenACC
+        $:acc_directive
+#elif MFC_OpenMP
+        $:omp_directive
+#else
+        $:cray_noinline_directive
+#endif
+        #! On non-Cray CPU builds (no _CRAYFTN, no MFC_OpenACC, no MFC_OpenMP), nothing is
+        #! emitted — intentional, since !DIR$ NOINLINE is a Cray-specific directive.
+#elif MFC_OpenACC
+        $:acc_directive
+#elif MFC_OpenMP
+        $:omp_directive
+#endif
+    #:elif cray_inline == True
         #:if not isinstance(function_name, str)
             #:stop "When inlining for Cray Compiler, function name must be given and given as a string"
         #:endif
         #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
 #ifdef _CRAYFTN
+#if MFC_OpenACC
+        $:acc_directive
+#elif MFC_OpenMP
+        $:omp_directive
+#else
         $:cray_directive
+#endif
 #elif MFC_OpenACC
         $:acc_directive
 #elif MFC_OpenMP
@@ -74,8 +110,11 @@
     #:endif
 #:enddef
 
-#:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, link=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_DECLARE(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, present=present, deviceptr=deviceptr, link=link, extraAccArgs=None)
+! Declare device-resident data
+#:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, &
+                  & link=None, extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_DECLARE(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
+                                 & present=present, deviceptr=deviceptr, link=link, extraAccArgs=None)
     #:assert copyout is None
     #:assert present is None
     #:assert deviceptr is None
@@ -89,9 +128,13 @@
 #endif
 #:enddef
 
-#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, reductionOp=reductionOp, private=private, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, reductionOp=reductionOp, private=private, extraOmpArgs=extraOmpArgs)
+! Inner loop within a GPU parallel region
+#:def GPU_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, &
+               & extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, &
+                              & reductionOp=reductionOp, private=private, extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_LOOP(collapse=collapse, parallelism=parallelism, data_dependency=data_dependency, reduction=reduction, &
+                              & reductionOp=reductionOp, private=private, extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -100,9 +143,15 @@
 #endif
 #:enddef
 
-#:def GPU_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, deviceptr=None, attach=None, default=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, extraOmpArgs=extraOmpArgs)
+! Scoped GPU data region
+#:def GPU_DATA(code, copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, no_create=None, present=None, &
+               & deviceptr=None, attach=None, default=None, extraAccArgs=None, extraOmpArgs=None)
+    #:set acc_code = ACC_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
+                              & no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, &
+                              & extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_DATA(code=code, copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
+                              & no_create=no_create, present=present, deviceptr=deviceptr, attach=attach, default=default, &
+                              & extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -113,8 +162,8 @@
 #endif
 #:enddef
 
+! Host code with device pointers (for MPI with GPU buffers)
 #:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, extraAccArgs=None, extraOmpArgs=None)
-
     #:if use_device_addr is not None and use_device_ptr is not None
         #:set use_device_addr_end_index = len(use_device_addr) - 1
         #:set use_device = use_device_addr + use_device_ptr
@@ -130,7 +179,8 @@
         #:set use_device = None
     #:endif
     #:set acc_code = ACC_HOST_DATA(code=code, use_device=use_device, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_HOST_DATA(code=code, use_device_addr=use_device_addr, use_device_ptr=use_device_ptr, extraOmpArgs=extraOmpArgs)
+    #:set omp_code = OMP_HOST_DATA(code=code, use_device_addr=use_device_addr, use_device_ptr=use_device_ptr, &
+                                   & extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -141,9 +191,12 @@
 #endif
 #:enddef
 
+! Allocate device memory (unscoped)
 #:def GPU_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
-    #:set acc_code = ACC_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, extraAccArgs=extraAccArgs)
-    #:set omp_code = OMP_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, extraOmpArgs=extraOmpArgs)
+    #:set acc_code = ACC_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, &
+                                    & extraAccArgs=extraAccArgs)
+    #:set omp_code = OMP_ENTER_DATA(copyin=copyin, copyinReadOnly=copyinReadOnly, create=create, attach=attach, &
+                                    & extraOmpArgs=extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -152,6 +205,7 @@
 #endif
 #:enddef
 
+! Free device memory
 #:def GPU_EXIT_DATA(copyout=None, delete=None, detach=None, extraAccArgs=None, extraOmpArgs=None)
     #:set acc_code = ACC_EXIT_DATA(copyout=copyout, delete=delete, detach=detach, extraAccArgs=extraAccArgs)
     #:set omp_code = OMP_EXIT_DATA(copyout=copyout, delete=delete, detach=detach, extraOmpArgs=extraOmpArgs)
@@ -163,6 +217,7 @@
 #endif
 #:enddef
 
+! Atomic operation on device
 #:def GPU_ATOMIC(atomic, extraAccArgs=None, extraOmpArgs=None)
     #:set acc_code = ACC_ATOMIC(atomic=atomic, extraAccArgs=extraAccArgs)
     #:set omp_code = OMP_ATOMIC(atomic=atomic, extraOmpArgs=extraOmpArgs)
@@ -174,6 +229,7 @@
 #endif
 #:enddef
 
+! End atomic capture block
 #:def END_GPU_ATOMIC_CAPTURE()
     #:set acc_end_directive = '!$acc end atomic'
     #:set omp_end_directive = '!$omp end atomic'
@@ -184,6 +240,7 @@
 #endif
 #:enddef
 
+! Copy data between host and device
 #:def GPU_UPDATE(host=None, device=None, extraAccArgs=None, extraOmpArgs=None)
     #:set acc_code = ACC_UPDATE(host=host, device=device, extraAccArgs=extraAccArgs)
     #:set omp_code = OMP_UPDATE(host=host, device=device, extraOmpArgs=extraOmpArgs)
@@ -195,6 +252,7 @@
 #endif
 #:enddef
 
+! Synchronization barrier
 #:def GPU_WAIT(extraAccArgs=None, extraOmpArgs=None)
     #:set acc_code = ACC_WAIT(extraAccArgs=extraAccArgs)
     #:set omp_code = OMP_WAIT(extraOmpArgs=extraOmpArgs)
@@ -206,34 +264,37 @@
 #endif
 #:enddef
 
+! Import GPU library module (openacc or omp_lib)
 #:def USE_GPU_MODULE()
-
 #if defined(MFC_OpenACC)
     use openacc
 #elif defined(MFC_OpenMP)
     use omp_lib
 #endif
-
 #:enddef
 
+! Emit code only for AMD compiler
 #:def DEF_AMD(code)
     #:if MFC_COMPILER == AMD_COMPILER_ID
         $:code
     #:endif
 #:enddef
 
+! Emit code for non-Cray compilers
 #:def UNDEF_CCE(code)
     #:if MFC_COMPILER != CCE_COMPILER_ID
         $:code
     #:endif
 #:enddef
 
+! Emit code only for Cray compiler
 #:def DEF_CCE(code)
     #:if MFC_COMPILER == CCE_COMPILER_ID
         $:code
     #:endif
 #:enddef
 
+! Emit code for non-NVIDIA compilers
 #:def UNDEF_NVIDIA(code)
     #:if MFC_COMPILER != NVIDIA_COMPILER_ID and MFC_COMPILER != PGI_COMPILER_ID
         $:code

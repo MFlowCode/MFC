@@ -14,12 +14,17 @@ device="$2"
 interface="$3"
 cluster="$4"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "[$dir] Submitting benchmark for $device-$interface on $cluster..."
 cd "$dir"
 
-# Submit and monitor job (submit.sh auto-detects bench mode from script name)
-bash .github/workflows/$cluster/submit.sh \
-    .github/workflows/$cluster/bench.sh "$device" "$interface"
+# Use the PR's submit-slurm-job.sh and bench script for both master and PR jobs.
+# The bench script must come from the PR tree (master may not have common/bench.sh
+# yet), and the script only orchestrates build+bench — the actual MFC code under
+# test is the cwd's checkout (master/ or pr/).
+PR_BENCH_SCRIPT="$(cd "${SCRIPT_DIR}/../workflows/common" && pwd)/bench.sh"
+bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster"
 
 # Verify the YAML output file was created
 job_slug="bench-$device-$interface"
@@ -31,9 +36,9 @@ if [ ! -f "$yaml_file" ]; then
     echo ""
     output_file="${job_slug}.out"
     echo "[$dir] Last 100 lines of job output ($output_file):"
-    echo "----------------------------------------"
+    echo "--------------------"
     tail -n 100 "$output_file" 2>/dev/null || echo "  Could not read output file"
-    echo "----------------------------------------"
+    echo "--------------------"
     exit 1
 fi
 

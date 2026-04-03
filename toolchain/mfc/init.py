@@ -3,14 +3,13 @@
 import os
 import shutil
 
-from .printer import cons
 from .common import MFC_EXAMPLE_DIRPATH, MFCException
+from .printer import cons
 from .state import ARG
-
 
 # Built-in minimal templates
 BUILTIN_TEMPLATES = {
-    '1D_minimal': '''\
+    "1D_minimal": '''\
 #!/usr/bin/env python3
 """
 1D Minimal Case Template
@@ -23,9 +22,7 @@ Usage:
 import math
 import json
 
-# =============================================================================
 # SIMULATION PARAMETERS - Modify these for your case
-# =============================================================================
 
 # Grid resolution
 Nx = 399                    # Number of cells in x-direction
@@ -51,15 +48,11 @@ pres_R = 0.1                # Pressure
 # Fluid properties
 gamma = 1.4                 # Ratio of specific heats
 
-# =============================================================================
 # DERIVED QUANTITIES - Usually don't need to modify
-# =============================================================================
 dx = (x_end - x_start) / (Nx + 1)
 dt = t_end / Nt
 
-# =============================================================================
 # CASE DICTIONARY - MFC configuration
-# =============================================================================
 print(json.dumps({
     # Logistics
     "run_time_info": "T",
@@ -120,8 +113,7 @@ print(json.dumps({
     "fluid_pp(1)%pi_inf": 0.0,
 }))
 ''',
-
-    '2D_minimal': '''\
+    "2D_minimal": '''\
 #!/usr/bin/env python3
 """
 2D Minimal Case Template
@@ -134,9 +126,7 @@ Usage:
 import math
 import json
 
-# =============================================================================
 # SIMULATION PARAMETERS - Modify these for your case
-# =============================================================================
 
 # Grid resolution
 Nx = 99                     # Cells in x-direction
@@ -166,9 +156,7 @@ pres_pert = 2.0e5
 # Fluid properties
 gamma = 1.4
 
-# =============================================================================
 # CASE DICTIONARY - MFC configuration
-# =============================================================================
 print(json.dumps({
     # Logistics
     "run_time_info": "T",
@@ -239,8 +227,7 @@ print(json.dumps({
     "fluid_pp(1)%pi_inf": 0.0,
 }))
 ''',
-
-    '3D_minimal': '''\
+    "3D_minimal": '''\
 #!/usr/bin/env python3
 """
 3D Minimal Case Template
@@ -253,9 +240,7 @@ Usage:
 import math
 import json
 
-# =============================================================================
 # SIMULATION PARAMETERS - Modify these for your case
-# =============================================================================
 
 # Grid resolution (keep low for testing, increase for production)
 Nx = 49                     # Cells in x-direction
@@ -286,9 +271,7 @@ pres_pert = 2.0e5
 # Fluid properties
 gamma = 1.4
 
-# =============================================================================
 # CASE DICTIONARY - MFC configuration
-# =============================================================================
 print(json.dumps({
     # Logistics
     "run_time_info": "T",
@@ -379,7 +362,7 @@ def get_available_templates():
     if os.path.isdir(MFC_EXAMPLE_DIRPATH):
         for name in sorted(os.listdir(MFC_EXAMPLE_DIRPATH)):
             example_path = os.path.join(MFC_EXAMPLE_DIRPATH, name)
-            if os.path.isdir(example_path) and os.path.isfile(os.path.join(example_path, 'case.py')):
+            if os.path.isdir(example_path) and os.path.isfile(os.path.join(example_path, "case.py")):
                 templates.append(f"example:{name}")
 
     return templates
@@ -392,10 +375,10 @@ def list_templates():
     cons.print("  [bold cyan]Built-in Templates:[/bold cyan]")
     for name in sorted(BUILTIN_TEMPLATES.keys()):
         desc = {
-            '1D_minimal': 'Minimal 1D shock tube case',
-            '2D_minimal': 'Minimal 2D case with circular perturbation',
-            '3D_minimal': 'Minimal 3D case with spherical perturbation',
-        }.get(name, '')
+            "1D_minimal": "Minimal 1D shock tube case",
+            "2D_minimal": "Minimal 2D case with circular perturbation",
+            "3D_minimal": "Minimal 3D case with spherical perturbation",
+        }.get(name, "")
         cons.print(f"    [green]{name:20s}[/green] {desc}")
 
     cons.print()
@@ -405,14 +388,14 @@ def list_templates():
         examples = []
         for name in sorted(os.listdir(MFC_EXAMPLE_DIRPATH)):
             example_path = os.path.join(MFC_EXAMPLE_DIRPATH, name)
-            if os.path.isdir(example_path) and os.path.isfile(os.path.join(example_path, 'case.py')):
+            if os.path.isdir(example_path) and os.path.isfile(os.path.join(example_path, "case.py")):
                 examples.append(name)
 
         # Group by dimension
-        for dim in ['0D', '1D', '2D', '3D']:
+        for dim in ["0D", "1D", "2D", "3D"]:
             dim_examples = [e for e in examples if e.startswith(dim)]
             if dim_examples:
-                cons.print(f"    [dim]{dim}:[/dim] {', '.join(dim_examples[:5])}", end='')
+                cons.print(f"    [dim]{dim}:[/dim] {', '.join(dim_examples[:5])}", end="")
                 if len(dim_examples) > 5:
                     cons.print(f" [dim]... (+{len(dim_examples) - 5} more)[/dim]")
                 else:
@@ -437,9 +420,9 @@ def create_case(name: str, template: str):
     # Check if it's a built-in template
     if template in BUILTIN_TEMPLATES:
         os.makedirs(output_dir, exist_ok=True)
-        case_path = os.path.join(output_dir, 'case.py')
+        case_path = os.path.join(output_dir, "case.py")
 
-        with open(case_path, 'w') as f:
+        with open(case_path, "w") as f:
             f.write(BUILTIN_TEMPLATES[template])
 
         os.chmod(case_path, 0o755)  # Make executable
@@ -453,7 +436,7 @@ def create_case(name: str, template: str):
         cons.print()
 
     # Check if it's an example template
-    elif template.startswith('example:'):
+    elif template.startswith("example:"):
         example_name = template[8:]  # Remove 'example:' prefix
         example_path = os.path.join(MFC_EXAMPLE_DIRPATH, example_name)
 
@@ -472,12 +455,9 @@ def create_case(name: str, template: str):
         cons.print()
 
     else:
-        available = ', '.join(list(BUILTIN_TEMPLATES.keys())[:3])
+        available = ", ".join(list(BUILTIN_TEMPLATES.keys())[:3])
         raise MFCException(
-            f"Unknown template: {template}\n"
-            f"Available built-in templates: {available}\n"
-            f"Or use 'example:<name>' to copy from examples.\n"
-            f"Run './mfc.sh new --list' to see all available templates."
+            f"Unknown template: {template}\nAvailable built-in templates: {available}\nOr use 'example:<name>' to copy from examples.\nRun './mfc.sh new --list' to see all available templates."
         )
 
 
@@ -492,12 +472,12 @@ def init():
 
     if not name:
         # Show full help like ./mfc.sh new -h
-        # pylint: disable=import-outside-toplevel
         import sys
-        from .user_guide import print_command_help
-        from .cli.commands import MFC_CLI_SCHEMA
+
         from .cli.argparse_gen import generate_parser
+        from .cli.commands import MFC_CLI_SCHEMA
         from .state import MFCConfig
+        from .user_guide import print_command_help
 
         print_command_help("new", show_argparse=False)
         _, subparser_map = generate_parser(MFC_CLI_SCHEMA, MFCConfig())

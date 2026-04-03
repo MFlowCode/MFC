@@ -6,10 +6,13 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6 AM UTC: refresh coverage cache before 7-day expiry
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # PRs: group by branch (new push cancels old). Push to master: unique per SHA (never cancelled).
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   lint-gate:
@@ -38,26 +41,22 @@ jobs:
       - name: Lint Toolchain
         run: ./mfc.sh lint
 
-      - name: Lint Source - No Raw Directives
-        run: |
-          ! grep -iR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="acc_macros.fpp" --exclude="omp_macros.fpp" --exclude="shared_parallel_macros.fpp" --exclude="syscheck.fpp" ./src/*
-
-      - name: Lint Source - No Double Precision Intrinsics
-        run: |
-          ! grep -iR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/*
-
-      - name: Lint Source - No Junk Code
-        run: |
-          ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+      - name: Lint Source
+        run: python3 toolchain/mfc/lint_source.py
 
       - name: Lint Docs
         run: python3 toolchain/mfc/lint_docs.py
 
+      - name: Lint Parameter Docs
+        run: python3 toolchain/mfc/lint_param_docs.py
+
   file-changes:
     name: Detect File Changes
     runs-on: 'ubuntu-latest'
-    outputs: 
+    outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
+      cases_py: ${{ steps.changes.outputs.cases_py }}
+      dep_changed: ${{ steps.dep-check.outputs.dep_changed }}
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -65,20 +64,108 @@ jobs:
       - name: Detect Changes
         uses: dorny/paths-filter@v3
         id: changes
-        with: 
+        with:
           filters: ".github/file-filter.yml"
 
-  github:
-    name: Github
-    if: needs.file-changes.outputs.checkall == 'true'
+      - name: Check for Fortran dependency changes
+        id: dep-check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Detect added/removed use/include statements that change the
+          # Fortran dependency graph, which would make the coverage cache stale.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Default to dep_changed=true if gh pr diff fails (safe fallback).
+            DIFF=$(gh pr diff "$PR_NUMBER" 2>/dev/null) || {
+              echo "gh pr diff failed — defaulting to dep_changed=true for safety."
+              echo "dep_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            }
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            DIFF=$(git diff "$BEFORE".."$AFTER" 2>/dev/null) || {
+              echo "git diff failed for push event — defaulting to dep_changed=true for safety."
+              echo "dep_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            }
+          else
+            DIFF=""
+          fi
+          if echo "$DIFF" | \
+             grep -qE '^[+-][[:space:]]*(use[[:space:],]+[a-zA-Z_]|#:include[[:space:]]|include[[:space:]]+['"'"'"])'; then
+            echo "dep_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Fortran dependency change detected — will rebuild coverage cache."
+          else
+            echo "dep_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  rebuild-cache:
+    name: Rebuild Coverage Cache
     needs: [lint-gate, file-changes]
+    if: >-
+      github.repository == 'MFlowCode/MFC' &&
+      (
+        (github.event_name == 'pull_request' &&
+         (needs.file-changes.outputs.cases_py == 'true' ||
+          needs.file-changes.outputs.dep_changed == 'true')) ||
+        (github.event_name == 'push' &&
+         (needs.file-changes.outputs.cases_py == 'true' ||
+          needs.file-changes.outputs.dep_changed == 'true')) ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule'
+      )
+    timeout-minutes: 240
+    runs-on:
+      group:  phoenix
+      labels: gt
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          clean: false
+
+      - name: Rebuild Cache via SLURM
+        run: bash .github/scripts/submit-slurm-job.sh .github/workflows/common/rebuild-cache.sh cpu none phoenix
+
+      - name: Print Logs
+        if:   always()
+        run:  cat rebuild-cache-cpu-none.out
+
+      - name: Upload Cache Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          retention-days: 1
+
+      - name: Save Coverage Cache
+        uses: actions/cache/save@v4
+        with:
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
+        continue-on-error: true
+
+  github:
+    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || format('Github ({0}, {1}, {2}, intel={3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel) }}
+    needs: [lint-gate, file-changes, rebuild-cache]
+    if: >-
+      !cancelled() &&
+      needs.lint-gate.result == 'success' &&
+      needs.file-changes.result == 'success' &&
+      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
+      needs.file-changes.outputs.checkall == 'true'
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
         mpi:   ['mpi']
         precision: ['']
-        debug: ['debug', 'no-debug']
+        debug: ['reldebug', 'no-debug']
         intel: [true, false]
+        nvhpc: ['']
+        target: ['']
         exclude:
           - os:    macos
             intel: true
@@ -90,25 +177,175 @@ jobs:
             debug: no-debug
             intel: false
 
+          # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
+          # Every release from 23.11 through 26.3 (current)
+          - { nvhpc: '23.11', target: cpu }
+          - { nvhpc: '23.11', target: gpu }
+          - { nvhpc: '24.1',  target: cpu }
+          - { nvhpc: '24.1',  target: gpu }
+          - { nvhpc: '24.3',  target: cpu }
+          - { nvhpc: '24.3',  target: gpu }
+          - { nvhpc: '24.5',  target: cpu }
+          - { nvhpc: '24.5',  target: gpu }
+          - { nvhpc: '24.7',  target: cpu }
+          - { nvhpc: '24.7',  target: gpu }
+          - { nvhpc: '24.9',  target: cpu }
+          - { nvhpc: '24.9',  target: gpu }
+          - { nvhpc: '24.11', target: cpu }
+          - { nvhpc: '24.11', target: gpu }
+          - { nvhpc: '25.1',  target: cpu }
+          - { nvhpc: '25.1',  target: gpu }
+          - { nvhpc: '25.3',  target: cpu }
+          - { nvhpc: '25.3',  target: gpu }
+          - { nvhpc: '25.5',  target: cpu }
+          - { nvhpc: '25.5',  target: gpu }
+          - { nvhpc: '25.7',  target: cpu }
+          - { nvhpc: '25.7',  target: gpu }
+          - { nvhpc: '25.9',  target: cpu }
+          - { nvhpc: '25.9',  target: gpu }
+          - { nvhpc: '25.11', target: cpu }
+          - { nvhpc: '25.11', target: gpu }
+          - { nvhpc: '26.1',  target: cpu }
+          - { nvhpc: '26.1',  target: gpu }
+          - { nvhpc: '26.3',  target: cpu }
+          - { nvhpc: '26.3',  target: gpu }
+
       fail-fast: false
     continue-on-error: true
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.nvhpc && 'ubuntu-22.04' || format('{0}-latest', matrix.os) }}
+    env:
+      # Image tag for NVHPC jobs; empty for non-NVHPC jobs.
+      NVHPC_IMAGE: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda_multi-ubuntu22.04', matrix.nvhpc) || '' }}
 
     steps:
+      # ── NVHPC: free disk before pulling the ~25-30 GB cuda_multi image ──
+      - name: Free disk space
+        if:   matrix.nvhpc
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android \
+            /opt/ghc /usr/local/share/boost /opt/hostedtoolcache \
+            /usr/local/graalvm /usr/local/.ghcup \
+            /usr/local/share/chromium /usr/local/lib/node_modules
+          sudo docker image prune -af
+          sudo apt-get clean
+          echo "=== Disk after cleanup ==="
+          df -h /
+
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Fetch master for coverage diff
+        run: |
+          git fetch origin master:master --depth=1
+          git fetch --deepen=200
+        continue-on-error: true
+
+      - name: Download Coverage Cache (from rebuild in this run)
+        id: cache-artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test
+        continue-on-error: true
+
+      - name: Restore Coverage Cache (from previous run)
+        if: steps.cache-artifact.outcome != 'success'
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
+          restore-keys: |
+            coverage-cache-${{ github.event.pull_request.number || 'master' }}-
+            coverage-cache-master-
+        continue-on-error: true
+
+      - name: Coverage Cache Status
+        run: |
+          if [ "${{ steps.cache-artifact.outcome }}" = "success" ]; then
+            echo "Coverage cache: loaded from rebuild artifact (this run)"
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
+            echo "Coverage cache: restored from actions/cache (previous run)"
+          elif [ -f toolchain/mfc/test/test_coverage_cache.json.gz ]; then
+            echo "Coverage cache: using committed fallback in repo"
+          else
+            echo "Coverage cache: none available — full test suite will run"
+          fi
+
+      # ── NVHPC: pull image and start a long-lived container ──────────────
+      # Replaces the container: directive so we can free disk space first.
+      # Uses "docker run -d ... sleep infinity" + "docker exec" to preserve
+      # installed packages and env vars across steps.
+      - name: Pull NVHPC container
+        if:   matrix.nvhpc
+        run:  docker pull "$NVHPC_IMAGE"
+
+      - name: Start NVHPC container
+        if:   matrix.nvhpc
+        run: |
+          docker run -d --name nvhpc \
+            --security-opt seccomp=unconfined \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            -e CC=nvc \
+            -e CXX=nvc++ \
+            -e FC=nvfortran \
+            -e OMPI_ALLOW_RUN_AS_ROOT=1 \
+            -e OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+            -e PMIX_MCA_gds=hash \
+            -e OMPI_MCA_hwloc_base_binding_policy=none \
+            -e "FFLAGS=-tp=px -Kieee -noswitcherror" \
+            -e CFLAGS=-tp=px \
+            -e CXXFLAGS=-tp=px \
+            "$NVHPC_IMAGE" sleep infinity
+
+      - name: Setup NVHPC
+        if:   matrix.nvhpc
+        run: |
+          docker exec nvhpc bash -c '
+            set -e
+            apt-get update -y
+            apt-get install -y cmake python3 python3-venv python3-pip \
+                               libfftw3-dev libhdf5-dev hdf5-tools git
+
+            # The repo is bind-mounted from the host so git sees a different
+            # owner.  Mark it safe to suppress "dubious ownership" errors that
+            # otherwise spam 80 000+ lines into the CI log.
+            git config --global --add safe.directory /workspace
+
+            # Set up NVHPC HPC-X MPI runtime paths
+            HPCX_DIR=$(dirname "$(find /opt/nvidia/hpc_sdk -path "*/hpcx/hpcx-*/ompi/bin/mpirun" | head -1)")/../..
+            MPI_LIB=$(mpifort --showme:link | grep -oP "(?<=-L)\S+" | head -1)
+
+            # Persist env vars for subsequent docker exec calls
+            cat > /etc/nvhpc-env.sh <<EOF
+          export LD_LIBRARY_PATH=${MPI_LIB}:${HPCX_DIR}/ucx/lib:${HPCX_DIR}/ucc/lib:\$LD_LIBRARY_PATH
+          export OMPI_MCA_rmaps_base_oversubscribe=1
+          EOF
+
+            # Debug: confirm compiler flags are set
+            echo "=== NVHPC Environment ==="
+            echo "FFLAGS=$FFLAGS"
+            echo "CFLAGS=$CFLAGS"
+            echo "CXXFLAGS=$CXXFLAGS"
+            nvfortran --version
+            cat /proc/cpuinfo | grep "model name" | head -1
+          '
+
+      # ── Standard (non-NVHPC) setup ─────────────────────────────────────
       - name: Setup MacOS
-        if:   matrix.os == 'macos'
+        if:   matrix.os == 'macos' && !matrix.nvhpc
         run:  |
           brew update
-          brew upgrade
+          brew upgrade || true
           brew install coreutils python fftw hdf5 gcc@15 boost open-mpi lapack
           echo "FC=gfortran-15" >> $GITHUB_ENV
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
       - name: Setup Ubuntu
-        if:   matrix.os == 'ubuntu' && matrix.intel == false
+        if:   matrix.os == 'ubuntu' && matrix.intel == false && !matrix.nvhpc
         run: |
            sudo apt update -y
            sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
@@ -122,50 +359,86 @@ jobs:
           sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
           sudo apt-get update
-          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
+          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mpi intel-oneapi-mpi-devel
+          # Export only new/changed env vars from setvars.sh.
+          # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
+          # with special characters that corrupt GITHUB_ENV parsing.
+          printenv | sort > /tmp/env_before
           source /opt/intel/oneapi/setvars.sh
-          printenv >> $GITHUB_ENV
+          printenv | sort > /tmp/env_after
+          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
+          echo "FC=ifx" >> $GITHUB_ENV
+          echo "CC=icx" >> $GITHUB_ENV
+          echo "CXX=icpx" >> $GITHUB_ENV
+          echo "MPIFC=mpiifx" >> $GITHUB_ENV
+          echo "MPICC=mpiicx" >> $GITHUB_ENV
+          echo "MPICXX=mpiicpx" >> $GITHUB_ENV
 
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-
-      - name: Get system info for cache key
-        id: sys-info
-        run: |
-          {
-            uname -m
-            cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1 || sysctl -n machdep.cpu.brand_string 2>/dev/null || true
-            if command -v ifx &>/dev/null; then ifx --version 2>/dev/null | head -1; else ${FC:-gfortran} --version 2>/dev/null | head -1 || true; fi
-            ${CC:-gcc} --version 2>/dev/null | head -1 || true
-          } | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-16 > /tmp/sys-hash
-          echo "sys-hash=$(cat /tmp/sys-hash)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Build Cache
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ steps.sys-info.outputs.sys-hash }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
-
+      # ── Standard build + test ───────────────────────────────────────────
       - name: Build
+        if:   '!matrix.nvhpc'
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j "$(nproc)" --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
-        run: bash .github/scripts/run-tests-with-retry.sh -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT
+        if:   '!matrix.nvhpc'
+        run:  |
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $ONLY_CHANGES $TEST_ALL $TEST_PCT
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
+          ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
+
+      # ── NVHPC build + test (via docker exec into long-lived container) ──
+      - name: Build (NVHPC)
+        if:   matrix.nvhpc && matrix.target == 'cpu'
+        run: |
+          docker exec nvhpc bash -c '
+            source /etc/nvhpc-env.sh
+            /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all
+          '
+
+      - name: Build (NVHPC GPU)
+        if:   matrix.nvhpc && matrix.target == 'gpu'
+        run: |
+          docker exec nvhpc bash -c '
+            source /etc/nvhpc-env.sh
+            /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu acc
+            /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu mp
+          '
+
+      - name: Test (NVHPC)
+        if:   matrix.nvhpc && matrix.target == 'cpu'
+        run: |
+          docker exec nvhpc bash -c '
+            source /etc/nvhpc-env.sh
+            ulimit -s unlimited || ulimit -s 65536 || true
+            /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
+          '
+
+      # ── Cleanup ─────────────────────────────────────────────────────────
+      - name: Stop NVHPC container
+        if:   always() && matrix.nvhpc
+        run:  docker rm -f nvhpc || true
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
-    needs: [lint-gate, file-changes]
-    continue-on-error: false
+    needs: [lint-gate, file-changes, rebuild-cache]
+    if: >-
+      !cancelled() &&
+      needs.lint-gate.result == 'success' &&
+      needs.file-changes.result == 'success' &&
+      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
+      github.repository == 'MFlowCode/MFC' &&
+      needs.file-changes.outputs.checkall == 'true' &&
+      github.event.pull_request.draft != true
+    # Frontier CCE compiler is periodically broken by toolchain updates (e.g.
+    # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
+    # fail without blocking PR merges; Phoenix remains a hard gate.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -186,7 +459,7 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL) — build on login node, GPU tests sharded for batch partition
+          # Frontier (ORNL) — CCE
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
@@ -243,48 +516,99 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
+          # clean: false preserves .slurm_job_id files across reruns so
+          # submit-slurm-job.sh can detect and cancel stale SLURM jobs on retry.
           clean: false
 
-      - name: Build
-        if:   matrix.cluster != 'phoenix'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+      - name: Clean stale output files
+        run:  rm -f *.out
+
+      - name: Download Coverage Cache (from rebuild in this run)
+        id: cache-artifact
+        uses: actions/download-artifact@v4
         with:
-          max_attempts: 3
-          retry_wait_seconds: 60
-          timeout_minutes: 60
-          command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: ./mfc.sh clean
+          name: coverage-cache
+          path: toolchain/mfc/test
+        continue-on-error: true
+
+      - name: Restore Coverage Cache (from previous run)
+        if: steps.cache-artifact.outcome != 'success'
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          key: coverage-cache-${{ github.event.pull_request.number || 'master' }}-${{ hashFiles('toolchain/mfc/test/cases.py') }}-${{ github.sha }}
+          restore-keys: |
+            coverage-cache-${{ github.event.pull_request.number || 'master' }}-
+            coverage-cache-master-
+        continue-on-error: true
+
+      - name: Coverage Cache Status
+        run: |
+          if [ "${{ steps.cache-artifact.outcome }}" = "success" ]; then
+            echo "Coverage cache: loaded from rebuild artifact (this run)"
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
+            echo "Coverage cache: restored from actions/cache (previous run)"
+          elif [ -f toolchain/mfc/test/test_coverage_cache.json.gz ]; then
+            echo "Coverage cache: using committed fallback in repo"
+          else
+            echo "Coverage cache: none available — full test suite will run"
+          fi
+
+      - name: Fetch Dependencies
+        if:   matrix.cluster != 'phoenix'
+        timeout-minutes: 60
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Build
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
       - name: Test
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Compute Log Slug
         if:   always()
         id:   log
         run:  |
-          SLUG="test-${{ matrix.device }}-${{ matrix.interface }}"
+          SHARD_SUFFIX=""
           SHARD="${{ matrix.shard }}"
           if [ -n "$SHARD" ]; then
-            SLUG="${SLUG}-$(echo "$SHARD" | sed 's|/|-of-|')"
+            SHARD_SUFFIX="-$(echo "$SHARD" | sed 's|/|-of-|')"
           fi
-          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
+          echo "build_slug=build-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
+          echo "test_slug=test-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Print Logs
         if:   always()
-        run:  cat ${{ steps.log.outputs.slug }}.out
+        run:  |
+          for f in ${{ steps.log.outputs.build_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
+            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          done
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   matrix.cluster != 'phoenix'
         with:
-          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
-          path: ${{ steps.log.outputs.slug }}.out
+          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
+          path: |
+            ${{ steps.log.outputs.build_slug }}.out
+            ${{ steps.log.outputs.test_slug }}.out
 
   case-optimization:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    # Frontier is non-blocking for the same reason as the self job above.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -323,22 +647,33 @@ jobs:
         with:
           clean: false
 
+      - name: Clean stale output files
+        run:  rm -f *.out
+
+      - name: Fetch Dependencies
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
-        run:  bash .github/workflows/phoenix/submit.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh cpu ${{ matrix.interface }} ${{ matrix.cluster }}
 
-      - name: Pre-Build (login node)
+      - name: Build & Run Case-Optimization Tests
         if:   matrix.cluster != 'phoenix'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          max_attempts: 3
-          retry_wait_seconds: 60
-          timeout_minutes: 120
-          command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: ./mfc.sh clean
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Run Case-Optimization Tests
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Print Logs
         if:   always()

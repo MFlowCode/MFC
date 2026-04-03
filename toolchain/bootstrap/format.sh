@@ -43,45 +43,31 @@ done
 log "Formatting MFC:"
 
 if [[ ${#PATHS[@]} -gt 0 ]]; then
-    # Custom paths provided - format all file types in those paths
     SEARCH_PATHS="${PATHS[@]}"
-
-    # Format Fortran files (.f90, .fpp)
-    if ! find $SEARCH_PATHS -type f 2>/dev/null | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_file.sh; then
-        error "Formatting Fortran files failed."
-        exit 1
-    fi
-
-    # Format Python files
-    if ! find $SEARCH_PATHS -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting Python files failed."
-        exit 1
-    fi
+    FORTRAN_DIRS="$SEARCH_PATHS"
+    PYTHON_DIRS="$SEARCH_PATHS"
 else
-    # Default: format src/, examples/, and benchmarks/
+    FORTRAN_DIRS="src"
+    PYTHON_DIRS="toolchain/ examples/ benchmarks/"
+fi
 
-    # Format Fortran files (.f90, .fpp) in src/
-    if ! find src -type f 2>/dev/null | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_file.sh; then
-        error "Formatting MFC source failed."
-        exit 1
-    fi
+# Format Fortran files with ffmt (single-pass, idempotent)
+if ! ffmt -j ${JOBS:-1} $FORTRAN_DIRS 2>/dev/null; then
+    error "Formatting Fortran files failed: ffmt."
+    exit 1
+fi
 
-    # Format Python files in examples/
-    if ! find examples -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting MFC examples failed."
-        exit 1
-    fi
-
-    # Format Python files in benchmarks/
-    if ! find benchmarks -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting MFC benchmarks failed."
-        exit 1
-    fi
+# Apply safe auto-fixes (import sorting, etc.) before formatting.
+# --fix-only exits 0 even when unfixable violations remain — those are
+# caught later by `ruff check` in lint.sh.  This only errors if ruff
+# itself fails to run.
+if ! ruff check --fix-only $PYTHON_DIRS; then
+    error "ruff failed to run. Check your ruff installation."
+    exit 1
+fi
+if ! ruff format $PYTHON_DIRS; then
+    error "Formatting Python files failed."
+    exit 1
 fi
 
 ok "Done. MFC has been formatted."

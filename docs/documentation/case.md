@@ -104,6 +104,11 @@ Definition of the parameters is described in the following subsections.
 | ---:             |    :----:      |          :---                             |
 | `run_time_info`  | Logical        | Output run-time information               |
 | `rdma_mpi`       | Logical        | (GPUs) Enable RDMA for MPI communication. |
+| `case_dir`       | String         | Case directory path                       |
+| `old_grid`       | Logical        | Use grid from previous simulation         |
+| `old_ic`         | Logical        | Use initial conditions from previous simulation |
+| `t_step_old`     | Integer        | Time step to restart from                 |
+| `n_start_old`    | Integer        | Starting index from previous simulation   |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
 - `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
@@ -124,6 +129,8 @@ feature, detecting GPU pointers and performing RDMA accordingly.
 | `m`                      | Integer | Number of grid cells in the $x$-coordinate direction |
 | `n`                      | Integer | Number of grid cells in the $y$-coordinate direction |
 | `p`                      | Integer | Number of grid cells in the $z$-coordinate direction |
+| `pref`                   | Real    | Reference pressure                                   |
+| `rhoref`                 | Real    | Reference density                                    |
 
 The parameters define the boundaries of the spatial and temporal domains, and their discretization that are used in simulation.
 
@@ -267,11 +274,11 @@ The number has to be a positive integer.
 - `num_fluids` defines the total number of fluids defined in each of the patches.
 The number has to be a positive integer.
 
-- `patch_icpp(j)%%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 13.
+- `patch_icpp(j)%%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 21.
 Definition of the patch type for each integer is listed in table [Patch Types](#patch-types).
 
 - `[x,y,z]_centroid`, `length_[x,y,z]`, and/or `radius` are used to uniquely define the geometry of the patch with given type.
-Requisite combinations of the parameters for each type can be found in is listed in table [Patch types](#patch-types).
+Requisite combinations of the parameters for each type are listed in table [Patch types](#patch-types).
 
 - `patch_icpp(j)%%alter_patch(i)` activates alternation of `patch(i)` with `patch(j)`.
 For instance, in a 2D simulation, when a cylindrical `patch(2)` is immersed in a rectangular `patch(1)`:
@@ -304,6 +311,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
+| `num_ibs`            | Integer | Number of immersed boundary patches |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -341,7 +349,7 @@ Definitions for currently implemented immersed boundary patch types are listed i
 
 - `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil.
 `m` is the maximum camber, `p` is the location of maximum camber, `c` is the coord length, and `t` is the thickness.
-Additional details on this specification can be found in [The Naca Airfoil Series](https://web.stanford.edu/~cantwell/AA200_Course_Material/The%20NACA%20airfoil%20series.pdf)
+Additional details on this specification can be found in [NACA airfoil](https://en.wikipedia.org/wiki/NACA_airfoil).
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
@@ -425,6 +433,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `mp_weno`                  | Logical | Monotonicity preserving WENO |
 | `muscl_order`              | Integer | MUSCL order [1,2] |
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
+| `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
 | `int_comp`                 | Logical | THINC Interface Compression |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
@@ -441,6 +450,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `t_step_print`             | Integer | Frequency to print the current step number to standard output (default 1) |
 | `cfl_adap_dt`              | Logical | CFL based adaptive time-stepping |
 | `cfl_const_dt`             | Logical | CFL based non-adaptive time-stepping |
+| `cfl_dt`                   | Logical | Enable CFL-based time stepping |
 | `cfl_target`               | Real    | Specified CFL value |
 | `n_start`                  | Integer | Save file from which to start simulation |
 | `t_save`                   | Real    | Time duration between data output |
@@ -448,6 +458,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `surface_tension`          | Logical | Activate surface tension |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
+| `pre_stress`               | Logical | Enable pre-stress initialization for hypoelasticity |
 | `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
@@ -615,6 +626,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `alpha_wrt(i)`          | Logical | Add the volume fraction of fluid $i$ to the database	|
 | `gamma_wrt`             | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
+| `ib_state_wrt`          | Logical | Write IB state and loads to a datafile at each time step |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
 | `c_wrt`                 | Logical | Add the sound speed to the database	 |
@@ -622,6 +634,13 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `schlieren_wrt`         | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`                | Logical | Add the Q-criterion to the database|
 | `liutex_wrt`            | Logical | Add the Liutex to the database|
+| `cf_wrt`                | Logical | Write color function field |
+| `chem_wrt_T`            | Logical | Write temperature field for chemistry output |
+| `fft_wrt`               | Logical | Enable FFT output |
+| `sim_data`              | Logical | Write interface and energy data files (post_process) |
+| `integral_wrt`          | Logical | Write integral data |
+| `num_integrals`         | Integer | Number of integral regions |
+| `down_sample`           | Logical | Enable output downsampling |
 | `fd_order`              | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)`    | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`             | Logical | Write the flow chosen probes data files for each time step	|
@@ -674,6 +693,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 `fd_order = 1`, `2`, and `4` correspond to the first, second, and fourth-order finite difference schemes.
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
+
+- `ib_state_wrt` activates the output of data specified by patch_ib(i)%force(:) (and torque, vel, angular_vel, angles, [x,y,z]_centroid) into a single binary datafile for all IBs at all timesteps. During post_processing, this file is converted into separate time histories for each IB.
 
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.
@@ -768,6 +789,12 @@ Details of the transducer acoustic source model can be found in \cite Maeda17.
 | `bubbles_euler`    | Logical | Ensemble-averaged bubble modeling |
 | `bubbles_lagrange` | Logical | Volume-averaged bubble modeling |
 | `bubble_model`     | Integer | [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
+| `Ca`               | Real    | Cavitation number |
+| `Web`              | Real    | Weber number |
+| `Re_inv`           | Real    | Inverse Reynolds number |
+| `pref`             | Real    | Reference pressure for bubble models |
+| `rhoref`           | Real    | Reference density for bubble models |
+| `fluid_rho`        | Real    | Reference fluid density |
 | `bub_pp%%R0ref`*†‡  | Real    | Reference bubble radius |
 | `bub_pp%%p0ref`*†‡  | Real    | Reference pressure |
 | `bub_pp%%rho0ref`*†‡| Real    | Reference density |
@@ -890,6 +917,9 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `mixlayer_vel_profile` | Logical | Set the mean streamwise velocity to hyperbolic tangent profile |
 | `mixlayer_vel_coef`    | Real    | Coefficient for the hyperbolic tangent profile of a mixing layer |
 | `mixlayer_perturb`     | Logical | Perturb the initial velocity field using a spectrum-based synthetic turbulence generation method |
+| `mixlayer_perturb_k0`  | Real    | Base wavenumber for mixing layer perturbation |
+| `mixlayer_perturb_nk`  | Integer | Number of perturbation modes for mixing layer |
+| `simplex_perturb`      | Logical | Enable simplex noise perturbation of initial conditions |
 
 The table lists velocity field parameters.
 The parameters are optionally used to define initial velocity profiles and perturbations.
@@ -1027,6 +1057,16 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
 
+### 18. GPU Performance (NVIDIA UVM)
+
+| Parameter                  | Type    | Description                                              |
+| ---:                       | :---:   | :---                                                     |
+| `nv_uvm_out_of_core`      | Logical | Enable NVIDIA Unified Virtual Memory out-of-core execution |
+| `nv_uvm_pref_gpu`         | Logical | Prefer GPU placement for NVIDIA UVM allocations          |
+| `nv_uvm_igr_temps_on_gpu` | Integer | Store IGR temporaries on GPU with UVM                    |
+
+- These parameters are for NVIDIA Grace-Hopper and similar architectures with hardware-managed unified memory. They allow MFC to run problems larger than GPU memory by paging data between host and device.
+
 ## Enumerations
 
 ### Boundary conditions {#boundary-conditions}
@@ -1087,8 +1127,8 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
 | 11   | Sweep plane 	           | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		           | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
-| 14   | Spherical Harmonic      | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
+| 13   | 2D modal (Fourier)      | 2     | Y      | Requires `x_centroid`, `y_centroid`, `radius`. Optional: `fourier_cos(n)`, `fourier_sin(n)` (n=1..10), `modal_clip_r_to_min`, `modal_r_min`, `modal_use_exp_form`. |
+| 14   | 3D spherical harmonic   | 3     | Y      | Requires `x_centroid`, `y_centroid`, `z_centroid`, `radius`. Optional: `sph_har_coeff(l,m)` (l=0..5, m=-l..l). |
 | 15   | N/A                     | N/A   | N/A    | No longer exists. Empty.  |
 | 16   | 1D bubble pulse         | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral                  | 2     | N      | Requires `[x,y]_centroid` |
@@ -1101,6 +1141,19 @@ The patch types supported by the MFC are listed in table [Patch Types](#patch-ty
 This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
+
+**Geometry 13: 2D modal (Fourier):**  
+Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}}, x - x_{\mathrm{centroid}})\f$.
+
+- **Additive form** (default, `modal_use_exp_form` false):  
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]\f$.  
+  Coefficients are absolute: same units as `radius` (length).  
+  If this formula gives \f$R_{\mathrm{boundary}} < 0\f$ at some \f$\theta\f$, it is clipped to zero.  
+  With `modal_clip_r_to_min` true, if \f$R_{\mathrm{boundary}} <\f$ `modal_r_min` at some \f$\theta\f$, it is clipped to `modal_r_min`.  
+  
+- **Exponential form** (`modal_use_exp_form` true):  
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)\f$.  
+  Coefficients are relative (dimensionless); the sum scales the radius.
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
 

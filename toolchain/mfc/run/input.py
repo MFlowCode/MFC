@@ -1,27 +1,32 @@
-import os, json, glob, typing, dataclasses
+import dataclasses
+import glob
+import json
+import os
+import typing
+
+from .. import case_validator, common
+from ..case import Case
 
 # Note: pyrometheus and cantera are imported lazily in the methods that need them
 # to avoid slow startup times for commands that don't use chemistry features
 # Note: build is imported lazily to avoid circular import with build.py
-
 from ..printer import cons
-from ..        import common
-from ..state   import ARGS, ARG, gpuConfigOptions
-from ..case    import Case
-from ..        import case_validator
+from ..state import ARG, ARGS, gpuConfigOptions
+
 
 @dataclasses.dataclass(init=False)
 class MFCInputFile(Case):
     filename: str
-    dirpath:  str
+    dirpath: str
 
     def __init__(self, filename: str, dirpath: str, params: dict) -> None:
         super().__init__(params)
         self.filename = filename
-        self.dirpath  = dirpath
+        self.dirpath = dirpath
 
     def generate_inp(self, target) -> None:
-        from .. import build  # pylint: disable=import-outside-toplevel
+        from .. import build
+
         target = build.get_target(target)
 
         # Save .inp input file
@@ -38,9 +43,9 @@ class MFCInputFile(Case):
 
     def get_cantera_solution(self):
         # Lazy import to avoid slow startup for commands that don't need chemistry
-        import cantera as ct  # pylint: disable=import-outside-toplevel
+        import cantera as ct
 
-        if self.params.get("chemistry", 'F') == 'T':
+        if self.params.get("chemistry", "F") == "T":
             cantera_file = self.params["cantera_file"]
 
             candidates = [
@@ -64,12 +69,12 @@ class MFCInputFile(Case):
 
     def generate_fpp(self, target) -> None:
         # Lazy import to avoid slow startup for commands that don't need chemistry
-        import pyrometheus as pyro  # pylint: disable=import-outside-toplevel
+        import pyrometheus as pyro
 
         if target.isDependency:
             return
 
-        cons.print(f"Generating [magenta]case.fpp[/magenta].")
+        cons.print("Generating [magenta]case.fpp[/magenta].")
         cons.indent()
 
         # Case FPP file
@@ -80,32 +85,28 @@ class MFCInputFile(Case):
         common.create_directory(modules_dir)
 
         # Determine the real type based on the single precision flag
-        real_type = 'real(sp)' if (ARG('single') or ARG('mixed')) else 'real(dp)'
+        real_type = "real(sp)" if (ARG("single") or ARG("mixed")) else "real(dp)"
 
         if ARG("gpu") == gpuConfigOptions.MP.value:
-            directive_str = 'mp'
+            directive_str = "mp"
         elif ARG("gpu") == gpuConfigOptions.ACC.value:
-            directive_str = 'acc'
+            directive_str = "acc"
         else:
             directive_str = None
 
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
-        common.file_write(
-            os.path.join(modules_dir, "m_thermochem.f90"),
-            pyro.FortranCodeGenerator().generate(
-                "m_thermochem",
-                self.get_cantera_solution(),
-                pyro.CodeGenerationOptions(scalar_type = real_type, directive_offload = directive_str)
-            ),
-            True
-        )
+        sol = self.get_cantera_solution()
+
+        thermochem_code = pyro.FortranCodeGenerator().generate("m_thermochem", sol, pyro.CodeGenerationOptions(scalar_type=real_type, directive_offload=directive_str))
+
+        common.file_write(os.path.join(modules_dir, "m_thermochem.f90"), thermochem_code, True)
 
         cons.unindent()
 
-
     def validate_constraints(self, target) -> None:
         """Validate case parameter constraints for a given target stage"""
-        from .. import build  # pylint: disable=import-outside-toplevel
+        from .. import build
+
         target_obj = build.get_target(target)
         stage = target_obj.name
 
@@ -130,20 +131,18 @@ class MFCInputFile(Case):
         self.generate_fpp(target)
 
     def clean(self, _targets) -> None:
-        from .. import build  # pylint: disable=import-outside-toplevel
+        from .. import build
+
         targets = [build.get_target(target) for target in _targets]
 
         files = set()
-        dirs  = set()
+        dirs = set()
 
-        files = set([
-            "equations.dat", "run_time.inf", "time_data.dat",
-            "io_time_data.dat", "fort.1", "pre_time_data.dat"
-        ] + [f"{target.name}.inp" for target in targets])
+        files = set(["equations.dat", "run_time.inf", "time_data.dat", "io_time_data.dat", "fort.1", "pre_time_data.dat"] + [f"{target.name}.inp" for target in targets])
 
         if build.PRE_PROCESS in targets:
             files = files | set(glob.glob(os.path.join(self.dirpath, "D", "*.000000.dat")))
-            dirs  = dirs  | set(glob.glob(os.path.join(self.dirpath, "p_all", "p*", "0")))
+            dirs = dirs | set(glob.glob(os.path.join(self.dirpath, "p_all", "p*", "0")))
 
         if build.SIMULATION in targets:
             restarts = set(glob.glob(os.path.join(self.dirpath, "restart_data", "*.dat")))
@@ -160,14 +159,12 @@ class MFCInputFile(Case):
             dirs.add("silo_hdf5")
 
         for relfile in files:
-            if not os.path.isfile(relfile):
-                relfile = os.path.join(self.dirpath, relfile)
-            common.delete_file(relfile)
+            filepath = relfile if os.path.isfile(relfile) else os.path.join(self.dirpath, relfile)
+            common.delete_file(filepath)
 
         for reldir in dirs:
-            if not os.path.isdir(reldir):
-                reldir = os.path.join(self.dirpath, reldir)
-            common.delete_directory(reldir)
+            dirpath = reldir if os.path.isdir(reldir) else os.path.join(self.dirpath, reldir)
+            common.delete_directory(dirpath)
 
 
 # Load the input file
@@ -185,7 +182,7 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
     if do_print:
         cons.print(f"Acquiring [bold magenta]{filename}[/bold magenta]...")
 
-    dirpath:    str  = os.path.abspath(os.path.dirname(filename))
+    dirpath: str = os.path.abspath(os.path.dirname(filename))
     dictionary: dict = {}
 
     if not os.path.exists(filename):
@@ -199,8 +196,9 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
     elif filename.endswith(".json"):
         json_str = common.file_read(filename)
     elif filename.endswith((".yaml", ".yml")):
-        import yaml  # pylint: disable=import-outside-toplevel
-        with open(filename, 'r') as f:
+        import yaml
+
+        with open(filename, "r") as f:
             dictionary = yaml.safe_load(f)
         json_str = json.dumps(dictionary)
     else:

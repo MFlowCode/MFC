@@ -25,6 +25,7 @@ yml: &yml
   - '.github/workflows/phoenix/**'
   - '.github/workflows/frontier/**'
   - '.github/workflows/frontier_amd/**'
+  - '.github/workflows/common/**'
   - '.github/scripts/**'
   - '.github/workflows/bench.yml'
   - '.github/workflows/test.yml'
@@ -37,3 +38,6 @@ checkall: &checkall
   - *tests
   - *scripts
   - *yml
+
+cases_py:
+  - 'toolchain/mfc/test/cases.py'
