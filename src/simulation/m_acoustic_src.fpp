@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief One-way acoustic source injection, Maeda and Colonius JCP (2017)
+!> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
 module m_acoustic_src
 
     use m_derived_types
@@ -59,7 +59,7 @@ module m_acoustic_src
 
 contains
 
-    !> Initialize the acoustic source module
+    !> This subroutine initializes the acoustic source module
     impure subroutine s_initialize_acoustic_src
 
         integer :: i, j  !< generic loop variables
@@ -123,7 +123,10 @@ contains
 
     end subroutine s_initialize_acoustic_src
 
-    !> Compute mass, momentum, and energy acoustic source terms and add to the RHS
+    !> This subroutine updates the rhs by computing the mass, mom, energy sources
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
     impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Conservative variables
@@ -207,7 +210,7 @@ contains
                 deallocate (phi_rn)
 
                 $:GPU_PARALLEL_LOOP(private='[myalpha, myalpha_rho, myRho, B_tait, c, small_gamma, frequency_local, &
-                                    & gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q]', &
+                                    & gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q ]', &
                                     & copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
                 do i = 1, num_points
                     j = source_spatials(ai)%coord(1, i)
@@ -330,7 +333,15 @@ contains
 
     end subroutine s_acoustic_src_calculations
 
-    !> Compute the temporally varying amplitude of the pulse
+    !> This subroutine gives the temporally varying amplitude of the pulse
+    !! @param sim_time Simulation time
+    !! @param c Sound speed
+    !! @param ai Acoustic source index
+    !! @param term_index Index of the term to be calculated (1: mass source, 2: momentum source)
+    !! @param frequency_local Frequency at the spatial location for sine and square waves
+    !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
+    !! @param source Source term amplitude
+    !! @param sum_bb Sum of basis functions
     elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -354,7 +365,6 @@ contains
 
         source = 0._wp
 
-        ! Temporal waveform: sine, Gaussian pulse, square wave, or broadband
         if (pulse(ai) == 1) then  ! Sine wave
             if ((sim_time - delay(ai))*frequency_local > npulse(ai)) return
 
@@ -388,7 +398,7 @@ contains
 
     end subroutine s_source_temporal
 
-    !> Pre-compute non-zero spatial source weights before time-stepping
+    !> This subroutine identifies and precalculates the non-zero acoustic spatial sources before time-stepping
     impure subroutine s_precalculate_acoustic_spatial_sources
 
         integer             :: j, k, l, ai
@@ -476,7 +486,15 @@ contains
 
     end subroutine s_precalculate_acoustic_spatial_sources
 
-    !> Compute the spatial support of the acoustic source
+    !> This subroutine gives the spatial support of the acoustic source
+    !! @param j x-index
+    !! @param k y-index
+    !! @param l z-index
+    !! @param loc Nominal source term location
+    !! @param ai Acoustic source index
+    !! @param source Source term amplitude
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial(j, k, l, loc, ai, source, angle, xyz_to_r_ratios)
 
         integer, intent(in)                :: j, k, l, ai
@@ -510,7 +528,11 @@ contains
 
     end subroutine s_source_spatial
 
-    !> Compute the spatial support for planar acoustic sources in 1D, 2D, and 3D
+    !> This subroutine calculates the spatial support for planar acoustic sources in 1D, 2D, and 3D
+    !! @param ai Acoustic source index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
     subroutine s_source_spatial_planar(ai, sig, r, source)
 
         integer, intent(in)   :: ai
@@ -520,7 +542,6 @@ contains
 
         source = 0._wp
 
-        ! Gaussian spatial pulse profile: exp(-0.5 * (d / sigma)^2) / (sqrt(2*pi) * sigma)
         if (support(ai) == 1) then  ! 1D
             source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(r(1)/(sig/2._wp))**2._wp)
         else if (support(ai) == 2 .or. support(ai) == 3) then  ! 2D or 3D
@@ -536,7 +557,13 @@ contains
 
     end subroutine s_source_spatial_planar
 
-    !> Compute the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
+    !> This subroutine calculates the spatial support for a single transducer in 2D, 2D axisymmetric, and 3D
+    !! @param ai Acoustic source index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer(ai, sig, r, source, angle, xyz_to_r_ratios)
 
         integer, intent(in)   :: ai
@@ -574,7 +601,13 @@ contains
 
     end subroutine s_source_spatial_transducer
 
-    !> Compute the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
+    !> This subroutine calculates the spatial support for multiple transducers in 2D, 2D axisymmetric, and 3D
+    !! @param ai Acoustic source index
+    !! @param sig Sigma value for the Gaussian distribution
+    !! @param r Displacement from source to current point
+    !! @param source Source term amplitude
+    !! @param angle Angle of the source term with respect to the x-axis (for 2D or 2D axisymmetric)
+    !! @param xyz_to_r_ratios Ratios of the [xyz]-component of the source term to the magnitude (for 3D)
     subroutine s_source_spatial_transducer_array(ai, sig, r, source, angle, xyz_to_r_ratios)
 
         integer, intent(in)   :: ai
@@ -650,7 +683,11 @@ contains
 
     end subroutine s_source_spatial_transducer_array
 
-    !> Convert wavelength to frequency
+    !> This function performs wavelength to frequency conversion
+    !! @param freq_conv_flag Determines if frequency is given or wavelength
+    !! @param ai Acoustic source index
+    !! @param c Speed of sound
+    !! @return frequency_local Converted frequency
     elemental function f_frequency_local(freq_conv_flag, ai, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -667,7 +704,11 @@ contains
 
     end function f_frequency_local
 
-    !> Convert Gaussian sigma from distance to time
+    !> This function performs Gaussian sigma dist to time conversion
+    !! @param gauss_conv_flag Determines if sigma_dist is given or sigma_time
+    !! @param c Speed of sound
+    !! @param ai Acoustic source index
+    !! @return gauss_sigma_time_local Converted Gaussian sigma time
     function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')

@@ -31,7 +31,7 @@ module m_chemistry
 
 contains
 
-    !> Compute mixture viscosities for left and right states and invert them for use as reciprocal Reynolds numbers.
+    !> @brief Computes mixture viscosities for left and right states and inverts them for use as reciprocal Reynolds numbers.
     subroutine compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L, Re_R)
 
         $:GPU_ROUTINE(function_name='compute_viscosity_and_inversion',parallelism='[seq]', cray_inline=True)
@@ -41,13 +41,12 @@ contains
 
         call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L)
         call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R)
-        ! Convert dynamic viscosity to inverse (MFC stores 1/mu for Reynolds number convention)
         Re_L = 1.0_wp/Re_L
         Re_R = 1.0_wp/Re_R
 
     end subroutine compute_viscosity_and_inversion
 
-    !> Initialize the temperature field from conservative variables by inverting the energy equation.
+    !> @brief Initializes the temperature field from conservative variables by inverting the energy equation.
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
 
         ! Initialize the temperature field at the start of the simulation to reasonable values. Temperature is computed the regular
@@ -82,7 +81,7 @@ contains
 
     end subroutine s_compute_q_T_sf
 
-    !> Compute the temperature field from primitive variables using the ideal gas law and mixture molecular weight.
+    !> @brief Computes the temperature field from primitive variables using the ideal gas law and mixture molecular weight.
     subroutine s_compute_T_from_primitives(q_T_sf, q_prim_vf, bounds)
 
         type(scalar_field), intent(inout)                   :: q_T_sf
@@ -107,7 +106,7 @@ contains
 
     end subroutine s_compute_T_from_primitives
 
-    !> Add chemical reaction source terms to the species transport RHS using net production rates.
+    !> @brief Adds chemical reaction source terms to the species transport RHS using net production rates.
     subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
@@ -157,7 +156,7 @@ contains
 
     end subroutine s_compute_chemistry_reaction_flux
 
-    !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
+    !> @brief Computes species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
     subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp

@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_global_parameters
+!! Contains module m_global_parameters
 
 #:include 'case.fpp'
 
@@ -41,14 +41,19 @@ module m_global_parameters
     integer               :: num_vels             !< Number of velocity components (different from num_dims for mhd)
     logical               :: cyl_coord
     integer               :: grid_geometry        !< Cylindrical coordinates (either axisymmetric or full 3D)
+
     !> Locations of cell-centers (cc) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
+
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
     real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     logical :: stretch_x, stretch_y, stretch_z         !< Grid stretching flags for the x-, y- and z-coordinate directions
-    ! Grid stretching: a_x/a_y/a_z = rate, x_a/y_a/z_a = location
+
+    ! Parameters of the grid stretching function for the x-, y- and z-coordinate directions. The "a" parameters are a measure of the
+    ! rate at which the grid is stretched while the remaining parameters are indicative of the location on the grid at which the
+    ! stretching begins.
     real(wp) :: a_x, a_y, a_z
     integer  :: loops_x, loops_y, loops_z
     real(wp) :: x_a, y_a, z_a
@@ -81,6 +86,7 @@ module m_global_parameters
     logical            :: igr                          !< Use information geometric regularization
     integer            :: igr_order                    !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
+
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
@@ -99,11 +105,21 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
     integer               :: damage_idx            !< Index of damage state variable (D) for continuum damage model
     integer               :: psi_idx               !< Index of hyperbolic cleaning state variable for MHD
+
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
-    ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
-    type(int_bounds_info)      :: idwbuff(1:3)
+    ! Cell Indices for the entire (local) domain. In simulation and post_process, this includes the buffer region. idwbuff and
+    ! idwint are the same otherwise. Stands for "InDices With BUFFer".
+    type(int_bounds_info) :: idwbuff(1:3)
+    integer               :: fd_order   !< Finite-difference order for CoM/probe derivative approximations
+    integer               :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
+
+    !> @name lagrangian subgrid bubble parameters
+    !> @{!
+    type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters
+    !> @}
+
     type(int_bounds_info)      :: bc_x, bc_y, bc_z       !< Boundary conditions in the x-, y- and z-coordinate directions
     integer                    :: shear_num              !< Number of shear stress components
     integer, dimension(3)      :: shear_indices          !< Indices of the stress components that represent shear stress
@@ -125,16 +141,19 @@ module m_global_parameters
     logical                    :: bubbles_lagrange
 
     ! Perturb density of surrounding air so as to break symmetry of grid
-    logical                             :: perturb_flow
-    integer                             :: perturb_flow_fluid  !< Fluid to be perturbed with perturb_flow flag
-    real(wp)                            :: perturb_flow_mag    !< Magnitude of perturbation with perturb_flow flag
-    logical                             :: perturb_sph
-    integer                             :: perturb_sph_fluid   !< Fluid to be perturbed with perturb_sph flag
-    real(wp), dimension(num_fluids_max) :: fluid_rho
-    logical                             :: elliptic_smoothing
-    integer                             :: elliptic_smoothing_iters
-    integer, allocatable, dimension(:)  :: proc_coords         !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:)  :: start_idx           !< Starting cell-center index of local processor in global grid
+    logical                                :: perturb_flow
+    integer                                :: perturb_flow_fluid  !< Fluid to be perturbed with perturb_flow flag
+    real(wp)                               :: perturb_flow_mag    !< Magnitude of perturbation with perturb_flow flag
+    logical                                :: perturb_sph
+    integer                                :: perturb_sph_fluid   !< Fluid to be perturbed with perturb_sph flag
+    real(wp), dimension(num_fluids_max)    :: fluid_rho
+    logical                                :: elliptic_smoothing
+    integer                                :: elliptic_smoothing_iters
+    integer, allocatable, dimension(:)     :: proc_coords         !< Processor coordinates in MPI_CART_COMM
+    type(int_bounds_info), dimension(3)    :: nidx
+    integer, allocatable, dimension(:,:,:) :: neighbor_ranks      !< Neighbor ranks
+    integer, allocatable, dimension(:)     :: start_idx           !< Starting cell-center index of local processor in global grid
+
 #ifdef MFC_MPI
     type(mpi_io_var), public :: MPI_IO_DATA
     character(LEN=name_len)  :: mpiiofs
@@ -142,14 +161,13 @@ module m_global_parameters
 #endif
 
     ! Initial Condition Parameters
-    integer                                                  :: num_patches     !< Number of patches composing initial condition
-    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp      !< IC patch parameters (max: num_patches_max)
-    integer                                                  :: num_bc_patches  !< Number of boundary condition patches
-    logical                                                  :: bc_io           !< whether or not to save BC data
-    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc        !< Boundary condition patch parameters
-
-    ! Fluids Physical Parameters
+    integer :: num_patches  !< Number of patches composing initial condition
+    type(ic_patch_parameters), dimension(num_patches_max) :: patch_icpp  !< IC patch parameters (max: num_patches_max)
+    integer :: num_bc_patches  !< Number of boundary condition patches
+    logical :: bc_io  !< whether or not to save BC data
+    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc  !< BC patch parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
+
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     real(wp)                                 :: rhoref, pref  !< Reference parameters for Tait EOS
@@ -173,6 +191,7 @@ module m_global_parameters
     integer                                               :: Np
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
+    ! IB patch parameters database (max count: num_patches_max in m_derived_types.f90).
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -215,13 +234,17 @@ module m_global_parameters
     logical                                :: fft_wrt
     logical                                :: dummy      !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
+    ! Variables for hardcoded initial conditions that are read from input files
+    character(LEN=2*path_len) :: interface_file
+    real(wp)                  :: normFac, normMag, g0_ic, p0_ic
+
 contains
 
-    !> Assigns default values to user inputs prior to reading them in. This allows for an easier consistency check of these
-    !! parameters once they are read from the input file.
+    !> Assigns default values to user inputs prior to reading them in.
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i  !< Generic loop operator
+
         ! Logistics
 
         case_dir = '.'
@@ -337,6 +360,25 @@ contains
 
         ! Initial condition parameters
         num_patches = dflt_int
+
+        fd_order = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%write_void_evol = .false.
+        lag_params%pressure_force = .false.
+        lag_params%gravity_force = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%epsilonb = 1._wp
+        lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
+        lag_params%valmaxvoid = dflt_real
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
@@ -820,8 +862,10 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
+        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then
@@ -870,7 +914,7 @@ contains
 
     end subroutine s_initialize_global_parameters_module
 
-    !> Configure MPI parallel I/O settings and allocate processor coordinate arrays.
+    !> Configures MPI parallel I/O settings and allocates processor coordinate arrays.
     impure subroutine s_initialize_parallel_io
 
 #ifdef MFC_MPI
@@ -904,7 +948,7 @@ contains
 
     end subroutine s_initialize_parallel_io
 
-    !> Deallocate all global grid, index, and equation-of-state parameter arrays.
+    !> Deallocates all global grid, index, and equation-of-state parameter arrays.
     impure subroutine s_finalize_global_parameters_module
 
         integer :: i
@@ -933,6 +977,8 @@ contains
             deallocate (MPI_IO_DATA%view)
         end if
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

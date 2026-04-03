@@ -22,10 +22,13 @@ module m_data_output
         & s_write_energy_data_file, s_close_formatted_database_file, s_close_intf_data_file, s_close_energy_data_file, &
         & s_finalize_data_output_module
 
-    ! Include Silo-HDF5 interface library
+    ! Including the Silo Fortran interface library that features the subroutines and parameters that are required to write in the
+    ! Silo-HDF5 database format INCLUDE 'silo.inc'
     include 'silo_f9x.inc'
 
-    ! Flow variable storage; q_root_sf gathers to rank 0 in 1D parallel runs
+    ! Generic storage for flow variable(s) that are to be written to formatted database file(s). Note that for 1D simulations,
+    ! q_root_sf is employed to gather the flow variable(s) from all sub-domains on to the root process. If the run is not parallel,
+    ! but serial, then q_root_sf is equal to q_sf.
     real(wp), allocatable, dimension(:,:,:), public :: q_sf
     real(wp), allocatable, dimension(:,:,:)         :: q_root_sf
     real(wp), allocatable, dimension(:,:,:)         :: cyl_q_sf
@@ -35,15 +38,20 @@ module m_data_output
     real(sp), allocatable, dimension(:,:,:)         :: q_root_sf_s
     real(sp), allocatable, dimension(:,:,:)         :: cyl_q_sf_s
 
-    ! Spatial and data extents for VisIt visualization
+    ! The spatial and data extents array variables contain information about the minimum and maximum values of the grid and flow
+    ! variable(s), respectively. The purpose of bookkeeping this information is to boost the visualization of the Silo-HDF5 database
+    ! file(s) in VisIt.
     real(wp), allocatable, dimension(:,:) :: spatial_extents
     real(wp), allocatable, dimension(:,:) :: data_extents
 
-    ! Ghost zone layer sizes (lo/hi) for subdomain connectivity in VisIt
+    ! The size of the ghost zone layer at beginning of each coordinate direction (lo) and at end of each coordinate direction (hi).
+    ! Adding this information to Silo-HDF5 database file(s) is recommended since it supplies VisIt with connectivity information
+    ! between the sub-domains of a parallel data set.
     integer, allocatable, dimension(:) :: lo_offset
     integer, allocatable, dimension(:) :: hi_offset
 
-    ! Track cell-boundary count per active coordinate direction
+    ! For Silo-HDF5 database format, this variable is used to keep track of the number of cell-boundaries, for the grid associated
+    ! with the local process, in each of the active coordinate directions.
     integer, allocatable, dimension(:) :: dims
 
     ! Locations of various folders in the case's directory tree, associated with the choice of the formatted database format. These
@@ -74,12 +82,20 @@ module m_data_output
 
 contains
 
-    !> Allocate storage arrays, configure output directories, and count flow variables for formatted database output.
+    !> @brief Allocate storage arrays, configure output directories, and count flow variables for formatted database output.
     impure subroutine s_initialize_data_output_module()
 
+        ! Description: Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
+
+        ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
-        logical                                        :: dir_check
-        integer                                        :: i
+
+        ! Generic logical used to test the existence of a particular folder
+        logical :: dir_check
+        integer :: i
+
+        ! Allocating the generic storage for the flow variable(s) that are going to be written to the formatted database file(s).
+        ! Note once more that the root variable is only required for 1D computations.
 
         allocate (q_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
         if (grid_geometry == 3) then
@@ -157,7 +173,9 @@ contains
             end if
         end if
 
+        ! Generating Silo-HDF5 Directory Tree
         if (format == 1) then
+            ! Creating the directory associated with the local process
             dbdir = trim(case_dir) // '/silo_hdf5'
 
             write (proc_rank_dir, '(A,I0)') '/p', proc_rank
@@ -171,6 +189,7 @@ contains
                 call s_create_directory(trim(proc_rank_dir))
             end if
 
+            ! Creating the directory associated with the root process
             if (proc_rank == 0) then
                 rootdir = trim(dbdir) // '/root'
 
@@ -181,7 +200,10 @@ contains
                     call s_create_directory(trim(rootdir))
                 end if
             end if
+
+            ! Generating Binary Directory Tree
         else
+            ! Creating the directory associated with the local process
             dbdir = trim(case_dir) // '/binary'
 
             write (proc_rank_dir, '(A,I0)') '/p', proc_rank
@@ -196,6 +218,7 @@ contains
                 call s_create_directory(trim(proc_rank_dir))
             end if
 
+            ! Creating the directory associated with the root process
             if (n == 0 .and. proc_rank == 0) then
                 rootdir = trim(dbdir) // '/root'
 
@@ -229,9 +252,13 @@ contains
             dbfile = 1
         end if
 
+        ! Querying Number of Flow Variable(s) in Binary Output
+
         if (format == 2) then
+            ! Initializing the counter of the number of flow variable(s) to be written to the formatted database file(s)
             dbvars = 0
 
+            ! Partial densities
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
                 do i = 1, num_fluids
                     if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
@@ -240,6 +267,7 @@ contains
                 end do
             end if
 
+            ! Density
             if ((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) then
                 dbvars = dbvars + 1
             end if
@@ -247,24 +275,37 @@ contains
             if (relativity .and. (rho_wrt .or. prim_vars_wrt)) dbvars = dbvars + 1
             if (relativity .and. (rho_wrt .or. cons_vars_wrt)) dbvars = dbvars + 1
 
+            ! Momentum
             do i = 1, E_idx - mom_idx%beg
                 if (mom_wrt(i) .or. cons_vars_wrt) dbvars = dbvars + 1
             end do
 
+            ! Velocity
             do i = 1, E_idx - mom_idx%beg
                 if (vel_wrt(i) .or. prim_vars_wrt) dbvars = dbvars + 1
             end do
 
+            ! Flux limiter function
             do i = 1, E_idx - mom_idx%beg
                 if (flux_wrt(i)) dbvars = dbvars + 1
             end do
 
+            ! Energy
             if (E_wrt .or. cons_vars_wrt) dbvars = dbvars + 1
+
+            ! Pressure
             if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
+
+            ! Elastic stresses
             if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
+
+            ! Damage state variable
             if (cont_damage) dbvars = dbvars + 1
+
+            ! Hyperbolic cleaning for MHD
             if (hyper_cleaning) dbvars = dbvars + 1
 
+            ! Magnetic field
             if (mhd) then
                 if (n == 0) then
                     dbvars = dbvars + 2
@@ -273,6 +314,7 @@ contains
                 end if
             end if
 
+            ! Volume fraction(s)
             if ((model_eqns == 2) .or. (model_eqns == 3)) then
                 do i = 1, num_fluids - 1
                     if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
@@ -285,19 +327,26 @@ contains
                 end if
             end if
 
+            ! Specific heat ratio function
             if (gamma_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
                 dbvars = dbvars + 1
             end if
 
+            ! Specific heat ratio
             if (heat_ratio_wrt) dbvars = dbvars + 1
 
+            ! Liquid stiffness function
             if (pi_inf_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
                 dbvars = dbvars + 1
             end if
 
+            ! Liquid stiffness
             if (pres_inf_wrt) dbvars = dbvars + 1
+
+            ! Speed of sound
             if (c_wrt) dbvars = dbvars + 1
 
+            ! Vorticity
             if (p > 0) then
                 do i = 1, num_vels
                     if (omega_wrt(i)) dbvars = dbvars + 1
@@ -308,12 +357,15 @@ contains
                 end do
             end if
 
+            ! Numerical Schlieren function
             if (schlieren_wrt) dbvars = dbvars + 1
         end if
 
+        ! END: Querying Number of Flow Variable(s) in Binary Output
+
     end subroutine s_initialize_data_output_module
 
-    !> Compute the cell-index bounds for the user-specified partial output domain in each coordinate direction.
+    !> @brief Compute the cell-index bounds for the user-specified partial output domain in each coordinate direction.
     impure subroutine s_define_output_region
 
         integer :: i
@@ -348,23 +400,42 @@ contains
 
     end subroutine s_define_output_region
 
-    !> Open (or create) the Silo-HDF5 or Binary formatted database slave and master files for a given time step.
+    !> @brief Open (or create) the Silo-HDF5 or Binary formatted database slave and master files for a given time step.
     impure subroutine s_open_formatted_database_file(t_step)
 
-        integer, intent(in)                            :: t_step
+        ! Description: This subroutine opens a new formatted database file, or replaces an old one, and readies it for the data
+        ! storage of the grid and the flow variable(s) associated with the current time-step, t_step. This is performed by all the
+        ! local process(es). The root processor, in addition, must also generate a master formatted database file whose job will be
+        ! to link, and thus combine, the data from all of the local process(es). Note that for the Binary format, this extra task
+        ! that is assigned to the root process is not performed in multidimensions.
+
+        ! Time-step that is currently being post-processed
+        integer, intent(in) :: t_step
+
+        ! Generic string used to store the location of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
         integer                                        :: ierr
 
+        ! Silo-HDF5 Database Format
+
         if (format == 1) then
+            ! Generating the relative path to the formatted database slave file, that is to be opened for the current time-step,
+            ! t_step
             write (file_loc, '(A,I0,A)') '/', t_step, '.silo'
             file_loc = trim(proc_rank_dir) // trim(file_loc)
 
+            ! Creating formatted database slave file at the above location and setting up the structure of the file and its header
+            ! info
             ierr = DBCREATE(trim(file_loc), len_trim(file_loc), DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, DB_HDF5, dbfile)
 
+            ! Verifying that the creation and setup process of the formatted database slave file has been performed without errors.
+            ! If this is not the case, the post-process exits.
             if (dbfile == -1) then
                 call s_mpi_abort('Unable to create Silo-HDF5 database ' // 'slave file ' // trim(file_loc) // '. ' // 'Exiting.')
             end if
 
+            ! Next, analogous steps to the ones above are carried out by the root process to create and setup the formatted database
+            ! master file.
             if (proc_rank == 0) then
                 write (file_loc, '(A,I0,A)') '/collection_', t_step, '.silo'
                 file_loc = trim(rootdir) // trim(file_loc)
@@ -376,16 +447,26 @@ contains
                                      & // 'Exiting.')
                 end if
             end if
+
+            ! Binary Database Format
         else
+            ! Generating the relative path to the formatted database slave file, that is to be opened for the current time-step,
+            ! t_step
             write (file_loc, '(A,I0,A)') '/', t_step, '.dat'
             file_loc = trim(proc_rank_dir) // trim(file_loc)
 
+            ! Creating the formatted database slave file, at the previously precised relative path location, and setting up its
+            ! structure
             open (dbfile, IOSTAT=err, FILE=trim(file_loc), form='unformatted', STATUS='replace')
 
+            ! Verifying that the creation and setup process of the formatted database slave file has been performed without errors.
+            ! If this is not the case, the post-process exits.
             if (err /= 0) then
                 call s_mpi_abort('Unable to create Binary database slave ' // 'file ' // trim(file_loc) // '. Exiting.')
             end if
 
+            ! Further defining the structure of the formatted database slave file by describing in it the dimensionality of
+            ! post-processed data as well as the total number of flow variable(s) that will eventually be stored in it
             if (output_partial_domain) then
                 write (dbfile) x_output_idx%end - x_output_idx%beg, y_output_idx%end - y_output_idx%beg, &
                        & z_output_idx%end - z_output_idx%beg, dbvars
@@ -393,6 +474,8 @@ contains
                 write (dbfile) m, n, p, dbvars
             end if
 
+            ! Next, analogous steps to the ones above are carried out by the root process to create and setup the formatted database
+            ! master file. Note that this is only done in multidimensional cases.
             if (n == 0 .and. proc_rank == 0) then
                 write (file_loc, '(A,I0,A)') '/', t_step, '.dat'
                 file_loc = trim(rootdir) // trim(file_loc)
@@ -413,7 +496,7 @@ contains
 
     end subroutine s_open_formatted_database_file
 
-    !> Open the interface data file for appending extracted interface coordinates.
+    !> @brief Open the interface data file for appending extracted interface coordinates.
     impure subroutine s_open_intf_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path
@@ -421,11 +504,12 @@ contains
         write (file_path, '(A)') '/intf_data.dat'
         file_path = trim(case_dir) // trim(file_path)
 
+        ! Opening the simulation data file
         open (211, FILE=trim(file_path), form='formatted', POSITION='append', STATUS='unknown')
 
     end subroutine s_open_intf_data_file
 
-    !> Open the energy data file for appending volume-integrated energy budget quantities.
+    !> @brief Open the energy data file for appending volume-integrated energy budget quantities.
     impure subroutine s_open_energy_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path
@@ -433,20 +517,37 @@ contains
         write (file_path, '(A)') '/eng_data.dat'
         file_path = trim(case_dir) // trim(file_path)
 
+        ! Opening the simulation data file
         open (251, FILE=trim(file_path), form='formatted', POSITION='append', STATUS='unknown')
 
     end subroutine s_open_energy_data_file
 
-    !> Write the computational grid (cell-boundary coordinates) to the formatted database slave and master files.
+    !> @brief Write the computational grid (cell-boundary coordinates) to the formatted database slave and master files.
     impure subroutine s_write_grid_to_formatted_database_file(t_step)
 
+        ! Description: The general objective of this subroutine is to write the necessary grid data to the formatted database file,
+        ! for the current time-step, t_step. The local processor will write the grid data of the domain segment that it is in charge
+        ! of to the formatted database slave file. The root process will additionally take care of linking that grid data in the
+        ! formatted database master file. In the Silo- HDF5 database format, the spatial extents of each local process grid are also
+        ! written to the master file. In the Binary format, note that no master file is maintained in multidimensions. Finally, in
+        ! 1D, no grid data is written within this subroutine for the Silo-HDF5 format because curve objects rather than
+        ! quadrilateral meshes are used. For curve objects, in contrast to the quadrilateral mesh objects, the grid data is included
+        ! side by side with the flow variable data. Then, in this case, we take care of writing both the grid and the flow variable
+        ! data in the subroutine s_write_variable_to_formatted_database_file.
+
+        ! Time-step that is currently being post-processed
         integer, intent(in) :: t_step
 
-        ! NAG compiler requires these to be statically sized
+        ! Bookkeeping variables storing the name and type of mesh that is handled by the local processor(s). Note that due to an
+        ! internal NAG Fortran compiler problem, these two variables could not be allocated dynamically.
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
         integer, dimension(num_procs)                   :: meshtypes
-        integer                                         :: i
-        integer                                         :: ierr
+
+        ! Generic loop iterator
+        integer :: i
+        integer :: ierr
+
+        ! Silo-HDF5 Database Format
 
         if (format == 1) then
             ! For multidimensional data sets, the spatial extents of all of the grid(s) handled by the local processor(s) are
@@ -514,6 +615,9 @@ contains
                               & DB_DOUBLE, DB_COLLINEAR, optlist, ierr)
                 err = DBFREEOPTLIST(optlist)
             end if
+            ! END: Silo-HDF5 Database Format
+
+            ! Binary Database Format
         else if (format == 2) then
             ! Multidimensional local grid data is written to the formatted database slave file. Recall that no master file to
             ! maintained in multidimensions.
@@ -574,17 +678,34 @@ contains
 
     end subroutine s_write_grid_to_formatted_database_file
 
-    !> Write a single flow variable field to the formatted database slave and master files for a given time step.
+    !> @brief Write a single flow variable field to the formatted database slave and master files for a given time step.
     impure subroutine s_write_variable_to_formatted_database_file(varname, t_step)
 
-        character(LEN=*), intent(in) :: varname
-        integer, intent(in)          :: t_step
+        ! Description: The goal of this subroutine is to write to the formatted database file the flow variable at the current
+        ! time-step, t_step. The local process(es) write the part of the flow variable that they handle to the formatted database
+        ! slave file. The root process, on the other hand, will also take care of connecting all of the flow variable data in the
+        ! formatted database master file. In the Silo-HDF5 database format, the extents of each local process flow variable are also
+        ! written to the master file. Note that in Binary format, no master file is maintained in multidimensions. Finally note that
+        ! in 1D, grid data is also written within this subroutine for Silo-HDF5 database format since curve and not the
+        ! quadrilateral variable objects are used, see description of s_write_grid_to_formatted_database_file for more details on
+        ! this topic.
 
-        ! NAG compiler requires these to be statically sized
+        ! Name of the flow variable, which will be written to the formatted database file at the current time-step, t_step
+        character(LEN=*), intent(in) :: varname
+
+        ! Time-step that is currently being post-processed
+        integer, intent(in) :: t_step
+
+        ! Bookkeeping variables storing the name and type of flow variable that is about to be handled by the local processor(s).
+        ! Note that due to an internal NAG Fortran compiler problem, these variables could not be allocated dynamically.
         character(LEN=4*name_len), dimension(num_procs) :: varnames
         integer, dimension(num_procs)                   :: vartypes
-        integer                                         :: i, j, k
-        integer                                         :: ierr
+
+        ! Generic loop iterator
+        integer :: i, j, k
+        integer :: ierr
+
+        ! Silo-HDF5 Database Format
 
         if (format == 1) then
             ! Determining the extents of the flow variable on each local process and gathering all this information on root process
@@ -594,6 +715,7 @@ contains
                 data_extents(:,0) = (/minval(q_sf), maxval(q_sf)/)
             end if
 
+            ! Next, the root process proceeds to write the gathered flow variable data extents to formatted database master file.
             if (proc_rank == 0) then
                 do i = 1, num_procs
                     write (varnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:' // trim(varname)
@@ -610,6 +732,8 @@ contains
                 err = DBFREEOPTLIST(optlist)
             end if
 
+            ! Finally, each of the local processor(s) proceeds to write the flow variable data that it is responsible for to the
+            ! formatted database slave file.
             if (wp == dp) then
                 if (precision == 1) then
                     do i = -offset_x%beg, m + offset_x%end
@@ -677,6 +801,10 @@ contains
                     end if
                 end if
             #:endfor
+
+            ! END: Silo-HDF5 Database Format
+
+            ! Binary Database Format
         else
             ! Writing the name of the flow variable and its data, associated with the local processor, to the formatted database
             ! slave file
@@ -707,7 +835,8 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file
 
-    !> Write the post-processed results in the folder 'lag_bubbles_data'
+    !> Subroutine that writes the post processed results in the folder 'lag_bubbles_data'
+    !! @param t_step Current time step
     impure subroutine s_write_lag_bubbles_results_to_text(t_step)
 
         integer, intent(in)                            :: t_step
@@ -729,7 +858,6 @@ contains
         integer                                :: i
         integer, dimension(:), allocatable     :: proc_bubble_counts
         real(wp), dimension(1:1,1:lag_io_vars) :: lag_io_null
-
         lag_io_null = 0._wp
 
         ! Construct file path
@@ -860,7 +988,7 @@ contains
 
     end subroutine s_write_lag_bubbles_results_to_text
 
-    !> Read Lagrangian bubble restart data and write bubble positions and scalar fields to the Silo database.
+    !> @brief Read Lagrangian bubble restart data and write bubble positions and scalar fields to the Silo database.
     impure subroutine s_write_lag_bubbles_to_formatted_database_file(t_step)
 
         integer, intent(in)                            :: t_step
@@ -1068,7 +1196,7 @@ contains
 
     end subroutine s_write_lag_bubbles_to_formatted_database_file
 
-    !> Write a single Lagrangian bubble point-variable to the Silo database slave and master files.
+    !> @brief Write a single Lagrangian bubble point-variable to the Silo database slave and master files.
     subroutine s_write_lag_variable_to_formatted_database_file(varname, t_step, data, nBubs)
 
         character(len=*), intent(in)                  :: varname
@@ -1113,7 +1241,6 @@ contains
 
     end subroutine s_write_lag_variable_to_formatted_database_file
 
-    !> Convert the binary immersed-boundary state file to per-body formatted text files
     impure subroutine s_write_ib_state_files()
 
         character(len=len_trim(case_dir) + 4*name_len) :: in_file, out_file, file_loc
@@ -1164,7 +1291,8 @@ contains
 
     end subroutine s_write_ib_state_files
 
-    !> Extract the volume-fraction interface contour from primitive fields and write the coordinates to the interface data file.
+    !> @brief Extract the volume-fraction interface contour from primitive fields and write the coordinates to the interface data
+    !! file.
     impure subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -1250,7 +1378,8 @@ contains
 
     end subroutine s_write_intf_data_file
 
-    !> Compute volume-integrated kinetic, potential, and internal energies and write the energy budget to the energy data file.
+    !> @brief Compute volume-integrated kinetic, potential, and internal energies and write the energy budget to the energy data
+    !! file.
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf, q_cons_vf
@@ -1342,14 +1471,24 @@ contains
 
     end subroutine s_write_energy_data_file
 
-    !> Close the formatted database slave file and, for the root process, the master file.
+    !> @brief Close the formatted database slave file and, for the root process, the master file.
     impure subroutine s_close_formatted_database_file()
 
+        ! Description: The purpose of this subroutine is to close any formatted database file(s) that may be opened at the time-step
+        ! that is currently being post-processed. The root process must typically close two files, one associated with the local
+        ! sub-domain and the other with the entire domain. The non- root process(es) must close one file, which is associated with
+        ! the local sub-domain. Note that for the Binary data- base format and multidimensional data, the root process only has to
+        ! close the file associated with the local sub- domain, because one associated with the entire domain is not generated.
+
         integer :: ierr
+
+        ! Silo-HDF5 database format
 
         if (format == 1) then
             ierr = DBCLOSE(dbfile)
             if (proc_rank == 0) ierr = DBCLOSE(dbroot)
+
+            ! Binary database format
         else
             close (dbfile)
             if (n == 0 .and. proc_rank == 0) close (dbroot)
@@ -1357,23 +1496,27 @@ contains
 
     end subroutine s_close_formatted_database_file
 
-    !> Close the interface data file.
+    !> @brief Close the interface data file.
     impure subroutine s_close_intf_data_file()
 
         close (211)
 
     end subroutine s_close_intf_data_file
 
-    !> Close the energy data file.
+    !> @brief Close the energy data file.
     impure subroutine s_close_energy_data_file()
 
         close (251)
 
     end subroutine s_close_energy_data_file
 
-    !> Deallocate module arrays and release all data-output resources.
+    !> @brief Deallocate module arrays and release all data-output resources.
     impure subroutine s_finalize_data_output_module()
 
+        ! Description: Deallocation procedures for the module
+
+        ! Deallocating the generic storage employed for the flow variable(s) that were written to the formatted database file(s).
+        ! Note that the root variable is only deallocated in the case of a 1D computation.
         deallocate (q_sf)
         if (n == 0) deallocate (q_root_sf)
         if (grid_geometry == 3) then

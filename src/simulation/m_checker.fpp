@@ -56,30 +56,26 @@ contains
 
         call s_int_to_str(num_stcls_min*weno_order, numStr)
         @:PROHIBIT(m + 1 < num_stcls_min*weno_order, &
-                   & "m must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " // trim(numStr))
+                   & "m must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*weno_order, &
-                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*weno_order, &
-                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
 
     end subroutine s_check_inputs_weno
 
-    !> Validate that the grid resolution is sufficient for the MUSCL reconstruction order
+    !> @brief Validates that the grid resolution is sufficient for the MUSCL reconstruction order.
     impure subroutine s_check_inputs_muscl
 
         character(len=5) :: numStr  !< for int to string conversion
 
         call s_int_to_str(num_stcls_min*muscl_order, numStr)
         @:PROHIBIT(m + 1 < num_stcls_min*muscl_order, &
-                   & "m must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " // trim(numStr))
+                   & "m must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*muscl_order, &
-                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
-                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
-                   & // trim(numStr))
+                   & "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
 
     end subroutine s_check_inputs_muscl
 
@@ -92,7 +88,6 @@ contains
 
     end subroutine s_check_inputs_time_stepping
 
-    !> Validate NVIDIA unified virtual memory configuration parameters
     impure subroutine s_check_inputs_nvidia_uvm
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM

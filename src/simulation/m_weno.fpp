@@ -10,10 +10,12 @@ module m_weno
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+
     ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
     use m_muscl
+
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they are stored in v_vf. However, they are
@@ -82,7 +84,8 @@ module m_weno
 
 contains
 
-    !> Initialize the WENO module
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_weno_module
 
         if (weno_order == 1) return
@@ -169,10 +172,11 @@ contains
 
     end subroutine s_initialize_weno_module
 
-    !> Compute WENO polynomial coefficients, ideal weights, and smoothness indicators for a given direction
+    !> The purpose of this subroutine is to compute the grid dependent coefficients of the WENO polynomials, ideal weights and
+    !! smoothness indicators, provided the order, the coordinate direction and the location of the WENO reconstruction.
+    !! @param weno_dir Coordinate direction of the WENO reconstruction
+    !! @param is Index bounds in the s-direction
     subroutine s_compute_weno_coefficients(weno_dir, is)
-
-        ! Compute WENO coefficients for a given coordinate direction. Shu (1997)
 
         integer, intent(in)               :: weno_dir
         type(int_bounds_info), intent(in) :: is
@@ -183,7 +187,8 @@ contains
         real(wp)                          :: w(1:8)          !< Intermediate var for ideal weights: s_cb across overall stencil
         real(wp)                          :: y(1:4)          !< Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
-        ! Determine cell count, boundary locations, and BCs for selected WENO direction
+        ! Determining the number of cells, the cell-boundary locations and the boundary conditions in the coordinate direction
+        ! selected for the WENO reconstruction
 
         if (weno_dir == 1) then
             s = m; s_cb => x_cb; bc_s = bc_x
@@ -198,21 +203,18 @@ contains
             if (weno_dir == ${WENO_DIR}$) then
                 if (weno_order == 3) then
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-                        ! Polynomial reconstruction coefficients
                         poly_coef_cbR_${XYZ}$ (i + 1, 0, 0) = (s_cb(i) - s_cb(i + 1))/(s_cb(i) - s_cb(i + 2))
                         poly_coef_cbR_${XYZ}$ (i + 1, 1, 0) = (s_cb(i) - s_cb(i + 1))/(s_cb(i - 1) - s_cb(i + 1))
 
                         poly_coef_cbL_${XYZ}$ (i + 1, 0, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 0, 0)
                         poly_coef_cbL_${XYZ}$ (i + 1, 1, 0) = -poly_coef_cbR_${XYZ}$ (i + 1, 1, 0)
 
-                        ! Ideal (linear) weights
                         d_cbR_${XYZ}$ (0, i + 1) = (s_cb(i - 1) - s_cb(i + 1))/(s_cb(i - 1) - s_cb(i + 2))
                         d_cbL_${XYZ}$ (0, i + 1) = (s_cb(i - 1) - s_cb(i))/(s_cb(i - 1) - s_cb(i + 2))
 
                         d_cbR_${XYZ}$ (1, i + 1) = 1._wp - d_cbR_${XYZ}$ (0, i + 1)
                         d_cbL_${XYZ}$ (1, i + 1) = 1._wp - d_cbL_${XYZ}$ (0, i + 1)
 
-                        ! Smoothness indicator coefficients
                         beta_coef_${XYZ}$ (i + 1, 0, 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp/(s_cb(i) - s_cb(i + 2))**2._wp
                         beta_coef_${XYZ}$ (i + 1, 1, 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp/(s_cb(i - 1) - s_cb(i + 1))**2._wp
                     end do
@@ -235,7 +237,6 @@ contains
                     ! Computing WENO5 Coefficients
                 else if (weno_order == 5) then
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
-                        ! Polynomial reconstruction coefficients
                         poly_coef_cbR_${XYZ}$ (i + 1, 0, &
                                                & 0) = ((s_cb(i) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i + 2)))/((s_cb(i) - s_cb(i &
                                                & + 3))*(s_cb(i + 3) - s_cb(i + 1)))
@@ -274,7 +275,6 @@ contains
                                                & 0) = ((s_cb(i - 2) - s_cb(i)) + (s_cb(i - 1) - s_cb(i + 1)))/((s_cb(i - 2) &
                                                & - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))*((s_cb(i) - s_cb(i + 1)))
 
-                        ! Ideal (linear) weights
                         d_cbR_${XYZ}$ (0, &
                                        & i + 1) = ((s_cb(i - 2) - s_cb(i + 1))*(s_cb(i + 1) - s_cb(i - 1)))/((s_cb(i - 2) &
                                        & - s_cb(i + 3))*(s_cb(i + 3) - s_cb(i - 1)))
@@ -291,7 +291,6 @@ contains
                         d_cbR_${XYZ}$ (1, i + 1) = 1._wp - d_cbR_${XYZ}$ (0, i + 1) - d_cbR_${XYZ}$ (2, i + 1)
                         d_cbL_${XYZ}$ (1, i + 1) = 1._wp - d_cbL_${XYZ}$ (0, i + 1) - d_cbL_${XYZ}$ (2, i + 1)
 
-                        ! Smoothness indicator coefficients
                         beta_coef_${XYZ}$ (i + 1, 0, &
                                            & 0) = 4._wp*(s_cb(i) - s_cb(i + 1))**2._wp*(10._wp*(s_cb(i + 1) - s_cb(i))**2._wp &
                                            & + (s_cb(i + 1) - s_cb(i))*(s_cb(i + 2) - s_cb(i + 1)) + (s_cb(i + 2) - s_cb(i + 1)) &
@@ -856,10 +855,9 @@ contains
 
     end subroutine s_compute_weno_coefficients
 
-    !> Perform WENO reconstruction of left and right cell-boundary values from cell-averaged variables
+    !> @brief Performs WENO reconstruction of left and right cell-boundary values from cell-averaged variables.
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, weno_dir, is1_weno_d, &
-
-        & is2_weno_d, is3_weno_d)
+                      & is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z
@@ -1075,8 +1073,9 @@ contains
                                             tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q)))
-                                                ! Equation 28 (note: weno_eps was already added to beta)
+                                                alpha(q) = d_cbL_${XYZ}$ (q, &
+                                                      & j)*(1._wp + (tau/beta(q))) &
+                                                      &  ! Equation 28 (note: weno_eps was already added to beta)
                                             end do
                                         else if (teno) then
                                             ! Fu, et al. (2016) Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
@@ -1373,21 +1372,26 @@ contains
             #:endif
         end if
 
-        if (int_comp) then
+        if (int_comp .and. v_size >= advxe) then
             call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, weno_dir, &
                                          & is1_weno_d, is2_weno_d, is3_weno_d)
         end if
 
     end subroutine s_weno
 
-    !> Set up the WENO reconstruction for a given direction
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures that are required for the setup of the WENO reconstruction.
+    !! @param v_vf Cell-averaged variables
+    !! @param weno_dir Coordinate direction of the WENO reconstruction
     subroutine s_initialize_weno(v_vf, weno_dir)
 
         type(scalar_field), dimension(:), intent(in) :: v_vf
         integer, intent(in)                          :: weno_dir
         integer                                      :: j, k, l, q
 
-        ! Determine WENO-reconstructed variables and map coordinate directions
+        ! Determining the number of cell-average variables which will be WENO-reconstructed and mapping their indical bounds in the
+        ! x-, y- and z-directions to those in the s1-, s2- and s3-directions as to reshape the inputted data in the coordinate
+        ! direction of the WENO reconstruction
 
         v_size = ubound(v_vf, 1)
         $:GPU_UPDATE(device='[v_size]')
@@ -1442,7 +1446,12 @@ contains
 
     end subroutine s_initialize_weno
 
-    !> Enforce monotonicity-preserving bounds on the WENO reconstruction
+    !> The goal of this subroutine is to ensure that the WENO reconstruction is monotonic. The latter is achieved by enforcing
+    !! monotonicity preserving bounds of Suresh and Huynh (1997). The resulting MPWENO reconstruction, see Balsara and Shu (2000),
+    !! ensures that the reconstructed values do not reside outside the range spanned by WENO stencil.
+    !! @param v_rs_ws Reshaped cell-averaged variables
+    !! @param vL_rs_vf Left WENO reconstructed cell-boundary values
+    !! @param vR_rs_vf Right WENO reconstructed cell-boundary values
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: v_rs_ws
@@ -1450,6 +1459,7 @@ contains
         integer :: i, j, k, l
         real(wp), dimension(-1:1) :: d  !< Curvature measures at the zone centers
         real(wp) :: d_MD, d_LC          !< Median (md) curvature and large curvature (LC) measures
+
         ! The left and right upper bounds (UL), medians, large curvatures, minima, and maxima of the WENO-reconstructed values of
         ! the cell- average variables.
         real(wp) :: vL_UL, vR_UL
@@ -1457,8 +1467,13 @@ contains
         real(wp) :: vL_LC, vR_LC
         real(wp) :: vL_min, vR_min
         real(wp) :: vL_max, vR_max
-        ! Monotonicity-preserving bounds, Suresh & Huynh JCP (1997)
-        real(wp), parameter :: alpha = 2._wp       !< Max CFL stability parameter (CFL < 1/(1+alpha))
+        !> Max CFL stability parameter (CFL < 1/(1+alpha)) Determines the maximum Courant-Friedrichs-Lewy (CFL) number that may be
+        !! utilized with the scheme. In theory, for stability, a CFL number less than 1/(1+alpha) is necessary. The default value
+        !! for alpha is 2.
+        real(wp), parameter :: alpha = 2._wp
+
+        !> Determines the amount of freedom available from utilizing a large value for the local curvature. The default value for
+        !! beta is 4/3.
         real(wp), parameter :: beta = 4._wp/3._wp  !< Local curvature freedom parameter
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
@@ -1468,12 +1483,10 @@ contains
             do k = is2_weno%beg, is2_weno%end
                 do j = is1_weno%beg, is1_weno%end
                     do i = 1, v_size
-                        ! Second-order undivided differences for curvature estimation
                         d(-1) = v_rs_ws(j, k, l, i) + v_rs_ws(j - 2, k, l, i) - v_rs_ws(j - 1, k, l, i)*2._wp
                         d(0) = v_rs_ws(j + 1, k, l, i) + v_rs_ws(j - 1, k, l, i) - v_rs_ws(j, k, l, i)*2._wp
                         d(1) = v_rs_ws(j + 2, k, l, i) + v_rs_ws(j, k, l, i) - v_rs_ws(j + 1, k, l, i)*2._wp
 
-                        ! Median function for oscillation detection
                         d_MD = (sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, 4._wp*d(0) - d(-1)))*abs((sign(1._wp, &
                                 & 4._wp*d(-1) - d(0)) + sign(1._wp, d(-1)))*(sign(1._wp, 4._wp*d(-1) - d(0)) + sign(1._wp, &
                                 & d(0))))*min(abs(4._wp*d(-1) - d(0)), abs(d(-1)), abs(4._wp*d(0) - d(-1)), abs(d(0)))/8._wp
@@ -1543,6 +1556,7 @@ contains
 
         ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
+        ! deallocate(vL_rs_vf_x, vR_rs_vf_x)
         @:DEALLOCATE(v_rs_ws_x)
 
         ! Deallocating WENO coefficients in x-direction
@@ -1553,6 +1567,7 @@ contains
         ! Deallocating WENO coefficients in y-direction
         if (n == 0) return
 
+        ! deallocate(vL_rs_vf_y, vR_rs_vf_y)
         @:DEALLOCATE(v_rs_ws_y)
 
         @:DEALLOCATE(poly_coef_cbL_y, poly_coef_cbR_y)
@@ -1562,6 +1577,7 @@ contains
         ! Deallocating WENO coefficients in z-direction
         if (p == 0) return
 
+        ! deallocate(vL_rs_vf_z, vR_rs_vf_z)
         @:DEALLOCATE(v_rs_ws_z)
 
         @:DEALLOCATE(poly_coef_cbL_z, poly_coef_cbR_z)

@@ -627,8 +627,8 @@ CONSTRAINTS = {
     },
     # Bubbles
     "bubble_model": {
-        "choices": [1, 2, 3],
-        "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+        "choices": [0, 1, 2, 3],
+        "value_labels": {0: "Particle", 1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
     },
     # Output
     "format": {
@@ -1053,6 +1053,13 @@ def _load():
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
+    # Interfacial flow inputs
+    _r("normMag", REAL)
+    _r("p0_ic", REAL)
+    _r("g0_ic", REAL)
+    _r("normFac", REAL)
+    _r("interface_file", STR)
+
     # INDEXED PARAMETERS
 
     # patch_icpp (10 patches)
@@ -1260,12 +1267,13 @@ def _load():
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # lag_params (Lagrangian bubbles)
-    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
+    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
+    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
+    _r("lag_params%input_path", STR, {"bubbles"})
 
     # chem_params
     for a in ["diffusion", "reactions"]:

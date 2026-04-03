@@ -10,6 +10,8 @@ module m_initial_condition
     use m_mpi_proxy
     use m_helper
     use m_variables_conversion
+    ! one form to another
+
     use m_icpp_patches
     use m_assign_variables
     use m_perturbation
@@ -18,11 +20,14 @@ module m_initial_condition
 
     implicit none
 
-    ! NOTE: Abstract interface enables dynamic dispatch without repeated model_eqns checks
+    ! NOTE: The abstract interface allows for the declaration of a pointer to a procedure such that the choice of the model
+    ! equations does not have to be queried every time the patch primitive variables are to be assigned in a cell in the
+    ! computational domain.
     type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< primitive variables
     type(scalar_field), allocatable, dimension(:)    :: q_cons_vf  !< conservative variables
     type(scalar_field)                               :: q_T_sf     !< Temperature field
     type(integer_field), dimension(:,:), allocatable :: bc_type    !< bc_type fields
+
     !> @cond
 #ifdef MFC_MIXED_PRECISION
     integer(kind=1), allocatable, dimension(:,:,:) :: patch_id_fp
@@ -40,6 +45,8 @@ contains
 
         integer :: i, j, k, l
 
+        ! Allocating the primitive and conservative variables
+
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
 
@@ -52,18 +59,24 @@ contains
             allocate (q_T_sf%sf(0:m,0:n,0:p))
         end if
 
+        ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m,0:n,0:p))
 
         if (qbmm .and. .not. polytropic) then
+            ! Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
             allocate (pb%sf(0:m,0:n,0:p,1:nnode,1:nb))
             allocate (mv%sf(0:m,0:n,0:p,1:nnode,1:nb))
         end if
 
+        ! Setting default values for conservative and primitive variables so that in the case that the initial condition is wrongly
+        ! laid out on the grid the simulation component will catch the problem on start- up. The conservative variables do not need
+        ! to be similarly treated since they are computed directly from the primitive variables.
         do i = 1, sys_size
             q_cons_vf(i)%sf = -1.e-6_stp  ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
             q_prim_vf(i)%sf = -1.e-6_stp  ! real(dflt_real, kind=stp)
         end do
 
+        ! Allocating arrays to store the bc types
         allocate (bc_type(1:num_dims,1:2))
 
         allocate (bc_type(1, 1)%sf(0:0,0:n,0:p))
@@ -119,12 +132,15 @@ contains
 
     end subroutine s_initialize_initial_condition_module
 
-    !> Iterate over patches and, depending on the geometry type, call the related subroutine to setup the said geometry on the grid
-    !! using the primitive variables included with the patch parameters. The subroutine is complete once the primitive variables are
-    !! converted to conservative ones.
+    !> This subroutine peruses the patches and depending on the type of geometry associated with a particular patch, it calls the
+    !! related subroutine to setup the said geometry on the grid using the primitive variables included with the patch parameters.
+    !! The subroutine is complete once the primitive variables are converted to conservative ones.
     impure subroutine s_generate_initial_condition
 
         integer :: i
+
+        ! Converting the conservative variables to the primitive ones given preexisting initial condition data files were read in on
+        ! start-up
 
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
@@ -140,11 +156,13 @@ contains
         if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
         if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
 
+        ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
+            ! Initialize pb and mv
             call s_initialize_mv(q_cons_vf, mv%sf)
             call s_initialize_pb(q_cons_vf, mv%sf, pb%sf)
         end if
@@ -155,6 +173,8 @@ contains
     impure subroutine s_finalize_initial_condition_module
 
         integer :: i
+
+        ! Dellocating the primitive and conservative variables
 
         do i = 1, sys_size
             deallocate (q_prim_vf(i)%sf)
@@ -168,6 +188,7 @@ contains
             deallocate (q_T_sf%sf)
         end if
 
+        ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
 
         deallocate (bc_type(1, 1)%sf)

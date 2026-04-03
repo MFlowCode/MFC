@@ -9,6 +9,7 @@ module m_grid
     use m_global_parameters  ! Global parameters for the code
     use m_mpi_proxy  ! Message passing interface (MPI) module proxy
     use m_helper_basic
+
 #ifdef MFC_MPI
     use mpi  ! Message passing interface (MPI) module
 #endif
@@ -20,7 +21,7 @@ module m_grid
 
     abstract interface
 
-        !> Abstract interface for generating a rectilinear computational grid.
+        !> @brief Abstract interface for generating a rectilinear computational grid.
         impure subroutine s_generate_abstract_grid
 
         end subroutine s_generate_abstract_grid
@@ -30,13 +31,16 @@ module m_grid
 
 contains
 
-    !> Generate a uniform or stretched rectilinear grid in serial from user parameters.
+    !> The following subroutine generates either a uniform or non-uniform rectilinear grid in serial, defined by the parameters
+    !! inputted by the user. The grid information is stored in the grid variables containing coordinates of the cell- centers and
+    !! cell-boundaries.
     impure subroutine s_generate_serial_grid
 
         ! Generic loop iterator
         integer  :: i, j    !< generic loop operators
         real(wp) :: length  !< domain lengths
-        ! Uniform grid: dx = (x_end - x_beg) / (m + 1)
+
+        ! Grid Generation in the x-direction
 
         dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
 
@@ -47,7 +51,6 @@ contains
 
         x_cb(m) = x_domain%end
 
-        ! Hyperbolic tangent grid stretching
         if (stretch_x) then
             length = abs(x_cb(m) - x_cb(-1))
             x_cb = x_cb/length
@@ -72,8 +75,8 @@ contains
         ! Grid Generation in the y-direction
         if (n == 0) return
 
-        ! Axisymmetric cylindrical grid (r, z): half-cell offset at r=0 axis
         if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
+            ! IF (grid_geometry == 2) THEN
             dy = (y_domain%end - y_domain%beg)/real(2*n + 1, wp)
 
             y_cc(0) = y_domain%beg + 5.e-1_wp*dy
@@ -94,7 +97,6 @@ contains
 
         y_cb(n) = y_domain%end
 
-        ! Hyperbolic tangent grid stretching in y-direction
         if (stretch_y) then
             length = abs(y_cb(n) - y_cb(-1))
             y_cb = y_cb/length
@@ -128,7 +130,6 @@ contains
 
         z_cb(p) = z_domain%end
 
-        ! Hyperbolic tangent grid stretching in z-direction
         if (stretch_z) then
             length = abs(z_cb(p) - z_cb(-1))
             z_cb = z_cb/length
@@ -152,11 +153,14 @@ contains
 
     end subroutine s_generate_serial_grid
 
-    !> Generate a uniform or stretched rectilinear grid in parallel from user parameters.
+    !> The following subroutine generates either a uniform or non-uniform rectilinear grid in parallel, defined by the parameters
+    !! inputted by the user. The grid information is stored in the grid variables containing coordinates of the cell- centers and
+    !! cell-boundaries.
     impure subroutine s_generate_parallel_grid
 
 #ifdef MFC_MPI
         real(wp) :: length  !< domain lengths
+
         ! Locations of cell boundaries
         real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb  !< Locations of cell boundaries
         character(LEN=path_len + name_len)  :: file_loc                      !< Generic string used to store the address of a file
@@ -168,13 +172,12 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
-        ! Uniform grid: dx = (x_end - x_beg) / (m_glb + 1)
+        ! Grid generation in the x-direction
         dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
         do i = 0, m_glb
             x_cb_glb(i - 1) = x_domain%beg + dx*real(i, wp)
         end do
         x_cb_glb(m_glb) = x_domain%end
-        ! Hyperbolic tangent grid stretching in x-direction (parallel version)
         if (stretch_x) then
             length = abs(x_cb_glb(m_glb) - x_cb_glb(-1))
 
@@ -195,7 +198,6 @@ contains
 
         ! Grid generation in the y-direction
         if (n_glb > 0) then
-            ! Axisymmetric cylindrical grid (r, z): half-cell offset at r=0 axis
             if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
                 dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, wp)
                 y_cb_glb(-1) = y_domain%beg

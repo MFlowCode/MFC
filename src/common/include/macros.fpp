@@ -14,12 +14,15 @@
 
 ! Caution: This macro requires the use of a binding script to set CUDA_VISIBLE_DEVICES, such that we have one GPU device per MPI
 ! rank. That's because for both cudaMemAdvise (preferred location) and cudaMemPrefetchAsync we use location = device_id = 0. For an
-! example see misc/nvidia_uvm/bind.sh. NVIDIA unified memory page placement hint
+! example see misc/nvidia_uvm/bind.sh.
 #:def PREFER_GPU(*args)
 #ifdef MFC_SIMULATION
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     block
-        ! NVIDIA CUDA Fortran 25.3+: uses submodules (cuda_runtime_api, gpu_reductions, sort) See
+        ! Beginning in the 25.3 release, the structure of the cudafor module has been changed slightly. The module now includes, or
+        ! "uses" 3 submodules: cuda_runtime_api, gpu_reductions, and sort. The cudafor functionality has not changed. But for new
+        ! users, or users who have needed to work-around name conflicts in the module, it may be better to use cuda_runtime_api to
+        ! expose interfaces to the CUDA runtime calls described in Chapter 4 of this guide.
         ! https://docs.nvidia.com/hpc-sdk/compilers/cuda-fortran-prog-guide/index.html#fortran-host-modules
 #if __NVCOMPILER_MAJOR__ < 25 || (__NVCOMPILER_MAJOR__ == 25 && __NVCOMPILER_MINOR__ < 3)
         use cudafor, gpu_sum => sum, gpu_maxval => maxval, gpu_minval => minval
@@ -55,7 +58,6 @@
 #endif
 #:enddef
 
-! Allocate and create GPU device memory
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     #:set allocated_variables = ', '.join(args)
@@ -75,7 +77,6 @@
     $:GPU_ENTER_DATA(create='[' + joined + ']')
 #:enddef ALLOCATE
 
-! Free GPU device memory and deallocate
 #:def DEALLOCATE(*args)
     @:LOG({'@:DEALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     #:set allocated_variables = ', '.join(args)
@@ -83,7 +84,6 @@
     deallocate (${allocated_variables}$)
 #:enddef DEALLOCATE
 
-! Cray-specific GPU pointer setup for vector fields
 #:def ACC_SETUP_VFs(*args)
 #ifdef _CRAYFTN
     block
@@ -107,7 +107,6 @@
 #endif
 #:enddef
 
-! Cray-specific GPU pointer setup for scalar fields
 #:def ACC_SETUP_SFs(*args)
 #ifdef _CRAYFTN
     block
@@ -123,7 +122,6 @@
 #endif
 #:enddef
 
-! Cray-specific GPU pointer setup for acoustic source spatials
 #:def ACC_SETUP_source_spatials(*args)
 #ifdef _CRAYFTN
     block

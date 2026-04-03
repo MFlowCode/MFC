@@ -13,7 +13,6 @@ module m_finite_differences
 
 contains
 
-    !> Accumulate the finite-difference divergence of a vector field onto a scalar field.
     subroutine s_compute_fd_divergence(div, fields, ix_s, iy_s, iz_s)
 
         type(scalar_field), intent(inout) :: div
@@ -70,9 +69,14 @@ contains
 
     end subroutine s_compute_fd_divergence
 
-    !> Compute the centered finite-difference coefficients for first-order spatial derivatives in the s-coordinate direction (x, y,
-    !! or z). Supports up to 4th order accuracy.
+    !> The purpose of this subroutine is to compute the finite- difference coefficients for the centered schemes utilized in
+    !! computations of first order spatial derivatives in the s-coordinate direction. The s-coordinate direction refers to the x-,
+    !! y- or z-coordinate direction, depending on the subroutine's inputs. Note that coefficients of up to 4th order accuracy are
+    !! available.
+    !! @param q Number of cells in the s-coordinate direction
+    !! @param s_cc Locations of the cell-centers in the s-coordinate direction
     !! @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
+    !! @param local_buff_size Size of the local buffer
     !! @param fd_number_in Finite-difference number
     !! @param fd_order_in Finite-difference order of accuracy
     !! @param offset_s Optional offset bounds in the s-coordinate direction

@@ -31,10 +31,10 @@ contains
 #ifdef MFC_MPI
         integer :: i     !< Generic loop iterator
         integer :: ierr  !< Generic flag used to identify and report MPI errors
+
         ! Allocating and configuring the receive counts and the displacement vector variables used in variable-gather communication
         ! procedures. Note that these are only needed for either multidimensional runs that utilize the Silo database file format or
         ! for 1D simulations.
-
         if ((format == 1 .and. n > 0) .or. n == 0) then
             allocate (recvcounts(0:num_procs - 1))
             allocate (displs(0:num_procs - 1))
@@ -64,8 +64,8 @@ contains
 #ifdef MFC_MPI
         integer :: i     !< Generic loop iterator
         integer :: ierr  !< Generic flag used to identify and report MPI errors
-        ! Logistics
 
+        ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',               &
@@ -138,7 +138,10 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
-    !> Gather spatial extents from all ranks for Silo database metadata
+    !> This subroutine gathers the Silo database metadata for the spatial extents in order to boost the performance of the
+    !! multidimensional visualization.
+    ! ! @param spatial_extents Spatial extents for each processor's sub-domain. First dimension corresponds to the minimum and
+    ! maximum values, respectively, while the second dimension corresponds to the processor rank.
     impure subroutine s_mpi_gather_spatial_extents(spatial_extents)
 
         real(wp), dimension(1:,0:), intent(inout) :: spatial_extents
@@ -148,7 +151,6 @@ contains
         real(wp) :: ext_temp(0:num_procs - 1)
 
         ! Simulation is 3D
-
         if (p > 0) then
             if (grid_geometry == 3) then
                 ! Minimum spatial extent in the r-direction
@@ -229,14 +231,14 @@ contains
 
     end subroutine s_mpi_gather_spatial_extents
 
-    !> Collect the sub-domain cell-boundary or cell-center location data from all processors and put back together the grid of the
-    !! entire computational domain on the rank 0 processor. This is only done for 1D simulations.
+    !> This subroutine collects the sub-domain cell-boundary or cell-center locations data from all of the processors and puts back
+    !! together the grid of the entire computational domain on the rank 0 processor. This is only done for 1D simulations.
     impure subroutine s_mpi_defragment_1d_grid_variable
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
-        ! Silo-HDF5 database format
 
+        ! Silo-HDF5 database format
         if (format == 1) then
             call MPI_GATHERV(x_cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
@@ -250,8 +252,11 @@ contains
 
     end subroutine s_mpi_defragment_1d_grid_variable
 
-    !> Gather the Silo database metadata for the flow variable's extents to boost performance of the multidimensional visualization.
-    !! @param q_sf Flow variable on a single computational sub-domain
+    !> This subroutine gathers the Silo database metadata for the flow variable's extents as to boost performance of the
+    !! multidimensional visualization.
+    !! @param q_sf Flow variable defined on a single computational sub-domain
+    ! ! @param data_extents The flow variable extents on each of the processor's sub-domain. First dimension of array corresponds to
+    ! the former's minimum and maximum values, respectively, while second dimension corresponds to each processor's rank.
     impure subroutine s_mpi_gather_data_extents(q_sf, data_extents)
 
         real(wp), dimension(:,:,:), intent(in)                  :: q_sf
@@ -283,10 +288,10 @@ contains
 
     end subroutine s_mpi_gather_data_extents
 
-    !> Gather the sub-domain flow variable data from all processors and reassemble it for the entire computational domain on the
-    !! rank 0 processor. This is only done for 1D simulations.
-    !! @param q_sf Flow variable on a single computational sub-domain
-    !! @param q_root_sf Flow variable on the entire computational domain
+    !> This subroutine gathers the sub-domain flow variable data from all of the processors and puts it back together for the entire
+    !! computational domain on the rank 0 processor. This is only done for 1D simulations.
+    !! @param q_sf Flow variable defined on a single computational sub-domain
+    !! @param q_root_sf Flow variable defined on the entire computational domain
     impure subroutine s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
 
         real(wp), dimension(0:m), intent(in)    :: q_sf
@@ -294,9 +299,9 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
+
         ! Gathering the sub-domain flow variable data from all the processes and putting it back together for the entire
         ! computational domain on the process with rank 0
-
         call MPI_GATHERV(q_sf(0), m + 1, mpi_p, q_root_sf(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 

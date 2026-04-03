@@ -24,25 +24,25 @@ module m_cbc
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
 
-    ! The cell-average primitive variables. They are obtained by reshaping (RS) q_prim_vf in the coordinate direction normal to the
-    ! domain boundary along which the CBC is applied.
+    !! The cell-average primitive variables. They are obtained by reshaping (RS) q_prim_vf in the coordinate direction normal to the
+    !! domain boundary along which the CBC is applied.
 
     real(wp), allocatable, dimension(:,:,:,:) :: q_prim_rsx_vf
     real(wp), allocatable, dimension(:,:,:,:) :: q_prim_rsy_vf
     real(wp), allocatable, dimension(:,:,:,:) :: q_prim_rsz_vf
     $:GPU_DECLARE(create='[q_prim_rsx_vf, q_prim_rsy_vf, q_prim_rsz_vf]')
 
-    ! Cell-average fluxes (src - source). These are directly determined from the cell-average primitive variables, q_prims_rs_vf,
-    ! and not a Riemann solver.
+    !! Cell-average fluxes (src - source). These are directly determined from the cell-average primitive variables, q_prims_rs_vf,
+    !! and not a Riemann solver.
 
     real(wp), allocatable, dimension(:,:,:,:) :: F_rsx_vf, F_src_rsx_vf
     real(wp), allocatable, dimension(:,:,:,:) :: F_rsy_vf, F_src_rsy_vf
     real(wp), allocatable, dimension(:,:,:,:) :: F_rsz_vf, F_src_rsz_vf
     $:GPU_DECLARE(create='[F_rsx_vf, F_src_rsx_vf, F_rsy_vf, F_src_rsy_vf, F_rsz_vf, F_src_rsz_vf]')
 
-    ! There is a CCE bug that is causing some subset of these variables to interfere with variables of the same name in
-    ! m_riemann_solvers.fpp, and giving this versions unique "_l" names works around the bug. Other private module allocatable
-    ! arrays in `acc declare create` clauses don't have this problem, so we still need to isolate this bug.
+    !! There is a CCE bug that is causing some subset of these variables to interfere with variables of the same name in
+    !! m_riemann_solvers.fpp, and giving this versions unique "_l" names works around the bug. Other private module allocatable
+    !! arrays in `acc declare create` clauses don't have this problem, so we still need to isolate this bug.
 
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf_l, flux_src_rsx_vf_l
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsy_vf_l, flux_src_rsy_vf_l
@@ -50,20 +50,25 @@ module m_cbc
     $:GPU_DECLARE(create='[flux_rsx_vf_l, flux_src_rsx_vf_l, flux_rsy_vf_l, flux_src_rsy_vf_l, flux_rsz_vf_l, flux_src_rsz_vf_l]')
 
     real(wp), allocatable, dimension(:) :: ds  !< Cell-width distribution in the s-direction
+
     ! CBC Coefficients
 
     real(wp), allocatable, dimension(:,:) :: fd_coef_x  !< Finite diff. coefficients x-dir
     real(wp), allocatable, dimension(:,:) :: fd_coef_y  !< Finite diff. coefficients y-dir
+    !> Finite diff. coefficients z-dir The first dimension identifies the location of a coefficient in the FD formula, while the
+    !! last dimension denotes the location of the CBC.
     real(wp), allocatable, dimension(:,:) :: fd_coef_z  !< Finite diff. coefficients, z-direction
+
     ! Bug with NVHPC when using nullified pointers in a declare create real(wp), pointer, dimension(:, :) :: fd_coef => null()
 
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_x  !< Polynomial interpolant coefficients in x-dir
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_y  !< Polynomial interpolant coefficients in y-dir
     real(wp), allocatable, dimension(:,:,:) :: pi_coef_z  !< Polynomial interpolant coefficients in z-dir
+
     $:GPU_DECLARE(create='[ds, fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z]')
 
-    ! The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients
-    ! and the last dimension denotes the location of the CBC.
+    !! The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients
+    !! and the last dimension denotes the location of the CBC.
 
     type(int_bounds_info) :: is1, is2, is3  !< Indical bounds in the s1-, s2- and s3-directions
     $:GPU_DECLARE(create='[is1, is2, is3]')
@@ -75,8 +80,8 @@ module m_cbc
     $:GPU_DECLARE(create='[dj, bcxb, bcxe, bcyb, bcye, bczb, bcze]')
     $:GPU_DECLARE(create='[cbc_dir, cbc_loc, flux_cbc_index]')
 
-    ! GRCBC inputs for subsonic inflow and outflow conditions consisting of inflow velocities, pressure, density and void fraction
-    ! as well as outflow velocities and pressure
+    !! GRCBC inputs for subsonic inflow and outflow conditions consisting of inflow velocities, pressure, density and void fraction
+    !! as well as outflow velocities and pressure
 
     real(wp), allocatable, dimension(:)   :: pres_in, pres_out, Del_in, Del_out
     real(wp), allocatable, dimension(:,:) :: vel_in, vel_out
@@ -87,7 +92,8 @@ module m_cbc
 
 contains
 
-    !> Initialize the CBC module
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures that are necessary to setup the module.
     impure subroutine s_initialize_cbc_module
 
         integer               :: i
@@ -350,9 +356,12 @@ contains
     end subroutine s_initialize_cbc_module
 
     !> Compute CBC coefficients
+    !! @param cbc_dir_in CBC coordinate direction
+    !! @param cbc_loc_in CBC coordinate location
     subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in)
 
-        ! Compute grid-dependent CBC coefficients for given direction and location
+        ! Description: The purpose of this subroutine is to compute the grid dependent FD and PI coefficients, or CBC coefficients,
+        ! provided the CBC coordinate direction and location.
 
         ! CBC coordinate direction and location
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
@@ -433,11 +442,16 @@ contains
 
     end subroutine s_compute_cbc_coefficients
 
-    !> Associate CBC finite-difference and polynomial-interpolation coefficients based on direction and boundary location
+    !> @brief Associates finite-difference and polynomial-interpolation CBC coefficients with targets based on coordinate direction
+    !! and boundary location. The goal of the procedure is to associate the FD and PI coefficients, or CBC coefficients, with the
+    !! appropriate targets, based on the coordinate direction and location of the CBC.
+    !! @param cbc_dir_in CBC coordinate direction
+    !! @param cbc_loc_in CBC coordinate location
     subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
         integer             :: i  !< Generic loop iterator
+
         ! Associating CBC Coefficients in x-direction
 
         if (cbc_dir_in == 1) then
@@ -486,7 +500,17 @@ contains
 
     end subroutine s_associate_cbc_coefficients_pointers
 
-    !> Apply characteristic boundary conditions by modifying fluxes near domain boundaries
+    !> The following is the implementation of the CBC based on the work of Thompson (1987, 1990) on hyperbolic systems. The CBC is
+    !! indirectly applied in the computation of the right-hand-side (RHS) near the relevant domain boundary through the modification
+    !! of the fluxes.
+    !! @param q_prim_vf Cell-average primitive variables
+    !! @param flux_vf Cell-boundary-average fluxes
+    !! @param flux_src_vf Cell-boundary-average flux sources
+    !! @param cbc_dir_norm CBC coordinate direction
+    !! @param cbc_loc_norm CBC coordinate location
+    !! @param ix Index bound in the first coordinate direction
+    !! @param iy Index bound in the second coordinate direction
+    !! @param iz Index bound in the third coordinate direction
     subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
@@ -537,6 +561,7 @@ contains
         real(wp)               :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)               :: vel_K_sum, vel_dv_dt_sum
         integer                :: i, j, k, r  !< Generic loop iterators
+
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 
@@ -952,13 +977,21 @@ contains
 
     end subroutine s_cbc
 
-    !> Set up the selected CBC for the current boundary
+    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
+    !! procedures that are required for the setup of the selected CBC.
+    !! @param q_prim_vf Cell-average primitive variables
+    !! @param flux_vf Cell-boundary-average fluxes
+    !! @param flux_src_vf Cell-boundary-average flux sources
+    !! @param ix Index bound in the first coordinate direction
+    !! @param iy Index bound in the second coordinate direction
+    !! @param iz Index bound in the third coordinate direction
     subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
         type(int_bounds_info), intent(in)                   :: ix, iy, iz
         integer                                             :: i, j, k, r  !< Generic loop iterators
+
         ! Configuring the coordinate direction indexes and flags
 
         ! Determining the indicial shift based on CBC location
@@ -1206,10 +1239,13 @@ contains
     end subroutine s_initialize_cbc
 
     !> Deallocation and/or the disassociation procedures that are necessary in order to finalize the CBC application
+    !! @param flux_vf Cell-boundary-average fluxes
+    !! @param flux_src_vf Cell-boundary-average flux sources
     subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
         integer                                                :: i, j, k, r  !< Generic loop iterators
+
         ! Determining the indicial shift based on CBC location
 
         dj = max(0, cbc_loc)
@@ -1368,7 +1404,7 @@ contains
 
     end subroutine s_finalize_cbc
 
-    !> Detect whether any domain boundary uses characteristic boundary conditions
+    !> @brief Detects whether any domain boundary uses characteristic boundary conditions.
     elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle

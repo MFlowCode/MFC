@@ -20,7 +20,7 @@ module m_compute_levelset
 
 contains
 
-    !> Dispatch level-set distance and normal computations for all ghost points based on patch geometry type
+    !> @brief Dispatches level-set distance and normal computations for all ghost points based on their patch geometry type.
     impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), dimension(:), intent(inout) :: gps
@@ -73,7 +73,7 @@ contains
 
     end subroutine s_apply_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a circular immersed boundary
+    !> @brief Computes the signed distance and outward normal from a ghost point to a circular immersed boundary.
     subroutine s_circle_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -83,14 +83,17 @@ contains
         real(wp), dimension(2)           :: center
         real(wp), dimension(3)           :: dist_vec
         integer                          :: i, j, ib_patch_id  !< Loop index variables
+
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
 
         radius = patch_ib(ib_patch_id)%radius
 
-        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, &
+                 & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, &
+                 & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
@@ -103,7 +106,7 @@ contains
 
     end subroutine s_circle_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a 2D NACA airfoil surface
+    !> @brief Computes the signed distance and outward normal from a ghost point to a 2D NACA airfoil surface.
     subroutine s_airfoil_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -116,12 +119,13 @@ contains
         real(wp), dimension(1:2)         :: center
         real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         integer                          :: i, j, k, ib_patch_id  !< Loop index variables
+
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
@@ -182,7 +186,8 @@ contains
 
     end subroutine s_airfoil_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a 3D extruded airfoil surface
+    !> @brief Computes the signed distance and outward normal from a ghost point to a 3D extruded airfoil surface including spanwise
+    !! end caps.
     subroutine s_3d_airfoil_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -196,14 +201,15 @@ contains
         real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         real(wp)                         :: length_z
         integer                          :: i, j, k, l, ib_patch_id            !< Loop index variables
+
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
         l = gp%loc(3)
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         lz = patch_ib(ib_patch_id)%length_z
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
@@ -296,14 +302,15 @@ contains
         integer                          :: i, j, k             !< Loop index variables
         integer                          :: idx                 !< Shortest path direction indicator
         integer                          :: ib_patch_id         !< patch ID
+
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
@@ -348,7 +355,8 @@ contains
 
     end subroutine s_rectangle_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to an elliptical immersed boundary
+    !> @brief Computes the signed distance and outward normal from a ghost point to an elliptical immersed boundary via a quadratic
+    !! projection.
     subroutine s_ellipse_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -363,14 +371,15 @@ contains
         integer                          :: i, j, k                  !< Loop index variables
         integer                          :: idx                      !< Shortest path direction indicator
         integer                          :: ib_patch_id              !< patch ID
+
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
@@ -398,7 +407,7 @@ contains
 
     end subroutine s_ellipse_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a cuboid immersed boundary
+    !> @brief Computes the signed distance and outward normal from a ghost point to the nearest face of a cuboid immersed boundary.
     subroutine s_cuboid_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -413,6 +422,7 @@ contains
         real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         integer                          :: i, j, k              !< Loop index variables
         integer                          :: ib_patch_id          !< patch ID
+
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -422,9 +432,9 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         length_z = patch_ib(ib_patch_id)%length_z
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
 
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
@@ -485,7 +495,7 @@ contains
 
     end subroutine s_cuboid_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a spherical immersed boundary
+    !> @brief Computes the signed distance and outward normal from a ghost point to a spherical immersed boundary.
     subroutine s_sphere_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -494,15 +504,16 @@ contains
         real(wp)                         :: radius, dist
         real(wp), dimension(3)           :: dist_vec, center, periodicity
         integer                          :: i, j, k, ib_patch_id  !< Loop index variables
+
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        periodicity(1) = real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        periodicity(2) = real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        periodicity(3) = real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        periodicity(1) = real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        periodicity(2) = real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        periodicity(3) = real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         center(1) = patch_ib(ib_patch_id)%x_centroid
         center(2) = patch_ib(ib_patch_id)%y_centroid
         center(3) = patch_ib(ib_patch_id)%z_centroid
@@ -521,7 +532,8 @@ contains
 
     end subroutine s_sphere_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a cylindrical immersed boundary
+    !> @brief Computes the signed distance and outward normal from a ghost point to a cylindrical immersed boundary surface and end
+    !! caps.
     subroutine s_cylinder_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -542,9 +554,9 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         length(1) = patch_ib(ib_patch_id)%length_x
         length(2) = patch_ib(ib_patch_id)%length_y
         length(3) = patch_ib(ib_patch_id)%length_z
@@ -596,6 +608,7 @@ contains
     end subroutine s_cylinder_levelset
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
+    !! @param gp Ghost point to compute levelset for
     subroutine s_model_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -618,12 +631,12 @@ contains
 
         center = 0._wp
         if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid + real(gp%x_periodicity, &
-            & wp)*(x_domain%end - x_domain%beg)
+            & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid + real(gp%y_periodicity, &
-            & wp)*(y_domain%end - y_domain%beg)
+            & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         if (p > 0) then
             if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid &
-                & + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+                & + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         end if
 
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
