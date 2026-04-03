@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 
+# Intel ifx/icx CI support
 # Developer's note:
 #  CMake has extensive documentation available online. Searching "cmake <variable>"
 #  or "cmake <function_name>" will return a cmake.org page with more information
@@ -9,7 +10,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 
-# We include C as a language because - for some reason -
+# We include C as a language because - for some reason
 # FIND_LIBRARY_USE_LIB64_PATHS is otherwise ignored.
 
 project(MFC LANGUAGES C CXX Fortran)
@@ -37,6 +38,18 @@ if (MFC_ALL)
     set(MFC_POST_PROCESS  ON FORCE)
     set(MFC_DOCUMENTATION ON FORCE)
 endif()
+
+# Validate CMAKE_BUILD_TYPE to catch typos (CMake is case-sensitive).
+set(_VALID_BUILD_TYPES "Debug" "Release" "RelDebug" "")
+if (NOT CMAKE_BUILD_TYPE IN_LIST _VALID_BUILD_TYPES)
+    message(FATAL_ERROR "Unknown CMAKE_BUILD_TYPE '${CMAKE_BUILD_TYPE}'. Valid: Debug, RelDebug, Release")
+endif()
+
+# RelDebug: a lighter debug mode for CI. Compiler-specific blocks below add the
+# actual flags; these defaults just tell CMake it is a recognised build type.
+set(CMAKE_C_FLAGS_RELDEBUG       "-g" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_RELDEBUG     "-g" CACHE STRING "")
+set(CMAKE_Fortran_FLAGS_RELDEBUG "-g" CACHE STRING "")
 
 if (MFC_SINGLE_PRECISION)
     add_compile_definitions(MFC_SINGLE_PRECISION)
@@ -83,7 +96,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         message(FATAL_ERROR "ERROR: When using NVHPC, v21.7 or newer is required to build MFC.\n${__err_msg}")
     endif()
 
-    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 24.5) AND (CMAKE_BUILD_TYPE STREQUAL "Debug") AND MFC_OpenACC)
+    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 24.5) AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug") AND MFC_OpenACC)
         message(FATAL_ERROR "ERROR: When using NVHPC, MFC with Debug and GPU options requires NVHPC v24.5 or newer.\n${__err_msg}")
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
@@ -165,18 +178,34 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -Wrealloc-lhs
             -Wsurprising
 	    )
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(
+            -Og
+            -Wall
+            -Wextra
+            -fcheck=bounds,pointer
+            -fbacktrace
+            -fimplicit-none
+            -fsignaling-nans
+            -finit-real=snan
+            -finit-integer=-99999999
+            -Wconversion
+            -Wintrinsic-shadow
+            -Wunderflow
+            -Wrealloc-lhs
+            -Wsurprising
+	    )
     endif()
 
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER 10)
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-invalid-boz>
             $<$<COMPILE_LANGUAGE:Fortran>:-fallow-argument-mismatch>
-            $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=bounds>
         )
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_compile_options(
-        "SHELL:-M 296,878,1391,1069,5025"
+        "SHELL:-M 296,878,1391,1069,990,5025,7208,7212,7242"
         "SHELL:-h static" "SHELL:-h keepfiles"
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
@@ -190,9 +219,16 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
-                "SHELL: -K trap=fp" "SHELL: -G2"
+                "SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0"
         )
-        add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
+        add_link_options("SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0")
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(
+                "SHELL:-h acc_model=auto_async_none"
+                "SHELL: -h acc_model=no_fast_addr"
+                "SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O1"
+        )
+        add_link_options("SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O1")
     endif()
 
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
@@ -201,11 +237,17 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
         $<$<COMPILE_LANGUAGE:Fortran>:-Mpreprocess>
         $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
     )
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
+    endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-g -Og -traceback -debug)
+        add_compile_options(-g -Og -traceback -debug -check all)
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(-g -Og -traceback -check bounds)
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
@@ -222,6 +264,13 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
             $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
+        )
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
+            $<$<COMPILE_LANGUAGE:Fortran>:-g>
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
     endif()
@@ -262,11 +311,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         if (MFC_Unified)
             message(STATUS "LTO/IPO is not available with NVHPC using Unified Memory")
-        elseif (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER "24.11" AND CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "25.9")
-            message(STATUS "LTO/IPO is not supported in NVHPC Version 24.11 to 25.9. Use >=25.9 or (<=24.11 && > 23.11) Performance will be degraded.")
-            set(NVHPC_USE_TWO_PASS_IPO FALSE)
-        elseif(CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "23.11")
-            message(STATUS "LTO/IPO is not supported in NVHPC Version < 23.11. Use a newer version of NVHPC for best performance.")
         else()
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
             set(NVHPC_USE_TWO_PASS_IPO TRUE)
@@ -282,7 +326,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
     add_compile_definitions(MFC_DEBUG)
 endif()
 
@@ -447,13 +491,51 @@ function(MFC_SETUP_TARGET)
     # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
     # A little hacky, but it *is* an edge-case for *one* compiler.
     if (NVHPC_USE_TWO_PASS_IPO AND NOT(MFC_OpenMP AND ARGS_OpenMP))
+        # nvfortran -Mextract does not produce .o files, only inline library
+        # data. An OBJECT library with -Mextract causes CMake to rebuild
+        # everything on every build because the expected .o outputs never
+        # exist. We use a wrapper script as RULE_LAUNCH_COMPILE that runs
+        # the compiler and then touches the expected .o output file.
+        set(_ipo_wrapper "${CMAKE_BINARY_DIR}/${ARGS_TARGET}_extract_wrapper.sh")
+        file(WRITE "${_ipo_wrapper}" [=[#!/bin/sh
+# Find the -o argument (the object file CMake expects)
+out=
+prev=
+for arg do
+  if [ "$prev" = "-o" ]; then out="$arg"; break; fi
+  prev="$arg"
+done
+# Run the compiler; propagate its exit status on failure
+"$@"
+status=$?
+[ "$status" -eq 0 ] || exit "$status"
+# Touch the .o so CMake's dependency tracking sees it
+[ -n "$out" ] && touch "$out"
+exit 0
+]=])
+        file(CHMOD "${_ipo_wrapper}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
         add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
+        set_target_properties(${ARGS_TARGET}_lib PROPERTIES
+            RULE_LAUNCH_COMPILE "${_ipo_wrapper}")
         target_compile_options(${ARGS_TARGET}_lib PRIVATE
 		    $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers)
+
+        # Exclude m_start_up and m_cbc from cross-file inlining: these are
+        # initialization/boundary code that trigger NVHPC 25.x fort2 ICE when
+        # too many functions are cross-inlined into them. GPU hot-path files
+        # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.
+        foreach(_no_inline_file m_start_up m_cbc)
+            set_source_files_properties(
+                "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
+                TARGET_DIRECTORY ${ARGS_TARGET}
+                PROPERTIES COMPILE_OPTIONS "-Mnoinline"
+            )
+        endforeach()
+
         list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
     endif()
 
@@ -596,7 +678,7 @@ function(MFC_SETUP_TARGET)
                     )
                 endif()
 
-                if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+                if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
                     target_compile_options(${a_target}
                         PRIVATE -gpu=debug
                     )
@@ -659,16 +741,13 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 IPA workaround: two files trigger IPA crashes:
+    # CCE 19.0.0 IPA workaround: disable interprocedural analysis for files
+    # that trigger compiler crashes during IPA:
     #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
     #   m_phase_change: bring_routine_resident SIGSEGV
-    # Disabling IPA per-file avoids the crashes while preserving IPA for
-    # the rest of simulation (needed for thermochem INLINEALWAYS inlining).
-    # Applied to Cray+OpenACC and Cray CPU, but NOT Cray+OpenMP: on OpenMP,
-    # m_thermochem uses !DIR$ INLINEALWAYS (requires IPA), so disabling IPA
-    # for these files breaks thermochem on-device calls. On OpenACC the
-    # pyrometheus patch emits !$acc routine seq instead (no IPA needed).
-    # See PR #1286.
+    # Not applied to Cray+OpenMP because thermochem uses !DIR$ INLINEALWAYS,
+    # which requires IPA to inline device calls. On OpenACC the pyrometheus
+    # patch emits !$acc routine seq instead (no IPA needed). See PR #1286.
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
         set_source_files_properties(
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"

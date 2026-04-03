@@ -149,7 +149,7 @@ jobs:
         continue-on-error: true
 
   github:
-    name: Github
+    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || format('Github ({0}, {1}, {2}, intel={3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel) }}
     needs: [lint-gate, file-changes, rebuild-cache]
     if: >-
       !cancelled() &&
@@ -162,8 +162,10 @@ jobs:
         os:    ['ubuntu', 'macos']
         mpi:   ['mpi']
         precision: ['']
-        debug: ['debug', 'no-debug']
+        debug: ['reldebug', 'no-debug']
         intel: [true, false]
+        nvhpc: ['']
+        target: ['']
         exclude:
           - os:    macos
             intel: true
@@ -175,11 +177,62 @@ jobs:
             debug: no-debug
             intel: false
 
+          # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
+          # Every release from 23.11 through 26.3 (current)
+          - { nvhpc: '23.11', target: cpu }
+          - { nvhpc: '23.11', target: gpu }
+          - { nvhpc: '24.1',  target: cpu }
+          - { nvhpc: '24.1',  target: gpu }
+          - { nvhpc: '24.3',  target: cpu }
+          - { nvhpc: '24.3',  target: gpu }
+          - { nvhpc: '24.5',  target: cpu }
+          - { nvhpc: '24.5',  target: gpu }
+          - { nvhpc: '24.7',  target: cpu }
+          - { nvhpc: '24.7',  target: gpu }
+          - { nvhpc: '24.9',  target: cpu }
+          - { nvhpc: '24.9',  target: gpu }
+          - { nvhpc: '24.11', target: cpu }
+          - { nvhpc: '24.11', target: gpu }
+          - { nvhpc: '25.1',  target: cpu }
+          - { nvhpc: '25.1',  target: gpu }
+          - { nvhpc: '25.3',  target: cpu }
+          - { nvhpc: '25.3',  target: gpu }
+          - { nvhpc: '25.5',  target: cpu }
+          - { nvhpc: '25.5',  target: gpu }
+          - { nvhpc: '25.7',  target: cpu }
+          - { nvhpc: '25.7',  target: gpu }
+          - { nvhpc: '25.9',  target: cpu }
+          - { nvhpc: '25.9',  target: gpu }
+          - { nvhpc: '25.11', target: cpu }
+          - { nvhpc: '25.11', target: gpu }
+          - { nvhpc: '26.1',  target: cpu }
+          - { nvhpc: '26.1',  target: gpu }
+          - { nvhpc: '26.3',  target: cpu }
+          - { nvhpc: '26.3',  target: gpu }
+
       fail-fast: false
     continue-on-error: true
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.nvhpc && 'ubuntu-22.04' || format('{0}-latest', matrix.os) }}
+    env:
+      # Image tag for NVHPC jobs; empty for non-NVHPC jobs.
+      NVHPC_IMAGE: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda_multi-ubuntu22.04', matrix.nvhpc) || '' }}
 
     steps:
+      # ── NVHPC: free disk before pulling the ~25-30 GB cuda_multi image ──
+      - name: Free disk space
+        if:   matrix.nvhpc
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android \
+            /opt/ghc /usr/local/share/boost /opt/hostedtoolcache \
+            /usr/local/graalvm /usr/local/.ghcup \
+            /usr/local/share/chromium /usr/local/lib/node_modules
+          sudo docker image prune -af
+          sudo apt-get clean
+          echo "=== Disk after cleanup ==="
+          df -h /
+
       - name: Clone
         uses: actions/checkout@v4
 
@@ -221,8 +274,69 @@ jobs:
             echo "Coverage cache: none available — full test suite will run"
           fi
 
+      # ── NVHPC: pull image and start a long-lived container ──────────────
+      # Replaces the container: directive so we can free disk space first.
+      # Uses "docker run -d ... sleep infinity" + "docker exec" to preserve
+      # installed packages and env vars across steps.
+      - name: Pull NVHPC container
+        if:   matrix.nvhpc
+        run:  docker pull "$NVHPC_IMAGE"
+
+      - name: Start NVHPC container
+        if:   matrix.nvhpc
+        run: |
+          docker run -d --name nvhpc \
+            --security-opt seccomp=unconfined \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            -e CC=nvc \
+            -e CXX=nvc++ \
+            -e FC=nvfortran \
+            -e OMPI_ALLOW_RUN_AS_ROOT=1 \
+            -e OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+            -e PMIX_MCA_gds=hash \
+            -e OMPI_MCA_hwloc_base_binding_policy=none \
+            -e "FFLAGS=-tp=px -Kieee -noswitcherror" \
+            -e CFLAGS=-tp=px \
+            -e CXXFLAGS=-tp=px \
+            "$NVHPC_IMAGE" sleep infinity
+
+      - name: Setup NVHPC
+        if:   matrix.nvhpc
+        run: |
+          docker exec nvhpc bash -c '
+            set -e
+            apt-get update -y
+            apt-get install -y cmake python3 python3-venv python3-pip \
+                               libfftw3-dev libhdf5-dev hdf5-tools git
+
+            # The repo is bind-mounted from the host so git sees a different
+            # owner.  Mark it safe to suppress "dubious ownership" errors that
+            # otherwise spam 80 000+ lines into the CI log.
+            git config --global --add safe.directory /workspace
+
+            # Set up NVHPC HPC-X MPI runtime paths
+            HPCX_DIR=$(dirname "$(find /opt/nvidia/hpc_sdk -path "*/hpcx/hpcx-*/ompi/bin/mpirun" | head -1)")/../..
+            MPI_LIB=$(mpifort --showme:link | grep -oP "(?<=-L)\S+" | head -1)
+
+            # Persist env vars for subsequent docker exec calls
+            cat > /etc/nvhpc-env.sh <<EOF
+          export LD_LIBRARY_PATH=${MPI_LIB}:${HPCX_DIR}/ucx/lib:${HPCX_DIR}/ucc/lib:\$LD_LIBRARY_PATH
+          export OMPI_MCA_rmaps_base_oversubscribe=1
+          EOF
+
+            # Debug: confirm compiler flags are set
+            echo "=== NVHPC Environment ==="
+            echo "FFLAGS=$FFLAGS"
+            echo "CFLAGS=$CFLAGS"
+            echo "CXXFLAGS=$CXXFLAGS"
+            nvfortran --version
+            cat /proc/cpuinfo | grep "model name" | head -1
+          '
+
+      # ── Standard (non-NVHPC) setup ─────────────────────────────────────
       - name: Setup MacOS
-        if:   matrix.os == 'macos'
+        if:   matrix.os == 'macos' && !matrix.nvhpc
         run:  |
           brew update
           brew upgrade || true
@@ -231,7 +345,7 @@ jobs:
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
       - name: Setup Ubuntu
-        if:   matrix.os == 'ubuntu' && matrix.intel == false
+        if:   matrix.os == 'ubuntu' && matrix.intel == false && !matrix.nvhpc
         run: |
            sudo apt update -y
            sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
@@ -245,7 +359,7 @@ jobs:
           sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
           sudo apt-get update
-          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
+          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mpi intel-oneapi-mpi-devel
           # Export only new/changed env vars from setvars.sh.
           # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
           # with special characters that corrupt GITHUB_ENV parsing.
@@ -253,8 +367,16 @@ jobs:
           source /opt/intel/oneapi/setvars.sh
           printenv | sort > /tmp/env_after
           diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
+          echo "FC=ifx" >> $GITHUB_ENV
+          echo "CC=icx" >> $GITHUB_ENV
+          echo "CXX=icpx" >> $GITHUB_ENV
+          echo "MPIFC=mpiifx" >> $GITHUB_ENV
+          echo "MPICC=mpiicx" >> $GITHUB_ENV
+          echo "MPICXX=mpiicpx" >> $GITHUB_ENV
 
+      # ── Standard build + test ───────────────────────────────────────────
       - name: Build
+        if:   '!matrix.nvhpc'
         run:  |
           /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
@@ -262,12 +384,45 @@ jobs:
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
+        if:   '!matrix.nvhpc'
         run:  |
           /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $ONLY_CHANGES $TEST_ALL $TEST_PCT
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
           ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
+
+      # ── NVHPC build + test (via docker exec into long-lived container) ──
+      - name: Build (NVHPC)
+        if:   matrix.nvhpc && matrix.target == 'cpu'
+        run: |
+          docker exec nvhpc bash -c '
+            source /etc/nvhpc-env.sh
+            /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all
+          '
+
+      - name: Build (NVHPC GPU)
+        if:   matrix.nvhpc && matrix.target == 'gpu'
+        run: |
+          docker exec nvhpc bash -c '
+            source /etc/nvhpc-env.sh
+            /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu acc
+            /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu mp
+          '
+
+      - name: Test (NVHPC)
+        if:   matrix.nvhpc && matrix.target == 'cpu'
+        run: |
+          docker exec nvhpc bash -c '
+            source /etc/nvhpc-env.sh
+            ulimit -s unlimited || ulimit -s 65536 || true
+            /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
+          '
+
+      # ── Cleanup ─────────────────────────────────────────────────────────
+      - name: Stop NVHPC container
+        if:   always() && matrix.nvhpc
+        run:  docker rm -f nvhpc || true
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
@@ -400,10 +555,13 @@ jobs:
             echo "Coverage cache: none available — full test suite will run"
           fi
 
-      - name: Build (login node)
+      - name: Fetch Dependencies
         if:   matrix.cluster != 'phoenix'
         timeout-minutes: 60
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Build
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
       - name: Test
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
@@ -421,23 +579,29 @@ jobs:
         if:   always()
         id:   log
         run:  |
-          SLUG="test-${{ matrix.device }}-${{ matrix.interface }}"
+          SHARD_SUFFIX=""
           SHARD="${{ matrix.shard }}"
           if [ -n "$SHARD" ]; then
-            SLUG="${SLUG}-$(echo "$SHARD" | sed 's|/|-of-|')"
+            SHARD_SUFFIX="-$(echo "$SHARD" | sed 's|/|-of-|')"
           fi
-          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
+          echo "build_slug=build-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
+          echo "test_slug=test-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Print Logs
         if:   always()
-        run:  cat ${{ steps.log.outputs.slug }}.out
+        run:  |
+          for f in ${{ steps.log.outputs.build_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
+            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          done
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   matrix.cluster != 'phoenix'
         with:
-          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
-          path: ${{ steps.log.outputs.slug }}.out
+          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
+          path: |
+            ${{ steps.log.outputs.build_slug }}.out
+            ${{ steps.log.outputs.test_slug }}.out
 
   case-optimization:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
@@ -486,15 +650,20 @@ jobs:
       - name: Clean stale output files
         run:  rm -f *.out
 
+      - name: Fetch Dependencies
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh cpu ${{ matrix.interface }} ${{ matrix.cluster }}
 
-      - name: Pre-Build (login node)
+      - name: Build & Run Case-Optimization Tests
         if:   matrix.cluster != 'phoenix'
-        run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Run Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Cancel SLURM Jobs
