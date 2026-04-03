@@ -31,6 +31,7 @@ module m_start_up
     use m_viscous
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL  !< Lagrange particle dynamics routines
     use ieee_arithmetic
     use m_helper_basic
     use m_helper
@@ -59,6 +60,7 @@ module m_start_up
 contains
 
     !> Read data files. Dispatch subroutine that replaces procedure pointer.
+    !! @param q_cons_vf Conservative variables
     impure subroutine s_read_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -71,15 +73,19 @@ contains
 
     end subroutine s_read_data_files
 
-    !> Verify the input file exists and read it
+    !> The purpose of this procedure is to first verify that an input file has been made available by the user. Provided that this
+    !! is so, the input file is then read in.
     impure subroutine s_read_input_file
 
+        ! Relative path to the input file provided by the user
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
         logical                            :: file_exist  !< Logical used to check the existence of the input file
         integer                            :: iostatus
-        ! Integer to check iostat of file read
+        !! Integer to check iostat of file read
 
         character(len=1000) :: line
+
+        ! Namelist of the global parameters which may be specified by user
 
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
@@ -87,8 +93,6 @@ contains
             rdma_mpi, teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
-            x_a, y_a, z_a, x_b, y_b, z_b, &
-            x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
             ib_state_wrt, &
@@ -110,8 +114,11 @@ contains
             & g_y, g_z, n_start, t_save, t_stop, cfl_adap_dt, cfl_const_dt, cfl_target, surface_tension, bubbles_lagrange, &
             & lag_params, hyperelasticity, R0ref, num_bc_patches, Bx0, cont_damage, tau_star, cont_damage_s, alpha_bar, &
             & hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, alf_factor, num_igr_iters, num_igr_warm_start_iters, &
-            & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
+            & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, &
+            & particles_lagrange, particle_pp
 
+        ! Checking that an input file has been provided by the user. If it has, then the input file is read in, otherwise,
+        ! simulation exits.
         inquire (FILE=trim(file_path), EXIST=file_exist)
 
         if (file_exist) then
@@ -131,6 +138,7 @@ contains
                 bodyForces = .true.
             end if
 
+            ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
             p_glb = p
@@ -139,20 +147,30 @@ contains
 
             if (cfl_adap_dt .or. cfl_const_dt) cfl_dt = .true.
 
-            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. num_bc_patches > 0) then
+            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_DIRICHLET) .or. num_bc_patches > 0) then
                 bc_io = .true.
             end if
+
+            if (bc_x%beg == BC_PERIODIC .and. bc_x%end == BC_PERIODIC) periodic_bc(1) = .true.
+            if (bc_y%beg == BC_PERIODIC .and. bc_y%end == BC_PERIODIC) periodic_bc(2) = .true.
+            if (bc_z%beg == BC_PERIODIC .and. bc_z%end == BC_PERIODIC) periodic_bc(3) = .true.
         else
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
 
     end subroutine s_read_input_file
 
-    !> Validate that all user-provided inputs form a consistent simulation configuration
+    !> The goal of this procedure is to verify that each of the user provided inputs is valid and that their combination constitutes
+    !! a meaningful configuration for the simulation.
     impure subroutine s_check_input_file
 
+        ! Relative path to the current directory file in the case directory
         character(LEN=path_len) :: file_path
-        logical                 :: file_exist
+
+        ! Logical used to check the existence of the current directory file
+        logical :: file_exist
+
+        ! Logistics
 
         file_path = trim(case_dir) // '/.'
 
@@ -167,14 +185,20 @@ contains
 
     end subroutine s_check_input_file
 
-    !> Read serial initial condition and grid data files and compute cell-width distributions
+    !> @brief Reads serial initial condition and grid data files and computes cell-width distributions.
+    !! @param q_cons_vf Cell-averaged conservative variables
     impure subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the starting time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
         logical :: file_exist
+        ! Logical used to check the existence of the data files
+
         integer :: i, r
+
+        ! Confirming that the directory from which the initial condition and the grid data files are to be read in exists and
+        ! exiting otherwise
 
         if (cfl_dt) then
             write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all/p', proc_rank, '/', n_start
@@ -195,6 +219,7 @@ contains
             call s_assign_default_bc_type(bc_type)
         end if
 
+        ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -218,6 +243,7 @@ contains
             end do
         end if
 
+        ! Cell-boundary Locations in y-direction
         if (n > 0) then
             file_path = trim(t_step_dir) // '/y_cb.dat'
 
@@ -234,6 +260,7 @@ contains
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
         end if
 
+        ! Cell-boundary Locations in z-direction
         if (p > 0) then
             file_path = trim(t_step_dir) // '/z_cb.dat'
 
@@ -293,7 +320,8 @@ contains
 
     end subroutine s_read_serial_data_files
 
-    !> Read parallel initial condition and grid data files via MPI I/O
+    !> @brief Reads parallel initial condition and grid data files via MPI I/O.
+    !! @param q_cons_vf Conservative variables
     impure subroutine s_read_parallel_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -321,6 +349,7 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
+        ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -343,8 +372,11 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
+        ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
+        ! Computing the cell width distribution
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
+        ! Computing the cell center locations
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (ib) then
@@ -358,6 +390,7 @@ contains
         end if
 
         if (n > 0) then
+            ! Read in cell boundary locations in y-direction
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -370,11 +403,15 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
+            ! Assigning local cell boundary locations
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
+            ! Computing the cell width distribution
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
+            ! Computing the cell center locations
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
+                ! Read in cell boundary locations in z-direction
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
                 inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -387,8 +424,11 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // 'is missing. Exiting.')
                 end if
 
+                ! Assigning local cell boundary locations
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
+                ! Computing the cell width distribution
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
+                ! Computing the cell center locations
                 z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
             end if
         end if
@@ -407,6 +447,7 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
+                ! Initialize MPI data I/O
                 if (down_sample) then
                     call s_initialize_mpi_data_ds(q_cons_vf)
                 else
@@ -418,17 +459,20 @@ contains
                 end if
 
                 if (down_sample) then
+                    ! Size of local arrays
                     data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
                     m_glb_read = m_glb_ds + 1
                     n_glb_read = n_glb_ds + 1
                     p_glb_read = p_glb_ds + 1
                 else
+                    ! Size of local arrays
                     data_size = (m + 1)*(n + 1)*(p + 1)
                     m_glb_read = m_glb + 1
                     n_glb_read = n_glb + 1
                     p_glb_read = p_glb + 1
                 end if
 
+                ! Resize some integers so MPI can read even the biggest file
                 m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
@@ -437,6 +481,7 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
+                ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size  ! adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -474,6 +519,7 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
         else
+            ! Open the file to read conservative variables
             if (cfl_dt) then
                 write (file_loc, '(I0,A)') n_start, '.dat'
             else
@@ -485,14 +531,18 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
+                ! Initialize MPI data I/O
+
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers)
                 else
                     call s_initialize_mpi_data(q_cons_vf)
                 end if
 
+                ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
 
+                ! Resize some integers so MPI can read even the biggest file
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -501,9 +551,11 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
+                ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size  ! adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
+                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -513,6 +565,7 @@ contains
                     if (qbmm .and. .not. polytropic) then
                         do i = sys_size + 1, sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
+                            ! Initial displacement to skip at beginning of file
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -523,6 +576,7 @@ contains
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
+                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -549,7 +603,9 @@ contains
 
     end subroutine s_read_parallel_data_files
 
-    !> Initialize internal-energy equations from phase mass, mixture momentum, and total energy
+    !> The purpose of this procedure is to initialize the values of the internal-energy equations of each phase from the mass of
+    !! each phase, the mixture momentum and mixture-total-energy equations.
+    !! @param v_vf conservative variables
     subroutine s_initialize_internal_energy_equations(v_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
@@ -606,7 +662,7 @@ contains
 
     end subroutine s_initialize_internal_energy_equations
 
-    !> Advance the simulation by one time step, handling CFL-based dt and time-stepper dispatch
+    !> @brief Advances the simulation by one time step, handling CFL-based dt and time-stepper dispatch.
     impure subroutine s_perform_time_step(t_step, time_avg)
 
         integer, intent(inout)  :: t_step
@@ -672,9 +728,8 @@ contains
 
     end subroutine s_perform_time_step
 
-    !> Collect per-process wall-clock times and write aggregate performance metrics to file
+    !> @brief Collects per-process wall-clock times and writes aggregate performance metrics to file.
     impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
-
         & file_exists)
 
         real(wp), intent(inout)               :: time_avg, time_final
@@ -733,7 +788,7 @@ contains
 
     end subroutine s_save_performance_metrics
 
-    !> Save conservative variable data to disk at the current time step
+    !> @brief Saves conservative variable data to disk at the current time step.
     impure subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
 
         integer, intent(inout)  :: t_step
@@ -796,7 +851,7 @@ contains
         if (bubbles_lagrange) then
             $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
                          & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
-            do i = 1, nBubs
+            do i = 1, n_el_bubs_loc
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
                 end if
@@ -807,6 +862,20 @@ contains
             $:GPU_UPDATE(host='[Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel]')
             call s_write_restart_lag_bubbles(save_count)  ! parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+        else if (particles_lagrange) then
+            $:GPU_UPDATE(host='[lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, particle_R0, &
+                         & Rmax_stats_part, Rmin_stats_part, particle_mass]')
+            do i = 1, n_el_particles_loc
+                if (ieee_is_nan(particle_rad(i, 1)) .or. particle_rad(i, 1) <= 0._wp) then
+                    call s_mpi_abort("Particle radius is negative or NaN, please reduce dt.")
+                end if
+            end do
+
+            $:GPU_UPDATE(host='[q_particles(1)%sf]')
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(1))
+            $:GPU_UPDATE(host='[Rmax_stats_part, Rmin_stats_part]')
+            call s_write_restart_lag_particles(save_count)  ! parallel
+            if (lag_params%write_bubbles_stats) call s_write_lag_particle_stats()
         else
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
@@ -827,7 +896,7 @@ contains
 
     end subroutine s_save_data
 
-    !> Initialize all simulation sub-modules in the required dependency order
+    !> @brief Initializes all simulation sub-modules in the required dependency order.
     impure subroutine s_initialize_modules
 
         integer  :: m_ds, n_ds, p_ds
@@ -848,6 +917,11 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
+
+        if (particles_lagrange) then
+            call s_initialize_particles_model()
+        end if
+
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
@@ -888,6 +962,7 @@ contains
             end do
         end if
 
+        ! Reading in the user provided initial condition and grid data
         if (down_sample) then
             call s_read_data_files(q_cons_temp)
             call s_upsample_data(q_cons_ts(1)%vf, q_cons_temp)
@@ -902,6 +977,7 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
+        ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
@@ -931,14 +1007,16 @@ contains
         end if
 
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
+
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
+        if (particles_lagrange) call s_initialize_particles_EL_module(q_cons_ts(1)%vf, bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_modules
 
-    !> Set up the MPI execution environment, bind GPUs, and decompose the computational domain
+    !> @brief Sets up the MPI execution environment, binds GPUs, and decomposes the computational domain.
     impure subroutine s_initialize_mpi_domain
 
         integer :: ierr
@@ -955,8 +1033,11 @@ contains
 #endif
 #endif
 
+        ! Initializing MPI execution environment
+
         call s_mpi_initialize()
 
+        ! Bind GPUs if OpenACC is enabled
 #ifdef MFC_GPU
 #ifndef MFC_MPI
         local_size = 1
@@ -979,6 +1060,9 @@ contains
 #endif
 #endif
 
+        ! The rank 0 processor assigns default values to the user inputs prior to reading them in from the input file. Next, the
+        ! user inputs are read and their consistency is checked. The identification of any inconsistencies will result in the
+        ! termination of the simulation.
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
@@ -1000,6 +1084,9 @@ contains
 #endif
         end if
 
+        ! Broadcasting the user inputs to all of the processors and performing the parallel computational domain decomposition.
+        ! Neither procedure has to be carried out if the simulation is in fact not truly executed in parallel.
+
         call s_mpi_bcast_user_inputs()
 
         call s_initialize_parallel_io()
@@ -1008,10 +1095,11 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    !> Transfer initial conservative variable and model parameter data to the GPU device
+    !> @brief Transfers initial conservative variable and model parameter data to the GPU device.
     subroutine s_initialize_gpu_vars
 
         integer :: i
+        ! Update GPU DATA
 
         if (.not. down_sample) then
             do i = 1, sys_size
@@ -1052,6 +1140,10 @@ contains
         $:GPU_UPDATE(device='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
 
+        $:GPU_UPDATE(device='[bc_x%beg, bc_x%end]')
+        $:GPU_UPDATE(device='[bc_y%beg, bc_y%end]')
+        $:GPU_UPDATE(device='[bc_z%beg, bc_z%end]')
+
         $:GPU_UPDATE(device='[bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
@@ -1078,7 +1170,7 @@ contains
 
     end subroutine s_initialize_gpu_vars
 
-    !> Finalize and deallocate all simulation sub-modules in reverse initialization order
+    !> @brief Finalizes and deallocates all simulation sub-modules in reverse initialization order.
     impure subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()
@@ -1105,6 +1197,7 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
+        if (particles_lagrange) call s_finalize_particle_lagrangian_solver()
         if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if
@@ -1113,6 +1206,7 @@ contains
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
+        ! Terminating MPI execution environment
         call s_mpi_finalize()
 
     end subroutine s_finalize_modules

@@ -27,7 +27,7 @@ module m_bubbles_EE
 
 contains
 
-    !> Initialize the Euler-Euler bubble module
+    !> @brief Allocates and initializes arrays for the Euler-Euler bubble model.
     impure subroutine s_initialize_bubbles_EE_module
 
         integer :: l
@@ -65,7 +65,8 @@ contains
 
     end subroutine s_initialize_bubbles_EE_module
 
-    !> Compute the bubble volume fraction alpha from the bubble number density
+    !> @brief Computes the bubble volume fraction alpha from the bubble number density.
+    !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -90,6 +91,8 @@ contains
     end subroutine s_comp_alpha_from_n
 
     !> Compute the right-hand side for Euler-Euler bubble transport
+    !! @param idir Direction index
+    !! @param q_prim_vf Primitive variables
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in)                                 :: idir
@@ -137,7 +140,10 @@ contains
 
     end subroutine s_compute_bubbles_EE_rhs
 
-    !> Compute the Euler-Euler bubble source terms
+    !> The purpose of this procedure is to compute the source terms that are needed for the bubble modeling
+    !! @param q_prim_vf Primitive variables
+    !! @param q_cons_vf Conservative variables
+    !! @param rhs_vf Right-hand side variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -159,7 +165,7 @@ contains
         real(wp) :: nbub                            !< Bubble number density
         real(wp) :: my_divu
         integer  :: i, j, k, l, q, ii               !< Loop variables
-        integer  :: adap_dt_stop_max, adap_dt_stop  !< Fail-safe exit if max iteration count reached
+        integer  :: adap_dt_stop_sum, adap_dt_stop  !< Fail-safe exit if max iteration count reached
         integer  :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
@@ -181,10 +187,10 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        adap_dt_stop_max = 0
+        adap_dt_stop_sum = 0
         $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
-                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu]', collapse=3, &
-                            & reduction = '[[adap_dt_stop_max]]', reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
+                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu, &
+                                & adap_dt_stop]', collapse=3, copy='[adap_dt_stop_sum]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -272,24 +278,25 @@ contains
                                 pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
                             end if
 
+                            adap_dt_stop = 0
+
                             ! Adaptive time stepping
                             if (adap_dt) then
-                                adap_dt_stop = 0
-
-                                call s_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, &
-                                                    & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, dmMass_n, &
-                                                    & dmBeta_c, dmBeta_t, dmCson, adap_dt_stop)
+                                adap_dt_stop = f_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, &
+                                                              & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, &
+                                                              & dmMass_n, dmBeta_c, dmBeta_t, dmCson)
 
                                 q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                                 q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
-                                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
                             else
                                 rddot = f_rddot(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, bub_adv_src(j, &
                                                 & k, l), divu_in%sf(j, k, l), dmCson)
                                 bub_v_src(j, k, l, q) = nbub*rddot
                                 bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                             end if
+
+                            $:GPU_ATOMIC(atomic='update')
+                            adap_dt_stop_sum = adap_dt_stop_sum + adap_dt_stop
                         end if
                     end do
                 end do
@@ -297,7 +304,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
+        if (adap_dt .and. adap_dt_stop_sum > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
             $:GPU_PARALLEL_LOOP(private='[i, k, l, q]', collapse=3)

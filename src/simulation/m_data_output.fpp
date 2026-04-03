@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_data_output
+!! Contains module m_data_output
 
 #:include 'macros.fpp'
 #:include 'case.fpp'
@@ -30,19 +30,8 @@ module m_data_output
         & s_finalize_data_output_module
 
     integer                                       :: ib_state_unit = -1  !< I/O unit for IB state binary file
-    real(wp), allocatable, dimension(:,:,:)       :: icfl_sf             !< ICFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: vcfl_sf             !< VCFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: ccfl_sf             !< CCFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: Rc_sf               !< Rc stability criterion
     real(wp), public, allocatable, dimension(:,:) :: c_mass
-    $:GPU_DECLARE(create='[icfl_sf, vcfl_sf, ccfl_sf, Rc_sf, c_mass]')
-
-    real(wp) :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
-    real(wp) :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
-    real(wp) :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
-    real(wp) :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
-    $:GPU_DECLARE(create='[icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb]')
-    $:GPU_DECLARE(create='[ccfl_max_loc, ccfl_max_glb, Rc_min_loc, Rc_min_glb]')
+    $:GPU_DECLARE(create='[c_mass]')
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -57,6 +46,12 @@ module m_data_output
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
+    !! @param q_cons_vf Conservative variables
+    !! @param q_T_sf Temperature scalar field
+    !! @param q_prim_vf Primitive variables
+    !! @param t_step Current time step
+    !! @param bc_type Boundary condition type
+    !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
@@ -74,12 +69,14 @@ contains
 
     end subroutine s_write_data_files
 
-    !> Open the run-time information file and write the stability criteria table header
+    !> Open the run-time information file and write the stability criteria table header.
     impure subroutine s_open_run_time_information_file
 
         character(LEN=name_len), parameter :: file_name = 'run_time.inf'  !< Name of the run-time information file
         character(LEN=path_len + name_len) :: file_path                   !< Relative path to a file in the case directory
         character(LEN=8)                   :: file_date                   !< Creation date of the run-time information file
+
+        ! Opening the run-time information file
 
         file_path = trim(case_dir) // '/' // trim(file_name)
 
@@ -98,25 +95,32 @@ contains
 
         write (3, '(A)') ''; write (3, '(A)') ''
 
+        ! Generating table header for the stability criteria to be outputted
         write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
 
         if (viscous) then
             write (3, '(13X,A10,13X,A16)', advance="no") trim('VCFL Max'), trim('Rc Min')
         end if
 
+        if (bubbles_lagrange) then
+            write (3, '(13X,A10)', advance="no") trim('N Bubbles')
+        end if
+
         write (3, *)  ! new line
 
     end subroutine s_open_run_time_information_file
 
-    !> Open center-of-mass data files for writing
+    !> This opens a formatted data file where the root processor can write out the CoM information
     impure subroutine s_open_com_files()
 
         character(len=path_len + 3*name_len) :: file_path  !< Relative path to the CoM file in the case directory
         integer                              :: i          !< Generic loop iterator
 
         do i = 1, num_fluids
+            ! Generating the relative path to the CoM data file
             write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
             file_path = trim(case_dir) // trim(file_path)
+            ! Creating the formatted data file and setting up its structure
             open (i + 120, file=trim(file_path), form='formatted', position='append', status='unknown')
             if (n == 0) then
                 write (i + 120, '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    Total Volume    '
@@ -133,7 +137,7 @@ contains
 
     end subroutine s_open_com_files
 
-    !> Open flow probe data files for writing
+    !> This opens a formatted data file where the root processor can write out flow probe information
     impure subroutine s_open_probe_files
 
         character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the probe data file in the case directory
@@ -141,9 +145,11 @@ contains
         logical                              :: file_exist
 
         do i = 1, num_probes
+            ! Generating the relative path to the data file
             write (file_path, '(A,I0,A)') '/D/probe', i, '_prim.dat'
             file_path = trim(case_dir) // trim(file_path)
 
+            ! Creating the formatted data file and setting up its structure
             inquire (file=trim(file_path), exist=file_exist)
 
             if (file_exist) then
@@ -164,7 +170,6 @@ contains
 
     end subroutine s_open_probe_files
 
-    !> Open the immersed boundary state file for binary output
     impure subroutine s_open_ib_state_file
 
         character(len=path_len + 2*name_len) :: file_loc
@@ -177,7 +182,7 @@ contains
 
     end subroutine s_open_ib_state_file
 
-    !> Write stability criteria extrema to the run-time information file at the given time step
+    !> Write stability criteria extrema to the run-time information file and track them over all time-steps.
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -191,19 +196,27 @@ contains
             real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
             real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
         #:endif
-        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)               :: pres     !< Cell-avg. pressure
-        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv       !< Cell-avg. internal energy reference value
-        real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp)               :: H        !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum                     !< Cell-avg. velocity sum
+        real(wp)               :: pres                        !< Cell-avg. pressure
+        real(wp)               :: gamma                       !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf                      !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                          !< Cell-avg. internal energy reference value
+        real(wp)               :: c                           !< Cell-avg. sound speed
+        real(wp)               :: H                           !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re                          !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
+        real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
+        real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
+        real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
+        real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
+        real(wp)               :: icfl, vcfl, Rc
 
+        icfl_max_loc = 0._wp
+        vcfl_max_loc = 0._wp
+        Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
-
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
+                            & vcfl, Rc]', reduction='[[icfl_max_loc, vcfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -212,49 +225,32 @@ contains
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
 
                     if (viscous) then
-                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc)
                     else
-                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl)
                     end if
+
+                    icfl_max_loc = max(icfl_max_loc, icfl)
+                    vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
+                    Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        ! end: Computing Stability Criteria at Current Time-step
 
-#ifdef _CRAYFTN
-        $:GPU_UPDATE(host='[icfl_sf]')
-
-        if (viscous) then
-            $:GPU_UPDATE(host='[vcfl_sf, Rc_sf]')
-        end if
-
-        icfl_max_loc = maxval(icfl_sf)
-
-        if (viscous) then
-            vcfl_max_loc = maxval(vcfl_sf)
-            Rc_min_loc = minval(Rc_sf)
-        end if
-#else
-        #:call GPU_PARALLEL(copyout='[icfl_max_loc]', copyin='[icfl_sf]')
-            icfl_max_loc = maxval(icfl_sf)
-        #:endcall GPU_PARALLEL
-        if (viscous .or. dummy) then
-            #:call GPU_PARALLEL(copyout='[vcfl_max_loc, Rc_min_loc]', copyin='[vcfl_sf,Rc_sf]')
-                vcfl_max_loc = maxval(vcfl_sf)
-                Rc_min_loc = minval(Rc_sf)
-            #:endcall GPU_PARALLEL
-        end if
-#endif
-
+        ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
-            call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
-                & Rc_min_glb)
+            call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, n_el_bubs_loc, icfl_max_glb, &
+                & vcfl_max_glb, Rc_min_glb, n_el_bubs_glb)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
+            if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
+        ! Determining the stability criteria extrema over all the time-steps
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
         if (viscous) then
@@ -262,11 +258,16 @@ contains
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
         end if
 
+        ! Outputting global stability criteria extrema at current time-step
         if (proc_rank == 0) then
             write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
 
             if (viscous) then
                 write (3, '(13X,F10.6,13X,ES16.6)', advance="no") vcfl_max_glb, Rc_min_glb
+            end if
+
+            if (bubbles_lagrange) then
+                write (3, '(13X,I10)', advance="no") n_el_bubs_glb
             end if
 
             write (3, *)  ! new line
@@ -286,13 +287,19 @@ contains
                     call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
                 end if
             end if
+
+            if (bubbles_lagrange) then
+                if (n_el_bubs_glb == 0) then
+                    call s_mpi_abort('No Lagrangian bubbles remain in the domain. Exiting.')
+                end if
+            end if
         end if
 
         call s_mpi_barrier()
 
     end subroutine s_write_run_time_information
 
-    !> Write grid and conservative variable data files in serial format
+    !> Output the grid and conservative variables data files for the given time-step (serial).
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -308,7 +315,10 @@ contains
         integer :: i, j, k, l, r
         real(wp) :: gamma, lit_gamma, pi_inf, qv            !< Temporary EOS params
 
+        ! Creating or overwriting the time-step root directory
+
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
+
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step
 
         file_path = trim(t_step_dir) // '/.'
@@ -316,11 +326,13 @@ contains
         if (file_exist) call s_delete_directory(trim(t_step_dir))
         call s_create_directory(trim(t_step_dir))
 
+        ! Writing the grid data file in the x-direction
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
         open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
         write (2) x_cb(-1:m); close (2)
 
+        ! Writing the grid data files in the y- and z-directions
         if (n > 0) then
             file_path = trim(t_step_dir) // '/y_cb.dat'
 
@@ -335,6 +347,7 @@ contains
             end if
         end if
 
+        ! Writing the conservative variables data files
         do i = 1, sys_size
             write (file_path, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', i, '.dat'
 
@@ -378,6 +391,11 @@ contains
         ! Writing the IB markers
         if (ib) then
             call s_write_serial_ib_data(t_step)
+            ! write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
+
+            ! open (2, FILE=trim(file_path), & FORM='unformatted', & STATUS='new')
+
+            ! write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
         end if
 
         gamma = gammas(1)
@@ -391,6 +409,7 @@ contains
             FMT = "(2F40.14)"
         end if
 
+        ! writing an output directory
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/D'
         file_path = trim(t_step_dir) // '/.'
 
@@ -409,6 +428,7 @@ contains
             end if
         end if
 
+        ! 1D
         if (n == 0 .and. p == 0) then
             if (model_eqns == 2 .and. (.not. igr)) then
                 do i = 1, sys_size
@@ -471,6 +491,7 @@ contains
             FMT = "(3F40.14)"
         end if
 
+        ! 2D
         if ((n > 0) .and. (p == 0)) then
             do i = 1, sys_size
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step, '.dat'
@@ -555,6 +576,7 @@ contains
             FMT = "(4F40.14)"
         end if
 
+        ! 3D
         if (p > 0) then
             do i = 1, sys_size
                 write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/cons.', i, '.', proc_rank, '.', t_step, '.dat'
@@ -648,7 +670,7 @@ contains
 
     end subroutine s_write_serial_data_files
 
-    !> Write grid and conservative variable data files in parallel via MPI I/O
+    !> Output the grid and conservative variables data files for the given time-step (parallel).
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
@@ -669,6 +691,7 @@ contains
         character(len=10)                    :: t_step_string
         integer                              :: i        !< Generic loop iterator
         integer                              :: alt_sys  !< Altered system size for the lagrangian subgrid bubble model
+
         ! Down sampling variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
@@ -687,6 +710,7 @@ contains
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
 
+            ! Initialize MPI data I/O
             if (down_sample) then
                 call s_initialize_mpi_data_ds(q_cons_temp_ds)
             else
@@ -708,8 +732,10 @@ contains
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
 
+            ! Initialize MPI data I/O
             call s_initialize_mpi_data(q_cons_vf)
 
+            ! Open the file to write all flow variables
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -719,17 +745,20 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
             if (down_sample) then
+                ! Size of local arrays
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
                 m_glb_save = m_glb_ds + 1
                 n_glb_save = n_glb_ds + 1
                 p_glb_save = p_glb_ds + 1
             else
+                ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
                 m_glb_save = m_glb + 1
                 n_glb_save = n_glb + 1
                 p_glb_save = p_glb + 1
             end if
 
+            ! Resize some integers so MPI can write even the biggest files
             m_MOK = int(m_glb_save + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb_save + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb_save + 1, MPI_OFFSET_KIND)
@@ -739,11 +768,13 @@ contains
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             if (bubbles_euler) then
+                ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
+                ! Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -769,6 +800,8 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         else
+            ! Initialize MPI data I/O
+
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers)
             else if (present(beta)) then
@@ -785,8 +818,10 @@ contains
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
+            ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
 
+            ! Resize some integers so MPI can write even the biggest files
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -796,18 +831,22 @@ contains
             NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
             if (bubbles_euler) then
+                ! Write the data for each variable
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
+                    ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
+                ! Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
+                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -818,6 +857,7 @@ contains
                 do i = 1, sys_size  ! TODO: check if sys_size is correct
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
+                    ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
@@ -825,9 +865,11 @@ contains
                 end do
             end if
 
+            ! Correction for the lagrangian subgrid bubble model
             if (present(beta)) then
                 var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
 
+                ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                 call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), 'native', mpi_info_int, ierr)
@@ -836,20 +878,32 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
+            ! Write ib data
             if (ib) then
                 call s_write_parallel_ib_data(t_step)
+                ! write (file_loc, '(A)') 'ib.dat' file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc) call
+                ! MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), & mpi_info_int, ifile, ierr)
+
+                ! var_MOK = int(sys_size + 1, MPI_OFFSET_KIND) disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 +
+                ! int(t_step/t_step_save))
+
+                ! call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, & 'native', mpi_info_int, ierr) call
+                ! MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, & MPI_INTEGER, status, ierr) call
+                ! MPI_FILE_CLOSE(ifile, ierr)
             end if
         end if
 #endif
 
     end subroutine s_write_parallel_data_files
 
-    !> Write immersed boundary marker data to a serial (per-processor) unformatted file
+    !> Writes immersed boundary marker data to a serial (per-processor) unformatted file.
     subroutine s_write_serial_ib_data(time_step)
 
         integer, intent(in)                  :: time_step
         character(LEN=path_len + 2*name_len) :: file_path
         character(LEN=path_len + 2*name_len) :: t_step_dir
+
+        ! Creating or overwriting the time-step root directory
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', time_step
@@ -862,7 +916,7 @@ contains
 
     end subroutine s_write_serial_ib_data
 
-    !> Write immersed boundary marker data in parallel using MPI I/O
+    !> Writes immersed boundary marker data in parallel using MPI I/O.
     subroutine s_write_parallel_ib_data(time_step)
 
         integer, intent(in) :: time_step
@@ -877,6 +931,7 @@ contains
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
+        ! Size of local arrays
         data_size = (m + 1)*(n + 1)*(p + 1)
         m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
         n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
@@ -899,7 +954,7 @@ contains
 
     end subroutine s_write_parallel_ib_data
 
-    !> Dispatch immersed boundary data output to the serial or parallel writer
+    !> Dispatches immersed boundary data output to the serial or parallel writer.
     subroutine s_write_ib_data_file(time_step)
 
         integer, intent(in) :: time_step
@@ -912,7 +967,7 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> Write IB state records to D/ib_state.dat (rank 0 only)
+    !> Writes IB state records to D/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file()
 
         integer :: i
@@ -924,13 +979,15 @@ contains
 
     end subroutine s_write_ib_state_file
 
-    !> Write center-of-mass data at the current time step
+    !> Write center-of-mass data to formatted file (root processor only).
     impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in)                            :: t_step
         real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
         integer                                        :: i            !< Generic loop iterator
         real(wp)                                       :: nondim_time  !< Non-dimensional time
+
+        ! Non-dimensional time calculation
 
         if (t_step_old /= dflt_int) then
             nondim_time = real(t_step + t_step_old, wp)*dt
@@ -957,7 +1014,7 @@ contains
 
     end subroutine s_write_com_files
 
-    !> Write flow probe data at the current time step
+    !> Write flow probe data to formatted files.
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in)                                 :: t_step
@@ -966,44 +1023,42 @@ contains
         real(wp), dimension(-1:m)                           :: distx
         real(wp), dimension(-1:n)                           :: disty
         real(wp), dimension(-1:p)                           :: distz
-
-        ! The cell-averaged partial densities, density, velocity, pressure, volume fractions, specific heat ratio function, liquid
-        ! stiffness function, and sound speed.
-        real(wp)                        :: lit_gamma, nbub
-        real(wp)                        :: rho
-        real(wp), dimension(num_vels)   :: vel
-        real(wp)                        :: pres
-        real(wp)                        :: ptilde
-        real(wp)                        :: ptot
-        real(wp)                        :: alf
-        real(wp)                        :: alfgr
-        real(wp), dimension(num_fluids) :: alpha
-        real(wp)                        :: gamma
-        real(wp)                        :: pi_inf
-        real(wp)                        :: qv
-        real(wp)                        :: c
-        real(wp)                        :: M00, M10, M01, M20, M11, M02
-        real(wp)                        :: varR, varV
-        real(wp), dimension(Nb)         :: nR, R, nRdot, Rdot
-        real(wp)                        :: nR3
-        real(wp)                        :: accel
-        real(wp)                        :: int_pres
-        real(wp)                        :: max_pres
-        real(wp), dimension(2)          :: Re
-        real(wp), dimension(6)          :: tau_e
-        real(wp)                        :: G_local
-        real(wp)                        :: dyn_p, T
-        real(wp)                        :: damage_state
-        integer                         :: i, j, k, l, s, d  !< Generic loop iterator
-        real(wp)                        :: nondim_time       !< Non-dimensional time
-        real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
-        integer                         :: npts              !< Number of included integral points
-        real(wp)                        :: rad, thickness    !< For integral quantities
-        logical                         :: trigger           !< For integral quantities
-        real(wp)                        :: rhoYks(1:num_species)
+        real(wp)                                            :: lit_gamma, nbub
+        real(wp)                                            :: rho
+        real(wp), dimension(num_vels)                       :: vel
+        real(wp)                                            :: pres
+        real(wp)                                            :: ptilde
+        real(wp)                                            :: ptot
+        real(wp)                                            :: alf
+        real(wp)                                            :: alfgr
+        real(wp), dimension(num_fluids)                     :: alpha
+        real(wp)                                            :: gamma
+        real(wp)                                            :: pi_inf
+        real(wp)                                            :: qv
+        real(wp)                                            :: c
+        real(wp)                                            :: M00, M10, M01, M20, M11, M02
+        real(wp)                                            :: varR, varV
+        real(wp), dimension(Nb)                             :: nR, R, nRdot, Rdot
+        real(wp)                                            :: nR3
+        real(wp)                                            :: accel
+        real(wp)                                            :: int_pres
+        real(wp)                                            :: max_pres
+        real(wp), dimension(2)                              :: Re
+        real(wp), dimension(6)                              :: tau_e
+        real(wp)                                            :: G_local
+        real(wp)                                            :: dyn_p, T
+        real(wp)                                            :: damage_state
+        integer                                             :: i, j, k, l, s, d  !< Generic loop iterator
+        real(wp)                                            :: nondim_time  !< Non-dimensional time
+        real(wp)                                            :: tmp  !< Temporary variable to store quantity for mpi_allreduce
+        integer                                             :: npts  !< Number of included integral points
+        real(wp)                                            :: rad, thickness  !< For integral quantities
+        logical                                             :: trigger  !< For integral quantities
+        real(wp)                                            :: rhoYks(1:num_species)
 
         T = dflt_T_guess
 
+        ! Non-dimensional time calculation
         if (time_stepper == 23) then
             nondim_time = mytime
         else
@@ -1015,6 +1070,7 @@ contains
         end if
 
         do i = 1, num_probes
+            ! Zeroing out flow variables for all processors
             rho = 0._wp
             do s = 1, num_vels
                 vel(s) = 0._wp
@@ -1041,6 +1097,7 @@ contains
             end do
             damage_state = 0._wp
 
+            ! Find probe location in terms of indices on a specific processor
             if (n == 0) then
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     do s = -1, m
@@ -1494,17 +1551,19 @@ contains
 
     end subroutine s_write_probe_files
 
-    !> Write footer with stability criteria extrema and run-time to the information file, then close it
+    !> Write stability criteria extrema footer to the run-time information file and close it.
     impure subroutine s_close_run_time_information_file
 
         real(wp) :: run_time  !< Run-time of the simulation
+
+        ! Writing the footer of and closing the run-time information file
 
         write (3, '(A)') '    '
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
         if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (viscous) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
+        if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
@@ -1537,28 +1596,24 @@ contains
 
     end subroutine s_close_probe_files
 
-    !> Close the immersed boundary state file
     impure subroutine s_close_ib_state_file
 
         close (ib_state_unit)
 
     end subroutine s_close_ib_state_file
 
-    !> Initialize the data output module
+    !> Initialize the data output module.
     impure subroutine s_initialize_data_output_module
 
         integer :: i, m_ds, n_ds, p_ds
 
+        ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
+
         if (run_time_info) then
-            @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
             icfl_max = 0._wp
-
             if (viscous) then
-                @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-                @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
-
                 vcfl_max = 0._wp
-                Rc_min = 1.e3_wp
+                Rc_min = 1.e12_wp
             end if
         end if
 
@@ -1586,13 +1641,6 @@ contains
 
         if (probe_wrt) then
             @:DEALLOCATE(c_mass)
-        end if
-
-        if (run_time_info) then
-            @:DEALLOCATE(icfl_sf)
-            if (viscous) then
-                @:DEALLOCATE(vcfl_sf, Rc_sf)
-            end if
         end if
 
         if (down_sample) then

@@ -10,6 +10,7 @@ module m_muscl
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -37,7 +38,6 @@ module m_muscl
 
 contains
 
-    !> Allocate and initialize MUSCL reconstruction working arrays
     subroutine s_initialize_muscl_module()
 
         ! Initializing in x-direction
@@ -90,10 +90,9 @@ contains
 
     end subroutine s_initialize_muscl_module
 
-    !> Perform MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables
+    !> @brief Performs MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables.
     subroutine s_muscl(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, is1_muscl_d, &
-
-        & is2_muscl_d, is3_muscl_d)
+                       & is2_muscl_d, is3_muscl_d)
 
         type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
@@ -210,17 +209,16 @@ contains
             #:endfor
         end if
 
-        if (int_comp) then
+        if (int_comp .and. v_size >= advxe) then
             call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, &
                                          & is1_muscl_d, is2_muscl_d, is3_muscl_d)
         end if
 
     end subroutine s_muscl
 
-    !> Apply THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces
+    !> @brief Applies THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces.
     subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, &
-
-        & is1_muscl_d, is2_muscl_d, is3_muscl_d)
+                                       & is1_muscl_d, is2_muscl_d, is3_muscl_d)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
              & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
@@ -287,13 +285,16 @@ contains
 
     end subroutine s_interface_compression
 
-    !> Reshape cell-averaged variable data into direction-local work arrays for MUSCL reconstruction
+    !> @brief Reshapes cell-averaged variable data into direction-local work arrays for MUSCL reconstruction.
     subroutine s_initialize_muscl(v_vf, muscl_dir)
 
         type(scalar_field), dimension(:), intent(in) :: v_vf
         integer, intent(in)                          :: muscl_dir
         integer                                      :: j, k, l, q  !< Generic loop iterators
-        ! Determine MUSCL-reconstructed variables and map coordinate directions
+
+        ! Determining the number of cell-average variables which will be muscl-reconstructed and mapping their indical bounds in the
+        ! x-, y- and z-directions to those in the s1-, s2- and s3-directions as to reshape the inputted data in the coordinate
+        ! direction of the muscl reconstruction
 
         v_size = ubound(v_vf, 1)
         $:GPU_UPDATE(device='[v_size]')
@@ -347,7 +348,7 @@ contains
 
     end subroutine s_initialize_muscl
 
-    !> Finalize the MUSCL module
+    !> @brief Deallocates the MUSCL direction-local work arrays.
     subroutine s_finalize_muscl_module()
 
         @:DEALLOCATE(v_rs_ws_x_muscl)

@@ -187,9 +187,15 @@ module m_derived_types
     type ic_patch_parameters
 
         integer :: geometry  !< Type of geometry for the patch
+
+        !> Location of the geometric center, i.e. the centroid, of the patch. It is specified through its x-, y- and z-coordinates,
+        !! respectively.
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
-        real(wp) :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
-        real(wp) :: radius  !< Dimensions of the patch. radius.
+        real(wp) :: length_x, length_y, length_z        !< Dimensions of the patch. x,y,z Lengths.
+        real(wp) :: radius                              !< Dimensions of the patch. radius.
+
+        !> Vector indicating the various radii for the elliptical and ellipsoidal patch geometries. It is specified through its x-,
+        !! y-, and z-components respectively.
         real(wp), dimension(3) :: radii  !< Elliptical/ellipsoidal patch radii in x, y, z
         real(wp) :: epsilon, beta  !< The isentropic vortex parameters for the amplitude of the disturbance and domain of influence.
         real(wp), dimension(2:9) :: a  !< Used by hardcoded IC and as temporary variables.
@@ -200,53 +206,66 @@ module m_derived_types
         logical :: modal_clip_r_to_min  !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
         real(wp) :: modal_r_min  !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
         logical :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
+
         ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
         real(wp), dimension(0:max_sph_harm_degree,-max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
-        real(wp), dimension(3) :: normal  !< Patch orientation normal vector (x, y, z)
-        logical, dimension(0:num_patches_max - 1) :: alter_patch  !< Overwrite permissions for preceding patches
-        logical :: smoothen  !< Whether patch boundaries are smoothed across cells
-        integer :: smooth_patch_id  !< Identity (id) of the patch with which current patch is to get smoothed
-        real(wp) :: smooth_coeff  !< Smoothing stencil size coefficient
-        real(wp), dimension(num_fluids_max) :: alpha_rho
-        real(wp) :: rho
-        real(wp), dimension(3) :: vel
-        real(wp) :: pres
-        real(wp), dimension(num_fluids_max) :: alpha
-        real(wp) :: gamma
-        real(wp) :: pi_inf
-        real(wp) :: cv
-        real(wp) :: qv
-        real(wp) :: qvp  !< Reference entropy per unit mass (SGEOS)
-        real(wp) :: Bx, By, Bz  !< Magnetic field components; B%x is not used for 1D
-        real(wp), dimension(6) :: tau_e  !< Elastic stresses added to primitive variables if hypoelasticity = True
-        real(wp) :: R0  !< Bubble size
-        real(wp) :: V0  !< Bubble velocity
-        real(wp) :: p0  !< Bubble size
-        real(wp) :: m0  !< Bubble velocity
-        integer :: hcid  !< Hardcoded initial condition ID
-        real(wp) :: cf_val  !< Color function value
-        real(wp) :: Y(1:num_species)  !< Species mass fractions
 
-        ! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath   !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
-        !> Angle to rotate the STL object along each cartesian coordinate axis, in radians.
-        real(wp), dimension(1:3) :: model_rotate
-        integer                  :: model_spc        !< Number of samples per cell to use when discretizing the STL object.
-        real(wp)                 :: model_threshold  !< Threshold to turn on smoothen STL patch.
+        !> Normal vector indicating the orientation of the patch. It is specified through its x-, y- and z-components, respectively.
+        real(wp), dimension(3) :: normal  !< Patch orientation normal vector (x, y, z)
+
+        !> List of permissions that indicate to the current patch which preceding patches it is allowed to overwrite when it is in
+        !! process of being laid out in the domain
+        logical, dimension(0:num_patches_max - 1) :: alter_patch  !< Overwrite permissions for preceding patches
+
+        !> Permission indicating to the current patch whether its boundaries will be smoothed out across a few cells or whether they
+        !! are to remain sharp
+        logical :: smoothen         !< Whether patch boundaries are smoothed across cells
+        integer :: smooth_patch_id  !< Identity (id) of the patch with which current patch is to get smoothed
+
+        !> Smoothing coefficient (coeff) for the size of the stencil of cells across which boundaries of the current patch will be
+        !! smeared out
+        real(wp)                            :: smooth_coeff  !< Smoothing stencil size coefficient
+        real(wp), dimension(num_fluids_max) :: alpha_rho
+        real(wp)                            :: rho
+        real(wp), dimension(3)              :: vel
+        real(wp)                            :: pres
+        real(wp), dimension(num_fluids_max) :: alpha
+        real(wp)                            :: gamma
+        real(wp)                            :: pi_inf
+        real(wp)                            :: cv
+        real(wp)                            :: qv
+        !> Primitive variables associated with the patch. In order, these include the partial densities, density, velocity,
+        !! pressure, volume fractions, specific heat ratio function and the liquid stiffness function.
+        real(wp)                   :: qvp               !< Reference entropy per unit mass (SGEOS)
+        real(wp)                   :: Bx, By, Bz        !< Magnetic field components; B%x is not used for 1D
+        real(wp), dimension(6)     :: tau_e             !< Elastic stresses added to primitive variables if hypoelasticity = True
+        real(wp)                   :: R0                !< Bubble size
+        real(wp)                   :: V0                !< Bubble velocity
+        real(wp)                   :: p0                !< Bubble size
+        real(wp)                   :: m0                !< Bubble velocity
+        integer                    :: hcid              !< Hardcoded initial condition ID id for hard coded initial condition
+        real(wp)                   :: cf_val            !< Color function value
+        real(wp)                   :: Y(1:num_species)  !< Species mass fractions STL or OBJ model input parameter
+        character(LEN=pathlen_max) :: model_filepath    !< Path the STL file relative to case_dir.
+        real(wp), dimension(1:3)   :: model_translate   !< Translation of the STL object.
+        real(wp), dimension(1:3)   :: model_scale       !< Scale factor for the STL object.
+        real(wp), dimension(1:3)   :: model_rotate
+        integer                    :: model_spc         !< Number of samples per cell to use when discretizing the STL object.
+        real(wp)                   :: model_threshold   !< Threshold to turn on smoothen STL patch.
     end type ic_patch_parameters
 
     type ib_patch_parameters
 
-        integer  :: geometry                            !< Type of geometry for the patch
+        integer :: geometry  !< Type of geometry for the patch
+
+        !> Location of the geometric center, i.e. the centroid, of the patch. It is specified through its x-, y- and z-coordinates,
+        !! respectively.
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
         !> Centroid locations of intermediate steps in the time_stepper module
-        real(wp)                 :: step_x_centroid, step_y_centroid, step_z_centroid
-        real(wp), dimension(1:3) :: centroid_offset  !< offset of center of mass from computed cell center for odd-shaped IBs
-        real(wp), dimension(1:3) :: angles
-        real(wp), dimension(1:3) :: step_angles
-        !> matrix that converts from IB reference frame to fluid reference frame
+        real(wp)                     :: step_x_centroid, step_y_centroid, step_z_centroid
+        real(wp), dimension(1:3)     :: centroid_offset  !< offset of center of mass from computed cell center for odd-shaped IBs
+        real(wp), dimension(1:3)     :: angles
+        real(wp), dimension(1:3)     :: step_angles
         real(wp), dimension(1:3,1:3) :: rotation_matrix
         !> matrix that converts from fluid reference frame to IB reference frame
         real(wp), dimension(1:3,1:3) :: rotation_matrix_inverse
@@ -256,11 +275,10 @@ module m_derived_types
         real(wp)                     :: theta
         logical                      :: slip
 
-        ! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath   !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
-        !> Angle to rotate the STL object along each cartesian coordinate axis, in radians.
+        !! STL or OBJ model input parameter
+        character(LEN=pathlen_max) :: model_filepath  !< Path the STL file relative to case_dir.
+        real(wp), dimension(1:3) :: model_translate  !< Translation of the STL object.
+        real(wp), dimension(1:3) :: model_scale  !< Scale factor for the STL object.
         real(wp), dimension(1:3) :: model_rotate
         integer :: model_spc  !< Number of samples per cell to use when discretizing the STL object.
         real(wp) :: model_threshold  !< Threshold to turn on smoothen STL patch. Patch conditions for moving imersed boundaries
@@ -308,6 +326,16 @@ module m_derived_types
         real(wp) :: R_v      !< gas constant of host in vapor state
         real(wp) :: R_g      !< gas constant of gas (bubble)
     end type subgrid_bubble_physical_parameters
+
+    !> Physical parameters for Lagrangian solid particles
+    type subgrid_particle_physical_parameters
+        real(wp) :: rho0ref_particle  !< Reference particle density
+        real(wp) :: cp_particle       !< Specific heat capacity of particle
+        real(wp) :: ksp_col           !< number of timesteps over which collision occurs
+        real(wp) :: nu_col            !< Poisson's ratio of particle for collision
+        real(wp) :: E_col             !< Young's modulus of particle for collision
+        real(wp) :: cor_col           !< coefficient of restituion for collision
+    end type subgrid_particle_physical_parameters
 
     type mpi_io_airfoil_ib_var
         integer, dimension(2)                    :: view
@@ -396,18 +424,33 @@ module m_derived_types
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
 
-        integer  :: solver_approach      !< 1: One-way coupling, 2: two-way coupling
-        integer  :: cluster_type         !< Cluster model to find p_inf
-        logical  :: pressure_corrector   !< Cell pressure correction term
-        integer  :: smooth_type          !< Smoothing function. 1: Gaussian, 2:Delta 3x3
-        logical  :: heatTransfer_model   !< Activate HEAT transfer model at the bubble-liquid interface
-        logical  :: massTransfer_model   !< Activate MASS transfer model at the bubble-liquid interface
-        logical  :: write_bubbles        !< Write files to track the bubble evolution each time step
-        logical  :: write_bubbles_stats  !< Write the maximum and minimum radius of each bubble
-        integer  :: nBubs_glb            !< Global number of bubbles
-        real(wp) :: epsilonb             !< Standard deviation scaling for the gaussian function
-        real(wp) :: charwidth            !< Domain virtual depth (z direction, for 2D simulations)
-        real(wp) :: valmaxvoid           !< Maximum void fraction permitted
+        integer                    :: solver_approach      !< 1: One-way coupling, 2: two-way coupling
+        integer                    :: cluster_type         !< Cluster model to find p_inf
+        logical                    :: pressure_corrector   !< Cell pressure correction term
+        integer                    :: smooth_type          !< Smoothing function. 1: Gaussian, 2:Delta 3x3
+        logical                    :: heatTransfer_model   !< Activate HEAT transfer model at the bubble-liquid interface
+        logical                    :: massTransfer_model   !< Activate MASS transfer model at the bubble-liquid interface
+        logical                    :: write_bubbles        !< Write files to track the bubble evolution each time step
+        logical                    :: write_bubbles_stats  !< Write the maximum and minimum radius of each bubble
+        integer                    :: nBubs_glb            !< Global number of bubbles
+        real(wp)                   :: epsilonb             !< Standard deviation scaling for the gaussian function
+        real(wp)                   :: charwidth            !< Domain virtual depth (z direction, for 2D simulations)
+        real(wp)                   :: valmaxvoid           !< Maximum void fraction permitted
+        logical                    :: write_void_evol      !< Write files to track evolution of void fraction at each time step
+        integer                    :: nParticles_glb       !< Global number of particles
+        integer                    :: vel_model            !< Particle velocity model
+        integer                    :: drag_model           !< Particle drag model
+        logical                    :: pressure_force       !< Include pressure force translational motion
+        logical                    :: gravity_force        !< Include gravity force in translational motion
+        integer                    :: qs_drag_model        !< Particle QS drag model
+        integer                    :: stokes_drag          !< Particle stokes drag
+        integer                    :: added_mass_model     !< Particle added mass model
+        integer                    :: interpolation_order  !< Fluid-to-Particle barycentric interpolation order
+        logical                    :: collision_force      !< Include collision forces
+        logical                    :: qs_fluct_force       !< QS Fluctuations
+        character(LEN=pathlen_max) :: input_path           !< Path to lag_bubbles.dat
+        integer                    :: charNz               !< Number of grid cells in characteristic depth
+        real(wp)                   :: mu_ref               !< Reference Viscosity for particle drag
     end type bubbles_lagrange_parameters
 
     !> Max and min number of cells in a direction of each combination of x-,y-, and z-

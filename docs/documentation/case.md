@@ -266,6 +266,16 @@ Setup: Only requires specifying `init_dir` and filename pattern via `zeros_defau
 Implementation: All variables and file handling are managed in `src/common/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
 Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
 
+The following parameters support hardcoded initial conditions that read interface data from files:
+
+| Parameter        | Type    | Description                                               |
+| ---:             | :---:   | :---                                                      |
+| `interface_file` | String  | Path to interface geometry data file                      |
+| `normFac`        | Real    | Interface normalization factor                            |
+| `normMag`        | Real    | Interface normal magnitude                                |
+| `g0_ic`          | Real    | Initial gas volume fraction for interfacial IC            |
+| `p0_ic`          | Real    | Initial pressure for interfacial IC                       |
+
 #### Parameter Descriptions
 
 - `num_patches` defines the total number of patches defined in the domain.
@@ -349,7 +359,7 @@ Definitions for currently implemented immersed boundary patch types are listed i
 
 - `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil.
 `m` is the maximum camber, `p` is the location of maximum camber, `c` is the coord length, and `t` is the thickness.
-Additional details on this specification can be found in [NACA airfoil](https://en.wikipedia.org/wiki/NACA_airfoil).
+Additional details on this specification can be found in [The Naca Airfoil Series](https://web.stanford.edu/~cantwell/AA200_Course_Material/The%20NACA%20airfoil%20series.pdf)
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
@@ -788,7 +798,7 @@ Details of the transducer acoustic source model can be found in \cite Maeda17.
 | ---:               | :----:  |          :---                                  |
 | `bubbles_euler`    | Logical | Ensemble-averaged bubble modeling |
 | `bubbles_lagrange` | Logical | Volume-averaged bubble modeling |
-| `bubble_model`     | Integer | [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
+| `bubble_model`     | Integer | [0] Particle; [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
 | `Ca`               | Real    | Cavitation number |
 | `Web`              | Real    | Weber number |
 | `Re_inv`           | Real    | Inverse Reynolds number |
@@ -892,6 +902,13 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `epsilonb`            | Real    | Standard deviation scaling for the gaussian function      |
 | `charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)    |
 | `valmaxvoid`          | Real    | Maximum void fraction permitted                           |
+| `drag_model`          | Integer | Drag model for bubble dynamics                            |
+| `vel_model`           | Integer | Velocity model for bubble interface                       |
+| `charNz`              | Integer | Characteristic size parameter                             |
+| `input_path`          | String  | Path to bubble input file (default: `./input`)            |
+| `pressure_force`      | Logical | Enable pressure gradient force                            |
+| `gravity_force`       | Logical | Enable gravitational force                                |
+| `write_void_evol`     | Logical | Write void fraction evolution data                        |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
@@ -904,6 +921,47 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on (\cite Preston07).
 
 - `massTransfer_model` Activates the mass transfer model at the bubble's interface based on (\cite Preston07).
+
+#### 9.3 Lagrangian Solid Particle Model
+
+| Parameter                        | Type    | Description                                                     |
+| ---:                             | :---:   | :---                                                            |
+| `particles_lagrange`             | Logical | Lagrangian solid particle model switch                          |
+| `nParticles_glb`                 | Integer | Global number of particles                                      |
+| `solver_approach`                | Integer | 1: One-way coupling, 2: Two-way coupling                       |
+| `smooth_type`                    | Integer | Smoothing function. 1: Gaussian, 2: Delta 3x3                  |
+| `stokes_drag`                    | Integer | Stokes drag model flag                                          |
+| `qs_drag_model`                  | Integer | Quasi-steady drag model (0: off, 1: Parmar, 2: Osnes, 3: Modified Parmar, 4: Gidaspow) |
+| `added_mass_model`               | Integer | Added mass model (0: off, >0: active)                           |
+| `interpolation_order`            | Integer | Polynomial order for barycentric field interpolation            |
+| `collision_force`                | Logical | Enable soft-sphere DEM particle-particle collisions             |
+| `qs_fluct_force`                 | Logical | Enable quasi-steady drag force fluctuation contribution         |
+| `pressure_force`                 | Logical | Enable pressure gradient force on particles                     |
+| `gravity_force`                  | Logical | Enable gravitational force on particles                         |
+| `write_void_evol`                | Logical | Write void fraction evolution data                              |
+| `epsilonb`                       | Real    | Standard deviation scaling for the Gaussian kernel              |
+| `valmaxvoid`                     | Real    | Maximum void fraction permitted                                 |
+| `mu_ref`                         | Real    | Fluid reference dynamic viscosity                               |
+| `particle_pp%%rho0ref_particle`  | Real    | Reference particle material density                             |
+| `particle_pp%%cp_particle`       | Real    | Particle specific heat capacity                                 |
+| `particle_pp%%ksp_col`           | Real    | Spring stiffness multiplier for collisions                      |
+| `particle_pp%%nu_col`            | Real    | Poisson's ratio used for collisions                             |
+| `particle_pp%%E_col`             | Real    | Young's modulus [Pa] used for collisions                        |
+| `particle_pp%%cor_col`           | Real    | Coefficient of restitution of particles                         |  
+
+- `particles_lagrange` activates the Euler-Lagrange solid particle solver. Particle initial conditions are read from `./input/lag_particles.dat`. The solver tracks non-deformable spherical particles in a compressible carrier flow using volume-averaged source terms (\cite Maeda18).
+
+- `nParticles_glb` specifies the total number of particles across all MPI ranks. Their initial positions, velocities, and radii must be specified in the input file.
+
+- `solver_approach` specifies the coupling method: [1] one-way coupling where particles are advected by the flow but do not influence it, [2] two-way coupling where particle forces are projected back onto the Eulerian grid as source terms.
+
+- `qs_drag_model` selects the quasi-steady drag correlation: [1] Parmar et al. (2010) with Sangani volume fraction correction, [2] Osnes et al. (2023) full correlation with Loth et al. (2021) rarefied regime, [3] Modified Parmar with Osnes et al. (2023) volume fraction correction, [4] Gidaspow (1994) correlation for dense particle suspensions.
+
+- `collision_force` activates soft-sphere DEM collisions using a spring-dashpot contact model with Hertzian stiffness. Collision forces between particles on different MPI ranks are communicated via non-blocking point-to-point messaging.
+
+- `interpolation_order` sets the order of the barycentric Lagrange polynomial used to interpolate Eulerian field quantities (pressure, velocity, density) to particle positions. Must be even; the interpolation stencil uses `N/2` points in each direction.
+
+- `mu_ref` is the fluids reference dynamic viscosity at 273.15 K. Used for particle drag if "viscous" is turned off. Only the air sutherland model is currently implemented. If "viscous" is enabled, the true fluid's viscosity is used.
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 

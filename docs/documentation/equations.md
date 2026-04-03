@@ -514,6 +514,46 @@ with \f$\sigma = \varepsilon_b \max(\Delta x^{1/3}_\text{cell},\;R_\text{bubble}
 
 Each bubble is tracked individually with Keller-Miksis dynamics and 4th-order adaptive Runge-Kutta time integration.
 
+### 6.3 Euler-Lagrange Solid Particles (`particles_lagrange = .true.`)
+
+**Source:** `src/simulation/m_particles_EL.fpp`, `src/simulation/m_particles_EL_kernels.fpp`
+
+The Euler-Lagrange particle solver tracks non-deformable solid particles in a compressible carrier flow.
+The volume-averaged carrier flow equations use the same source term framework as the bubble model (Section 6.2),
+with the particle volume fraction \f$\alpha_p\f$ replacing the bubble void fraction \f$\alpha\f$.
+
+**Particle volume fraction via Gaussian kernel:**
+
+\f[\alpha_p(\mathbf{x}) = \sum_n V_{p,n}\,\delta_\sigma(\mathbf{x} - \mathbf{x}_n)\f]
+
+where \f$V_{p,n} = \frac{4}{3}\pi R_n^3\f$ is the volume of particle \f$n\f$ and \f$\delta_\sigma\f$ is the Gaussian regularization kernel from Section 6.2.
+
+**Particle equation of motion:**
+
+\f[m_p \frac{d\mathbf{u}_p}{dt} = \mathbf{F}_\text{drag} + \mathbf{F}_\text{pressure} + \mathbf{F}_\text{AM} + \mathbf{F}_\text{gravity} + \mathbf{F}_\text{collision}\f]
+
+**Quasi-steady drag force:**
+
+\f[\mathbf{F}_\text{drag} = \beta\,(\mathbf{u}_f - \mathbf{u}_p)\f]
+
+where \f$\beta\f$ is a drag coefficient computed from one of several correlations selected via `qs_drag_model`:
+- Parmar et al. (2010): Re and Ma corrections with Sangani et al. (1991) volume fraction correction
+- Modified Parmar: Re and Ma corrections with Osnes et al. (2023) volume fraction correction
+- Osnes et al. (2023): comprehensive correlation for compressible flow through random particle suspensions
+- Gidaspow (1994): Ergun/Wen-Yu correlation for dense suspensions
+
+**Pressure gradient force** (`pressure_force = .true.`):
+
+\f[\mathbf{F}_\text{pressure} = -V_p\,\nabla p\f]
+
+**Added mass force** (`added_mass_model > 0`):
+
+\f[\mathbf{F}_\text{AM} = C_\text{AM}\,\rho_f\,V_p\left(\frac{D\mathbf{u}_f}{Dt} - \frac{d\mathbf{u}_p}{dt}\right)\f]
+
+**Collision force** (`collision_force = .true.`):
+
+Soft-sphere DEM model with Hertzian contact stiffness and viscous damping.
+
 ---
 
 ## 7. Fluid-Structure Interaction

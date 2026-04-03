@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_boundary_common
+!! Contains module m_boundary_common
 
 !> @brief Noncharacteristic and processor boundary condition application for ghost cells and buffer regions
 #:include 'case.fpp'
@@ -20,13 +20,16 @@ module m_boundary_common
     type(scalar_field), dimension(:,:), allocatable :: bc_buffers
     $:GPU_DECLARE(create='[bc_buffers]')
 
+    type(int_bounds_info), dimension(3) :: beta_bc_bounds
+    $:GPU_DECLARE(create='[beta_bc_bounds]')
+
 #ifdef MFC_MPI
     integer, dimension(1:3,1:2) :: MPI_BC_TYPE_TYPE
     integer, dimension(1:3,1:2) :: MPI_BC_BUFFER_TYPE
 #endif
 
-    private; public :: s_initialize_boundary_common_module, s_populate_variables_buffers, s_create_mpi_types, &
-        & s_populate_capillary_buffers, s_populate_F_igr_buffers, s_write_serial_boundary_condition_files, &
+    private; public :: s_initialize_boundary_common_module, s_populate_variables_buffers, s_populate_beta_buffers, &
+        & s_create_mpi_types, s_populate_capillary_buffers, s_populate_F_igr_buffers, s_write_serial_boundary_condition_files, &
         & s_write_parallel_boundary_condition_files, s_read_serial_boundary_condition_files, &
         & s_read_parallel_boundary_condition_files, s_assign_default_bc_type, s_populate_grid_variables_buffers, &
         & s_finalize_boundary_common_module
@@ -39,7 +42,7 @@ module m_boundary_common
 
 contains
 
-    !> Allocate and set up boundary condition buffer arrays for all coordinate directions.
+    !> Allocates and sets up boundary condition buffer arrays for all coordinate directions.
     impure subroutine s_initialize_boundary_common_module()
 
         integer :: i, j
@@ -68,17 +71,32 @@ contains
             end do
         end if
 
+        if (bubbles_lagrange .or. particles_lagrange) then
+            beta_bc_bounds(1)%beg = -mapcells - 1
+            beta_bc_bounds(1)%end = m + mapcells + 1
+            ! n > 0 always for bubbles_lagrange
+            beta_bc_bounds(2)%beg = -mapcells - 1
+            beta_bc_bounds(2)%end = n + mapcells + 1
+            if (p == 0) then
+                beta_bc_bounds(3)%beg = 0
+                beta_bc_bounds(3)%end = 0
+            else
+                beta_bc_bounds(3)%beg = -mapcells - 1
+                beta_bc_bounds(3)%end = p + mapcells + 1
+            end if
+        end if
+        $:GPU_UPDATE(device='[beta_bc_bounds]')
+
     end subroutine s_initialize_boundary_common_module
 
-    !> Populate the buffers of the primitive variables based on the selected boundary conditions.
+    !> The purpose of this procedure is to populate the buffers of the primitive variables, depending on the selected boundary
+    !! conditions.
     impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
         integer                                                                                              :: k, l
-
-        ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
 
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)
@@ -137,8 +155,6 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-
-        ! Population of Buffers in y-direction
 
         if (n == 0) return
 
@@ -205,8 +221,6 @@ contains
             end if
         #:endif
 
-        ! Population of Buffers in z-direction
-
         if (p == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
@@ -241,7 +255,7 @@ contains
 
             if (bc_z%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in)
-            else
+            else  !< bc_z%end
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
@@ -268,10 +282,11 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         #:endif
+        ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_variables_buffers
 
-    !> Fill ghost cells by copying the nearest boundary cell value along the specified direction.
+    !> Fills ghost cells by copying the nearest boundary cell value along the specified direction.
     subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
@@ -287,7 +302,7 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
@@ -301,7 +316,7 @@ contains
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                     end do
                 end do
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
@@ -315,7 +330,7 @@ contains
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                     end do
                 end do
-            else  !< bc_z%end
+            else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
@@ -326,7 +341,8 @@ contains
 
     end subroutine s_ghost_cell_extrapolation
 
-    !> Apply reflective (symmetry) boundary conditions by mirroring primitive variables and flipping the normal velocity component.
+    !> Applies reflective (symmetry) boundary conditions by mirroring primitive variables and flipping the normal velocity
+    !! component.
     subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -371,7 +387,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do j = 1, buff_size
                     do i = 1, contxe
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
@@ -440,7 +456,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do j = 1, buff_size
                     do i = 1, momxb
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
@@ -510,7 +526,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_z%end
+            else  !< bc_x%end
                 do j = 1, buff_size
                     do i = 1, momxb + 1
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
@@ -549,7 +565,7 @@ contains
 
     end subroutine s_symmetry
 
-    !> Apply periodic boundary conditions by copying values from the opposite domain boundary.
+    !> Applies periodic boundary conditions by copying values from the opposite domain boundary.
     subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -577,7 +593,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
@@ -613,7 +629,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, j - 1, l)
@@ -649,7 +665,7 @@ contains
                         end do
                     end do
                 end if
-            else  !< bc_z%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, j - 1)
@@ -671,7 +687,7 @@ contains
 
     end subroutine s_periodic
 
-    !> Apply axis boundary conditions for cylindrical coordinates by reflecting values across the axis with azimuthal phase shift.
+    !> Applies axis boundary conditions for cylindrical coordinates by reflecting values across the axis with azimuthal phase shift.
     subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -721,7 +737,7 @@ contains
 
     end subroutine s_axis
 
-    !> Apply slip wall boundary conditions by extrapolating scalars and reflecting the wall-normal velocity component.
+    !> Applies slip wall boundary conditions by extrapolating scalars and reflecting the wall-normal velocity component.
     subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_slip_wall',parallelism='[seq]', cray_inline=True)
@@ -736,12 +752,12 @@ contains
                     do j = 1, buff_size
                         if (i == momxb) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
-                        else
+                        else  !< bc_x%end
                             q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                         end if
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -758,12 +774,12 @@ contains
                     do j = 1, buff_size
                         if (i == momxb + 1) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
-                        else
+                        else  !< bc_y%end
                             q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                         end if
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb + 1) then
@@ -780,12 +796,12 @@ contains
                     do j = 1, buff_size
                         if (i == momxe) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
-                        else
+                        else  !< bc_z%end
                             q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                         end if
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxe) then
@@ -800,7 +816,7 @@ contains
 
     end subroutine s_slip_wall
 
-    !> Apply no-slip wall boundary conditions by reflecting and negating all velocity components at the wall.
+    !> Applies no-slip wall boundary conditions by reflecting and negating all velocity components at the wall.
     subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_no_slip_wall',parallelism='[seq]', cray_inline=True)
@@ -820,12 +836,12 @@ contains
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb3
-                        else
+                        else  !< bc_x%end
                             q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                         end if
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -850,12 +866,12 @@ contains
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb3
-                        else
+                        else  !< bc_y%end
                             q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                         end if
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -880,12 +896,12 @@ contains
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
-                        else
+                        else  !< bc_z%end
                             q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                         end if
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, sys_size
                     do j = 1, buff_size
                         if (i == momxb) then
@@ -894,7 +910,7 @@ contains
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve2
                         else if (i == momxb + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve3
-                        else
+                        else  !< bc_x%end
                             q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
                         end if
                     end do
@@ -904,7 +920,7 @@ contains
 
     end subroutine s_no_slip_wall
 
-    !> Apply Dirichlet boundary conditions by prescribing ghost cell values from stored boundary buffers.
+    !> Applies Dirichlet boundary conditions by prescribing ghost cell values from stored boundary buffers.
     subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_dirichlet',parallelism='[seq]', cray_inline=True)
@@ -921,7 +937,7 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)
@@ -936,7 +952,7 @@ contains
                             q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)
                         end do
                     end do
-                else  !< bc_y%end
+                else  !< bc_z%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)
@@ -952,7 +968,7 @@ contains
                             q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)
                         end do
                     end do
-                else  !< bc_z%end
+                else  !< bc_x%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)
@@ -967,7 +983,7 @@ contains
 
     end subroutine s_dirichlet
 
-    !> Extrapolate QBMM bubble pressure and mass-vapor variables into ghost cells by copying boundary values.
+    !> Extrapolates QBMM bubble pressure and mass-vapor variables into ghost cells by copying boundary values.
     subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -986,7 +1002,7 @@ contains
                         end do
                     end do
                 end do
-            else  !< bc_x%end
+            else  !< bc_y%end
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1006,7 +1022,7 @@ contains
                         end do
                     end do
                 end do
-            else  !< bc_y%end
+            else  !< bc_z%end
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1026,7 +1042,7 @@ contains
                         end do
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, nb
                     do q = 1, nnode
                         do j = 1, buff_size
@@ -1040,7 +1056,385 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
-    !> Populate ghost cell buffers for the color function and its divergence used in capillary surface tension.
+    impure subroutine s_populate_beta_buffers(q_beta, kahan_comp, bc_type, nvar, vars_comm)
+
+        type(scalar_field), dimension(:), intent(inout)            :: q_beta
+        type(scalar_field), dimension(:), intent(inout)            :: kahan_comp
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer, intent(in)                                        :: nvar
+        integer, dimension(:), intent(in)                          :: vars_comm
+        integer                                                    :: k, l
+
+        !> x-direction
+
+        if (bc_x%beg < 0) then
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
+            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+                do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+                    select case (bc_x%beg)
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, kahan_comp, 1, -1, k, l, nvar, vars_comm)
+                    case (BC_REFLECTIVE)
+                        call s_beta_reflective(q_beta, kahan_comp, 1, -1, k, l, nvar, vars_comm)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        if (bc_x%beg >= 0 .or. bc_x%end >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, kahan_comp, 1, -1, nvar, vars_comm)
+        end if
+
+        if (bc_x%end < 0) then
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
+            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+                do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+                    select case (bc_x%end)
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, kahan_comp, 1, 1, k, l, nvar, vars_comm)
+                    case (BC_REFLECTIVE)
+                        call s_beta_reflective(q_beta, kahan_comp, 1, 1, k, l, nvar, vars_comm)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        if (bc_x%beg >= 0 .or. bc_x%end >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, kahan_comp, 1, 1, nvar, vars_comm)
+        end if
+
+        !> y-direction
+        if (bc_y%beg < 0) then
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
+            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+                do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+                    select case (bc_y%beg)
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, kahan_comp, 2, -1, k, l, nvar, vars_comm)
+                    case (BC_REFLECTIVE)
+                        call s_beta_reflective(q_beta, kahan_comp, 2, -1, k, l, nvar, vars_comm)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        if (bc_y%beg >= 0 .or. bc_y%end >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, kahan_comp, 2, -1, nvar, vars_comm)
+        end if
+
+        if (bc_y%end < 0) then
+            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
+            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+                do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+                    select case (bc_y%end)
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, kahan_comp, 2, 1, k, l, nvar, vars_comm)
+                    case (BC_REFLECTIVE)
+                        call s_beta_reflective(q_beta, kahan_comp, 2, 1, k, l, nvar, vars_comm)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        if (bc_y%beg >= 0 .or. bc_y%end >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, kahan_comp, 2, 1, nvar, vars_comm)
+        end if
+
+        if (num_dims == 2) return
+
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+            !> z-direction
+            if (bc_z%beg < 0) then
+                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
+                do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+                    do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+                        select case (bc_type(3, 1)%sf(k, l, 0))
+                        case (BC_PERIODIC)
+                            call s_beta_periodic(q_beta, kahan_comp, 3, -1, k, l, nvar, vars_comm)
+                        case (BC_REFLECTIVE)
+                            call s_beta_reflective(q_beta, kahan_comp, 3, -1, k, l, nvar, vars_comm)
+                        case default
+                        end select
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+            if (bc_z%beg >= 0 .or. bc_z%end >= 0) then
+                call s_mpi_reduce_beta_variables_buffers(q_beta, kahan_comp, 3, -1, nvar, vars_comm)
+            end if
+
+            if (bc_z%end < 0) then
+                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2, copyin = '[vars_comm]')
+                do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+                    do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+                        select case (bc_type(3, 2)%sf(k, l, 0))
+                        case (BC_PERIODIC)
+                            call s_beta_periodic(q_beta, kahan_comp, 3, 1, k, l, nvar, vars_comm)
+                        case (BC_REFLECTIVE)
+                            call s_beta_reflective(q_beta, kahan_comp, 3, 1, k, l, nvar, vars_comm)
+                        case default
+                        end select
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+            if (bc_z%beg >= 0 .or. bc_z%end >= 0) then
+                call s_mpi_reduce_beta_variables_buffers(q_beta, kahan_comp, 3, 1, nvar, vars_comm)
+            end if
+        #:endif
+
+    end subroutine s_populate_beta_buffers
+
+    subroutine s_beta_periodic(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar, vars_comm)
+
+        $:GPU_ROUTINE(function_name='s_beta_periodic', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: q_beta
+        type(scalar_field), dimension(1:), intent(inout) :: kahan_comp
+        integer, intent(in)                              :: bc_dir, bc_loc
+        integer, intent(in)                              :: k, l
+        integer, intent(in)                              :: nvar
+        integer, dimension(:), intent(in)                :: vars_comm
+        integer                                          :: j, i
+        real(wp)                                         :: y_kahan, t_kahan
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
+                do i = 1, nvar
+                    do j = -mapCells - 1, mapCells
+                        ! Kahan-compensated addition of ghost to interior
+                        y_kahan = real(q_beta(vars_comm(i))%sf(m + j + 1, k, l), &
+                                       & kind=wp) + kahan_comp(vars_comm(i))%sf(m + j + 1, k, l) - kahan_comp(vars_comm(i))%sf(j, &
+                                       & k, l)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(j, k, l), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(j, k, l) = (t_kahan - q_beta(vars_comm(i))%sf(j, k, l)) - y_kahan
+                        q_beta(vars_comm(i))%sf(j, k, l) = t_kahan
+                    end do
+                end do
+            else  !< bc_x%end
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(vars_comm(i))%sf(m + j, k, l) = q_beta(vars_comm(i))%sf(j - 1, k, l)
+                        kahan_comp(vars_comm(i))%sf(m + j, k, l) = kahan_comp(vars_comm(i))%sf(j - 1, k, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
+                do i = 1, nvar
+                    do j = -mapcells - 1, mapcells
+                        y_kahan = real(q_beta(vars_comm(i))%sf(k, n + j + 1, l), kind=wp) + kahan_comp(vars_comm(i))%sf(k, &
+                                       & n + j + 1, l) - kahan_comp(vars_comm(i))%sf(k, j, l)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(k, j, l), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(k, j, l) = (t_kahan - q_beta(vars_comm(i))%sf(k, j, l)) - y_kahan
+                        q_beta(vars_comm(i))%sf(k, j, l) = t_kahan
+                    end do
+                end do
+            else  !< bc_y%end
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(vars_comm(i))%sf(k, n + j, l) = q_beta(vars_comm(i))%sf(k, j - 1, l)
+                        kahan_comp(vars_comm(i))%sf(k, n + j, l) = kahan_comp(vars_comm(i))%sf(k, j - 1, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
+                do i = 1, nvar
+                    do j = -mapcells - 1, mapcells
+                        y_kahan = real(q_beta(vars_comm(i))%sf(k, l, p + j + 1), kind=wp) + kahan_comp(vars_comm(i))%sf(k, l, &
+                                       & p + j + 1) - kahan_comp(vars_comm(i))%sf(k, l, j)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(k, l, j), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(k, l, j) = (t_kahan - q_beta(vars_comm(i))%sf(k, l, j)) - y_kahan
+                        q_beta(vars_comm(i))%sf(k, l, j) = t_kahan
+                    end do
+                end do
+            else  !< bc_z%end
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(vars_comm(i))%sf(k, l, p + j) = q_beta(vars_comm(i))%sf(k, l, j - 1)
+                        kahan_comp(vars_comm(i))%sf(k, l, p + j) = kahan_comp(vars_comm(i))%sf(k, l, j - 1)
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_beta_periodic
+
+    subroutine s_beta_extrapolation(q_beta, bc_dir, bc_loc, k, l, nvar, vars_comm)
+
+        $:GPU_ROUTINE(function_name='s_beta_extrapolation', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: q_beta
+        integer, intent(in)                              :: bc_dir, bc_loc
+        integer, intent(in)                              :: k, l
+        integer, intent(in)                              :: nvar
+        integer, dimension(:), intent(in)                :: vars_comm
+        integer                                          :: j, i
+
+        ! Set beta in buffer regions equal to zero
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(vars_comm(i))%sf(-j, k, l) = 0._wp
+                    end do
+                end do
+            else  !< bc_x%end
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(vars_comm(i))%sf(m + j, k, l) = 0._wp
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(vars_comm(i))%sf(k, -j, l) = 0._wp
+                    end do
+                end do
+            else  !< bc_y%end
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(vars_comm(i))%sf(k, n + j, l) = 0._wp
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(vars_comm(i))%sf(k, l, -j) = 0._wp
+                    end do
+                end do
+            else  !< bc_z%end
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(vars_comm(i))%sf(k, l, p + j) = 0._wp
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_beta_extrapolation
+
+    subroutine s_beta_reflective(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar, vars_comm)
+
+        $:GPU_ROUTINE(function_name='s_beta_reflective', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: q_beta
+        type(scalar_field), dimension(1:), intent(inout) :: kahan_comp
+        integer, intent(in)                              :: bc_dir, bc_loc
+        integer, intent(in)                              :: k, l
+        integer, intent(in)                              :: nvar
+        integer, dimension(:), intent(in)                :: vars_comm
+        integer                                          :: j, i
+        real(wp)                                         :: y_kahan, t_kahan
+
+        ! Reflective BC for void fraction: 1) Fold ghost-cell contributions back onto their mirror interior cells (Kahan) 2) Set
+        ! ghost cells = mirror of (now-folded) interior values
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  !< bc_x%beg
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(vars_comm(i))%sf(-j, k, l), kind=wp) + kahan_comp(vars_comm(i))%sf(-j, k, &
+                                       & l) - kahan_comp(vars_comm(i))%sf(j - 1, k, l)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(j - 1, k, l), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(j - 1, k, l) = (t_kahan - q_beta(vars_comm(i))%sf(j - 1, k, l)) - y_kahan
+                        q_beta(vars_comm(i))%sf(j - 1, k, l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(vars_comm(i))%sf(-j, k, l) = q_beta(vars_comm(i))%sf(j - 1, k, l)
+                        kahan_comp(vars_comm(i))%sf(-j, k, l) = kahan_comp(vars_comm(i))%sf(j - 1, k, l)
+                    end do
+                end do
+            else  !< bc_x%end
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(vars_comm(i))%sf(m + j, k, l), kind=wp) + kahan_comp(vars_comm(i))%sf(m + j, k, &
+                                       & l) - kahan_comp(vars_comm(i))%sf(m - (j - 1), k, l)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(m - (j - 1), k, l), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(m - (j - 1), k, l) = (t_kahan - q_beta(vars_comm(i))%sf(m - (j - 1), k, &
+                                   & l)) - y_kahan
+                        q_beta(vars_comm(i))%sf(m - (j - 1), k, l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(vars_comm(i))%sf(m + j, k, l) = q_beta(vars_comm(i))%sf(m - (j - 1), k, l)
+                        kahan_comp(vars_comm(i))%sf(m + j, k, l) = kahan_comp(vars_comm(i))%sf(m - (j - 1), k, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(vars_comm(i))%sf(k, -j, l), kind=wp) + kahan_comp(vars_comm(i))%sf(k, -j, &
+                                       & l) - kahan_comp(vars_comm(i))%sf(k, j - 1, l)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(k, j - 1, l), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(k, j - 1, l) = (t_kahan - q_beta(vars_comm(i))%sf(k, j - 1, l)) - y_kahan
+                        q_beta(vars_comm(i))%sf(k, j - 1, l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(vars_comm(i))%sf(k, -j, l) = q_beta(vars_comm(i))%sf(k, j - 1, l)
+                        kahan_comp(vars_comm(i))%sf(k, -j, l) = kahan_comp(vars_comm(i))%sf(k, j - 1, l)
+                    end do
+                end do
+            else  !< bc_y%end
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(vars_comm(i))%sf(k, n + j, l), kind=wp) + kahan_comp(vars_comm(i))%sf(k, n + j, &
+                                       & l) - kahan_comp(vars_comm(i))%sf(k, n - (j - 1), l)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(k, n - (j - 1), l), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(k, n - (j - 1), l) = (t_kahan - q_beta(vars_comm(i))%sf(k, n - (j - 1), &
+                                   & l)) - y_kahan
+                        q_beta(vars_comm(i))%sf(k, n - (j - 1), l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(vars_comm(i))%sf(k, n + j, l) = q_beta(vars_comm(i))%sf(k, n - (j - 1), l)
+                        kahan_comp(vars_comm(i))%sf(k, n + j, l) = kahan_comp(vars_comm(i))%sf(k, n - (j - 1), l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(vars_comm(i))%sf(k, l, -j), kind=wp) + kahan_comp(vars_comm(i))%sf(k, l, &
+                                       & -j) - kahan_comp(vars_comm(i))%sf(k, l, j - 1)
+                        t_kahan = real(q_beta(vars_comm(i))%sf(k, l, j - 1), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(k, l, j - 1) = (t_kahan - q_beta(vars_comm(i))%sf(k, l, j - 1)) - y_kahan
+                        q_beta(vars_comm(i))%sf(k, l, j - 1) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(vars_comm(i))%sf(k, l, -j) = q_beta(vars_comm(i))%sf(k, l, j - 1)
+                        kahan_comp(vars_comm(i))%sf(k, l, -j) = kahan_comp(vars_comm(i))%sf(k, l, j - 1)
+                    end do
+                end do
+            else  !< bc_z%end
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(vars_comm(i))%sf(k, l, p + j), kind=wp) + kahan_comp(vars_comm(i))%sf(k, l, &
+                                       & p + j) - kahan_comp(vars_comm(i))%sf(k, l, p - (j - 1))
+                        t_kahan = real(q_beta(vars_comm(i))%sf(k, l, p - (j - 1)), kind=wp) + y_kahan
+                        kahan_comp(vars_comm(i))%sf(k, l, p - (j - 1)) = (t_kahan - q_beta(vars_comm(i))%sf(k, l, &
+                                   & p - (j - 1))) - y_kahan
+                        q_beta(vars_comm(i))%sf(k, l, p - (j - 1)) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(vars_comm(i))%sf(k, l, p + j) = q_beta(vars_comm(i))%sf(k, l, p - (j - 1))
+                        kahan_comp(vars_comm(i))%sf(k, l, p + j) = kahan_comp(vars_comm(i))%sf(k, l, p - (j - 1))
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_beta_reflective
+
+    !> Populates ghost cell buffers for the color function and its divergence used in capillary surface tension.
     impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
@@ -1051,7 +1445,7 @@ contains
 
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
-        else
+        else  !< bc_z%end
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
             do l = 0, p
                 do k = 0, n
@@ -1093,7 +1487,7 @@ contains
             !> y-direction
             if (bc_y%beg >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 2, -1, num_dims + 1)
-            else
+            else  !< bc_x%end
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = 0, p
                     do k = -buff_size, m + buff_size
@@ -1112,7 +1506,7 @@ contains
 
             if (bc_y%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
-            else
+            else  !< bc_y%end
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = 0, p
                     do k = -buff_size, m + buff_size
@@ -1136,7 +1530,7 @@ contains
             !> z-direction
             if (bc_z%beg >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 3, -1, num_dims + 1)
-            else
+            else  !< bc_z%end
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
@@ -1175,7 +1569,7 @@ contains
 
     end subroutine s_populate_capillary_buffers
 
-    !> Apply periodic boundary conditions to the color function and its divergence fields.
+    !> Applies periodic boundary conditions to the color function and its divergence fields.
     subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_periodic', parallelism='[seq]', cray_inline=True)
@@ -1191,7 +1585,7 @@ contains
                         c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(j - 1, k, l)
@@ -1205,7 +1599,7 @@ contains
                         c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, n - (j - 1), l)
                     end do
                 end do
-            else  !< bc_y%end
+            else
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, j - 1, l)
@@ -1219,7 +1613,7 @@ contains
                         c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, p - (j - 1))
                     end do
                 end do
-            else  !< bc_z%end
+            else
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, j - 1)
@@ -1230,7 +1624,7 @@ contains
 
     end subroutine s_color_function_periodic
 
-    !> Apply reflective boundary conditions to the color function and its divergence fields.
+    !> Applies reflective boundary conditions to the color function and its divergence fields.
     subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_reflective', parallelism='[seq]', cray_inline=True)
@@ -1250,7 +1644,7 @@ contains
                         end if
                     end do
                 end do
-            else  !< bc_x%end
+            else
                 do i = 1, num_dims + 1
                     do j = 1, buff_size
                         if (i == bc_dir) then
@@ -1309,7 +1703,7 @@ contains
 
     end subroutine s_color_function_reflective
 
-    !> Extrapolate the color function and its divergence into ghost cells by copying boundary values.
+    !> Extrapolates the color function and its divergence into ghost cells by copying boundary values.
     subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
@@ -1364,7 +1758,7 @@ contains
 
     end subroutine s_color_function_ghost_cell_extrapolation
 
-    !> Populate ghost cell buffers for the Jacobian scalar field used in the IGR elliptic solver.
+    !> Populates ghost cell buffers for the Jacobian scalar field used in the IGR elliptic solver.
     impure subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -1531,7 +1925,7 @@ contains
 
     end subroutine s_populate_F_igr_buffers
 
-    !> Create MPI derived datatypes for boundary condition type arrays and buffer arrays used in parallel I/O.
+    !> Creates MPI derived datatypes for boundary condition type arrays and buffer arrays used in parallel I/O.
     impure subroutine s_create_mpi_types(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -1566,7 +1960,7 @@ contains
 
     end subroutine s_create_mpi_types
 
-    !> Write boundary condition type and buffer data to serial (unformatted) restart files.
+    !> Writes boundary condition type and buffer data to serial (unformatted) restart files.
     subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
@@ -1605,7 +1999,7 @@ contains
 
     end subroutine s_write_serial_boundary_condition_files
 
-    !> Write boundary condition type and buffer data to per-rank parallel files using MPI I/O.
+    !> Writes boundary condition type and buffer data to per-rank parallel files using MPI I/O.
     subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
@@ -1670,7 +2064,7 @@ contains
 
     end subroutine s_write_parallel_boundary_condition_files
 
-    !> Read boundary condition type and buffer data from serial (unformatted) restart files.
+    !> Reads boundary condition type and buffer data from serial (unformatted) restart files.
     subroutine s_read_serial_boundary_condition_files(step_dirpath, bc_type)
 
         character(LEN=*), intent(in)                                  :: step_dirpath
@@ -1715,7 +2109,7 @@ contains
 
     end subroutine s_read_serial_boundary_condition_files
 
-    !> Read boundary condition type and buffer data from per-rank parallel files using MPI I/O.
+    !> Reads boundary condition type and buffer data from per-rank parallel files using MPI I/O.
     subroutine s_read_parallel_boundary_condition_files(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
@@ -1780,7 +2174,7 @@ contains
 
     end subroutine s_read_parallel_boundary_condition_files
 
-    !> Pack primitive variable boundary slices into bc_buffers arrays for serialization.
+    !> Packs primitive variable boundary slices into bc_buffers arrays for serialization.
     subroutine s_pack_boundary_condition_buffers(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -1823,7 +2217,7 @@ contains
 
     end subroutine s_pack_boundary_condition_buffers
 
-    !> Initialize the per-cell boundary condition type arrays with the global default BC values.
+    !> Initializes the per-cell boundary condition type arrays with the global default BC values.
     subroutine s_assign_default_bc_type(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -1849,8 +2243,8 @@ contains
 
     end subroutine s_assign_default_bc_type
 
-    !> Populate the buffers of the grid variables, which are constituted of the cell-boundary locations and cell-width
-    !! distributions, based on the boundary conditions.
+    !> The purpose of this subroutine is to populate the buffers of the grid variables, which are constituted of the cell- boundary
+    !! locations and cell-width distributions, based on the boundary conditions.
     subroutine s_populate_grid_variables_buffers
 
         integer :: i
@@ -1858,15 +2252,36 @@ contains
 #ifdef MFC_SIMULATION
         ! Required for compatibility between codes
         type(int_bounds_info) :: offset_x, offset_y, offset_z
-
         offset_x%beg = buff_size; offset_x%end = buff_size
         offset_y%beg = buff_size; offset_y%end = buff_size
         offset_z%beg = buff_size; offset_z%end = buff_size
+
+#ifdef MFC_MPI
+        ! Populate global domain boundaries with stretched grids
+        call s_mpi_allreduce_min(x_cb(-1), glb_bounds(1)%beg)
+        call s_mpi_allreduce_max(x_cb(m), glb_bounds(1)%end)
+
+        if (n > 0) then
+            call s_mpi_allreduce_min(y_cb(-1), glb_bounds(2)%beg)
+            call s_mpi_allreduce_max(y_cb(n), glb_bounds(2)%end)
+            if (p > 0) then
+                call s_mpi_allreduce_min(z_cb(-1), glb_bounds(3)%beg)
+                call s_mpi_allreduce_max(z_cb(p), glb_bounds(3)%end)
+            end if
+        end if
+#else
+        glb_bounds(1)%beg = x_cb(-1); glb_bounds(1)%end = x_cb(m)
+        if (n > 0) then
+            glb_bounds(2)%beg = y_cb(-1); glb_bounds(2)%end = y_cb(n)
+            if (p > 0) then
+                glb_bounds(3)%beg = z_cb(-1); glb_bounds(3)%end = z_cb(p)
+            end if
+        end if
+#endif
+        $:GPU_UPDATE(device='[glb_bounds]')
 #endif
 
 #ifndef MFC_PRE_PROCESS
-        ! Population of Buffers in x-direction
-
         ! Populating cell-width distribution buffer at bc_x%beg
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_grid_variables_buffers(1, -1)
@@ -1918,8 +2333,7 @@ contains
         do i = 1, buff_size
             x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
-
-        ! Population of Buffers in y-direction
+        ! END: Population of Buffers in x-direction
 
         ! Populating cell-width distribution buffer at bc_y%beg
         if (n == 0) then
@@ -1974,8 +2388,7 @@ contains
         do i = 1, buff_size
             y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
         end do
-
-        ! Population of Buffers in z-direction
+        ! END: Population of Buffers in y-direction
 
         ! Populating cell-width distribution buffer at bc_z%beg
         if (p == 0) then
@@ -2030,11 +2443,12 @@ contains
         do i = 1, buff_size
             z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
         end do
+        ! END: Population of Buffers in z-direction
 #endif
 
     end subroutine s_populate_grid_variables_buffers
 
-    !> Deallocate boundary condition buffer arrays allocated during module initialization.
+    !> Deallocates boundary condition buffer arrays allocated during module initialization.
     subroutine s_finalize_boundary_common_module()
 
         if (bc_io) then

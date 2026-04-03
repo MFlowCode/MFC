@@ -42,13 +42,16 @@ module m_constants
     real(wp), parameter :: broadband_spectral_level_constant = 20._wp
     !> The spectral level constant to correct the magnitude at each frequency to ensure the source is overall broadband
     real(wp), parameter :: broadband_spectral_level_growth_rate = 10._wp
+
     ! Reconstruction Types
     integer, parameter :: WENO_TYPE = 1   !< Using WENO for reconstruction type
     integer, parameter :: MUSCL_TYPE = 2  !< Using MUSCL for reconstruction type
+
     ! Interface Compression
     real(wp), parameter :: dflt_ic_eps = 1e-4_wp    !< Ensure compression is only applied to surface cells in THINC
     real(wp), parameter :: dflt_ic_beta = 1.6_wp    !< Sharpness parameter's default value used in THINC
     real(wp), parameter :: moncon_cutoff = 1e-8_wp  !< Monotonicity constraint's limiter to prevent extremas in THINC
+
     ! Chemistry
     real(wp), parameter :: dflt_T_guess = 1200._wp  !< Default guess for temperature (when a previous value is not available)
 
@@ -58,6 +61,7 @@ module m_constants
     real(wp), parameter :: threshold_vector_zero = 1.e-10_wp   !< Threshold to treat the component of a vector to be zero
     real(wp), parameter :: threshold_edge_zero = 1.e-10_wp     !< Threshold to treat two edges to be overlapped
     real(wp), parameter :: initial_distance_buffer = 1.e12_wp  !< Initialized levelset distance for the shortest path pair algorithm
+
     ! Lagrange bubbles constants
     integer, parameter  :: mapCells = 3      !< Number of cells around the bubble where the smoothening function will have effect
     real(wp), parameter :: R_uni = 8314._wp  !< Universal gas constant - J/kmol/K
@@ -66,6 +70,7 @@ module m_constants
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp   !< Default tolerance for adaptive step size
     integer, parameter  :: dflt_adap_dt_max_iters = 100  !< Default max iteration for adaptive step size
+
     ! Constants of the algorithm described by Heirer, E. Hairer, S. P.Norsett, G. Wanner, Solving Ordinary Differential Equations I,
     ! Chapter II.4 to choose the initial time step size for the adaptive time stepping routine
     real(wp), parameter :: threshold_first_guess = 1.e-5_wp    !< Threshold for initial step size estimate
@@ -75,10 +80,9 @@ module m_constants
     real(wp), parameter :: small_guess = 1.e-6_wp              !< Minimum initial step size
 
     ! Relativity
-    !> Max Newton-Raphson iterations for relativistic primitive recovery
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
 
-    ! Linear congruential pseudo-random number generator parameters
+    ! Pseudo-random number generator
     integer, parameter  :: modulus = 2**30 - 1     !< PRNG modulus
     integer, parameter  :: multiplier = 1664525    !< PRNG multiplier
     integer, parameter  :: increment = 1013904223  !< PRNG increment

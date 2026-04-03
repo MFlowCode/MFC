@@ -17,7 +17,7 @@ module m_delay_file_access
 
 contains
 
-    !> Introduce a rank-dependent busy-wait delay to stagger parallel file access and reduce I/O contention.
+    !> @brief Introduces a rank-dependent busy-wait delay to stagger parallel file access and reduce I/O contention.
     impure subroutine DelayFileAccess(ProcessRank)
 
         integer, intent(in) :: ProcessRank
@@ -27,6 +27,7 @@ contains
         nFileAccessDelayIterations = (ProcessRank/N_PROCESSES_FILE_ACCESS)*FILE_ACCESS_DELAY_UNIT
 
         do iDelay = 1, nFileAccessDelayIterations
+            ! Wait my turn
             call random_number(Number)
             Dummy = Number*Number
         end do
