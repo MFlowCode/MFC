@@ -613,7 +613,6 @@ contains
         real(wp)                :: eta_sec
         integer, intent(inout)  :: t_step
         real(wp), intent(inout) :: time_avg
-        integer                 :: i
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
