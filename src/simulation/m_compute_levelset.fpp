@@ -80,7 +80,6 @@ contains
 
         type(ghost_point), intent(inout) :: gp
         real(wp)                         :: radius, dist
-        real(wp), dimension(2)           :: center
         real(wp), dimension(3)           :: dist_vec
         integer                          :: i, j, ib_patch_id  !< Loop index variables
         ib_patch_id = gp%ib_patch_id
@@ -188,13 +187,12 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-        real(wp)                         :: dist, dist_surf, dist_side, global_dist
+        real(wp)                         :: dist_surf, dist_side, global_dist
         integer                          :: global_id
         real(wp)                         :: lz, z_max, z_min
         real(wp), dimension(3)           :: dist_vec
         real(wp), dimension(1:3)         :: xyz_local, center, offset, normal  !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
-        real(wp)                         :: length_z
         integer                          :: i, j, k, l, ib_patch_id            !< Loop index variables
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -360,8 +358,7 @@ contains
         real(wp), dimension(1:3)         :: xy_local, normal_vector  !< x and y coordinates in local IB frame
         real(wp), dimension(2)           :: center                   !< x and y coordinates in local IB frame
         real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
-        integer                          :: i, j, k                  !< Loop index variables
-        integer                          :: idx                      !< Shortest path direction indicator
+        integer                          :: i, j                     !< Loop index variables
         integer                          :: ib_patch_id              !< patch ID
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -601,7 +598,7 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
-        integer                          :: i, j, k, patch_id, boundary_edge_count, total_vertices
+        integer                          :: i, j, k, patch_id, boundary_edge_count
         real(wp), dimension(1:3)         :: center, xyz_local
         real(wp)                         :: normals(1:3)  !< Boundary normal buffer
         real(wp)                         :: distance
@@ -614,7 +611,6 @@ contains
 
         ! load in model values
         boundary_edge_count = gpu_boundary_edge_count(patch_id)
-        total_vertices = gpu_total_vertices(patch_id)
 
         center = 0._wp
         if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid + real(gp%x_periodicity, &

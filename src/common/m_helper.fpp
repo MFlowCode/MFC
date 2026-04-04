@@ -169,7 +169,7 @@ contains
     impure subroutine s_initialize_nonpoly()
 
         integer                 :: ir
-        real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN, rhol0
+        real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN
         real(wp), parameter     :: k_poly = 1._wp  !< polytropic index used to compute isothermal natural frequency
         ! Chapman-Enskog transport coefficients for vapor-gas mixture, Ando JAS (2010)
 

@@ -328,8 +328,6 @@ class Case:
             wenoz = 1 if self.params.get("wenoz", "F") == "T" else 0
             teno = 1 if self.params.get("teno", "F") == "T" else 0
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
-            igr = 1 if self.params.get("igr", "F") == "T" else 0
-
             recon_type = self.params.get("recon_type", 1)
 
             # This fixes a bug on Frontier to do with allocating 0:0 arrays

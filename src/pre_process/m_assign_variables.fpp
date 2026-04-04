@@ -139,12 +139,10 @@ contains
         integer, intent(in)                                      :: j, k, l
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i
-        real(wp)                                                 :: pres_mag, loc, n_tait, B_tait, p0
+        real(wp)                                                 :: n_tait, B_tait, p0
         real(wp)                                                 :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
         p0 = 101325._wp
-        pres_mag = 1.e-1_wp
-        loc = x_cc(177)
         n_tait = gs_min(1)
         B_tait = ps_inf(1)
 

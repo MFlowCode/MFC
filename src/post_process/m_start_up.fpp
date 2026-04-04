@@ -171,16 +171,14 @@ contains
         integer, intent(inout)                 :: t_step
         character(LEN=name_len), intent(inout) :: varname
         real(wp), intent(inout)                :: pres, c, H
-        real(wp)                               :: theta1, theta2
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
              & -offset_z%beg:p + offset_z%end) :: liutex_mag
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end, &
              & 3) :: liutex_axis
         integer       :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
-        real(wp)      :: En_tot
-        character(50) :: filename, dirname
-        logical       :: file_exists, dir_exists
+        character(50) :: filename
+        logical       :: file_exists
         integer       :: x_beg, x_end, y_beg, y_end, z_beg, z_end
 
         if (output_partial_domain) then
