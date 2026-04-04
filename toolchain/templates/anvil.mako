@@ -9,7 +9,7 @@
 #SBATCH --job-name="${name}"
 #SBATCH --time=${walltime}
 % if partition:
-##SBATCH --partition=${partition}
+#SBATCH --partition=${partition}
 % endif
 % if account:
 #SBATCH --account="${account}"
