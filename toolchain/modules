@@ -65,9 +65,17 @@ d-gpu MFC_CUDA_CC=80,86
 
 o     Brown Oscar
 o-all python
-o-cpu hpcx-mpi python/3.13.10s
+o-cpu hpcx-mpi python/3.13.5
 o-gpu nvhpc cuda/12.3.0 cmake/3.26.3
 o-gpu CC=nvc CXX=nvc++ FC=nvfortran
+
+pa     Purdue Anvil
+pa-cpu gcc/11.2.0 
+pa-cpu openmpi/4.1.6 
+pa-cpu python/3.9.5 
+pa-cpu fftw/3.3.8 
+pa-cpu cmake/3.20.0
+pa-all PYTHONPATH=""
 
 dai     NCSA DeltaAI
 dai-all python cmake nvidia/25.5
@@ -102,3 +110,7 @@ h-gpu CC=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpicc
 h-gpu CXX=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpicxx
 h-gpu FC=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpifort
 h-gpu NVCOMPILER_COMM_LIBS_HOME=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/12.9
+
+t     WPI Turing
+t-all slurm
+t-cpu gcc/12.1.0/i6yk33f openmpi/4.1.3/ebae7zc python/3.13.5/6anz4qy

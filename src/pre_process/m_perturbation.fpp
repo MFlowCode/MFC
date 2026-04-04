@@ -63,7 +63,6 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer                                                :: i, j, k
-        real(wp)                                               :: perturb_alpha
         real(wp)                                               :: rand_real
 
         call random_seed()
@@ -71,7 +70,6 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    perturb_alpha = q_prim_vf(E_idx + perturb_flow_fluid)%sf(i, j, k)
                     call random_number(rand_real)
                     rand_real = rand_real*perturb_flow_mag
                     q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
@@ -353,7 +351,6 @@ contains
 
         integer, intent(inout) :: seed
         real(wp), intent(out)  :: var
-        integer                :: i
 
         seed = mod(modmul(seed), modulus)
         var = seed/real(modulus, wp)

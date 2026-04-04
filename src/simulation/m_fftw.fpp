@@ -53,7 +53,7 @@ module m_fftw
     !> @endcond
 
     integer, allocatable :: gpu_fft_size(:), iembed(:), oembed(:)
-    integer              :: istride, ostride, idist, odist, rank
+    integer              :: istride, ostride, rank
 #endif
 
 contains
