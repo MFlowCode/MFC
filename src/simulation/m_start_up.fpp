@@ -609,10 +609,10 @@ contains
     !> Advance the simulation by one time step, handling CFL-based dt and time-stepper dispatch
     impure subroutine s_perform_time_step(t_step, time_avg)
 
-        integer                 :: i, eta_hh, eta_mm, eta_ss
-        real(wp)                :: eta_sec
         integer, intent(inout)  :: t_step
         real(wp), intent(inout) :: time_avg
+        integer                 :: i, eta_hh, eta_mm, eta_ss
+        real(wp)                :: eta_sec
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()

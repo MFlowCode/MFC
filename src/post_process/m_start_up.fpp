@@ -152,7 +152,7 @@ contains
                     & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time, eta_hh, &
                     & eta_mm, eta_ss
             else
-                eta_sec = wall_time_avg*real((t_step_stop - t_step)/t_step_save + 1, wp)
+                eta_sec = wall_time_avg*real((t_step_stop - t_step)/t_step_save, wp)
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
