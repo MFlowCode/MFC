@@ -144,7 +144,7 @@ contains
 
         if (proc_rank == 0) then
             if (cfl_dt) then
-                eta_sec = wall_time_avg*real(n_save - t_step, wp)
+                eta_sec = wall_time_avg*real(n_save - 1 - t_step, wp)
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
