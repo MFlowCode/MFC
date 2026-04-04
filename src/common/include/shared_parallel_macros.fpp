@@ -50,7 +50,7 @@
 #:def SPLIT_LONG_DIRECTIVE(directive, continuation_prefix)
     #:set _MAX = 120
     #:if len(directive) <= _MAX
-$:directive
+        $:directive
     #:else
         #! Split at commas, respecting parentheses depth
         #:set _parts = []
@@ -71,7 +71,7 @@ $:directive
         #:if _cur
             #:set _ = _parts.append(_cur)
         #:endif
-$:(' &\n' + continuation_prefix).join(_parts)
+        $:(' &\n' + continuation_prefix).join(_parts)
     #:endif
 #:enddef
 
