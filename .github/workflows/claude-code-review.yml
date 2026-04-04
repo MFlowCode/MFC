@@ -227,7 +227,7 @@ jobs:
             - Nearby unchanged lines in changed files may be used as supporting context only.
             - Do NOT raise findings about code outside changed files.
             - Do NOT provide general repo suggestions or unrelated improvement ideas.
-            - Do NOT include positive confirmations like "No issues with X".
+            - Do NOT include positive confirmations like "No issues with X"
             - If confidence is low, omit the finding.
 
             Allowed workflow:
