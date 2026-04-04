@@ -182,7 +182,7 @@ jobs:
           plugins: "code-review@claude-code-plugins"
           claude_args: >
             --dangerously-skip-permissions
-            --max-turns 20
+            --max-turns 40
             --allowedTools
             "Bash"
           prompt: |
