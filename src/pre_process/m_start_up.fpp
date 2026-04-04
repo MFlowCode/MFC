@@ -417,8 +417,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE)  :: status
         integer(KIND=MPI_OFFSET_KIND)        :: disp
         integer(KIND=MPI_OFFSET_KIND)        :: m_MOK, n_MOK, p_MOK
-        integer(KIND=MPI_OFFSET_KIND)        :: WP_MOK, var_MOK, str_MOK
-        integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
+        integer(KIND=MPI_OFFSET_KIND)        :: WP_MOK, var_MOK
         integer(KIND=MPI_OFFSET_KIND)        :: MOK
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
@@ -445,8 +444,6 @@ contains
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
             WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
-            str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             do i = 1, sys_size
                 var_MOK = int(i, MPI_OFFSET_KIND)
