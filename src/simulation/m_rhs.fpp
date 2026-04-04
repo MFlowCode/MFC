@@ -1219,7 +1219,7 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 end if
-            case (2)  ! y-direction
+            case (2)
                 ! y-direction: loops q_idx (x), k_idx (y), l_idx (z); sf(q_idx, k_idx, l_idx); dy(k_idx); Kterm(q_idx,k_idx,l_idx)
                 use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
                 if (use_standard_riemann) then
@@ -1295,9 +1295,9 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 end if
-            case (3)  ! z-direction
+            case (3)
                 ! z-direction: loops l_idx (x), q_idx (y), k_idx (z); sf(l_idx, q_idx, k_idx); dz(k_idx); Kterm(l_idx,q_idx,k_idx)
-                if (grid_geometry == 3) then  ! Cylindrical Coordinates
+                if (grid_geometry == 3) then
                     use_standard_riemann = (riemann_solver == 1)
                 else
                     use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
@@ -1605,7 +1605,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (grid_geometry == 3) then  ! Cylindrical Coordinates
+            if (grid_geometry == 3) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
                     do k = 0, n

@@ -15,7 +15,7 @@ module m_start_up
     use m_variables_conversion
     use m_weno
     use m_muscl
-    use m_thinc  !< THINC/MTHINC interface compression schemes for convservation laws
+    use m_thinc
     use m_riemann_solvers
     use m_cbc
     use m_boundary_common
@@ -153,7 +153,7 @@ contains
     impure subroutine s_check_input_file
 
         character(LEN=path_len) :: file_path
-        logical                 :: file_exist  !< Logical used to check the existence of the input file
+        logical                 :: file_exist
 
         file_path = trim(case_dir) // '/.'
 
@@ -309,7 +309,7 @@ contains
         integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND)        :: MOK
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist  !< Logical used to check the existence of the input file
+        logical                              :: file_exist
         character(len=10)                    :: t_step_start_string
         integer                              :: i, j
 
