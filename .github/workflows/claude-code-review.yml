@@ -138,6 +138,10 @@ jobs:
 
           mkdir -p .claude-review/context
 
+          # Prioritize src/ files for context (most likely to need review)
+          sort -t/ -k1,1 -s < "${{ steps.review_input.outputs.changed_files_path }}" | \
+            awk '/^src\//{print; next} {rest[NR]=$0} END{for(i in rest) print rest[i]}' > .claude-review/sorted_files.txt
+
           while IFS= read -r path; do
             [[ -z "$path" ]] && continue
             COUNT=$((COUNT + 1))
@@ -154,10 +158,10 @@ jobs:
             [[ -z "$CONTENT" ]] && continue
 
             LINE_COUNT="$(printf '%s' "$CONTENT" | wc -l | tr -d ' ')"
-            if [[ "$LINE_COUNT" -le 400 ]]; then
+            if [[ "$LINE_COUNT" -le 1500 ]]; then
               printf '%s' "$CONTENT" > ".claude-review/context/$SAFE_NAME"
             fi
-          done < "${{ steps.review_input.outputs.changed_files_path }}"
+          done < .claude-review/sorted_files.txt
 
           echo "context_dir=.claude-review/context" >> "$GITHUB_OUTPUT"
 
@@ -177,7 +181,7 @@ jobs:
           plugins: "code-review@claude-code-plugins"
           claude_args: >
             --dangerously-skip-permissions
-            --max-turns 90
+            --max-turns 20
             --allowedTools
             "Bash"
           prompt: |
@@ -227,8 +231,14 @@ jobs:
             - Do NOT restate the full PR summary.
             - If there are no high-confidence findings, leave .claude-review/output.md empty and STOP.
 
-            Review standard:
-            - Prefer correctness, reliability, cleanup/finalization gaps, inconsistent behavior, edge cases, and meaningful test gaps.
+            Review standard (in priority order per CLAUDE.md "Code Review Priorities"):
+            1. Correctness (logic bugs, numerical issues, array bounds)
+            2. Precision discipline (stp vs wp mixing)
+            3. Memory management (@:ALLOCATE/@:DEALLOCATE pairing, GPU pointer setup)
+            4. MPI correctness (halo exchange, buffer sizing, GPU_UPDATE calls)
+            5. GPU code (GPU_* Fypp macros only, no raw pragmas)
+            6. Physics consistency (pressure formula matches model_eqns)
+            7. Compiler portability (4 CI-gated compilers + AMD flang for GPU)
             - Avoid style nitpicks.
             - A finding is valid only if it is supported by changed lines, with changed-file context used only to confirm it.
 
