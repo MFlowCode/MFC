@@ -70,9 +70,11 @@ jobs:
 
       - name: Fetch PR branch
         shell: bash
+        env:
+          PR_HEAD_REF: ${{ steps.mode.outputs.pr_head_ref }}
         run: |
           set -euo pipefail
-          git fetch origin "${{ steps.mode.outputs.pr_head_ref }}"
+          git fetch origin "$PR_HEAD_REF"
 
       - name: Resolve review state
         id: state
