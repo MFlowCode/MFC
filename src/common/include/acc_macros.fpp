@@ -155,7 +155,7 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #:set acc_directive = '!$acc parallel loop ' + &
         & clause_val + extraAccArgs_val.strip('\n')
-    $:acc_directive
+    $:SPLIT_LONG_DIRECTIVE(acc_directive, '!$acc& ')
 #:enddef
 
 #:def ACC_ROUTINE(function_name=None, parallelism=None, nohost=False, extraAccArgs=None)

@@ -44,6 +44,37 @@
     $:clause_str
 #:enddef
 
+#! Split a long directive string into continuation lines for Fortran compilers
+#! that enforce the 132-character free-form line limit.
+#! continuation_prefix: '!$acc& ' for OpenACC, '!$omp& ' for OpenMP
+#:def SPLIT_LONG_DIRECTIVE(directive, continuation_prefix)
+    #:set _MAX = 120
+    #:if len(directive) <= _MAX
+$:directive
+    #:else
+        #! Split at commas, respecting parentheses depth
+        #:set _parts = []
+        #:set _cur = ''
+        #:set _depth = 0
+        #:for ch in directive
+            #:if ch == '('
+                #:set _depth = _depth + 1
+            #:elif ch == ')'
+                #:set _depth = _depth - 1
+            #:endif
+            #:set _cur = _cur + ch
+            #:if ch == ',' and _depth <= 1 and len(_cur) >= _MAX - 20
+                #:set _ = _parts.append(_cur)
+                #:set _cur = ''
+            #:endif
+        #:endfor
+        #:if _cur
+            #:set _ = _parts.append(_cur)
+        #:endif
+$:(' &\n' + continuation_prefix).join(_parts)
+    #:endif
+#:enddef
+
 #:def GEN_PARENTHESES_CLAUSE(clause_name, clause_str)
     #:assert isinstance(clause_name, str)
     #:if clause_str is not None

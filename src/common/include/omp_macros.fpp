@@ -187,7 +187,7 @@
     #:endif
 
     #:set omp_directive = omp_start_directive + clause_val + extraOmpArgs_val.strip('\n')
-    $:omp_directive
+    $:SPLIT_LONG_DIRECTIVE(omp_directive, '!$omp& ')
 #:enddef
 
 #:def END_OMP_PARALLEL_LOOP()
