@@ -307,7 +307,7 @@ contains
                             aCR = v_rs_ws(j + 1, k, l, advxb)
 
                             if (aC >= ic_eps .and. aC <= 1._wp - ic_eps) then
-                                if (int_comp == 2 .and. n > 0) then ! MTHINC
+                                if (int_comp == 2 .and. n > 0) then  ! MTHINC
                                     ! Map reshaped (j,k,l) to physical (ix,iy,iz)
                                     #:if REC_DIR == 1
                                         ix = j; iy = k; iz = l
@@ -347,7 +347,7 @@ contains
                                         vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                         vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1._wp - aTHINC
                                     end if
-                                else ! THINC
+                                else  ! THINC
                                     moncon = (aCR - aC)*(aC - aCL)
 
                                     if (moncon > moncon_cutoff) then
