@@ -113,8 +113,11 @@ jobs:
           # Filter out tests/ directory — golden files don't need code review
           grep -v '^tests/' .claude-review/changed_files.txt.raw > .claude-review/changed_files.txt || true
           # Strip diff hunks for tests/ files
-          awk '/^diff --git a\/tests\//,/^diff --git a\//{if(/^diff --git a\// && !/^diff --git a\/tests\//)print; next}; {print}' \
-            .claude-review/review.diff.raw > .claude-review/review.diff
+          awk '
+            /^diff --git a\/tests\// { skip=1; next }
+            /^diff --git /           { skip=0 }
+            !skip                    { print }
+          ' .claude-review/review.diff.raw > .claude-review/review.diff
 
           sed -i '/^[[:space:]]*$/d' .claude-review/changed_files.txt || true
 
