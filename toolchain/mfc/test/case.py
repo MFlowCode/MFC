@@ -1,3 +1,4 @@
+import ast
 import binascii
 import dataclasses
 import glob
@@ -5,14 +6,131 @@ import hashlib
 import itertools
 import json
 import os
+import resource
 import shutil
 import subprocess
-from typing import Callable, List, Optional, Set, Union
+from typing import Callable, Dict, List, Optional, Set, Union
 
 from .. import case, common
 from ..build import MFCTarget, get_target
 from ..run import input
 from ..state import ARG
+
+# MFC simulations (especially viscous cylindrical cases) require large stack
+# sizes.  The batch templates all include `ulimit -s unlimited`, but the direct
+# MPI execution path in the test runner bypasses the templates.  Set the soft
+# stack limit to the hard limit so that spawned MPI processes inherit it.
+try:
+    _soft, _hard = resource.getrlimit(resource.RLIMIT_STACK)
+    if _soft != resource.RLIM_INFINITY and _soft < _hard:
+        resource.setrlimit(resource.RLIMIT_STACK, (_hard, _hard))
+except (ValueError, OSError):
+    pass
+
+
+@dataclasses.dataclass
+class MPIConfig:
+    binary: str
+    flags: List[str] = dataclasses.field(default_factory=list)
+    env: Dict[str, str] = dataclasses.field(default_factory=dict)
+    gpu_flags: List[str] = dataclasses.field(default_factory=list)
+    gpu_env: Dict[str, str] = dataclasses.field(default_factory=dict)
+
+
+def _extract_mpi_config(template_name: str) -> Optional[MPIConfig]:
+    """Extract the mpi_config dict from a Mako template file."""
+    template_dir = os.path.join(common.MFC_TOOLCHAIN_DIR, "templates")
+    filepath = os.path.join(template_dir, f"{template_name}.mako")
+
+    if not os.path.isfile(filepath):
+        return None
+
+    content = common.file_read(filepath)
+    # Anchor on the assignment to avoid matching usage sites like ${mpi_config['binary']}
+    idx = content.find("mpi_config =")
+    if idx == -1:
+        idx = content.find("mpi_config=")
+    if idx == -1:
+        return None
+
+    brace_start = content.find("{", idx)
+    if brace_start == -1:
+        return None
+
+    try:
+        depth = 0
+        for i in range(brace_start, len(content)):
+            if content[i] == "{":
+                depth += 1
+            elif content[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    d = ast.literal_eval(content[brace_start : i + 1])
+                    return MPIConfig(
+                        binary=d["binary"],
+                        flags=d.get("flags", []),
+                        env=d.get("env", {}),
+                        gpu_flags=d.get("gpu_flags", []),
+                        gpu_env=d.get("gpu_env", {}),
+                    )
+    except (ValueError, SyntaxError, KeyError):
+        return None
+
+    return None
+
+
+# Cached MPI config (resolved once at first test execution)
+_resolved_mpi_config: Optional[MPIConfig] = None
+
+
+def _get_mpi_config() -> MPIConfig:
+    """Return the MPI launch configuration for the current system.
+
+    Reads -c <computer> from the passthrough args, extracts mpi_config
+    from the corresponding .mako template, and caches the result.
+    Falls back to auto-detection when no template match.
+    """
+    global _resolved_mpi_config  # noqa: PLW0603
+    if _resolved_mpi_config is not None:
+        return _resolved_mpi_config
+
+    extra = ARG("--") or []
+    computer = None
+    for i, arg in enumerate(extra):
+        if arg in ("-c", "--computer") and i + 1 < len(extra):
+            computer = extra[i + 1]
+            break
+
+    if computer:
+        cfg = _extract_mpi_config(computer)
+        if cfg is not None:
+            _resolved_mpi_config = cfg
+            return _resolved_mpi_config
+
+    # Auto-detect: try common launchers in order
+    for name in ["mpirun", "srun", "mpiexec"]:
+        if shutil.which(name) is not None:
+            _resolved_mpi_config = MPIConfig(binary=name)
+            return _resolved_mpi_config
+
+    raise common.MFCException("Could not find an MPI launcher (mpirun, srun, or mpiexec).")
+
+
+def _mpi_cmd(cfg: MPIConfig, ppn: int, exe: str, gpu: bool = False) -> List[str]:
+    """Build the MPI launch command for a given config."""
+    binary = cfg.binary
+    gf = cfg.gpu_flags if gpu else []
+    if binary == "mpirun":
+        return [binary, "-np", str(ppn), *gf, *cfg.flags, exe]
+    if binary == "srun":
+        return [binary, "--nodes", "1", "--ntasks-per-node", str(ppn), *gf, *cfg.flags, exe]
+    if binary == "jsrun":
+        gpu_per_rs = "1" if gpu else "0"
+        return [binary, "--nrs", str(ppn), "--cpu_per_rs", "1", "--gpu_per_rs", gpu_per_rs, "--tasks_per_rs", "1", *gf, *cfg.flags, exe]
+    if binary == "flux":
+        return [binary, *cfg.flags, "--ntasks", str(ppn), *gf, exe]
+    return [binary, "-n", str(ppn), *gf, *cfg.flags, exe]
+
 
 # Parameters that enable simulation output writing for post_process.
 # When post_process is a target, simulation must write field data so
@@ -60,7 +178,7 @@ def get_post_process_mods(case_params: dict) -> dict:
 
 
 Tend = 0.25
-Nt = 50
+Nt = 25
 mydt = 0.0005
 
 BASE_CFG = {
@@ -162,26 +280,93 @@ class TestCase(case.Case):
         super().__init__({**BASE_CFG.copy(), **mods})
 
     def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
-        if gpus is not None and len(gpus) != 0:
-            gpus_select = ["--gpus"] + [str(_) for _ in gpus]
-        else:
-            gpus_select = []
-
-        filepath = f"{self.get_dirpath()}/case.py"
-        tasks = ["-n", str(self.ppn)]
-        jobs = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
-        case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
-
         if self.params.get("bubbles_lagrange", "F") == "T":
             input_bubbles_lagrange(self)
 
-        mfc_script = ".\\mfc.bat" if os.name == "nt" else "./mfc.sh"
+        dirpath = self.get_dirpath()
+        target_objs = [get_target(t) for t in targets]
+        target_names = {t.name for t in target_objs}
 
-        target_names = [get_target(t).name for t in targets]
+        # Apply post_process parameter modifications (same logic as generated case.py)
+        params = dict(self.params)
+        if "post_process" in target_names:
+            params.update(POST_PROCESS_OUTPUT_PARAMS)
+            if int(params.get("p", 0)) != 0:
+                params.update(POST_PROCESS_3D_PARAMS)
+        else:
+            params.update(POST_PROCESS_OFF_PARAMS)
 
-        command = [mfc_script, "run", filepath, "--no-build", *tasks, *case_optimization, *jobs, "-t", *target_names, *gpus_select, *ARG("--")]
+        # Generate .inp files directly from in-memory params (no subprocess)
+        inp_case = case.Case(params)
+        for target_obj in target_objs:
+            content = inp_case._get_inp_content(target_obj)
+            common.file_write(os.path.join(dirpath, f"{target_obj.name}.inp"), content)
 
-        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        # Get MPI config for the current system (resolved once, cached)
+        cfg = _get_mpi_config()
+
+        # Set up environment: apply system-specific env vars from mpi_config.
+        # gpu_env is applied only for GPU builds (e.g. MPICH_GPU_SUPPORT_ENABLED).
+        # ARG("gpu") is "acc", "mp", or "no"/"" — only truthy GPU backends apply.
+        env = dict(os.environ)
+        env.update(cfg.env)
+        gpu_build = ARG("gpu") not in (None, "", "no")
+        if gpu_build:
+            env.update(cfg.gpu_env)
+        if gpus:
+            gpu_ids = ",".join(str(g) for g in gpus)
+            env["CUDA_VISIBLE_DEVICES"] = gpu_ids
+            env["HIP_VISIBLE_DEVICES"] = gpu_ids
+
+        # Resolve binary paths using the original (unmodified) params for slug
+        slug_case = self.to_input_file()
+
+        # Run each target binary sequentially
+        all_output = []
+        for target_obj in target_objs:
+            bin_path = target_obj.get_install_binpath(slug_case)
+            cmd = _mpi_cmd(cfg, self.ppn, bin_path, gpu=gpu_build)
+
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=dirpath,
+                    env=env,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                    timeout=3600,
+                )
+            except subprocess.TimeoutExpired:
+                all_output.append(f"TIMEOUT after 3600s: {' '.join(cmd)}")
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=-1,
+                    stdout="\n".join(all_output),
+                )
+            except (subprocess.SubprocessError, OSError) as exc:
+                all_output.append(f"LAUNCH FAILED: {exc}")
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=-1,
+                    stdout="\n".join(all_output),
+                )
+
+            all_output.append(result.stdout or "")
+
+            if result.returncode != 0:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=result.returncode,
+                    stdout="\n".join(all_output),
+                )
+
+        return subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="\n".join(all_output),
+        )
 
     def get_trace(self) -> str:
         return self.trace

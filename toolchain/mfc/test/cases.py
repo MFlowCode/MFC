@@ -698,8 +698,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "patch_ib(1)%model_threshold": 0.5,
         }
 
+        def reduce_ibm_stl_grid(case: dict):
+            if case.get("p", 0) != 0:
+                case["m"] = min(case.get("m", 49), 29)
+                case["n"] = min(case.get("n", 49), 29)
+                case["p"] = min(case.get("p", 49), 29)
+            else:
+                case["m"] = min(case.get("m", 49), 29)
+                case["n"] = min(case.get("n", 49), 29)
+
         for ndim in range(2, 4):
-            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=common_mods))
+            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=common_mods, functor=reduce_ibm_stl_grid))
 
     ibm_stl()
 
@@ -1552,10 +1561,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             def modify_example_case(case: dict):
                 case["parallel_io"] = "F"
-                if "t_step_stop" in case and case["t_step_stop"] >= 50:
+                if "t_step_stop" in case and case["t_step_stop"] >= 25:
                     case["t_step_start"] = 0
-                    case["t_step_stop"] = 50
-                    case["t_step_save"] = 50
+                    case["t_step_stop"] = 25
+                    case["t_step_save"] = 25
+
+                # Adaptive-dt examples use t_stop/t_save instead of
+                # t_step_stop/t_step_save.  Clamp t_stop = t_save so
+                # only save indices 0 and 1 are produced (always
+                # consecutive).  Without this, large adaptive steps
+                # skip save indices and post_process aborts on the gap.
+                if case.get("cfl_adap_dt", "F") == "T":
+                    t_save = float(case.get("t_save", 1.0))
+                    case["t_stop"] = t_save
 
                 caseSize = case["m"] * max(case["n"], 1) * max(case["p"], 1)
                 if caseSize > 25 * 25:

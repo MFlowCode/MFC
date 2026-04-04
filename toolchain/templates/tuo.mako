@@ -19,6 +19,16 @@
 % endif
 % endif
 
+<%
+mpi_config = {
+    "binary":    "flux",
+    "flags":     ["run", "-o", "spindle.level=off", "--exclusive"],
+    "env":       {"HSA_XNACK": "0", "MPICH_GPU_SUPPORT_ENABLED": "0"},
+    "gpu_env":   {"MPICH_GPU_SUPPORT_ENABLED": "1"},
+    "gpu_flags": ["--gpus-per-task", "1"],
+}
+%>
+
 ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
@@ -43,9 +53,8 @@ export HSA_XNACK=0
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; flux run \
+        (set -x; ${mpi_config['binary']} ${' '.join(mpi_config['flags'])} \
             --nodes=${nodes} --ntasks=${tasks_per_node * nodes} \
-            -o spindle.level=off --exclusive \
             % if gpu:
                 --gpus-per-task 1 \
             % endif

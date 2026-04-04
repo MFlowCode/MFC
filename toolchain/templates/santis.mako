@@ -54,6 +54,17 @@ export MPICH_NO_BUFFER_ALIAS_CHECK=1
 export NSYS=0                                 # enable nsys profiling
 export NSYS_FILE=myreport.qdrep
 
+<%
+mpi_config = {
+    "binary": "srun",
+    "flags":  ["--unbuffered", "--cpus-per-task", "72", "--cpu-bind=none"],
+    "env":       {"MPICH_GPU_SUPPORT_ENABLED": "1", "MPICH_NO_BUFFER_ALIAS_CHECK": "1",
+                  "FI_CXI_RX_MATCH_MODE": "software", "FI_MR_CACHE_MONITOR": "disabled",
+                  "NV_ACC_USE_MALLOC": "0", "NVCOMPILER_ACC_MEMHINTS": "DISABLE"},
+    "gpu_flags": ["--gpus-per-task", "1"],
+}
+%>
+
 ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
@@ -70,10 +81,9 @@ echo
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; srun --unbuffered \
+        (set -x; ${mpi_config['binary']} \
                 --ntasks=${nodes*tasks_per_node}                     \
-                --cpus-per-task 72                                   \
-                --cpu-bind=none                                      \
+                ${' '.join(mpi_config['flags'])}                     \
             % if gpu_enabled:
                 --gpus-per-task 1                                    \
             % endif

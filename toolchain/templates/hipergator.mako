@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 
 <%namespace name="helpers" file="helpers.mako"/>
+<%
+mpi_config = {
+    "binary": "mpirun",
+    "flags":  ["--bind-to", "none"],
+    "env":    {},
+}
+%>
 
 % if engine == 'batch':
 #SBATCH --nodes=${nodes}
@@ -52,14 +59,10 @@ echo
         (set -x; ${profiler}    \
             /apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpirun \
                    -np ${nodes*tasks_per_node}            \
-                   --bind-to none                         \
+                   ${' '.join(mpi_config['flags'])}       \
                    "${target.get_install_binpath(case)}")
         % else:
-        (set -x; ${profiler}    \
-            mpirun              \
-                   -np ${nodes*tasks_per_node}            \
-                   --bind-to none                         \
-                   "${target.get_install_binpath(case)}")
+    ${helpers.mpi_cmd(nodes*tasks_per_node, target.get_install_binpath(case))}
         % endif
     % endif
 

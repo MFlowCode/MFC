@@ -81,6 +81,21 @@ END
 % endif
 </%def>
 
+<%def name="mpi_cmd(nprocs, binary_path, extra_flags=[])">
+<%
+    b = mpi_config['binary']
+    all_flags = list(mpi_config.get('flags', [])) + list(extra_flags)
+    flags_str = ' '.join(all_flags)
+%>\
+% if b == 'flux':
+        (set -x; ${profiler} flux ${flags_str} --ntasks=${nprocs} "${binary_path}")
+% elif b == 'srun':
+        (set -x; ${profiler} srun --ntasks ${nprocs} ${flags_str} "${binary_path}")
+% else:
+        (set -x; ${profiler} ${b} -np ${nprocs} ${flags_str} "${binary_path}")
+% endif
+</%def>
+
 <%def name="run_epilogue(target)">
 % if os.name != 'nt':
     code=$?
