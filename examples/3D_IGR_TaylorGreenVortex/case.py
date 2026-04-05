@@ -2,20 +2,20 @@
 import json
 import math
 
-N = 99
+N = 127
 
-Re = 1600
+Re = 10000
 L = 1
 P0 = 101325
 rho0 = 1
 C0 = math.sqrt(1.4 * P0)
-V0 = 0.1 * C0
+V0 = 1.25 * C0
 mu = V0 * L / Re
 
-cfl = 0.5
+cfl = 0.3
 dx = 2 * math.pi * L / (N + 1)
 
-dt = cfl * dx / (C0)
+dt = cfl * dx / (C0 + V0)
 
 tC = L / V0
 tEnd = 20 * tC
@@ -60,7 +60,7 @@ print(
             "igr_iter_solver": 1,
             "num_igr_iters": 3,
             "num_igr_warm_start_iters": 3,
-            "alf_factor": 10,
+            "alf_factor": 2,
             "viscous": "T",
             # Formatted Database Files Structure Parameters
             "format": 1,
@@ -70,6 +70,7 @@ print(
             "omega_wrt(2)": "T",
             "omega_wrt(3)": "T",
             "qm_wrt": "T",
+            "fft_wrt": "T",
             "fd_order": 4,
             "parallel_io": "T",
             # Patch 1: Background (AIR - 2)

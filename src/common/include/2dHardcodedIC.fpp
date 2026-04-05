@@ -12,6 +12,11 @@
     real(wp) :: sigma, gauss1, gauss2
     ! # 208
     real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
+    ! #284
+    real(wp) :: ux_tl, ux_tr, ux_bl, ux_br, uy_tl, uy_tr, uy_bl, uy_br, rho_tl, rho_tr, rho_bl, rho_br, En_tl, En_tr, En_bl, &
+         & En_br, p_tl, p_tr, p_bl, p_br
+    ! #285
+    real(wp) :: sb
 
     eps = 1.e-9_wp
 #:enddef
@@ -303,6 +308,75 @@
             q_prim_vf(momxb + 0)%sf(i, j, &
                       & 0) = 112.99092883944267*(1 - (0.1/0.3))*y_cc(j)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
             q_prim_vf(momxb + 1)%sf(i, j, 0) = 112.99092883944267*((0.1/0.3))*x_cc(i)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
+        end if
+    case (283)  ! IGR Isentropic vortex
+        ! Modified initial condition so as to match the initial condition used in IGR User Guide
+        if (patch_id == 1) then
+            q_prim_vf(E_idx)%sf(i, j, &
+                      & 0) = 1.0*(1.0 - (1.0/1.0)*(5.0**2*0.4/(8.0*(1.4)*pi**2))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1) &
+                      & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**(1.4/0.4)
+            q_prim_vf(contxb + 0)%sf(i, j, &
+                      & 0) = 1.0*(1.0 - (1.0/1.0)*(5.0**2*0.4/(8.0*(1.4)*pi**2))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1) &
+                      & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**(1/0.4)
+            q_prim_vf(momxb + 0)%sf(i, j, &
+                      & 0) = 0.1 + (y_cc(j) - patch_icpp(1)%y_centroid)*(5.0/(2.0*pi))*exp(0.5*(1.0 - (x_cc(i) - patch_icpp(1) &
+                      & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+            q_prim_vf(momxb + 1)%sf(i, j, &
+                      & 0) = 0.0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*pi))*exp(0.5*(1.0 - (x_cc(i) - patch_icpp(1) &
+                      & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+        end if
+    case(284)  ! 2D IGR riemann test
+        ! Modified initial condition to include entropy wave with fluctuations in density and energy
+        if (patch_id == 1) then
+            gam = 1.4_wp
+            ux_tl = 1.206_wp
+            ux_tr = 0.0_wp
+            ux_bl = 1.206_wp
+            ux_br = 0.0_wp
+
+            uy_tl = 0.0_wp
+            uy_tr = 0.0_wp
+            uy_bl = 1.206_wp
+            uy_br = 1.206_wp
+
+            rho_tl = 0.5323_wp
+            rho_tr = 1.5_wp
+            rho_bl = 0.138_wp
+            rho_br = 0.5323_wp
+
+            p_tl = 0.3_wp
+            p_tr = 1.5_wp
+            p_bl = 0.029_wp
+            p_br = 0.3_wp
+
+            En_tl = p_tl/((gam - 1.0)*rho_tl)
+            En_tr = p_tr/((gam - 1.0)*rho_tr)
+            En_bl = p_bl/((gam - 1.0)*rho_bl)
+            En_br = p_br/((gam - 1.0)*rho_br)
+
+            call symm_2d_blending(q_prim_vf(momxb)%sf(i, j, 0), ux_tl, ux_tr, ux_bl, ux_br, 0.75_wp, 0.75_wp, 0.0025_wp, i, j)
+            call symm_2d_blending(q_prim_vf(momxb + 1)%sf(i, j, 0), uy_tl, uy_tr, uy_bl, uy_br, 0.75_wp, 0.75_wp, 0.0025_wp, i, j)
+
+            call symm_2d_blending(q_prim_vf(contxb)%sf(i, j, 0), rho_tl, rho_tr, rho_bl, rho_br, 0.75_wp, 0.75_wp, 0.0025_wp, i, j)
+            q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(contxb)%sf(i, j, 0) + 0.025 + 0.025*sin(2*pi*x_cc(i)*25)*sin(2*pi*y_cc(j)*25)
+
+            call symm_2d_blending(q_prim_vf(E_idx)%sf(i, j, 0), p_tl, p_tr, p_bl, p_br, 0.75_wp, 0.75_wp, 0.0025_wp, i, j)
+        end if
+    case (285)
+        ! This patch is hard-coded for 2D_IGR_double_mach case with Mach number set to 10
+        gam = 1._wp + 1._wp/fluid_pp(1)%gamma
+
+        if (patch_id == 1) then
+            sb = y_cc(j) - tan(theta_dm)*(x_cc(i) - xr_dm)
+            pshock = (2*gam*Mach**2 - (gam - 1._wp))/(gam + 1._wp)
+            rhoshock = ((gam + 1._wp)*Mach**2)*rho0_dm/((gam - 1._wp)*Mach**2 + 2)
+            velshock = (Mach - (Mach*rho0_dm/rhoshock))/2
+
+            q_prim_vf(contxb)%sf(i, j, 0) = 0.5_wp*(1._wp + tanh(cf*sb))*rhoshock + 0.5_wp*(1._wp - tanh(cf*sb))*rho0_dm
+            q_prim_vf(E_idx)%sf(i, j, 0) = 0.5_wp*(1._wp + tanh(cf*sb))*pshock + 0.5_wp*(1._wp - tanh(cf*sb))*p0_dm
+            q_prim_vf(momxb)%sf(i, j, &
+                      & 0) = 0.5_wp*(1._wp + tanh(cf*sb))*(velshock*tan(theta_dm)) + 0.5_wp*(1._wp - tanh(cf*sb))*u0_dm
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = 0.5_wp*(1._wp + tanh(cf*sb))*(-velshock) + 0.5_wp*(1._wp - tanh(cf*sb))*v0_dm
         end if
     case default
         if (proc_rank == 0) then

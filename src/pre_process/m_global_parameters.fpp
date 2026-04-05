@@ -195,6 +195,10 @@ module m_global_parameters
     logical  :: surface_tension
     !> @}
 
+    ! Double Mach parameters
+    logical  :: double_mach
+    real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm
+
     !> @name Index variables used for m_variables_conversion
     !> @{
     integer :: momxb, momxe
@@ -540,6 +544,21 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
+        double_mach = .false.
+        xshock = dflt_real
+        cf = dflt_real
+        rhoshock = dflt_real
+        pshock = dflt_real
+        velshock = dflt_real
+        u0_dm = dflt_real
+        v0_dm = dflt_real
+        p0_dm = dflt_real
+        rho0_dm = dflt_real
+        theta_dm = dflt_real
+        gam_dm = dflt_real
+        xr_dm = dflt_real
+        Mach = dflt_real
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
@@ -866,6 +885,10 @@ contains
 
         if (.not. igr) then
             allocate (logic_grid(0:m,0:n,0:p))
+        end if
+
+        if (double_mach) then
+            xshock = xr_dm + 1._wp/tan(theta_dm)
         end if
 
     end subroutine s_initialize_global_parameters_module

@@ -256,6 +256,7 @@ _SIMPLE_DESCS = {
     "Re_inv": "Inverse Reynolds number",
     "format": "Output format",
     "precision": "Output precision",
+    "double_mach": "Enable double mach test case",
     # Body forces
     "bf_x": "Enable body force in x",
     "bf_y": "Enable body force in y",
@@ -1041,6 +1042,7 @@ def _load():
         "int_comp",
         "nv_uvm_out_of_core",
         "nv_uvm_pref_gpu",
+        "double_mach",
     ]:
         _r(n, LOG)
     _r("case_dir", STR)

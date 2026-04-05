@@ -495,6 +495,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
     !> @}
 
+    !! Double Mach parameters
+    logical  :: double_mach
+    real(wp) :: xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, theta_dm, gam_dm
+    $:GPU_DECLARE(create='[double_mach, xshock, cf, Mach, pshock, rhoshock, velshock, rho0_dm, p0_dm, u0_dm, v0_dm, xr_dm, &
+                  & theta_dm, gam_dm]')
+
 contains
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
@@ -793,6 +799,21 @@ contains
             mhd = .false.
             relativity = .false.
         #:endif
+
+        double_mach = .false.
+        xshock = dflt_real
+        cf = dflt_real
+        rhoshock = dflt_real
+        pshock = dflt_real
+        velshock = dflt_real
+        u0_dm = dflt_real
+        v0_dm = dflt_real
+        p0_dm = dflt_real
+        rho0_dm = dflt_real
+        theta_dm = dflt_real
+        xr_dm = dflt_real
+        gam_dm = dflt_real
+        Mach = dflt_real
 
         do i = 1, num_patches_max
             patch_ib(i)%geometry = dflt_int

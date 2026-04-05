@@ -637,6 +637,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `cf_wrt`                | Logical | Write color function field |
 | `chem_wrt_T`            | Logical | Write temperature field for chemistry output |
 | `fft_wrt`               | Logical | Enable FFT output |
+| `double_mach`           | Logical | Enable Double Mach Reflection case |
 | `sim_data`              | Logical | Write interface and energy data files (post_process) |
 | `integral_wrt`          | Logical | Write integral data |
 | `num_integrals`         | Integer | Number of integral regions |
