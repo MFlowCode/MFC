@@ -101,7 +101,6 @@ contains
         type(integer_field), optional, intent(in)           :: ib_markers
         type(scalar_field), intent(in), optional            :: beta
         integer, dimension(num_dims)                        :: sizes_glb, sizes_loc
-        integer, dimension(1)                               :: airfoil_glb, airfoil_loc, airfoil_start
 
 #ifdef MFC_MPI
         integer :: i, j
@@ -180,11 +179,11 @@ contains
     subroutine s_initialize_mpi_data_ds(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, dimension(num_dims)                        :: sizes_glb, sizes_loc
+        integer, dimension(num_dims)                        :: sizes_loc
         integer, dimension(3)                               :: sf_start_idx
 
 #ifdef MFC_MPI
-        integer :: i, j, q, k, l, m_ds, n_ds, p_ds, ierr
+        integer :: i, m_ds, n_ds, p_ds, ierr
 
         sf_start_idx = (/0, 0, 0/)
 
@@ -297,16 +296,22 @@ contains
         real(wp), intent(out) :: vcfl_max_glb
         real(wp), intent(out) :: Rc_min_glb
 
+        icfl_max_glb = icfl_max_loc
+        vcfl_max_glb = vcfl_max_loc
+        Rc_min_glb = Rc_min_loc
+
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
+        block
+            integer :: ierr
 
-        call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+            call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
 
-        if (viscous) then
-            call MPI_REDUCE(vcfl_max_loc, vcfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
-            call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
-        end if
+            if (viscous) then
+                call MPI_REDUCE(vcfl_max_loc, vcfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+                call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
+            end if
+        end block
 #else
         icfl_max_glb = icfl_max_loc
 
@@ -336,9 +341,9 @@ contains
     !> Reduce an array of vectors to their global sums across all MPI ranks.
     impure subroutine s_mpi_allreduce_vectors_sum(var_loc, var_glb, num_vectors, vector_length)
 
-        integer, intent(in)                   :: num_vectors, vector_length
-        real(wp), dimension(:,:), intent(in)  :: var_loc
-        real(wp), dimension(:,:), intent(out) :: var_glb
+        integer, intent(in)                     :: num_vectors, vector_length
+        real(wp), dimension(:,:), intent(in)    :: var_loc
+        real(wp), dimension(:,:), intent(inout) :: var_glb
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors

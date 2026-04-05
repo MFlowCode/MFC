@@ -260,6 +260,14 @@ contains
         real(wp), optional, intent(out)     :: G_K
         real(wp)                            :: alpha_K_sum
         integer                             :: i, j  !< Generic loop iterators
+
+        rho_K = 0._wp
+        gamma_K = 0._wp
+        pi_inf_K = 0._wp
+        qv_K = 0._wp
+        Re_K = dflt_real
+        if (present(G_K)) G_K = 0._wp
+
 #ifdef MFC_SIMULATION
         ! Constrain partial densities and volume fractions within physical bounds
         if (num_fluids == 1 .and. bubbles_euler) then
@@ -1315,7 +1323,7 @@ contains
             disc = term**2 - 4*c**2*B(norm)**2/(rho*h + B2)
         end if
 
-#ifdef DEBUG
+#ifdef MFC_DEBUG
         if (disc < 0._wp) then
             print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, B(1), B(2), B(3), h, term, disc
             call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')

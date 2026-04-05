@@ -40,4 +40,4 @@ if [ "$job_cluster" = "phoenix" ]; then
 fi
 
 RETRY_VALIDATE_CMD="$validate_cmd" \
-    retry_build ./mfc.sh test -v --dry-run -j 8 $build_opts || exit 1
+    retry_build ./mfc.sh test -v --dry-run -a -j 8 $build_opts || exit 1

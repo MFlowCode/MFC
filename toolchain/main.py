@@ -208,6 +208,19 @@ if __name__ == "__main__":
         # Setup debug logging if requested
         setup_debug_logging(ARG("debug_log", dflt=None))
 
+        # --reldebug and --debug are mutually exclusive: if the user explicitly
+        # passed one, clear the other (which may be lingering from a prior run's
+        # persisted config).
+        if state.gARG.get("reldebug") and state.gARG.get("debug"):
+            # Determine which flag the user explicitly passed on this invocation
+            # by checking whether the persisted config already had it set.
+            if not state.gCFG.reldebug:
+                # User just passed --reldebug; clear persisted --debug
+                state.gARG["debug"] = False
+            else:
+                # User just passed --debug; clear persisted --reldebug
+                state.gARG["reldebug"] = False
+
         lock.switch(state.MFCConfig.from_dict(state.gARG))
 
         # Ensure IDE configuration is up to date (lightweight check)

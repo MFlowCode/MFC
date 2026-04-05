@@ -84,7 +84,7 @@ module m_riemann_solvers
 contains
 
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
-    !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_exact_riemann_solver 4) s_hlld_riemann_solver
+    !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_lf_riemann_solver 4) s_hlld_riemann_solver
     subroutine s_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
 
         & qL_prim_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
@@ -2205,7 +2205,8 @@ contains
                                         & G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
                                         & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
                                         & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP]')
+                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, &
+                                        & Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2423,7 +2424,8 @@ contains
                                         & qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, &
                                         & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, &
                                         & xi_P, xi_L, xi_R, xi_MP, xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, &
-                                        & R3V2Lbar, R3V2Rbar]')
+                                        & R3V2Lbar, R3V2Rbar, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, &
+                                        & Phi_avg, h_iL, h_iR, h_avg_2]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
