@@ -519,6 +519,13 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         radius = patch_ib(patch_id)%radius
 
+        ! completely skip particles no in the domain
+        if (center(1) - radius > x_cc(m + gp_layers + 1) .or. center(1) + radius < x_cc(-gp_layers - 1) .or. center(2) &
+            & - radius > y_cc(n + gp_layers + 1) .or. center(2) + radius < y_cc(-gp_layers - 1) .or. center(3) - radius > z_cc(p &
+            & + gp_layers + 1) .or. center(3) + radius < z_cc(-gp_layers - 1)) then
+            return
+        end if
+
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
@@ -1073,8 +1080,7 @@ contains
 
         #:for X in [('x'), ('y')]
             ! check for periodicity
-
-            if (bc_${X}$%beg == BC_PERIODIC) then
+            if (ib_bc_${X}$%beg == BC_PERIODIC) then
                 ${X}$p_lower = -1
                 ${X}$p_upper = 1
             else
@@ -1086,7 +1092,7 @@ contains
 
         ! z only if 3D
         if (present(zp_lower) .and. p /= 0) then
-            if (bc_z%beg == BC_PERIODIC) then
+            if (ib_bc_z%beg == BC_PERIODIC) then
                 zp_lower = -1
                 zp_upper = 1
             else

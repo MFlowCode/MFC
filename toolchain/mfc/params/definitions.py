@@ -27,7 +27,8 @@ def _fc(name: str) -> int:
 NF = _fc("num_fluids_max")  # fluid_pp
 NPR = _fc("num_probes_max")  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max")  # patch_bc
-NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp, patch_ib (Fortran array bound)
+NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp (Fortran array bound)
+NIB = _fc("num_ib_patches_max")  # patch_ib (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -223,6 +224,10 @@ _SIMPLE_DESCS = {
     "hyperelasticity": "Enable hyperelastic model",
     "relativity": "Enable special relativity",
     "ib": "Enable immersed boundaries",
+    "collision_model": "Collision model for immersed boundaries (0=none, 1=soft sphere)",
+    "coefficient_of_restitution": "Coefficient of restitution for IB collisions",
+    "collision_time": "Characteristic collision time for IB collisions",
+    "ib_coefficient_of_friction": "Coefficient of friction for IB collisions",
     "acoustic_source": "Enable acoustic sources",
     # Output
     "parallel_io": "Enable parallel I/O",
@@ -708,6 +713,11 @@ DEPENDENCIES = {
             "requires": ["num_ibs"],
         }
     },
+    "collision_model": {
+        "when_set": {
+            "requires": ["ib", "coefficient_of_restitution", "collision_time"],
+        }
+    },
     "acoustic_source": {
         "when_true": {
             "requires": ["num_source"],
@@ -902,6 +912,10 @@ def _load():
     # Immersed boundary
     _r("num_ibs", INT, {"ib"})
     _r("ib", LOG, {"ib"})
+    _r("collision_model", INT, {"ib"})
+    _r("coefficient_of_restitution", REAL, {"ib"})
+    _r("collision_time", REAL, {"ib"})
+    _r("ib_coefficient_of_friction", REAL, {"ib"})
 
     # Probes
     for n in ["num_probes", "num_integrals"]:
@@ -1151,7 +1165,7 @@ def _load():
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
     # max_index is None so the parameter registry stays compact (no enumeration).
-    # The Fortran-side upper bound (num_patches_max in m_constants.fpp) is parsed
+    # The Fortran-side upper bound (num_ib_patches_max in m_constants.fpp) is parsed
     # and enforced by the case_validator, not by max_index here.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
@@ -1177,7 +1191,7 @@ def _load():
             base_name="patch_ib",
             attrs=_ib_attrs,
             tags=_ib_tags,
-            max_index=NUM_PATCHES_MAX,
+            max_index=NIB,
         )
     )
 

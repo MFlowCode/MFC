@@ -76,7 +76,7 @@ contains
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
             & 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
             & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters', &
-            & 'adap_dt_max_iters' ]
+            & 'adap_dt_max_iters', 'collision_model' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -133,7 +133,8 @@ contains
             & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
             & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
             & 'ic_eps', 'ic_beta', 'hyper_cleaning_speed', &
-            & 'hyper_cleaning_tau' ]
+            & 'hyper_cleaning_tau', 'coefficient_of_restitution', 'collision_time', &
+            & 'ib_coefficient_of_friction' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

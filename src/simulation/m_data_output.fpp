@@ -167,9 +167,16 @@ contains
         character(len=path_len + 2*name_len) :: file_loc
         integer                              :: ios
 
+        call s_create_directory(trim(case_dir) // '/restart_data')
         write (file_loc, '(A)') 'ib_state.dat'
-        file_loc = trim(case_dir) // '/D/' // trim(file_loc)
-        open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
+        file_loc = trim(case_dir) // '/restart_data/' // trim(file_loc)
+        if (t_step_start /= 0) then
+            ! On restart, append to existing file to preserve history
+            open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', &
+                  & position='append', iostat=ios)
+        else
+            open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
+        end if
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
 
     end subroutine s_open_ib_state_file
@@ -909,7 +916,7 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> Write IB state records to D/ib_state.dat (rank 0 only)
+    !> @brief Writes IB state records to restart_data/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file()
 
         integer :: i
@@ -918,6 +925,7 @@ contains
             write (ib_state_unit) mytime, i, patch_ib(i)%force, patch_ib(i)%torque, patch_ib(i)%vel, patch_ib(i)%angular_vel, &
                    & patch_ib(i)%angles, patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid
         end do
+        flush (ib_state_unit)
 
     end subroutine s_write_ib_state_file
 

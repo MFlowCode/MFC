@@ -18,7 +18,7 @@ module m_helper
     public :: s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, s_simpson, s_transcoeff, &
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
-        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data
+        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product
 
 contains
 
@@ -297,7 +297,22 @@ contains
 
     end function f_cross
 
-    !> Swap two real numbers.
+    !> @brief Computes the cross product c = a x b of two 3D vectors.
+    subroutine s_cross_product(a, b, c)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in)  :: a(3), b(3)
+        real(wp), intent(out) :: c(3)
+
+        c(1) = a(2)*b(3) - a(3)*b(2)
+        c(2) = a(3)*b(1) - a(1)*b(3)
+        c(3) = a(1)*b(2) - a(2)*b(1)
+
+    end subroutine s_cross_product
+
+    !> This procedure swaps two real numbers.
+    !! @param lhs Left-hand side.
+    !! @param rhs Right-hand side.
     elemental subroutine s_swap(lhs, rhs)
 
         real(wp), intent(inout) :: lhs, rhs

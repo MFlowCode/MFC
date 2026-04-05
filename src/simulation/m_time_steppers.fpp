@@ -394,8 +394,8 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        ! Opening and writing the header of the ib state data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
+        ! Opening the ib state data file (used for restart and diagnostics)
+        if (proc_rank == 0 .and. ib) then
             call s_open_ib_state_file()
         end if
 
@@ -558,13 +558,6 @@ contains
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
                     ! compute ib forces for fixed immersed boundaries if requested for output
-                else if (ib_state_wrt .and. s == nstage) then
-                    call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                end if
-
-                ! Write IB state to file if requested and at the RK final stage
-                if (proc_rank == 0 .and. ib_state_wrt .and. s == nstage) then
-                    call s_write_ib_state_file()
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -576,7 +569,13 @@ contains
             end if
         end do
 
-        if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
+        !
+        if (ib) then
+            if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
+            if (ib_state_wrt .and. (.not. moving_immersed_boundary_flag)) then
+                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+            end if
+        end if
 
         ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
@@ -972,8 +971,8 @@ contains
             call s_close_run_time_information_file()
         end if
 
-        ! Writing the footer of and closing the IB data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
+        ! Closing the IB state data file
+        if (proc_rank == 0 .and. ib) then
             call s_close_ib_state_file()
         end if
 

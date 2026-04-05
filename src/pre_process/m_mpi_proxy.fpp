@@ -112,8 +112,9 @@ contains
             if (chemistry) then
                 call MPI_BCAST(patch_icpp(i)%Y, size(patch_icpp(i)%Y), mpi_p, 0, MPI_COMM_WORLD, ierr)
             end if
-            ! Broadcast IB variables: patch_ib is indexed 1:num_patches_max, not 1:num_bc_patches_max, so these must live in the
-            ! num_patches_max loop.
+        end do
+
+        do i = 1, num_ibs
             #:for VAR in ['vel', 'angular_vel', 'angles']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
