@@ -1541,7 +1541,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
-                "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "1D_qbmm",
+                "2D_premixed_landau_insta",
+                "1D_flamelet",
+                "2D_premixed_flame_vortex",  # formatted I/O field overflow on gfortran 12
             ]
             if path in casesToSkip:
                 continue
@@ -1585,6 +1588,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-10),
                 )
             )
+
+        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={**common_mods}, override_tol=10 ** (-10)))
 
         stack.push(
             "1D -> Chemistry -> MultiComponent Diffusion",

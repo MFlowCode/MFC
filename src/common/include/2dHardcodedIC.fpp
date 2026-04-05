@@ -3,7 +3,7 @@
     real(wp) :: eps, eps_mhd, C_mhd
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
-    real(wp) :: factor
+    real(wp) :: factor, x1c, y1c, x2c, y2c, r1c, r2c, cvortex, u1c, u2c, v1c, v2c, rvortex
     real(wp) :: r0, alpha, r2
     real(wp) :: sinA, cosA
     real(wp) :: r_sq
@@ -11,7 +11,13 @@
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
     ! # 208
-    real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
+    real(wp)            :: ei, d, fsm, alpha_air, alpha_sf6
+    real(wp)            :: y_center, y_dist, wave_phase, front_shift, x_mapped, interp_wt
+    integer             :: v, idx_lo, idx_hi, idx_mid
+    real(wp), parameter :: Ly_param = 0.00775735_wp
+    real(wp), parameter :: A_param = 0.1_wp*96.9880867_wp*10.0_wp**(-6.0_wp)
+    integer, parameter  :: Nwaves = 6
+    real(wp), parameter :: y0_ref = 0.0_wp
 
     eps = 1.e-9_wp
 #:enddef
@@ -266,6 +272,63 @@
     case (270)  ! 2D extrusion of 1D profile from external data
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
         @: HardcodedReadValues()
+    case (271)  ! Premixed Flame Vortices interctiom
+        @: HardcodedReadValues()
+        x1c = 0.0027_wp
+        y1c = 0.005_wp
+        x2c = 0.0027_wp
+        y2c = 0.003_wp
+        r1c = (x_cc(i) - x1c)**(2.0_wp) + (y_cc(j) - y1c)**(2.0_wp)
+        r2c = (x_cc(i) - x2c)**(2.0_wp) + (y_cc(j) - y2c)**(2.0_wp)
+        rvortex = 0.0005_wp
+        cvortex = 6000.0_wp
+
+        u1c = -cvortex*((y_cc(j) - y1c))*exp(-r1c/(2.0_wp*rvortex**2.0_wp))
+        v1c = cvortex*((x_cc(i) - x1c))*exp(-r1c/(2.0_wp*rvortex**2.0_wp))
+
+        u2c = cvortex*((y_cc(j) - y2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
+        v2c = -cvortex*((x_cc(i) - x2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
+        q_prim_vf(momxb)%sf(i, j, 0) = q_prim_vf(momxb)%sf(i, j, 0) + u1c + u2c
+        q_prim_vf(momxe)%sf(i, j, 0) = v1c + v2c
+    case (272)  ! Prexmied flame instability
+        @: HardcodedReadValues()
+
+        y_center = y0_ref
+        y_dist = y_cc(j) - y_center
+        wave_phase = 2.0_wp*pi*Nwaves*(y_dist/Ly_param)
+        front_shift = A_param*sin(wave_phase)
+
+        x_mapped = x_cc(i) - front_shift
+
+        if (x_mapped <= x_coords(1)) then
+            do v = 1, sys_size - 1
+                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = stored_values(1, 1, v)
+            end do
+            q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+        else if (x_mapped >= x_coords(xRows)) then
+            do v = 1, sys_size - 1
+                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = stored_values(xRows, 1, v)
+            end do
+            q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+        else
+            idx_lo = 1; idx_hi = xRows
+            do while (idx_hi - idx_lo > 1)
+                idx_mid = (idx_lo + idx_hi)/2
+                if (x_coords(idx_mid) <= x_mapped) then
+                    idx_lo = idx_mid
+                else
+                    idx_hi = idx_mid
+                end if
+            end do
+
+            interp_wt = (x_mapped - x_coords(idx_lo))/(x_coords(idx_hi) - x_coords(idx_lo))  ! weight in [0,1)
+
+            do v = 1, sys_size - 1
+                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = (1.0_wp - interp_wt)*stored_values(idx_lo, 1, &
+                          & v) + interp_wt*stored_values(idx_hi, 1, v)
+            end do
+            q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+        end if
     case (280)  ! Isentropic vortex
         ! This is patch is hard-coded for test suite optimization used in the 2D_isentropicvortex case: This analytic patch uses
         ! geometry 2
