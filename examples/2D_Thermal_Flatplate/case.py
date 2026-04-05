@@ -51,7 +51,7 @@ case =     {
             "bc_x%beg": -7,
             "bc_x%end": -3,
             "bc_y%beg": -16,
-            "bc_y%end": -16,
+            "bc_y%end": -8,
             "bc_y%isothermal_in": "T",
             "bc_y%Twall_in" : 600.0,
             "bc_y%isothermal_out": "T",
