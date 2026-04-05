@@ -41,14 +41,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip jq
 
-      - name: Checkout base repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
       - name: Determine PR number
         id: mode
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -61,7 +58,23 @@ jobs:
             exit 1
           fi
 
+          PR_HEAD_REF="$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName)"
+
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_head_ref=$PR_HEAD_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout base repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch PR branch
+        shell: bash
+        env:
+          PR_HEAD_REF: ${{ steps.mode.outputs.pr_head_ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$PR_HEAD_REF"
 
       - name: Resolve review state
         id: state
@@ -214,7 +227,7 @@ jobs:
             - Nearby unchanged lines in changed files may be used as supporting context only.
             - Do NOT raise findings about code outside changed files.
             - Do NOT provide general repo suggestions or unrelated improvement ideas.
-            - Do NOT include positive confirmations like "No issues with X".
+            - Do NOT include positive confirmations like "No issues with X"
             - If confidence is low, omit the finding.
 
             Allowed workflow:
