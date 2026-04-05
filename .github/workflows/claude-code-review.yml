@@ -68,13 +68,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch PR branch
+      - name: Fetch PR head
         shell: bash
         env:
-          PR_HEAD_REF: ${{ steps.mode.outputs.pr_head_ref }}
+          PR_NUMBER: ${{ steps.mode.outputs.pr_number }}
         run: |
           set -euo pipefail
-          git fetch origin "$PR_HEAD_REF"
+          # Fetch the PR merge ref — works for both same-repo and fork PRs
+          # (fork branches don't exist on origin, but pull/<n>/head always does)
+          git fetch origin "pull/${PR_NUMBER}/head"
 
       - name: Resolve review state
         id: state
