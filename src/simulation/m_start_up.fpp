@@ -15,6 +15,7 @@ module m_start_up
     use m_variables_conversion
     use m_weno
     use m_muscl
+    use m_thinc
     use m_riemann_solvers
     use m_cbc
     use m_boundary_common
@@ -173,7 +174,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the starting time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
-        logical :: file_exist
+        logical :: file_exist                               !< Logical used to check the existence of the input file
         integer :: i, r
 
         if (cfl_dt) then
@@ -435,7 +436,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -497,7 +498,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
@@ -679,7 +680,6 @@ contains
 
     !> Collect per-process wall-clock times and write aggregate performance metrics to file
     impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
-
         & file_exists)
 
         real(wp), intent(inout)               :: time_avg, time_final
@@ -930,6 +930,7 @@ contains
             else if (recon_type == MUSCL_TYPE) then
                 call s_initialize_muscl_module()
             end if
+            if (int_comp > 0) call s_initialize_thinc_module()
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
@@ -1101,6 +1102,7 @@ contains
             else if (recon_type == MUSCL_TYPE) then
                 call s_finalize_muscl_module()
             end if
+            if (int_comp > 0) call s_finalize_thinc_module()
         end if
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module

@@ -32,6 +32,7 @@ module m_rhs
     use m_body_forces
     use m_chemistry
     use m_igr
+    use m_thinc
     use m_pressure_relaxation
 
     implicit none
@@ -439,7 +440,7 @@ contains
                         @:ALLOCATE(dqR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                    & idwbuff(3)%beg:idwbuff(3)%end, mom_idx%beg:mom_idx%end))
                     end if
-                end if  ! end allocation for weno_Re_flux
+                end if
             else
                 @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
                 @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
@@ -457,7 +458,7 @@ contains
                         end if
                     end if
                 end do
-            end if  ! end allocation of viscous variables
+            end if
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l, id]', collapse=4)
             do id = 1, num_dims
@@ -472,7 +473,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-        end if  ! end allocation for .not. igr
+        end if
 
         if (qbmm) then
             @:ALLOCATE(mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
@@ -531,7 +532,6 @@ contains
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
-
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
@@ -616,7 +616,12 @@ contains
             call nvtxEndRange
         end if
 
-        ! Loop over coordinate directions for dimensional splitting
+        if (int_comp == 2 .and. n > 0) then
+            call nvtxStartRange("RHS-COMPRESSION-NORMALS")
+            call s_compute_mthinc_normals(q_prim_qp%vf)
+            call nvtxEndRange
+        end if
+
         do id = 1, num_dims
             if (igr .or. dummy) then
                 if (id == 1) then
@@ -647,10 +652,9 @@ contains
                     call nvtxEndRange
                 end if
             end if
-            if ((.not. igr) .or. dummy) then  ! Finite volume solve
-
+            if ((.not. igr) .or. dummy) then
                 ! Reconstructing Primitive/Conservative Variables
-                call nvtxStartRange("RHS-WENO")
+                call nvtxStartRange("RHS-RECONSTRUCTION")
 
                 if (.not. surface_tension) then
                     if (all(Re_size == 0)) then
@@ -715,7 +719,7 @@ contains
                     end if
                 end if
 
-                call nvtxEndRange  ! WENO
+                call nvtxEndRange
 
                 ! Configuring Coordinate Direction Indexes
                 if (id == 1) then
@@ -726,6 +730,7 @@ contains
                     irx%beg = 0; iry%beg = 0; irz%beg = -1
                 end if
                 irx%end = m; iry%end = n; irz%end = p
+
                 ! Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
                 call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, &
@@ -985,7 +990,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             if (model_eqns == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do l = 0, p
                     do k = 0, n
@@ -1063,7 +1068,7 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            else  ! Cartesian Coordinates
+            else
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1, flux_face2]')
                 do j = 1, sys_size
                     do k = 0, p
@@ -1081,7 +1086,7 @@ contains
             end if
 
             if (model_eqns == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do k = 0, p
                     do q = 0, n
@@ -1108,7 +1113,6 @@ contains
 
         !> Add the advection source flux-difference terms for a single coordinate direction to the RHS
         subroutine s_add_directional_advection_source_terms(current_idir, rhs_vf_arg, q_cons_vf_arg, q_prim_vf_arg, &
-
             & flux_src_n_vf_arg, Kterm_arg)
             integer, intent(in)                                    :: current_idir
             type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf_arg
@@ -1143,7 +1147,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                else  ! Other Riemann solvers
+                else
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
@@ -1165,7 +1169,7 @@ contains
                             do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                 local_inv_ds = 1._wp/dx(k_idx)
                                 local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
-                                local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx)  ! Access is safe
+                                local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx)  ! Access is safe due to outer alt_soundspeed check
                                 local_term_coeff = local_q_cons_val + local_k_term_val
                                 local_flux1 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
                                 local_flux2 = flux_src_n_vf_arg%vf(advxb)%sf(k_idx - 1, l_idx, q_idx)
@@ -1174,7 +1178,7 @@ contains
                             end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else  ! NOT alt_soundspeed
+                    else
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = advxb, advxe
@@ -1211,7 +1215,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                else  ! Other Riemann solvers
+                else
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
@@ -1250,7 +1254,7 @@ contains
                             end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else  ! NOT alt_soundspeed
+                    else
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = advxb, advxe
@@ -1292,7 +1296,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                else  ! Other Riemann solvers
+                else
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
@@ -1323,7 +1327,7 @@ contains
                             end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else  ! NOT alt_soundspeed
+                    else
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = advxb, advxe
@@ -1648,7 +1652,7 @@ contains
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_x, vL_y, vL_z
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, intent(in) :: norm_dir
-        integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir  !< Coordinate direction of the reconstruction
         integer :: i, j, k, l
         ! Reconstruction in s1-direction
 
