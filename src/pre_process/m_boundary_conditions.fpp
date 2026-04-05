@@ -45,6 +45,7 @@ contains
                     do j = 0, n
                         if (y_cc(j) > y_boundary%beg .and. y_cc(j) < y_boundary%end) then
                             bc_type(1, ${IDX}$)%sf(0, j, 0) = patch_bc(patch_id)%type
+                           
                         end if
                     end do
                 end if
@@ -247,6 +248,7 @@ contains
 
                 if (patch_bc(i)%geometry == 1) then
                     call s_line_segment_bc(i, bc_type)
+                 !   print *, 'hehe'
                 end if
             end do
         end if

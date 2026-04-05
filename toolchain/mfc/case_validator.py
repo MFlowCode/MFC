@@ -1281,7 +1281,7 @@ class CaseValidator:
         if num_fluids is not None and perturb_sph_fluid is not None:
             self.prohibit(perturb_sph_fluid > num_fluids or perturb_sph_fluid < 0, "perturb_sph_fluid must be between 0 and num_fluids")
 
-    def check_chemistry(self):
+    def check_chemistry(self):ss
         """Checks chemistry constraints (pre-process)
 
         Note: num_species is set automatically by Cantera at runtime when cantera_file
