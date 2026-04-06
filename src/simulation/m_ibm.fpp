@@ -857,7 +857,7 @@ contains
     impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
-        integer             :: i, j, k, ierr, z_gp_layers
+        integer             :: i, j, k, z_gp_layers
 
         call nvtxStartRange("UPDATE-MIBM")
 
@@ -906,11 +906,11 @@ contains
         ! intent(in) :: pressure
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
-        integer                                                        :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
+        integer                                                        :: i, j, k, l, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3)                                :: forces, torques
         real(wp), dimension(1:3,1:3)                                   :: viscous_stress_div, viscous_stress_div_1, &
              & viscous_stress_div_2  ! viscous stress tensor with temp vectors to hold divergence calculations
-        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
+        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution
         real(wp)                 :: cell_volume, dx, dy, dz, dynamic_viscosity
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -931,7 +931,7 @@ contains
                     dynamic_viscosities(fluid_idx) = f_compute_hb_viscosity(fluid_pp(fluid_idx)%tau0, fluid_pp(fluid_idx)%K, &
                                         & fluid_pp(fluid_idx)%nn, fluid_pp(fluid_idx)%mu_min, fluid_pp(fluid_idx)%mu_max, 1._wp, &
                                         & fluid_pp(fluid_idx)%hb_m)
-                else if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) then
+                else if (fluid_pp(fluid_idx)%Re(1) > 0._wp) then
                     dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
                 else
                     dynamic_viscosities(fluid_idx) = 0._wp
@@ -1138,7 +1138,7 @@ contains
 
         if (p == 0) then
             normal_axis = [0, 0, 1]
-        else if (sqrt(sum(axis**2)) == 0) then
+        else if (sqrt(sum(axis**2)) < sgm_eps) then
             ! if the object is not actually rotating at this time, return a dummy value and exit
             patch_ib(ib_marker)%moment = 1._wp
             return
