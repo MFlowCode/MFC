@@ -111,10 +111,10 @@ contains
         integer                                     :: ifile, ierr, data_size
 
 #ifdef MFC_MPI
-        integer, dimension(MPI_STATUS_SIZE)  :: status
-        integer(KIND=MPI_OFFSET_KIND)        :: disp
-        integer(KIND=MPI_OFFSET_KIND)        :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, var_MOK
-        integer                              :: save_index
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(KIND=MPI_OFFSET_KIND)       :: disp
+        integer(KIND=MPI_OFFSET_KIND)       :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, var_MOK
+        integer                             :: save_index
 #endif
 
         if (.not. ib) return

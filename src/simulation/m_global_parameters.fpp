@@ -352,16 +352,16 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                               :: ib
-    integer                                               :: num_ibs
-    integer                                               :: collision_model
-    real(wp)                                              :: coefficient_of_restitution
-    real(wp)                                              :: collision_time
-    real(wp)                                              :: ib_coefficient_of_friction
-    logical                                               :: ib_state_wrt
+    logical                                                  :: ib
+    integer                                                  :: num_ibs
+    integer                                                  :: collision_model
+    real(wp)                                                 :: coefficient_of_restitution
+    real(wp)                                                 :: collision_time
+    real(wp)                                                 :: ib_coefficient_of_friction
+    logical                                                  :: ib_state_wrt
     type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
-    integer                                               :: Np
+    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
+    integer                                                  :: Np
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
     !> @}
