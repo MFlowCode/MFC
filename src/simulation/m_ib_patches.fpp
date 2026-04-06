@@ -24,26 +24,9 @@ module m_ib_patches
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models, &
         & s_decode_patch_periodicity
 
-    real(wp) :: x_centroid, y_centroid, z_centroid
-    real(wp) :: length_x, length_y, length_z
-    $:GPU_DECLARE(create='[x_centroid, y_centroid, z_centroid]')
-    $:GPU_DECLARE(create='[length_x, length_y, length_z]')
-
-    integer  :: smooth_patch_id
-    real(wp) :: smooth_coeff
-    $:GPU_DECLARE(create='[smooth_patch_id, smooth_coeff]')
-    ! Analogous to ic_patch_parameters fields; used to lay out IB patches on the grid.
-
-    real(wp) :: cart_x, cart_y, cart_z
-    real(wp) :: sph_phi
-    $:GPU_DECLARE(create='[cart_x, cart_y, cart_z, sph_phi]')
-    ! Cell locations in Cartesian coordinates for 3D cylindrical simulations.
-
-    type(bounds_info) :: x_boundary, y_boundary, z_boundary
-    $:GPU_DECLARE(create='[x_boundary, y_boundary, z_boundary]')
-    ! Patch boundary locations in x, y, z derived from centroid and length parameters.
-
-    character(len=5) :: istr  !< string to store int to string result for error checking
+    real(wp) :: cart_y, cart_z
+    $:GPU_DECLARE(create='[cart_y, cart_z]')
+    ! Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
 
 contains
 
@@ -761,15 +744,15 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp                   !< integers containing the periodicity projection information
-        integer                            :: i, j, k, il, ir, jl, jr  !< Generic loop iterators
+        integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
+        integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
         integer                            :: cx, cy
         real(wp)                           :: lx(2), ly(2)
         real(wp), dimension(1:2)           :: bbox_min, bbox_max
         real(wp), dimension(1:3)           :: local_corner, world_corner
         real(wp)                           :: eta, threshold
-        real(wp), dimension(1:3)           :: point, local_point, offset
+        real(wp), dimension(1:3)           :: offset
         real(wp), dimension(1:3)           :: center, xy_local
         real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
 
@@ -843,8 +826,8 @@ contains
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
         integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
-        real(wp)                           :: eta, threshold, corner_distance
-        real(wp), dimension(1:3)           :: point, local_point, offset
+        real(wp)                           :: eta, threshold
+        real(wp), dimension(1:3)           :: offset
         real(wp), dimension(1:3)           :: center, xyz_local
         real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
         integer                            :: cx, cy, cz
@@ -926,7 +909,6 @@ contains
     subroutine s_update_ib_rotation_matrix(patch_id)
 
         integer, intent(in)          :: patch_id
-        integer                      :: i
         real(wp), dimension(3, 3, 3) :: rotation
         real(wp)                     :: angle
 
@@ -991,17 +973,6 @@ contains
         cart = (/cyl(1), cyl(2)*sin(cyl(3)), cyl(2)*cos(cyl(3))/)
 
     end function f_convert_cyl_to_cart
-
-    !> Converts cylindrical coordinates (x, r) to the spherical azimuthal angle phi and stores in a module variable.
-    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in) :: cyl_x, cyl_y
-
-        sph_phi = atan(cyl_y/cyl_x)
-
-    end subroutine s_convert_cylindrical_to_spherical_coord
 
     subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
 

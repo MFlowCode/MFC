@@ -32,9 +32,8 @@ module m_qbmm
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
     $:GPU_DECLARE(create='[is1_qbmm, is2_qbmm, is3_qbmm]')
 
-    integer, allocatable, dimension(:)   :: bubrs_qbmm
     integer, allocatable, dimension(:,:) :: bubmoms
-    $:GPU_DECLARE(create='[bubrs_qbmm, bubmoms]')
+    $:GPU_DECLARE(create='[bubmoms]')
 
 contains
 
@@ -383,13 +382,7 @@ contains
 
         $:GPU_UPDATE(device='[momrhs]')
 
-        @:ALLOCATE(bubrs_qbmm(1:nb))
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
-
-        do i = 1, nb
-            bubrs_qbmm(i) = bub_idx%rs(i)
-        end do
-        $:GPU_UPDATE(device='[bubrs_qbmm]')
 
         do j = 1, nmom
             do i = 1, nb

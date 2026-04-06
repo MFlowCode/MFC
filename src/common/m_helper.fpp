@@ -182,7 +182,7 @@ contains
     impure subroutine s_initialize_nonpoly()
 
         integer                 :: ir
-        real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN, rhol0
+        real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN
         real(wp), parameter     :: k_poly = 1._wp  !< polytropic index used to compute isothermal natural frequency
 
         ! phi_vg & phi_gv (phi_gg = phi_vv = 1) (Eq. 2.22 in Ando 2010)

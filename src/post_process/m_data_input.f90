@@ -219,14 +219,9 @@ contains
 
         !> Used to store the variable position, in character form, of the currently manipulated conservative variable file
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-
-        !> Location of the time-step directory associated with t_step
-        character(LEN=len_trim(case_dir) + 2*name_len) :: t_step_ib_dir
-        logical                                        :: dir_check
-        logical                                        :: file_check
-        integer                                        :: i
-
-        ! Setting location of time-step folder based on current time-step
+        logical                                                  :: dir_check
+        logical                                                  :: file_check
+        integer                                                  :: i
 
         write (t_step_dir, '(A,I0,A,I0)') '/p_all/p', proc_rank, '/', t_step
         t_step_dir = trim(case_dir) // trim(t_step_dir)
@@ -300,7 +295,6 @@ contains
         integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND)        :: MOK
         integer(kind=MPI_OFFSET_KIND)        :: offset
-        real(wp)                             :: delx, dely, delz
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
         character(len=10)                    :: t_step_string

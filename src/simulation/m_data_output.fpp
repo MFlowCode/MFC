@@ -33,11 +33,10 @@ module m_data_output
     real(wp), public, allocatable, dimension(:,:) :: c_mass
     $:GPU_DECLARE(create='[c_mass]')
 
-    !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
+    !> @name ICFL, VCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
     real(wp) :: icfl_max  !< ICFL criterion maximum
     real(wp) :: vcfl_max  !< VCFL criterion maximum
-    real(wp) :: ccfl_max  !< CCFL criterion maximum
     real(wp) :: Rc_min    !< Rc criterion maximum
     !> @}
 
@@ -1036,7 +1035,7 @@ contains
         real(wp)                                            :: pi_inf
         real(wp)                                            :: qv
         real(wp)                                            :: c
-        real(wp)                                            :: M00, M10, M01, M20, M11, M02
+        real(wp)                                            :: M00, M10, M01, M20, M02
         real(wp)                                            :: varR, varV
         real(wp), dimension(Nb)                             :: nR, R, nRdot, Rdot
         real(wp)                                            :: nR3
@@ -1088,7 +1087,6 @@ contains
             M10 = 0._wp
             M01 = 0._wp
             M20 = 0._wp
-            M11 = 0._wp
             M02 = 0._wp
             varR = 0._wp; varV = 0._wp
             alf = 0._wp
@@ -1168,7 +1166,7 @@ contains
 
                             nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
                         end if
-#ifdef DEBUG
+#ifdef MFC_DEBUG
                         print *, 'In probe, nbub: ', nbub
 #endif
                         if (qbmm) then
@@ -1176,13 +1174,11 @@ contains
                             M10 = q_cons_vf(bub_idx%moms(1, 2))%sf(j - 2, k, l)/nbub
                             M01 = q_cons_vf(bub_idx%moms(1, 3))%sf(j - 2, k, l)/nbub
                             M20 = q_cons_vf(bub_idx%moms(1, 4))%sf(j - 2, k, l)/nbub
-                            M11 = q_cons_vf(bub_idx%moms(1, 5))%sf(j - 2, k, l)/nbub
                             M02 = q_cons_vf(bub_idx%moms(1, 6))%sf(j - 2, k, l)/nbub
 
                             M10 = M10/M00
                             M01 = M01/M00
                             M20 = M20/M00
-                            M11 = M11/M00
                             M02 = M02/M00
 
                             varR = M20 - M10**2._wp

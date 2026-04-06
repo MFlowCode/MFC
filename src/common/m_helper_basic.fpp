@@ -8,6 +8,7 @@
 module m_helper_basic
 
     use m_derived_types
+    use m_precision_select
 
     implicit none
 
@@ -32,7 +33,11 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1.e-10_wp
+            if (wp == single_precision) then
+                tol = 1.e-6_wp
+            else
+                tol = 1.e-10_wp
+            end if
         end if
 
         if (a == b) then
@@ -64,7 +69,11 @@ contains
         if (present(tol_input)) then
             tol = tol_input
         else
-            tol = 1e-10_wp
+            if (wp == single_precision) then
+                tol = 1.e-6_wp
+            else
+                tol = 1.e-10_wp
+            end if
         end if
 
         do i = 1, size(b)
