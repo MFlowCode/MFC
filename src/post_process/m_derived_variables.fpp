@@ -31,7 +31,6 @@ module m_derived_variables
     real(wp), allocatable, dimension(:,:), public :: fd_coeff_z
     !> @}
 
-
 contains
 
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
@@ -62,7 +61,6 @@ contains
         if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
             allocate (fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
         end if
-
 
     end subroutine s_initialize_derived_variables_module
 
