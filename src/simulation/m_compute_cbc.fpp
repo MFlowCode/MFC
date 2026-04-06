@@ -149,7 +149,6 @@ contains
             real(wp), dimension(num_dims), intent(in) :: dvel_ds
         #:endif
         real(wp), intent(in) :: rho, c, dpres_ds
-        integer              :: i
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         L(2:advxe - 1) = 0._wp

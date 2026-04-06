@@ -157,7 +157,6 @@ contains
         #:endif
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
         real(wp) :: nbub                            !< Bubble number density
-        real(wp) :: my_divu
         integer  :: i, j, k, l, q, ii               !< Loop variables
         integer  :: adap_dt_stop_max, adap_dt_stop  !< Fail-safe exit if max iteration count reached
         integer  :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
@@ -183,7 +182,7 @@ contains
 
         adap_dt_stop_max = 0
         $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
-                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu]', collapse=3, &
+                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait]', collapse=3, &
                             & reduction = '[[adap_dt_stop_max]]', reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
         do l = 0, p
             do k = 0, n

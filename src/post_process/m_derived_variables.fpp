@@ -28,8 +28,6 @@ module m_derived_variables
     real(wp), allocatable, dimension(:,:), public :: fd_coeff_z
     !> @}
 
-    integer, private :: flg  !< Dimensionality flag: 1 = 3D dataset, 0 = otherwise
-
 contains
 
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
@@ -52,12 +50,6 @@ contains
 
         if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
             allocate (fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
-        end if
-
-        if (p > 0) then
-            flg = 1
-        else
-            flg = 0
         end if
 
     end subroutine s_initialize_derived_variables_module
@@ -206,42 +198,6 @@ contains
         end do
 
     end subroutine s_derive_flux_limiter
-
-    !> Solve Ax=b via Gaussian elimination with partial pivoting
-    subroutine s_solve_linear_system(A, b, sol, ndim)
-
-        integer, intent(in)                            :: ndim
-        real(wp), dimension(ndim, ndim), intent(inout) :: A
-        real(wp), dimension(ndim), intent(inout)       :: b
-        real(wp), dimension(ndim), intent(out)         :: sol
-        integer                                        :: i, j, k
-
-        ! Forward elimination with partial pivoting
-
-        do i = 1, ndim
-            j = i - 1 + maxloc(abs(A(i:ndim,i)), 1)
-            sol = A(i,:)
-            A(i,:) = A(j,:)
-            A(j,:) = sol
-            sol(1) = b(i)
-            b(i) = b(j)
-            b(j) = sol(1)
-            b(i) = b(i)/A(i, i)
-            A(i,:) = A(i,:)/A(i, i)
-            do k = i + 1, ndim
-                b(k) = b(k) - A(k, i)*b(i)
-                A(k,:) = A(k,:) - A(k, i)*A(i,:)
-            end do
-        end do
-
-        do i = ndim, 1, -1
-            sol(i) = b(i)
-            do k = i + 1, ndim
-                sol(i) = sol(i) - A(i, k)*sol(k)
-            end do
-        end do
-
-    end subroutine s_solve_linear_system
 
     !> Compute the specified component of the vorticity from the primitive variables. From those inputs, it proceeds to calculate
     !! values of the desired vorticity component, which are subsequently stored in derived flow quantity storage variable, q_sf.

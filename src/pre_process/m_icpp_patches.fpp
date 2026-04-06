@@ -32,8 +32,7 @@ module m_icpp_patches
     integer           :: smooth_patch_id
     real(wp)          :: smooth_coeff                        !< Smoothing coefficient (mirrors ic_patch_parameters%smooth_coeff)
     real(wp)          :: eta                                 !< Pseudo volume fraction for patch boundary smoothing
-    real(wp)          :: cart_x, cart_y, cart_z
-    real(wp)          :: sph_phi                             !< Spherical phi for Cartesian conversion in cylindrical coordinates
+    real(wp)          :: cart_y, cart_z
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !< Patch boundary locations in x, y, z
     character(len=5)  :: istr                                !< string to store int to string result for error checking
 
@@ -1268,20 +1267,18 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Variables for IBM+STL
-        real(wp) :: normals(1:3)  !< Boundary normal buffer
-        integer :: boundary_vertex_count, boundary_edge_count, total_vertices  !< Boundary vertex
+        real(wp)                                :: normals(1:3)  !< Boundary normal buffer
+        integer                                 :: boundary_vertex_count, boundary_edge_count, total_vertices  !< Boundary vertex
         real(wp), allocatable, dimension(:,:,:) :: boundary_v  !< Boundary vertex buffer
-        real(wp) :: distance  !< Levelset distance buffer
-        logical :: interpolate  !< Logical variable to determine whether or not the model should be interpolated
-        integer :: i, j, k  !< Generic loop iterators
-        type(t_bbox) :: bbox, bbox_old
-        type(t_model) :: model
-        type(ic_model_parameters) :: params
-        real(wp), dimension(1:3) :: point, model_center
-        real(wp) :: grid_mm(1:3,1:2)
-        integer :: cell_num
-        integer :: ncells
-        real(wp), dimension(1:4,1:4) :: transform, transform_n
+        integer                                 :: i, j, k  !< Generic loop iterators
+        type(t_bbox)                            :: bbox, bbox_old
+        type(t_model)                           :: model
+        type(ic_model_parameters)               :: params
+        real(wp), dimension(1:3)                :: point, model_center
+        real(wp)                                :: grid_mm(1:3,1:2)
+        integer                                 :: cell_num
+        integer                                 :: ncells
+        real(wp), dimension(1:4,1:4)            :: transform, transform_n
 
         if (proc_rank == 0) then
             print *, " * Reading model: " // trim(patch_icpp(patch_id)%model_filepath)
@@ -1404,17 +1401,6 @@ contains
         cart = (/cyl(1), cyl(2)*sin(cyl(3)), cyl(2)*cos(cyl(3))/)
 
     end function f_convert_cyl_to_cart
-
-    !> Compute the spherical azimuthal angle from cylindrical (x, r) coordinates.
-    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in) :: cyl_x, cyl_y
-
-        sph_phi = atan(cyl_y/cyl_x)
-
-    end subroutine s_convert_cylindrical_to_spherical_coord
 
     !> Archimedes spiral function
     elemental function f_r(myth, offset, a)
