@@ -488,7 +488,7 @@ contains
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(in) :: spacing
         integer, intent(in)                  :: spc
-        real(wp)                             :: phi, theta
+        real(wp)                             :: phi
         integer                              :: rand_seed
         real(wp)                             :: fraction
         type(t_ray)                          :: ray
@@ -779,7 +779,7 @@ contains
         real(wp)                              :: v1(1:3), v2(1:3), v3(1:3)
         real(wp)                              :: e0(1:3), e1(1:3), pv(1:3)
         real(wp)                              :: n(1:3), proj(1:3), norm_vec(1:3)
-        real(wp)                              :: d, ndot, denom, norm_mag
+        real(wp)                              :: d, denom, norm_mag
         real(wp)                              :: u, v_bary, w
         real(wp)                              :: l00, l01, l11, l20, l21
         real(wp)                              :: edge(1:3), pe(1:3)
@@ -905,9 +905,9 @@ contains
         real(wp), dimension(1:3), intent(out) :: normals
         real(wp), intent(out)                 :: distance
         integer                               :: i
-        real(wp)                              :: dist_min, dist, t, norm_mag
+        real(wp)                              :: dist_min, dist, t
         real(wp)                              :: v1(1:2), v2(1:2), edge(1:2), pv(1:2)
-        real(wp)                              :: edge_len_sq, proj(1:2), norm(1:2), c
+        real(wp)                              :: edge_len_sq, proj(1:2), norm(1:2)
 
         dist_min = initial_distance_buffer
         normals = 0._wp
@@ -967,16 +967,15 @@ contains
     subroutine s_instantiate_STL_models()
 
         ! Variables for IBM+STL
-        real(wp)                                :: normals(1:3)  !< Boundary normal buffer
-        integer                                 :: boundary_vertex_count, boundary_edge_count, total_vertices  !< Boundary vertex
-        real(wp), allocatable, dimension(:,:,:) :: boundary_v  !< Boundary vertex buffer
-        real(wp)                                :: dx_local, dy_local, dz_local  !< Levelset distance buffer
-        integer                                 :: i, j, k  !< Generic loop iterators
+        real(wp)                                :: normals(1:3)                                !< Boundary normal buffer
+        integer                                 :: boundary_vertex_count, boundary_edge_count  !< Boundary vertex
+        real(wp), allocatable, dimension(:,:,:) :: boundary_v                                  !< Boundary vertex buffer
+        real(wp)                                :: dx_local, dy_local, dz_local                !< Levelset distance buffer
+        integer                                 :: i, j, k                                     !< Generic loop iterators
         integer                                 :: patch_id
         type(t_bbox)                            :: bbox, bbox_old
         type(t_model)                           :: model
         type(ic_model_parameters)               :: params
-        real(wp)                                :: eta
         real(wp), dimension(1:3)                :: point, model_center
         real(wp)                                :: grid_mm(1:3,1:2)
         real(wp), dimension(1:4,1:4)            :: transform, transform_n
@@ -1066,11 +1065,10 @@ contains
         ! Pack and upload flat arrays for GPU (AFTER the loop)
         block
             integer :: pid, max_ntrs
-            integer :: max_bv1, max_bv2, max_bv3, max_iv1, max_iv2
+            integer :: max_bv1, max_bv2, max_bv3
 
             max_ntrs = 0
             max_bv1 = 0; max_bv2 = 0; max_bv3 = 0
-            max_iv1 = 0; max_iv2 = 0
 
             do pid = 1, num_ibs
                 if (allocated(models(pid)%model)) then

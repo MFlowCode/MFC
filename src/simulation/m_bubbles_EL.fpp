@@ -229,7 +229,7 @@ contains
         integer, intent(in)                                 :: bub_id
         integer                                             :: i
         real(wp)                                            :: pliq, volparticle, concvap, totalmass, kparticle, cpparticle
-        real(wp)                                            :: omegaN_local, PeG, PeT, rhol, pcrit, qv, gamma, pi_inf, dynP
+        real(wp)                                            :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
         integer, dimension(3)                               :: cell
         real(wp), dimension(2)                              :: Re
         real(wp)                                            :: massflag, heatflag, Re_trans, Im_trans
@@ -288,10 +288,7 @@ contains
         ! Initial particle pressure
         gas_p(bub_id, 1) = pliq + 2._wp*(1._wp/Web)/bub_R0(bub_id)
         if (.not. f_approx_equal((1._wp/Web), 0._wp)) then
-            pcrit = pv - 4._wp*(1._wp/Web)/(3._wp*sqrt(3._wp*gas_p(bub_id, 1)*bub_R0(bub_id)**3._wp/(2._wp*(1._wp/Web))))
             pref = gas_p(bub_id, 1)
-        else
-            pcrit = 0._wp
         end if
 
         ! Initial particle mass
