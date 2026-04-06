@@ -1961,7 +1961,7 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         logical, intent(in)                                        :: old_grid_in
         character(LEN=*), intent(in)                               :: step_dirpath
-        integer                                                    :: dir, loc, i
+        integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_path
         character(len=10)                                          :: status
 
@@ -2000,12 +2000,10 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_loc, file_path
-        character(len=10)                                          :: status
 
 #ifdef MFC_MPI
         integer          :: ierr
         integer          :: file_id
-        integer          :: offset
         character(len=7) :: proc_rank_str
         logical          :: dir_check
         integer          :: nelements
@@ -2029,8 +2027,6 @@ contains
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'
         call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL, file_id, ierr)
-
-        offset = 0
 
         ! Write bc_types
         do dir = 1, num_dims
@@ -2066,7 +2062,6 @@ contains
         integer                                                       :: dir, loc
         logical                                                       :: file_exist
         character(len=path_len)                                       :: file_path
-        character(len=10)                                             :: status
 
         ! Read bc_types
 
@@ -2109,12 +2104,10 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
         integer                                                       :: dir, loc
         character(len=path_len)                                       :: file_loc, file_path
-        character(len=10)                                             :: status
 
 #ifdef MFC_MPI
         integer          :: ierr
         integer          :: file_id
-        integer          :: offset
         character(len=7) :: proc_rank_str
         logical          :: dir_check
         integer          :: nelements
@@ -2137,8 +2130,6 @@ contains
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'
         call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_RDONLY, MPI_INFO_NULL, file_id, ierr)
-
-        offset = 0
 
         ! Read bc_types
         do dir = 1, num_dims

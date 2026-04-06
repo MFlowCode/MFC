@@ -109,7 +109,7 @@
             do
                 read (unit2, *, iostat=ios2) dummy_x, dummy_y, dummy_z
                 if (ios2 /= 0) exit
-                if (dummy_x == x0 .and. dummy_y /= y0) then
+                if (f_approx_equal(dummy_x, x0) .and. (.not. f_approx_equal(dummy_y, y0))) then
                     yRows = yRows + 1
                 else
                     exit

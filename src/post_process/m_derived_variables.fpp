@@ -31,12 +31,6 @@ module m_derived_variables
     real(wp), allocatable, dimension(:,:), public :: fd_coeff_z
     !> @}
 
-    !> Flagging (flg) variable used to annotate the dimensionality of the dataset that is undergoing the post-process. A flag value
-    !! of 1 indicates that the dataset is 3D, while a flag value of 0 indicates that it is not. This flg variable is necessary to
-    !! avoid cycling through the third dimension of the flow variable(s) when the simulation is not 3D and the size of the buffer is
-    !! non-zero. Note that a similar procedure does not have to be applied to the second dimension since in 1D, the buffer size is
-    !! always zero.
-    integer, private :: flg  !< Dimensionality flag: 1 = 3D dataset, 0 = otherwise
 
 contains
 
@@ -69,13 +63,6 @@ contains
             allocate (fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
         end if
 
-        ! Annotating the dimensionality of the dataset undergoing the post- process. A flag value of 1 indicates that the dataset is
-        ! 3D, while a flag value of 0 indicates that it is not.
-        if (p > 0) then
-            flg = 1
-        else
-            flg = 0
-        end if
 
     end subroutine s_initialize_derived_variables_module
 
@@ -246,58 +233,8 @@ contains
 
     end subroutine s_derive_flux_limiter
 
-    !> Computes the solution to the linear system Ax=b w/ sol = x
-    !! @param A Input matrix
-    !! @param b right-hane-side
-    !! @param sol Solution
-    !! @param ndim Problem size
-    subroutine s_solve_linear_system(A, b, sol, ndim)
-
-        integer, intent(in)                            :: ndim
-        real(wp), dimension(ndim, ndim), intent(inout) :: A
-        real(wp), dimension(ndim), intent(inout)       :: b
-        real(wp), dimension(ndim), intent(out)         :: sol
-
-        ! EXTERNAL DGESV
-
-        integer :: i, j, k
-
-        ! Solve linear system using own linear solver (Thomson/Darter/Comet/Stampede) Forward elimination
-
-        do i = 1, ndim
-            ! Pivoting
-            j = i - 1 + maxloc(abs(A(i:ndim,i)), 1)
-            sol = A(i,:)
-            A(i,:) = A(j,:)
-            A(j,:) = sol
-            sol(1) = b(i)
-            b(i) = b(j)
-            b(j) = sol(1)
-            ! Elimination
-            b(i) = b(i)/A(i, i)
-            A(i,:) = A(i,:)/A(i, i)
-            do k = i + 1, ndim
-                b(k) = b(k) - A(k, i)*b(i)
-                A(k,:) = A(k,:) - A(k, i)*A(i,:)
-            end do
-        end do
-
-        ! Backward substitution
-        do i = ndim, 1, -1
-            sol(i) = b(i)
-            do k = i + 1, ndim
-                sol(i) = sol(i) - A(i, k)*sol(k)
-            end do
-        end do
-
-    end subroutine s_solve_linear_system
-
-    !> This subroutine receives as inputs the indicator of the component of the vorticity that should be outputted and the primitive
-    !! variables. From those inputs, it proceeds to calculate values of the desired vorticity component, which are subsequently
-    !! stored in derived flow quantity storage variable, q_sf.
-    !! @param i Vorticity component indicator
-    !! @param q_prim_vf Primitive variables
-    !! @param q_sf Vorticity component
+    !> Compute the specified component of the vorticity from the primitive variables. From those inputs, it proceeds to calculate
+    !! values of the desired vorticity component, which are subsequently stored in derived flow quantity storage variable, q_sf.
     subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
         integer, intent(in)                                 :: i
