@@ -366,7 +366,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -399,7 +399,7 @@ contains
                         q_prim_vf(xibeg)%sf(m + j, k, l) = -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
                     end if
                 end do
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -435,7 +435,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -469,7 +469,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -505,7 +505,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -539,7 +539,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -572,7 +572,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -589,7 +589,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -608,7 +608,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -625,7 +625,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -644,7 +644,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -661,7 +661,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
