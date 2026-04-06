@@ -25,6 +25,7 @@ module m_collisions
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
     real(wp)                              :: spring_stiffness, damping_parameter
     $:GPU_DECLARE(create='[spring_stiffness, damping_parameter]')
+    $:GPU_DECLARE(create='[collision_lookup, wall_overlap_distances]')
 
 contains
 
