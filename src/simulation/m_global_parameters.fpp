@@ -27,7 +27,7 @@ module m_global_parameters
     logical                 :: run_time_info  !< Run-time output flag
     integer                 :: t_step_old     !< Existing IC/grid folder
     ! Computational Domain Parameters
-    integer :: proc_rank  !< Rank of the local processor3
+    integer :: proc_rank  !< Rank of the local processor
     !> @name Number of cells in the x-, y- and z-directions, respectively
     !> @{
     integer :: m, n, p

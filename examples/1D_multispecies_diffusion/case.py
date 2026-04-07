@@ -8,7 +8,7 @@ import math
 
 import cantera as ct
 
-ctfile = "h2o2.yaml"
+ctfile = "gri30.yaml"
 sol_L = ct.Solution(ctfile)
 sol_L.TPX = 300, 8000, "O2:2,N2:2,H2O:5"
 

@@ -247,7 +247,6 @@ contains
 
                 if (patch_bc(i)%geometry == 1) then
                     call s_line_segment_bc(i, bc_type)
-                    !   print *, 'hehe'
                 end if
             end do
         end if
