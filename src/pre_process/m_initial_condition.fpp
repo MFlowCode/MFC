@@ -138,11 +138,15 @@ contains
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_perturb_mixlayer(q_prim_vf)
         if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
-        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
+
+        if (elliptic_smoothing .and. chemistry) then
+           call s_elliptic_smoothing(q_prim_vf, bc_type, q_T_sf)
+        else if (elliptic_smoothing) then
+           call s_elliptic_smoothing(q_prim_vf, bc_type)
+        end if
 
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
-
-        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             call s_initialize_mv(q_cons_vf, mv%sf)

@@ -7,17 +7,17 @@
     real(wp) :: r0, alpha, r2
     real(wp) :: sinA, cosA
     real(wp) :: r_sq
-    real(wp) :: deee
-    real(wp) :: x_transition  ! Location of transition center
-    real(wp) :: y_shear_layer, delta_shear, tanh_arg, mix_factor
-    real(wp) :: u_max, p_ref, rho_ref
-    real(wp) :: u_mean, v_kick, perturbation_amp, perturbation_k
-    real(wp) :: T_wall, T_inf, P_atm, y_height, T_loc, y_dist
-    real(wp) :: delta_th, T_target, rho_target, R_mix
+    
+    ! # 291 - Shear/Thermal Layer Case
+    real(wp) :: delta_shear, u_max, u_mean
+    real(wp) :: T_wall, T_inf, P_atm, T_loc
+    real(wp) :: delta_th, R_mix
     real(wp) :: Y_N2, Y_O2, MW_N2, MW_O2
-    real(wp) :: x_lim_left, x_lim_right
+    real(wp) :: bottom_blend_u, bottom_blend_T
+
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
+    
     ! # 208
     real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
 
@@ -313,68 +313,35 @@
             q_prim_vf(momxb + 1)%sf(i, j, 0) = 112.99092883944267*((0.1/0.3))*x_cc(i)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
         end if
     case (291)
+
         ! Setup Values
-        T_wall = 1125.0_wp
         T_inf = 1125.0_wp
-        P_atm = 101325.0_wp  ! 1 atm in Pa
-        delta_th = 0.0003_wp  ! Thermal BL thickness (e.g., 2mm - ADJUST THIS)
+        T_wall = 600.0_wp        ! Imposed wall temperature at the bottom
+        P_atm = 101325.0_wp 
+        
+        ! Boundary/Shear Layer thicknesses
+        delta_th = 0.0003_wp     ! Thermal BL thickness
+        delta_shear = 8e-3_wp ! Velocity BL thickness
 
-        ! Geometry Limits (converting mm to meters if your grid is in meters)
-        x_lim_left = (43.48e-3_wp - 21.99e-3_wp - 14.15e-3_wp)
-        x_lim_right = (43.48e-3_wp - 21.99e-3_wp)
+        u_max = 50.0_wp          ! Freestream Velocity (m/s)
 
-        ! Air Properties (Approximate)
-        MW_N2 = 28.0134e-3_wp  ! kg/mol
-        MW_O2 = 31.999e-3_wp  ! kg/mol
-        Y_N2 = 0.767_wp  ! Mass fraction
+        ! Gas Mixture Properties
+        MW_N2 = 28.0134e-3_wp 
+        MW_O2 = 31.999e-3_wp  
+        Y_N2 = 0.767_wp  
         Y_O2 = 0.233_wp
-
-        ! Calculate Mixture Gas Constant R_mix = R_u * sum(Y_i / MW_i)
         R_mix = 8.314462618_wp*((Y_N2/MW_N2) + (Y_O2/MW_O2))
-
-        y_shear_layer = 0.0_wp  ! 3.048e-3_wp
-
-        ! 2. Shear Layer Thickness (Smoothing)
-        delta_shear = 0.08e-3_wp
-
-        ! Flow Reference Conditions
-        u_max = 50.0_wp  ! Freestream Velocity (m/s)
-        p_ref = 101325.0_wp  ! Reference Pressure (Pa)
-        rho_ref = 1.0_wp  ! Reference Density (kg/m3)
-
-        ! Perturbation Parameters (To trigger vortices/Rossiter modes)
-        perturbation_amp = 0.05_wp*u_max  ! Amplitude: 5% of freestream
-        perturbation_k = 200.0_wp  ! Wavenumber: Oscillations along X
-
-        if (y_cc(j) > y_shear_layer) then
-            tanh_arg = (y_cc(j) - y_shear_layer)/delta_shear
-            mix_factor = tanh(tanh_arg)
-            u_mean = u_max*mix_factor
-
-            v_kick = 0.0_wp
-        else
-            u_mean = 0.0_wp
-            v_kick = 0.0_wp
-        end if
-
-        ! IF (y_cc(j) > y_shear_layer-0.01) THEN We are in the Left or Right regions: Apply Tanh Profile ! y_dist = y_cc(j) !
-        ! Distance from bottom wall
-
-        ! Tanh Temperature Profile: T = Tw + (Tinf - Tw) * tanh(y/delta) ! T_loc = T_wall + (T_inf - T_wall) *
-        ! tanh((y_dist-y_shear_layer) / delta_th)
-
-        ! ! else We are in the middle gap: Uniform Freestream Temperature
-        T_loc = T_inf
-        !   end if
-
-        q_prim_vf(contxb)%sf(i, j, 0) = P_atm/(R_mix*T_loc)
+        bottom_blend_u = tanh(y_cc(j) / delta_shear)
+        bottom_blend_T = tanh(y_cc(j) / delta_th)
+        u_mean = u_max * bottom_blend_u
+        T_loc = T_wall + (T_inf - T_wall) * bottom_blend_T
+        q_prim_vf(contxb)%sf(i, j, 0) = P_atm / (R_mix * T_loc)
         q_prim_vf(momxb)%sf(i, j, 0) = u_mean
+        q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+        q_prim_vf(E_idx)%sf(i, j, 0) = P_atm
+        q_prim_vf(chemxb)%sf(i, j, 0) = Y_O2
+        q_prim_vf(chemxe)%sf(i, j, 0) = Y_N2
 
-        q_prim_vf(momxe)%sf(i, j, 0) = v_kick
-
-        q_prim_vf(E_idx)%sf(i, j, 0) = p_ref
-
-        ! q_prim_vf(chemxb)%sf(i, j, 0) = 0.21_wp q_prim_vf(chemxe)%sf(i, j, 0) = 0.79_wp
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)

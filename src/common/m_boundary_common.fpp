@@ -892,7 +892,7 @@ contains
                 if (chemistry) then
                     if (bc_y%isothermal_in) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
+                            q_T_sf%sf(k, -j, l) = 600.0_wp - q_T_sf%sf(k, j - 1, l)
                         end do
                 else
                     do j = 1, buff_size
