@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import math
-import cantera as ct
+
 pA = 101325
 rhoA = 1.29
 gam = 1.4
@@ -24,11 +24,10 @@ Nt = int(time_end / dt)
 
 eps = 1e-5
 
-ctfile = "h2.yaml"
-sol_L = ct.Solution(ctfile)
-sol_L.TPY = 1125, ct.one_atm, "O2:0.21,N2:0.79"
 # Configuring case dictionary
-case =      {
+print(
+    json.dumps(
+        {
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
@@ -40,14 +39,16 @@ case =      {
             "n": int(Ny),
             "p": 0,
             "dt": dt,
+            "cfl_adap_dt": "T",
             "t_stop": time_end,
             "t_save": time_end / 50,
             "n_start": 0,
+            "cfl_target": 0.8,
             # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": 2,
             "alt_soundspeed": "F",
-            "num_fluids": 1,
+            "num_fluids": 2,
             "mpp_lim": "F",
             "mixture_err": "T",
             "time_stepper": 3,
@@ -61,17 +62,12 @@ case =      {
             "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,
-            "viscous": "T",
             "elliptic_smoothing": "T",
             "elliptic_smoothing_iters": 50,
-            "bc_x%beg": -16,
-            "bc_x%end": -16,
+            "bc_x%beg": -2,
+            "bc_x%end": -3,
             "bc_y%beg": -3,
             "bc_y%end": -3,
-                        "bc_x%Twall_in" : 600.0,
-                                             "bc_x%isothermal_in": "T",
-                                             "bc_x%isothermal_out": "T",
-                        "bc_x%Twall_out" : 850.0,
             "num_bc_patches": 1,
             "patch_bc(1)%dir": 1,
             "patch_bc(1)%loc": -1,
@@ -84,11 +80,6 @@ case =      {
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
-              "chemistry": "T" ,
-      "chem_params%diffusion": "T",
-      "chem_params%reactions": "F",
-      "cantera_file": ctfile,
-       "chem_wrt_T": "T",
             # Patch 1: Background
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.0,
@@ -99,7 +90,9 @@ case =      {
             "patch_icpp(1)%vel(2)": 0.0e00,
             "patch_icpp(1)%pres": pA,
             "patch_icpp(1)%alpha_rho(1)": rhoA,
-            "patch_icpp(1)%alpha(1)": 1.0 ,
+            "patch_icpp(1)%alpha(1)": 1.0 - eps,
+            "patch_icpp(1)%alpha_rho(2)": eps,
+            "patch_icpp(1)%alpha(2)": eps,
             "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%alter_patch(1)": "T",
             "patch_icpp(2)%x_centroid": -leng / 2,
@@ -109,16 +102,15 @@ case =      {
             "patch_icpp(2)%vel(1)": velS,
             "patch_icpp(2)%vel(2)": 0,
             "patch_icpp(2)%pres": pS,
-            "patch_icpp(2)%alpha_rho(1)": rhoS,
-            "patch_icpp(2)%alpha(1)": 1,
+            "patch_icpp(2)%alpha_rho(1)": eps,
+            "patch_icpp(2)%alpha(1)": eps,
+            "patch_icpp(2)%alpha_rho(2)": (1 - eps) * rhoS,
+            "patch_icpp(2)%alpha(2)": 1 - eps,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
-            "fluid_pp(1)%Re(1)": 100000,
+            "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+            "fluid_pp(2)%pi_inf": 0.0,
         }
-for i in range(len(sol_L.Y)):
-           case[f"chem_wrt_Y({i + 1})"] = "T"
-           case[f"patch_icpp(1)%Y({i+1})"] = sol_L.Y[i]
-           case[f"patch_icpp(2)%Y({i+1})"] = sol_L.Y[i]
-if __name__ == "__main__":
-     print(json.dumps(case))
+    )
+)

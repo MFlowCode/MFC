@@ -45,7 +45,6 @@ contains
         integer :: i, j, sys_size_alloc
 
         @:ALLOCATE(bc_buffers(1:3, 1:2))
-        
 
         if (bc_io) then
             sys_size_alloc = sys_size
@@ -847,13 +846,12 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
                         end do
-                    
-                   else
-                    do j = 1, buff_size
-                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
-                    end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
+                        end do
+                    end if
                 end if
-               end if
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -870,10 +868,10 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
-                    end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                        end do
                     end if
                 end if
             end if
@@ -894,11 +892,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, -j, l) = 600.0_wp - q_T_sf%sf(k, j - 1, l)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
+                        end do
+                    end if
                 end if
             else  !< bc_y%end
                 do i = 1, sys_size
@@ -916,11 +914,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                        end do
+                    end if
                 end if
             end if
         else if (bc_dir == 3) then  !< z-direction
@@ -940,11 +938,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
+                        end do
+                    end if
                 end if
             else  !< bc_z%end
                 do i = 1, sys_size
@@ -962,11 +960,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
+                        end do
+                    end if
                 end if
             end if
         end if
@@ -1006,10 +1004,10 @@ contains
                             q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
                         end do
                     else
-                    do j = 1, buff_size
-                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
-                    end do
-                     end if
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
+                        end do
+                    end if
                 end if
             else  !< bc_x%end
                 do i = 1, sys_size
@@ -1031,11 +1029,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                        end do
+                    end if
                 end if
             end if
         else if (bc_dir == 2) then  !< y-direction
@@ -1058,11 +1056,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
-                    end do
-               end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
+                        end do
+                    end if
                 end if
             else  !< bc_y%end
                 do i = 1, sys_size
@@ -1083,11 +1081,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                        end do
+                    end if
                 end if
             end if
         else if (bc_dir == 3) then  !< z-direction
@@ -1110,11 +1108,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
+                        end do
+                    end if
                 end if
             else  !< bc_z%end
                 do i = 1, sys_size
@@ -1135,11 +1133,11 @@ contains
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
                         end do
-                else
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
-                    end do
-                     end if
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
+                        end do
+                    end if
                 end if
             end if
         end if

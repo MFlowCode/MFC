@@ -148,7 +148,6 @@ contains
             #:endfor
         end do
 
-
         #:if not MFC_CASE_OPTIMIZATION
             call MPI_BCAST(mapped_weno, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(wenoz, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

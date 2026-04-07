@@ -1291,7 +1291,7 @@ class CaseValidator:
         # Fetch global chemistry and diffusion flags
         chemistry = self.get("chemistry", "F") == "T"
         diffusion = self.get("chem_params%diffusion", "F") == "T"
-        
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
@@ -1303,30 +1303,17 @@ class CaseValidator:
 
             if isothermal_in:
                 # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(
-                    not chemistry or not diffusion,
-                    f"Isothermal In (bc_{dir}%isothermal_in) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction."
-                )
-                
+                self.prohibit(not chemistry or not diffusion, f"Isothermal In (bc_{dir}%isothermal_in) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
+
                 # Prohibit if neither beg nor end is set to a valid wall condition
-                self.prohibit(
-                    bc_beg not in wall_bcs, 
-                    f"Isothermal In (bc_{dir}%isothermal_in) requires a wall. Set bc_{dir}%beg to -15 (slip) or -16 (no-slip)."
-                )
-                
+                self.prohibit(bc_beg not in wall_bcs, f"Isothermal In (bc_{dir}%isothermal_in) requires a wall. Set bc_{dir}%beg to -15 (slip) or -16 (no-slip).")
+
             if isothermal_out:
                 # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(
-                    not chemistry or not diffusion,
-                    f"Isothermal Out (bc_{dir}%isothermal_out) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction."
-                )
-                
-                # Prohibit if neither beg nor end is set to a valid wall condition
-                self.prohibit(
-                    bc_end not in wall_bcs, 
-                    f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall. Set bc_{dir}%end to -15 (slip) or -16 (no-slip)."
-                )
+                self.prohibit(not chemistry or not diffusion, f"Isothermal Out (bc_{dir}%isothermal_out) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
 
+                # Prohibit if neither beg nor end is set to a valid wall condition
+                self.prohibit(bc_end not in wall_bcs, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall. Set bc_{dir}%end to -15 (slip) or -16 (no-slip).")
 
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""

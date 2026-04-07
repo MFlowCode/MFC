@@ -573,15 +573,12 @@ contains
         end if
 
         if (chemistry) then
-        call s_write_data_files(q_cons_vf, q_prim_vf, bc_type, q_T_sf)
+            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type, q_T_sf)
         else
-        call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
+            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
         end if
 
-
         call cpu_time(finish)
-
-
 
     end subroutine s_apply_initial_condition
 

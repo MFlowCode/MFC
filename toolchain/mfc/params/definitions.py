@@ -1242,7 +1242,7 @@ def _load():
         for j in range(1, 4):
             _r(f"{px}vel_in({j})", REAL, {"bc"})
             _r(f"{px}vel_out({j})", REAL, {"bc"})
-        
+
         for a in ["Twall_in", "Twall_out"]:
             _r(f"{px}{a}", REAL, {"bc"})
         for a in ["isothermal_in", "isothermal_out"]:
@@ -1257,7 +1257,7 @@ def _load():
             _r(f"{px}centroid({j})", REAL, {"bc"})
             _r(f"{px}length({j})", REAL, {"bc"})
         _r(f"{px}radius", REAL, {"bc"})
-            
+
     # simplex_params
     for f in range(1, NF + 1):
         _r(f"simplex_params%perturb_dens({f})", LOG)
