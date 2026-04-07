@@ -105,7 +105,8 @@ contains
                         call s_dirichlet(q_prim_vf, 1, -1, k, l, q_T_sf)
                     end select
 
-                    if (qbmm .and. (.not. polytropic) .and. (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 1)%sf(0, k, &
+                        & l) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(1, -1, k, l, pb_in, mv_in)
                     end if
                 end do
@@ -134,7 +135,8 @@ contains
                         call s_dirichlet(q_prim_vf, 1, 1, k, l, q_T_sf)
                     end select
 
-                    if (qbmm .and. (.not. polytropic) .and. (bc_type(1, 2)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 2)%sf(0, k, &
+                        & l) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(1, 1, k, l, pb_in, mv_in)
                     end if
                 end do
@@ -170,8 +172,8 @@ contains
                             call s_dirichlet(q_prim_vf, 2, -1, k, l, q_T_sf)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. (bc_type(2, &
-                            & 1)%sf(k, 0, l) /= BC_AXIS)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 1)%sf(k, 0, &
+                            & l) <= BC_GHOST_EXTRAP) .and. (bc_type(2, 1)%sf(k, 0, l) /= BC_AXIS)) then
                             call s_qbmm_extrapolation(2, -1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -200,7 +202,8 @@ contains
                             call s_dirichlet(q_prim_vf, 2, 1, k, l, q_T_sf)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(2, 2)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 2)%sf(k, 0, &
+                            & l) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(2, 1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -235,7 +238,8 @@ contains
                             call s_dirichlet(q_prim_vf, 3, -1, k, l, q_T_sf)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 1)%sf(k, l, &
+                            & 0) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(3, -1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -264,7 +268,8 @@ contains
                             call s_dirichlet(q_prim_vf, 3, 1, k, l, q_T_sf)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(3, 2)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 2)%sf(k, l, &
+                            & 0) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(3, 1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -402,7 +407,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -439,7 +444,7 @@ contains
                         q_prim_vf(xibeg)%sf(m + j, k, l) = -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
                     end if
                 end do
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -479,7 +484,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -517,7 +522,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -557,7 +562,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -595,7 +600,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -635,7 +640,7 @@ contains
                     end do
                 end if
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -658,7 +663,7 @@ contains
                     end do
                 end if
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -683,7 +688,7 @@ contains
                     end do
                 end if
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -706,7 +711,7 @@ contains
                     end do
                 end if
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -731,7 +736,7 @@ contains
                     end do
                 end if
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -754,7 +759,7 @@ contains
                     end do
                 end if
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -773,10 +778,10 @@ contains
     subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_prim_vf
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                        :: k, l
-        integer                                                                                    :: j, q, i
+        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
+        integer, intent(in)                                                                                  :: k, l
+        integer                                                                                              :: j, q, i
 
         do j = 1, buff_size
             if (z_cc(l) < pi) then
@@ -806,7 +811,7 @@ contains
             end if
         end do
 
-        if (qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
             do i = 1, nb
                 do q = 1, nnode
                     do j = 1, buff_size
@@ -1844,7 +1849,7 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         logical, intent(in)                                        :: old_grid_in
         character(LEN=*), intent(in)                               :: step_dirpath
-        integer                                                    :: dir, loc, i
+        integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_path
         character(len=10)                                          :: status
         type(scalar_field), optional, intent(in)                   :: q_T_sf
@@ -1884,13 +1889,11 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_loc, file_path
-        character(len=10)                                          :: status
         type(scalar_field), intent(in), optional                   :: q_T_sf
 
 #ifdef MFC_MPI
         integer          :: ierr
         integer          :: file_id
-        integer          :: offset
         character(len=7) :: proc_rank_str
         logical          :: dir_check
         integer          :: nelements
@@ -1914,8 +1917,6 @@ contains
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'
         call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL, file_id, ierr)
-
-        offset = 0
 
         ! Write bc_types
         do dir = 1, num_dims
@@ -1951,7 +1952,6 @@ contains
         integer                                                       :: dir, loc
         logical                                                       :: file_exist
         character(len=path_len)                                       :: file_path
-        character(len=10)                                             :: status
 
         ! Read bc_types
 
@@ -1994,12 +1994,10 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
         integer                                                       :: dir, loc
         character(len=path_len)                                       :: file_loc, file_path
-        character(len=10)                                             :: status
 
 #ifdef MFC_MPI
         integer          :: ierr
         integer          :: file_id
-        integer          :: offset
         character(len=7) :: proc_rank_str
         logical          :: dir_check
         integer          :: nelements
@@ -2022,8 +2020,6 @@ contains
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'
         call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_RDONLY, MPI_INFO_NULL, file_id, ierr)
-
-        offset = 0
 
         ! Read bc_types
         do dir = 1, num_dims
