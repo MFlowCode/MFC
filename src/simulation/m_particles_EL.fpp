@@ -519,7 +519,10 @@ contains
             if (lag_params%write_void_evol) call s_write_void_evol_particles(qtime)
         end if
 
-        if (lag_params%write_bubbles) call s_write_lag_particle_evol(qtime)
+        if (lag_params%write_bubbles) then
+            call s_write_lag_particle_evol(qtime)
+            next_write_time = next_write_time + t_save
+        end if
 
     end subroutine s_read_input_particles
 
@@ -852,11 +855,13 @@ contains
                 fqs_fluct(k,:) = new_fqs_fluct
             end if
 
-            if (.not. lag_params%collision_force) then
+            if (.not. lag_params%collision_force .or. lag_params%subcycle_collisions) then
                 myMass = particle_mass(k) + p_AM(k)
                 myVel = particle_vel(k,:,2)
                 do l = 1, num_dims
-                    particle_dposdt(k, l, stage) = myVel(l)
+                    if (.not. lag_params%subcycle_collisions) then
+                        particle_dposdt(k, l, stage) = myVel(l)
+                    end if
                     particle_dveldt(k, l, stage) = f_p(k, l)/myMass
                     particle_draddt(k, stage) = 0._wp
                 end do
@@ -868,11 +873,8 @@ contains
             call s_smear_field_contributions(bc_type, Smx_id, SE_id, .false.)
         end if
 
-        call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS")
-        if (lag_params%collision_force) then
-            !> Compute Particle-Particle collision forces
-            call s_compute_particle_EL_collisions(stage, bc_type)
-
+        if (lag_params%collision_force .and. .not. lag_params%subcycle_collisions) then
+            call s_compute_particle_EL_collisions(stage, bc_type, dt)
             $:GPU_PARALLEL_LOOP(private='[k, l, myMass, myVel]')
             do k = 1, n_el_particles_loc
                 myMass = particle_mass(k) + p_AM(k)
@@ -885,7 +887,6 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-        call nvtxEndRange
 
         call nvtxEndRange
 
@@ -970,23 +971,57 @@ contains
             end do
         end if
 
-        !!!!!!!!!!!!!!!!!!!
-
     end subroutine s_smear_field_contributions
+
+    subroutine s_subcycle_collisions(stage, bc_type, N_sub)
+
+        integer, intent(in)                                        :: stage
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer, intent(in)                                        :: N_sub
+        integer                                                    :: i_sub, k, l
+        real(wp)                                                   :: dt_sub, myMass
+        integer, dimension(3)                                      :: cell
+
+        dt_sub = dt/real(N_sub, wp)
+
+        do i_sub = 1, N_sub
+            $:GPU_PARALLEL_LOOP(private='[k, cell]')
+            do k = 1, n_el_particles_loc
+                cell = fd_number - buff_size
+                call s_locate_cell(particle_pos(k,1:3,2), cell, particle_s(k,1:3,2))
+                f_p(k,1:3) = 0._wp
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            call s_compute_particle_EL_collisions(stage, bc_type, dt_sub)
+
+            $:GPU_PARALLEL_LOOP(private='[k, myMass]', copyin='[dt_sub]')
+            do k = 1, n_el_particles_loc
+                myMass = particle_mass(k) + p_AM(k)
+
+                particle_vel(k,1:3,2) = particle_vel(k,1:3,2) + (f_p(k,1:3)/myMass)*dt_sub
+
+                particle_pos(k,1:3,2) = particle_pos(k,1:3,2) + particle_vel(k,1:3,2)*dt_sub
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end do
+
+    end subroutine s_subcycle_collisions
 
     !> Compute inter-particle collision forces using a soft-sphere DEM model. Uses a cell-based linked list for O(N) neighbor
     !! search. The contact force model is a spring-dashpot (Hertzian stiffness with viscous damping).
-    subroutine s_compute_particle_EL_collisions(stage, bc_type)
+    subroutine s_compute_particle_EL_collisions(stage, bc_type, dt_sub)
 
         integer, intent(in) :: stage
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        real(wp), intent(in) :: dt_sub
         integer, dimension(3) :: cell
         real(wp), dimension(3) :: s_cell
         integer, dimension(3) :: cellaux
         integer :: i, k, l, q, ip, jp, kp, ii, jj, kk
         logical :: celloutside
         real(wp) :: pidtksp2, pidtksp2_wall, ksp, ksp_wall, nu1, nu2, Rp1, Rp2, E1, E2, Estar, cor, rmag, Rstar, dij, eta_n, &
-             & kappa_n, rmult, mp1, mp2, dt_loc
+             & kappa_n, rmult, mp1, mp2, log_cor, sqrt_log_cor2_pi2, log_cor_factor
         real(wp), dimension(3) :: xp1, xp2, vp1, vp2, v_rel, rpij, nij, vnij, Fnpp_ij, force_vec
         integer                :: kpz
         integer                :: total_recv
@@ -1009,21 +1044,24 @@ contains
         E2 = E1  ! Young's modulus [Pa], particle 2
         cor = particle_pp%cor_col  ! Coefficient of restitution
 
-        pidtksp2 = (pi**2)/((dt*ksp)**2)
-        pidtksp2_wall = (pi**2)/((dt*ksp_wall)**2)
+        pidtksp2 = (pi**2._wp)/((dt_sub*ksp)**2._wp)
+        pidtksp2_wall = (pi**2._wp)/((dt_sub*ksp_wall)**2._wp)
 
-        Estar = 1._wp/(((1._wp - nu1**2)/E1) + ((1._wp - nu2**2)/E2))
+        Estar = 1._wp/(((1._wp - nu1**2._wp)/E1) + ((1._wp - nu2**2._wp)/E2))
         Estar = (4._wp/3._wp)*Estar
+
+        log_cor = log(cor)
+        sqrt_log_cor2_pi2 = sqrt(log_cor**2._wp + pi**2._wp)
+        log_cor_factor = -2._wp*log_cor/sqrt_log_cor2_pi2
 
         call s_reset_linked_list()
 
         call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS")
-        error_flag = 0
-        $:GPU_UPDATE(device='[error_flag]')
 
         $:GPU_PARALLEL_LOOP(private='[i, k, cell, ip, jp, kp, Rp1, xp1, mp1, vp1, kk, jj, ii, cellaux, q, Rp2, xp2, mp2, vp2, &
                             & v_rel, Rstar, rpij, rmag, nij, vnij, dij, kappa_n, rmult, eta_n, Fnpp_ij, force_vec, s_cell, &
-                            & celloutside, count]', copyin='[ksp, nu1, nu2, E1, E2, cor, pidtksp2, pidtksp2_wall, Estar, kpz]')
+                            & celloutside, count]', copyin='[ksp, nu1, nu2, E1, E2, cor, pidtksp2, pidtksp2_wall, Estar, kpz, &
+                                & log_cor_factor]')
         do k = 1, n_el_particles_loc
             if (p_owner_rank(k) /= proc_rank) then
                 cycle
@@ -1057,15 +1095,7 @@ contains
                             q = particle_head(ii, jj, kk)
                             ! Traverse linked list in that cell
 
-                            count = 0
                             do while (q /= -1)
-                                count = count + 1
-                                if (count > n_el_particles_loc) then
-                                    $:GPU_ATOMIC(atomic='write')
-                                    error_flag = 1
-                                    exit
-                                end if
-
                                 if (q /= k) then
                                     Rp2 = particle_rad(q, 2)
                                     xp2 = particle_pos(q,:,2)
@@ -1085,9 +1115,9 @@ contains
                                         kappa_n = min((pidtksp2*mp1), (Estar*sqrt(Rstar)*sqrt(abs(dij))))
 
                                         rmult = (mp1*mp2)/(mp1 + mp2)
-                                        eta_n = ((-2._wp*sqrt(kappa_n)*log(cor))/sqrt((log(cor))**2 + pi**2))*sqrt(rmult)
+                                        eta_n = log_cor_factor*sqrt(kappa_n)*sqrt(rmult)
 
-                                        Fnpp_ij = -kappa_n*dij*nij - eta_n*vnij
+                                        Fnpp_ij = -kappa_n*dij*nij + eta_n*vnij
 
                                         f_p(k,:) = f_p(k,:) + Fnpp_ij
                                     end if
@@ -1102,17 +1132,12 @@ contains
 
             !> Check each local particle for wall collisions
 
-            call s_compute_wall_collisions(xp1, vp1, Rp1, mp1, Estar, pidtksp2_wall, cor, force_vec)
+            call s_compute_wall_collisions(xp1, vp1, Rp1, mp1, Estar, pidtksp2_wall, log_cor_factor, force_vec)
             f_p(k,:) = f_p(k,:) + force_vec
         end do
         $:END_GPU_PARALLEL_LOOP()
 
         call nvtxEndRange
-
-        $:GPU_UPDATE(host='[error_flag]')
-        if (error_flag == 1) then
-            call s_mpi_abort("Linked list infinite loop detected")
-        end if
 
         if (num_procs > 1) then
             n_el_particles_loc = n_el_particles_loc_before_ghost
@@ -1209,11 +1234,70 @@ contains
         ! Wall has infinite mass so use mp1 only
         kappa_n = min((pidtksp*mass), (Es*sqrt(rad)*sqrt(abs(dij))))
 
-        eta_n = ((-2._wp*sqrt(kappa_n)*log(core))/sqrt((log(core))**2 + pi**2))*(1._wp/sqrt(1._wp/mass))
+        eta_n = core*sqrt(kappa_n)*(1._wp/sqrt(1._wp/mass))
 
         wcol_force = wcol_force + (kappa_n*dij*nij - eta_n*vnij)
 
     end subroutine s_compute_wall_collision_force
+
+    !> Reset and rebuild the cell-based linked list for particle-to-cell mapping
+    subroutine s_reset_linked_list()
+
+        integer :: j, k, l
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    particle_head(j, k, l) = -1
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[k]')
+        do k = 1, n_el_particles_loc
+            linked_list(k) = -1
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call s_build_linked_list()
+
+    end subroutine s_reset_linked_list
+
+    !> Build a cell-based linked list for particle-to-cell mapping. particle_head(i,j,k) points to the first particle in cell
+    !! (i,j,k). linked_list(k) points to the next particle in the same cell (-1 = end).
+    subroutine s_build_linked_list()
+
+        integer                :: k, glb_id, i
+        integer, dimension(3)  :: cell
+        real(wp), dimension(3) :: s_cell
+        logical                :: celloutside
+
+        $:GPU_PARALLEL_LOOP(private='[i, k, cell, s_cell, glb_id, celloutside]')
+        do k = 1, n_el_particles_loc
+            glb_id = lag_part_id(k, 1)
+            gid_to_local(glb_id) = k
+
+            s_cell = particle_s(k,1:3,2)
+            cell = int(s_cell(:))
+            do i = 1, num_dims
+                if (s_cell(i) < 0._wp) cell(i) = cell(i) - 1
+            end do
+
+            call s_check_celloutside_wbuff(cell, celloutside)
+
+            if (.not. celloutside) then
+                !> Particle linked list building
+                $:GPU_ATOMIC(atomic='capture')
+                linked_list(k) = particle_head(cell(1), cell(2), cell(3))
+                particle_head(cell(1), cell(2), cell(3)) = k
+                $:END_GPU_ATOMIC_CAPTURE()
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_build_linked_list
 
     !> This subroutine adds temporary ghost particles for collision purposes
     subroutine s_add_ghost_particles()
@@ -1381,65 +1465,6 @@ contains
 
     end subroutine s_compute_particles_EL_source
 
-    !> Reset and rebuild the cell-based linked list for particle-to-cell mapping
-    subroutine s_reset_linked_list()
-
-        integer :: j, k, l
-
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
-                    particle_head(j, k, l) = -1
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        $:GPU_PARALLEL_LOOP(private='[k]')
-        do k = 1, n_el_particles_loc
-            linked_list(k) = -1
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        call s_build_linked_list()
-
-    end subroutine s_reset_linked_list
-
-    !> Build a cell-based linked list for particle-to-cell mapping. particle_head(i,j,k) points to the first particle in cell
-    !! (i,j,k). linked_list(k) points to the next particle in the same cell (-1 = end).
-    subroutine s_build_linked_list()
-
-        integer                :: k, glb_id, i
-        integer, dimension(3)  :: cell
-        real(wp), dimension(3) :: s_cell
-        logical                :: celloutside
-
-        $:GPU_PARALLEL_LOOP(private='[i, k, cell, s_cell, glb_id, celloutside]')
-        do k = 1, n_el_particles_loc
-            glb_id = lag_part_id(k, 1)
-            gid_to_local(glb_id) = k
-
-            s_cell = particle_s(k,1:3,2)
-            cell = int(s_cell(:))
-            do i = 1, num_dims
-                if (s_cell(i) < 0._wp) cell(i) = cell(i) - 1
-            end do
-
-            call s_check_celloutside_wbuff(cell, celloutside)
-
-            if (.not. celloutside) then
-                !!!!! Particle linked list building
-                $:GPU_ATOMIC(atomic='capture')
-                linked_list(k) = particle_head(cell(1), cell(2), cell(3))
-                particle_head(cell(1), cell(2), cell(3)) = k
-                $:END_GPU_ATOMIC_CAPTURE()
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_build_linked_list
-
     !> This subroutine updates the Lagrange variables using the tvd RK time steppers. The time derivative of the particle variables
     !! must be stored at every stage to avoid precision errors.
     !! @param stage Current tvd RK stage
@@ -1465,6 +1490,20 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             call s_transfer_data_to_tmp_particles()
+
+            if (lag_params%collision_force .and. lag_params%subcycle_collisions) then
+                call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS-SUBCYCLE")
+                call s_subcycle_collisions(stage, bc_type, lag_params%N_collision_subcycles)
+                ! Copy collision-updated slot 2 back to slot 1
+                $:GPU_PARALLEL_LOOP(private='[k]')
+                do k = 1, n_el_particles_loc
+                    particle_pos(k,1:3,1) = particle_pos(k,1:3,2)
+                    particle_vel(k,1:3,1) = particle_vel(k,1:3,2)
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+                call nvtxEndRange
+            end if
+
             if (moving_lag_particles) call s_enforce_EL_particles_boundary_conditions(q_prim_vf, stage, bc_type)
             if (lag_params%write_void_evol) call s_write_void_evol_particles(mytime)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_particle_stats()
@@ -1504,6 +1543,20 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
 
                 call s_transfer_data_to_tmp_particles()
+
+                if (lag_params%collision_force .and. lag_params%subcycle_collisions) then
+                    call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS-SUBCYCLE")
+                    call s_subcycle_collisions(stage, bc_type, lag_params%N_collision_subcycles)
+                    ! Copy collision-updated slot 2 back to slot 1
+                    $:GPU_PARALLEL_LOOP(private='[k]')
+                    do k = 1, n_el_particles_loc
+                        particle_pos(k,1:3,1) = particle_pos(k,1:3,2)
+                        particle_vel(k,1:3,1) = particle_vel(k,1:3,2)
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                    call nvtxEndRange
+                end if
+
                 if (moving_lag_particles) call s_enforce_EL_particles_boundary_conditions(q_prim_vf, stage, bc_type)
                 if (lag_params%write_void_evol) call s_write_void_evol_particles(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_particle_stats()
@@ -1560,6 +1613,20 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
 
                 call s_transfer_data_to_tmp_particles()
+
+                if (lag_params%collision_force .and. lag_params%subcycle_collisions) then
+                    call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS-SUBCYCLE")
+                    call s_subcycle_collisions(stage, bc_type, lag_params%N_collision_subcycles)
+                    ! Copy collision-updated slot 2 back to slot 1
+                    $:GPU_PARALLEL_LOOP(private='[k]')
+                    do k = 1, n_el_particles_loc
+                        particle_pos(k,1:3,1) = particle_pos(k,1:3,2)
+                        particle_vel(k,1:3,1) = particle_vel(k,1:3,2)
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                    call nvtxEndRange
+                end if
+
                 if (moving_lag_particles) call s_enforce_EL_particles_boundary_conditions(q_prim_vf, stage, bc_type)
                 if (lag_params%write_void_evol) call s_write_void_evol_particles(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_particle_stats()
@@ -2275,10 +2342,8 @@ contains
         logical                              :: file_exist
 
         if (precision == 1) then
-            ! FMT = "(F16.8,I14,8F16.8)"
             FMT = "(F16.8,I14,10F16.8)"
         else
-            ! FMT = "(F24.16,I14,8F24.16)"
             FMT = "(F24.16,I14,10F24.16)"
         end if
 

@@ -935,6 +935,8 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `added_mass_model`               | Integer | Added mass model (0: off, >0: active)                           |
 | `interpolation_order`            | Integer | Polynomial order for barycentric field interpolation            |
 | `collision_force`                | Logical | Enable soft-sphere DEM particle-particle collisions             |
+| `subcycle_collisions`            | Logical | Enable operator-split sub-cycling of collisions                 |
+| `N_collision_subcycles`          | Logical | Number of sub-cycles of collision operations.                   |
 | `qs_fluct_force`                 | Logical | Enable quasi-steady drag force fluctuation contribution         |
 | `pressure_force`                 | Logical | Enable pressure gradient force on particles                     |
 | `gravity_force`                  | Logical | Enable gravitational force on particles                         |

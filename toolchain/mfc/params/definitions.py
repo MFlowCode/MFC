@@ -1282,11 +1282,11 @@ def _load():
     _r("lag_params%input_path", STR, {"bubbles"})
 
     # --- lag_params (Lagrangian particles) ---
-    for a in ["nParticles_glb", "stokes_drag", "qs_drag_model", "added_mass_model", "interpolation_order"]:
+    for a in ["nParticles_glb", "stokes_drag", "qs_drag_model", "added_mass_model", "interpolation_order", "N_collision_subcycles"]:
         _r(f"lag_params%{a}", INT, {"particles"})
 
-    for a in ["collision_force", "qs_fluct_force"]:
-        _r(f"lag_params%{a}", LOG, {"particles"})
+    for a in ["collision_force", "qs_fluct_force", "subcycle_collisions"]:
+        _r(f"lag_params%{a}", LOG, {'particles'})
 
     for a in ["mu_ref"]:
         _r(f"lag_params%{a}", REAL, {"particles"})

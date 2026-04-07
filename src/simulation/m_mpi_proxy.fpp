@@ -108,15 +108,16 @@ contains
     subroutine s_initialize_solid_particles_mpi(lag_num_ts)
 
         integer :: i, j, k
-        integer :: real_size, int_size, nReal, lag_num_ts
+        integer :: real_size, int_size, nReal, lag_num_ts, max_dirs
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
 #ifdef MFC_MPI
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
+        max_dirs = 2**num_dims - 1
         nReal = 10 + 13*2 + 7*lag_num_ts
         p_var_size = (nReal*real_size + 2*int_size)
-        p_buff_size = lag_params%nParticles_glb*p_var_size
+        p_buff_size = lag_params%nParticles_glb*p_var_size*max_dirs
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, &
                    & 0:lag_params%nParticles_glb))
@@ -215,12 +216,13 @@ contains
         if (particles_lagrange) then
             #:for VAR in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector', &
                 & 'write_bubbles', 'write_bubbles_stats', 'write_void_evol', 'pressure_force', &
-                & 'gravity_force', 'collision_force', 'qs_fluct_force']
+                & 'gravity_force', 'collision_force', 'qs_fluct_force', 'subcycle_collisions']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
             #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', 'nParticles_glb', 'vel_model', &
-                & 'drag_model', 'qs_drag_model', 'stokes_drag', 'added_mass_model', 'interpolation_order']
+                & 'drag_model', 'qs_drag_model', 'stokes_drag', 'added_mass_model', 'interpolation_order', &
+                & 'N_collision_subcycles']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -678,15 +680,13 @@ contains
                         f_crosses_boundary = .false.
                         return
                     end if
-
-                    f_crosses_boundary = pos(particle_id, dir) < pcomm_coords_ghost(dir)%beg
+                    f_crosses_boundary = pos(particle_id, dir) <= pcomm_coords_ghost(dir)%beg
                 else if (loc == 1) then  ! End of the domain
                     if (nidx(dir)%end == 0) then
                         f_crosses_boundary = .false.
                         return
                     end if
-
-                    f_crosses_boundary = pos(particle_id, dir) > pcomm_coords_ghost(dir)%end
+                    f_crosses_boundary = pos(particle_id, dir) >= pcomm_coords_ghost(dir)%end
                 end if
             else
                 if (loc == -1) then  ! Beginning of the domain
@@ -703,8 +703,8 @@ contains
                         return
                     end if
 
-                    f_crosses_boundary = (posPrev(particle_id, dir) <= pcomm_coords(dir)%end .and. pos(particle_id, &
-                                          & dir) > pcomm_coords(dir)%end)
+                    f_crosses_boundary = (posPrev(particle_id, dir) < pcomm_coords(dir)%end .and. pos(particle_id, &
+                                          & dir) >= pcomm_coords(dir)%end)
                 end if
             end if
 
@@ -1050,7 +1050,7 @@ contains
         recv_count = 0
 
         ! Post all receives for particle data first
-        recv_offset = 1
+        recv_offset = 0
         do l = 1, n_neighbors
             i = neighbor_list(l, 1)
             j = neighbor_list(l, 2)

@@ -856,8 +856,10 @@ contains
         lag_params%added_mass_model = dflt_int
         lag_params%interpolation_order = dflt_int
         lag_params%collision_force = .false.
+        lag_params%subcycle_collisions = .false.
         lag_params%qs_fluct_force = .false.
         lag_params%mu_ref = dflt_real
+        lag_params%N_collision_subcycles = dflt_int
 
         moving_lag_bubbles = .false.
         lag_vel_model = dflt_int
