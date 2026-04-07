@@ -1541,7 +1541,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
-                "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "1D_qbmm",  
+                "2D_Thermal_Flatplate", # formatted I/O field overflow on gfortran 12
             ]
             if path in casesToSkip:
                 continue
@@ -1620,14 +1621,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
                 "fluid_pp(1)%pi_inf": 0.0,
                 "fluid_pp(1)%Re(1)": 100000,
-                "patch_icpp(1)%geometry": 1,  # 1D Cartesian
-                "patch_icpp(1)%hcid": 191,  # Your new linear temp gradient IC
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%hcid": 191,
                 "patch_icpp(1)%x_centroid": 0.025,
                 "patch_icpp(1)%length_x": 0.05,
                 "patch_icpp(1)%vel(1)": 0.0,
                 "patch_icpp(1)%pres": 101325.0,
                 "patch_icpp(1)%alpha(1)": 1.0,
-                "patch_icpp(1)%Y(1)": 1.0,  # Pure H2
+                "patch_icpp(1)%Y(1)": 1.0,
                 "t_step_start": 0,
                 "t_step_stop": 1000,
                 "t_step_save": 1000,
