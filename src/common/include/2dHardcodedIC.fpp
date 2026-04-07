@@ -312,11 +312,9 @@
                       & 0) = 112.99092883944267*(1 - (0.1/0.3))*y_cc(j)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
             q_prim_vf(momxb + 1)%sf(i, j, 0) = 112.99092883944267*((0.1/0.3))*x_cc(i)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
         end if
-
-    case (291) ! Isothermal Flat Plate
-
+    case (291)  ! Isothermal Flat Plate
         T_inf = 1125.0_wp
-        T_wall = 600.0_wp  
+        T_wall = 600.0_wp
         P_atm = 101325.0_wp
 
         ! Boundary/Shear Layer thicknesses
