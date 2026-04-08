@@ -364,6 +364,7 @@ module m_global_parameters
     integer                                                  :: Np
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
+    $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
     !> @name Bubble modeling

@@ -43,6 +43,7 @@ contains
 
         wall_overlap_distances = 0
         $:GPU_UPDATE(device='[wall_overlap_distances]')
+        $:GPU_UPDATE(device='[ib_coefficient_of_friction]')
 
     end subroutine s_initialize_collisions_module
 
@@ -220,6 +221,8 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        print *, forces(1,1:3)
 
     end subroutine s_apply_wall_collision_forces_soft_sphere
 
