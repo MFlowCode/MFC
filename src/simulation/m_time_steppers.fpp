@@ -729,6 +729,13 @@ contains
                 patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
             end if
 
+            ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
+            ! velocity-dependent collision damping forces are evaluated on the GPU.
+            if (patch_ib(i)%moving_ibm == 2 .and. .not. forces_computed) then
+                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                forces_computed = .true.
+            end if
+
             if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
@@ -738,12 +745,6 @@ contains
                     ! plug in analytic velocities for 1-way coupling, if it exists
                     @:mib_analytical()
                 else if (patch_ib(i)%moving_ibm == 2) then  ! if we are using two-way coupling, apply force and torque
-                    ! compute the force and torque on the IB from the fluid
-                    if (.not. forces_computed) then
-                        call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                        forces_computed = .true.
-                    end if
-
                     ! update the velocity from the force value
                     patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
 
