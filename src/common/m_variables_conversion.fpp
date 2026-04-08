@@ -914,7 +914,7 @@ contains
                                                    & l)**2 + q_prim_vf(B_idx%beg + 2)%sf(j, k, l)**2)
                             end if
                             ! MHD energy includes magnetic pressure contribution
-                            q_cons_vf(E_idx)%sf(j, k, l) = gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pres_mag + pi_inf + qv
+                            q_cons_vf(E_idx)%sf(j, k, l) = gamma*q_prim_vf(E_idx)%sf(j, k, l) +ff dyn_pres + pres_mag + pi_inf + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                             ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
                             q_cons_vf(E_idx)%sf(j, k, l) = gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf + qv

@@ -641,7 +641,7 @@ contains
             buf = 1._wp
             do ii = 0, 1
                 do jj = 0, 1
-                    if (p == 0) then
+                    if (p == 0) thenff
                         dist(1 + ii, 1 + jj, 1) = sqrt((x_cc(i + ii) - gp%ip_loc(1))**2 + (y_cc(j + jj) - gp%ip_loc(2))**2)
                     else
                         do kk = 0, 1

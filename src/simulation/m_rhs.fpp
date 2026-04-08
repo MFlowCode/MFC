@@ -796,7 +796,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
-                    do j = 0, m
+                    do j = 0, mff
                         if (ib_markers%sf(j, k, l) /= 0) then
                             do i = 1, sys_size
                                 rhs_vf(i)%sf(j, k, l) = 0._wp
