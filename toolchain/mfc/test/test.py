@@ -611,11 +611,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             cons.print(f"    UUID: [magenta]{case.get_uuid()}[/magenta]")
             cons.print(f"    Attempts: {nAttempts}")
 
-            # Show truncated error message
-            exc_str = str(exc)
-            if len(exc_str) > 300:
-                exc_str = exc_str[:297] + "..."
-            cons.print(f"    Error: {exc_str}")
+            cons.print(f"    Error: {exc}")
 
             # Provide helpful hints based on error type
             exc_lower = str(exc).lower()
