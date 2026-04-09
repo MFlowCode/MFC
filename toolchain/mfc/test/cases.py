@@ -258,12 +258,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_weno(dimInfo):
         for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {"weno_order": weno_order})
-
-            if weno_order == 5:  # Only test weno_order = 5
-                cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
-                if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
-                    cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
-
             for mapped_weno, wenoz, teno, mp_weno in itertools.product("FT", repeat=4):
                 if sum(var == "T" for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
                     continue
@@ -304,21 +298,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
-    def alter_muscl(dimInfo):
+    def alter_muscl():
         for muscl_order in [1, 2]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0})
 
-            if muscl_order == 1:
-                cases.append(define_case_d(stack, "int_comp=0", {"int_comp": 0}))
-            elif muscl_order == 2:
-                for int_comp in [0, 1]:
-                    stack.push(f"int_comp={int_comp}", {"int_comp": int_comp})
-                    cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
-                    stack.pop()
-                if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
-                    stack.push("int_comp=2", {"int_comp": 2})
-                    cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
-                    stack.pop()
+            if muscl_order == 2:
                 for muscl_lim in [2, 3, 4, 5]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
             stack.pop()
@@ -390,6 +374,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
                 alter_igr()
+
+            if num_fluids == 2:
+                # Test interface compression with WENO
+                stack.push("weno_order=5", {"weno_order": 5})
+                cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+                if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+                    cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
+                stack.pop()
+
+                # Test interface compression with MUSCL
+                stack.push("muscl_order=2", {"muscl_order": 2, "recon_type": 2, "weno_order": 0})
+                stack.push("int_comp=1", {"int_comp": 1})
+                cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
+                stack.pop()
+                if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+                    stack.push("int_comp=2", {"int_comp": 2})
+                    cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
+                    stack.pop()
+                stack.pop()
 
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
@@ -1486,7 +1489,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_bcs(dimInfo)
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
-            alter_muscl(dimInfo)
+            alter_muscl()
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
