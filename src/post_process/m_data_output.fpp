@@ -720,12 +720,12 @@ contains
         integer, dimension(MPI_STATUS_SIZE)    :: status
         integer(KIND=MPI_OFFSET_KIND)          :: disp
         integer                                :: view
-        logical                                :: lg_bub_file, file_exist
+        logical                                :: file_exist
         integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
         integer                                :: ifile
         integer                                :: ierr
         real(wp)                               :: file_time, file_dt
-        integer                                :: file_num_procs, file_tot_part, tot_part
+        integer                                :: file_num_procs, file_tot_part
         integer                                :: i
         integer, dimension(:), allocatable     :: proc_bubble_counts
         real(wp), dimension(1:1,1:lag_io_vars) :: lag_io_null
@@ -868,14 +868,13 @@ contains
         integer                                        :: id
 
 #ifdef MFC_MPI
-        real(wp), dimension(20)                         :: inputvals
         real(wp)                                        :: time_real
         integer, dimension(MPI_STATUS_SIZE)             :: status
         integer(KIND=MPI_OFFSET_KIND)                   :: disp
         integer                                         :: view
-        logical                                         :: lg_bub_file, file_exist
+        logical                                         :: file_exist
         integer, dimension(2)                           :: gsizes, lsizes, start_idx_part
-        integer                                         :: ifile, ierr, tot_data, valid_data, nBub
+        integer                                         :: ifile, ierr, nBub
         real(wp)                                        :: file_time, file_dt
         integer                                         :: file_num_procs, file_tot_part
         integer, dimension(:), allocatable              :: proc_bubble_counts
@@ -883,7 +882,7 @@ contains
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
         integer, dimension(num_procs)                   :: meshtypes
         real(wp)                                        :: dummy_data
-        integer                                         :: i, j
+        integer                                         :: i
         real(wp), dimension(:), allocatable             :: bub_id
         real(wp), dimension(:), allocatable             :: px, py, pz, ppx, ppy, ppz, vx, vy, vz
         real(wp), dimension(:), allocatable             :: radius, rvel, rnot, rmax, rmin, dphidt

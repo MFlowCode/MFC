@@ -463,7 +463,6 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         real(wp)                :: start, finish
-        integer                 :: dest
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -587,8 +586,8 @@ contains
 
         wall_time = abs(finish - start)
 
-        if (t_step >= 2) then
-            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        if (t_step - t_step_start >= 2) then
+            wall_time_avg = (wall_time + (t_step - t_step_start - 2)*wall_time_avg)/(t_step - t_step_start - 1)
         else
             wall_time_avg = 0._wp
         end if
@@ -599,7 +598,6 @@ contains
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
-        type(vector_field)  :: gm_alpha_qp
 
         call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
 
@@ -643,7 +641,6 @@ contains
         real(wp)               :: c        !< Cell-avg. sound speed
         real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
-        type(vector_field)     :: gm_alpha_qp
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
 

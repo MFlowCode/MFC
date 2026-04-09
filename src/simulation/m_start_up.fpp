@@ -304,8 +304,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE)  :: status
         integer(KIND=MPI_OFFSET_KIND)        :: disp
         integer(KIND=MPI_OFFSET_KIND)        :: m_MOK, n_MOK, p_MOK
-        integer(KIND=MPI_OFFSET_KIND)        :: WP_MOK, var_MOK, str_MOK
-        integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
+        integer(KIND=MPI_OFFSET_KIND)        :: WP_MOK, var_MOK
         integer(KIND=MPI_OFFSET_KIND)        :: MOK
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
@@ -434,8 +433,6 @@ contains
                 p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size  ! adv_idx%end
@@ -498,8 +495,6 @@ contains
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size  ! adv_idx%end
@@ -611,7 +606,8 @@ contains
 
         integer, intent(inout)  :: t_step
         real(wp), intent(inout) :: time_avg
-        integer                 :: i
+        integer                 :: i, eta_hh, eta_mm, eta_ss
+        real(wp)                :: eta_sec
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
@@ -640,14 +636,23 @@ contains
 
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
-                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time
+                eta_sec = wall_time_avg*(t_stop - mytime)/max(dt, tiny(dt))
+                eta_hh = int(eta_sec)/3600
+                eta_mm = mod(int(eta_sec), 3600)/60
+                eta_ss = mod(int(eta_sec), 60)
+                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
+                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time, eta_hh, eta_mm, eta_ss
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, "")', &
+                eta_sec = wall_time_avg*real(t_step_stop - t_step, wp)
+                eta_hh = int(eta_sec)/3600
+                eta_mm = mod(int(eta_sec), 3600)/60
+                eta_ss = mod(int(eta_sec), 60)
+                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time
+                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time, eta_hh, &
+                    & eta_mm, eta_ss
             end if
         end if
 
@@ -830,9 +835,8 @@ contains
     !> Initialize all simulation sub-modules in the required dependency order
     impure subroutine s_initialize_modules
 
-        integer  :: m_ds, n_ds, p_ds
-        integer  :: i, j, k, l, x_id, y_id, z_id, ix, iy, iz
-        real(wp) :: temp1, temp2, temp3, temp4
+        integer :: m_ds, n_ds, p_ds
+        integer :: i
 
         call s_initialize_global_parameters_module()
         #:if USING_AMD

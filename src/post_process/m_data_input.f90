@@ -190,7 +190,6 @@ contains
         character(LEN=len_trim(case_dir) + 2*name_len)           :: t_step_dir
         character(LEN=len_trim(case_dir) + 3*name_len)           :: file_loc
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-        character(LEN=len_trim(case_dir) + 2*name_len)           :: t_step_ib_dir
         logical                                                  :: dir_check
         logical                                                  :: file_check
         integer                                                  :: i
@@ -258,7 +257,6 @@ contains
         integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND)        :: MOK
         integer(kind=MPI_OFFSET_KIND)        :: offset
-        real(wp)                             :: delx, dely, delz
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
         character(len=10)                    :: t_step_string
