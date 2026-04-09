@@ -101,7 +101,8 @@ contains
                         call s_dirichlet(q_prim_vf, 1, -1, k, l)
                     end select
 
-                    if (qbmm .and. (.not. polytropic) .and. (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 1)%sf(0, k, &
+                        & l) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(1, -1, k, l, pb_in, mv_in)
                     end if
                 end do
@@ -130,7 +131,8 @@ contains
                         call s_dirichlet(q_prim_vf, 1, 1, k, l)
                     end select
 
-                    if (qbmm .and. (.not. polytropic) .and. (bc_type(1, 2)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 2)%sf(0, k, &
+                        & l) <= BC_GHOST_EXTRAP)) then
                         call s_qbmm_extrapolation(1, 1, k, l, pb_in, mv_in)
                     end if
                 end do
@@ -166,8 +168,8 @@ contains
                             call s_dirichlet(q_prim_vf, 2, -1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. (bc_type(2, &
-                            & 1)%sf(k, 0, l) /= BC_AXIS)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 1)%sf(k, 0, &
+                            & l) <= BC_GHOST_EXTRAP) .and. (bc_type(2, 1)%sf(k, 0, l) /= BC_AXIS)) then
                             call s_qbmm_extrapolation(2, -1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -196,7 +198,8 @@ contains
                             call s_dirichlet(q_prim_vf, 2, 1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(2, 2)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 2)%sf(k, 0, &
+                            & l) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(2, 1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -231,7 +234,8 @@ contains
                             call s_dirichlet(q_prim_vf, 3, -1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 1)%sf(k, l, &
+                            & 0) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(3, -1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -260,7 +264,8 @@ contains
                             call s_dirichlet(q_prim_vf, 3, 1, k, l)
                         end select
 
-                        if (qbmm .and. (.not. polytropic) .and. (bc_type(3, 2)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 2)%sf(k, l, &
+                            & 0) <= BC_GHOST_EXTRAP)) then
                             call s_qbmm_extrapolation(3, 1, k, l, pb_in, mv_in)
                         end if
                     end do
@@ -361,7 +366,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -394,7 +399,7 @@ contains
                         q_prim_vf(xibeg)%sf(m + j, k, l) = -q_prim_vf(xibeg)%sf(m - (j - 1), k, l)
                     end if
                 end do
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -430,7 +435,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -464,7 +469,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -500,7 +505,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -534,7 +539,7 @@ contains
                     end if
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -567,7 +572,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -584,7 +589,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -603,7 +608,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -620,7 +625,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -639,7 +644,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -656,7 +661,7 @@ contains
                     end do
                 end do
 
-                if (qbmm .and. .not. polytropic) then
+                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
                             do j = 1, buff_size
@@ -675,10 +680,10 @@ contains
     subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_prim_vf
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                        :: k, l
-        integer                                                                                    :: j, q, i
+        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
+        integer, intent(in)                                                                                  :: k, l
+        integer                                                                                              :: j, q, i
 
         do j = 1, buff_size
             if (z_cc(l) < pi) then
@@ -708,7 +713,7 @@ contains
             end if
         end do
 
-        if (qbmm .and. .not. polytropic) then
+        if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
             do i = 1, nb
                 do q = 1, nnode
                     do j = 1, buff_size

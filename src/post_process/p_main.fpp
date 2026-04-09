@@ -10,7 +10,7 @@ program p_main
 
     implicit none
 
-    integer :: t_step  !< Iterator for the main time-stepping loop
+    integer :: t_step, nt_step  !< Iterator for the main time-stepping loop
     !> Generic storage for the name(s) of the flow variable(s) that will be added to the formatted database file(s)
     character(LEN=name_len) :: varname
     real(wp)                :: pres
@@ -47,8 +47,13 @@ program p_main
 
         wall_time = abs(finish - start)
 
-        if (t_step >= 2) then
-            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        if (cfl_dt) then
+            nt_step = t_step - n_start + 1
+        else
+            nt_step = (t_step - t_step_start)/t_step_save + 1
+        end if
+        if (nt_step >= 2) then
+            wall_time_avg = (wall_time + (nt_step - 2)*wall_time_avg)/(nt_step - 1)
         else
             wall_time_avg = 0._wp
         end if

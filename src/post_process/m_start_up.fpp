@@ -139,16 +139,27 @@ contains
     impure subroutine s_perform_time_step(t_step)
 
         integer, intent(inout) :: t_step
+        integer                :: eta_hh, eta_mm, eta_ss
+        real(wp)               :: eta_sec
 
         if (proc_rank == 0) then
             if (cfl_dt) then
-                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
-                    & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time
+                eta_sec = wall_time_avg*real(n_save - 1 - t_step, wp)
+                eta_hh = int(eta_sec)/3600
+                eta_mm = mod(int(eta_sec), 3600)/60
+                eta_ss = mod(int(eta_sec), 60)
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS)  = ", I0, ":", I2.2, ":", I2.2)', &
+                    & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time, eta_hh, &
+                    & eta_mm, eta_ss
             else
-                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I8, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
+                eta_sec = wall_time_avg*real((t_step_stop - t_step)/t_step_save, wp)
+                eta_hh = int(eta_sec)/3600
+                eta_mm = mod(int(eta_sec), 3600)/60
+                eta_ss = mod(int(eta_sec), 60)
+                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I8, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     & (t_step - t_step_start)/t_step_save + 1, (t_step_stop - t_step_start)/t_step_save + 1, t_step, &
-                    & wall_time_avg, wall_time
+                    & wall_time_avg, wall_time, eta_hh, eta_mm, eta_ss
             end if
         end if
 
