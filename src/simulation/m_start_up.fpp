@@ -920,11 +920,10 @@ contains
             else if (recon_type == MUSCL_TYPE) then
                 call s_initialize_muscl_module()
             end if
-            if (int_comp > 0) call s_initialize_thinc_module()
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
-
+        if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
@@ -1092,8 +1091,8 @@ contains
             else if (recon_type == MUSCL_TYPE) then
                 call s_finalize_muscl_module()
             end if
-            if (int_comp > 0) call s_finalize_thinc_module()
         end if
+        if (int_comp > 0) call s_finalize_thinc_module()
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
