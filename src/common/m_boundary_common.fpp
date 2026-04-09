@@ -1051,15 +1051,16 @@ contains
     end subroutine s_qbmm_extrapolation
 
     !> Populate ghost cell buffers for the color function and its divergence used in capillary surface tension.
-    impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
+    impure subroutine s_populate_capillary_buffers(c_divs, bc_type, bc)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(bc_xyz_info), intent(in)                              :: bc
         integer                                                    :: k, l
 
         !> x-direction
 
-        if (bc_x%beg >= 0) then
+        if (bc%x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
@@ -1078,7 +1079,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bc_x%end >= 0) then
+        if (bc%x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, 1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
@@ -1101,7 +1102,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             !> y-direction
-            if (bc_y%beg >= 0) then
+            if (bc%y%beg >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 2, -1, num_dims + 1)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
@@ -1120,7 +1121,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (bc_y%end >= 0) then
+            if (bc%y%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
@@ -1144,7 +1145,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             !> z-direction
-            if (bc_z%beg >= 0) then
+            if (bc%z%beg >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 3, -1, num_dims + 1)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
@@ -1163,7 +1164,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (bc_z%end >= 0) then
+            if (bc%z%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 3, 1, num_dims + 1)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)

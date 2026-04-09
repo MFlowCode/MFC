@@ -69,10 +69,9 @@ module m_cbc
     $:GPU_DECLARE(create='[is1, is2, is3]')
 
     integer :: dj
-    integer :: bcxb, bcxe, bcyb, bcye, bczb, bcze
     integer :: cbc_dir, cbc_loc
     integer :: flux_cbc_index
-    $:GPU_DECLARE(create='[dj, bcxb, bcxe, bcyb, bcye, bczb, bcze]')
+    $:GPU_DECLARE(create='[dj]')
     $:GPU_DECLARE(create='[cbc_dir, cbc_loc, flux_cbc_index]')
 
     ! GRCBC inputs for subsonic inflow and outflow conditions consisting of inflow velocities, pressure, density and void fraction
@@ -293,28 +292,6 @@ contains
         end if
 
         $:GPU_UPDATE(device='[fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z]')
-
-        ! Associating the procedural pointer to the appropriate subroutine that will be utilized in the conversion to the mixture
-        ! variables
-
-        bcxb = bc_x%beg
-        bcxe = bc_x%end
-
-        $:GPU_UPDATE(device='[bcxb, bcxe]')
-
-        if (n > 0) then
-            bcyb = bc_y%beg
-            bcye = bc_y%end
-
-            $:GPU_UPDATE(device='[bcyb, bcye]')
-        end if
-
-        if (p > 0) then
-            bczb = bc_z%beg
-            bcze = bc_z%end
-
-            $:GPU_UPDATE(device='[bczb, bcze]')
-        end if
 
         ! Allocate GRCBC inputs
         @:ALLOCATE(pres_in(1:num_dims), pres_out(1:num_dims))

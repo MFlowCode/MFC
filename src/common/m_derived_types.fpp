@@ -108,6 +108,11 @@ module m_derived_types
         logical                             :: grcbc_in, grcbc_out, grcbc_vel_out
     end type int_bounds_info
 
+    !> Groups the x, y, z boundary condition begin/end codes for passing as a single argument.
+    type bc_xyz_info
+        type(int_bounds_info) :: x, y, z
+    end type bc_xyz_info
+
     type bc_patch_parameters
         integer                :: geometry
         integer                :: type

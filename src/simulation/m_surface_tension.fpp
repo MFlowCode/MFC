@@ -281,7 +281,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_populate_capillary_buffers(c_divs, bc_type)
+        call s_populate_capillary_buffers(c_divs, bc_type, bc_xyz_info(bc_x, bc_y, bc_z))
 
         iv%beg = 1; iv%end = num_dims + 1
 
