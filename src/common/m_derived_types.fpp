@@ -113,6 +113,16 @@ module m_derived_types
         type(int_bounds_info) :: x, y, z
     end type bc_xyz_info
 
+    !> Scalar equation indices computed at startup from model_eqns and enabled features.
+    type eqn_idx_info
+        integer :: E       !< Index of energy equation
+        integer :: n       !< Index of number density
+        integer :: alf     !< Index of void fraction
+        integer :: gamma   !< Index of specific heat ratio func. eqn.
+        integer :: pi_inf  !< Index of liquid stiffness func. eqn.
+        integer :: c       !< Index of color function
+    end type eqn_idx_info
+
     type bc_patch_parameters
         integer                :: geometry
         integer                :: type

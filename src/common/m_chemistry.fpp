@@ -67,8 +67,8 @@ contains
                         Ys(eqn - chemxb + 1) = q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
                     end do
 
-                    ! e = E - 1/2*|u|^2 cons. E_idx = \rho E cons. contxb = \rho (1-fluid model) cons. momxb + i = \rho u_i
-                    energy = q_cons_vf(E_idx)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
+                    ! e = E - 1/2*|u|^2 cons. eqn_idx%E = \rho E cons. contxb = \rho (1-fluid model) cons. momxb + i = \rho u_i
+                    energy = q_cons_vf(eqn_idx%E)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
                     do eqn = momxb, momxe
                         energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
                     end do
@@ -100,7 +100,7 @@ contains
                     end do
 
                     call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                    q_T_sf%sf(x, y, z) = q_prim_vf(E_idx)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
+                    q_T_sf%sf(x, y, z) = q_prim_vf(eqn_idx%E)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
                 end do
             end do
         end do
@@ -235,8 +235,8 @@ contains
                             Rgas_L = gas_constant/MW_L
                             Rgas_R = gas_constant/MW_R
 
-                            P_L = q_prim_qp(E_idx)%sf(x, y, z)
-                            P_R = q_prim_qp(E_idx)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
+                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_L = q_prim_qp(1)%sf(x, y, z)
                             rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
@@ -313,7 +313,7 @@ contains
                             Mass_Diffu_Energy = lambda_Cell*dT_dxi + Mass_Diffu_Energy
 
                             ! Update flux arrays
-                            flux_src_vf(E_idx)%sf(x, y, z) = flux_src_vf(E_idx)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = chemxb, chemxe
@@ -361,8 +361,8 @@ contains
                             Rgas_L = gas_constant/MW_L
                             Rgas_R = gas_constant/MW_R
 
-                            P_L = q_prim_qp(E_idx)%sf(x, y, z)
-                            P_R = q_prim_qp(E_idx)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
+                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_L = q_prim_qp(1)%sf(x, y, z)
                             rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
@@ -405,7 +405,7 @@ contains
                             Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
 
                             ! Update flux arrays
-                            flux_src_vf(E_idx)%sf(x, y, z) = flux_src_vf(E_idx)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = chemxb, chemxe

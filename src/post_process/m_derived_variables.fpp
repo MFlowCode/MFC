@@ -108,11 +108,11 @@ contains
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
                     if (alt_soundspeed .neqv. .true.) then
-                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_inf_sf(i, j, &
+                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_inf_sf(i, j, &
                              & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
                     else
-                        blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_infs(2))/gammas(2)
+                        blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_infs(1))/gammas(1)
+                        blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_infs(2))/gammas(2)
                         q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, &
                              & k)/blkmod1 + (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
                     end if
@@ -495,9 +495,9 @@ contains
                     do j = -offset_x%beg, m + offset_x%end
                         q_sf(j, k, l) = 0._wp
 
-                        do i = 1, adv_idx%end - E_idx
-                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + E_idx)%sf(j, k, l)*gm_rho_sf(j, k, &
-                                 & l)/gm_rho_max(1)
+                        do i = 1, adv_idx%end - eqn_idx%E
+                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, l)*gm_rho_sf(j, &
+                                 & k, l)/gm_rho_max(1)
                         end do
                     end do
                 end do

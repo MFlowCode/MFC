@@ -236,9 +236,9 @@ contains
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
                 if (adv_n) then
-                    @:ALLOCATE(q_prim_vf(n_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+                    @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%n))
                 end if
             end if
 
@@ -287,9 +287,9 @@ contains
             end if
 
             if (surface_tension) then
-                @:ALLOCATE(q_prim_vf(c_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(c_idx))
+                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%c))
             end if
 
             if (chemistry) then
@@ -694,7 +694,7 @@ contains
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = momxb, E_idx
+        do i = momxb, eqn_idx%E
             do l = 0, p
                 do k = 0, n
                     do j = 0, m

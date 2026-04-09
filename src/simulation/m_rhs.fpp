@@ -127,7 +127,7 @@ contains
                 @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
             end do
-            do l = mom_idx%beg, E_idx
+            do l = mom_idx%beg, eqn_idx%E
                 @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
             end do
@@ -170,9 +170,9 @@ contains
         end if
 
         if (surface_tension) then
-            q_prim_qp%vf(c_idx)%sf => q_cons_qp%vf(c_idx)%sf
-            $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(c_idx)%sf]')
-            $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(c_idx)%sf]')
+            q_prim_qp%vf(eqn_idx%c)%sf => q_cons_qp%vf(eqn_idx%c)%sf
+            $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(eqn_idx%c)%sf]')
+            $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(eqn_idx%c)%sf]')
         end if
 
         if (hyper_cleaning) then
@@ -200,7 +200,7 @@ contains
                     end do
 
                     if (viscous .or. surface_tension) then
-                        do l = mom_idx%beg, E_idx
+                        do l = mom_idx%beg, eqn_idx%E
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
                         end do
@@ -222,8 +222,8 @@ contains
                                        & idwbuff(3)%beg:idwbuff(3)%end))
                         end do
                         if (chem_params%diffusion .and. .not. viscous) then
-                            @:ALLOCATE(flux_src_n(i)%vf(E_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                       & idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                         end if
                     end if
                 else
@@ -339,9 +339,9 @@ contains
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(tau_Re_vf(cont_idx%end + i))
                 end do
-                @:ALLOCATE(tau_Re_vf(E_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(tau_Re_vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(tau_Re_vf(E_idx))
+                @:ACC_SETUP_SFs(tau_Re_vf(eqn_idx%E))
 
                 @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
                 @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
@@ -564,8 +564,8 @@ contains
                             end do
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe - 1
-                                q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, &
-                                             & l))/alf_sum%sf(j, k, l)
+                                q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, &
+                                             & l)*(1._wp - q_cons_qp%vf(eqn_idx%alf)%sf(j, k, l))/alf_sum%sf(j, k, l)
                             end do
                         end do
                     end do
@@ -663,21 +663,21 @@ contains
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
 
-                        iv%beg = E_idx; iv%end = sys_size
+                        iv%beg = eqn_idx%E; iv%end = sys_size
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
                     end if
                 else
                     if (all(Re_size == 0)) then
-                        iv%beg = 1; iv%end = E_idx - 1
+                        iv%beg = 1; iv%end = eqn_idx%E - 1
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
 
-                        iv%beg = E_idx; iv%end = E_idx
-                        call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(E_idx), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                            & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
+                        iv%beg = eqn_idx%E; iv%end = eqn_idx%E
+                        call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(eqn_idx%E), qL_rsx_vf, qL_rsy_vf, &
+                            & qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
 
-                        iv%beg = E_idx + 1; iv%end = sys_size
+                        iv%beg = eqn_idx%E + 1; iv%end = sys_size
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
                     else
@@ -685,11 +685,11 @@ contains
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
 
-                        iv%beg = E_idx; iv%end = E_idx
-                        call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(E_idx), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                            & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
+                        iv%beg = eqn_idx%E; iv%end = eqn_idx%E
+                        call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(eqn_idx%E), qL_rsx_vf, qL_rsy_vf, &
+                            & qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
 
-                        iv%beg = E_idx + 1; iv%end = sys_size
+                        iv%beg = eqn_idx%E + 1; iv%end = sys_size
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
                     end if
@@ -892,14 +892,14 @@ contains
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(E_idx)%sf(k_loop, l_loop, &
+                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
                                 & q_loop) + pi_infs(1))/gammas(1)
-                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(E_idx)%sf(k_loop, l_loop, &
+                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
                                 & q_loop) + pi_infs(2))/gammas(2)
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(advxb)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then
-                            alpha2(k_loop, l_loop, q_loop) = q_cons_vf%vf(alf_idx - 1)%sf(k_loop, l_loop, q_loop)
+                            alpha2(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%alf - 1)%sf(k_loop, l_loop, q_loop)
                         else
                             alpha2(k_loop, l_loop, q_loop) = q_cons_vf%vf(advxe)%sf(k_loop, l_loop, q_loop)
                         end if
@@ -947,7 +947,7 @@ contains
                             do i_fluid_loop = 1, num_fluids
                                 inv_ds = 1._wp/dx(k_loop)
                                 advected_qty_val = q_cons_vf%vf(i_fluid_loop + advxb - 1)%sf(k_loop, l_loop, q_loop)
-                                pressure_val = q_prim_vf%vf(E_idx)%sf(k_loop, l_loop, q_loop)
+                                pressure_val = q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop)
                                 flux_face1 = flux_src_n_vf%vf(advxb)%sf(k_loop, l_loop, q_loop)
                                 flux_face2 = flux_src_n_vf%vf(advxb)%sf(k_loop - 1, l_loop, q_loop)
                                 rhs_vf(i_fluid_loop + intxb - 1)%sf(k_loop, l_loop, &
@@ -993,7 +993,7 @@ contains
                             do i_fluid_loop = 1, num_fluids
                                 inv_ds = 1._wp/dy(k)
                                 advected_qty_val = q_cons_vf%vf(i_fluid_loop + advxb - 1)%sf(q, k, l)
-                                pressure_val = q_prim_vf%vf(E_idx)%sf(q, k, l)
+                                pressure_val = q_prim_vf%vf(eqn_idx%E)%sf(q, k, l)
                                 flux_face1 = flux_src_n_vf%vf(advxb)%sf(q, k, l)
                                 flux_face2 = flux_src_n_vf%vf(advxb)%sf(q, k - 1, l)
                                 rhs_vf(i_fluid_loop + intxb - 1)%sf(q, k, l) = rhs_vf(i_fluid_loop + intxb - 1)%sf(q, k, &
@@ -1089,7 +1089,7 @@ contains
                             do i_fluid_loop = 1, num_fluids
                                 inv_ds = 1._wp/dz(k)
                                 advected_qty_val = q_cons_vf%vf(i_fluid_loop + advxb - 1)%sf(l, q, k)
-                                pressure_val = q_prim_vf%vf(E_idx)%sf(l, q, k)
+                                pressure_val = q_prim_vf%vf(eqn_idx%E)%sf(l, q, k)
                                 flux_face1 = flux_src_n_vf%vf(advxb)%sf(l, q, k)
                                 flux_face2 = flux_src_n_vf%vf(advxb)%sf(l, q, k - 1)
                                 rhs_vf(i_fluid_loop + intxb - 1)%sf(l, q, k) = rhs_vf(i_fluid_loop + intxb - 1)%sf(l, q, &
@@ -1362,8 +1362,9 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dx(j)*q_prim_vf(c_idx)%sf(j, k, &
-                                   & l)*(flux_src_n_in(advxb)%sf(j, k, l) - flux_src_n_in(advxb)%sf(j - 1, k, l))
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
+                                   & l) + 1._wp/dx(j)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_n_in(advxb)%sf(j, k, &
+                                   & l) - flux_src_n_in(advxb)%sf(j - 1, k, l))
                         end do
                     end do
                 end do
@@ -1377,7 +1378,7 @@ contains
                         do j = 0, m
                             if (surface_tension .or. viscous) then
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)*(flux_src_n_in(i)%sf(j - 1, k, &
                                            & l) - flux_src_n_in(i)%sf(j, k, l))
                                 end do
@@ -1391,9 +1392,9 @@ contains
                                 end do
 
                                 if (.not. viscous) then
-                                    rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, &
-                                           & l) + 1._wp/dx(j)*(flux_src_n_in(E_idx)%sf(j - 1, k, l) - flux_src_n_in(E_idx)%sf(j, &
-                                           & k, l))
+                                    rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
+                                           & l) + 1._wp/dx(j)*(flux_src_n_in(eqn_idx%E)%sf(j - 1, k, &
+                                           & l) - flux_src_n_in(eqn_idx%E)%sf(j, k, l))
                                 end if
                             end if
                         end do
@@ -1407,8 +1408,9 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dy(k)*q_prim_vf(c_idx)%sf(j, k, &
-                                   & l)*(flux_src_n_in(advxb)%sf(j, k, l) - flux_src_n_in(advxb)%sf(j, k - 1, l))
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
+                                   & l) + 1._wp/dy(k)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_n_in(advxb)%sf(j, k, &
+                                   & l) - flux_src_n_in(advxb)%sf(j, k - 1, l))
                         end do
                     end do
                 end do
@@ -1431,7 +1433,7 @@ contains
                     do l = 0, p
                         do j = 0, m
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = momxb, E_idx
+                            do i = momxb, eqn_idx%E
                                 rhs_vf(i)%sf(j, 0, l) = rhs_vf(i)%sf(j, 0, l) + 1._wp/(y_cc(1) - y_cc(-1))*(tau_Re_vf(i)%sf(j, &
                                        & -1, l) - tau_Re_vf(i)%sf(j, 1, l))
                             end do
@@ -1445,7 +1447,7 @@ contains
                     do k = 1, n
                         do j = 0, m
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = momxb, E_idx
+                            do i = momxb, eqn_idx%E
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_src_n_in(i)%sf(j, k - 1, &
                                        & l) - flux_src_n_in(i)%sf(j, k, l))
                             end do
@@ -1461,7 +1463,7 @@ contains
                             do j = 0, m
                                 if (surface_tension .or. viscous) then
                                     $:GPU_LOOP(parallelism='[seq]')
-                                    do i = momxb, E_idx
+                                    do i = momxb, eqn_idx%E
                                         rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_src_n_in(i)%sf(j, &
                                                & k - 1, l) - flux_src_n_in(i)%sf(j, k, l))
                                     end do
@@ -1474,9 +1476,9 @@ contains
                                                & k - 1, l) - flux_src_n_in(i)%sf(j, k, l))
                                     end do
                                     if (.not. viscous) then
-                                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, &
-                                               & l) + 1._wp/dy(k)*(flux_src_n_in(E_idx)%sf(j, k - 1, &
-                                               & l) - flux_src_n_in(E_idx)%sf(j, k, l))
+                                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
+                                               & l) + 1._wp/dy(k)*(flux_src_n_in(eqn_idx%E)%sf(j, k - 1, &
+                                               & l) - flux_src_n_in(eqn_idx%E)%sf(j, k, l))
                                     end if
                                 end if
                             end do
@@ -1494,7 +1496,7 @@ contains
                         do k = 1, n
                             do j = 0, m
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)*(flux_src_n_in(i)%sf(j, &
                                            & k - 1, l) + flux_src_n_in(i)%sf(j, k, l))
                                 end do
@@ -1508,7 +1510,7 @@ contains
                         do l = 0, p
                             do j = 0, m
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, 0, l) = rhs_vf(i)%sf(j, 0, l) - 1._wp/y_cc(0)*tau_Re_vf(i)%sf(j, 0, l)
                                 end do
                             end do
@@ -1521,7 +1523,7 @@ contains
                         do k = 0, n
                             do j = 0, m
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)*(flux_src_n_in(i)%sf(j, &
                                            & k - 1, l) + flux_src_n_in(i)%sf(j, k, l))
                                 end do
@@ -1537,8 +1539,9 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(c_idx)%sf(j, k, l) = rhs_vf(c_idx)%sf(j, k, l) + 1._wp/dz(l)*q_prim_vf(c_idx)%sf(j, k, &
-                                   & l)*(flux_src_n_in(advxb)%sf(j, k, l) - flux_src_n_in(advxb)%sf(j, k, l - 1))
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
+                                   & l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_n_in(advxb)%sf(j, k, &
+                                   & l) - flux_src_n_in(advxb)%sf(j, k, l - 1))
                         end do
                     end do
                 end do
@@ -1552,7 +1555,7 @@ contains
                         do j = 0, m
                             if (surface_tension .or. viscous) then
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = momxb, E_idx
+                                do i = momxb, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)*(flux_src_n_in(i)%sf(j, k, &
                                            & l - 1) - flux_src_n_in(i)%sf(j, k, l))
                                 end do
@@ -1565,9 +1568,9 @@ contains
                                            & l - 1) - flux_src_n_in(i)%sf(j, k, l))
                                 end do
                                 if (.not. viscous) then
-                                    rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, &
-                                           & l) + 1._wp/dz(l)*(flux_src_n_in(E_idx)%sf(j, k, l - 1) - flux_src_n_in(E_idx)%sf(j, &
-                                           & k, l))
+                                    rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
+                                           & l) + 1._wp/dz(l)*(flux_src_n_in(eqn_idx%E)%sf(j, k, &
+                                           & l - 1) - flux_src_n_in(eqn_idx%E)%sf(j, k, l))
                                 end if
                             end if
                         end do
@@ -1737,7 +1740,7 @@ contains
                 nullify (q_prim_qp%vf(j)%sf)
             end do
 
-            do j = mom_idx%beg, E_idx
+            do j = mom_idx%beg, eqn_idx%E
                 @:DEALLOCATE(q_cons_qp%vf(j)%sf)
                 @:DEALLOCATE(q_prim_qp%vf(j)%sf)
             end do
@@ -1849,13 +1852,13 @@ contains
                     end do
 
                     if (viscous) then
-                        do l = mom_idx%beg, E_idx
+                        do l = mom_idx%beg, eqn_idx%E
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
                     end if
 
                     if (chem_params%diffusion .and. .not. viscous) then
-                        @:DEALLOCATE(flux_src_n(i)%vf(E_idx)%sf)
+                        @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
                     end if
 
                     if (riemann_solver == 1 .or. riemann_solver == 4) then

@@ -33,7 +33,7 @@
         width_sq = (2.5_wp*10.0_wp**(-3.0_wp))**2
         profile_shape = 1.0_wp - 0.5_wp*exp(-(x_cc(i) - x_mid_diffu)**2/width_sq)
         q_prim_vf(momxb)%sf(i, 0, 0) = 0.0_wp
-        q_prim_vf(E_idx)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5
+        q_prim_vf(eqn_idx%E)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5
         q_prim_vf(advxb)%sf(i, 0, 0) = 1.0_wp
 
         y1 = (0.195_wp - 0.142_wp)*profile_shape + 0.142_wp

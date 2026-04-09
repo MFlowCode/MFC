@@ -276,7 +276,7 @@ contains
             varname(:) = ' '
         end if
 
-        do i = 1, E_idx - mom_idx%beg
+        do i = 1, eqn_idx%E - mom_idx%beg
             if (mom_wrt(i) .or. cons_vars_wrt) then
                 q_sf(:,:,:) = q_cons_vf(i + cont_idx%end)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I0)') 'mom', i
@@ -286,7 +286,7 @@ contains
             end if
         end do
 
-        do i = 1, E_idx - mom_idx%beg
+        do i = 1, eqn_idx%E - mom_idx%beg
             if (vel_wrt(i) .or. prim_vars_wrt) then
                 q_sf(:,:,:) = q_prim_vf(i + cont_idx%end)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I0)') 'vel', i
@@ -316,7 +316,7 @@ contains
             end if
         end if
 
-        do i = 1, E_idx - mom_idx%beg
+        do i = 1, eqn_idx%E - mom_idx%beg
             if (flux_wrt(i)) then
                 call s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
@@ -328,7 +328,7 @@ contains
         end do
 
         if (E_wrt .or. cons_vars_wrt) then
-            q_sf(:,:,:) = q_cons_vf(E_idx)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+            q_sf(:,:,:) = q_cons_vf(eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'E'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
@@ -518,7 +518,7 @@ contains
         end if
 
         if (pres_wrt .or. prim_vars_wrt) then
-            q_sf(:,:,:) = q_prim_vf(E_idx)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+            q_sf(:,:,:) = q_prim_vf(eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'pres'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
@@ -528,7 +528,7 @@ contains
         if (((model_eqns == 2) .and. (bubbles_euler .neqv. .true.)) .or. (model_eqns == 3)) then
             do i = 1, num_fluids - 1
                 if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                    q_sf(:,:,:) = q_cons_vf(i + E_idx)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                    q_sf(:,:,:) = q_cons_vf(i + eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I0)') 'alpha', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
 
@@ -543,7 +543,7 @@ contains
                             do i = x_beg, x_end
                                 q_sf(i, j, k) = 1._wp
                                 do l = 1, num_fluids - 1
-                                    q_sf(i, j, k) = q_sf(i, j, k) - q_cons_vf(E_idx + l)%sf(i, j, k)
+                                    q_sf(i, j, k) = q_sf(i, j, k) - q_cons_vf(eqn_idx%E + l)%sf(i, j, k)
                                 end do
                             end do
                         end do
@@ -596,11 +596,11 @@ contains
             do k = -offset_z%beg, p + offset_z%end
                 do j = -offset_y%beg, n + offset_y%end
                     do i = -offset_x%beg, m + offset_x%end
-                        do l = 1, adv_idx%end - E_idx
-                            adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                        do l = 1, adv_idx%end - eqn_idx%E
+                            adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
                         end do
 
-                        pres = q_prim_vf(E_idx)%sf(i, j, k)
+                        pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
                         H = ((gamma_sf(i, j, k) + 1._wp)*pres + pi_inf_sf(i, j, k) + qv_sf(i, j, k))/rho_sf(i, j, k)
 
@@ -675,7 +675,7 @@ contains
         end if
 
         if (cf_wrt) then
-            q_sf(:,:,:) = q_cons_vf(c_idx)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+            q_sf(:,:,:) = q_cons_vf(eqn_idx%c)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A,I0)') 'color_function'
             call s_write_variable_to_formatted_database_file(varname, t_step)
             varname(:) = ' '
@@ -684,7 +684,7 @@ contains
         if (bubbles_euler) then
             do i = adv_idx%beg, adv_idx%end
                 q_sf(:,:,:) = q_cons_vf(i)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
-                write (varname, '(A,I0)') 'alpha', i - E_idx
+                write (varname, '(A,I0)') 'alpha', i - eqn_idx%E
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
             end do
@@ -726,7 +726,7 @@ contains
 
             ! number density
             if (adv_n) then
-                q_sf(:,:,:) = q_cons_vf(n_idx)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                q_sf(:,:,:) = q_cons_vf(eqn_idx%n)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A)') 'n'
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '

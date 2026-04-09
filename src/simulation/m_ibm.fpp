@@ -165,13 +165,13 @@ contains
 
         ! set the Moving IBM interior conservative variables
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', copyin='[E_idx, momxb]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', copyin='[eqn_idx%E, momxb]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     patch_id = ib_markers%sf(j, k, l)
                     if (patch_id /= 0) then
-                        q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
+                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                         rho = 0._wp
                         do i = 1, num_fluids
                             rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
@@ -230,18 +230,18 @@ contains
                 end do
 
                 if (surface_tension) then
-                    q_prim_vf(c_idx)%sf(j, k, l) = c_IP
+                    q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP
                 end if
 
                 ! set the pressure
                 if (patch_ib(patch_id)%moving_ibm <= 1) then
-                    q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
+                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
                 else
-                    q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
+                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         ! Pressure correction for moving IB: accounts for acceleration of IB surface
-                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, &
+                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
                                   & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
                                   & *dot_product(patch_ib(patch_id) %force/patch_ib(patch_id)%mass, gp%levelset_norm))
                     end do
@@ -310,14 +310,14 @@ contains
 
                 ! Set color function
                 if (surface_tension) then
-                    q_cons_vf(c_idx)%sf(j, k, l) = c_IP
+                    q_cons_vf(eqn_idx%c)%sf(j, k, l) = c_IP
                 end if
 
                 ! Set Energy
                 if (bubbles_euler) then
-                    q_cons_vf(E_idx)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
                 else
-                    q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
                 end if
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
@@ -779,7 +779,7 @@ contains
                 do k = k1, k2
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
 
-                    pres_IP = pres_IP + coeff*q_prim_vf(E_idx)%sf(i, j, k)
+                    pres_IP = pres_IP + coeff*q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = momxb, momxe
@@ -793,7 +793,7 @@ contains
                     end do
 
                     if (surface_tension) then
-                        c_IP = c_IP + coeff*q_prim_vf(c_idx)%sf(i, j, k)
+                        c_IP = c_IP + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
@@ -936,17 +936,18 @@ contains
                         do fluid_idx = 0, num_fluids - 1
                             ! Get the pressure contribution to force via a finite difference to compute the 2D components of the
                             ! gradient of the pressure and cell volume
-                            local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i + 1, &
-                                                     & j, k) - q_prim_vf(E_idx + fluid_idx)%sf(i - 1, j, &
+                            local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i &
+                                                     & + 1, j, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i - 1, j, &
                                                      & k))/(2._wp*dx)  ! force is the negative pressure gradient
-                            local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(E_idx + fluid_idx)%sf(i, &
-                                                     & j + 1, k) - q_prim_vf(E_idx + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
+                            local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, &
+                                                     & j + 1, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
                             cell_volume = abs(dx*dy)
                             ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 dz = z_cc(k + 1) - z_cc(k)
-                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(E_idx + fluid_idx)%sf(i, &
-                                                         & j, k + 1) - q_prim_vf(E_idx + fluid_idx)%sf(i, j, k - 1))/(2._wp*dz)
+                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(eqn_idx%E + fluid_idx) &
+                                                         & %sf(i, j, k + 1) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j, &
+                                                         & k - 1))/(2._wp*dz)
                                 cell_volume = abs(cell_volume*dz)
                             end if
                         end do

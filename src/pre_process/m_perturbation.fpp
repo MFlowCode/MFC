@@ -43,13 +43,13 @@ contains
                 do i = 0, m
                     call random_number(rand_real)
 
-                    perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(eqn_idx%E + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields when the volume fraction is not near
                     ! 0 or 1
                     if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
                         do l = 1, num_fluids
-                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
+                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)*fluid_rho(l)
                         end do
                     end if
                 end do
@@ -75,7 +75,7 @@ contains
                     q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     if (bubbles_euler) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
+                        q_prim_vf(eqn_idx%alf)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(eqn_idx%alf)%sf(i, j, k)
                     end if
                 end do
             end do

@@ -84,18 +84,13 @@ module m_global_parameters
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
-    integer               :: E_idx                 !< Index of total energy equation
-    integer               :: alf_idx               !< Index of void fraction
-    integer               :: n_idx                 !< Index of number density
+    type(eqn_idx_info)    :: eqn_idx               !< Scalar equation indices (E, n, alf, gamma, pi_inf, c)
     type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
-    integer               :: gamma_idx             !< Index of specific heat ratio func. eqn.
-    integer               :: pi_inf_idx            !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: B_idx                 !< Indexes of first and last magnetic field eqns.
     type(int_bounds_info) :: stress_idx            !< Indexes of elastic shear stress eqns.
     type(int_bounds_info) :: xi_idx                !< Indexes of first and last reference map eqns.
-    integer               :: c_idx                 !< Index of the color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
     integer               :: damage_idx            !< Index of damage state variable (D) for continuum damage model
     integer               :: psi_idx               !< Index of hyperbolic cleaning state variable for MHD
@@ -567,11 +562,11 @@ contains
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
-            E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
+            eqn_idx%E = mom_idx%end + 1
+            adv_idx%beg = eqn_idx%E + 1
             adv_idx%end = adv_idx%beg + 1
-            gamma_idx = adv_idx%beg
-            pi_inf_idx = adv_idx%end
+            eqn_idx%gamma = adv_idx%beg
+            eqn_idx%pi_inf = adv_idx%end
             sys_size = adv_idx%end
 
             ! Volume Fraction Model (5-equation model)
@@ -582,27 +577,27 @@ contains
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
-            E_idx = mom_idx%end + 1
+            eqn_idx%E = mom_idx%end + 1
 
             if (igr) then
                 ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of (N-1)
                 ! volume fractions for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1 then adv_idx%end < adv_idx%beg,
                 ! which skips all loops over the volume fractions since there is no volume fraction to track
-                adv_idx%beg = E_idx + 1
-                adv_idx%end = E_idx + num_fluids - 1
+                adv_idx%beg = eqn_idx%E + 1
+                adv_idx%end = eqn_idx%E + num_fluids - 1
             else
                 ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann tracks
                 ! a total of (N) volume fractions for N fluids, hence the lack of "-1" in adv_idx%end
-                adv_idx%beg = E_idx + 1
-                adv_idx%end = E_idx + num_fluids
+                adv_idx%beg = eqn_idx%E + 1
+                adv_idx%end = eqn_idx%E + num_fluids
             end if
 
             sys_size = adv_idx%end
 
             if (bubbles_euler) then
-                alf_idx = adv_idx%end
+                eqn_idx%alf = adv_idx%end
             else
-                alf_idx = 1
+                eqn_idx%alf = 1
             end if
 
             if (bubbles_euler) then
@@ -622,8 +617,8 @@ contains
                 sys_size = bub_idx%end
 
                 if (adv_n) then
-                    n_idx = bub_idx%end + 1
-                    sys_size = n_idx
+                    eqn_idx%n = bub_idx%end + 1
+                    sys_size = eqn_idx%n
                 end if
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
@@ -682,9 +677,9 @@ contains
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
-            E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
-            adv_idx%end = E_idx + num_fluids
+            eqn_idx%E = mom_idx%end + 1
+            adv_idx%beg = eqn_idx%E + 1
+            adv_idx%end = eqn_idx%E + num_fluids
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
@@ -694,11 +689,11 @@ contains
             cont_idx%end = 1  ! num_fluids
             mom_idx%beg = cont_idx%end + 1  ! one momentum equation in each direction
             mom_idx%end = cont_idx%end + num_vels
-            E_idx = mom_idx%end + 1  ! one energy equation
-            adv_idx%beg = E_idx + 1
+            eqn_idx%E = mom_idx%end + 1  ! one energy equation
+            adv_idx%beg = eqn_idx%E + 1
             adv_idx%end = adv_idx%beg  ! one volume advection equation
-            alf_idx = adv_idx%end
-            sys_size = alf_idx  ! adv_idx%end
+            eqn_idx%alf = adv_idx%end
+            sys_size = eqn_idx%alf  ! adv_idx%end
 
             if (bubbles_euler) then
                 bub_idx%beg = sys_size + 1
@@ -782,8 +777,8 @@ contains
             end if
 
             if (surface_tension) then
-                c_idx = sys_size + 1
-                sys_size = c_idx
+                eqn_idx%c = sys_size + 1
+                sys_size = eqn_idx%c
             end if
 
             if (cont_damage) then
