@@ -345,17 +345,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         eps = 1e-6
         sharp_ic = {
             "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
-            "patch_icpp(1)%alpha(1)":     1.0 - eps,
+            "patch_icpp(1)%alpha(1)": 1.0 - eps,
             "patch_icpp(1)%alpha_rho(2)": eps,
-            "patch_icpp(1)%alpha(2)":     eps,
+            "patch_icpp(1)%alpha(2)": eps,
             "patch_icpp(2)%alpha_rho(1)": 1.0 - eps,
-            "patch_icpp(2)%alpha(1)":     1.0 - eps,
+            "patch_icpp(2)%alpha(1)": 1.0 - eps,
             "patch_icpp(2)%alpha_rho(2)": eps,
-            "patch_icpp(2)%alpha(2)":     eps,
+            "patch_icpp(2)%alpha(2)": eps,
             "patch_icpp(3)%alpha_rho(1)": eps,
-            "patch_icpp(3)%alpha(1)":     eps,
+            "patch_icpp(3)%alpha(1)": eps,
             "patch_icpp(3)%alpha_rho(2)": 1.0 - eps,
-            "patch_icpp(3)%alpha(2)":     1.0 - eps,
+            "patch_icpp(3)%alpha(2)": 1.0 - eps,
         }
 
         stack.push("", sharp_ic)
