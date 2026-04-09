@@ -27,11 +27,10 @@ module m_particles_EL
 
     real(wp)                             :: next_write_time
     integer, allocatable, dimension(:,:) :: lag_part_id      !< Global and local IDs
-    integer, allocatable, dimension(:)   :: gid_to_local
     real(wp), allocatable, dimension(:)  :: particle_R0      !< Initial particle radius
     real(wp), allocatable, dimension(:)  :: Rmax_stats_part  !< Maximum radius
     real(wp), allocatable, dimension(:)  :: Rmin_stats_part  !< Minimum radius
-    $:GPU_DECLARE(create='[lag_part_id, gid_to_local, particle_R0, Rmax_stats_part, Rmin_stats_part]')
+    $:GPU_DECLARE(create='[lag_part_id, particle_R0, Rmax_stats_part, Rmin_stats_part]')
 
     real(wp), allocatable, dimension(:) :: particle_mass  !< Particle Mass
     $:GPU_DECLARE(create='[particle_mass]')
@@ -157,8 +156,13 @@ module m_particles_EL
     $:GPU_DECLARE(create='[keep_bubble]')
     $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
 
-    integer :: error_flag  ! Error flag for collisions
-    $:GPU_DECLARE(create='[error_flag]')
+    real(wp)                            :: pi2_over_ksp2      !< collision spring stiffness factor
+    real(wp)                            :: Estar              !< collision material stiffness factor
+    real(wp)                            :: log_cor_factor     !< coefficient of restituion factor for spring collision damping
+    logical, allocatable, dimension(:)  :: self_periodic      !< checker for self-periodicity in each direction on self rank
+    logical                             :: any_self_periodic  !< checker to see if any direction is self-rank-periodic
+    real(wp), allocatable, dimension(:) :: domain_len         !< domain length for self-periodic case
+    $:GPU_DECLARE(create='[pi2_over_ksp2, Estar, log_cor_factor, self_periodic, any_self_periodic, domain_len]')
 
     integer, parameter :: ncc = 1  !< Number of collisions cells at boundaries
     real(wp)           :: eps_overlap = 1.e-12
@@ -181,6 +185,7 @@ contains
         integer                :: save_count
         real(wp)               :: qtime
         integer                :: ind_end_loc
+        real(wp)               :: ksp, nu1, nu2, E1, E2, cor, log_cor, sqrt_log_cor2_pi2
 
         next_write_time = 0._wp
 
@@ -307,7 +312,6 @@ contains
         nParticles_glb = lag_params%nParticles_glb
 
         @:ALLOCATE(lag_part_id(1:nParticles_glb, 1:2))
-        @:ALLOCATE(gid_to_local(1:nParticles_glb))
         @:ALLOCATE(particle_R0(1:nParticles_glb))
         @:ALLOCATE(Rmax_stats_part(1:nParticles_glb))
         @:ALLOCATE(Rmin_stats_part(1:nParticles_glb))
@@ -356,6 +360,50 @@ contains
         end if
 
         $:GPU_UPDATE(device='[moving_lag_particles, lag_pressure_force, lag_gravity_force, lag_vel_model, lag_drag_model]')
+
+        if (lag_params%collision_force) then
+            @:ALLOCATE(self_periodic(1:3))
+            @:ALLOCATE(domain_len(1:3))
+
+            ksp = particle_pp%ksp_col  ! Spring stiffness multiplier
+            nu1 = particle_pp%nu_col  ! Poisson's ratio, particle 1
+            nu2 = nu1  ! Poisson's ratio, particle 2
+            E1 = particle_pp%E_col  ! Young's modulus [Pa], particle 1
+            E2 = E1  ! Young's modulus [Pa], particle 2
+            cor = particle_pp%cor_col  ! Coefficient of restitution
+
+            pi2_over_ksp2 = (pi**2._wp)/(ksp**2._wp)
+
+            Estar = 1._wp/(((1._wp - nu1**2._wp)/E1) + ((1._wp - nu2**2._wp)/E2))
+            Estar = (4._wp/3._wp)*Estar
+
+            log_cor = log(cor)
+            sqrt_log_cor2_pi2 = sqrt(log_cor**2._wp + pi**2._wp)
+            log_cor_factor = -2._wp*log_cor/sqrt_log_cor2_pi2
+
+            ! Precompute self-periodic info
+            self_periodic = .false.
+            domain_len = 0._wp
+
+            if (bc_x%beg == BC_PERIODIC .and. bc_x%end == BC_PERIODIC) then
+                self_periodic(1) = .true.
+                domain_len(1) = glb_bounds(1)%end - glb_bounds(1)%beg
+            end if
+            if (bc_y%beg == BC_PERIODIC .and. bc_y%end == BC_PERIODIC) then
+                self_periodic(2) = .true.
+                domain_len(2) = glb_bounds(2)%end - glb_bounds(2)%beg
+            end if
+            if (p > 0) then
+                if (bc_z%beg == BC_PERIODIC .and. bc_z%end == BC_PERIODIC) then
+                    self_periodic(3) = .true.
+                    domain_len(3) = glb_bounds(3)%end - glb_bounds(3)%beg
+                end if
+            end if
+
+            any_self_periodic = any(self_periodic)
+
+            $:GPU_UPDATE(device='[pi2_over_ksp2, Estar, log_cor_factor, self_periodic, any_self_periodic, domain_len]')
+        end if
 
         call s_read_input_particles(q_cons_vf, bc_type)
 
@@ -495,8 +543,8 @@ contains
         $:GPU_UPDATE(device='[particles_lagrange, lag_params]')
 
         $:GPU_UPDATE(device='[lag_part_id, particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, particle_seed, f_p, &
-                     & fqs_fluct, p_AM, p_owner_rank, gid_to_local, particle_rad, particle_pos, particle_posPrev, particle_vel, &
-                     & particle_s, particle_draddt, particle_dposdt, particle_dveldt, n_el_particles_loc]')
+                     & fqs_fluct, p_AM, p_owner_rank, particle_rad, particle_pos, particle_posPrev, particle_vel, particle_s, &
+                     & particle_draddt, particle_dposdt, particle_dveldt, n_el_particles_loc]')
 
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
@@ -561,7 +609,6 @@ contains
         fqs_fluct(part_id,1:3) = 0._wp
         p_AM(part_id) = 0._wp
         p_owner_rank(part_id) = proc_rank
-        gid_to_local(part_id) = -1
 
         if (cyl_coord .and. p == 0) then
             particle_pos(part_id, 2, 1) = sqrt(particle_pos(part_id, 2, 1)**2._wp + particle_pos(part_id, 3, 1)**2._wp)
@@ -1019,49 +1066,29 @@ contains
         real(wp), dimension(3) :: s_cell
         integer, dimension(3) :: cellaux
         integer :: i, k, l, q, ip, jp, kp, ii, jj, kk
-        logical :: celloutside
-        real(wp) :: pidtksp2, pidtksp2_wall, ksp, ksp_wall, nu1, nu2, Rp1, Rp2, E1, E2, Estar, cor, rmag, Rstar, dij, eta_n, &
-             & kappa_n, rmult, mp1, mp2, log_cor, sqrt_log_cor2_pi2, log_cor_factor
+        real(wp) :: pidtksp2, rmag, Rstar, dij, eta_n, kappa_n, rmult, mp1, mp2, Rp1, Rp2
         real(wp), dimension(3) :: xp1, xp2, vp1, vp2, v_rel, rpij, nij, vnij, Fnpp_ij, force_vec
-        integer                :: kpz
-        integer                :: total_recv
-        integer                :: glb_id, count
-        integer                :: n_el_particles_loc_before_ghost
+        integer :: kpz
+        integer :: n_el_particles_loc_before_ghost
+        real(wp), dimension(3) :: periodic_offset
 
         if (num_procs > 1) then
             n_el_particles_loc_before_ghost = n_el_particles_loc
             call s_add_ghost_particles()
         end if
 
+        call s_reset_linked_list()
+
         kpz = 0
         if (num_dims == 3) kpz = ncc
 
-        ksp = particle_pp%ksp_col  ! Spring stiffness multiplier
-        ksp_wall = ksp  ! Spring stiffness multiplier for wall collision
-        nu1 = particle_pp%nu_col  ! Poisson's ratio, particle 1 (glass/steel-like)
-        nu2 = nu1  ! Poisson's ratio, particle 2
-        E1 = particle_pp%E_col  ! Young's modulus [Pa], particle 1
-        E2 = E1  ! Young's modulus [Pa], particle 2
-        cor = particle_pp%cor_col  ! Coefficient of restitution
-
-        pidtksp2 = (pi**2._wp)/((dt_sub*ksp)**2._wp)
-        pidtksp2_wall = (pi**2._wp)/((dt_sub*ksp_wall)**2._wp)
-
-        Estar = 1._wp/(((1._wp - nu1**2._wp)/E1) + ((1._wp - nu2**2._wp)/E2))
-        Estar = (4._wp/3._wp)*Estar
-
-        log_cor = log(cor)
-        sqrt_log_cor2_pi2 = sqrt(log_cor**2._wp + pi**2._wp)
-        log_cor_factor = -2._wp*log_cor/sqrt_log_cor2_pi2
-
-        call s_reset_linked_list()
+        pidtksp2 = pi2_over_ksp2*(1._wp/(dt_sub**2._wp))
 
         call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS")
 
         $:GPU_PARALLEL_LOOP(private='[i, k, cell, ip, jp, kp, Rp1, xp1, mp1, vp1, kk, jj, ii, cellaux, q, Rp2, xp2, mp2, vp2, &
                             & v_rel, Rstar, rpij, rmag, nij, vnij, dij, kappa_n, rmult, eta_n, Fnpp_ij, force_vec, s_cell, &
-                            & celloutside, count]', copyin='[ksp, nu1, nu2, E1, E2, cor, pidtksp2, pidtksp2_wall, Estar, kpz, &
-                                & log_cor_factor]')
+                            & periodic_offset]', copyin='[pidtksp2, kpz]')
         do k = 1, n_el_particles_loc
             if (p_owner_rank(k) /= proc_rank) then
                 cycle
@@ -1089,50 +1116,85 @@ contains
                         cellaux(2) = jj
                         cellaux(3) = kk
 
-                        call s_check_celloutside_wbuff(cellaux, celloutside)
+                        periodic_offset = 0._wp
+                        if (any_self_periodic) then
+                            if (self_periodic(1)) then
+                                if (ii < 0) then
+                                    cellaux(1) = ii + m + 1
+                                    periodic_offset(1) = -domain_len(1)
+                                else if (ii > m) then
+                                    cellaux(1) = ii - (m + 1)
+                                    periodic_offset(1) = domain_len(1)
+                                end if
+                            end if
 
-                        if (.not. celloutside) then
-                            q = particle_head(ii, jj, kk)
-                            ! Traverse linked list in that cell
+                            if (self_periodic(2)) then
+                                if (jj < 0) then
+                                    cellaux(2) = jj + n + 1
+                                    periodic_offset(2) = -domain_len(2)
+                                else if (jj > n) then
+                                    cellaux(2) = jj - (n + 1)
+                                    periodic_offset(2) = domain_len(2)
+                                end if
+                            end if
 
-                            do while (q /= -1)
-                                if (q /= k) then
-                                    Rp2 = particle_rad(q, 2)
-                                    xp2 = particle_pos(q,:,2)
-                                    mp2 = particle_mass(q)
-                                    vp2 = particle_vel(q,:,2)
-                                    v_rel = vp2 - vp1
+                            if (self_periodic(3)) then
+                                if (kk < 0) then
+                                    cellaux(3) = kk + p + 1
+                                    periodic_offset(3) = -domain_len(3)
+                                else if (kk > p) then
+                                    cellaux(3) = kk - (p + 1)
+                                    periodic_offset(3) = domain_len(3)
+                                end if
+                            end if
+                        end if
 
-                                    Rstar = (Rp1*Rp2)/(Rp1 + Rp2)
+                        q = particle_head(cellaux(1), cellaux(2), cellaux(3))
+                        ! Traverse linked list in that cell
+
+                        do while (q /= -1)
+                            if (q /= k) then
+                                Rp2 = particle_rad(q, 2)
+                                xp2 = particle_pos(q,:,2)
+                                mp2 = particle_mass(q)
+                                vp2 = particle_vel(q,:,2)
+                                v_rel = vp2 - vp1
+
+                                Rstar = (Rp1*Rp2)/(Rp1 + Rp2)
+
+                                if (any_self_periodic) then
+                                    rpij = (xp2 + periodic_offset) - xp1
+                                else
                                     rpij = xp2 - xp1
-                                    rmag = sqrt(rpij(1)**2 + rpij(2)**2 + rpij(3)**2)
-                                    rmag = max(rmag, eps_overlap)
-                                    nij = rpij/rmag
-                                    vnij = dot_product(v_rel, nij)*nij
-                                    dij = (Rp1 + Rp2) - rmag
-
-                                    if (dij > 0._wp) then
-                                        kappa_n = min((pidtksp2*mp1), (Estar*sqrt(Rstar)*sqrt(abs(dij))))
-
-                                        rmult = (mp1*mp2)/(mp1 + mp2)
-                                        eta_n = log_cor_factor*sqrt(kappa_n)*sqrt(rmult)
-
-                                        Fnpp_ij = -kappa_n*dij*nij + eta_n*vnij
-
-                                        f_p(k,:) = f_p(k,:) + Fnpp_ij
-                                    end if
                                 end if
 
-                                q = linked_list(q)
-                            end do
-                        end if
+                                rmag = sqrt(rpij(1)**2 + rpij(2)**2 + rpij(3)**2)
+                                rmag = max(rmag, eps_overlap)
+                                nij = rpij/rmag
+                                vnij = dot_product(v_rel, nij)*nij
+                                dij = (Rp1 + Rp2) - rmag
+
+                                if (dij > 0._wp) then
+                                    kappa_n = min((pidtksp2*mp1), (Estar*sqrt(Rstar)*sqrt(abs(dij))))
+
+                                    rmult = (mp1*mp2)/(mp1 + mp2)
+                                    eta_n = log_cor_factor*sqrt(kappa_n)*sqrt(rmult)
+
+                                    Fnpp_ij = -kappa_n*dij*nij + eta_n*vnij
+
+                                    f_p(k,:) = f_p(k,:) + Fnpp_ij
+                                end if
+                            end if
+
+                            q = linked_list(q)
+                        end do
                     end do
                 end do
             end do
 
             !> Check each local particle for wall collisions
 
-            call s_compute_wall_collisions(xp1, vp1, Rp1, mp1, Estar, pidtksp2_wall, log_cor_factor, force_vec)
+            call s_compute_wall_collisions(xp1, vp1, Rp1, mp1, pidtksp2, force_vec)
             f_p(k,:) = f_p(k,:) + force_vec
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -1147,12 +1209,12 @@ contains
     end subroutine s_compute_particle_EL_collisions
 
     !> This subroutine checks for particles at solid walls to compute a collision force
-    subroutine s_compute_wall_collisions(pos, vel, rad, mass, Es, pidtksp, core, wcol_force)
+    subroutine s_compute_wall_collisions(pos, vel, rad, mass, pidtksp, wcol_force)
 
         $:GPU_ROUTINE(function_name='s_compute_wall_collisions',parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in)    :: pos, vel
-        real(wp), intent(in)                  :: rad, mass, Es, pidtksp, core
+        real(wp), intent(in)                  :: rad, mass, pidtksp
         real(wp), dimension(3), intent(inout) :: wcol_force
         real(wp)                              :: dij
 
@@ -1163,7 +1225,7 @@ contains
             dij = rad - (pos(1) - x_cb(-1))
 
             if (dij > 0._wp) then
-                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 1, 1._wp, wcol_force)
+                call s_compute_wall_collision_force(dij, vel, rad, mass, pidtksp, 1, 1._wp, wcol_force)
             end if
         end if
 
@@ -1171,7 +1233,7 @@ contains
             dij = rad - (x_cb(m) - pos(1))
 
             if (dij > 0._wp) then
-                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 1, -1._wp, wcol_force)
+                call s_compute_wall_collision_force(dij, vel, rad, mass, pidtksp, 1, -1._wp, wcol_force)
             end if
         end if
 
@@ -1179,7 +1241,7 @@ contains
             dij = rad - (pos(2) - y_cb(-1))
 
             if (dij > 0._wp) then
-                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 2, 1._wp, wcol_force)
+                call s_compute_wall_collision_force(dij, vel, rad, mass, pidtksp, 2, 1._wp, wcol_force)
             end if
         end if
 
@@ -1187,7 +1249,7 @@ contains
             dij = rad - (y_cb(n) - pos(2))
 
             if (dij > 0._wp) then
-                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 2, -1._wp, wcol_force)
+                call s_compute_wall_collision_force(dij, vel, rad, mass, pidtksp, 2, -1._wp, wcol_force)
             end if
         end if
 
@@ -1196,7 +1258,7 @@ contains
                 dij = rad - (pos(3) - z_cb(-1))
 
                 if (dij > 0._wp) then
-                    call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 3, 1._wp, wcol_force)
+                    call s_compute_wall_collision_force(dij, vel, rad, mass, pidtksp, 3, 1._wp, wcol_force)
                 end if
             end if
 
@@ -1204,7 +1266,7 @@ contains
                 dij = rad - (z_cb(p) - pos(3))
 
                 if (dij > 0._wp) then
-                    call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 3, -1._wp, wcol_force)
+                    call s_compute_wall_collision_force(dij, vel, rad, mass, pidtksp, 3, -1._wp, wcol_force)
                 end if
             end if
         end if
@@ -1212,12 +1274,12 @@ contains
     end subroutine s_compute_wall_collisions
 
     !> This subroutine computes the collision force with a solid wall
-    subroutine s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, dir, normal, wcol_force)
+    subroutine s_compute_wall_collision_force(dij, vel, rad, mass, pidtksp, dir, normal, wcol_force)
 
         $:GPU_ROUTINE(function_name='s_compute_wall_collision_force',parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in)    :: vel
-        real(wp), intent(in)                  :: dij, rad, mass, Es, pidtksp, core, normal
+        real(wp), intent(in)                  :: dij, rad, mass, pidtksp, normal
         integer, intent(in)                   :: dir
         real(wp), dimension(3), intent(inout) :: wcol_force
         real(wp), dimension(3)                :: nij, v_rel, vnij
@@ -1232,9 +1294,9 @@ contains
         vnij = dot_product(v_rel, nij)*nij
 
         ! Wall has infinite mass so use mp1 only
-        kappa_n = min((pidtksp*mass), (Es*sqrt(rad)*sqrt(abs(dij))))
+        kappa_n = min((pidtksp*mass), (Estar*sqrt(rad)*sqrt(abs(dij))))
 
-        eta_n = core*sqrt(kappa_n)*(1._wp/sqrt(1._wp/mass))
+        eta_n = log_cor_factor*sqrt(kappa_n)*(1._wp/sqrt(1._wp/mass))
 
         wcol_force = wcol_force + (kappa_n*dij*nij - eta_n*vnij)
 
@@ -1269,31 +1331,23 @@ contains
     !! (i,j,k). linked_list(k) points to the next particle in the same cell (-1 = end).
     subroutine s_build_linked_list()
 
-        integer                :: k, glb_id, i
+        integer                :: k, i
         integer, dimension(3)  :: cell
         real(wp), dimension(3) :: s_cell
-        logical                :: celloutside
 
-        $:GPU_PARALLEL_LOOP(private='[i, k, cell, s_cell, glb_id, celloutside]')
+        $:GPU_PARALLEL_LOOP(private='[i, k, cell, s_cell]')
         do k = 1, n_el_particles_loc
-            glb_id = lag_part_id(k, 1)
-            gid_to_local(glb_id) = k
-
             s_cell = particle_s(k,1:3,2)
             cell = int(s_cell(:))
             do i = 1, num_dims
                 if (s_cell(i) < 0._wp) cell(i) = cell(i) - 1
             end do
 
-            call s_check_celloutside_wbuff(cell, celloutside)
-
-            if (.not. celloutside) then
-                !> Particle linked list building
-                $:GPU_ATOMIC(atomic='capture')
-                linked_list(k) = particle_head(cell(1), cell(2), cell(3))
-                particle_head(cell(1), cell(2), cell(3)) = k
-                $:END_GPU_ATOMIC_CAPTURE()
-            end if
+            !> Particle linked list building
+            $:GPU_ATOMIC(atomic='capture')
+            linked_list(k) = particle_head(cell(1), cell(2), cell(3))
+            particle_head(cell(1), cell(2), cell(3)) = k
+            $:END_GPU_ATOMIC_CAPTURE()
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -1805,25 +1859,21 @@ contains
 
             n_el_particles_loc = newBubs
 
-            ! Handle periodic wrapping of bubbles on same processor
-            newBubs = 0
+            ! Handle periodic wrapping of particles on same processor
             do k = 1, n_el_particles_loc
                 if (any(wrap_bubble_dir(k,:) == 1)) then
-                    newBubs = newBubs + 1
-                    new_idx = n_el_particles_loc + newBubs
-                    call s_copy_lag_particle(new_idx, k)
                     do i = 1, num_dims
                         if (wrap_bubble_dir(k, i) == 1) then
                             offset = glb_bounds(i)%end - glb_bounds(i)%beg
                             if (wrap_bubble_loc(k, i) == 1) then
                                 do q = 1, 2
-                                    particle_pos(new_idx, i, q) = particle_pos(new_idx, i, q) - offset
-                                    particle_posPrev(new_idx, i, q) = particle_posPrev(new_idx, i, q) - offset
+                                    particle_pos(k, i, q) = particle_pos(k, i, q) - offset
+                                    particle_posPrev(k, i, q) = particle_posPrev(k, i, q) - offset
                                 end do
                             else if (wrap_bubble_loc(k, i) == -1) then
                                 do q = 1, 2
-                                    particle_pos(new_idx, i, q) = particle_pos(new_idx, i, q) + offset
-                                    particle_posPrev(new_idx, i, q) = particle_posPrev(new_idx, i, q) + offset
+                                    particle_pos(k, i, q) = particle_pos(k, i, q) + offset
+                                    particle_posPrev(k, i, q) = particle_posPrev(k, i, q) + offset
                                 end do
                             end if
                         end if
@@ -2727,7 +2777,6 @@ contains
 
         ! Deallocating space
         @:DEALLOCATE(lag_part_id)
-        @:DEALLOCATE(gid_to_local)
         @:DEALLOCATE(particle_R0)
         @:DEALLOCATE(Rmax_stats_part)
         @:DEALLOCATE(Rmin_stats_part)
@@ -2756,6 +2805,11 @@ contains
 
         @:DEALLOCATE(linked_list)
         @:DEALLOCATE(particle_head)
+
+        if (lag_params%collision_force) then
+            @:DEALLOCATE(self_periodic)
+            @:DEALLOCATE(domain_len)
+        end if
 
     end subroutine s_finalize_particle_lagrangian_solver
 
