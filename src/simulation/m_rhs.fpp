@@ -1824,7 +1824,7 @@ contains
                     do i = 1, num_dims
                         @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
                     end do
-                    @:DEALLOCATE(tau_re_vf(e_idx)%sf)
+                    @:DEALLOCATE(tau_re_vf(eqn_idx%E)%sf)
                     @:DEALLOCATE(tau_re_vf)
                 end if
             end if
