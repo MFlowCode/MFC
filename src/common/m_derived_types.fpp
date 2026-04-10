@@ -92,6 +92,12 @@ module m_derived_types
         real(wp) :: R(3)
     end type riemann_states_vec3
 
+    !> Lightweight beg/end pair for equation index ranges (no BC payload).
+    type idx_bounds_info
+        integer :: beg
+        integer :: end
+    end type idx_bounds_info
+
     !> Integer bounds for variables
     type int_bounds_info
         integer                             :: beg
@@ -127,15 +133,15 @@ module m_derived_types
     !> Range indices (beg/end) use int_bounds_info; scalar indices are plain integers (0 = inactive).
     !> Contains no allocatable members - safe for GPU_DECLARE as a single struct.
     type eqn_idx_info
-        type(int_bounds_info) :: cont     !< Partial densities (continuity equations)
-        type(int_bounds_info) :: mom      !< Momentum components
-        type(int_bounds_info) :: adv      !< Volume fractions (advection equations)
-        type(int_bounds_info) :: bub      !< Bubble equation range (beg/end only)
-        type(int_bounds_info) :: stress   !< Stress tensor components
-        type(int_bounds_info) :: xi       !< Reference map equations
-        type(int_bounds_info) :: B        !< Magnetic field components
-        type(int_bounds_info) :: int_en   !< Internal energy equations
-        type(int_bounds_info) :: species  !< Chemistry species equations
+        type(idx_bounds_info) :: cont     !< Partial densities (continuity equations)
+        type(idx_bounds_info) :: mom      !< Momentum components
+        type(idx_bounds_info) :: adv      !< Volume fractions (advection equations)
+        type(idx_bounds_info) :: bub      !< Bubble equation range (beg/end only)
+        type(idx_bounds_info) :: stress   !< Stress tensor components
+        type(idx_bounds_info) :: xi       !< Reference map equations
+        type(idx_bounds_info) :: B        !< Magnetic field components
+        type(idx_bounds_info) :: int_en   !< Internal energy equations
+        type(idx_bounds_info) :: species  !< Chemistry species equations
         integer               :: E        !< Energy/pressure equation
         integer               :: n        !< Number density equation
         integer               :: alf      !< Void fraction (scalar, model_eqns=4)
