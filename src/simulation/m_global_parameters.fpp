@@ -1309,7 +1309,9 @@ contains
 
         if (bubbles_euler) then
             @:DEALLOCATE(qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
-            if (qbmm) @:deallocate(qbmm_idx%moms)
+            if (qbmm) then
+                @:DEALLOCATE(qbmm_idx%moms)
+            end if
         end if
 
         deallocate (proc_coords)
