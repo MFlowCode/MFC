@@ -894,6 +894,11 @@ contains
 
         integer :: i
 
+        if (bubbles_euler) then
+            deallocate (qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
+            if (qbmm) deallocate (qbmm_idx%moms, qbmm_idx%fullmom)
+        end if
+
         ! Deallocating grid variables for the x-direction
 
         deallocate (x_cc, x_cb)

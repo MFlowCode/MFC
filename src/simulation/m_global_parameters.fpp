@@ -256,7 +256,6 @@ module m_global_parameters
     integer             :: tensor_size  !< Number of elements in the full tensor plus one
     !> @}
     $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
-    $:GPU_DECLARE(create='[qbmm_idx]')
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With INTerior".
     type(int_bounds_info) :: idwint(1:3)
@@ -1306,6 +1305,11 @@ contains
 
         if (viscous) then
             @:DEALLOCATE(Re_idx)
+        end if
+
+        if (bubbles_euler) then
+            @:DEALLOCATE(qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
+            if (qbmm) @:deallocate(qbmm_idx%moms)
         end if
 
         deallocate (proc_coords)

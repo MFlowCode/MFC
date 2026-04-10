@@ -919,6 +919,11 @@ contains
 
         integer :: i
 
+        if (bubbles_euler) then
+            deallocate (qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
+            if (qbmm) deallocate (qbmm_idx%moms)
+        end if
+
         ! Deallocating the grid variables for the x-coordinate direction
 
         deallocate (x_cc, x_cb, dx)
