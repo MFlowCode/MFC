@@ -279,7 +279,7 @@ contains
         call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), rhol, gamma, pi_inf, qv, Re)
         dynP = 0._wp
         do i = 1, num_dims
-            dynP = dynP + 0.5_wp*q_cons_vf(contxe + i)%sf(cell(1), cell(2), cell(3))**2/rhol
+            dynP = dynP + 0.5_wp*q_cons_vf(eqn_idx%cont%end + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
         pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
         if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
@@ -655,8 +655,8 @@ contains
                     do j = 0, n
                         do i = 0, m
                             if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - (1._wp - q_beta(1)%sf(i, j, &
-                                       & k))/q_beta(1)%sf(i, j, k)*q_beta(3)%sf(i, j, k)
+                                rhs_vf(eqn_idx%cont%end + l)%sf(i, j, k) = rhs_vf(eqn_idx%cont%end + l)%sf(i, j, &
+                                       & k) - (1._wp - q_beta(1)%sf(i, j, k))/q_beta(1)%sf(i, j, k)*q_beta(3)%sf(i, j, k)
                             end if
                         end do
                     end do
@@ -668,7 +668,7 @@ contains
                 do k = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(2)%beg, idwbuff(2)%end
                         do i = idwbuff(1)%beg, idwbuff(1)%end
-                            q_beta(3)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+                            q_beta(3)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, k)*q_prim_vf(eqn_idx%cont%end + l)%sf(i, j, k)
                         end do
                     end do
                 end do
@@ -714,7 +714,7 @@ contains
         vel(:) = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_dims
-            vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
+            vel(i) = q_prim_vf(i + eqn_idx%cont%end)%sf(cell(1), cell(2), cell(3))
         end do
         E = gamma*pinf + pi_inf + 0.5_wp*rhol*dot_product(vel, vel)
         H = (E + pinf)/rhol

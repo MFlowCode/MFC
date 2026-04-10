@@ -262,17 +262,7 @@ module m_global_parameters
     logical  :: surface_tension
     !> @}
 
-    !> @name Index variables used for m_variables_conversion
-    !> @{
-    integer :: momxb, momxe
-    integer :: advxb, advxe
-    integer :: contxb, contxe
-    integer :: intxb, intxe
-    integer :: bubxb, bubxe
-    integer :: strxb, strxe
     integer :: xibeg, xiend
-    integer :: chemxb, chemxe
-    !> @}
 
     !> @name Lagrangian bubbles
     !> @{
@@ -751,22 +741,8 @@ contains
             z_output_idx%end = 0
         end if
 
-        momxb = eqn_idx%mom%beg
-        momxe = eqn_idx%mom%end
-        advxb = eqn_idx%adv%beg
-        advxe = eqn_idx%adv%end
-        contxb = eqn_idx%cont%beg
-        contxe = eqn_idx%cont%end
-        bubxb = eqn_idx%bub%beg
-        bubxe = eqn_idx%bub%end
-        strxb = eqn_idx%stress%beg
-        strxe = eqn_idx%stress%end
-        intxb = eqn_idx%int_en%beg
-        intxe = eqn_idx%int_en%end
         xibeg = eqn_idx%xi%beg
         xiend = eqn_idx%xi%end
-        chemxb = eqn_idx%species%beg
-        chemxe = eqn_idx%species%end
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then

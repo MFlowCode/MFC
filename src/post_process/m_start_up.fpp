@@ -299,7 +299,7 @@ contains
         if (chemistry) then
             do i = 1, num_species
                 if (chem_wrt_Y(i) .or. prim_vars_wrt) then
-                    q_sf(:,:,:) = q_prim_vf(chemxb + i - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                    q_sf(:,:,:) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,A)') 'Y_', trim(species_names(i))
                     call s_write_variable_to_formatted_database_file(varname, t_step)
 
@@ -338,7 +338,7 @@ contains
         if (model_eqns == 3) then
             do i = 1, num_fluids
                 if (alpha_rho_e_wrt(i) .or. cons_vars_wrt) then
-                    q_sf = q_cons_vf(i + intxb - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                    q_sf = q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I0)') 'alpha_rho_e', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
 

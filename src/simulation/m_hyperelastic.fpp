@@ -178,7 +178,8 @@ contains
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, b_size - 1
-                                q_cons_vf(strxb + i - 1)%sf(j, k, l) = rho*q_prim_vf(strxb + i - 1)%sf(j, k, l)
+                                q_cons_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, &
+                                          & l) = rho*q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l)
                             end do
                         end if
                     end if
@@ -210,7 +211,7 @@ contains
         ! dividing by the jacobian for neo-Hookean model setting the tensor to the stresses for riemann solver
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
-            q_prim_vf(strxb + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
+            q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! First invariant strain energy: W = G/2 * (I1 - 3), neo-Hookean model
         q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
@@ -239,7 +240,7 @@ contains
         ! dividing by the jacobian for neo-Hookean model setting the tensor to the stresses for riemann solver
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, b_size - 1
-            q_prim_vf(strxb + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
+            q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! First invariant strain energy: W = G/2 * (I1 - 3), neo-Hookean model
         q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)

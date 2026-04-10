@@ -293,7 +293,7 @@ contains
             end if
 
             if (chemistry) then
-                do i = chemxb, chemxe
+                do i = eqn_idx%species%beg, eqn_idx%species%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -694,7 +694,7 @@ contains
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = momxb, eqn_idx%E
+        do i = eqn_idx%mom%beg, eqn_idx%E
             do l = 0, p
                 do k = 0, n
                     do j = 0, m

@@ -575,7 +575,7 @@ contains
 
                     if (chemistry) then
                         do c = 1, num_species
-                            rhoYks(c) = v_vf(chemxb + c - 1)%sf(j, k, l)
+                            rhoYks(c) = v_vf(eqn_idx%species%beg + c - 1)%sf(j, k, l)
                         end do
                     end if
 
@@ -592,8 +592,8 @@ contains
                                             & T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + intxb - 1)%sf(j, k, l) = v_vf(i + advxb - 1)%sf(j, k, &
-                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
+                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
                     end do
                 end do
             end do

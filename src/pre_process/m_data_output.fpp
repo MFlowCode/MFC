@@ -168,7 +168,7 @@ contains
                     do j = 0, m
                         if (chemistry) then
                             do c = 1, num_species
-                                rhoYks(c) = q_cons_vf(chemxb + c - 1)%sf(j, 0, 0)
+                                rhoYks(c) = q_cons_vf(eqn_idx%species%beg + c - 1)%sf(j, 0, 0)
                             end do
                         end if
 
@@ -176,10 +176,11 @@ contains
 
                         lit_gamma = 1._wp/gamma + 1._wp
 
-                        if ((i >= chemxb) .and. (i <= chemxe)) then
+                        if ((i >= eqn_idx%species%beg) .and. (i <= eqn_idx%species%end)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
                         else if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
-                                 & .and. (i <= eqn_idx%adv%end)) .or. ((i >= chemxb) .and. (i <= chemxe))) then
+                                 & .and. (i <= eqn_idx%adv%end)) .or. ((i >= eqn_idx%species%beg) .and. (i <= eqn_idx%species%end) &
+                                 & )) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == eqn_idx%mom%beg) then  ! u
                             write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)/rho
@@ -207,7 +208,7 @@ contains
                             end if
                         else if ((i >= eqn_idx%bub%beg) .and. (i <= eqn_idx%bub%end) .and. bubbles_euler) then
                             if (qbmm) then
-                                nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
+                                nbub = q_cons_vf(eqn_idx%bub%beg)%sf(j, 0, 0)
                             else
                                 if (adv_n) then
                                     nbub = q_cons_vf(eqn_idx%n)%sf(j, 0, 0)
@@ -618,22 +619,22 @@ contains
 
         write (iu, '(A3,A20,A20)') "#", "Conservative", "Primitive"
         write (iu, '(A)') "    "
-        do i = contxb, contxe
-            write (temp, '(I0)') i - contxb + 1
+        do i = eqn_idx%cont%beg, eqn_idx%cont%end
+            write (temp, '(I0)') i - eqn_idx%cont%beg + 1
             write (iu, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "} \rho_{" // trim(temp) // "}", &
                    & "\alpha_{" // trim(temp) // "} \rho"
         end do
-        do i = momxb, momxe
-            write (iu, '(I3,A20,A20)') i, "\rho u_" // coord(i - momxb + 1), "u_" // coord(i - momxb + 1)
+        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+            write (iu, '(I3,A20,A20)') i, "\rho u_" // coord(i - eqn_idx%mom%beg + 1), "u_" // coord(i - eqn_idx%mom%beg + 1)
         end do
         if (eqn_idx%E /= 0) write (iu, '(I3,A20,A20)') eqn_idx%E, "\rho U", "p"
-        do i = advxb, advxe
-            write (temp, '(I0)') i - contxb + 1
+        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+            write (temp, '(I0)') i - eqn_idx%cont%beg + 1
             write (iu, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "}", "\alpha_{" // trim(temp) // "}"
         end do
         if (chemistry) then
             do i = 1, num_species
-                write (iu, '(I3,A20,A20)') chemxb + i - 1, "Y_{" // trim(species_names(i)) // "} \rho", &
+                write (iu, '(I3,A20,A20)') eqn_idx%species%beg + i - 1, "Y_{" // trim(species_names(i)) // "} \rho", &
                        & "Y_{" // trim(species_names(i)) // "}"
             end do
         end if

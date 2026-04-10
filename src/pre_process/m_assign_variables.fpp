@@ -116,15 +116,15 @@ contains
                 sum = 0._wp
                 do i = 1, num_species
                     term = eta*patch_icpp(patch_id)%Y(i) + (1._wp - eta)*patch_icpp(smooth_patch_id)%Y(i)
-                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = term
+                    q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l) = term
                     sum = sum + term
                 end do
 
                 sum = max(sum, verysmall)
 
                 do i = 1, num_species
-                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)/sum
-                    Ys(i) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)
+                    q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/sum
+                    Ys(i) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)
                 end do
             end block
         end if
@@ -152,8 +152,8 @@ contains
 
         if (qbmm) then
             do i = 1, nb
-                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, &
-                          & l)*((p0 - bub_pp%pv)/(q_prim_vf(eqn_idx%E)%sf(j, k, l)*p0 - bub_pp%pv))**(1._wp/3._wp)
+                q_prim_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, &
+                          & k, l)*((p0 - bub_pp%pv)/(q_prim_vf(eqn_idx%E)%sf(j, k, l)*p0 - bub_pp%pv))**(1._wp/3._wp)
             end do
         end if
 
@@ -161,14 +161,14 @@ contains
 
         if (qbmm) then
             do i = 1, nb
-                R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
+                R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
             end do
         else
             do i = 1, nb
                 if (polytropic) then
-                    R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*2)%sf(j, k, l))**3._wp
+                    R3bar = R3bar + weight(i)*(q_prim_vf(eqn_idx%bub%beg + (i - 1)*2)%sf(j, k, l))**3._wp
                 else
-                    R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*4)%sf(j, k, l))**3._wp
+                    R3bar = R3bar + weight(i)*(q_prim_vf(eqn_idx%bub%beg + (i - 1)*4)%sf(j, k, l))**3._wp
                 end if
             end do
         end if
@@ -446,7 +446,7 @@ contains
                 sum = 0._wp
                 do i = 1, num_species
                     term = eta*patch_icpp(patch_id)%Y(i) + (1._wp - eta)*patch_icpp(smooth_patch_id)%Y(i)
-                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = term
+                    q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l) = term
                     sum = sum + term
                 end do
 
@@ -455,8 +455,8 @@ contains
                 end if
 
                 do i = 1, num_species
-                    q_prim_vf(chemxb + i - 1)%sf(j, k, l) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)/sum
-                    Ys(i) = q_prim_vf(chemxb + i - 1)%sf(j, k, l)
+                    q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/sum
+                    Ys(i) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)
                 end do
             end block
         end if

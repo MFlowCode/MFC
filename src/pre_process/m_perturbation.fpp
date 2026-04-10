@@ -181,11 +181,12 @@ contains
 
                             vel_rsm = 0._wp
                             do q = 1, num_dims
-                                vel_rsm = vel_rsm + q_prim_vf(momxb + q - 1)%sf(j, k, l)**2._wp
+                                vel_rsm = vel_rsm + q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l)**2._wp
                             end do
                             vel_rsm = sqrt(vel_rsm)
 
-                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = q_prim_vf(momxb + i - 1)%sf(j, k, l) + vel_rsm*scale*mag
+                            q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
+                                      & l) + vel_rsm*scale*mag
                         end do
                     end do
                 end do
@@ -215,8 +216,8 @@ contains
                                 zl = freq*(z_cc(l) + ofs(i, 3))
                                 mag = f_simplex3d(xl, yl, zl)
                             end if
-                            q_prim_vf(contxb + i - 1)%sf(j, k, l) = q_prim_vf(contxb + i - 1)%sf(j, k, &
-                                      & l) + q_prim_vf(contxb + i - 1)%sf(j, k, l)*scale*mag
+                            q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l) = q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, &
+                                      & l) + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)*scale*mag
                         end do
                     end do
                 end do
@@ -295,9 +296,9 @@ contains
                         alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) + khat(3)*z_cc(l)) + 2._wp*pi*phi
                         velfluc = 2._wp*q*sig*cos(alpha)
                         velfluc = matmul(Lmat, velfluc)
-                        q_prim_vf(momxb)%sf(j, r, l) = q_prim_vf(momxb)%sf(j, r, l) + velfluc(1)
-                        q_prim_vf(momxb + 1)%sf(j, r, l) = q_prim_vf(momxb + 1)%sf(j, r, l) + velfluc(2)
-                        q_prim_vf(momxb + 2)%sf(j, r, l) = q_prim_vf(momxb + 2)%sf(j, r, l) + velfluc(3)
+                        q_prim_vf(eqn_idx%mom%beg)%sf(j, r, l) = q_prim_vf(eqn_idx%mom%beg)%sf(j, r, l) + velfluc(1)
+                        q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, r, l) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, r, l) + velfluc(2)
+                        q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, r, l) = q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, r, l) + velfluc(3)
                     end do
                 end do
             end do

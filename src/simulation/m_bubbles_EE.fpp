@@ -104,8 +104,8 @@ contains
                     do k = 0, n
                         do j = 0, m
                             divu_in%sf(j, k, l) = 0._wp
-                            divu_in%sf(j, k, l) = 5.e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, &
-                                       & l) - q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+                            divu_in%sf(j, k, l) = 5.e-1_wp/dx(j)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j + 1, k, &
+                                       & l) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j - 1, k, l))
                         end do
                     end do
                 end do
@@ -116,8 +116,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, &
-                                   & l) - q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dy(k)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, &
+                                   & k + 1, l) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k - 1, l))
                     end do
                 end do
             end do
@@ -127,8 +127,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, &
-                                   & l + 1) - q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dz(l)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
+                                   & l + 1) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, l - 1))
                     end do
                 end do
             end do
@@ -222,7 +222,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do ii = 1, num_fluids
                             myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
-                            myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
+                            myalpha(ii) = q_cons_vf(eqn_idx%adv%beg + ii - 1)%sf(j, k, l)
                         end do
 
                         if (num_fluids == 1) then
@@ -304,7 +304,8 @@ contains
                 do q = 0, n
                     do i = 0, m
                         rhs_vf(eqn_idx%alf)%sf(i, q, l) = rhs_vf(eqn_idx%alf)%sf(i, q, l) + bub_adv_src(i, q, l)
-                        if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
+                        if (num_fluids > 1) rhs_vf(eqn_idx%adv%beg)%sf(i, q, l) = rhs_vf(eqn_idx%adv%beg)%sf(i, q, &
+                            & l) - bub_adv_src(i, q, l)
                         $:GPU_LOOP(parallelism='[seq]')
                         do k = 1, nb
                             rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)

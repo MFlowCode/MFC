@@ -113,7 +113,8 @@ contains
                             @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
+                                flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
+                                            & l) + Omega(1, i)
 
                                 flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + Omega(1, &
                                             & i)*vSrc_rsx_vf(j, k, l, i)
@@ -155,7 +156,8 @@ contains
                                 @:compute_capillary_stress_tensor()
 
                                 do i = 1, num_dims
-                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
+                                    flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
+                                                & k, l) + Omega(2, i)
 
                                     flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + Omega(2, &
                                                 & i)*vSrc_rsy_vf(k, j, l, i)
@@ -197,7 +199,8 @@ contains
                                 @:compute_capillary_stress_tensor()
 
                                 do i = 1, num_dims
-                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) = flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3, i)
+                                    flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
+                                                & k, l) + Omega(3, i)
 
                                     flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + Omega(3, &
                                                 & i)*vSrc_rsz_vf(l, k, j, i)

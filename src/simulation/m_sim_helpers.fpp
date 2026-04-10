@@ -105,12 +105,12 @@ contains
         if (igr) then
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_vels
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)/rho
+                vel(i) = q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l)/rho
             end do
         else
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_vels
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
+                vel(i) = q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l)
             end do
         end if
 

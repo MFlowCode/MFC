@@ -344,13 +344,13 @@ contains
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
                 do j = 1, buff_size
-                    do i = 1, contxe
+                    do i = 1, eqn_idx%cont%end
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
                     end do
 
-                    q_prim_vf(momxb)%sf(-j, k, l) = -q_prim_vf(momxb)%sf(j - 1, k, l)
+                    q_prim_vf(eqn_idx%mom%beg)%sf(-j, k, l) = -q_prim_vf(eqn_idx%mom%beg)%sf(j - 1, k, l)
 
-                    do i = momxb + 1, sys_size
+                    do i = eqn_idx%mom%beg + 1, sys_size
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
                     end do
 
@@ -378,13 +378,13 @@ contains
                 end if
             else  !< bc_x%end
                 do j = 1, buff_size
-                    do i = 1, contxe
+                    do i = 1, eqn_idx%cont%end
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
 
-                    q_prim_vf(momxb)%sf(m + j, k, l) = -q_prim_vf(momxb)%sf(m - (j - 1), k, l)
+                    q_prim_vf(eqn_idx%mom%beg)%sf(m + j, k, l) = -q_prim_vf(eqn_idx%mom%beg)%sf(m - (j - 1), k, l)
 
-                    do i = momxb + 1, sys_size
+                    do i = eqn_idx%mom%beg + 1, sys_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
 
@@ -413,13 +413,13 @@ contains
         else if (bc_dir == 2) then  !< y-direction
             if (bc_loc == -1) then  !< bc_y%beg
                 do j = 1, buff_size
-                    do i = 1, momxb
+                    do i = 1, eqn_idx%mom%beg
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l)
                     end do
 
-                    q_prim_vf(momxb + 1)%sf(k, -j, l) = -q_prim_vf(momxb + 1)%sf(k, j - 1, l)
+                    q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, j - 1, l)
 
-                    do i = momxb + 2, sys_size
+                    do i = eqn_idx%mom%beg + 2, sys_size
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l)
                     end do
 
@@ -447,13 +447,13 @@ contains
                 end if
             else  !< bc_y%end
                 do j = 1, buff_size
-                    do i = 1, momxb
+                    do i = 1, eqn_idx%mom%beg
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
                     end do
 
-                    q_prim_vf(momxb + 1)%sf(k, n + j, l) = -q_prim_vf(momxb + 1)%sf(k, n - (j - 1), l)
+                    q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, n + j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, n - (j - 1), l)
 
-                    do i = momxb + 2, sys_size
+                    do i = eqn_idx%mom%beg + 2, sys_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
                     end do
 
@@ -483,11 +483,11 @@ contains
         else if (bc_dir == 3) then  !< z-direction
             if (bc_loc == -1) then  !< bc_z%beg
                 do j = 1, buff_size
-                    do i = 1, momxb + 1
+                    do i = 1, eqn_idx%mom%beg + 1
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
                     end do
 
-                    q_prim_vf(momxe)%sf(k, l, -j) = -q_prim_vf(momxe)%sf(k, l, j - 1)
+                    q_prim_vf(eqn_idx%mom%end)%sf(k, l, -j) = -q_prim_vf(eqn_idx%mom%end)%sf(k, l, j - 1)
 
                     do i = eqn_idx%E, sys_size
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
@@ -517,11 +517,11 @@ contains
                 end if
             else  !< bc_z%end
                 do j = 1, buff_size
-                    do i = 1, momxb + 1
+                    do i = 1, eqn_idx%mom%beg + 1
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
                     end do
 
-                    q_prim_vf(momxe)%sf(k, l, p + j) = -q_prim_vf(momxe)%sf(k, l, p - (j - 1))
+                    q_prim_vf(eqn_idx%mom%end)%sf(k, l, p + j) = -q_prim_vf(eqn_idx%mom%end)%sf(k, l, p - (j - 1))
 
                     do i = eqn_idx%E, sys_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
@@ -687,25 +687,25 @@ contains
 
         do j = 1, buff_size
             if (z_cc(l) < pi) then
-                do i = 1, momxb
+                do i = 1, eqn_idx%mom%beg
                     q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
                 end do
 
-                q_prim_vf(momxb + 1)%sf(k, -j, l) = -q_prim_vf(momxb + 1)%sf(k, j - 1, l + ((p + 1)/2))
+                q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, j - 1, l + ((p + 1)/2))
 
-                q_prim_vf(momxe)%sf(k, -j, l) = -q_prim_vf(momxe)%sf(k, j - 1, l + ((p + 1)/2))
+                q_prim_vf(eqn_idx%mom%end)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%end)%sf(k, j - 1, l + ((p + 1)/2))
 
                 do i = eqn_idx%E, sys_size
                     q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
                 end do
             else
-                do i = 1, momxb
+                do i = 1, eqn_idx%mom%beg
                     q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
                 end do
 
-                q_prim_vf(momxb + 1)%sf(k, -j, l) = -q_prim_vf(momxb + 1)%sf(k, j - 1, l - ((p + 1)/2))
+                q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, j - 1, l - ((p + 1)/2))
 
-                q_prim_vf(momxe)%sf(k, -j, l) = -q_prim_vf(momxe)%sf(k, j - 1, l - ((p + 1)/2))
+                q_prim_vf(eqn_idx%mom%end)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%end)%sf(k, j - 1, l - ((p + 1)/2))
 
                 do i = eqn_idx%E, sys_size
                     q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
@@ -744,7 +744,7 @@ contains
             if (bc_loc == -1) then  !< bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
                         else
                             q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
@@ -754,7 +754,7 @@ contains
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve1
                         else
                             q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
@@ -766,7 +766,7 @@ contains
             if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb + 1) then
+                        if (i == eqn_idx%mom%beg + 1) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
                         else
                             q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
@@ -776,7 +776,7 @@ contains
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb + 1) then
+                        if (i == eqn_idx%mom%beg + 1) then
                             q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve2
                         else
                             q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
@@ -788,7 +788,7 @@ contains
             if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxe) then
+                        if (i == eqn_idx%mom%end) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
                         else
                             q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
@@ -798,7 +798,7 @@ contains
             else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxe) then
+                        if (i == eqn_idx%mom%end) then
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve3
                         else
                             q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
@@ -824,11 +824,11 @@ contains
             if (bc_loc == -1) then  !< bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
-                        else if (i == momxb + 1 .and. num_dims > 1) then
+                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb2
-                        else if (i == momxb + 2 .and. num_dims > 2) then
+                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb3
                         else
                             q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
@@ -838,11 +838,11 @@ contains
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve1
-                        else if (i == momxb + 1 .and. num_dims > 1) then
+                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
                             q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve2
-                        else if (i == momxb + 2 .and. num_dims > 2) then
+                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve3
                         else
                             q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
@@ -854,11 +854,11 @@ contains
             if (bc_loc == -1) then  !< bc_y%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb1
-                        else if (i == momxb + 1 .and. num_dims > 1) then
+                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
-                        else if (i == momxb + 2 .and. num_dims > 2) then
+                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb3
                         else
                             q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
@@ -868,11 +868,11 @@ contains
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve1
-                        else if (i == momxb + 1 .and. num_dims > 1) then
+                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
                             q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve2
-                        else if (i == momxb + 2 .and. num_dims > 2) then
+                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve3
                         else
                             q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
@@ -884,11 +884,11 @@ contains
             if (bc_loc == -1) then  !< bc_z%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb1
-                        else if (i == momxb + 1 .and. num_dims > 1) then
+                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb2
-                        else if (i == momxb + 2 .and. num_dims > 2) then
+                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
                         else
                             q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
@@ -898,11 +898,11 @@ contains
             else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        if (i == momxb) then
+                        if (i == eqn_idx%mom%beg) then
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve1
-                        else if (i == momxb + 1 .and. num_dims > 1) then
+                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve2
-                        else if (i == momxb + 2 .and. num_dims > 2) then
+                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
                             q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve3
                         else
                             q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)

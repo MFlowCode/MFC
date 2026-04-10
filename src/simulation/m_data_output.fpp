@@ -400,9 +400,10 @@ contains
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:, :, :)]')
             end do
-            ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
+            ! q_prim_vf(eqn_idx%bub%beg) stores the value of nb needed in riemann solvers, so replace with true primitive value
+            ! (=1._wp)
             if (qbmm) then
-                q_prim_vf(bubxb)%sf = 1._wp
+                q_prim_vf(eqn_idx%bub%beg)%sf = 1._wp
             end if
         end if
 
@@ -628,7 +629,8 @@ contains
                         do k = 0, n
                             do l = 0, p
                                 if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
-                                    & .and. (i <= eqn_idx%adv%end)) .or. ((i >= chemxb) .and. (i <= chemxe))) then
+                                    & .and. (i <= eqn_idx%adv%end)) .or. ((i >= eqn_idx%species%beg) &
+                                    & .and. (i <= eqn_idx%species%end))) then
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
                                 else
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)
@@ -1050,7 +1052,7 @@ contains
 
                     if (chemistry) then
                         do d = 1, num_species
-                            rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k, l)
+                            rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k, l)
                         end do
                     end if
 
@@ -1142,7 +1144,7 @@ contains
             else if (p == 0) then
                 if (chemistry) then
                     do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
+                        rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
                     end do
                 end if
 
@@ -1254,7 +1256,7 @@ contains
 
                             if (chemistry) then
                                 do d = 1, num_species
-                                    rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l - 2)
+                                    rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l - 2)
                                 end do
                             end if
 

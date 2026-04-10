@@ -165,7 +165,7 @@ contains
 
         ! set the Moving IBM interior conservative variables
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', copyin='[eqn_idx%E, momxb]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', copyin='[eqn_idx%E, eqn_idx%mom%beg]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -174,13 +174,13 @@ contains
                         q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                         rho = 0._wp
                         do i = 1, num_fluids
-                            rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
+                            rho = rho + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
                         end do
 
                         ! Sets the momentum
                         do i = 1, num_dims
-                            q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
-                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
+                            q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
+                            q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
                         end do
                     end if
                 end do
@@ -226,7 +226,7 @@ contains
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
                     q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                    q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+                    q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
                 end do
 
                 if (surface_tension) then
@@ -296,16 +296,16 @@ contains
 
                 ! Set momentum
                 $:GPU_LOOP(parallelism='[seq]')
-                do q = momxb, momxe
-                    q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
-                    dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)*vel_g(q - momxb + 1)/2._wp
+                do q = eqn_idx%mom%beg, eqn_idx%mom%end
+                    q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - eqn_idx%mom%beg + 1)
+                    dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)*vel_g(q - eqn_idx%mom%beg + 1)/2._wp
                 end do
 
                 ! Set continuity and adv vars
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
                     q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                    q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+                    q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
                 end do
 
                 ! Set color function
@@ -324,13 +324,13 @@ contains
                     call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
-                        q_cons_vf(bubxb + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
-                        q_cons_vf(bubxb + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
+                        q_cons_vf(eqn_idx%bub%beg + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
+                        q_cons_vf(eqn_idx%bub%beg + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
                         if (.not. polytropic) then
-                            q_cons_vf(bubxb + (q - 1)*4)%sf(j, k, l) = nbub*r_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*4 + 1)%sf(j, k, l) = nbub*v_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*4 + 2)%sf(j, k, l) = nbub*pb_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*4 + 3)%sf(j, k, l) = nbub*mv_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4)%sf(j, k, l) = nbub*r_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4 + 1)%sf(j, k, l) = nbub*v_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4 + 2)%sf(j, k, l) = nbub*pb_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4 + 3)%sf(j, k, l) = nbub*mv_IP(q)
                         end if
                     end do
                 end if
@@ -339,12 +339,12 @@ contains
                     nbub = nmom_IP(1)
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb*nmom
-                        q_cons_vf(bubxb + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
+                        q_cons_vf(eqn_idx%bub%beg + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
                     end do
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
-                        q_cons_vf(bubxb + (q - 1)*nmom)%sf(j, k, l) = nbub
+                        q_cons_vf(eqn_idx%bub%beg + (q - 1)*nmom)%sf(j, k, l) = nbub
                     end do
 
                     if (.not. polytropic) then
@@ -361,8 +361,10 @@ contains
 
                 if (model_eqns == 3) then
                     $:GPU_LOOP(parallelism='[seq]')
-                    do q = intxb, intxe
-                        q_cons_vf(q)%sf(j, k, l) = alpha_IP(q - intxb + 1)*(gammas(q - intxb + 1)*pres_IP + pi_infs(q - intxb + 1))
+                    do q = eqn_idx%int_en%beg, eqn_idx%int_en%end
+                        q_cons_vf(q)%sf(j, k, &
+                                  & l) = alpha_IP(q - eqn_idx%int_en%beg + 1)*(gammas(q - eqn_idx%int_en%beg + 1)*pres_IP &
+                                  & + pi_infs(q - eqn_idx%int_en%beg + 1))
                     end do
                 end if
             end do
@@ -782,14 +784,14 @@ contains
                     pres_IP = pres_IP + coeff*q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
                     $:GPU_LOOP(parallelism='[seq]')
-                    do q = momxb, momxe
-                        vel_IP(q + 1 - momxb) = vel_IP(q + 1 - momxb) + coeff*q_prim_vf(q)%sf(i, j, k)
+                    do q = eqn_idx%mom%beg, eqn_idx%mom%end
+                        vel_IP(q + 1 - eqn_idx%mom%beg) = vel_IP(q + 1 - eqn_idx%mom%beg) + coeff*q_prim_vf(q)%sf(i, j, k)
                     end do
 
                     $:GPU_LOOP(parallelism='[seq]')
-                    do l = contxb, contxe
+                    do l = eqn_idx%cont%beg, eqn_idx%cont%end
                         alpha_rho_IP(l) = alpha_rho_IP(l) + coeff*q_prim_vf(l)%sf(i, j, k)
-                        alpha_IP(l) = alpha_IP(l) + coeff*q_prim_vf(advxb + l - 1)%sf(i, j, k)
+                        alpha_IP(l) = alpha_IP(l) + coeff*q_prim_vf(eqn_idx%adv%beg + l - 1)%sf(i, j, k)
                     end do
 
                     if (surface_tension) then
@@ -800,20 +802,20 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do l = 1, nb
                             if (polytropic) then
-                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(bubxb + (l - 1)*2)%sf(i, j, k)
-                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(bubxb + 1 + (l - 1)*2)%sf(i, j, k)
+                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + (l - 1)*2)%sf(i, j, k)
+                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 1 + (l - 1)*2)%sf(i, j, k)
                             else
-                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(bubxb + (l - 1)*4)%sf(i, j, k)
-                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(bubxb + 1 + (l - 1)*4)%sf(i, j, k)
-                                pb_IP(l) = pb_IP(l) + coeff*q_prim_vf(bubxb + 2 + (l - 1)*4)%sf(i, j, k)
-                                mv_IP(l) = mv_IP(l) + coeff*q_prim_vf(bubxb + 3 + (l - 1)*4)%sf(i, j, k)
+                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + (l - 1)*4)%sf(i, j, k)
+                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 1 + (l - 1)*4)%sf(i, j, k)
+                                pb_IP(l) = pb_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 2 + (l - 1)*4)%sf(i, j, k)
+                                mv_IP(l) = mv_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 3 + (l - 1)*4)%sf(i, j, k)
                             end if
                         end do
                     end if
 
                     if (qbmm) then
                         do l = 1, nb*nmom
-                            nmom_IP(l) = nmom_IP(l) + coeff*q_prim_vf(bubxb - 1 + l)%sf(i, j, k)
+                            nmom_IP(l) = nmom_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg - 1 + l)%sf(i, j, k)
                         end do
                         if (.not. polytropic) then
                             do q = 1, nb
@@ -958,7 +960,7 @@ contains
                             dynamic_viscosity = 0._wp
                             do fluid_idx = 1, num_fluids
                                 ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
-                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, &
+                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, j, &
                                     & k)*dynamic_viscosities(fluid_idx))
                             end do
 

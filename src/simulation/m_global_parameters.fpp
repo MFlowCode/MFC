@@ -427,17 +427,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[sigma, surface_tension]')
     !> @}
 
-    integer :: momxb, momxe
-    integer :: advxb, advxe
-    integer :: contxb, contxe
-    integer :: intxb, intxe
-    integer :: bubxb, bubxe
-    integer :: strxb, strxe
-    integer :: chemxb, chemxe
     integer :: xibeg, xiend
-    $:GPU_DECLARE(create='[momxb, momxe, advxb, advxe, contxb, contxe]')
-    $:GPU_DECLARE(create='[intxb, intxe, bubxb, bubxe]')
-    $:GPU_DECLARE(create='[strxb, strxe, chemxb, chemxe]')
     $:GPU_DECLARE(create='[xibeg, xiend]')
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
@@ -1183,25 +1173,10 @@ contains
             grid_geometry = 3
         end if
 
-        momxb = eqn_idx%mom%beg
-        momxe = eqn_idx%mom%end
-        advxb = eqn_idx%adv%beg
-        advxe = eqn_idx%adv%end
-        contxb = eqn_idx%cont%beg
-        contxe = eqn_idx%cont%end
-        bubxb = eqn_idx%bub%beg
-        bubxe = eqn_idx%bub%end
-        strxb = eqn_idx%stress%beg
-        strxe = eqn_idx%stress%end
-        intxb = eqn_idx%int_en%beg
-        intxe = eqn_idx%int_en%end
         xibeg = eqn_idx%xi%beg
         xiend = eqn_idx%xi%end
-        chemxb = eqn_idx%species%beg
-        chemxe = eqn_idx%species%end
 
-        $:GPU_UPDATE(device='[momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, &
-                     & eqn_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe, adap_dt_tol, adap_dt_max_iters]')
+        $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
         $:GPU_UPDATE(device='[b_size, xibeg, xiend, tensor_size]')
 
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')

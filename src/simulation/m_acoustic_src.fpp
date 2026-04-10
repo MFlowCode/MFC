@@ -222,7 +222,7 @@ contains
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
-                        myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                        myalpha(q) = q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l)
                     end do
 
                     if (bubbles_euler) then
@@ -315,12 +315,12 @@ contains
             do k = 0, n
                 do j = 0, m
                     $:GPU_LOOP(parallelism='[seq]')
-                    do q = contxb, contxe
+                    do q = eqn_idx%cont%beg, eqn_idx%cont%end
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
                     end do
                     $:GPU_LOOP(parallelism='[seq]')
-                    do q = momxb, momxe
-                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
+                    do q = eqn_idx%mom%beg, eqn_idx%mom%end
+                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - eqn_idx%cont%end, j, k, l)
                     end do
                     rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + e_src(j, k, l)
                 end do
