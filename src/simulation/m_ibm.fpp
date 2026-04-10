@@ -165,7 +165,7 @@ contains
 
         ! set the Moving IBM interior conservative variables
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', copyin='[eqn_idx%E, eqn_idx%mom%beg]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m

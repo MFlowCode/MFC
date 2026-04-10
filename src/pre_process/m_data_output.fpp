@@ -612,7 +612,7 @@ contains
             s_write_data_files => s_write_parallel_data_files
         end if
 
-        open (newunit=iu, FILE='indices.dat', STATUS='unknown')
+        open (newunit=iu, file='indices.dat', status='unknown')
 
         write (iu, '(A)') "Warning: The creation of file is currently experimental."
         write (iu, '(A)') "This file may contain errors and not support all features."
@@ -672,7 +672,7 @@ contains
             integer, intent(in)      :: beg, end
             character(*), intent(in) :: label
 
-            if (beg /= 0) write (iu, '("[",I2,",",I2,"]",A)') beg, end, label
+            if (beg /= 0) write (iu, '("[",I0,",",I0,"]",A)') beg, end, label
 
         end subroutine write_range
 
