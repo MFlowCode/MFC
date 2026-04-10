@@ -222,8 +222,6 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        print *, forces(1,1:3)
-
     end subroutine s_apply_wall_collision_forces_soft_sphere
 
     !> uses ghost-point/image-point information to determine if it is possible if two IBs are colliding, effectively an optimized

@@ -771,6 +771,7 @@ contains
             end if
         end do
 
+        $:GPU_UPDATE(device='[patch_ib]')
         call s_update_mib(num_ibs)
 
         call nvtxEndRange

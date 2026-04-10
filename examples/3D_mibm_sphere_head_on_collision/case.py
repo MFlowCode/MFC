@@ -92,9 +92,9 @@ print(
             # Patch: Constant Tube filled with air
             # Specify the cylindrical air tube grid geometry
             "patch_icpp(1)%geometry": 9,
-            "patch_icpp(1)%x_centroid": 0.5 * domain_size,
+            "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": 0.5 * domain_size,
-            "patch_icpp(1)%z_centroid": 0.5 * domain_size,
+            "patch_icpp(1)%z_centroid": 0.0,
             "patch_icpp(1)%length_x": domain_size,
             "patch_icpp(1)%length_y": domain_size,
             "patch_icpp(1)%length_z": domain_size,
