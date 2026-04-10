@@ -639,14 +639,17 @@ contains
         end if
 
         write (iu, '(A)') ""
-        if (momxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
-        if (sys_idx%E /= 0) write (iu, '("[",I2,",",I2,"]",A)') sys_idx%E, sys_idx%E, " Energy/Pressure"
-        if (advxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
-        if (contxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
-        if (bubxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles_euler"
-        if (strxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
-        if (intxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
-        if (chemxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
+        call write_range(sys_idx%cont%beg, sys_idx%cont%end, " Continuity")
+        call write_range(sys_idx%mom%beg, sys_idx%mom%end, " Momentum")
+        call write_range(sys_idx%E, sys_idx%E, " Energy/Pressure")
+        call write_range(sys_idx%adv%beg, sys_idx%adv%end, " Advection")
+        call write_range(sys_idx%bub%beg, sys_idx%bub%end, " Bubbles")
+        call write_range(sys_idx%stress%beg, sys_idx%stress%end, " Stress")
+        call write_range(sys_idx%int_en%beg, sys_idx%int_en%end, " Internal Energies")
+        call write_range(sys_idx%xi%beg, sys_idx%xi%end, " Reference Map")
+        call write_range(sys_idx%B%beg, sys_idx%B%end, " Magnetic Field")
+        call write_range(sys_idx%c, sys_idx%c, " Color Function")
+        call write_range(sys_idx%species%beg, sys_idx%species%end, " Chemistry")
 
         close (iu)
 
@@ -660,6 +663,17 @@ contains
                 allocate (q_cons_temp(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1))
             end do
         end if
+
+    contains
+
+        subroutine write_range(beg, end, label)
+
+            integer, intent(in)      :: beg, end
+            character(*), intent(in) :: label
+
+            if (beg /= 0) write (iu, '("[",I2,",",I2,"]",A)') beg, end, label
+
+        end subroutine write_range
 
     end subroutine s_initialize_data_output_module
 
