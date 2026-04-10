@@ -136,7 +136,7 @@ contains
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
-        
+
         ! Simplex noise  and fluid physical parameters
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf', 'G', 'cv', 'qv', 'qvp' ]

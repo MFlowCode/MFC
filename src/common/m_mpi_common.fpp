@@ -961,7 +961,7 @@ contains
                                                        & + 2*buff_size + 1)*(l + buff_size)))
                                     q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_T_sf%sf(j, k, l +  unpack_offset))) then
+                                    if (ieee_is_nan(q_T_sf%sf(j, k, l + unpack_offset))) then
                                         print *, "Error", j, k, l, i
                                         call s_mpi_abort("NaN(s) in recv")
                                     end if
