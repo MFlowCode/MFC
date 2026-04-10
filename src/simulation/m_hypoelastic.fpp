@@ -192,7 +192,7 @@ contains
                         end do
 
                         ! Continuum damage: (1-D) scales effective stiffness, D in [0,1]
-                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
+                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(sys_idx%damage)%sf(k, l, q)), 0._wp)
 
                         rho_K_field(k, l, q) = rho_K
                         G_K_field(k, l, q) = G_K
@@ -360,7 +360,7 @@ contains
             l = 0; q = 0
             $:GPU_PARALLEL_LOOP()
             do k = 0, m
-                rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(real(q_cons_vf(stress_idx%beg)%sf(k, l, q), &
+                rhs_vf(sys_idx%damage)%sf(k, l, q) = (alpha_bar*max(abs(real(q_cons_vf(sys_idx%stress%beg)%sf(k, l, q), &
                        & kind=wp)) - tau_star, 0._wp))**cont_damage_s
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -370,11 +370,12 @@ contains
             do l = 0, n
                 do k = 0, m
                     ! Maximum principal stress
-                    tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + q_cons_vf(stress_idx%beg + 2)%sf(k, l, &
-                                    & q)) + sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - q_cons_vf(stress_idx%beg + 2)%sf(k, l, &
-                                    & q))**2.0_wp + 4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
+                    tau_p = 0.5_wp*(q_cons_vf(sys_idx%stress%beg)%sf(k, l, q) + q_cons_vf(sys_idx%stress%beg + 2)%sf(k, l, &
+                                    & q)) + sqrt((q_cons_vf(sys_idx%stress%beg)%sf(k, l, &
+                                    & q) - q_cons_vf(sys_idx%stress%beg + 2)%sf(k, l, &
+                                    & q))**2.0_wp + 4._wp*q_cons_vf(sys_idx%stress%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
 
-                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
+                    rhs_vf(sys_idx%damage)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -384,12 +385,12 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        tau_xx = q_cons_vf(stress_idx%beg)%sf(k, l, q)
-                        tau_xy = q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)
-                        tau_yy = q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)
-                        tau_xz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
-                        tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
-                        tau_zz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
+                        tau_xx = q_cons_vf(sys_idx%stress%beg)%sf(k, l, q)
+                        tau_xy = q_cons_vf(sys_idx%stress%beg + 1)%sf(k, l, q)
+                        tau_yy = q_cons_vf(sys_idx%stress%beg + 2)%sf(k, l, q)
+                        tau_xz = q_cons_vf(sys_idx%stress%beg + 3)%sf(k, l, q)
+                        tau_yz = q_cons_vf(sys_idx%stress%beg + 4)%sf(k, l, q)
+                        tau_zz = q_cons_vf(sys_idx%stress%beg + 5)%sf(k, l, q)
 
                         ! Invariants of the stress tensor
                         I1 = tau_xx + tau_yy + tau_zz
@@ -411,7 +412,7 @@ contains
                             tau_p = I1/3.0_wp
                         end if
 
-                        rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
+                        rhs_vf(sys_idx%damage)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                     end do
                 end do
             end do

@@ -11,8 +11,8 @@
         q_prim_vf(momxb + 2)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
 
         ! magnetic field
-        q_prim_vf(B_idx%end - 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
-        q_prim_vf(B_idx%end)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
+        q_prim_vf(sys_idx%B%end - 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
+        q_prim_vf(sys_idx%B%end)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
     case (170)  ! 1D profile from external data (e.g. Cantera, SDtoolbox)
         ! This hardcoded case can be used to start a simulation with initial conditions given from a known 1D profile (e.g. Cantera,
         ! SDtoolbox)
@@ -33,7 +33,7 @@
         width_sq = (2.5_wp*10.0_wp**(-3.0_wp))**2
         profile_shape = 1.0_wp - 0.5_wp*exp(-(x_cc(i) - x_mid_diffu)**2/width_sq)
         q_prim_vf(momxb)%sf(i, 0, 0) = 0.0_wp
-        q_prim_vf(eqn_idx%E)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5
+        q_prim_vf(sys_idx%E)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5
         q_prim_vf(advxb)%sf(i, 0, 0) = 1.0_wp
 
         y1 = (0.195_wp - 0.142_wp)*profile_shape + 0.142_wp

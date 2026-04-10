@@ -113,15 +113,39 @@ module m_derived_types
         type(int_bounds_info) :: x, y, z
     end type bc_xyz_info
 
-    !> Scalar equation indices computed at startup from model_eqns and enabled features.
-    type eqn_idx_info
-        integer :: E       !< Index of energy equation
-        integer :: n       !< Index of number density
-        integer :: alf     !< Index of void fraction
-        integer :: gamma   !< Index of specific heat ratio func. eqn.
-        integer :: pi_inf  !< Index of liquid stiffness func. eqn.
-        integer :: c       !< Index of color function
-    end type eqn_idx_info
+    !> bounds for the bubble dynamic variables
+    type bub_bounds_info
+        integer                                :: beg
+        integer                                :: end
+        integer, dimension(:), allocatable     :: rs
+        integer, dimension(:), allocatable     :: vs
+        integer, dimension(:), allocatable     :: ps
+        integer, dimension(:), allocatable     :: ms
+        integer, dimension(:,:), allocatable   :: moms     !< Moment indices for qbmm
+        integer, dimension(:,:,:), allocatable :: fullmom  !< Moment indices for qbmm
+    end type bub_bounds_info
+
+    !> All conserved-variable equation indices, computed at startup from model_eqns and enabled features.
+    !> Range indices (beg/end) use int_bounds_info; scalar indices are plain integers (0 = inactive).
+    type sys_idx_info
+        type(int_bounds_info) :: cont     !< Partial densities (continuity equations)
+        type(int_bounds_info) :: mom      !< Momentum components
+        type(int_bounds_info) :: adv      !< Volume fractions (advection equations)
+        type(bub_bounds_info) :: bub      !< Bubble variables (Euler-Euler)
+        type(int_bounds_info) :: stress   !< Stress tensor components
+        type(int_bounds_info) :: xi       !< Reference map equations
+        type(int_bounds_info) :: B        !< Magnetic field components
+        type(int_bounds_info) :: int_en   !< Internal energy equations
+        type(int_bounds_info) :: species  !< Chemistry species equations
+        integer               :: E        !< Energy/pressure equation
+        integer               :: n        !< Number density equation
+        integer               :: alf      !< Void fraction (scalar, model_eqns=4)
+        integer               :: gamma    !< Specific heat ratio function (model_eqns=1)
+        integer               :: pi_inf   !< Liquid stiffness function (model_eqns=1)
+        integer               :: c        !< Color function equation
+        integer               :: damage   !< Damage variable equation
+        integer               :: psi      !< Psi variable equation
+    end type sys_idx_info
 
     type bc_patch_parameters
         integer                :: geometry
@@ -138,18 +162,6 @@ module m_derived_types
         real(wp) :: beg
         real(wp) :: end
     end type bounds_info
-
-    !> bounds for the bubble dynamic variables
-    type bub_bounds_info
-        integer                                :: beg
-        integer                                :: end
-        integer, dimension(:), allocatable     :: rs
-        integer, dimension(:), allocatable     :: vs
-        integer, dimension(:), allocatable     :: ps
-        integer, dimension(:), allocatable     :: ms
-        integer, dimension(:,:), allocatable   :: moms     !< Moment indices for qbmm
-        integer, dimension(:,:,:), allocatable :: fullmom  !< Moment indices for qbmm
-    end type bub_bounds_info
 
     !> Defines parameters for a Model Patch
     type ic_model_parameters

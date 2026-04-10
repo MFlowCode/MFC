@@ -489,7 +489,7 @@ contains
 
                     q_prim_vf(momxe)%sf(k, l, -j) = -q_prim_vf(momxe)%sf(k, l, j - 1)
 
-                    do i = eqn_idx%E, sys_size
+                    do i = sys_idx%E, sys_size
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
                     end do
 
@@ -523,7 +523,7 @@ contains
 
                     q_prim_vf(momxe)%sf(k, l, p + j) = -q_prim_vf(momxe)%sf(k, l, p - (j - 1))
 
-                    do i = eqn_idx%E, sys_size
+                    do i = sys_idx%E, sys_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
                     end do
 
@@ -695,7 +695,7 @@ contains
 
                 q_prim_vf(momxe)%sf(k, -j, l) = -q_prim_vf(momxe)%sf(k, j - 1, l + ((p + 1)/2))
 
-                do i = eqn_idx%E, sys_size
+                do i = sys_idx%E, sys_size
                     q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
                 end do
             else
@@ -707,7 +707,7 @@ contains
 
                 q_prim_vf(momxe)%sf(k, -j, l) = -q_prim_vf(momxe)%sf(k, j - 1, l - ((p + 1)/2))
 
-                do i = eqn_idx%E, sys_size
+                do i = sys_idx%E, sys_size
                     q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
                 end do
             end if

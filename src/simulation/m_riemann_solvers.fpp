@@ -250,28 +250,28 @@ contains
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                             end do
 
-                            pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E)
-                            pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E)
+                            pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E)
+                            pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E)
 
                             if (mhd) then
                                 if (n == 0) then  ! 1D: constant Bx; By, Bz as variables
                                     B%L(1) = Bx0
                                     B%R(1) = Bx0
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg + 1)
                                 else  ! 2D/3D: Bx, By, Bz as variables
-                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
-                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 2)
+                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg)
+                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + 1)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg + 1)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + 2)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg + 2)
                                 end if
                             end if
 
@@ -446,8 +446,8 @@ contains
                                 end do
 
                                 if (cont_damage) then
-                                    G_L = G_L*max((1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, damage_idx)), 0._wp)
-                                    G_R = G_R*max((1._wp - qR_prim_rs${XYZ}$_vf(j, k, l, damage_idx)), 0._wp)
+                                    G_L = G_L*max((1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%damage)), 0._wp)
+                                    G_R = G_R*max((1._wp - qR_prim_rs${XYZ}$_vf(j, k, l, sys_idx%damage)), 0._wp)
                                 end if
 
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -642,7 +642,7 @@ contains
                                 ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) &
+                                                      & sys_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) &
                                                       & - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
                                                       & - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir) &
                                                       & *(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) + s_M*s_P*(E_L &
@@ -651,12 +651,12 @@ contains
                             else if (mhd .and. relativity) then
                                 ! energy flux = m_${XYZ}$ - mass flux Hard-coded for single-component for now
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
+                                                  & sys_idx%E) = (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
                                                   & - s_P*(cm%L(norm_dir) - Ga%L*alpha_rho_L(1)*vel_L(norm_dir)) + s_M*s_P*(E_L &
                                                   & - E_R))/(s_M - s_P)
                             else if (bubbles_euler) then
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
+                                                  & sys_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
                                                   & - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + s_M*s_P*(E_L - E_R))/(s_M &
                                                   & - s_P) + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             else if (hypoelasticity) then
@@ -667,12 +667,12 @@ contains
                                     flux_tau_R = flux_tau_R + tau_e_R(dir_idx_tau(i))*vel_R(dir_idx(i))
                                 end do
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
+                                                  & sys_idx%E) = (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
                                                   & - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) - flux_tau_L) + s_M*s_P*(E_L - E_R)) &
                                                   & /(s_M - s_P)
                             else
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R) - s_P*vel_L(dir_idx(1)) &
+                                                  & sys_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R) - s_P*vel_L(dir_idx(1)) &
                                                   & *(E_L + pres_L) + s_M*s_P*(E_L - E_R))/(s_M - s_P) + (s_M/s_L)*(s_P/s_R) &
                                                   & *pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             end if
@@ -723,7 +723,7 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 1
                                         flux_rsx_vf(j, k, l, &
-                                                    & B_idx%beg + i) = (s_M*(vel_R(1)*B%R(2 + i) - vel_R(2 + i)*Bx0) &
+                                                    & sys_idx%B%beg + i) = (s_M*(vel_R(1)*B%R(2 + i) - vel_R(2 + i)*Bx0) &
                                                     & - s_P*(vel_L(1)*B%L(2 + i) - vel_L(2 + i)*Bx0) + s_M*s_P*(B%L(2 + i) &
                                                     & - B%R(2 + i)))/(s_M - s_P)
                                     end do
@@ -734,24 +734,26 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 2
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & B_idx%beg + i) = (s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1) &
+                                                          & sys_idx%B%beg + i) = (s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1) &
                                                           & *B%R(norm_dir)) - s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1) &
                                                           & *B%L(norm_dir)) + s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
                                     end do
 
                                     if (hyper_cleaning) then
                                         ! propagate magnetic field divergence as a wave
-                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & B_idx%beg + norm_dir - 1) + (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                          & psi_idx) - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx))/(s_M - s_P)
+                                        flux_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + norm_dir - 1) = flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & sys_idx%B%beg + norm_dir - 1) + (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, &
+                                                          & l, sys_idx%psi) - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, &
+                                                          & sys_idx%psi))/(s_M - s_P)
 
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & psi_idx) = (hyper_cleaning_speed**2*(s_M*B%R(norm_dir) &
+                                                          & sys_idx%psi) = (hyper_cleaning_speed**2*(s_M*B%R(norm_dir) &
                                                           & - s_P*B%L(norm_dir)) + s_M*s_P*(qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                          & psi_idx) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx)))/(s_M - s_P)
+                                                          & sys_idx%psi) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
+                                                          & sys_idx%psi)))/(s_M - s_P)
                                     else
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & B_idx%beg + norm_dir - 1) &
+                                                          & sys_idx%B%beg + norm_dir - 1) &
                                                           & = 0._wp  ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
                                     end if
                                 end if
@@ -762,7 +764,7 @@ contains
                                 if (cyl_coord) then
                                     ! Substituting the advective flux into the inviscid geometrical source flux
                                     $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%E
+                                    do i = 1, sys_idx%E
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
                                     ! Recalculating the radial momentum geometric source flux
@@ -930,28 +932,28 @@ contains
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                             end do
 
-                            pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E)
-                            pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E)
+                            pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E)
+                            pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E)
 
                             if (mhd) then
                                 if (n == 0) then  ! 1D: constant Bx; By, Bz as variables
                                     B%L(1) = Bx0
                                     B%R(1) = Bx0
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + 1)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg + 1)
                                 else  ! 2D/3D: Bx, By, Bz as variables
-                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg)
-                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg)
-                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1)
-                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 1)
-                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + 2)
-                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + 2)
+                                    B%L(1) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg)
+                                    B%R(1) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg)
+                                    B%L(2) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + 1)
+                                    B%R(2) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg + 1)
+                                    B%L(3) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + 2)
+                                    B%R(3) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg + 2)
                                 end if
                             end if
 
@@ -1124,8 +1126,8 @@ contains
                                 end do
 
                                 if (cont_damage) then
-                                    G_L = G_L*max((1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, damage_idx)), 0._wp)
-                                    G_R = G_R*max((1._wp - qR_prim_rs${XYZ}$_vf(j, k, l, damage_idx)), 0._wp)
+                                    G_L = G_L*max((1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%damage)), 0._wp)
+                                    G_R = G_R*max((1._wp - qR_prim_rs${XYZ}$_vf(j, k, l, sys_idx%damage)), 0._wp)
                                 end if
 
                                 do i = 1, strxe - strxb + 1
@@ -1257,7 +1259,7 @@ contains
                                 ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) &
+                                                      & sys_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) &
                                                       & - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
                                                       & - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir) &
                                                       & *(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) + s_M*s_P*(E_L &
@@ -1266,12 +1268,12 @@ contains
                             else if (mhd .and. relativity) then
                                 ! energy flux = m_${XYZ}$ - mass flux Hard-coded for single-component for now
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
+                                                  & sys_idx%E) = (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
                                                   & - s_P*(cm%L(norm_dir) - Ga%L*alpha_rho_L(1)*vel_L(norm_dir)) + s_M*s_P*(E_L &
                                                   & - E_R))/(s_M - s_P)
                             else if (bubbles_euler) then
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
+                                                  & sys_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) &
                                                   & - s_P*vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + s_M*s_P*(E_L - E_R))/(s_M &
                                                   & - s_P) + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             else if (hypoelasticity) then
@@ -1282,12 +1284,12 @@ contains
                                     flux_tau_R = flux_tau_R + tau_e_R(dir_idx_tau(i))*vel_R(dir_idx(i))
                                 end do
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
+                                                  & sys_idx%E) = (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
                                                   & - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) - flux_tau_L) + s_M*s_P*(E_L - E_R)) &
                                                   & /(s_M - s_P)
                             else
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R) - s_P*vel_L(dir_idx(1)) &
+                                                  & sys_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R) - s_P*vel_L(dir_idx(1)) &
                                                   & *(E_L + pres_L) + s_M*s_P*(E_L - E_R))/(s_M - s_P) + (s_M/s_L)*(s_P/s_R) &
                                                   & *pcorr*(vel_R_rms - vel_L_rms)/2._wp
                             end if
@@ -1338,7 +1340,7 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 1
                                         flux_rsx_vf(j, k, l, &
-                                                    & B_idx%beg + i) = (s_M*(vel_R(1)*B%R(2 + i) - vel_R(2 + i)*Bx0) &
+                                                    & sys_idx%B%beg + i) = (s_M*(vel_R(1)*B%R(2 + i) - vel_R(2 + i)*Bx0) &
                                                     & - s_P*(vel_L(1)*B%L(2 + i) - vel_L(2 + i)*Bx0) + s_M*s_P*(B%L(2 + i) &
                                                     & - B%R(2 + i)))/(s_M - s_P)
                                     end do
@@ -1349,10 +1351,10 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 2
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & B_idx%beg + i) = (1 - dir_flg(i + 1))*(s_M*(vel_R(dir_idx(1))*B%R(i &
-                                                          & + 1) - vel_R(i + 1)*B%R(norm_dir)) - s_P*(vel_L(dir_idx(1))*B%L(i + 1) &
-                                                          & - vel_L(i + 1)*B%L(norm_dir)) + s_M*s_P*(B%L(i + 1) - B%R(i + 1))) &
-                                                          & /(s_M - s_P)
+                                                          & sys_idx%B%beg + i) = (1 - dir_flg(i + 1))*(s_M*(vel_R(dir_idx(1)) &
+                                                          & *B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - s_P*(vel_L(dir_idx(1)) &
+                                                          & *B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + s_M*s_P*(B%L(i + 1) &
+                                                          & - B%R(i + 1)))/(s_M - s_P)
                                     end do
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
@@ -1362,7 +1364,7 @@ contains
                                 if (cyl_coord) then
                                     ! Substituting the advective flux into the inviscid geometrical source flux
                                     $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%E
+                                    do i = 1, sys_idx%E
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                     end do
                                     ! Recalculating the radial momentum geometric source flux
@@ -1407,8 +1409,8 @@ contains
                         if (norm_dir == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rsx_vf(j, k, l, eqn_idx%E + i)
-                                alpha_R(i) = qR_prim_rsx_vf(j + 1, k, l, eqn_idx%E + i)
+                                alpha_L(i) = qL_prim_rsx_vf(j, k, l, sys_idx%E + i)
+                                alpha_R(i) = qR_prim_rsx_vf(j + 1, k, l, sys_idx%E + i)
                             end do
 
                             $:GPU_LOOP(parallelism='[seq]')
@@ -1419,8 +1421,8 @@ contains
                         else if (norm_dir == 2) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rsy_vf(k, j, l, eqn_idx%E + i)
-                                alpha_R(i) = qR_prim_rsy_vf(k + 1, j, l, eqn_idx%E + i)
+                                alpha_L(i) = qL_prim_rsy_vf(k, j, l, sys_idx%E + i)
+                                alpha_R(i) = qR_prim_rsy_vf(k + 1, j, l, sys_idx%E + i)
                             end do
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
@@ -1430,8 +1432,8 @@ contains
                         else
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rsz_vf(l, k, j, eqn_idx%E + i)
-                                alpha_R(i) = qR_prim_rsz_vf(l + 1, k, j, eqn_idx%E + i)
+                                alpha_L(i) = qL_prim_rsz_vf(l, k, j, sys_idx%E + i)
+                                alpha_R(i) = qR_prim_rsz_vf(l + 1, k, j, sys_idx%E + i)
                             end do
 
                             $:GPU_LOOP(parallelism='[seq]')
@@ -1484,34 +1486,34 @@ contains
                             if (norm_dir == 1) then
                                 flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, &
                                             & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                             & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(1) + vel_grad_R(1, 1)*vel_R(1))
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     if (num_dims > 1) then
                                         flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, &
                                                     & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                        flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                     & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(1) + vel_grad_R(2, &
                                                     & 2)*vel_R(1))
 
                                         flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                     & l) - 0.5_wp*(vel_grad_L(1, 2) + vel_grad_R(1, 2)) - 0.5_wp*(vel_grad_L(2, &
                                                     & 1) + vel_grad_R(2, 1))
-                                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                        flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                     & l) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(2) + vel_grad_R(1, &
                                                     & 2)*vel_R(2)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(2) + vel_grad_R(2, 1)*vel_R(2))
                                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                             if (num_dims > 2) then
                                                 flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, &
                                                             & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                                flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                             & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
                                                             & 3)*vel_L(1) + vel_grad_R(3, 3)*vel_R(1))
 
                                                 flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                             & l) - 0.5_wp*(vel_grad_L(1, 3) + vel_grad_R(1, &
                                                             & 3)) - 0.5_wp*(vel_grad_L(3, 1) + vel_grad_R(3, 1))
-                                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                                flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                             & l) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(3) + vel_grad_R(1, &
                                                             & 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, 1)*vel_L(3) + vel_grad_R(3, &
                                                             & 1)*vel_R(3))
@@ -1523,31 +1525,31 @@ contains
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                 & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
 
                                     flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                 & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
 
                                     flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, &
                                                 & 2) + vel_grad_R(1, 2)) - 0.5_wp*(vel_grad_L(2, 1) + vel_grad_R(2, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(1) + vel_grad_R(1, &
                                                 & 2)*vel_R(1)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(1) + vel_grad_R(2, 1)*vel_R(1))
                                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                         if (num_dims > 2) then
                                             flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                         & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                            flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                         & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3)*vel_L(2) + vel_grad_R(3, &
                                                         & 3)*vel_R(2))
 
                                             flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                         & l) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, &
                                                         & 3)) - 0.5_wp*(vel_grad_L(3, 2) + vel_grad_R(3, 2))
-                                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                            flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                         & l) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(3) + vel_grad_R(2, &
                                                         & 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(3) + vel_grad_R(3, &
                                                         & 2)*vel_R(3))
@@ -1558,29 +1560,29 @@ contains
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                 & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
 
                                     flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                 & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
 
                                     flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, &
                                                 & 3) + vel_grad_R(1, 3)) - 0.5_wp*(vel_grad_L(3, 1) + vel_grad_R(3, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(1) + vel_grad_R(1, &
                                                 & 3)*vel_R(1)) - 0.5_wp*(vel_grad_L(3, 1)*vel_L(1) + vel_grad_R(3, 1)*vel_R(1))
 
                                     flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                 & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
 
                                     flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, 3)) - 0.5_wp*(vel_grad_L(3, &
                                                 & 2) + vel_grad_R(3, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(2) + vel_grad_R(2, &
                                                 & 3)*vel_R(2)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(2) + vel_grad_R(3, 2)*vel_R(2))
                                 #:endif
@@ -1612,20 +1614,20 @@ contains
                             if (norm_dir == 1) then
                                 flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, &
                                             & 1) + vel_grad_R(1, 1))
-                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, &
+                                flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, &
                                             & 1)*vel_L(1) + vel_grad_R(1, 1)*vel_R(1))
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     if (num_dims > 1) then
                                         flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, l) - 0.5_wp*(vel_grad_L(2, &
                                                     & 2) + vel_grad_R(2, 2))
-                                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                        flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                     & l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(1) + vel_grad_R(2, 2)*vel_R(1))
 
                                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                             if (num_dims > 2) then
                                                 flux_src_vf(momxb)%sf(j, k, l) = flux_src_vf(momxb)%sf(j, k, &
                                                             & l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                                flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                             & l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(1) + vel_grad_R(3, 3)*vel_R(1))
                                             end if
                                         #:endif
@@ -1635,19 +1637,19 @@ contains
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
 
                                     flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
 
                                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                         if (num_dims > 2) then
                                             flux_src_vf(momxb + 1)%sf(j, k, l) = flux_src_vf(momxb + 1)%sf(j, k, &
                                                         & l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                            flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                         & l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(2) + vel_grad_R(3, 3)*vel_R(2))
                                         end if
                                     #:endif
@@ -1656,17 +1658,17 @@ contains
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                     flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
 
                                     flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
 
                                     flux_src_vf(momxb + 2)%sf(j, k, l) = flux_src_vf(momxb + 2)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                                    flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                                 & l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
                                 #:endif
                             end if
@@ -1816,8 +1818,8 @@ contains
                                     vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                                 end do
 
-                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E)
-                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E)
 
                                 rho_L = 0._wp
                                 gamma_L = 0._wp
@@ -1836,38 +1838,38 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, i))
-                                        qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i) = min(max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, &
-                                                             & l, eqn_idx%E + i)), 1._wp)
-                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i) = min(max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, &
+                                                             & l, sys_idx%E + i)), 1._wp)
+                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
                                     end do
 
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
-                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i) = min(max(0._wp, &
-                                                             & qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)), 1._wp)
-                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i) = min(max(0._wp, &
+                                                             & qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)), 1._wp)
+                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                                     end do
 
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
-                                        qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i) = qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                             & eqn_idx%E + i)/max(alpha_L_sum, sgm_eps)
-                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                             & eqn_idx%E + i)/max(alpha_R_sum, sgm_eps)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i) = qL_prim_rs${XYZ}$_vf(j, k, l, &
+                                                             & sys_idx%E + i)/max(alpha_L_sum, sgm_eps)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
+                                                             & sys_idx%E + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*pi_infs(i)
+                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*pi_infs(i)
                                     qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
 
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
-                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*pi_infs(i)
+                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*pi_infs(i)
                                     qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
 
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, advxb + i - 1)
@@ -1883,8 +1885,8 @@ contains
                                         if (Re_size(i) > 0) Re_R(i) = 0._wp
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do q = 1, Re_size(i)
-                                            Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                            Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + Re_idx(i, q))/Res_gs(i, &
+                                            Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
+                                            Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + Re_idx(i, q))/Res_gs(i, &
                                                  & q) + Re_R(i)
                                         end do
                                         Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
@@ -2071,7 +2073,7 @@ contains
                                 end do
 
                                 ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) = (E_star + p_Star)*vel_K_Star + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
+                                flux_rs${XYZ}$_vf(j, k, l, sys_idx%E) = (E_star + p_Star)*vel_K_Star + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
@@ -2089,7 +2091,7 @@ contains
                                                                         & *tau_e_R(dir_idx_tau(i)) + s_P*(xi_R*((s_S - vel_R(i)) &
                                                                         & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                     end do
-                                    flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) = flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) + flux_ene_e
+                                    flux_rs${XYZ}$_vf(j, k, l, sys_idx%E) = flux_rs${XYZ}$_vf(j, k, l, sys_idx%E) + flux_ene_e
                                 end if
 
                                 ! VOLUME FRACTION FLUX.
@@ -2155,8 +2157,8 @@ contains
 
                                 ! COLOR FUNCTION FLUX
                                 if (surface_tension) then
-                                    flux_rs${XYZ}$_vf(j, k, l, eqn_idx%c) = (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%c) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%c))*s_S
+                                    flux_rs${XYZ}$_vf(j, k, l, sys_idx%c) = (xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
+                                                      & sys_idx%c) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%c))*s_S
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
@@ -2164,7 +2166,7 @@ contains
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
                                         $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, eqn_idx%E
+                                        do i = 1, sys_idx%E
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         $:GPU_LOOP(parallelism='[seq]')
@@ -2233,13 +2235,13 @@ contains
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                                 end do
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                                 end do
 
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -2255,8 +2257,8 @@ contains
                                     qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
 
-                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E)
-                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E)
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
@@ -2344,10 +2346,10 @@ contains
                                     end do
                                 end if
 
-                                flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) = 0._wp
+                                flux_rs${XYZ}$_vf(j, k, l, sys_idx%E) = 0._wp
 
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = eqn_idx%alf, eqn_idx%alf  ! only advect the void fraction
+                                do i = sys_idx%alf, sys_idx%alf  ! only advect the void fraction
                                     flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
                                                       & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) + xi_P*qR_prim_rs${XYZ}$_vf(j &
                                                       & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
@@ -2379,7 +2381,7 @@ contains
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
                                         $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, eqn_idx%E
+                                        do i = 1, sys_idx%E
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
@@ -2438,8 +2440,8 @@ contains
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                                 end do
 
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
@@ -2457,24 +2459,24 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*pi_infs(i)
+                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*gammas(i)
+                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*pi_infs(i)
                                         qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
-                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*pi_infs(i)
+                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*gammas(i)
+                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*pi_infs(i)
                                         qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
                                 else if (num_fluids > 2) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*pi_infs(i)
+                                        gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*gammas(i)
+                                        pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*pi_infs(i)
                                         qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
                                         rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
-                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*pi_infs(i)
+                                        gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*gammas(i)
+                                        pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*pi_infs(i)
                                         qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
                                 else
@@ -2500,9 +2502,9 @@ contains
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_L(i) = (1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + Re_idx(i, &
+                                                Re_L(i) = (1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + Re_idx(i, &
                                                      & q)))/Res_gs(i, q) + Re_L(i)
-                                                Re_R(i) = (1._wp - qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + Re_idx(i, &
+                                                Re_R(i) = (1._wp - qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + Re_idx(i, &
                                                      & q)))/Res_gs(i, q) + Re_R(i)
                                             end do
 
@@ -2512,8 +2514,8 @@ contains
                                     end if
                                 end if
 
-                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E)
-                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E)
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms
@@ -2537,8 +2539,8 @@ contains
 
                                     if (.not. qbmm) then
                                         if (adv_n) then
-                                            nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%n)
-                                            nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%n)
+                                            nbub_L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%n)
+                                            nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%n)
                                         else
                                             nbub_L = 0._wp
                                             nbub_R = 0._wp
@@ -2548,9 +2550,9 @@ contains
                                                 nbub_R = nbub_R + (R0_R(i)**3._wp)*weight(i)
                                             end do
 
-                                            nbub_L = (3._wp/(4._wp*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + num_fluids)/nbub_L
+                                            nbub_L = (3._wp/(4._wp*pi))*qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + num_fluids)/nbub_L
                                             nbub_R = (3._wp/(4._wp*pi))*qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                      & eqn_idx%E + num_fluids)/nbub_R
+                                                      & sys_idx%E + num_fluids)/nbub_R
                                         end if
                                     else
                                         ! nb stored in 0th moment of first R0 bin in variable conversion module
@@ -2721,7 +2723,7 @@ contains
 
                                 ! Energy flux. f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(xi_L*(E_L + (s_S &
+                                                  & sys_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(xi_L*(E_L + (s_S &
                                                   & - vel_L(dir_idx(1)))*(rho_L*s_S + (pres_L)/(s_L - vel_L(dir_idx(1))))) - E_L)) &
                                                   & + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(xi_R*(E_R + (s_S &
                                                   & - vel_R(dir_idx(1)))*(rho_R*s_S + (pres_R)/(s_R - vel_R(dir_idx(1))))) - E_R)) &
@@ -2765,7 +2767,7 @@ contains
 
                                 if (adv_n) then
                                     flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%n) = xi_M*nbub_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                      & sys_idx%n) = xi_M*nbub_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
                                                       & + xi_P*nbub_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end if
 
@@ -2774,7 +2776,7 @@ contains
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
                                         $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, eqn_idx%E
+                                        do i = 1, sys_idx%E
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
@@ -2835,8 +2837,8 @@ contains
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                    alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                    alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                                 end do
 
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -2847,42 +2849,42 @@ contains
                                     vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                                 end do
 
-                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E)
-                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E)
+                                pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E)
+                                pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E)
 
                                 ! Change this by splitting it into the cases present in the bubbles_euler
                                 if (mpp_lim) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, i))
-                                        qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i) = min(max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, &
-                                                             & l, eqn_idx%E + i)), 1._wp)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i) = min(max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, &
+                                                             & l, sys_idx%E + i)), 1._wp)
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
-                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i) = min(max(0._wp, &
-                                                             & qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)), 1._wp)
-                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i) = min(max(0._wp, &
+                                                             & qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)), 1._wp)
+                                        alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                        alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                                     end do
 
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
-                                        qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i) = qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                             & eqn_idx%E + i)/max(alpha_L_sum, sgm_eps)
-                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                             & eqn_idx%E + i)/max(alpha_R_sum, sgm_eps)
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i) = qL_prim_rs${XYZ}$_vf(j, k, l, &
+                                                             & sys_idx%E + i)/max(alpha_L_sum, sgm_eps)
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
+                                                             & sys_idx%E + i)/max(alpha_R_sum, sgm_eps)
                                     end do
                                 end if
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
-                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)*pi_infs(i)
+                                    gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*gammas(i)
+                                    pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)*pi_infs(i)
                                     qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
 
                                     rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
-                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)*pi_infs(i)
+                                    gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*gammas(i)
+                                    pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)*pi_infs(i)
                                     qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                 end do
 
@@ -3137,7 +3139,7 @@ contains
 
                                 ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, &
-                                                  & eqn_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(xi_L*(E_L + (s_S &
+                                                  & sys_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(xi_L*(E_L + (s_S &
                                                   & - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) - E_L)) &
                                                   & + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(xi_R*(E_R + (s_S &
                                                   & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R)) &
@@ -3159,7 +3161,7 @@ contains
                                                                         & *tau_e_R(dir_idx_tau(i)) + s_P*(xi_R*((s_S - vel_R(i)) &
                                                                         & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                     end do
-                                    flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) = flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) + flux_ene_e
+                                    flux_rs${XYZ}$_vf(j, k, l, sys_idx%E) = flux_rs${XYZ}$_vf(j, k, l, sys_idx%E) + flux_ene_e
                                 end if
 
                                 ! HYPOELASTIC STRESS EVOLUTION FLUX.
@@ -3192,10 +3194,10 @@ contains
 
                                 ! COLOR FUNCTION FLUX
                                 if (surface_tension) then
-                                    flux_rs${XYZ}$_vf(j, k, l, eqn_idx%c) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%c)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                    flux_rs${XYZ}$_vf(j, k, l, sys_idx%c) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
+                                                      & sys_idx%c)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
                                                       & + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                      & eqn_idx%c)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & sys_idx%c)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end if
 
                                 ! Hyperelastic reference map flux for material deformation tracking
@@ -3229,7 +3231,7 @@ contains
                                     if (cyl_coord) then
                                         ! Substituting the advective flux into the inviscid geometrical source flux
                                         $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, eqn_idx%E
+                                        do i = 1, sys_idx%E
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
@@ -3378,27 +3380,28 @@ contains
                             vel_rms%R = sum(vel%R**2._wp)
 
                             do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)
-                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E + i)
+                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E + i)
+                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E + i)
                             end do
 
-                            pres%L = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E)
-                            pres%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%E)
+                            pres%L = qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%E)
+                            pres%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%E)
 
                             ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
                             if (mhd) then
                                 if (n == 0) then  ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
-                                    B%L = [Bx0, qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg), qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                                     & B_idx%beg + 1)]
-                                    B%R = [Bx0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg), qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                                     & B_idx%beg + 1)]
+                                    B%L = [Bx0, qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg), qL_prim_rs${XYZ}$_vf(j, k, l, &
+                                                                     & sys_idx%B%beg + 1)]
+                                    B%R = [Bx0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg), qR_prim_rs${XYZ}$_vf(j + 1, k, &
+                                                                     & l, sys_idx%B%beg + 1)]
                                 else  ! 2D/3D: Bx, By, Bz as variables
-                                    B%L = [qL_prim_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(1) - 1), qL_prim_rs${XYZ}$_vf(j, k, &
-                                                                & l, B_idx%beg + dir_idx(2) - 1), qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                                & B_idx%beg + dir_idx(3) - 1)]
-                                    B%R = [qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(1) - 1), &
-                                                                & qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(2) - 1), &
-                                                                & qR_prim_rs${XYZ}$_vf(j + 1, k, l, B_idx%beg + dir_idx(3) - 1)]
+                                    B%L = [qL_prim_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + dir_idx(1) - 1), qL_prim_rs${XYZ}$_vf(j, &
+                                                                & k, l, sys_idx%B%beg + dir_idx(2) - 1), qL_prim_rs${XYZ}$_vf(j, &
+                                                                & k, l, sys_idx%B%beg + dir_idx(3) - 1)]
+                                    B%R = [qR_prim_rs${XYZ}$_vf(j + 1, k, l, sys_idx%B%beg + dir_idx(1) - 1), &
+                                                                & qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
+                                                                & sys_idx%B%beg + dir_idx(2) - 1), qR_prim_rs${XYZ}$_vf(j + 1, k, &
+                                                                & l, sys_idx%B%beg + dir_idx(3) - 1)]
                                 end if
                             end if
 
@@ -3524,14 +3527,14 @@ contains
                             flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(3)) = F_hlld(4)
                             ! Magnetic field
                             if (n == 0) then
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg) = F_hlld(5)
+                                flux_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + 1) = F_hlld(6)
                             else
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(2) - 1) = F_hlld(5)
-                                flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + dir_idx(3) - 1) = F_hlld(6)
+                                flux_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + dir_idx(2) - 1) = F_hlld(5)
+                                flux_rs${XYZ}$_vf(j, k, l, sys_idx%B%beg + dir_idx(3) - 1) = F_hlld(6)
                             end if
                             ! Energy
-                            flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) = F_hlld(7)
+                            flux_rs${XYZ}$_vf(j, k, l, sys_idx%E) = F_hlld(7)
                             ! Volume fractions
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
@@ -3978,7 +3981,7 @@ contains
         if (norm_dir == 1) then
             if (viscous .or. (surface_tension) .or. dummy) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = momxb, eqn_idx%E
+                do i = momxb, sys_idx%E
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -3992,11 +3995,11 @@ contains
 
             if (chem_params%diffusion) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = eqn_idx%E, chemxe
+                do i = sys_idx%E, chemxe
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                if (i == eqn_idx%E .or. i >= chemxb) then
+                                if (i == sys_idx%E .or. i >= chemxb) then
                                     flux_src_vf(i)%sf(j, k, l) = 0._wp
                                 end if
                             end do
@@ -4024,7 +4027,7 @@ contains
         else if (norm_dir == 2) then
             if (viscous .or. (surface_tension) .or. dummy) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = momxb, eqn_idx%E
+                do i = momxb, sys_idx%E
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
@@ -4038,11 +4041,11 @@ contains
 
             if (chem_params%diffusion) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = eqn_idx%E, chemxe
+                do i = sys_idx%E, chemxe
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
-                                if (i == eqn_idx%E .or. i >= chemxb) then
+                                if (i == sys_idx%E .or. i >= chemxb) then
                                     flux_src_vf(i)%sf(k, j, l) = 0._wp
                                 end if
                             end do
@@ -4070,7 +4073,7 @@ contains
         else
             if (viscous .or. (surface_tension) .or. dummy) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = momxb, eqn_idx%E
+                do i = momxb, sys_idx%E
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
@@ -4084,11 +4087,11 @@ contains
 
             if (chem_params%diffusion) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = eqn_idx%E, chemxe
+                do i = sys_idx%E, chemxe
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
-                                if (i == eqn_idx%E .or. i >= chemxb) then
+                                if (i == sys_idx%E .or. i >= chemxb) then
                                     flux_src_vf(i)%sf(l, k, j) = 0._wp
                                 end if
                             end do
@@ -4267,7 +4270,7 @@ contains
                         do i_vel = 1, num_dims
                             flux_src_vf(momxb + i_vel - 1)%sf(j, k, l) = flux_src_vf(momxb + i_vel - 1)%sf(j, k, &
                                         & l) - stress_vector_shear(i_vel)
-                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                            flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                         & l) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
                         end do
                     end if
@@ -4277,7 +4280,7 @@ contains
 
                         flux_src_vf(momxb + norm_dir - 1)%sf(j, k, l) = flux_src_vf(momxb + norm_dir - 1)%sf(j, k, &
                                     & l) - stress_normal_bulk
-                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
+                        flux_src_vf(sys_idx%E)%sf(j, k, l) = flux_src_vf(sys_idx%E)%sf(j, k, &
                                     & l) - vel_src_int(norm_dir)*stress_normal_bulk
                     end if
                 end do
@@ -4387,7 +4390,7 @@ contains
                             flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = flux_src_vf(momxb + i_dim - 1)%sf(j_loop, &
                                         & k_loop, l_loop) - current_tau_shear(norm_dir, i_dim)
 
-                            flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, l_loop) = flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, &
+                            flux_src_vf(sys_idx%E)%sf(j_loop, k_loop, l_loop) = flux_src_vf(sys_idx%E)%sf(j_loop, k_loop, &
                                         & l_loop) - vel_src_at_interface(i_dim)*current_tau_shear(norm_dir, i_dim)
                         end do
                     end if
@@ -4400,7 +4403,7 @@ contains
                             flux_src_vf(momxb + i_dim - 1)%sf(j_loop, k_loop, l_loop) = flux_src_vf(momxb + i_dim - 1)%sf(j_loop, &
                                         & k_loop, l_loop) - current_tau_bulk(norm_dir, i_dim)
 
-                            flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, l_loop) = flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, &
+                            flux_src_vf(sys_idx%E)%sf(j_loop, k_loop, l_loop) = flux_src_vf(sys_idx%E)%sf(j_loop, k_loop, &
                                         & l_loop) - vel_src_at_interface(i_dim)*current_tau_bulk(norm_dir, i_dim)
                         end do
                     end if

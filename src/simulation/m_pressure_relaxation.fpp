@@ -225,7 +225,7 @@ contains
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
-            alpha(i) = q_cons_vf(eqn_idx%E + i)%sf(j, k, l)
+            alpha(i) = q_cons_vf(sys_idx%E + i)%sf(j, k, l)
         end do
 
         ! Compute mixture properties (combined bubble and standard logic)
@@ -293,7 +293,7 @@ contains
             dyn_pres = dyn_pres + 5.e-1_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
         end do
 
-        pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+        pres_relax = (q_cons_vf(sys_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids

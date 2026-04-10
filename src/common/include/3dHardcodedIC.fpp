@@ -88,14 +88,14 @@
             q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
             q_prim_vf(contxe)%sf(i, j, k) = (1._wp - alph)*rhoL
-            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(sys_idx%E)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(advxb)%sf(i, j, k) = alph
             q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
             q_prim_vf(contxe)%sf(i, j, k) = (1._wp - alph)*rhoL
             pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
-            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
+            q_prim_vf(sys_idx%E)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
     case (301)  ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
         h = 0.0_wp
@@ -105,7 +105,7 @@
         if (x_cc(i) > intH) then
             q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(1)%alpha_rho(2)
-            q_prim_vf(eqn_idx%E)%sf(i, j, k) = patch_icpp(1)%pres
+            q_prim_vf(sys_idx%E)%sf(i, j, k) = patch_icpp(1)%pres
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
@@ -138,7 +138,7 @@
             q_prim_vf(contxe)%sf(i, j, k) = rho_am*(1._wp - q_prim_vf(advxb)%sf(i, j, k))
         end if
 
-        q_prim_vf(eqn_idx%E)%sf(i, j, k) = p_th*rcut*xcut + p_am
+        q_prim_vf(sys_idx%E)%sf(i, j, k) = p_th*rcut*xcut + p_am
     case (303)  ! 3D Multijet
         eps_smooth = 3.0_wp
         ux_th = 10*sqrt(1.4*0.4)
@@ -164,7 +164,7 @@
             q_prim_vf(contxe)%sf(i, j, k) = rho_am*(1._wp - q_prim_vf(advxb)%sf(i, j, k))
         end if
 
-        q_prim_vf(eqn_idx%E)%sf(i, j, k) = p_th*rcut*xcut + p_am
+        q_prim_vf(sys_idx%E)%sf(i, j, k) = p_th*rcut*xcut + p_am
     case (370)  ! 3D extrusion of 2D profile from external data
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
@@ -173,7 +173,7 @@
         ! geometry 9
         Mach = 0.1
         if (patch_id == 1) then
-            q_prim_vf(eqn_idx%E)%sf(i, j, &
+            q_prim_vf(sys_idx%E)%sf(i, j, &
                       & k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
             q_prim_vf(momxb + 0)%sf(i, j, k) = Mach*376.636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
             q_prim_vf(momxb + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)

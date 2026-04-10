@@ -100,7 +100,7 @@ contains
         integer              :: i
 
         ! $:GPU_LOOP(parallelism='[seq]')
-        do i = eqn_idx%E, advxe - 1
+        do i = sys_idx%E, advxe - 1
             L(i) = lambda_factor*lambda2*dadv_ds(i - momxe)
         end do
 

@@ -178,51 +178,51 @@ contains
 
                         if ((i >= chemxb) .and. (i <= chemxe)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
-                        else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) .or. ((i >= adv_idx%beg) .and. (i <= adv_idx%end) &
-                                 & ) .or. ((i >= chemxb) .and. (i <= chemxe))) then
+                        else if (((i >= sys_idx%cont%beg) .and. (i <= sys_idx%cont%end)) .or. ((i >= sys_idx%adv%beg) &
+                                 & .and. (i <= sys_idx%adv%end)) .or. ((i >= chemxb) .and. (i <= chemxe))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == mom_idx%beg) then  ! u
-                            write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == stress_idx%beg) then  ! tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
-                        else if (i == eqn_idx%E) then  ! p
+                        else if (i == sys_idx%mom%beg) then  ! u
+                            write (2, FMT) x_cb(j), q_cons_vf(sys_idx%mom%beg)%sf(j, 0, 0)/rho
+                        else if (i == sys_idx%stress%beg) then  ! tau_e
+                            write (2, FMT) x_cb(j), q_cons_vf(sys_idx%stress%beg)%sf(j, 0, 0)/rho
+                        else if (i == sys_idx%E) then  ! p
                             if (mhd) then
-                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(B_idx%beg)%sf(j, 0, 0)**2 + q_cons_vf(B_idx%beg + 1)%sf(j, &
-                                                   & 0, 0)**2)
+                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(sys_idx%B%beg)%sf(j, 0, &
+                                                   & 0)**2 + q_cons_vf(sys_idx%B%beg + 1)%sf(j, 0, 0)**2)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
-                                                    & 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, rho, &
-                                                    & qv, rhoYks, pres, T, pres_mag=pres_mag)
+                            call s_compute_pressure(q_cons_vf(sys_idx%E)%sf(j, 0, 0), q_cons_vf(sys_idx%alf)%sf(j, 0, 0), &
+                                                    & 0.5_wp*(q_cons_vf(sys_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, &
+                                                    & rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
-                            if (i == mom_idx%beg + 1) then  ! v
-                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 1)%sf(j, 0, 0)/rho
-                            else if (i == mom_idx%beg + 2) then  ! w
-                                write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg + 2)%sf(j, 0, 0)/rho
-                            else if (i == B_idx%beg) then  ! By
-                                write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg)%sf(j, 0, 0)/rho
-                            else if (i == B_idx%beg + 1) then  ! Bz
-                                write (2, FMT) x_cb(j), q_cons_vf(B_idx%beg + 1)%sf(j, 0, 0)/rho
+                            if (i == sys_idx%mom%beg + 1) then  ! v
+                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%mom%beg + 1)%sf(j, 0, 0)/rho
+                            else if (i == sys_idx%mom%beg + 2) then  ! w
+                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%mom%beg + 2)%sf(j, 0, 0)/rho
+                            else if (i == sys_idx%B%beg) then  ! By
+                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%B%beg)%sf(j, 0, 0)/rho
+                            else if (i == sys_idx%B%beg + 1) then  ! Bz
+                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%B%beg + 1)%sf(j, 0, 0)/rho
                             end if
-                        else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
+                        else if ((i >= sys_idx%bub%beg) .and. (i <= sys_idx%bub%end) .and. bubbles_euler) then
                             if (qbmm) then
                                 nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
                             else
                                 if (adv_n) then
-                                    nbub = q_cons_vf(eqn_idx%n)%sf(j, 0, 0)
+                                    nbub = q_cons_vf(sys_idx%n)%sf(j, 0, 0)
                                 else
                                     do k = 1, nb
-                                        nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
+                                        nRtmp(k) = q_cons_vf(sys_idx%bub%rs(k))%sf(j, 0, 0)
                                     end do
 
-                                    call s_comp_n_from_cons(real(q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), kind=wp), nRtmp, nbub, weight)
+                                    call s_comp_n_from_cons(real(q_cons_vf(sys_idx%alf)%sf(j, 0, 0), kind=wp), nRtmp, nbub, weight)
                                 end if
                             end if
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
-                        else if (i == eqn_idx%n .and. adv_n .and. bubbles_euler) then
+                        else if (i == sys_idx%n .and. adv_n .and. bubbles_euler) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == damage_idx) then
+                        else if (i == sys_idx%damage) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
@@ -576,7 +576,7 @@ contains
         character(len=15)                              :: temp
         character(LEN=1), dimension(3), parameter      :: coord = (/'x', 'y', 'z'/)
         logical                                        :: dir_check
-        integer                                        :: i
+        integer                                        :: i, iu
         integer                                        :: m_ds, n_ds, p_ds
 
         if (parallel_io .neqv. .true.) then
@@ -611,46 +611,44 @@ contains
             s_write_data_files => s_write_parallel_data_files
         end if
 
-        open (1, FILE='indices.dat', STATUS='unknown')
+        open (newunit=iu, FILE='indices.dat', STATUS='unknown')
 
-        write (1, '(A)') "Warning: The creation of file is currently experimental."
-        write (1, '(A)') "This file may contain errors and not support all features."
+        write (iu, '(A)') "Warning: The creation of file is currently experimental."
+        write (iu, '(A)') "This file may contain errors and not support all features."
 
-        write (1, '(A3,A20,A20)') "#", "Conservative", "Primitive"
-        write (1, '(A)') "    "
+        write (iu, '(A3,A20,A20)') "#", "Conservative", "Primitive"
+        write (iu, '(A)') "    "
         do i = contxb, contxe
             write (temp, '(I0)') i - contxb + 1
-            write (1, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "} \rho_{" // trim(temp) // "}", &
+            write (iu, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "} \rho_{" // trim(temp) // "}", &
                    & "\alpha_{" // trim(temp) // "} \rho"
         end do
         do i = momxb, momxe
-            write (1, '(I3,A20,A20)') i, "\rho u_" // coord(i - momxb + 1), "u_" // coord(i - momxb + 1)
+            write (iu, '(I3,A20,A20)') i, "\rho u_" // coord(i - momxb + 1), "u_" // coord(i - momxb + 1)
         end do
-        do i = eqn_idx%E, eqn_idx%E
-            write (1, '(I3,A20,A20)') i, "\rho U", "p"
-        end do
+        if (sys_idx%E /= 0) write (iu, '(I3,A20,A20)') sys_idx%E, "\rho U", "p"
         do i = advxb, advxe
             write (temp, '(I0)') i - contxb + 1
-            write (1, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "}", "\alpha_{" // trim(temp) // "}"
+            write (iu, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "}", "\alpha_{" // trim(temp) // "}"
         end do
         if (chemistry) then
             do i = 1, num_species
-                write (1, '(I3,A20,A20)') chemxb + i - 1, "Y_{" // trim(species_names(i)) // "} \rho", &
+                write (iu, '(I3,A20,A20)') chemxb + i - 1, "Y_{" // trim(species_names(i)) // "} \rho", &
                        & "Y_{" // trim(species_names(i)) // "}"
             end do
         end if
 
-        write (1, '(A)') ""
-        if (momxb /= 0) write (1, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
-        if (eqn_idx%E /= 0) write (1, '("[",I2,",",I2,"]",A)') eqn_idx%E, eqn_idx%E, " Energy/Pressure"
-        if (advxb /= 0) write (1, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
-        if (contxb /= 0) write (1, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
-        if (bubxb /= 0) write (1, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles_euler"
-        if (strxb /= 0) write (1, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
-        if (intxb /= 0) write (1, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
-        if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
+        write (iu, '(A)') ""
+        if (momxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') momxb, momxe, " Momentum"
+        if (sys_idx%E /= 0) write (iu, '("[",I2,",",I2,"]",A)') sys_idx%E, sys_idx%E, " Energy/Pressure"
+        if (advxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') advxb, advxe, " Advection"
+        if (contxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') contxb, contxe, " Continuity"
+        if (bubxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') bubxb, bubxe, " Bubbles_euler"
+        if (strxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') strxb, strxe, " Stress"
+        if (intxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') intxb, intxe, " Internal Energies"
+        if (chemxb /= 0) write (iu, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
 
-        close (1)
+        close (iu)
 
         if (down_sample) then
             m_ds = int((m + 1)/3) - 1
