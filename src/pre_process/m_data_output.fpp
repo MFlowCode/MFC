@@ -178,51 +178,51 @@ contains
 
                         if ((i >= chemxb) .and. (i <= chemxe)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
-                        else if (((i >= sys_idx%cont%beg) .and. (i <= sys_idx%cont%end)) .or. ((i >= sys_idx%adv%beg) &
-                                 & .and. (i <= sys_idx%adv%end)) .or. ((i >= chemxb) .and. (i <= chemxe))) then
+                        else if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
+                                 & .and. (i <= eqn_idx%adv%end)) .or. ((i >= chemxb) .and. (i <= chemxe))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == sys_idx%mom%beg) then  ! u
-                            write (2, FMT) x_cb(j), q_cons_vf(sys_idx%mom%beg)%sf(j, 0, 0)/rho
-                        else if (i == sys_idx%stress%beg) then  ! tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(sys_idx%stress%beg)%sf(j, 0, 0)/rho
-                        else if (i == sys_idx%E) then  ! p
+                        else if (i == eqn_idx%mom%beg) then  ! u
+                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)/rho
+                        else if (i == eqn_idx%stress%beg) then  ! tau_e
+                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%stress%beg)%sf(j, 0, 0)/rho
+                        else if (i == eqn_idx%E) then  ! p
                             if (mhd) then
-                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(sys_idx%B%beg)%sf(j, 0, &
-                                                   & 0)**2 + q_cons_vf(sys_idx%B%beg + 1)%sf(j, 0, 0)**2)
+                                pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(eqn_idx%B%beg)%sf(j, 0, &
+                                                   & 0)**2 + q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)**2)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(sys_idx%E)%sf(j, 0, 0), q_cons_vf(sys_idx%alf)%sf(j, 0, 0), &
-                                                    & 0.5_wp*(q_cons_vf(sys_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, &
+                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
+                                                    & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, &
                                                     & rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
-                            if (i == sys_idx%mom%beg + 1) then  ! v
-                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%mom%beg + 1)%sf(j, 0, 0)/rho
-                            else if (i == sys_idx%mom%beg + 2) then  ! w
-                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%mom%beg + 2)%sf(j, 0, 0)/rho
-                            else if (i == sys_idx%B%beg) then  ! By
-                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%B%beg)%sf(j, 0, 0)/rho
-                            else if (i == sys_idx%B%beg + 1) then  ! Bz
-                                write (2, FMT) x_cb(j), q_cons_vf(sys_idx%B%beg + 1)%sf(j, 0, 0)/rho
+                            if (i == eqn_idx%mom%beg + 1) then  ! v
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%mom%beg + 2) then  ! w
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%B%beg) then  ! By
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%B%beg + 1) then  ! Bz
+                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)/rho
                             end if
-                        else if ((i >= sys_idx%bub%beg) .and. (i <= sys_idx%bub%end) .and. bubbles_euler) then
+                        else if ((i >= eqn_idx%bub%beg) .and. (i <= eqn_idx%bub%end) .and. bubbles_euler) then
                             if (qbmm) then
                                 nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
                             else
                                 if (adv_n) then
-                                    nbub = q_cons_vf(sys_idx%n)%sf(j, 0, 0)
+                                    nbub = q_cons_vf(eqn_idx%n)%sf(j, 0, 0)
                                 else
                                     do k = 1, nb
                                         nRtmp(k) = q_cons_vf(qbmm_idx%rs(k))%sf(j, 0, 0)
                                     end do
 
-                                    call s_comp_n_from_cons(real(q_cons_vf(sys_idx%alf)%sf(j, 0, 0), kind=wp), nRtmp, nbub, weight)
+                                    call s_comp_n_from_cons(real(q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), kind=wp), nRtmp, nbub, weight)
                                 end if
                             end if
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
-                        else if (i == sys_idx%n .and. adv_n .and. bubbles_euler) then
+                        else if (i == eqn_idx%n .and. adv_n .and. bubbles_euler) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
-                        else if (i == sys_idx%damage) then
+                        else if (i == eqn_idx%damage) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
@@ -626,7 +626,7 @@ contains
         do i = momxb, momxe
             write (iu, '(I3,A20,A20)') i, "\rho u_" // coord(i - momxb + 1), "u_" // coord(i - momxb + 1)
         end do
-        if (sys_idx%E /= 0) write (iu, '(I3,A20,A20)') sys_idx%E, "\rho U", "p"
+        if (eqn_idx%E /= 0) write (iu, '(I3,A20,A20)') eqn_idx%E, "\rho U", "p"
         do i = advxb, advxe
             write (temp, '(I0)') i - contxb + 1
             write (iu, '(I3,A20,A20)') i, "\alpha_{" // trim(temp) // "}", "\alpha_{" // trim(temp) // "}"
@@ -639,17 +639,17 @@ contains
         end if
 
         write (iu, '(A)') ""
-        call write_range(sys_idx%cont%beg, sys_idx%cont%end, " Continuity")
-        call write_range(sys_idx%mom%beg, sys_idx%mom%end, " Momentum")
-        call write_range(sys_idx%E, sys_idx%E, " Energy/Pressure")
-        call write_range(sys_idx%adv%beg, sys_idx%adv%end, " Advection")
-        call write_range(sys_idx%bub%beg, sys_idx%bub%end, " Bubbles")
-        call write_range(sys_idx%stress%beg, sys_idx%stress%end, " Stress")
-        call write_range(sys_idx%int_en%beg, sys_idx%int_en%end, " Internal Energies")
-        call write_range(sys_idx%xi%beg, sys_idx%xi%end, " Reference Map")
-        call write_range(sys_idx%B%beg, sys_idx%B%end, " Magnetic Field")
-        call write_range(sys_idx%c, sys_idx%c, " Color Function")
-        call write_range(sys_idx%species%beg, sys_idx%species%end, " Chemistry")
+        call write_range(eqn_idx%cont%beg, eqn_idx%cont%end, " Continuity")
+        call write_range(eqn_idx%mom%beg, eqn_idx%mom%end, " Momentum")
+        call write_range(eqn_idx%E, eqn_idx%E, " Energy/Pressure")
+        call write_range(eqn_idx%adv%beg, eqn_idx%adv%end, " Advection")
+        call write_range(eqn_idx%bub%beg, eqn_idx%bub%end, " Bubbles")
+        call write_range(eqn_idx%stress%beg, eqn_idx%stress%end, " Stress")
+        call write_range(eqn_idx%int_en%beg, eqn_idx%int_en%end, " Internal Energies")
+        call write_range(eqn_idx%xi%beg, eqn_idx%xi%end, " Reference Map")
+        call write_range(eqn_idx%B%beg, eqn_idx%B%end, " Magnetic Field")
+        call write_range(eqn_idx%c, eqn_idx%c, " Color Function")
+        call write_range(eqn_idx%species%beg, eqn_idx%species%end, " Chemistry")
 
         close (iu)
 

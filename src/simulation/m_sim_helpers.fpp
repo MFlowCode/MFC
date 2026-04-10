@@ -121,10 +121,10 @@ contains
         end do
 
         if (igr) then
-            E = q_prim_vf(sys_idx%E)%sf(j, k, l)
+            E = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
         else
-            pres = q_prim_vf(sys_idx%E)%sf(j, k, l)
+            pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 

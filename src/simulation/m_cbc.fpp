@@ -96,7 +96,7 @@ contains
         if (chemistry) then
             flux_cbc_index = sys_size
         else
-            flux_cbc_index = sys_idx%adv%end
+            flux_cbc_index = eqn_idx%adv%end
         end if
         $:GPU_UPDATE(device='[flux_cbc_index]')
 
@@ -124,12 +124,12 @@ contains
         if (weno_order > 1 .or. muscl_order > 1) then
             @:ALLOCATE(F_rsx_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, 1:flux_cbc_index))
 
-            @:ALLOCATE(F_src_rsx_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, sys_idx%adv%beg:sys_idx%adv%end))
+            @:ALLOCATE(F_src_rsx_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
         end if
 
         @:ALLOCATE(flux_rsx_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, 1:flux_cbc_index))
 
-        @:ALLOCATE(flux_src_rsx_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, sys_idx%adv%beg:sys_idx%adv%end))
+        @:ALLOCATE(flux_src_rsx_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
 
         if (n > 0) then
             if (m == 0) then
@@ -152,12 +152,12 @@ contains
             if (weno_order > 1 .or. muscl_order > 1) then
                 @:ALLOCATE(F_rsy_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, 1:flux_cbc_index))
 
-                @:ALLOCATE(F_src_rsy_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, sys_idx%adv%beg:sys_idx%adv%end))
+                @:ALLOCATE(F_src_rsy_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
             end if
 
             @:ALLOCATE(flux_rsy_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, 1:flux_cbc_index))
 
-            @:ALLOCATE(flux_src_rsy_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, sys_idx%adv%beg:sys_idx%adv%end))
+            @:ALLOCATE(flux_src_rsy_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
         end if
 
         if (p > 0) then
@@ -181,12 +181,12 @@ contains
             if (weno_order > 1 .or. muscl_order > 1) then
                 @:ALLOCATE(F_rsz_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, 1:flux_cbc_index))
 
-                @:ALLOCATE(F_src_rsz_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, sys_idx%adv%beg:sys_idx%adv%end))
+                @:ALLOCATE(F_src_rsz_vf(0:buff_size, is2%beg:is2%end, is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
             end if
 
             @:ALLOCATE(flux_rsz_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, 1:flux_cbc_index))
 
-            @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, sys_idx%adv%beg:sys_idx%adv%end))
+            @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
         end if
 
         ! Allocating the cell-width distribution in the s-direction
@@ -620,11 +620,11 @@ contains
                             vel_K_sum = vel_K_sum + vel(i)**2._wp
                         end do
 
-                        pres = q_prim_rs${XYZ}$_vf(0, k, r, sys_idx%E)
+                        pres = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E)
 
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, advxe - sys_idx%E
-                            adv_local(i) = q_prim_rs${XYZ}$_vf(0, k, r, sys_idx%E + i)
+                        do i = 1, advxe - eqn_idx%E
+                            adv_local(i) = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E + i)
                         end do
 
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
@@ -680,7 +680,7 @@ contains
 
                         dpres_ds = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, advxe - sys_idx%E
+                        do i = 1, advxe - eqn_idx%E
                             dadv_ds(i) = 0._wp
                         end do
 
@@ -702,10 +702,10 @@ contains
                                 dvel_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, contxe + i)*fd_coef_${XYZ}$ (j, cbc_loc) + dvel_ds(i)
                             end do
 
-                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, sys_idx%E)*fd_coef_${XYZ}$ (j, cbc_loc) + dpres_ds
+                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E)*fd_coef_${XYZ}$ (j, cbc_loc) + dpres_ds
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, advxe - sys_idx%E
-                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, sys_idx%E + i)*fd_coef_${XYZ}$ (j, cbc_loc) + dadv_ds(i)
+                            do i = 1, advxe - eqn_idx%E
+                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, eqn_idx%E + i)*fd_coef_${XYZ}$ (j, cbc_loc) + dadv_ds(i)
                             end do
 
                             if (chemistry) then
@@ -748,8 +748,8 @@ contains
                                     end if
                                 end if
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = sys_idx%E, advxe - 1
-                                    L(i) = c*Ma*(adv_local(i + 1 - sys_idx%E) - alpha_in(i + 1 - sys_idx%E, &
+                                do i = eqn_idx%E, advxe - 1
+                                    L(i) = c*Ma*(adv_local(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, &
                                       & ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 L(advxe) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, &
@@ -820,12 +820,12 @@ contains
                         ! The treatment of void fraction source is unclear
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, advxe - sys_idx%E
+                            do i = 1, advxe - eqn_idx%E
                                 dadv_dt(i) = -L(momxe + i)  ! + adv_local(i) * vel(dir_idx(1))/y_cc(n)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, advxe - sys_idx%E
+                            do i = 1, advxe - eqn_idx%E
                                 dadv_dt(i) = -L(momxe + i)
                             end do
                         end if
@@ -876,8 +876,8 @@ contains
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                                 #:endif
                             end do
-                            flux_rs${XYZ}$_vf_l(-1, k, r, sys_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                & sys_idx%E) + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2) &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                & eqn_idx%E) + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2) &
                                                 & /(c*c) + sum_Enthalpies)
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
@@ -885,8 +885,8 @@ contains
                                                     & chemxb + i - 1) + ds(0)*(drho_dt*Ys(i) + rho*dYs_dt(i))
                             end do
                         else
-                            flux_rs${XYZ}$_vf_l(-1, k, r, sys_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                & sys_idx%E) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt + dqv_dt &
+                            flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                & eqn_idx%E) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt + dqv_dt &
                                                 & + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
                         end if
 
@@ -901,12 +901,12 @@ contains
                                 flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = 1._wp/max(abs(vel(dir_idx(1))), sgm_eps)*sign(1._wp, &
                                                         & vel(dir_idx(1)))*(flux_rs${XYZ}$_vf_l(0, k, r, &
                                                         & i) + vel(dir_idx(1))*flux_src_rs${XYZ}$_vf_l(0, k, r, &
-                                                        & i) + ds(0)*dadv_dt(i - sys_idx%E))
+                                                        & i) + ds(0)*dadv_dt(i - eqn_idx%E))
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advxb, advxe
-                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + ds(0)*dadv_dt(i - sys_idx%E)
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + ds(0)*dadv_dt(i - eqn_idx%E)
                             end do
 
                             $:GPU_LOOP(parallelism='[seq]')

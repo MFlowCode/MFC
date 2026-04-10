@@ -72,7 +72,7 @@ contains
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
                     $:GPU_LOOP(parallelism='[seq]')
-                    do i = momxb, sys_idx%E
+                    do i = momxb, eqn_idx%E
                         tau_Re_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
@@ -91,9 +91,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -172,7 +172,7 @@ contains
                             do i = 1, 2
                                 tau_Re_vf(contxe + i)%sf(j, k, l) = tau_Re_vf(contxe + i)%sf(j, k, l) - tau_Re(2, i)
 
-                                tau_Re_vf(sys_idx%E)%sf(j, k, l) = tau_Re_vf(sys_idx%E)%sf(j, k, l) - q_prim_vf(contxe + i)%sf(j, &
+                                tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, l) - q_prim_vf(contxe + i)%sf(j, &
                                           & k, l)*tau_Re(2, i)
                             end do
                         end do
@@ -193,9 +193,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -269,7 +269,7 @@ contains
 
                             tau_Re_vf(momxb + 1)%sf(j, k, l) = tau_Re_vf(momxb + 1)%sf(j, k, l) - tau_Re(2, 2)
 
-                            tau_Re_vf(sys_idx%E)%sf(j, k, l) = tau_Re_vf(sys_idx%E)%sf(j, k, l) - q_prim_vf(momxb + 1)%sf(j, k, &
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, l) - q_prim_vf(momxb + 1)%sf(j, k, &
                                       & l)*tau_Re(2, 2)
                         end do
                     end do
@@ -290,9 +290,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -370,7 +370,7 @@ contains
                             do i = 2, 3
                                 tau_Re_vf(contxe + i)%sf(j, k, l) = tau_Re_vf(contxe + i)%sf(j, k, l) - tau_Re(2, i)
 
-                                tau_Re_vf(sys_idx%E)%sf(j, k, l) = tau_Re_vf(sys_idx%E)%sf(j, k, l) - q_prim_vf(contxe + i)%sf(j, &
+                                tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, l) - q_prim_vf(contxe + i)%sf(j, &
                                           & k, l)*tau_Re(2, i)
                             end do
                         end do
@@ -389,9 +389,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(sys_idx%E + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -464,7 +464,7 @@ contains
 
                             tau_Re_vf(momxb + 1)%sf(j, k, l) = tau_Re_vf(momxb + 1)%sf(j, k, l) - tau_Re(2, 2)
 
-                            tau_Re_vf(sys_idx%E)%sf(j, k, l) = tau_Re_vf(sys_idx%E)%sf(j, k, l) - q_prim_vf(momxb + 1)%sf(j, k, &
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, l) - q_prim_vf(momxb + 1)%sf(j, k, &
                                       & l)*tau_Re(2, 2)
                         end do
                     end do
@@ -494,7 +494,7 @@ contains
         integer                                         :: i, j, k, l
 
         do i = 1, num_dims
-            iv%beg = sys_idx%mom%beg; iv%end = sys_idx%mom%end
+            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
 
             $:GPU_UPDATE(device='[iv]')
 
@@ -521,7 +521,7 @@ contains
                 end if
             end do
         else  ! Compute velocity gradients at cell centers using central finite differences
-            iv%beg = sys_idx%mom%beg; iv%end = sys_idx%mom%end
+            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
             $:GPU_UPDATE(device='[iv]')
 
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz

@@ -113,7 +113,7 @@ module m_derived_types
         type(int_bounds_info) :: x, y, z
     end type bc_xyz_info
 
-    !> QBMM moment index mappings - separate from bub beg/end so sys_idx contains no allocatables.
+    !> QBMM moment index mappings - separate from bub beg/end so eqn_idx contains no allocatables.
     type qbmm_idx_info
         integer, dimension(:), allocatable     :: rs       !< R moment indices per bubble bin
         integer, dimension(:), allocatable     :: vs       !< V moment indices per bubble bin
@@ -126,7 +126,7 @@ module m_derived_types
     !> All conserved-variable equation indices, computed at startup from model_eqns and enabled features.
     !> Range indices (beg/end) use int_bounds_info; scalar indices are plain integers (0 = inactive).
     !> Contains no allocatable members - safe for GPU_DECLARE as a single struct.
-    type sys_idx_info
+    type eqn_idx_info
         type(int_bounds_info) :: cont     !< Partial densities (continuity equations)
         type(int_bounds_info) :: mom      !< Momentum components
         type(int_bounds_info) :: adv      !< Volume fractions (advection equations)
@@ -144,7 +144,7 @@ module m_derived_types
         integer               :: c        !< Color function equation
         integer               :: damage   !< Damage variable equation
         integer               :: psi      !< Psi variable equation
-    end type sys_idx_info
+    end type eqn_idx_info
 
     type bc_patch_parameters
         integer                :: geometry
