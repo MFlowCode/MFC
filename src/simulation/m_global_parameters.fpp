@@ -427,9 +427,6 @@ module m_global_parameters
     $:GPU_DECLARE(create='[sigma, surface_tension]')
     !> @}
 
-    integer :: xibeg, xiend
-    $:GPU_DECLARE(create='[xibeg, xiend]')
-
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
 
@@ -1173,11 +1170,8 @@ contains
             grid_geometry = 3
         end if
 
-        xibeg = eqn_idx%xi%beg
-        xiend = eqn_idx%xi%end
-
         $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
-        $:GPU_UPDATE(device='[b_size, xibeg, xiend, tensor_size]')
+        $:GPU_UPDATE(device='[b_size, tensor_size]')
 
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 

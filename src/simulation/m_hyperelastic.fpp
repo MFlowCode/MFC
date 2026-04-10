@@ -116,17 +116,17 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
                             ! derivatives in the x-direction
-                            tensora(1) = tensora(1) + q_prim_vf(xibeg)%sf(j + r, k, l)*fd_coeff_x_hyper(r, j)
-                            tensora(2) = tensora(2) + q_prim_vf(xibeg + 1)%sf(j + r, k, l)*fd_coeff_x_hyper(r, j)
-                            tensora(3) = tensora(3) + q_prim_vf(xiend)%sf(j + r, k, l)*fd_coeff_x_hyper(r, j)
+                            tensora(1) = tensora(1) + q_prim_vf(eqn_idx%xi%beg)%sf(j + r, k, l)*fd_coeff_x_hyper(r, j)
+                            tensora(2) = tensora(2) + q_prim_vf(eqn_idx%xi%beg + 1)%sf(j + r, k, l)*fd_coeff_x_hyper(r, j)
+                            tensora(3) = tensora(3) + q_prim_vf(eqn_idx%xi%end)%sf(j + r, k, l)*fd_coeff_x_hyper(r, j)
                             ! derivatives in the y-direction
-                            tensora(4) = tensora(4) + q_prim_vf(xibeg)%sf(j, k + r, l)*fd_coeff_y_hyper(r, k)
-                            tensora(5) = tensora(5) + q_prim_vf(xibeg + 1)%sf(j, k + r, l)*fd_coeff_y_hyper(r, k)
-                            tensora(6) = tensora(6) + q_prim_vf(xiend)%sf(j, k + r, l)*fd_coeff_y_hyper(r, k)
+                            tensora(4) = tensora(4) + q_prim_vf(eqn_idx%xi%beg)%sf(j, k + r, l)*fd_coeff_y_hyper(r, k)
+                            tensora(5) = tensora(5) + q_prim_vf(eqn_idx%xi%beg + 1)%sf(j, k + r, l)*fd_coeff_y_hyper(r, k)
+                            tensora(6) = tensora(6) + q_prim_vf(eqn_idx%xi%end)%sf(j, k + r, l)*fd_coeff_y_hyper(r, k)
                             ! derivatives in the z-direction
-                            tensora(7) = tensora(7) + q_prim_vf(xibeg)%sf(j, k, l + r)*fd_coeff_z_hyper(r, l)
-                            tensora(8) = tensora(8) + q_prim_vf(xibeg + 1)%sf(j, k, l + r)*fd_coeff_z_hyper(r, l)
-                            tensora(9) = tensora(9) + q_prim_vf(xiend)%sf(j, k, l + r)*fd_coeff_z_hyper(r, l)
+                            tensora(7) = tensora(7) + q_prim_vf(eqn_idx%xi%beg)%sf(j, k, l + r)*fd_coeff_z_hyper(r, l)
+                            tensora(8) = tensora(8) + q_prim_vf(eqn_idx%xi%beg + 1)%sf(j, k, l + r)*fd_coeff_z_hyper(r, l)
+                            tensora(9) = tensora(9) + q_prim_vf(eqn_idx%xi%end)%sf(j, k, l + r)*fd_coeff_z_hyper(r, l)
                         end do
                         ! STEP 2a: computing the adjoint of the grad_xi tensor for the inverse
                         tensorb(1) = tensora(5)*tensora(9) - tensora(6)*tensora(8)
@@ -174,7 +174,7 @@ contains
                             end if
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
-                                      & l) - G_local*q_prim_vf(xiend + 1)%sf(j, k, l)/gamma
+                                      & l) - G_local*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)/gamma
                             ! STEP 5c: updating the Cauchy stress conservative scalar field
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, b_size - 1
@@ -214,7 +214,7 @@ contains
             q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! First invariant strain energy: W = G/2 * (I1 - 3), neo-Hookean model
-        q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
+        q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
 
@@ -243,7 +243,7 @@ contains
             q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
         end do
         ! First invariant strain energy: W = G/2 * (I1 - 3), neo-Hookean model
-        q_prim_vf(xiend + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
+        q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 

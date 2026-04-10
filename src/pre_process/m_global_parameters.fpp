@@ -180,7 +180,6 @@ module m_global_parameters
     logical  :: surface_tension
     !> @}
 
-    integer                                :: xibeg, xiend
     integer, allocatable, dimension(:,:,:) :: logic_grid
     type(pres_field)                       :: pb
     type(pres_field)                       :: mv
@@ -776,9 +775,6 @@ contains
             eqn_idx%species%end = sys_size + num_species
             sys_size = eqn_idx%species%end
         end if
-
-        xibeg = eqn_idx%xi%beg
-        xiend = eqn_idx%xi%end
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
                                            & bubbles_lagrange, m, n, p, num_dims, igr, ib)

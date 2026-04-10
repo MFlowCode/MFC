@@ -1944,8 +1944,8 @@ contains
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
-                                        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
-                                        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
+                                        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%xi%beg - 1 + i)
+                                        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%xi%beg - 1 + i)
                                     end do
                                     G_L = 0._wp; G_R = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -1956,8 +1956,8 @@ contains
                                     end do
                                     ! Elastic contribution to energy if G large enough
                                     if (G_L > verysmall .and. G_R > verysmall) then
-                                        E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
-                                        E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
+                                        E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%xi%end + 1)
+                                        E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%xi%end + 1)
                                     end if
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, b_size - 1
@@ -2166,9 +2166,10 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & xibeg - 1 + i) = xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
-                                                          & - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) + xi_P*(s_S/(s_R - s_S)) &
-                                                          & *(s_R*rho_R*xi_field_R(i) - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
+                                                          & eqn_idx%xi%beg - 1 + i) = xi_M*(s_S/(s_L - s_S)) &
+                                                          & *(s_L*rho_L*xi_field_L(i) - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) &
+                                                          & + xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) &
+                                                          & - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
                                     end do
                                 end if
 
@@ -3027,8 +3028,8 @@ contains
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
-                                        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, xibeg - 1 + i)
-                                        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, xibeg - 1 + i)
+                                        xi_field_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%xi%beg - 1 + i)
+                                        xi_field_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%xi%beg - 1 + i)
                                     end do
                                     G_L = 0._wp
                                     G_R = 0._wp
@@ -3040,8 +3041,8 @@ contains
                                     end do
                                     ! Elastic contribution to energy if G large enough
                                     if (G_L > verysmall .and. G_R > verysmall) then
-                                        E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
-                                        E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
+                                        E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%xi%end + 1)
+                                        E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%xi%end + 1)
                                     end if
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, b_size - 1
@@ -3231,9 +3232,10 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & xibeg - 1 + i) = xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
-                                                          & - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) + xi_P*(s_S/(s_R - s_S)) &
-                                                          & *(s_R*rho_R*xi_field_R(i) - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
+                                                          & eqn_idx%xi%beg - 1 + i) = xi_M*(s_S/(s_L - s_S)) &
+                                                          & *(s_L*rho_L*xi_field_L(i) - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) &
+                                                          & + xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) &
+                                                          & - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
                                     end do
                                 end if
 

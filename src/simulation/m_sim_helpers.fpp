@@ -130,7 +130,7 @@ contains
 
         ! Adjust energy for hyperelasticity
         if (hyperelasticity) then
-            E = E + G_local*q_prim_vf(xiend + 1)%sf(j, k, l)
+            E = E + G_local*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)
         end if
 
         H = (E + pres)/rho

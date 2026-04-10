@@ -262,8 +262,6 @@ module m_global_parameters
     logical  :: surface_tension
     !> @}
 
-    integer :: xibeg, xiend
-
     !> @name Lagrangian bubbles
     !> @{
     logical :: bubbles_lagrange
@@ -740,9 +738,6 @@ contains
             z_output_idx%beg = 0
             z_output_idx%end = 0
         end if
-
-        xibeg = eqn_idx%xi%beg
-        xiend = eqn_idx%xi%end
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then

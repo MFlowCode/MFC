@@ -492,9 +492,9 @@ contains
         end if
 
         if (hyperelasticity) then
-            do i = 1, xiend - xibeg + 1
+            do i = 1, eqn_idx%xi%end - eqn_idx%xi%beg + 1
                 if (prim_vars_wrt) then
-                    q_sf(:,:,:) = q_prim_vf(i - 1 + xibeg)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                    q_sf(:,:,:) = q_prim_vf(i - 1 + eqn_idx%xi%beg)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I0)') 'xi', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                 end if
