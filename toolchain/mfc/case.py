@@ -19,12 +19,12 @@ def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> l
 
 
 QPVF_IDX_VARS = {
-    "alpha_rho": "contxb",
-    "vel": "momxb",
+    "alpha_rho": "eqn_idx%cont%beg",
+    "vel": "eqn_idx%mom%beg",
     "pres": "eqn_idx%E",
-    "alpha": "advxb",
+    "alpha": "eqn_idx%adv%beg",
     "tau_e": "eqn_idx%stress%beg",
-    "Y": "chemxb",
+    "Y": "eqn_idx%species%beg",
     "cf_val": "eqn_idx%c",
     "Bx": "eqn_idx%B%beg",
     "By": "eqn_idx%B%end-1",
