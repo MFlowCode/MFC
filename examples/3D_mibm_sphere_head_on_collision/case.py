@@ -18,11 +18,11 @@ dt = 5.0e-6
 collision_time = 20.0 * dt
 
 # parerticle properties
-radius = 5e-3
+radius = 5.0
 collision_angle_degrees = 30.0
 collision_angle_radians = collision_angle_degrees * math.pi / 180.0
-domain_size = 3.0 * radius
-lead_distance = 0.02 * radius
+domain_size = 4.0 * radius
+lead_distance = 0.2 * radius
 
 # simulation runs long enough to collide and travel about lead distance away again
 simulation_time = 2.0 * (lead_distance / velocity) + collision_time
@@ -37,12 +37,12 @@ print(
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
-            "x_domain%beg": 0.0,
-            "x_domain%end": domain_size,
+            "x_domain%beg": -0.5 * domain_size,
+            "x_domain%end": 0.5 * domain_size,
             "y_domain%beg": 0.0,
             "y_domain%end": domain_size,
-            "z_domain%beg": 0.0,
-            "z_domain%end": domain_size,
+            "z_domain%beg": -0.5 * domain_size,
+            "z_domain%end": 0.5 * domain_size,
             "cyl_coord": "F",
             "m": 60,
             "n": 60,
