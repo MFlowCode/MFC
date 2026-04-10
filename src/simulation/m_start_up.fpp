@@ -435,7 +435,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! eqn_idx%adv%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -497,7 +497,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! eqn_idx%adv%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 

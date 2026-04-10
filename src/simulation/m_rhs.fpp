@@ -134,9 +134,7 @@ contains
         end if
 
         if (surface_tension) then
-            ! This assumes that the color function advection equation is the last equation. If this changes then this logic will
-            ! need updated
-            do l = eqn_idx%adv%end + 1, sys_size - 1
+            do l = eqn_idx%adv%end + 1, eqn_idx%c - 1
                 @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
             end do
