@@ -38,11 +38,11 @@ contains
         @:ALLOCATE(ms(1:nb))
 
         do l = 1, nb
-            rs(l) = sys_idx%bub%rs(l)
-            vs(l) = sys_idx%bub%vs(l)
+            rs(l) = qbmm_idx%rs(l)
+            vs(l) = qbmm_idx%vs(l)
             if (.not. polytropic) then
-                ps(l) = sys_idx%bub%ps(l)
-                ms(l) = sys_idx%bub%ms(l)
+                ps(l) = qbmm_idx%ps(l)
+                ms(l) = qbmm_idx%ms(l)
             else
                 ps(l) = rs(l)
                 ms(l) = rs(l)

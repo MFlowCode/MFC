@@ -364,7 +364,7 @@ contains
         if (bubbles_euler) then
             @:ALLOCATE(bubrs_vc(1:nb))
             do i = 1, nb
-                bubrs_vc(i) = sys_idx%bub%rs(i)
+                bubrs_vc(i) = qbmm_idx%rs(i)
             end do
             $:GPU_UPDATE(device='[bubrs_vc]')
         end if
@@ -942,7 +942,7 @@ contains
                     if (bubbles_euler) then
                         ! From prim: Compute nbub = (3/4pi) * \alpha / \bar{R^3}
                         do i = 1, nb
-                            Rtmp(i) = q_prim_vf(sys_idx%bub%rs(i))%sf(j, k, l)
+                            Rtmp(i) = q_prim_vf(qbmm_idx%rs(i))%sf(j, k, l)
                         end do
 
                         if (.not. qbmm) then

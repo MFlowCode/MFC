@@ -213,7 +213,7 @@ contains
                                     nbub = q_cons_vf(sys_idx%n)%sf(j, 0, 0)
                                 else
                                     do k = 1, nb
-                                        nRtmp(k) = q_cons_vf(sys_idx%bub%rs(k))%sf(j, 0, 0)
+                                        nRtmp(k) = q_cons_vf(qbmm_idx%rs(k))%sf(j, 0, 0)
                                     end do
 
                                     call s_comp_n_from_cons(real(q_cons_vf(sys_idx%alf)%sf(j, 0, 0), kind=wp), nRtmp, nbub, weight)

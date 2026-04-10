@@ -386,7 +386,7 @@ contains
 
         do j = 1, nmom
             do i = 1, nb
-                bubmoms(i, j) = sys_idx%bub%moms(i, j)
+                bubmoms(i, j) = qbmm_idx%moms(i, j)
             end do
         end do
         $:GPU_UPDATE(device='[bubmoms]')

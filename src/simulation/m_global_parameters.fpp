@@ -249,12 +249,14 @@ module m_global_parameters
     !> @name Annotations of the structure of the state and flux vectors in terms of the size and the configuration of the system of
     !! equations to which they belong
     !> @{
-    integer            :: sys_size     !< Number of unknowns in system of eqns.
-    type(sys_idx_info) :: sys_idx      !< All conserved-variable equation index ranges and scalars.
-    integer            :: b_size       !< Number of elements in the symmetric b tensor, plus one
-    integer            :: tensor_size  !< Number of elements in the full tensor plus one
+    integer             :: sys_size     !< Number of unknowns in system of eqns.
+    type(sys_idx_info)  :: sys_idx      !< All conserved-variable equation index ranges and scalars.
+    type(qbmm_idx_info) :: qbmm_idx     !< QBMM moment index mappings (allocatable; GPU-managed separately).
+    integer             :: b_size       !< Number of elements in the symmetric b tensor, plus one
+    integer             :: tensor_size  !< Number of elements in the full tensor plus one
     !> @}
     $:GPU_DECLARE(create='[sys_size, sys_idx, b_size, tensor_size]')
+    $:GPU_DECLARE(create='[qbmm_idx]')
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With INTerior".
     type(int_bounds_info) :: idwint(1:3)
@@ -917,19 +919,19 @@ contains
                         sys_size = sys_idx%n
                     end if
 
-                    @:ALLOCATE(sys_idx%bub%rs(nb), sys_idx%bub%vs(nb))
-                    @:ALLOCATE(sys_idx%bub%ps(nb), sys_idx%bub%ms(nb))
+                    @:ALLOCATE(qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+                    @:ALLOCATE(qbmm_idx%ps(nb), qbmm_idx%ms(nb))
 
                     gam = bub_pp%gam_g
 
                     if (qbmm) then
-                        @:ALLOCATE(sys_idx%bub%moms(nb, nmom))
+                        @:ALLOCATE(qbmm_idx%moms(nb, nmom))
                         do i = 1, nb
                             do j = 1, nmom
-                                sys_idx%bub%moms(i, j) = sys_idx%bub%beg + (j - 1) + (i - 1)*nmom
+                                qbmm_idx%moms(i, j) = sys_idx%bub%beg + (j - 1) + (i - 1)*nmom
                             end do
-                            sys_idx%bub%rs(i) = sys_idx%bub%moms(i, 2)
-                            sys_idx%bub%vs(i) = sys_idx%bub%moms(i, 3)
+                            qbmm_idx%rs(i) = qbmm_idx%moms(i, 2)
+                            qbmm_idx%vs(i) = qbmm_idx%moms(i, 3)
                         end do
                     else
                         do i = 1, nb
@@ -939,12 +941,12 @@ contains
                                 fac = 2
                             end if
 
-                            sys_idx%bub%rs(i) = sys_idx%bub%beg + (i - 1)*fac
-                            sys_idx%bub%vs(i) = sys_idx%bub%rs(i) + 1
+                            qbmm_idx%rs(i) = sys_idx%bub%beg + (i - 1)*fac
+                            qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
 
                             if (.not. polytropic) then
-                                sys_idx%bub%ps(i) = sys_idx%bub%vs(i) + 1
-                                sys_idx%bub%ms(i) = sys_idx%bub%ps(i) + 1
+                                qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
+                                qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                             end if
                         end do
                     end if
@@ -990,8 +992,8 @@ contains
                     end if
                     sys_size = sys_idx%bub%end
 
-                    @:ALLOCATE(sys_idx%bub%rs(nb), sys_idx%bub%vs(nb))
-                    @:ALLOCATE(sys_idx%bub%ps(nb), sys_idx%bub%ms(nb))
+                    @:ALLOCATE(qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+                    @:ALLOCATE(qbmm_idx%ps(nb), qbmm_idx%ms(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -1000,12 +1002,12 @@ contains
                             fac = 4
                         end if
 
-                        sys_idx%bub%rs(i) = sys_idx%bub%beg + (i - 1)*fac
-                        sys_idx%bub%vs(i) = sys_idx%bub%rs(i) + 1
+                        qbmm_idx%rs(i) = sys_idx%bub%beg + (i - 1)*fac
+                        qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
 
                         if (.not. polytropic) then
-                            sys_idx%bub%ps(i) = sys_idx%bub%vs(i) + 1
-                            sys_idx%bub%ms(i) = sys_idx%bub%ps(i) + 1
+                            qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
+                            qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                         end if
                     end do
                 end if

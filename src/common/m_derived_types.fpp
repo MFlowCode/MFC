@@ -113,25 +113,24 @@ module m_derived_types
         type(int_bounds_info) :: x, y, z
     end type bc_xyz_info
 
-    !> bounds for the bubble dynamic variables
-    type bub_bounds_info
-        integer                                :: beg
-        integer                                :: end
-        integer, dimension(:), allocatable     :: rs
-        integer, dimension(:), allocatable     :: vs
-        integer, dimension(:), allocatable     :: ps
-        integer, dimension(:), allocatable     :: ms
+    !> QBMM moment index mappings - separate from bub beg/end so sys_idx contains no allocatables.
+    type qbmm_idx_info
+        integer, dimension(:), allocatable     :: rs       !< R moment indices per bubble bin
+        integer, dimension(:), allocatable     :: vs       !< V moment indices per bubble bin
+        integer, dimension(:), allocatable     :: ps       !< Pressure moment indices per bubble bin
+        integer, dimension(:), allocatable     :: ms       !< Mass moment indices per bubble bin
         integer, dimension(:,:), allocatable   :: moms     !< Moment indices for qbmm
-        integer, dimension(:,:,:), allocatable :: fullmom  !< Moment indices for qbmm
-    end type bub_bounds_info
+        integer, dimension(:,:,:), allocatable :: fullmom  !< Full moment indices for qbmm
+    end type qbmm_idx_info
 
     !> All conserved-variable equation indices, computed at startup from model_eqns and enabled features.
     !> Range indices (beg/end) use int_bounds_info; scalar indices are plain integers (0 = inactive).
+    !> Contains no allocatable members - safe for GPU_DECLARE as a single struct.
     type sys_idx_info
         type(int_bounds_info) :: cont     !< Partial densities (continuity equations)
         type(int_bounds_info) :: mom      !< Momentum components
         type(int_bounds_info) :: adv      !< Volume fractions (advection equations)
-        type(bub_bounds_info) :: bub      !< Bubble variables (Euler-Euler)
+        type(int_bounds_info) :: bub      !< Bubble equation range (beg/end only)
         type(int_bounds_info) :: stress   !< Stress tensor components
         type(int_bounds_info) :: xi       !< Reference map equations
         type(int_bounds_info) :: B        !< Magnetic field components

@@ -694,7 +694,7 @@ contains
         if (bubbles_euler) then
             ! nR
             do i = 1, nb
-                q_sf(:,:,:) = q_cons_vf(sys_idx%bub%rs(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                q_sf(:,:,:) = q_cons_vf(qbmm_idx%rs(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I3.3)') 'nR', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
@@ -702,7 +702,7 @@ contains
 
             ! nRdot
             do i = 1, nb
-                q_sf(:,:,:) = q_cons_vf(sys_idx%bub%vs(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                q_sf(:,:,:) = q_cons_vf(qbmm_idx%vs(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I3.3)') 'nV', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
@@ -710,7 +710,7 @@ contains
             if ((polytropic .neqv. .true.) .and. (.not. qbmm)) then
                 ! nP
                 do i = 1, nb
-                    q_sf(:,:,:) = q_cons_vf(sys_idx%bub%ps(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                    q_sf(:,:,:) = q_cons_vf(qbmm_idx%ps(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I3.3)') 'nP', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                     varname(:) = ' '
@@ -718,7 +718,7 @@ contains
 
                 ! nM
                 do i = 1, nb
-                    q_sf(:,:,:) = q_cons_vf(sys_idx%bub%ms(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+                    q_sf(:,:,:) = q_cons_vf(qbmm_idx%ms(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I3.3)') 'nM', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
                     varname(:) = ' '

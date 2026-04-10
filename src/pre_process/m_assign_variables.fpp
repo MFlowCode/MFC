@@ -315,27 +315,26 @@ contains
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 0))%sf(j, k, l) = muR
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(sys_idx%bub%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 1))%sf(j, k, &
-                                  & l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
+                        q_prim_vf(qbmm_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     else if (dist_type == 2) then
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(sys_idx%bub%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
+                        q_prim_vf(qbmm_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     end if
                 else
-                    q_prim_vf(sys_idx%bub%rs(i))%sf(j, k, l) = muR
-                    q_prim_vf(sys_idx%bub%vs(i))%sf(j, k, l) = muV
+                    q_prim_vf(qbmm_idx%rs(i))%sf(j, k, l) = muR
+                    q_prim_vf(qbmm_idx%vs(i))%sf(j, k, l) = muV
                     if (.not. polytropic) then
-                        q_prim_vf(sys_idx%bub%ps(i))%sf(j, k, l) = patch_icpp(patch_id)%p0
-                        q_prim_vf(sys_idx%bub%ms(i))%sf(j, k, l) = patch_icpp(patch_id)%m0
+                        q_prim_vf(qbmm_idx%ps(i))%sf(j, k, l) = patch_icpp(patch_id)%p0
+                        q_prim_vf(qbmm_idx%ms(i))%sf(j, k, l) = patch_icpp(patch_id)%m0
                     end if
                 end if
             end do
@@ -344,7 +343,7 @@ contains
                 ! Initialize number density
                 R3bar = 0._wp
                 do i = 1, nb
-                    R3bar = R3bar + weight(i)*(q_prim_vf(sys_idx%bub%rs(i))%sf(j, k, l))**3._wp
+                    R3bar = R3bar + weight(i)*(q_prim_vf(qbmm_idx%rs(i))%sf(j, k, l))**3._wp
                 end do
                 q_prim_vf(sys_idx%n)%sf(j, k, l) = 3*q_prim_vf(sys_idx%alf)%sf(j, k, l)/(4*pi*R3bar)
             end if
@@ -483,28 +482,27 @@ contains
                 if (qbmm) then
                     ! Initialize the moment set
                     if (dist_type == 1) then
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 0))%sf(j, k, l) = muR
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(sys_idx%bub%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 1))%sf(j, k, &
-                                  & l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
+                        q_prim_vf(qbmm_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     else if (dist_type == 2) then
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(sys_idx%bub%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
-                        q_prim_vf(sys_idx%bub%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
-                        q_prim_vf(sys_idx%bub%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
+                        q_prim_vf(qbmm_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
+                        q_prim_vf(qbmm_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
+                        q_prim_vf(qbmm_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     end if
                 else
-                    q_prim_vf(sys_idx%bub%rs(i))%sf(j, k, l) = muR
-                    q_prim_vf(sys_idx%bub%vs(i))%sf(j, k, l) = muV
+                    q_prim_vf(qbmm_idx%rs(i))%sf(j, k, l) = muR
+                    q_prim_vf(qbmm_idx%vs(i))%sf(j, k, l) = muV
 
                     if (.not. polytropic) then
-                        q_prim_vf(sys_idx%bub%ps(i))%sf(j, k, l) = patch_icpp(patch_id)%p0
-                        q_prim_vf(sys_idx%bub%ms(i))%sf(j, k, l) = patch_icpp(patch_id)%m0
+                        q_prim_vf(qbmm_idx%ps(i))%sf(j, k, l) = patch_icpp(patch_id)%p0
+                        q_prim_vf(qbmm_idx%ms(i))%sf(j, k, l) = patch_icpp(patch_id)%m0
                     end if
                 end if
             end do
@@ -513,7 +511,7 @@ contains
                 ! Initialize number density
                 R3bar = 0._wp
                 do i = 1, nb
-                    R3bar = R3bar + weight(i)*(q_prim_vf(sys_idx%bub%rs(i))%sf(j, k, l))**3._wp
+                    R3bar = R3bar + weight(i)*(q_prim_vf(qbmm_idx%rs(i))%sf(j, k, l))**3._wp
                 end do
                 q_prim_vf(sys_idx%n)%sf(j, k, l) = 3*q_prim_vf(sys_idx%alf)%sf(j, k, l)/(4*pi*R3bar)
             end if
@@ -533,11 +531,11 @@ contains
 
         if (bubbles_euler .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
-                if (f_is_default(real(q_prim_vf(sys_idx%bub%ps(i))%sf(j, k, l), kind=wp))) then
-                    q_prim_vf(sys_idx%bub%ps(i))%sf(j, k, l) = pb0(i)
+                if (f_is_default(real(q_prim_vf(qbmm_idx%ps(i))%sf(j, k, l), kind=wp))) then
+                    q_prim_vf(qbmm_idx%ps(i))%sf(j, k, l) = pb0(i)
                 end if
-                if (f_is_default(real(q_prim_vf(sys_idx%bub%ms(i))%sf(j, k, l), kind=wp))) then
-                    q_prim_vf(sys_idx%bub%ms(i))%sf(j, k, l) = mass_v0(i)
+                if (f_is_default(real(q_prim_vf(qbmm_idx%ms(i))%sf(j, k, l), kind=wp))) then
+                    q_prim_vf(qbmm_idx%ms(i))%sf(j, k, l) = mass_v0(i)
                 end if
             end do
         end if

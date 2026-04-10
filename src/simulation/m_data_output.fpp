@@ -1094,8 +1094,8 @@ contains
                             alfgr = q_cons_vf(sys_idx%alf - 1)%sf(j - 2, k, l)
                         end if
                         do s = 1, nb
-                            nR(s) = q_cons_vf(sys_idx%bub%rs(s))%sf(j - 2, k, l)
-                            nRdot(s) = q_cons_vf(sys_idx%bub%vs(s))%sf(j - 2, k, l)
+                            nR(s) = q_cons_vf(qbmm_idx%rs(s))%sf(j - 2, k, l)
+                            nRdot(s) = q_cons_vf(qbmm_idx%vs(s))%sf(j - 2, k, l)
                         end do
 
                         if (adv_n) then
@@ -1112,11 +1112,11 @@ contains
                         print *, 'In probe, nbub: ', nbub
 #endif
                         if (qbmm) then
-                            M00 = q_cons_vf(sys_idx%bub%moms(1, 1))%sf(j - 2, k, l)/nbub
-                            M10 = q_cons_vf(sys_idx%bub%moms(1, 2))%sf(j - 2, k, l)/nbub
-                            M01 = q_cons_vf(sys_idx%bub%moms(1, 3))%sf(j - 2, k, l)/nbub
-                            M20 = q_cons_vf(sys_idx%bub%moms(1, 4))%sf(j - 2, k, l)/nbub
-                            M02 = q_cons_vf(sys_idx%bub%moms(1, 6))%sf(j - 2, k, l)/nbub
+                            M00 = q_cons_vf(qbmm_idx%moms(1, 1))%sf(j - 2, k, l)/nbub
+                            M10 = q_cons_vf(qbmm_idx%moms(1, 2))%sf(j - 2, k, l)/nbub
+                            M01 = q_cons_vf(qbmm_idx%moms(1, 3))%sf(j - 2, k, l)/nbub
+                            M20 = q_cons_vf(qbmm_idx%moms(1, 4))%sf(j - 2, k, l)/nbub
+                            M02 = q_cons_vf(qbmm_idx%moms(1, 6))%sf(j - 2, k, l)/nbub
 
                             M10 = M10/M00
                             M01 = M01/M00
@@ -1197,8 +1197,8 @@ contains
                         if (bubbles_euler) then
                             alf = q_cons_vf(sys_idx%alf)%sf(j - 2, k - 2, l)
                             do s = 1, nb
-                                nR(s) = q_cons_vf(sys_idx%bub%rs(s))%sf(j - 2, k - 2, l)
-                                nRdot(s) = q_cons_vf(sys_idx%bub%vs(s))%sf(j - 2, k - 2, l)
+                                nR(s) = q_cons_vf(qbmm_idx%rs(s))%sf(j - 2, k - 2, l)
+                                nRdot(s) = q_cons_vf(qbmm_idx%vs(s))%sf(j - 2, k - 2, l)
                             end do
 
                             if (adv_n) then

@@ -82,7 +82,8 @@ module m_global_parameters
     integer            :: igr_order                    !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
     ! Annotations of the structure, i.e. the organization, of the state vectors
-    type(sys_idx_info) :: sys_idx  !< All conserved-variable equation index ranges and scalars.
+    type(sys_idx_info)  :: sys_idx   !< All conserved-variable equation index ranges and scalars.
+    type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings.
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
@@ -610,24 +611,24 @@ contains
                     sys_size = sys_idx%n
                 end if
 
-                allocate (sys_idx%bub%rs(nb), sys_idx%bub%vs(nb))
-                allocate (sys_idx%bub%ps(nb), sys_idx%bub%ms(nb))
+                allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+                allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
 
                 if (qbmm) then
-                    allocate (sys_idx%bub%moms(nb, nmom))
-                    allocate (sys_idx%bub%fullmom(nb,0:nmom,0:nmom))
+                    allocate (qbmm_idx%moms(nb, nmom))
+                    allocate (qbmm_idx%fullmom(nb,0:nmom,0:nmom))
 
                     do i = 1, nb
                         do j = 1, nmom
-                            sys_idx%bub%moms(i, j) = sys_idx%bub%beg + (j - 1) + (i - 1)*nmom
+                            qbmm_idx%moms(i, j) = sys_idx%bub%beg + (j - 1) + (i - 1)*nmom
                         end do
-                        sys_idx%bub%fullmom(i, 0, 0) = sys_idx%bub%moms(i, 1)
-                        sys_idx%bub%fullmom(i, 1, 0) = sys_idx%bub%moms(i, 2)
-                        sys_idx%bub%fullmom(i, 0, 1) = sys_idx%bub%moms(i, 3)
-                        sys_idx%bub%fullmom(i, 2, 0) = sys_idx%bub%moms(i, 4)
-                        sys_idx%bub%fullmom(i, 1, 1) = sys_idx%bub%moms(i, 5)
-                        sys_idx%bub%fullmom(i, 0, 2) = sys_idx%bub%moms(i, 6)
-                        sys_idx%bub%rs(i) = sys_idx%bub%fullmom(i, 1, 0)
+                        qbmm_idx%fullmom(i, 0, 0) = qbmm_idx%moms(i, 1)
+                        qbmm_idx%fullmom(i, 1, 0) = qbmm_idx%moms(i, 2)
+                        qbmm_idx%fullmom(i, 0, 1) = qbmm_idx%moms(i, 3)
+                        qbmm_idx%fullmom(i, 2, 0) = qbmm_idx%moms(i, 4)
+                        qbmm_idx%fullmom(i, 1, 1) = qbmm_idx%moms(i, 5)
+                        qbmm_idx%fullmom(i, 0, 2) = qbmm_idx%moms(i, 6)
+                        qbmm_idx%rs(i) = qbmm_idx%fullmom(i, 1, 0)
                     end do
                 else
                     do i = 1, nb
@@ -637,12 +638,12 @@ contains
                             fac = 2
                         end if
 
-                        sys_idx%bub%rs(i) = sys_idx%bub%beg + (i - 1)*fac
-                        sys_idx%bub%vs(i) = sys_idx%bub%rs(i) + 1
+                        qbmm_idx%rs(i) = sys_idx%bub%beg + (i - 1)*fac
+                        qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
 
                         if (.not. polytropic) then
-                            sys_idx%bub%ps(i) = sys_idx%bub%vs(i) + 1
-                            sys_idx%bub%ms(i) = sys_idx%bub%ps(i) + 1
+                            qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
+                            qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                         end if
                     end do
                 end if
@@ -692,8 +693,8 @@ contains
                 end if
                 sys_size = sys_idx%bub%end
 
-                allocate (sys_idx%bub%rs(nb), sys_idx%bub%vs(nb))
-                allocate (sys_idx%bub%ps(nb), sys_idx%bub%ms(nb))
+                allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+                allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
                 allocate (weight(nb), R0(nb))
 
                 do i = 1, nb
@@ -703,12 +704,12 @@ contains
                         fac = 2
                     end if
 
-                    sys_idx%bub%rs(i) = sys_idx%bub%beg + (i - 1)*fac
-                    sys_idx%bub%vs(i) = sys_idx%bub%rs(i) + 1
+                    qbmm_idx%rs(i) = sys_idx%bub%beg + (i - 1)*fac
+                    qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
 
                     if (.not. polytropic) then
-                        sys_idx%bub%ps(i) = sys_idx%bub%vs(i) + 1
-                        sys_idx%bub%ms(i) = sys_idx%bub%ps(i) + 1
+                        qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
+                        qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                     end if
                 end do
 
