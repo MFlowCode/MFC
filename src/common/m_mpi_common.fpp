@@ -817,9 +817,9 @@ contains
                                     r = nVar + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
                                     q_T_sf%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_T_sf%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_T_sf%sf(j + unpack_offset, k, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -887,9 +887,9 @@ contains
                                     r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
                                     q_T_sf%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_T_sf%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_T_sf%sf(j, k + unpack_offset, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -961,9 +961,9 @@ contains
                                                        & + 2*buff_size + 1)*(l + buff_size)))
                                     q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_T_sf%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_T_sf%sf(j, k, l +  unpack_offset))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do

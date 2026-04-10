@@ -624,7 +624,7 @@ contains
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
         integer, intent(in)                                                                                  :: k, l
         integer                                                                                              :: j, q, i
-        type(scalar_field), intent(inout)                                                                    :: q_T_sf
+        type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -895,7 +895,7 @@ contains
                 if (chemistry) then
                     if (bc_y%isothermal_in) then
                         do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = 600.0_wp - q_T_sf%sf(k, j - 1, l)
+                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in- q_T_sf%sf(k, j - 1, l)
                         end do
                     else
                         do j = 1, buff_size

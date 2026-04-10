@@ -91,7 +91,7 @@ contains
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'bc_x%isothermal_in', 'bc_y%isothermal_in', 'bc_z%isothermal_in',        &
-            &' bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out', &
+            & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out', &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',       &
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
             & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt', &

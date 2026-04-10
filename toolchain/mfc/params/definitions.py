@@ -118,8 +118,6 @@ _ATTR_DESCS = {
     "grcbc_vel_out": "Enable GRCBC velocity outlet",
     "isothermal_in": "Enable isothermal wall at the lower boundary (y-min)",
     "isothermal_out": "Enable isothermal wall at the upper boundary (y-max)",
-    "Twall_in": "Temperature of the lower isothermal wall.",
-    "Twall_out": "Temperature of the upper isothermal wall.",
     # Acoustic
     "loc": "Location",
     "mag": "Magnitude",
@@ -401,10 +399,8 @@ HINTS = {
         "ve1": "Boundary velocity component 1 at domain end",
         "ve2": "Boundary velocity component 2 at domain end",
         "ve3": "Boundary velocity component 3 at domain end",
-        "isothermal_in": "Enable Isothermal Wall in",
-        "isothermal_out": "Enable Isothermal Wall out",
-         "Twall_in"      : "Hehe1",
-        "Twall_out"    : "hehe2",
+        "Twall_in": "Temperature of the lower isothermal wall.",
+        "Twall_out": "Temperature of the upper isothermal wall.",
     },
     "patch_bc": {
         "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
