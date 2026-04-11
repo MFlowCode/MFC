@@ -49,8 +49,8 @@ The index layout within `q_cons_vf` depends on the flow model:
 ```
 For model_eqns == 2 (5-equation, multi-fluid):
 
-  Index:    1 .. num_fluids | num_fluids+1 .. +num_vels | E_idx | adv_idx
-  Meaning:  alpha*rho_k     | momentum components       | energy | volume fractions
+  Index:    1 .. num_fluids | num_fluids+1 .. +num_vels | eqn_idx%E | eqn_idx%adv
+  Meaning:  alpha*rho_k     | momentum components       | energy    | volume fractions
 ```
 
 Additional variables are appended for bubbles, elastic stress, magnetic fields, or chemistry species when those models are enabled. The total count is `sys_size`.
