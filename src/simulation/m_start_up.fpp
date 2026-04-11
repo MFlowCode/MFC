@@ -435,7 +435,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -497,7 +497,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
@@ -569,31 +569,31 @@ contains
                     call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
                     dyn_pres = 0._wp
-                    do i = mom_idx%beg, mom_idx%end
+                    do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         dyn_pres = dyn_pres + 5.e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
                     end do
 
                     if (chemistry) then
                         do c = 1, num_species
-                            rhoYks(c) = v_vf(chemxb + c - 1)%sf(j, k, l)
+                            rhoYks(c) = v_vf(eqn_idx%species%beg + c - 1)%sf(j, k, l)
                         end do
                     end if
 
                     if (mhd) then
                         if (n == 0) then
-                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
                         else
-                            pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, &
-                                               & l)**2 + v_vf(B_idx%beg + 2)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg + 1)%sf(j, k, &
+                                               & l)**2 + v_vf(eqn_idx%B%beg + 2)%sf(j, k, l)**2)
                         end if
                     end if
 
-                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._stp, dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                            & pres_mag=pres_mag)
+                    call s_compute_pressure(v_vf(eqn_idx%E)%sf(j, k, l), 0._stp, dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, &
+                                            & T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + intxb - 1)%sf(j, k, l) = v_vf(i + advxb - 1)%sf(j, k, &
-                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
+                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
                     end do
                 end do
             end do
@@ -842,8 +842,8 @@ contains
         #:if USING_AMD
             #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
-                           & bc_z%end/) == ${BC}$) .and. adv_idx%end > 20 .and. (.not. chemistry), &
-                           & "CBC module with AMD compiler requires adv_idx%end <= 20 when case optimization is turned off")
+                           & bc_z%end/) == ${BC}$) .and. eqn_idx%adv%end > 20 .and. (.not. chemistry), &
+                           & "CBC module with AMD compiler requires eqn_idx%adv%end <= 20 when case optimization is turned off")
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
                            & bc_z%end/) == ${BC}$) .and. sys_size > 20 .and. (chemistry), &
                            & "CBC module with AMD compiler and chemistry requires sys_size <= 20 when case optimization is turned off")
@@ -1035,7 +1035,7 @@ contains
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
                      & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
                      & polytropic, polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, &
-                     & adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
+                     & adap_dt_max_iters, eqn_idx%n, pi_fac, low_Mach]')
 
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight, R0]')
@@ -1046,12 +1046,13 @@ contains
             end if
         end if
 
-        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
+        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, pi_fac, low_Mach]')
 
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
         $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
+        $:GPU_UPDATE(device='[bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]')
         $:GPU_UPDATE(device='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')

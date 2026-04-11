@@ -99,7 +99,7 @@ contains
         s_needs_pressure_relaxation = .true.
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1._wp - sgm_eps)) then
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > (1._wp - sgm_eps)) then
                 s_needs_pressure_relaxation = .false.
             end if
         end do
@@ -119,18 +119,19 @@ contains
         sum_alpha = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if ((q_cons_vf(i + contxb - 1)%sf(j, k, l) < 0._wp) .or. (q_cons_vf(i + advxb - 1)%sf(j, k, l) < 0._wp)) then
-                q_cons_vf(i + contxb - 1)%sf(j, k, l) = 0._wp
-                q_cons_vf(i + advxb - 1)%sf(j, k, l) = 0._wp
-                q_cons_vf(i + intxb - 1)%sf(j, k, l) = 0._wp
+            if ((q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l) < 0._wp) .or. (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                & l) < 0._wp)) then
+                q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l) = 0._wp
+                q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) = 0._wp
+                q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = 0._wp
             end if
-            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > 1._wp) q_cons_vf(i + advxb - 1)%sf(j, k, l) = 1._wp
-            sum_alpha = sum_alpha + q_cons_vf(i + advxb - 1)%sf(j, k, l)
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > 1._wp) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) = 1._wp
+            sum_alpha = sum_alpha + q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
         end do
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)/sum_alpha
+            q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)/sum_alpha
         end do
 
     end subroutine s_correct_volume_fractions
@@ -157,14 +158,15 @@ contains
         pres_relax = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
-                pres_K_init(i) = (q_cons_vf(i + intxb - 1)%sf(j, k, l)/q_cons_vf(i + advxb - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
+                pres_K_init(i) = (q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l)/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                            & l) - pi_infs(i))/gammas(i)
                 if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp)*ps_inf(i) &
                     & + 1.e-8_wp
             else
                 pres_K_init(i) = 0._wp
             end if
-            pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
+            pres_relax = pres_relax + q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*pres_K_init(i)
         end do
 
         ! Newton-Raphson iteration
@@ -186,12 +188,13 @@ contains
                 df_pres = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
-                    if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
+                    if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
                         ! Isentropic relation: rho = rho0 * (p/p0)^(1/gamma), Saurel et al. JFM (2009)
-                        rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/max(q_cons_vf(i + advxb - 1)%sf(j, k, l), &
-                                & sgm_eps)*((pres_relax + ps_inf(i))/(pres_K_init(i) + ps_inf(i)))**(1._wp/gs_min(i))
-                        f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
-                        df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l)/(gs_min(i)*rho_K_s(i)*(pres_relax + ps_inf(i)))
+                        rho_K_s(i) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/max(q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, &
+                                & k, l), sgm_eps)*((pres_relax + ps_inf(i))/(pres_K_init(i) + ps_inf(i)))**(1._wp/gs_min(i))
+                        f_pres = f_pres + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
+                        df_pres = df_pres - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
+                                                      & l)/(gs_min(i)*rho_K_s(i)*(pres_relax + ps_inf(i)))
                     end if
                 end do
             end if
@@ -200,8 +203,8 @@ contains
         ! Update volume fractions
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + advxb - 1)%sf(j, k, &
-                & l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                & l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
         end do
 
     end subroutine s_equilibrate_pressure
@@ -225,7 +228,7 @@ contains
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
-            alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
+            alpha(i) = q_cons_vf(eqn_idx%E + i)%sf(j, k, l)
         end do
 
         ! Compute mixture properties (combined bubble and standard logic)
@@ -289,15 +292,16 @@ contains
         ! Compute dynamic pressure and update internal energies
         dyn_pres = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
-        do i = momxb, momxe
+        do i = eqn_idx%mom%beg, eqn_idx%mom%end
             dyn_pres = dyn_pres + 5.e-1_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
         end do
 
-        pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+        pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)*(gammas(i)*pres_relax + pi_infs(i))
+            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                      & l)*(gammas(i)*pres_relax + pi_infs(i))
         end do
 
     end subroutine s_correct_internal_energies

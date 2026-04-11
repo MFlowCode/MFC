@@ -547,15 +547,15 @@ contains
 
         ! hard-coded psi
         if (hyper_cleaning) then
-            @:ASSERT(psi_idx > 0, "hyper_cleaning requires psi_idx to be set")
+            @:ASSERT(eqn_idx%psi > 0, "hyper_cleaning requires eqn_idx%psi to be set")
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         r2 = x_cc(j)**2
                         if (n > 0) r2 = r2 + y_cc(k)**2
                         if (p > 0) r2 = r2 + z_cc(l)**2
-                        q_cons_vf(psi_idx)%sf(j, k, l) = 1.0e-2_wp*exp(-r2/(2.0_wp*0.05_wp**2))
-                        q_prim_vf(psi_idx)%sf(j, k, l) = q_cons_vf(psi_idx)%sf(j, k, l)
+                        q_cons_vf(eqn_idx%psi)%sf(j, k, l) = 1.0e-2_wp*exp(-r2/(2.0_wp*0.05_wp**2))
+                        q_prim_vf(eqn_idx%psi)%sf(j, k, l) = q_cons_vf(eqn_idx%psi)%sf(j, k, l)
                     end do
                 end do
             end do

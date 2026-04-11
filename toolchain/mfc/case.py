@@ -19,20 +19,20 @@ def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> l
 
 
 QPVF_IDX_VARS = {
-    "alpha_rho": "contxb",
-    "vel": "momxb",
-    "pres": "E_idx",
-    "alpha": "advxb",
-    "tau_e": "stress_idx%beg",
-    "Y": "chemxb",
-    "cf_val": "c_idx",
-    "Bx": "B_idx%beg",
-    "By": "B_idx%end-1",
-    "Bz": "B_idx%end",
+    "alpha_rho": "eqn_idx%cont%beg",
+    "vel": "eqn_idx%mom%beg",
+    "pres": "eqn_idx%E",
+    "alpha": "eqn_idx%adv%beg",
+    "tau_e": "eqn_idx%stress%beg",
+    "Y": "eqn_idx%species%beg",
+    "cf_val": "eqn_idx%c",
+    "Bx": "eqn_idx%B%beg",
+    "By": "eqn_idx%B%end-1",
+    "Bz": "eqn_idx%B%end",
 }
 
 MIBM_ANALYTIC_VARS = ["vel(1)", "vel(2)", "vel(3)", "angular_vel(1)", "angular_vel(2)", "angular_vel(3)"]
-# "B_idx%end - 1" not "B_idx%beg + 1" must be used because 1D does not have Bx
+# "eqn_idx%B%end - 1" not "eqn_idx%B%beg + 1" must be used because 1D does not have Bx
 
 
 @dataclasses.dataclass(init=False)
