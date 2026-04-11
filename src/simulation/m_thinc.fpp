@@ -212,7 +212,7 @@ contains
 
         type(scalar_field), dimension(:), intent(in) :: v_vf
         integer                                      :: j, k, l
-        real(wp)                                     :: nr_x, nr_y, nr_z, nmag, ac
+        real(wp)                                     :: nr_x, nr_y, nr_z, nmag, nmax, ac
         type(int_bounds_info), dimension(3)          :: id_norm
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
@@ -239,7 +239,7 @@ contains
         end if
 
         ! Compute unit normal and solve for d at interior
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, nr_x, nr_y, nr_z, nmag, ac]', copyin='[id_norm]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, nr_x, nr_y, nr_z, nmag, nmax, ac]', copyin='[id_norm]')
         do l = id_norm(3)%beg, id_norm(3)%end
             do k = id_norm(2)%beg, id_norm(2)%end
                 do j = id_norm(1)%beg, id_norm(1)%end
@@ -261,6 +261,16 @@ contains
                         nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
 
                         if (nmag > verysmall) then
+                            nr_x = nr_x/nmag
+                            nr_y = nr_y/nmag
+                            nr_z = nr_z/nmag
+
+                            ! Snap near-grid-aligned normals to exact alignment
+                            nmax = max(abs(nr_x), abs(nr_y), abs(nr_z))
+                            if (abs(nr_x) < mthinc_align_tol*nmax) nr_x = 0._wp
+                            if (abs(nr_y) < mthinc_align_tol*nmax) nr_y = 0._wp
+                            if (abs(nr_z) < mthinc_align_tol*nmax) nr_z = 0._wp
+                            nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
                             nr_x = nr_x/nmag
                             nr_y = nr_y/nmag
                             nr_z = nr_z/nmag

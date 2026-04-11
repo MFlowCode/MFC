@@ -1,12 +1,12 @@
-This file was created on 2026-04-09 17:01:56.643782.
+This file was created on 2026-04-11 17:04:56.016103.
 
 mfc.sh:
 
     Invocation: test -o int_comp=2 --generate
-    Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        5f1a1e53c6d8e92b44f6c0202dd080689510c882 on MTHINC (dirty)
+    Lock:       mpi=No & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        6d10d7b4e024a0aed9a110c8667b47a6eafa68c8 on MTHINC (dirty)
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
@@ -15,48 +15,14 @@ post_process:
         C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-        OpenMP  : OFF
-    
-        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : nvc
-        CXX      : nvc++
-        FC       : nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
-    
-        C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : ON
         OpenMP  : OFF
     
@@ -90,7 +56,7 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : ON
         OpenMP  : OFF
     
@@ -101,14 +67,14 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc
+        CXX      : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc++
+        FC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -117,14 +83,14 @@ pre_process:
         C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : ON
         OpenMP  : OFF
     
@@ -135,9 +101,9 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc
+        CXX      : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc++
+        FC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

@@ -1372,7 +1372,7 @@ contains
             #:endif
         end if
 
-        if (int_comp > 0 .and. v_size >= advxe) then
+        if (int_comp > 0 .and. v_size >= eqn_idx%adv%end) then
             call nvtxStartRange("WENO-INTCOMP")
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
