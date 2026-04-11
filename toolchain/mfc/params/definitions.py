@@ -399,8 +399,8 @@ HINTS = {
         "ve1": "Boundary velocity component 1 at domain end",
         "ve2": "Boundary velocity component 2 at domain end",
         "ve3": "Boundary velocity component 3 at domain end",
-       "Twall_in": "Temperature of the entrance-side isothermal wall.",
-       "Twall_out": "Temperature of the exit-side isothermal wall.",
+        "Twall_in": "Temperature of the entrance-side isothermal wall.",
+        "Twall_out": "Temperature of the exit-side isothermal wall.",
     },
     "patch_bc": {
         "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
