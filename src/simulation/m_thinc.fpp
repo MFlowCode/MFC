@@ -243,19 +243,19 @@ contains
         do l = id_norm(3)%beg, id_norm(3)%end
             do k = id_norm(2)%beg, id_norm(2)%end
                 do j = id_norm(1)%beg, id_norm(1)%end
-                    ac = v_vf(advxb)%sf(j, k, l)
+                    ac = v_vf(eqn_idx%adv%beg)%sf(j, k, l)
 
                     if (ac >= ic_eps .and. ac <= 1._wp - ic_eps) then
-                        nr_x = (v_vf(advxb)%sf(j + 1, k, l) - v_vf(advxb)%sf(j - 1, k, l))*5e-1_wp
+                        nr_x = (v_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - v_vf(eqn_idx%adv%beg)%sf(j - 1, k, l))*5e-1_wp
 
                         nr_y = 0._wp
                         if (n > 0) then
-                            nr_y = (v_vf(advxb)%sf(j, k + 1, l) - v_vf(advxb)%sf(j, k - 1, l))*5e-1_wp
+                            nr_y = (v_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - v_vf(eqn_idx%adv%beg)%sf(j, k - 1, l))*5e-1_wp
                         end if
 
                         nr_z = 0._wp
                         if (p > 0) then
-                            nr_z = (v_vf(advxb)%sf(j, k, l + 1) - v_vf(advxb)%sf(j, k, l - 1))*5e-1_wp
+                            nr_z = (v_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - v_vf(eqn_idx%adv%beg)%sf(j, k, l - 1))*5e-1_wp
                         end if
 
                         nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
@@ -302,9 +302,9 @@ contains
                 do l = is3_d%beg, is3_d%end
                     do k = is2_d%beg, is2_d%end
                         do j = is1_d%beg, is1_d%end
-                            aCL = v_rs_ws(j - 1, k, l, advxb)
-                            aC = v_rs_ws(j, k, l, advxb)
-                            aCR = v_rs_ws(j + 1, k, l, advxb)
+                            aCL = v_rs_ws(j - 1, k, l, eqn_idx%adv%beg)
+                            aC = v_rs_ws(j, k, l, eqn_idx%adv%beg)
+                            aCR = v_rs_ws(j + 1, k, l, eqn_idx%adv%beg)
 
                             if (aC >= ic_eps .and. aC <= 1._wp - ic_eps) then
                                 if (int_comp == 2 .and. n > 0) then  ! MTHINC
@@ -324,28 +324,28 @@ contains
 
                                     ! Skip if no valid normal was computed
                                     if (nh1*nh1 + nh2*nh2 + nh3*nh3 > 5e-1_wp) then
-                                        rho1 = v_rs_ws(j, k, l, contxb)/aC
-                                        rho2 = v_rs_ws(j, k, l, contxe)/(1._wp - aC)
+                                        rho1 = v_rs_ws(j, k, l, eqn_idx%cont%beg)/aC
+                                        rho2 = v_rs_ws(j, k, l, eqn_idx%cont%end)/(1._wp - aC)
 
                                         ! Left face
                                         aTHINC = f_mthinc_face_average(nh1, nh2, nh3, d_local, ic_beta, ${REC_DIR}$, -5e-1_wp, &
                                                                        & num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vL_rs_vf_${XYZ}$ (j, k, l, contxb) = rho1*aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, contxe) = rho2*(1._wp - aTHINC)
-                                        vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1._wp - aTHINC
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
 
                                         ! Right face
                                         aTHINC = f_mthinc_face_average(nh1, nh2, nh3, d_local, ic_beta, ${REC_DIR}$, 5e-1_wp, &
                                                                        & num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vR_rs_vf_${XYZ}$ (j, k, l, contxb) = rho1*aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, contxe) = rho2*(1._wp - aTHINC)
-                                        vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1._wp - aTHINC
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
                                     end if
                                 else  ! THINC
                                     moncon = (aCR - aC)*(aC - aCL)
@@ -366,26 +366,26 @@ contains
                                         B = exp(sgn*beta_eff*(2._wp*C - 1._wp))
                                         A = (B/cosh(beta_eff) - 1._wp)/tanh(beta_eff)
 
-                                        rho_b = v_rs_ws(j, k, l, contxb)/aC
-                                        rho_e = v_rs_ws(j, k, l, contxe)/(1._wp - aC)
+                                        rho_b = v_rs_ws(j, k, l, eqn_idx%cont%beg)/aC
+                                        rho_e = v_rs_ws(j, k, l, eqn_idx%cont%end)/(1._wp - aC)
 
                                         ! Left face
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*A)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vL_rs_vf_${XYZ}$ (j, k, l, contxb) = rho_b*aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, contxe) = rho_e*(1._wp - aTHINC)
-                                        vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1._wp - aTHINC
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
 
                                         ! Right face
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*(tanh(beta_eff) + A)/(1._wp + A*tanh(beta_eff)))
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vR_rs_vf_${XYZ}$ (j, k, l, contxb) = rho_b*aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, contxe) = rho_e*(1._wp - aTHINC)
-                                        vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1._wp - aTHINC
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
                                     end if
                                 end if
                             end if

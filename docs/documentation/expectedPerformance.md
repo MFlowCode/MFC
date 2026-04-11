@@ -137,6 +137,7 @@ Note:
 | NVIDIA A10                | FP32-only GPU             | GPU           | 1 GPU        | 4.3              | NVHPC 24.1           | TAMU Faster |
 | AMD EPYC 7713             | Milan, Zen3               | CPU           | 64 cores     | 5.0              | GNU 12.3.0           | GT Phoenix  |
 | Intel Xeon 8480CL         | Sapphire Rapids           | CPU           | 56 cores     | 5.0              | NVHPC 24.5           | GT Phoenix  |
+| Apple M5 Pro              |                           | CPU           | 18 cores     | 5.4              | GNU 15.2.0           | N/A         |
 | Intel Xeon 6454S          | Sapphire Rapids           | CPU           | 32 cores     | 5.6              | NVHPC 24.5           | GT Rogues Gallery  |
 | Intel Xeon 8462Y+         | Sapphire Rapids           | CPU           | 32 cores     | 6.2              | GNU 12.3.0           | GT ICE  |
 | Intel Xeon 6548Y+         | Emerald Rapids            | CPU           | 32 cores     | 6.6              | Intel 2021.9         | GT ICE  |

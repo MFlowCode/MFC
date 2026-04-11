@@ -38,11 +38,11 @@ contains
         @:ALLOCATE(ms(1:nb))
 
         do l = 1, nb
-            rs(l) = bub_idx%rs(l)
-            vs(l) = bub_idx%vs(l)
+            rs(l) = qbmm_idx%rs(l)
+            vs(l) = qbmm_idx%vs(l)
             if (.not. polytropic) then
-                ps(l) = bub_idx%ps(l)
-                ms(l) = bub_idx%ms(l)
+                ps(l) = qbmm_idx%ps(l)
+                ms(l) = qbmm_idx%ms(l)
             else
                 ps(l) = rs(l)
                 ms(l) = rs(l)
@@ -81,7 +81,7 @@ contains
                     do i = 1, nb
                         nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3._wp
                     end do
-                    q_cons_vf(alf_idx)%sf(j, k, l) = (4._wp*pi*nR3bar)/(3._wp*q_cons_vf(n_idx)%sf(j, k, l)**2._wp)
+                    q_cons_vf(eqn_idx%alf)%sf(j, k, l) = (4._wp*pi*nR3bar)/(3._wp*q_cons_vf(eqn_idx%n)%sf(j, k, l)**2._wp)
                 end do
             end do
         end do
@@ -104,8 +104,8 @@ contains
                     do k = 0, n
                         do j = 0, m
                             divu_in%sf(j, k, l) = 0._wp
-                            divu_in%sf(j, k, l) = 5.e-1_wp/dx(j)*(q_prim_vf(contxe + idir)%sf(j + 1, k, &
-                                       & l) - q_prim_vf(contxe + idir)%sf(j - 1, k, l))
+                            divu_in%sf(j, k, l) = 5.e-1_wp/dx(j)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j + 1, k, &
+                                       & l) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j - 1, k, l))
                         end do
                     end do
                 end do
@@ -116,8 +116,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dy(k)*(q_prim_vf(contxe + idir)%sf(j, k + 1, &
-                                   & l) - q_prim_vf(contxe + idir)%sf(j, k - 1, l))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dy(k)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, &
+                                   & k + 1, l) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k - 1, l))
                     end do
                 end do
             end do
@@ -127,8 +127,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dz(l)*(q_prim_vf(contxe + idir)%sf(j, k, &
-                                   & l + 1) - q_prim_vf(contxe + idir)%sf(j, k, l - 1))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dz(l)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
+                                   & l + 1) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, l - 1))
                     end do
                 end do
             end do
@@ -188,7 +188,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     if (adv_n) then
-                        nbub = q_prim_vf(n_idx)%sf(j, k, l)
+                        nbub = q_prim_vf(eqn_idx%n)%sf(j, k, l)
                     else
                         $:GPU_LOOP(parallelism='[seq]')
                         do q = 1, nb
@@ -203,7 +203,7 @@ contains
                             R3 = R3 + weight(q)*Rtmp(q)**3._wp
                         end do
 
-                        nbub = (3._wp/(4._wp*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+                        nbub = (3._wp/(4._wp*pi))*q_prim_vf(eqn_idx%alf)%sf(j, k, l)/R3
                     end if
 
                     if (.not. adap_dt) then
@@ -222,7 +222,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do ii = 1, num_fluids
                             myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
-                            myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
+                            myalpha(ii) = q_cons_vf(eqn_idx%adv%beg + ii - 1)%sf(j, k, l)
                         end do
 
                         if (num_fluids == 1) then
@@ -245,8 +245,8 @@ contains
                         n_tait = 1._wp/n_tait + 1._wp  ! make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait - 1)/n_tait  ! make this the usual pi_inf
 
-                        myP = q_prim_vf(E_idx)%sf(j, k, l)
-                        alf = q_prim_vf(alf_idx)%sf(j, k, l)
+                        myP = q_prim_vf(eqn_idx%E)%sf(j, k, l)
+                        alf = q_prim_vf(eqn_idx%alf)%sf(j, k, l)
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
 
@@ -303,8 +303,9 @@ contains
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
-                        rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
-                        if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
+                        rhs_vf(eqn_idx%alf)%sf(i, q, l) = rhs_vf(eqn_idx%alf)%sf(i, q, l) + bub_adv_src(i, q, l)
+                        if (num_fluids > 1) rhs_vf(eqn_idx%adv%beg)%sf(i, q, l) = rhs_vf(eqn_idx%adv%beg)%sf(i, q, &
+                            & l) - bub_adv_src(i, q, l)
                         $:GPU_LOOP(parallelism='[seq]')
                         do k = 1, nb
                             rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
