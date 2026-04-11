@@ -506,7 +506,7 @@ contains
         type(int_bounds_info) :: boundary_conditions(1:3)
         integer :: beg_end(1:2), grid_dims(1:3)
         integer :: dst_proc, src_proc, recv_tag, send_tag
-        logical :: beg_end_geq_0, qbmm_comm
+        logical :: beg_end_geq_0, qbmm_comm, chem_diff_comm
         integer :: pack_offset, unpack_offset
         type(scalar_field), optional, intent(inout) :: q_T_sf
 
@@ -516,6 +516,7 @@ contains
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
         qbmm_comm = .false.
+        chem_diff_comm = .false.
 
         if (present(pb_in) .and. present(mv_in) .and. qbmm .and. .not. polytropic) then
             qbmm_comm = .true.
@@ -523,6 +524,7 @@ contains
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         else if (chemistry .and. chem_params%diffusion) then
+            chem_diff_comm = .true.
             v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
@@ -578,12 +580,12 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chemistry .and. chem_params%diffusion) then
+                    if (chem_diff_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
-                                    r = (v_size - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
+                                    r = nVar + v_size*(j + buff_size*(k + (n + 1)*l))
                                     buff_send(r) = real(q_T_sf%sf(j + pack_offset, k, l), kind=wp)
                                 end do
                             end do
@@ -636,7 +638,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chemistry .and. chem_params%diffusion) then
+                    if (chem_diff_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -697,7 +699,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chemistry .and. chem_params%diffusion) then
+                    if (chem_diff_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -809,7 +811,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chemistry .and. chem_params%diffusion) then
+                    if (chem_diff_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
@@ -879,7 +881,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chemistry .and. chem_params%diffusion) then
+                    if (chem_diff_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = -buff_size, -1
@@ -952,7 +954,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chemistry .and. chem_params%diffusion) then
+                    if (chem_diff_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size

@@ -1065,7 +1065,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `bc_[x,y,z]%%Twall_in`         | Real    | Temperature [K] of the entrance isothermal wall.                            |
 | `bc_[x,y,z]%%Twall_out`        | Real    | Temperature [K] of the exit isothermal wall.                                |
 
-This boundary condition can be used for fixed-temperature (isothermal) walls at the domain extremities. These are exclusively available for reacting flows and require the chemistry enablled. This enables to properly evaluate physical heat and species fluxes at the interface when ``chemistry = 'T'``, ``chem_params%%diffusion = 'T'``, and the corresponding domain boundary is set to slip wall (`bc_[x,y,z]%%[beg,end]` = -15) or a no-slip wall (`bc_[x,y,z]%%[beg,end]` = -16).
+This boundary condition can be used for fixed-temperature (isothermal) walls at the domain extremities. It is exclusively available for reacting flows and requires chemistry to be enabled. It properly evaluates heat and species fluxes at the interface when ``chemistry = 'T'``, ``chem_params%%diffusion = 'T'``, and the corresponding domain boundary is set to a slip wall (`bc_[x,y,z]%%[beg,end]` = -15) or a no-slip wall (`bc_[x,y,z]%%[beg,end]` = -16).
+
 
 
 ### 19. GPU Performance (NVIDIA UVM)
