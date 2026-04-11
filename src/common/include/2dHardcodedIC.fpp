@@ -333,12 +333,12 @@
         bottom_blend_T = tanh(y_cc(j)/delta_th)
         u_mean = u_max*bottom_blend_u
         T_loc = T_wall + (T_inf - T_wall)*bottom_blend_T
-        q_prim_vf(contxb)%sf(i, j, 0) = P_atm/(R_mix*T_loc)
-        q_prim_vf(momxb)%sf(i, j, 0) = u_mean
-        q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
-        q_prim_vf(E_idx)%sf(i, j, 0) = P_atm
-        q_prim_vf(chemxb)%sf(i, j, 0) = Y_O2
-        q_prim_vf(chemxe)%sf(i, j, 0) = Y_N2
+        q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = P_atm/(R_mix*T_loc)
+        q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = u_mean
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
+        q_prim_vf(eqn_idx%E)%sf(i, j, 0) = P_atm
+        q_prim_vf(eqn_idx%species%beg)%sf(i, j, 0) = Y_O2
+        q_prim_vf(eqn_idx%species%end)%sf(i, j, 0) = Y_N2
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)

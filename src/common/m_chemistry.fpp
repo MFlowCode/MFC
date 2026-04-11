@@ -235,8 +235,8 @@ contains
                             call get_mole_fractions(MW_L, Ys_L, Xs_L)
                             call get_mole_fractions(MW_R, Ys_R, Xs_R)
 
-                            P_L = q_prim_qp(E_idx)%sf(x, y, z)
-                            P_R = q_prim_qp(E_idx)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
+                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_L = q_prim_qp(1)%sf(x, y, z)
                             rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
@@ -368,8 +368,8 @@ contains
                             call get_mixture_molecular_weight(Ys_R, MW_R)
                             MW_cell = 0.5_wp*(MW_L + MW_R)
 
-                            P_L = q_prim_qp(E_idx)%sf(x, y, z)
-                            P_R = q_prim_qp(E_idx)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
+                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_L = q_prim_qp(1)%sf(x, y, z)
                             rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
