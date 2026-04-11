@@ -146,7 +146,7 @@ contains
         else if (elliptic_smoothing) then
             call s_elliptic_smoothing(q_prim_vf, bc_type)
         end if
-        
+
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         if (qbmm .and. .not. polytropic) then
