@@ -271,15 +271,17 @@ contains
                             if (abs(nr_y) < mthinc_align_tol*nmax) nr_y = 0._wp
                             if (abs(nr_z) < mthinc_align_tol*nmax) nr_z = 0._wp
                             nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
-                            nr_x = nr_x/nmag
-                            nr_y = nr_y/nmag
-                            nr_z = nr_z/nmag
+                            if (nmag > verysmall) then
+                                nr_x = nr_x/nmag
+                                nr_y = nr_y/nmag
+                                nr_z = nr_z/nmag
 
-                            mthinc_nhat(1, j, k, l) = nr_x
-                            mthinc_nhat(2, j, k, l) = nr_y
-                            mthinc_nhat(3, j, k, l) = nr_z
+                                mthinc_nhat(1, j, k, l) = nr_x
+                                mthinc_nhat(2, j, k, l) = nr_y
+                                mthinc_nhat(3, j, k, l) = nr_z
 
-                            mthinc_d(j, k, l) = f_mthinc_solve_d(nr_x, nr_y, nr_z, ic_beta, ac, num_dims)
+                                mthinc_d(j, k, l) = f_mthinc_solve_d(nr_x, nr_y, nr_z, ic_beta, ac, num_dims)
+                            end if
                         end if
                     end if
                 end do
