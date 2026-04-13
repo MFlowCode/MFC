@@ -82,9 +82,9 @@ contains
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x, ib_bc_y]')
+        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z]')
+            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
         end if
 
         ! allocate STL models

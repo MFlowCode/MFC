@@ -218,14 +218,15 @@ module m_global_parameters
     !> (bc_x/y/z get overwritten with MPI neighbor ranks during decomposition)
     !> @{
     type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z
-    $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
-    !> @}ib_bc_z
+    !> @}
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
+    $:GPU_DECLARE(create='[ib_bc_x%beg, ib_bc_y%beg, ib_bc_z%beg]')
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
+    $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
