@@ -74,9 +74,9 @@ print(
                 #Patch 1: Free stream
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.0,
-                "patch_icpp(1)%y_centroid":50*djet,
-                "patch_icpp(1)%length_x": 1000*djet,
-                "patch_icpp(1)%length_y": 1000*djet,
+                "patch_icpp(1)%y_centroid":50*d_jet,
+                "patch_icpp(1)%length_x": 1000*d_jet,
+                "patch_icpp(1)%length_y": 1000*d_jet,
                 "patch_icpp(1)%vel(1)": f"{vel_inf} * tanh(y / {d_jet / 4})",
                 "patch_icpp(1)%vel(2)": 0.0,
                 "patch_icpp(1)%pres": p_inf,
