@@ -133,7 +133,7 @@ contains
             & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop',      &
             & 'x_output%beg', 'x_output%end', 'y_output%beg',    &
             & 'y_output%end', 'z_output%beg', 'z_output%end',    &
-            & 'bc_x%Twall_in', 'bc_x  %Twall_out', 'bc_y%Twall_in',&
+            & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in',&
             & 'bc_y%Twall_out','bc_z%Twall_in', 'bc_z%Twall_out' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
