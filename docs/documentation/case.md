@@ -235,7 +235,7 @@ In the example above, the following code is generated:
 
 ```f90
 if (patch_id == 2) then
-    q_prim_vf(contxb)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
+    q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
 end if
 ```
 

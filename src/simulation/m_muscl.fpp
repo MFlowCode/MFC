@@ -235,9 +235,9 @@ contains
                 do l = is3_muscl%beg, is3_muscl%end
                     do k = is2_muscl%beg, is2_muscl%end
                         do j = is1_muscl%beg, is1_muscl%end
-                            aCL = v_rs_ws_${XYZ}$_muscl(j - 1, k, l, advxb)
-                            aC = v_rs_ws_${XYZ}$_muscl(j, k, l, advxb)
-                            aCR = v_rs_ws_${XYZ}$_muscl(j + 1, k, l, advxb)
+                            aCL = v_rs_ws_${XYZ}$_muscl(j - 1, k, l, eqn_idx%adv%beg)
+                            aC = v_rs_ws_${XYZ}$_muscl(j, k, l, eqn_idx%adv%beg)
+                            aCR = v_rs_ws_${XYZ}$_muscl(j + 1, k, l, eqn_idx%adv%beg)
 
                             moncon = (aCR - aC)*(aC - aCL)
 
@@ -260,23 +260,25 @@ contains
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*A)
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vL_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, &
-                                                  & l, advxb)*aTHINC
-                                vL_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
-                                vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%beg)/vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg)*aTHINC
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%end)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%adv%beg))*(1._wp - aTHINC)
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1 - aTHINC
 
                                 ! Right reconstruction
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*(tanh(ic_beta) + A)/(1._wp + A*tanh(ic_beta)))
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vR_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, &
-                                                  & l, advxb)*aTHINC
-                                vR_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
-                                vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%beg)/vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg)*aTHINC
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%end)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%adv%beg))*(1._wp - aTHINC)
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1 - aTHINC
                             end if
                         end do
                     end do

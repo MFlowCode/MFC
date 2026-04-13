@@ -52,7 +52,7 @@ contains
         integer              :: i
 
         ! $:GPU_LOOP(parallelism='[seq]')
-        do i = 2, momxb
+        do i = 2, eqn_idx%mom%beg
             L(i) = lambda_factor*lambda2*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
 
@@ -76,8 +76,8 @@ contains
         integer              :: i
 
         ! $:GPU_LOOP(parallelism='[seq]')
-        do i = momxb + 1, momxe
-            L(i) = lambda_factor*lambda2*dvel_ds(dir_idx(i - contxe))
+        do i = eqn_idx%mom%beg + 1, eqn_idx%mom%end
+            L(i) = lambda_factor*lambda2*dvel_ds(dir_idx(i - eqn_idx%cont%end))
         end do
 
     end subroutine s_fill_velocity_L
@@ -100,8 +100,8 @@ contains
         integer              :: i
 
         ! $:GPU_LOOP(parallelism='[seq]')
-        do i = E_idx, advxe - 1
-            L(i) = lambda_factor*lambda2*dadv_ds(i - momxe)
+        do i = eqn_idx%E, eqn_idx%adv%end - 1
+            L(i) = lambda_factor*lambda2*dadv_ds(i - eqn_idx%mom%end)
         end do
 
     end subroutine s_fill_advection_L
@@ -126,8 +126,8 @@ contains
         if (.not. chemistry) return
 
         ! $:GPU_LOOP(parallelism='[seq]')
-        do i = chemxb, chemxe
-            L(i) = lambda_factor*lambda2*dYs_ds(i - chemxb + 1)
+        do i = eqn_idx%species%beg, eqn_idx%species%end
+            L(i) = lambda_factor*lambda2*dYs_ds(i - eqn_idx%species%beg + 1)
         end do
 
     end subroutine s_fill_chemistry_L
@@ -151,8 +151,8 @@ contains
         real(wp), intent(in) :: rho, c, dpres_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
-        L(2:advxe - 1) = 0._wp
-        L(advxe) = L(1)
+        L(2:eqn_idx%adv%end - 1) = 0._wp
+        L(eqn_idx%adv%end) = L(1)
 
     end subroutine s_compute_slip_wall_L
 
@@ -192,7 +192,7 @@ contains
         call s_fill_chemistry_L(L, lambda_factor, lambda(2), dYs_ds)
 
         lambda_factor = (5.e-1_wp - 5.e-1_wp*sign(1._wp, lambda(3)))
-        L(advxe) = lambda_factor*lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+        L(eqn_idx%adv%end) = lambda_factor*lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_nonreflecting_subsonic_buffer_L
 
@@ -215,8 +215,8 @@ contains
         real(wp), intent(in) :: rho, c, dpres_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
-        L(2:advxe) = 0._wp
-        if (chemistry) L(chemxb:chemxe) = 0._wp
+        L(2:eqn_idx%adv%end) = 0._wp
+        if (chemistry) L(eqn_idx%species%beg:eqn_idx%species%end) = 0._wp
 
     end subroutine s_compute_nonreflecting_subsonic_inflow_L
 
@@ -250,7 +250,7 @@ contains
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
         call s_fill_chemistry_L(L, 1._wp, lambda(2), dYs_ds)
-        L(advxe) = 0._wp
+        L(eqn_idx%adv%end) = 0._wp
 
     end subroutine s_compute_nonreflecting_subsonic_outflow_L
 
@@ -281,7 +281,7 @@ contains
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
-        L(advxe) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(dir_idx(1))
+        L(eqn_idx%adv%end) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(dir_idx(1))
 
     end subroutine s_compute_force_free_subsonic_outflow_L
 
@@ -312,7 +312,7 @@ contains
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
-        L(advxe) = -L(1)
+        L(eqn_idx%adv%end) = -L(1)
 
     end subroutine s_compute_constant_pressure_subsonic_outflow_L
 
@@ -325,8 +325,8 @@ contains
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
-        L(1:advxe) = 0._wp
-        if (chemistry) L(chemxb:chemxe) = 0._wp
+        L(1:eqn_idx%adv%end) = 0._wp
+        if (chemistry) L(eqn_idx%species%beg:eqn_idx%species%end) = 0._wp
 
     end subroutine s_compute_supersonic_inflow_L
 
@@ -360,7 +360,7 @@ contains
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
         call s_fill_chemistry_L(L, 1._wp, lambda(2), dYs_ds)
-        L(advxe) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
+        L(eqn_idx%adv%end) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_supersonic_outflow_L
 
