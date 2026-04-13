@@ -333,6 +333,9 @@ class CaseValidator:
         if recon_type != 1:
             return
 
+        for param in ["muscl_order", "muscl_lim"]:
+            self.prohibit(self.is_set(param), f"recon_type = 1 (WENO) is not compatible with {param}")
+
         weno_order = self.get("weno_order")
         m = self.get("m", 0)
         n = self.get("n", 0)
@@ -356,6 +359,10 @@ class CaseValidator:
         # MUSCL_TYPE = 2
         if recon_type != 2:
             return
+
+        weno_params = ["weno_order", "weno_eps", "mapped_weno", "wenoz", "teno", "teno_CT", "wenoz_q", "mp_weno", "weno_avg", "null_weights", "weno_Re_flux"]
+        for param in weno_params:
+            self.prohibit(self.is_set(param), f"recon_type = 2 (MUSCL) is not compatible with {param}")
 
         muscl_order = self.get("muscl_order")
         m = self.get("m", 0)
