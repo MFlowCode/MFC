@@ -573,7 +573,6 @@ contains
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             ghost_points_in(local_idx)%ib_patch_id = patch_id
-                            ! ib_markers%sf(i, j, k) = patch_id
                             ghost_points_in(local_idx)%x_periodicity = xp
                             ghost_points_in(local_idx)%y_periodicity = yp
                             ghost_points_in(local_idx)%z_periodicity = zp
