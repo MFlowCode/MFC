@@ -144,10 +144,6 @@ module m_particles_EL
     real(wp), allocatable, dimension(:) :: gSum_sources  !< gaussian sum for each particle
     $:GPU_DECLARE(create='[gSum_sources]')
 
-    integer, allocatable  :: force_recv_ids(:)   !< ids of collision forces received from other ranks
-    real(wp), allocatable :: force_recv_vals(:)  !< collision forces received from other ranks
-    $:GPU_DECLARE(create='[force_recv_ids, force_recv_vals]')
-
     integer, parameter                   :: LAG_EVOL_ID = 11  ! File id for lag_bubbles_evol_*.dat
     integer, parameter                   :: LAG_STATS_ID = 12  ! File id for stats_lag_bubbles_*.dat
     integer, parameter                   :: LAG_VOID_ID = 13  ! File id for voidfraction.dat
@@ -164,8 +160,11 @@ module m_particles_EL
     real(wp), allocatable, dimension(:) :: domain_len         !< domain length for self-periodic case
     $:GPU_DECLARE(create='[pi2_over_ksp2, Estar, log_cor_factor, self_periodic, any_self_periodic, domain_len]')
 
-    integer, parameter :: ncc = 1  !< Number of collisions cells at boundaries
-    real(wp)           :: eps_overlap = 1.e-12
+    integer, parameter                    :: ncc = 1                !< Number of collisions cells at boundaries
+    real(wp)                              :: eps_overlap = 1.e-12
+    real(wp), allocatable, dimension(:,:) :: fluid_vel_at_particle  !< fluid velocity at each particle
+    real(wp), allocatable, dimension(:)   :: density_at_particle    !< density at each particle
+    $:GPU_DECLARE(create='[fluid_vel_at_particle, density_at_particle]')
 
 contains
 
@@ -336,11 +335,11 @@ contains
 
         @:ALLOCATE(particle_head(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
 
-        @:ALLOCATE(force_recv_ids(1:lag_params%nParticles_glb))
-        @:ALLOCATE(force_recv_vals(1:3*lag_params%nParticles_glb))
-
         @:ALLOCATE(keep_bubble(1:nParticles_glb))
         @:ALLOCATE(wrap_bubble_loc(1:nParticles_glb, 1:num_dims), wrap_bubble_dir(1:nParticles_glb, 1:num_dims))
+
+        @:ALLOCATE(fluid_vel_at_particle(1:nParticles_glb, 1:3))
+        @:ALLOCATE(density_at_particle(1:nParticles_glb))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
@@ -406,6 +405,8 @@ contains
         end if
 
         call s_read_input_particles(q_cons_vf, bc_type)
+
+        call s_initialize_particle_kernels()
 
         if (lag_params%qs_fluct_force) then
             ind_end_loc = alphaup2z_id
@@ -565,11 +566,6 @@ contains
             call s_mpi_barrier()
             call s_write_restart_lag_particles(save_count)  ! Needed for post_processing
             if (lag_params%write_void_evol) call s_write_void_evol_particles(qtime)
-        end if
-
-        if (lag_params%write_bubbles) then
-            call s_write_lag_particle_evol(qtime)
-            next_write_time = next_write_time + t_save
         end if
 
     end subroutine s_read_input_particles
@@ -815,8 +811,8 @@ contains
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_x, vL_y, vL_z
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vR_x, vR_y, vR_z
         integer, dimension(3) :: cell
-        real(wp) :: myMass, myR, myBeta_c, myBeta_t, myR0, myRe, myGamma, rmass_add, func_sum, func_sum_sources
-        real(wp), dimension(3) :: myVel, myPos, force_vec, s_cell, myForce, my_fqs_fluct, new_fqs_fluct
+        real(wp) :: myMass, myR, myBeta_c, myBeta_t, myR0, myRe, myGamma, rmass_add, func_sum, func_sum_sources, myFluidRho
+        real(wp), dimension(3) :: myVel, myPos, force_vec, s_cell, myForce, my_fqs_fluct, new_fqs_fluct, myFluidVel
         integer :: mySeed, new_seed
         integer :: k, l, i, j, dir
 
@@ -865,7 +861,8 @@ contains
 
         !> Compute Fluid-Particle Forces (drag/pressure/added mass) and convert to particle acceleration
         $:GPU_PARALLEL_LOOP(private='[i, k, l, cell, s_cell, myMass, myR, myR0, myPos, myVel, mySeed, my_fqs_fluct, &
-                            & new_fqs_fluct, force_vec, rmass_add, func_sum, new_seed]', copyin='[stage, myGamma, myRe]')
+                            & new_fqs_fluct, force_vec, rmass_add, func_sum, new_seed, myFluidVel, myFluidRho]', copyin='[stage, &
+                            & myGamma, myRe]')
         do k = 1, n_el_particles_loc
             f_p(k,:) = 0._wp
             p_owner_rank(k) = proc_rank
@@ -890,9 +887,28 @@ contains
             particle_dveldt(k,:,stage) = 0._wp
             particle_draddt(k, stage) = 0._wp
 
-            call s_get_particle_force(myPos, myR, myVel, myMass, myRe, myGamma, mySeed, my_fqs_fluct, cell, q_prim_vf, q_cons_vf, &
-                                      & q_particles, field_vars, rhs_old, duidxj_id, weights_x_interp, weights_y_interp, &
-                                      & weights_z_interp, force_vec, rmass_add, new_seed, new_fqs_fluct)
+            if (lag_params%interpolation_order > 1) then
+                do dir = 1, num_dims
+                    fluid_vel_at_particle(k, dir) = f_interp_barycentric(myPos, cell, q_prim_vf, momxb + dir - 1, &
+                                          & weights_x_interp, weights_y_interp, weights_z_interp)
+                end do
+                density_at_particle(k) = f_interp_barycentric(myPos, cell, q_prim_vf, 1, weights_x_interp, weights_y_interp, &
+                                    & weights_z_interp)
+            else
+                do dir = 1, num_dims
+                    fluid_vel_at_particle(k, dir) = q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3))
+                end do
+                density_at_particle(k) = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
+            end if
+
+            if (moving_lag_particles) then
+                myFluidVel = fluid_vel_at_particle(k,:)
+                myFluidRho = density_at_particle(k)
+                call s_get_particle_force(myPos, myR, myVel, myMass, myRe, myGamma, mySeed, my_fqs_fluct, cell, q_prim_vf, &
+                                          & q_cons_vf, q_particles, field_vars, rhs_old, duidxj_id, weights_x_interp, &
+                                          & weights_y_interp, weights_z_interp, force_vec, rmass_add, new_seed, new_fqs_fluct, &
+                                          & myFluidVel, myFluidRho)
+            end if
 
             p_AM(k) = rMass_add
             f_p(k,:) = f_p(k,:) + force_vec(:)
@@ -1529,6 +1545,16 @@ contains
         integer, intent(in)                                        :: stage
         integer                                                    :: k
 
+        if (lag_params%write_bubbles .and. mytime == 0._wp .and. stage == 1) then
+            call s_write_lag_particle_evol(mytime)
+            next_write_time = next_write_time + t_save
+        end if
+
+        if (lag_params%write_bubbles .and. mytime >= next_write_time .and. stage == lag_num_ts) then
+            call s_write_lag_particle_evol(mytime)
+            next_write_time = next_write_time + t_save
+        end if
+
         if (time_stepper == 1) then  ! 1st order TVD RK
 
             $:GPU_PARALLEL_LOOP(private='[k]')
@@ -1561,11 +1587,6 @@ contains
             if (moving_lag_particles) call s_enforce_EL_particles_boundary_conditions(q_prim_vf, stage, bc_type)
             if (lag_params%write_void_evol) call s_write_void_evol_particles(mytime)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_particle_stats()
-            if (lag_params%write_bubbles) then
-                ! $:GPU_UPDATE(host='[gas_p,gas_mv,particle_rad,intfc_vel]')
-                $:GPU_UPDATE(host='[particle_rad]')
-                call s_write_lag_particle_evol(mytime)
-            end if
         else if (time_stepper == 2) then  ! 2nd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
@@ -1614,10 +1635,6 @@ contains
                 if (moving_lag_particles) call s_enforce_EL_particles_boundary_conditions(q_prim_vf, stage, bc_type)
                 if (lag_params%write_void_evol) call s_write_void_evol_particles(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_particle_stats()
-                if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[particle_rad]')
-                    call s_write_lag_particle_evol(mytime)
-                end if
             end if
         else if (time_stepper == 3) then  ! 3rd order TVD RK
             if (stage == 1) then
@@ -1684,11 +1701,6 @@ contains
                 if (moving_lag_particles) call s_enforce_EL_particles_boundary_conditions(q_prim_vf, stage, bc_type)
                 if (lag_params%write_void_evol) call s_write_void_evol_particles(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_particle_stats()
-                if (lag_params%write_bubbles .and. mytime >= next_write_time) then
-                    $:GPU_UPDATE(host='[particle_mass, particle_rad]')
-                    call s_write_lag_particle_evol(mytime)
-                    next_write_time = next_write_time + t_save
-                end if
             end if
         end if
 
@@ -2359,12 +2371,10 @@ contains
     impure subroutine s_open_lag_bubble_evol
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist
         character(LEN=25)                    :: FMT
 
         write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
         file_loc = trim(case_dir) // '/D/' // trim(file_loc)
-        call my_inquire(trim(file_loc), file_exist)
 
         if (precision == 1) then
             FMT = "(A16,A14,8A16)"
@@ -2372,12 +2382,9 @@ contains
             FMT = "(A24,A14,8A24)"
         end if
 
-        if (.not. file_exist) then
-            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='rewind')
-            write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', 'Vx', 'Vy', 'Vz', 'Fp_x', 'Fp_y', 'Fp_z', 'radius'
-        else
-            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='append')
-        end if
+        open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='rewind', status="replace")
+        write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', 'Vx', 'Vy', 'Vz', 'Fp_x', 'Fp_y', 'Fp_z', 'radius', &
+               & 'vFx_at_p', 'vFy_at_p', 'vFz_at_p', 'rhoF_at_p'
 
     end subroutine s_open_lag_bubble_evol
 
@@ -2392,16 +2399,17 @@ contains
         logical                              :: file_exist
 
         if (precision == 1) then
-            FMT = "(F16.8,I14,10F16.8)"
+            FMT = "(F16.8,I14,14F16.8)"
         else
-            FMT = "(F24.16,I14,10F24.16)"
+            FMT = "(F24.16,I14,14F24.16)"
         end if
 
         ! Cycle through list
         do k = 1, n_el_particles_loc
             write (LAG_EVOL_ID, FMT) qtime, lag_part_id(k, 1), particle_pos(k, 1, 1), particle_pos(k, 2, 1), particle_pos(k, 3, &
                    & 1), particle_vel(k, 1, 1), particle_vel(k, 2, 1), particle_vel(k, 3, 1), f_p(k, 1), f_p(k, 2), f_p(k, 3), &
-                   & particle_rad(k, 1)
+                   & particle_rad(k, 1), fluid_vel_at_particle(k, 1), fluid_vel_at_particle(k, 2), fluid_vel_at_particle(k, 3), &
+                   & density_at_particle(k)
         end do
 
     end subroutine s_write_lag_particle_evol
@@ -2797,9 +2805,6 @@ contains
         @:DEALLOCATE(gSum)
         @:DEALLOCATE(gSum_sources)
 
-        @:DEALLOCATE(force_recv_ids)
-        @:DEALLOCATE(force_recv_vals)
-
         @:DEALLOCATE(keep_bubble)
         @:DEALLOCATE(wrap_bubble_loc, wrap_bubble_dir)
 
@@ -2810,6 +2815,9 @@ contains
             @:DEALLOCATE(self_periodic)
             @:DEALLOCATE(domain_len)
         end if
+
+        @:DEALLOCATE(fluid_vel_at_particle)
+        @:DEALLOCATE(density_at_particle)
 
     end subroutine s_finalize_particle_lagrangian_solver
 

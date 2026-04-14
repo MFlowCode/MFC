@@ -357,7 +357,7 @@ contains
 
         ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to match the parallel I/O path and allow post_process to
         ! read it.
-        if (bubbles_lagrange) then
+        if (bubbles_lagrange .or. particles_lagrange) then
             write (file_path, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', sys_size + 1, '.dat'
 
             open (2, FILE=trim(file_path), form='unformatted', STATUS='new')

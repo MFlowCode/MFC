@@ -35,8 +35,21 @@ module m_particles_EL_kernels
     integer, parameter :: dufzdx_id_loc = 13  ! du_z/dx
     integer, parameter :: dufzdy_id_loc = 14  ! du_z/dy
     integer, parameter :: dufzdz_id_loc = 15  ! du_z/dz
+    integer            :: mapCells_loc
+    real(wp)           :: alpha
+    $:GPU_DECLARE(create='[mapCells_loc, alpha]')
 
 contains
+
+    !> The purpose of this subroutine is to initialize constants for use in the particle kernels
+    subroutine s_initialize_particle_kernels()
+
+        ! M = (N-1)/2, alpha chosen so G decays by 1e-4 at M+1 cells away mapCells_loc = (lag_params%Ncells_proj - 1) / 2
+        mapCells_loc = (3 - 1)/2
+        alpha = 4._wp*log(10._wp)/real(mapCells_loc + 1, wp)**2._wp
+        $:GPU_UPDATE(device='[mapCells_loc, alpha]')
+
+    end subroutine s_initialize_particle_kernels
 
     ! !> The purpose of this subroutine is to compute each particles total contribution to the gaussian for proper normalization
     subroutine s_compute_gaussian_contribution(rad, pos, cell, func_s, func_s_sources, updatedvar_old)
@@ -44,20 +57,18 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_gaussian_contribution',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), dimension(:), intent(in) :: updatedvar_old
-        real(wp), intent(in) :: rad
-        real(wp), intent(in), dimension(3) :: pos
-        integer, intent(in), dimension(3) :: cell
-        real(wp), intent(out) :: func_s, func_s_sources
-        real(wp) :: volpart, stddsv, Vol_loc, func, alpha_f
-        real(wp), dimension(3) :: nodecoord, center
-        integer :: ip, jp, kp, di, dj, dk, di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end, mapCells_loc
-        integer, dimension(3) :: cellijk
+        real(wp), intent(in)                         :: rad
+        real(wp), intent(in), dimension(3)           :: pos
+        integer, intent(in), dimension(3)            :: cell
+        real(wp), intent(out)                        :: func_s, func_s_sources
+        real(wp)                                     :: volpart, stddsv, Vol_loc, func, alpha_f
+        real(wp), dimension(3)                       :: nodecoord, center
+        integer                                      :: ip, jp, kp, di, dj, dk, di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end
+        integer, dimension(3)                        :: cellijk
 
-        mapCells_loc = 1
+        volpart = (4._wp/3._wp)*pi*rad**3._wp
 
-        volpart = (4._wp/3._wp)*pi*rad**3
-
-        call s_compute_stddsv(cell, volpart, stddsv)
+        if (cyl_coord) call s_compute_stddsv(cell, volpart, stddsv)
 
         ip = cell(1)
         jp = cell(2)
@@ -93,10 +104,21 @@ contains
                     center(3) = 0._wp
                     if (p > 0) center(3) = pos(3)
 
-                    Vol_loc = dx(cellijk(1))*dy(cellijk(2))
-                    if (num_dims == 3) Vol_loc = dx(cellijk(1))*dy(cellijk(2))*dz(cellijk(3))
+                    if (num_dims == 2) then
+                        if (cyl_coord) then
+                            Vol_loc = dx(cellijk(1))*dy(cellijk(2))*y_cc(cellijk(2))*2._wp*pi
+                        else
+                            Vol_loc = dx(cellijk(1))*dy(cellijk(2))*lag_params%charwidth
+                        end if
+                    else
+                        Vol_loc = dx(cellijk(1))*dy(cellijk(2))*dz(cellijk(3))
+                    end if
 
-                    call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
+                    if (cyl_coord) then
+                        call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
+                    else
+                        call s_applygaussian_aniso(center, cellijk, nodecoord, func)
+                    end if
 
                     alpha_f = updatedvar_old(alphaf_id_loc)%sf(cellijk(1), cellijk(2), cellijk(3))
                     func_s = func_s + (func*Vol_loc)
@@ -123,14 +145,12 @@ contains
         real(wp) :: fp_x, fp_y, fp_z, vp_x, vp_y, vp_z
         real(wp) :: addFun
         real(wp), dimension(3) :: nodecoord, center
-        integer :: ip, jp, kp, di, dj, dk, di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end, mapCells_loc, field_ind
+        integer :: ip, jp, kp, di, dj, dk, di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end, field_ind
         integer, dimension(3) :: cellijk
-
-        mapCells_loc = 1
 
         volpart = (4._wp/3._wp)*pi*rad**3._wp
 
-        call s_compute_stddsv(cell, volpart, stddsv)
+        if (cyl_coord) call s_compute_stddsv(cell, volpart, stddsv)
 
         ip = cell(1)
         jp = cell(2)
@@ -172,10 +192,21 @@ contains
                     cellijk(2) = dj
                     cellijk(3) = dk
 
-                    Vol_loc = dx(cellijk(1))*dy(cellijk(2))
-                    if (num_dims == 3) Vol_loc = Vol_loc*dz(cellijk(3))
+                    if (num_dims == 2) then
+                        if (cyl_coord) then
+                            Vol_loc = dx(cellijk(1))*dy(cellijk(2))*y_cc(cellijk(2))*2._wp*pi
+                        else
+                            Vol_loc = dx(cellijk(1))*dy(cellijk(2))*lag_params%charwidth
+                        end if
+                    else
+                        Vol_loc = dx(cellijk(1))*dy(cellijk(2))*dz(cellijk(3))
+                    end if
 
-                    call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
+                    if (cyl_coord) then
+                        call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
+                    else
+                        call s_applygaussian_aniso(center, cellijk, nodecoord, func)
+                    end if
 
                     weight = func/gauSum
 
@@ -218,6 +249,24 @@ contains
 
     end subroutine s_gaussian_atomic
 
+    subroutine s_applygaussian_aniso(center, cellaux, nodecoord, func)
+
+        real(wp), dimension(3), intent(in) :: center
+        integer, dimension(3), intent(in)  :: cellaux
+        real(wp), dimension(3), intent(in) :: nodecoord
+        real(wp), intent(out)              :: func
+        real(wp)                           :: arg
+
+        arg = alpha*(((center(1) - nodecoord(1))/dx(cellaux(1)))**2._wp + ((center(2) - nodecoord(2))/dy(cellaux(2)))**2._wp)
+
+        if (num_dims == 3) then
+            arg = arg + alpha*((center(3) - nodecoord(3))/dz(cellaux(3)))**2._wp
+        end if
+
+        func = exp(-arg)
+
+    end subroutine s_applygaussian_aniso
+
     !> The purpose of this subroutine is to apply the gaussian kernel function for each particle (Maeda and Colonius, 2018)).
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
 
@@ -234,47 +283,26 @@ contains
         real(wp)                           :: theta, dtheta, L2, dzp, Lz2, zc
         real(wp)                           :: Nr, Nr_count
 
-        distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + (center(3) - nodecoord(3))**2._wp)
-
-        if (num_dims == 3) then
-            !> 3D gaussian function
-            func = exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
-        else
-            if (cyl_coord) then
-                !> 2D cylindrical function:
-                ! We smear particles in the azimuthal direction for given r
-                theta = 0._wp
-                Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
-                dtheta = 2._wp*pi/Nr
-                L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
-                distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
-                ! Factor 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
-                func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
-                Nr_count = 0._wp
-                do while (Nr_count < Nr - 1._wp)
-                    Nr_count = Nr_count + 1._wp
-                    theta = Nr_count*dtheta
-                    ! trigonometric relation
-                    L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
-                    distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
-                    ! nodecoord(2)*dtheta is the azimuthal width of the cell
-                    func = func + dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv) &
-                                                      & **(3._wp*(strength_idx + 1._wp))
-                end do
-            else
-                !> 2D cartesian function: Equation (48) from Maeda and Colonius 2018
-                ! We smear particles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
-                dzp = (lag_params%charwidth/(lag_params%charNz + 1._wp))
-
-                func = 0._wp
-                do i = 0, lag_params%charNz
-                    zc = (-lag_params%charwidth/2._wp + dzp*(0.5_wp + i))  ! Center of virtual cell i in z-direction
-                    Lz2 = (center(3) - zc)**2._wp
-                    distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
-                    func = func + dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
-                end do
-            end if
-        end if
+        !> 2D cylindrical function:
+        ! We smear particles in the azimuthal direction for given r
+        theta = 0._wp
+        Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
+        dtheta = 2._wp*pi/Nr
+        L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
+        distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
+        ! Factor 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
+        func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
+        Nr_count = 0._wp
+        do while (Nr_count < Nr - 1._wp)
+            Nr_count = Nr_count + 1._wp
+            theta = Nr_count*dtheta
+            ! trigonometric relation
+            L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
+            distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
+            ! nodecoord(2)*dtheta is the azimuthal width of the cell
+            func = func + dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx &
+                                              & + 1._wp))
+        end do
 
     end subroutine s_applygaussian
 
@@ -294,18 +322,8 @@ contains
 
         !> Compute characteristic distance
         chardist = sqrt(dx(cell(1))*dy(cell(2)))
-        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
 
-        !> Compute characteristic volume
-        if (p > 0) then
-            charvol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-        else
-            if (cyl_coord) then
-                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-            else
-                charvol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-            end if
-        end if
+        charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
 
         rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
         stddsv = lag_params%epsilonb*max(chardist, rad)
@@ -397,13 +415,14 @@ contains
     !! @param q_prim_vf Eulerian field with primitive variables
     !! @return a Acceleration of the particle in direction i
     subroutine s_get_particle_force(pos, rad, vel_p, mass_p, Re, gamm, seed, fqsfluct, cell, q_prim_vf, q_cons_vf, q_particles, &
-                                    & fieldvars, rhs_old, duidxj_id_loc, wx, wy, wz, force, rmass_add, new_seed, new_fqsfluct)
+                                    & fieldvars, rhs_old, duidxj_id_loc, wx, wy, wz, force, rmass_add, new_seed, new_fqsfluct, &
+                                    & fluid_vel, fluid_rho)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)                                :: rad, mass_p, Re, gamm
+        real(wp), intent(in)                                :: rad, mass_p, Re, gamm, fluid_rho
         real(wp), dimension(3), intent(in)                  :: pos
         integer, dimension(3), intent(in)                   :: cell
         integer, intent(in)                                 :: seed
-        real(wp), dimension(3), intent(in)                  :: vel_p, fqsfluct
+        real(wp), dimension(3), intent(in)                  :: vel_p, fqsfluct, fluid_vel
         integer, dimension(3, 3), intent(in)                :: duidxj_id_loc
         type(scalar_field), dimension(:), intent(in)        :: q_particles
         type(scalar_field), dimension(:), intent(in)        :: fieldvars
@@ -415,12 +434,11 @@ contains
         real(wp), intent(out)                               :: rmass_add
         integer, intent(out)                                :: new_seed
         integer                                             :: seed_loc
-        real(wp)                                            :: a, vol, rho_fluid, pressure_fluid, alpha_f
+        real(wp)                                            :: a, vol, pressure_fluid, alpha_f
         real(wp), dimension(3)                              :: v_rel, dp
         real(wp)                                            :: particle_diam, gas_mu, vmag, cson
         real(wp)                                            :: slip_velocity_x, slip_velocity_y, slip_velocity_z, beta
         real(wp)                                            :: vol_frac
-        real(wp), dimension(3)                              :: fluid_vel
         integer                                             :: dir, l
 
         ! Added pass params
@@ -438,7 +456,6 @@ contains
         dp = 0._wp
         grad_rho = 0._wp
         fam = 0._wp
-        fluid_vel = 0._wp
         v_rel = 0._wp
         rhoDuDt = 0._wp
         SDrho = 0._wp
@@ -450,7 +467,6 @@ contains
 
         !!Interpolation - either even ordered barycentric or 0th order
         if (lag_params%interpolation_order > 1) then
-            rho_fluid = f_interp_barycentric(pos, cell, q_prim_vf, 1, wx, wy, wz)
             pressure_fluid = f_interp_barycentric(pos, cell, q_prim_vf, E_idx, wx, wy, wz)
             alpha_f = f_interp_barycentric(pos, cell, q_particles, alphaf_id_loc, wx, wy, wz)
             vol_frac = 1._wp - alpha_f
@@ -460,7 +476,6 @@ contains
                            & wz)/max(vol_frac, 1.e-12_wp)
                 vel2_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, alphaup2x_id_loc + dir - 1, wx, wy, &
                             & wz)/max(vol_frac, 1.e-12_wp)
-                fluid_vel(dir) = f_interp_barycentric(pos, cell, q_prim_vf, momxb + dir - 1, wx, wy, wz)
             end do
 
             if (lag_params%added_mass_model > 0) then
@@ -473,7 +488,7 @@ contains
                 end if
                 if (lag_params%added_mass_model > 0) then
                     grad_rho(dir) = f_interp_barycentric(pos, cell, fieldvars, drhox_id_loc + dir - 1, wx, wy, wz)
-                    rhoDuDt(dir) = (rhs_old(momxb + dir - 1)%sf(cell(1), cell(2), cell(3)) - fluid_vel(dir)*drhodt)/rho_fluid
+                    rhoDuDt(dir) = (rhs_old(momxb + dir - 1)%sf(cell(1), cell(2), cell(3)) - fluid_vel(dir)*drhodt)/fluid_rho
                     do l = 1, num_dims
                         udot_gradu(dir) = udot_gradu(dir) + fluid_vel(l)*f_interp_barycentric(pos, cell, fieldvars, &
                                    & duidxj_id_loc(dir, l), wx, wy, wz)
@@ -481,7 +496,6 @@ contains
                 end if
             end do
         else
-            rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
             pressure_fluid = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))
             alpha_f = q_particles(alphaf_id_loc)%sf(cell(1), cell(2), cell(3))
             vol_frac = 1._wp - alpha_f
@@ -489,7 +503,6 @@ contains
             do dir = 1, num_dims
                 vel_p_mean(dir) = q_particles(alphaupx_id_loc + dir - 1)%sf(cell(1), cell(2), cell(3))/max(vol_frac, 1.e-12_wp)
                 vel2_p_mean(dir) = q_particles(alphaup2x_id_loc + dir - 1)%sf(cell(1), cell(2), cell(3))/max(vol_frac, 1.e-12_wp)
-                fluid_vel(dir) = q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3))
             end do
 
             if (lag_params%added_mass_model > 0) then
@@ -502,7 +515,7 @@ contains
                 end if
                 if (lag_params%added_mass_model > 0) then
                     grad_rho(dir) = fieldvars(drhox_id_loc + dir - 1)%sf(cell(1), cell(2), cell(3))
-                    rhoDuDt(dir) = (rhs_old(momxb + dir - 1)%sf(cell(1), cell(2), cell(3)) - fluid_vel(dir)*drhodt)/rho_fluid
+                    rhoDuDt(dir) = (rhs_old(momxb + dir - 1)%sf(cell(1), cell(2), cell(3)) - fluid_vel(dir)*drhodt)/fluid_rho
                     do l = 1, num_dims
                         udot_gradu(dir) = udot_gradu(dir) + fluid_vel(l)*fieldvars(duidxj_id_loc(dir, l))%sf(cell(1), cell(2), &
                                    & cell(3))
@@ -524,8 +537,8 @@ contains
                 vmag = sqrt(slip_velocity_x*slip_velocity_x + slip_velocity_y*slip_velocity_y)
             end if
             particle_diam = rad*2._wp
-            if (rho_fluid > 0._wp) then
-                cson = sqrt((gamm*pressure_fluid)/rho_fluid)
+            if (fluid_rho > 0._wp) then
+                cson = sqrt((gamm*pressure_fluid)/fluid_rho)
             else
                 cson = 1._wp
             end if
@@ -535,14 +548,14 @@ contains
                 tref = 273.15_wp
                 R_fluid = 287.05_wp  ! J/kg-K for Air
                 suth = 110.4_wp
-                fluid_temp = pressure_fluid/(rho_fluid*R_fluid)
+                fluid_temp = pressure_fluid/(fluid_rho*R_fluid)
 
                 gas_mu = gas_mu*sqrt(fluid_temp/tref)*(1.0_wp + suth/tref)/(1.0_wp + suth/fluid_temp)
             end if
         end if
 
         if (lag_params%added_mass_model > 0) then
-            rhoDuDt = rho_fluid*(rhoDuDt + udot_gradu)
+            rhoDuDt = fluid_rho*(rhoDuDt + udot_gradu)
             vrel_gradrho = dot_product(-v_rel, grad_rho)
             SDrho = drhodt + vel_p(1)*grad_rho(1) + vel_p(2)*grad_rho(2) + vel_p(3)*grad_rho(3)
             mach = vmag/cson
@@ -550,16 +563,16 @@ contains
 
         ! Step 1: Force component quasi-steady
         if (lag_params%qs_drag_model == 1) then
-            beta = QS_Parmar(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_Parmar(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 2) then
-            beta = QS_Osnes(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_Osnes(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 3) then
-            beta = QS_ModifiedParmar(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_ModifiedParmar(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 4) then
-            beta = QS_Gidaspow(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_Gidaspow(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else
             ! No Quasi-Steady drag
@@ -595,7 +608,7 @@ contains
             end if
 
             Cam = 0.5_wp*Cam*(1._wp + 0.68_wp*vol_frac**2)
-            rmass_add = rho_fluid*vol*Cam
+            rmass_add = fluid_rho*vol*Cam
 
             fam = Cam*vol*(-v_rel*SDrho + rhoDuDt + fluid_vel*(vrel_gradrho))
 
@@ -614,7 +627,7 @@ contains
             ! Step 5: QS Fluctuations
             !> New addition: QS Fluctuations
             seed_loc = seed
-            call s_compute_qs_fluctuations(vel_p, fluid_vel, rho_fluid, cson, gas_mu, particle_diam, vol_frac, vmag, vel_p_mean, &
+            call s_compute_qs_fluctuations(vel_p, fluid_vel, fluid_rho, cson, gas_mu, particle_diam, vol_frac, vmag, vel_p_mean, &
                                            & vel2_p_mean, seed_loc, fqsfluct, dt, new_fqsfluct)
             force = force + new_fqsfluct
             new_seed = seed_loc
@@ -637,12 +650,12 @@ contains
     ! width. Compute mean using box filter for langevin model - not for feedback
     !
     ! The mean is calculated according to Lattanzi etal, Physical Review Fluids, 2022.
-    subroutine s_compute_qs_fluctuations(vel_p, fluid_vel, rho_fluid, cson, gas_mu, particle_diam, vol_frac, vmag, vel_p_mean, &
+    subroutine s_compute_qs_fluctuations(vel_p, fluid_vel, fluid_rho, cson, gas_mu, particle_diam, vol_frac, vmag, vel_p_mean, &
                                          & vel2_p_mean, seed, fqs_fluct_old, dt_loc, fqs_fluct_new)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(3), intent(in)  :: vel_p, fluid_vel
-        real(wp), intent(in)                :: rho_fluid, cson, gas_mu, particle_diam, vol_frac, vmag
+        real(wp), intent(in)                :: fluid_rho, cson, gas_mu, particle_diam, vol_frac, vmag
         real(wp), dimension(3), intent(in)  :: vel_p_mean, vel2_p_mean
         integer, intent(inout)              :: seed
         real(wp), dimension(3), intent(in)  :: fqs_fluct_old
@@ -677,7 +690,7 @@ contains
         slip_vel = fluid_vel - vel_p
 
         ! Particle Reynolds number
-        rep = rho_fluid*vmag*particle_diam/gas_mu
+        rep = fluid_rho*vmag*particle_diam/gas_mu
 
         ! Particle Mach number
         rmachp = vmag/cson
