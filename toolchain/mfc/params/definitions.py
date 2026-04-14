@@ -772,6 +772,29 @@ DEPENDENCIES = {
             "requires": ["mhd"],
         }
     },
+    "riemann_hypo_ADC": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [2, 4],
+            },
+        }
+    },
+    "hypo_hll_interface_rhs": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
+    "hll_u_interface": {
+        "when_true": {
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
     "schlieren_wrt": {
         "when_true": {
             "requires": ["fd_order"],

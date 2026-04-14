@@ -875,15 +875,25 @@ Four-state solver resolving the contact discontinuity. Star-state satisfies:
 
 Iterative exact Riemann solver.
 
-#### HLLD (`riemann_solver = 4`, MHD only)
+#### HLLD (`riemann_solver = 4`, MHD or hypoelasticity)
 
-Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contact waves (\cite Miyoshi05). The Riemann fan is divided by outer wave speeds \f$S_L\f$, \f$S_R\f$, Alfven speeds \f$S_L^*\f$, \f$S_R^*\f$, and a middle contact \f$S_M\f$:
+**MHD HLLD.** Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contact waves (\cite Miyoshi05). The Riemann fan is divided by outer wave speeds \f$S_L\f$, \f$S_R\f$, Alfven speeds \f$S_L^*\f$, \f$S_R^*\f$, and a middle contact \f$S_M\f$:
 
 \f[S_M = \frac{(S_R - u_R)\rho_R u_R - (S_L - u_L)\rho_L u_L - p_{T,R} + p_{T,L}}{(S_R - u_R)\rho_R - (S_L - u_L)\rho_L}\f]
 
 \f[S_L^* = S_M - \frac{|B_x|}{\sqrt{\rho_L^*}}, \qquad S_R^* = S_M + \frac{|B_x|}{\sqrt{\rho_R^*}}\f]
 
 where \f$p_T = p + |\mathbf{B}|^2/2\f$ is the total (thermal + magnetic) pressure. Continuity of normal velocity and total pressure is enforced across the Riemann fan.
+
+**Hypoelastic HLLD.** Shares the five-wave Riemann fan structure with MHD HLLD, but differs substantially in formulation. Elastic shear waves play the role of Alfven waves, with total pressure \f$p_T = p - \tau_{nn}\f$ and shear wave impedance \f$C = \hat{\rho}(\hat{G} + \hat{\tau}_{nn})\f$. However, the non-conservative nature of the multi-component elastic stress equations — particularly at material interfaces where \f$G\f$ is discontinuous — requires a dedicated treatment distinct from the MHD solver.
+
+The solver uses an **anchored dual-pass** formulation. Each Riemann solve at interface \f$j{+}1/2\f$ requires cell-centered quantities for the non-conservative products; these are taken as cell-centered values from the cell that the flux will update, rather than from the reconstructed interface states:
+
+\f[\mathbf{F}_{j+1/2}^{\text{left}} = \text{HLLD}\!\left(\mathbf{q}_{j+1/2}^L,\;\mathbf{q}_{j+1/2}^R;\;\mathbf{q}_{\text{cell},\,j}\right), \qquad \mathbf{F}_{j-1/2}^{\text{right}} = \text{HLLD}\!\left(\mathbf{q}_{j-1/2}^L,\;\mathbf{q}_{j-1/2}^R;\;\mathbf{q}_{\text{cell},\,j}\right)\f]
+
+\f[\frac{d\mathbf{U}_j}{dt} = \frac{1}{\Delta x}\!\left(\mathbf{F}_{j-1/2}^{\text{right}} - \mathbf{F}_{j+1/2}^{\text{left}}\right)\f]
+
+This formulation enables HLLD to be used with the non-conservative terms that affect the eigenstructure of the quasi-linear Jacobian. Volume fraction advection is built into the HLLD flux rather than treated as a separate non-conservative step.
 
 ### 15.3 Time Integration
 

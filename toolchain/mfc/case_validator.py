@@ -524,12 +524,18 @@ class CaseValidator:
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         model_eqns = self.get("model_eqns")
         riemann_solver = self.get("riemann_solver")
+        riemann_hypo_ADC = self.get("riemann_hypo_ADC", "F") == "T"
+        hypo_hll_interface_rhs = self.get("hypo_hll_interface_rhs", "F") == "T"
+        self.prohibit(riemann_hypo_ADC and not hypoelasticity, "riemann_hypo_ADC requires hypoelasticity to be enabled")
+        self.prohibit(hypo_hll_interface_rhs and not hypoelasticity, "hypo_hll_interface_rhs requires hypoelasticity to be enabled")
 
         if not hypoelasticity:
             return
 
         self.prohibit(model_eqns is not None and model_eqns != 2, "hypoelasticity requires model_eqns = 2")
         self.prohibit(riemann_solver is not None and riemann_solver not in [1, 2, 4], "hypoelasticity requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
+        self.prohibit(riemann_hypo_ADC and riemann_solver is not None and riemann_solver not in [2, 4], "riemann_hypo_ADC only applies to HLLC (2) or HLLD (4)")
+        self.prohibit(hypo_hll_interface_rhs and riemann_solver is not None and riemann_solver != 1, "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
 
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""
@@ -642,11 +648,13 @@ class CaseValidator:
         low_Mach = self.get("low_Mach", 0)
         cyl_coord = self.get("cyl_coord", "F") == "T"
         viscous = self.get("viscous", "F") == "T"
+        hll_u_interface = self.get("hll_u_interface", "F") == "T"
 
         if riemann_solver is None:
             return
 
         self.prohibit(riemann_solver < 1 or riemann_solver > 5, "riemann_solver must be 1, 2, 3, 4 or 5")
+        self.prohibit(hll_u_interface and riemann_solver != 1, "hll_u_interface requires HLL Riemann solver (riemann_solver = 1)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
         self.prohibit(riemann_solver == 3 and wave_speeds is not None, "Exact Riemann (riemann_solver = 3) does not support wave_speeds")
