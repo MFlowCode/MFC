@@ -222,6 +222,7 @@ class Case:
 
                 lhs = f"q_prim_vf({qpvf_idx})%sf({DATA['sf_idx']})"
                 rhs = re.sub(r"[a-zA-Z]+", rhs_replace, expr)
+                rhs = re.sub(r"(?<![a-zA-Z_])(\d+\.?\d*(?:[eEdD][+-]?\d+)?|\.\d+(?:[eEdD][+-]?\d+)?)(?![\w.])", r"\1_wp", rhs)
 
                 lines.append(f"        {lhs} = {rhs}")
 
