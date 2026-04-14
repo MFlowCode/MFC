@@ -63,6 +63,12 @@ program p_main
 
     call nvtxEndRange  ! INIT
 
+    if (bubbles_lagrange .or. particles_lagrange) then
+        call nvtxStartRange("SAVE-INIT-PARTICLES")
+        call s_save_data(t_step, start, finish, io_time_avg, nt)
+        call nvtxEndRange  ! SAVE-INIT-PARTICLES
+    end if
+
     call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop
     do
