@@ -49,7 +49,7 @@ contains
         end do
 
         if (chemistry) then
-            allocate (q_T_sf%sf(0:m,0:n,0:p))
+            allocate (q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
         allocate (patch_id_fp(0:m,0:n,0:p))
@@ -138,11 +138,11 @@ contains
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_perturb_mixlayer(q_prim_vf)
         if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
-        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwbuff)
 
         if (elliptic_smoothing .and. chemistry) then
             call s_elliptic_smoothing(q_prim_vf, bc_type, q_T_sf)
-            call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
+            call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwbuff)
         else if (elliptic_smoothing) then
             call s_elliptic_smoothing(q_prim_vf, bc_type)
         end if

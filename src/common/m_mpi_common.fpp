@@ -523,7 +523,7 @@ contains
             v_size = nVar + 2*nb*nnode
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
-        else if (chemistry .and. chem_params%diffusion) then
+        else if (present(q_T_sf) .and. chemistry .and. chem_params%diffusion) then
             chem_diff_comm = .true.
             v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
@@ -820,7 +820,7 @@ contains
                                     q_T_sf%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_T_sf%sf(j + unpack_offset, k, l))) then
-                                        print *, "Error", j, k, l, i
+                                        print *, "Error", j, k, l
                                         call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
@@ -890,7 +890,7 @@ contains
                                     q_T_sf%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_T_sf%sf(j, k + unpack_offset, l))) then
-                                        print *, "Error", j, k, l, i
+                                        print *, "Error", j, k, l
                                         call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
@@ -964,7 +964,7 @@ contains
                                     q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_T_sf%sf(j, k, l + unpack_offset))) then
-                                        print *, "Error", j, k, l, i
+                                        print *, "Error", j, k, l
                                         call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif

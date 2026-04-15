@@ -372,7 +372,7 @@ PATTERNS = [
     (r"bc_([xyz])%grcbc_out", "Enable GRCBC at {0}-outlet"),
     (r"bc_([xyz])%grcbc_vel_out", "Enable GRCBC velocity at {0}-outlet"),
     (r"bc_([xyz])%isothermal_in", "Enable isothermal wall at {0}-inlet"),
-    (r"bc_([xyz])%isothermal_out", "Enable isothermal at {0}-outlet"),
+    (r"bc_([xyz])%isothermal_out", "Enable isothermal wall at {0}-outlet"),
     (r"bc_([xyz])%Twall_in", "Wall temperature at {0}-inlet"),
     (r"bc_([xyz])%Twall_out", "Wall temperature at {0}-outlet"),
     # patch_bc patterns

@@ -634,7 +634,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. chem_params%diffusion .and. present(q_T_sf)) then
+                if (chemistry .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
                     end do
@@ -657,7 +657,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. chem_params%diffusion .and. present(q_T_sf)) then
+                if (chemistry .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(m + j, k, l) = q_T_sf%sf(j - 1, k, l)
                     end do
@@ -682,7 +682,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. chem_params%diffusion .and. present(q_T_sf)) then
+                if (chemistry .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, n - (j - 1), l)
                     end do
@@ -705,7 +705,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. chem_params%diffusion .and. present(q_T_sf)) then
+                if (chemistry .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, j - 1, l)
                     end do
@@ -753,7 +753,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. chem_params%diffusion .and. present(q_T_sf)) then
+                if (chemistry .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, j - 1)
                     end do
@@ -858,7 +858,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
+                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
                         end do
                     end if
                 end if
@@ -880,7 +880,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
                         end do
                     end if
                 end if
@@ -904,7 +904,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
+                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
                         end do
                     end if
                 end if
@@ -926,7 +926,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
                         end do
                     end if
                 end if
@@ -950,7 +950,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
+                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
                         end do
                     end if
                 end if
@@ -972,7 +972,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
+                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
                         end do
                     end if
                 end if
@@ -1009,13 +1009,13 @@ contains
                 end do
 
                 if (chemistry .and. present(q_T_sf)) then
-                    if ((bc_x%isothermal_in)) then
+                    if (bc_x%isothermal_in) then
                         do j = 1, buff_size
                             q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
+                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
                         end do
                     end if
                 end if
@@ -1041,7 +1041,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
                         end do
                     end if
                 end if
@@ -1068,7 +1068,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
+                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
                         end do
                     end if
                 end if
@@ -1093,7 +1093,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
                         end do
                     end if
                 end if
@@ -1120,7 +1120,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
+                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
                         end do
                     end if
                 end if
@@ -1145,7 +1145,7 @@ contains
                         end do
                     else
                         do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
+                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
                         end do
                     end if
                 end if
