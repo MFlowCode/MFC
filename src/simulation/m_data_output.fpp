@@ -170,7 +170,7 @@ contains
         call s_create_directory(trim(case_dir) // '/restart_data')
         write (file_loc, '(A)') 'ib_state.dat'
         file_loc = trim(case_dir) // '/restart_data/' // trim(file_loc)
-        if (t_step_start /= 0) then
+        if (t_step_start > 0) then
             ! On restart, append to existing file to preserve history
             open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', &
                   & position='append', iostat=ios)
