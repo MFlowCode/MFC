@@ -386,7 +386,7 @@ contains
 
         do j = 1, nmom
             do i = 1, nb
-                bubmoms(i, j) = bub_idx%moms(i, j)
+                bubmoms(i, j) = qbmm_idx%moms(i, j)
             end do
         end do
         $:GPU_UPDATE(device='[bubmoms]')
@@ -425,11 +425,11 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                nb_q = q_cons_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
+                                nR = q_cons_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                nR2 = q_cons_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                R = q_prim_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                R2 = q_prim_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
                                 var = max(R2 - R**2._wp, sgm_eps)
                                 if (q <= 2) then
                                     AX = R - sqrt(var)
@@ -439,41 +439,44 @@ contains
 
                                 select case (idir)
                                 case (1)
-                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, &
-                                                       & l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j - 1, k, &
-                                                       & l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                    nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j - 1, k, &
-                                                        & l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j - 1, k, &
+                                                       & l) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
+                                    nR_dot = flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j - 1, k, &
+                                                       & l) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j - 1, k, &
+                                                        & l) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                            & i) - 3._wp*gam/(dx(j)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (2)
-                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, &
-                                                       & l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, &
-                                                       & l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                    nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, &
-                                                        & l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k - 1, &
+                                                       & l) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
+                                    nR_dot = flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k - 1, &
+                                                       & l) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k - 1, &
+                                                        & l) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                            & i) - 3._wp*gam/(dy(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (3)
                                     if (is_axisym) then
-                                        nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, &
-                                                           & l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
-                                        nR_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, &
-                                                           & k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
-                                        nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, &
-                                                            & k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
+                                        nb_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
+                                                           & l)*(flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, &
+                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l))
+                                        nR_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
+                                                           & l)*(flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, &
+                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l))
+                                        nR2_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
+                                                            & l)*(flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, &
+                                                            & l - 1) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                                & i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, &
                                                & q, i))
                                     else
-                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, &
-                                                           & l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, &
-                                                           & l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                        nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, &
-                                                            & l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, &
+                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, &
+                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, &
+                                                            & l - 1) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                                & i) - 3._wp*gam/(dz(l)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                     end if
@@ -559,8 +562,8 @@ contains
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
-                        rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
-                        j = bubxb
+                        rhs_vf(eqn_idx%alf)%sf(i, q, l) = rhs_vf(eqn_idx%alf)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
+                        j = eqn_idx%bub%beg
                         $:GPU_LOOP(parallelism='[seq]')
                         do k = 1, nb
                             rhs_vf(j)%sf(i, q, l) = rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
@@ -764,9 +767,9 @@ contains
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
-                    alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
-                    pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
-                    rho = q_prim_vf(contxb)%sf(id1, id2, id3)
+                    alf = q_prim_vf(eqn_idx%alf)%sf(id1, id2, id3)
+                    pres = q_prim_vf(eqn_idx%E)%sf(id1, id2, id3)
+                    rho = q_prim_vf(eqn_idx%cont%beg)%sf(id1, id2, id3)
 
                     if (bubble_model == 2) then
                         n_tait = 1._wp/gammas(1) + 1._wp
@@ -778,7 +781,7 @@ contains
                     call s_coeff_selector(pres, rho, c, coeff, polytropic)
 
                     if (alf > small_alf) then
-                        nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
+                        nbub = q_cons_vf(eqn_idx%bub%beg)%sf(id1, id2, id3)
                         $:GPU_LOOP(parallelism='[seq]')
                         do q = 1, nb
                             ! Gather moments for this bubble bin

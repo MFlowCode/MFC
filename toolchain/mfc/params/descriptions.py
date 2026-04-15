@@ -256,6 +256,11 @@ DESCRIPTIONS = {
     "normMag": "Interface normal magnitude",
     "g0_ic": "Initial gas volume fraction for interfacial IC",
     "p0_ic": "Initial pressure for interfacial IC",
+    # IB collision parameters
+    "coefficient_of_restitution": "Real number describing the elasticity of collisions from 0 (perfectly ineleastic) to 1 (perfectly elastic)",
+    "collision_model": "Integer selecting the collision model being used. 0 for no collision. 1 for soft-sphere collisions",
+    "collision_time": "Amount of simulation time each collision will take to resolve",
+    "ib_coefficient_of_friction": "coefficient of friction used in IB collisions",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters

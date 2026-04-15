@@ -105,12 +105,12 @@ contains
         if (igr) then
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_vels
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)/rho
+                vel(i) = q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l)/rho
             end do
         else
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_vels
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
+                vel(i) = q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l)
             end do
         end if
 
@@ -121,16 +121,16 @@ contains
         end do
 
         if (igr) then
-            E = q_prim_vf(E_idx)%sf(j, k, l)
+            E = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
         else
-            pres = q_prim_vf(E_idx)%sf(j, k, l)
+            pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 
         ! Adjust energy for hyperelasticity
         if (hyperelasticity) then
-            E = E + G_local*q_prim_vf(xiend + 1)%sf(j, k, l)
+            E = E + G_local*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)
         end if
 
         H = (E + pres)/rho

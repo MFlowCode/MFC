@@ -13,13 +13,15 @@
 
 ## Field Variable Indexing
 - Conserved variables: `q_cons_vf(1:sys_size)`. Primitive: `q_prim_vf(1:sys_size)`.
-- Index ranges depend on `model_eqns` and enabled features (set in `m_global_parameters.fpp`):
-  - `cont_idx` — continuity (partial densities, one per fluid)
-  - `mom_idx` — momentum components
-  - `E_idx` — total energy (scalar)
-  - `adv_idx` — volume fractions (advection equations)
-  - `bub_idx`, `stress_idx`, `xi_idx`, `species_idx`, `B_idx`, `c_idx` — optional
-- Shorthand scalars: `momxb`/`momxe`, `contxb`/`contxe`, `advxb`/`advxe`, etc.
+- All equation indices live in the unified `eqn_idx` struct (`eqn_idx_info` type in `m_derived_types.fpp`).
+  Index ranges depend on `model_eqns` and enabled features (set in `m_global_parameters.fpp`):
+  - `eqn_idx%cont` — continuity range (partial densities, one per fluid)
+  - `eqn_idx%mom` — momentum range
+  - `eqn_idx%E` — total energy (scalar)
+  - `eqn_idx%adv` — volume fractions (advection equations)
+  - `eqn_idx%bub`, `eqn_idx%stress`, `eqn_idx%xi`, `eqn_idx%species`, `eqn_idx%B` — optional
+  - `eqn_idx%gamma`, `eqn_idx%pi_inf`, `eqn_idx%alf`, `eqn_idx%int_en` — additional scalars/ranges
+- Use `eqn_idx%cont%beg`/`eqn_idx%cont%end`, `eqn_idx%mom%beg`/`eqn_idx%mom%end`, etc. (old `contxb`/`contxe`, `momxb`/`momxe` shorthands are gone)
 - `sys_size` = total number of conserved variables (computed at startup)
 - Changing `model_eqns` or enabling features changes ALL index positions
 

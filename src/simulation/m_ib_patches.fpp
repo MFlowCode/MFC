@@ -513,6 +513,13 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         radius = patch_ib(patch_id)%radius
 
+        ! completely skip particles no in the domain
+        if (center(1) - radius > x_cc(m + gp_layers + 1) .or. center(1) + radius < x_cc(-gp_layers - 1) .or. center(2) &
+            & - radius > y_cc(n + gp_layers + 1) .or. center(2) + radius < y_cc(-gp_layers - 1) .or. center(3) - radius > z_cc(p &
+            & + gp_layers + 1) .or. center(3) + radius < z_cc(-gp_layers - 1)) then
+            return
+        end if
+
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
@@ -1054,19 +1061,28 @@ contains
 
         ! check domain wraps in x, y
 
-        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-            if (num_dims >= ${ID}$) then
-                ! check for periodicity
-                if (bc_${X}$%beg == BC_PERIODIC) then
-                    ${X}$p_lower = -1
-                    ${X}$p_upper = 1
-                else
-                    ! if it is not periodic, then both elements are 0
-                    ${X}$p_lower = 0
-                    ${X}$p_upper = 0
-                end if
+        #:for X in [('x'), ('y')]
+            ! check for periodicity
+            if (ib_bc_${X}$%beg == BC_PERIODIC) then
+                ${X}$p_lower = -1
+                ${X}$p_upper = 1
+            else
+                ! if it is not periodic, then both elements are 0
+                ${X}$p_lower = 0
+                ${X}$p_upper = 0
             end if
         #:endfor
+
+        ! z only if 3D
+        if (present(zp_lower) .and. p /= 0) then
+            if (ib_bc_z%beg == BC_PERIODIC) then
+                zp_lower = -1
+                zp_upper = 1
+            else
+                zp_lower = 0
+                zp_upper = 0
+            end if
+        end if
 
     end subroutine s_get_periodicities
 

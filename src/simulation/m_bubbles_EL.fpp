@@ -372,10 +372,10 @@ contains
         call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), rhol, gamma, pi_inf, qv, Re)
         dynP = 0._wp
         do i = 1, num_dims
-            dynP = dynP + 0.5_wp*q_cons_vf(contxe + i)%sf(cell(1), cell(2), cell(3))**2/rhol
+            dynP = dynP + 0.5_wp*q_cons_vf(eqn_idx%cont%end + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
-        pliq = (q_cons_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
-        if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(E_idx)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
+        pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
+        if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
             & pliq, cell, dynP
 
         ! Initial particle pressure
@@ -856,7 +856,7 @@ contains
         vel(:) = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_dims
-            vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
+            vel(i) = q_prim_vf(i + eqn_idx%cont%end)%sf(cell(1), cell(2), cell(3))
         end do
         E = gamma*pinf + pi_inf + 0.5_wp*rhol*dot_product(vel, vel)
         H = (E + pinf)/rhol
@@ -1134,11 +1134,12 @@ contains
                                 vol = dx(cellaux(1))*dy(cellaux(2))*lag_params%charwidth
                             end if
                         end if
+
                         !> Update values
                         charvol = charvol + vol
-                        charpres = charpres + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
+                        charpres = charpres + q_prim_vf(eqn_idx%E)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
                         charvol2 = charvol2 + vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
-                        charpres2 = charpres2 + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), &
+                        charpres2 = charpres2 + q_prim_vf(eqn_idx%E)%sf(cellaux(1), cellaux(2), &
                                                           & cellaux(3))*vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
                     end do
                 end do
