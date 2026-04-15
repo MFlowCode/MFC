@@ -522,6 +522,7 @@ module m_global_parameters
     logical                           :: lag_pressure_force
     logical                           :: lag_gravity_force
     integer                           :: lag_vel_model, lag_drag_model
+    logical                           :: lag_header
     $:GPU_DECLARE(create='[bubbles_lagrange, lag_params, n_el_bubs_loc, n_el_bubs_glb]')
     $:GPU_DECLARE(create='[particles_lagrange, n_el_particles_loc, n_el_particles_glb]')
     $:GPU_DECLARE(create='[moving_lag_particles]')
@@ -860,6 +861,8 @@ contains
         lag_params%qs_fluct_force = .false.
         lag_params%mu_ref = dflt_real
         lag_params%N_collision_subcycles = dflt_int
+
+        lag_header = .false.
 
         moving_lag_bubbles = .false.
         lag_vel_model = dflt_int

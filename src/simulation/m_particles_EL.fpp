@@ -598,7 +598,11 @@ contains
         particle_rad(part_id, 1) = inputPart(7)
         particle_pos(part_id,1:3,1) = inputPart(1:3)
         particle_posPrev(part_id,1:3,1) = particle_pos(part_id,1:3,1)
-        particle_vel(part_id,1:3,1) = inputPart(4:6)
+        if (moving_lag_particles) then
+            particle_vel(part_id,1:3,1) = inputPart(4:6)
+        else
+            particle_vel(part_id,1:3,1) = 0._wp
+        end if
 
         ! Initialize Particle Sources
         f_p(part_id,1:3) = 0._wp
@@ -901,14 +905,11 @@ contains
                 density_at_particle(k) = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
             end if
 
-            if (moving_lag_particles) then
-                myFluidVel = fluid_vel_at_particle(k,:)
-                myFluidRho = density_at_particle(k)
-                call s_get_particle_force(myPos, myR, myVel, myMass, myRe, myGamma, mySeed, my_fqs_fluct, cell, q_prim_vf, &
-                                          & q_cons_vf, q_particles, field_vars, rhs_old, duidxj_id, weights_x_interp, &
-                                          & weights_y_interp, weights_z_interp, force_vec, rmass_add, new_seed, new_fqs_fluct, &
-                                          & myFluidVel, myFluidRho)
-            end if
+            myFluidVel = fluid_vel_at_particle(k,:)
+            myFluidRho = density_at_particle(k)
+            call s_get_particle_force(myPos, myR, myVel, myMass, myRe, myGamma, mySeed, my_fqs_fluct, cell, q_prim_vf, q_cons_vf, &
+                                      & q_particles, field_vars, rhs_old, duidxj_id, weights_x_interp, weights_y_interp, &
+                                      & weights_z_interp, force_vec, rmass_add, new_seed, new_fqs_fluct, myFluidVel, myFluidRho)
 
             p_AM(k) = rMass_add
             f_p(k,:) = f_p(k,:) + force_vec(:)
@@ -1062,9 +1063,11 @@ contains
             do k = 1, n_el_particles_loc
                 myMass = particle_mass(k) + p_AM(k)
 
-                particle_vel(k,1:3,2) = particle_vel(k,1:3,2) + (f_p(k,1:3)/myMass)*dt_sub
+                if (moving_lag_particles) then
+                    particle_vel(k,1:3,2) = particle_vel(k,1:3,2) + (f_p(k,1:3)/myMass)*dt_sub
 
-                particle_pos(k,1:3,2) = particle_pos(k,1:3,2) + particle_vel(k,1:3,2)*dt_sub
+                    particle_pos(k,1:3,2) = particle_pos(k,1:3,2) + particle_vel(k,1:3,2)*dt_sub
+                end if
             end do
             $:END_GPU_PARALLEL_LOOP()
         end do
@@ -1461,6 +1464,7 @@ contains
         integer, intent(in)                                    :: stage
         integer                                                :: i, j, k, l, nf
         real(wp)                                               :: dalphapdt, alpha_f, udot_gradalpha
+        integer, dimension(3)                                  :: cell
 
         ! Spatial derivative of the fluid volume fraction and eulerian particle momentum fields.
 
@@ -2383,8 +2387,10 @@ contains
         end if
 
         open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='rewind', status="replace")
-        write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', 'Vx', 'Vy', 'Vz', 'Fp_x', 'Fp_y', 'Fp_z', 'radius', &
-               & 'vFx_at_p', 'vFy_at_p', 'vFz_at_p', 'rhoF_at_p'
+        if (lag_header) then
+            write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', 'Vx', 'Vy', 'Vz', 'Fp_x', 'Fp_y', 'Fp_z', &
+                   & 'radius', 'vFx_at_p', 'vFy_at_p', 'vFz_at_p', 'rhoF_at_p'
+        end if
 
     end subroutine s_open_lag_bubble_evol
 

@@ -230,6 +230,10 @@ contains
                 call MPI_BCAST(lag_params%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
+            #:for VAR in [ 'lag_header']
+                call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
             call MPI_BCAST(lag_params%input_path, len(lag_params%input_path), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
         end if
 
