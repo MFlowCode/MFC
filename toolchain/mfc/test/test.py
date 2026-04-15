@@ -187,6 +187,17 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
             if any(label in case.trace for label in skip):
                 cases.remove(case)
 
+    # Skip tests that fail under nvfortran in Docker (pass natively/Apptainer):
+    #  - Lagrange Bubbles: NaN on 24.1/24.3 (other versions not verified in Docker)
+    #  - 3D_rayleigh_taylor_muscl: segfaults with nvfortran+MPI (seccomp/mprotect)
+    if os.environ.get("FC") == "nvfortran" and os.path.exists("/.dockerenv"):
+        nvhpc_skip_uuids = {"B9553426", "4A1BD9B8", "0D1FA5C5", "2122A4F6"}
+        nvhpc_skip_traces = {"rayleigh_taylor_muscl"}
+        for case in cases[:]:
+            if case.get_uuid() in nvhpc_skip_uuids or any(t in case.trace for t in nvhpc_skip_traces):
+                cases.remove(case)
+                skipped_cases.append(case)
+
     if ARG("no_examples"):
         example_cases = [case for case in cases if "Example" in case.trace]
         skipped_cases += example_cases
@@ -497,6 +508,37 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 if msg is not None:
                     raise MFCException(f"Test {case}: {msg}")
 
+        # Restart roundtrip verification: run to midpoint, restart,
+        # and compare restarted output against the straight run.
+        if case.restart_check and not ARG("add_new_variables") and not ARG("generate"):
+            straight_pack = pack
+
+            if timeout_flag.is_set():
+                raise TestTimeoutError("Test case exceeded 1 hour timeout")
+
+            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices)
+
+            if timeout_flag.is_set():
+                raise TestTimeoutError("Test case exceeded 1 hour timeout")
+
+            out_filepath_restart = os.path.join(case.get_dirpath(), "out_restart.txt")
+            common.file_write(out_filepath_restart, restart_result.stdout)
+
+            if restart_result.returncode != 0:
+                cons.print(restart_result.stdout)
+                raise MFCException(f"Test {case}: Restart roundtrip run failed.")
+
+            restart_pack, restart_err = packer.pack(case.get_dirpath())
+            if restart_err is not None:
+                raise MFCException(f"Test {case}: Restart pack error: {restart_err}")
+
+            if restart_pack.has_bad_values():
+                raise MFCException(f"Test {case}: NaN or Inf detected in restarted output.")
+
+            _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
+            if restart_msg is not None:
+                raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
+
         if ARG("test_all"):
             case.delete_output()
             # Check timeout before launching the (potentially long) post-process run
@@ -569,11 +611,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             cons.print(f"    UUID: [magenta]{case.get_uuid()}[/magenta]")
             cons.print(f"    Attempts: {nAttempts}")
 
-            # Show truncated error message
-            exc_str = str(exc)
-            if len(exc_str) > 300:
-                exc_str = exc_str[:297] + "..."
-            cons.print(f"    Error: {exc_str}")
+            cons.print(f"    Error: {exc}")
 
             # Provide helpful hints based on error type
             exc_lower = str(exc).lower()

@@ -19,6 +19,7 @@ module m_ibm
     use m_ib_patches
     use m_viscous
     use m_model
+    use m_collisions
 
     implicit none
 
@@ -57,6 +58,8 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
 
+        if (collision_model > 0) call s_initialize_collisions_module()
+
     end subroutine s_initialize_ibm_module
 
     !> Initializes the values of various IBM variables, such as ghost points and image points.
@@ -79,9 +82,9 @@ contains
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain]')
+        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain]')
+            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
         end if
 
         ! allocate STL models
@@ -165,22 +168,22 @@ contains
 
         ! set the Moving IBM interior conservative variables
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', copyin='[E_idx, momxb]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     patch_id = ib_markers%sf(j, k, l)
                     if (patch_id /= 0) then
-                        q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
+                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                         rho = 0._wp
                         do i = 1, num_fluids
-                            rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
+                            rho = rho + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
                         end do
 
                         ! Sets the momentum
                         do i = 1, num_dims
-                            q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
-                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
+                            q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
+                            q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
                         end do
                     end if
                 end do
@@ -226,22 +229,22 @@ contains
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
                     q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                    q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+                    q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
                 end do
 
                 if (surface_tension) then
-                    q_prim_vf(c_idx)%sf(j, k, l) = c_IP
+                    q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP
                 end if
 
                 ! set the pressure
                 if (patch_ib(patch_id)%moving_ibm <= 1) then
-                    q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
+                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
                 else
-                    q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
+                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         ! Pressure correction for moving IB: accounts for acceleration of IB surface
-                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, &
+                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
                                   & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
                                   & *dot_product(patch_ib(patch_id) %force/patch_ib(patch_id)%mass, gp%levelset_norm))
                     end do
@@ -268,8 +271,7 @@ contains
                         ! compute the linear velocity of the ghost point due to rotation
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, &
                             & patch_ib(patch_id)%z_centroid]
-                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), &
-                                             & radial_vector, rotation_velocity)
+                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
 
                         ! add only the component of the IB's motion that is normal to the surface
                         vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
@@ -284,8 +286,7 @@ contains
                             & patch_ib(patch_id)%z_centroid]
                         ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear
                         ! velocity
-                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), &
-                                             & radial_vector, rotation_velocity)
+                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
                         do q = 1, 3
                             ! if mibm is 1 or 2, then the boundary may be moving
                             vel_g(q) = patch_ib(patch_id)%vel(q)  ! add the linear velocity
@@ -296,41 +297,41 @@ contains
 
                 ! Set momentum
                 $:GPU_LOOP(parallelism='[seq]')
-                do q = momxb, momxe
-                    q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
-                    dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)*vel_g(q - momxb + 1)/2._wp
+                do q = eqn_idx%mom%beg, eqn_idx%mom%end
+                    q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - eqn_idx%mom%beg + 1)
+                    dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)*vel_g(q - eqn_idx%mom%beg + 1)/2._wp
                 end do
 
                 ! Set continuity and adv vars
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
                     q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                    q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+                    q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
                 end do
 
                 ! Set color function
                 if (surface_tension) then
-                    q_cons_vf(c_idx)%sf(j, k, l) = c_IP
+                    q_cons_vf(eqn_idx%c)%sf(j, k, l) = c_IP
                 end if
 
                 ! Set Energy
                 if (bubbles_euler) then
-                    q_cons_vf(E_idx)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
                 else
-                    q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
                 end if
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
                     call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
-                        q_cons_vf(bubxb + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
-                        q_cons_vf(bubxb + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
+                        q_cons_vf(eqn_idx%bub%beg + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
+                        q_cons_vf(eqn_idx%bub%beg + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
                         if (.not. polytropic) then
-                            q_cons_vf(bubxb + (q - 1)*4)%sf(j, k, l) = nbub*r_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*4 + 1)%sf(j, k, l) = nbub*v_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*4 + 2)%sf(j, k, l) = nbub*pb_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*4 + 3)%sf(j, k, l) = nbub*mv_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4)%sf(j, k, l) = nbub*r_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4 + 1)%sf(j, k, l) = nbub*v_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4 + 2)%sf(j, k, l) = nbub*pb_IP(q)
+                            q_cons_vf(eqn_idx%bub%beg + (q - 1)*4 + 3)%sf(j, k, l) = nbub*mv_IP(q)
                         end if
                     end do
                 end if
@@ -339,12 +340,12 @@ contains
                     nbub = nmom_IP(1)
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb*nmom
-                        q_cons_vf(bubxb + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
+                        q_cons_vf(eqn_idx%bub%beg + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
                     end do
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, nb
-                        q_cons_vf(bubxb + (q - 1)*nmom)%sf(j, k, l) = nbub
+                        q_cons_vf(eqn_idx%bub%beg + (q - 1)*nmom)%sf(j, k, l) = nbub
                     end do
 
                     if (.not. polytropic) then
@@ -361,8 +362,10 @@ contains
 
                 if (model_eqns == 3) then
                     $:GPU_LOOP(parallelism='[seq]')
-                    do q = intxb, intxe
-                        q_cons_vf(q)%sf(j, k, l) = alpha_IP(q - intxb + 1)*(gammas(q - intxb + 1)*pres_IP + pi_infs(q - intxb + 1))
+                    do q = eqn_idx%int_en%beg, eqn_idx%int_en%end
+                        q_cons_vf(q)%sf(j, k, &
+                                  & l) = alpha_IP(q - eqn_idx%int_en%beg + 1)*(gammas(q - eqn_idx%int_en%beg + 1)*pres_IP &
+                                  & + pi_infs(q - eqn_idx%int_en%beg + 1))
                     end do
                 end if
             end do
@@ -570,7 +573,6 @@ contains
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             ghost_points_in(local_idx)%ib_patch_id = patch_id
-                            ib_markers%sf(i, j, k) = patch_id
                             ghost_points_in(local_idx)%x_periodicity = xp
                             ghost_points_in(local_idx)%y_periodicity = yp
                             ghost_points_in(local_idx)%z_periodicity = zp
@@ -779,41 +781,41 @@ contains
                 do k = k1, k2
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
 
-                    pres_IP = pres_IP + coeff*q_prim_vf(E_idx)%sf(i, j, k)
+                    pres_IP = pres_IP + coeff*q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
                     $:GPU_LOOP(parallelism='[seq]')
-                    do q = momxb, momxe
-                        vel_IP(q + 1 - momxb) = vel_IP(q + 1 - momxb) + coeff*q_prim_vf(q)%sf(i, j, k)
+                    do q = eqn_idx%mom%beg, eqn_idx%mom%end
+                        vel_IP(q + 1 - eqn_idx%mom%beg) = vel_IP(q + 1 - eqn_idx%mom%beg) + coeff*q_prim_vf(q)%sf(i, j, k)
                     end do
 
                     $:GPU_LOOP(parallelism='[seq]')
-                    do l = contxb, contxe
+                    do l = eqn_idx%cont%beg, eqn_idx%cont%end
                         alpha_rho_IP(l) = alpha_rho_IP(l) + coeff*q_prim_vf(l)%sf(i, j, k)
-                        alpha_IP(l) = alpha_IP(l) + coeff*q_prim_vf(advxb + l - 1)%sf(i, j, k)
+                        alpha_IP(l) = alpha_IP(l) + coeff*q_prim_vf(eqn_idx%adv%beg + l - 1)%sf(i, j, k)
                     end do
 
                     if (surface_tension) then
-                        c_IP = c_IP + coeff*q_prim_vf(c_idx)%sf(i, j, k)
+                        c_IP = c_IP + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do l = 1, nb
                             if (polytropic) then
-                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(bubxb + (l - 1)*2)%sf(i, j, k)
-                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(bubxb + 1 + (l - 1)*2)%sf(i, j, k)
+                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + (l - 1)*2)%sf(i, j, k)
+                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 1 + (l - 1)*2)%sf(i, j, k)
                             else
-                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(bubxb + (l - 1)*4)%sf(i, j, k)
-                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(bubxb + 1 + (l - 1)*4)%sf(i, j, k)
-                                pb_IP(l) = pb_IP(l) + coeff*q_prim_vf(bubxb + 2 + (l - 1)*4)%sf(i, j, k)
-                                mv_IP(l) = mv_IP(l) + coeff*q_prim_vf(bubxb + 3 + (l - 1)*4)%sf(i, j, k)
+                                r_IP(l) = r_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + (l - 1)*4)%sf(i, j, k)
+                                v_IP(l) = v_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 1 + (l - 1)*4)%sf(i, j, k)
+                                pb_IP(l) = pb_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 2 + (l - 1)*4)%sf(i, j, k)
+                                mv_IP(l) = mv_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg + 3 + (l - 1)*4)%sf(i, j, k)
                             end if
                         end do
                     end if
 
                     if (qbmm) then
                         do l = 1, nb*nmom
-                            nmom_IP(l) = nmom_IP(l) + coeff*q_prim_vf(bubxb - 1 + l)%sf(i, j, k)
+                            nmom_IP(l) = nmom_IP(l) + coeff*q_prim_vf(eqn_idx%bub%beg - 1 + l)%sf(i, j, k)
                         end do
                         if (.not. polytropic) then
                             do q = 1, nb
@@ -837,7 +839,7 @@ contains
     impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
-        integer             :: i, j, k, ierr, z_gp_layers
+        integer             :: i, j, k, z_gp_layers
 
         call nvtxStartRange("UPDATE-MIBM")
 
@@ -884,11 +886,11 @@ contains
 
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
-        integer                                                        :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
+        integer                                                        :: i, j, k, l, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3)                                :: forces, torques
         real(wp), dimension(1:3,1:3)                                   :: viscous_stress_div, viscous_stress_div_1, &
              & viscous_stress_div_2  ! viscous stress tensor with temp vectors to hold divergence calculations
-        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
+        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution
         real(wp)                 :: cell_volume, dx, dy, dz, dynamic_viscosity
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -904,7 +906,7 @@ contains
 
         if (viscous) then
             do fluid_idx = 1, num_fluids
-                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) then
+                if (fluid_pp(fluid_idx)%Re(1) > 0._wp) then
                     dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
                 else
                     dynamic_viscosities(fluid_idx) = 0._wp
@@ -914,7 +916,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
                             & local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, &
-                            & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[ib_markers, patch_ib, &
+                            & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[patch_ib, &
                             & dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -936,17 +938,18 @@ contains
                         do fluid_idx = 0, num_fluids - 1
                             ! Get the pressure contribution to force via a finite difference to compute the 2D components of the
                             ! gradient of the pressure and cell volume
-                            local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i + 1, &
-                                                     & j, k) - q_prim_vf(E_idx + fluid_idx)%sf(i - 1, j, &
+                            local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i &
+                                                     & + 1, j, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i - 1, j, &
                                                      & k))/(2._wp*dx)  ! force is the negative pressure gradient
-                            local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(E_idx + fluid_idx)%sf(i, &
-                                                     & j + 1, k) - q_prim_vf(E_idx + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
+                            local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, &
+                                                     & j + 1, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
                             cell_volume = abs(dx*dy)
                             ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 dz = z_cc(k + 1) - z_cc(k)
-                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(E_idx + fluid_idx)%sf(i, &
-                                                         & j, k + 1) - q_prim_vf(E_idx + fluid_idx)%sf(i, j, k - 1))/(2._wp*dz)
+                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(eqn_idx%E + fluid_idx) &
+                                                         & %sf(i, j, k + 1) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j, &
+                                                         & k - 1))/(2._wp*dz)
                                 cell_volume = abs(cell_volume*dz)
                             end if
                         end do
@@ -957,7 +960,7 @@ contains
                             dynamic_viscosity = 0._wp
                             do fluid_idx = 1, num_fluids
                                 ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
-                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, &
+                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, j, &
                                     & k)*dynamic_viscosities(fluid_idx))
                             end do
 
@@ -1003,6 +1006,8 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+
         ! reduce the forces across all MPI ranks
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
         call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
@@ -1023,8 +1028,7 @@ contains
         ! apply the summed forces
         do i = 1, num_ibs
             patch_ib(i)%force(:) = forces(i,:)
-            patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, &
-                     & :))  ! torques must be converted to the local coordinates of the IB
+            patch_ib(i)%torque(:) = torques(i,:)
         end do
 
         call nvtxEndRange
@@ -1039,6 +1043,8 @@ contains
             @:DEALLOCATE(airfoil_grid_u)
             @:DEALLOCATE(airfoil_grid_l)
         end if
+
+        if (collision_model > 0) call s_finalize_collisions_module()
 
     end subroutine s_finalize_ibm_module
 
@@ -1110,7 +1116,7 @@ contains
 
         if (p == 0) then
             normal_axis = [0, 0, 1]
-        else if (sqrt(sum(axis**2)) == 0) then
+        else if (sqrt(sum(axis**2)) < sgm_eps) then
             ! if the object is not actually rotating at this time, return a dummy value and exit
             patch_ib(ib_marker)%moment = 1._wp
             return
@@ -1186,7 +1192,7 @@ contains
             ! check domain wraps in x, y,
             #:for X in [('x'), ('y')]
                 ! check for periodicity
-                if (bc_${X}$%beg == BC_PERIODIC) then
+                if (ib_bc_${X}$%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
@@ -1202,7 +1208,7 @@ contains
 
             if (p /= 0) then
                 ! check for periodicity
-                if (bc_z%beg == BC_PERIODIC) then
+                if (ib_bc_z%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%z_centroid < z_domain%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
@@ -1216,18 +1222,5 @@ contains
         end do
 
     end subroutine s_wrap_periodic_ibs
-
-    !> Compute the cross product c = a x b of two 3D vectors
-    subroutine s_cross_product(a, b, c)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)  :: a(3), b(3)
-        real(wp), intent(out) :: c(3)
-
-        c(1) = a(2)*b(3) - a(3)*b(2)
-        c(2) = a(3)*b(1) - a(1)*b(3)
-        c(3) = a(1)*b(2) - a(2)*b(1)
-
-    end subroutine s_cross_product
 
 end module m_ibm

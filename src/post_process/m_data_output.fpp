@@ -247,15 +247,15 @@ contains
             if (relativity .and. (rho_wrt .or. prim_vars_wrt)) dbvars = dbvars + 1
             if (relativity .and. (rho_wrt .or. cons_vars_wrt)) dbvars = dbvars + 1
 
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (mom_wrt(i) .or. cons_vars_wrt) dbvars = dbvars + 1
             end do
 
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (vel_wrt(i) .or. prim_vars_wrt) dbvars = dbvars + 1
             end do
 
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (flux_wrt(i)) dbvars = dbvars + 1
             end do
 
@@ -720,12 +720,12 @@ contains
         integer, dimension(MPI_STATUS_SIZE)    :: status
         integer(KIND=MPI_OFFSET_KIND)          :: disp
         integer                                :: view
-        logical                                :: lg_bub_file, file_exist
+        logical                                :: file_exist
         integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
         integer                                :: ifile
         integer                                :: ierr
         real(wp)                               :: file_time, file_dt
-        integer                                :: file_num_procs, file_tot_part, tot_part
+        integer                                :: file_num_procs, file_tot_part
         integer                                :: i
         integer, dimension(:), allocatable     :: proc_bubble_counts
         real(wp), dimension(1:1,1:lag_io_vars) :: lag_io_null
@@ -868,14 +868,13 @@ contains
         integer                                        :: id
 
 #ifdef MFC_MPI
-        real(wp), dimension(20)                         :: inputvals
         real(wp)                                        :: time_real
         integer, dimension(MPI_STATUS_SIZE)             :: status
         integer(KIND=MPI_OFFSET_KIND)                   :: disp
         integer                                         :: view
-        logical                                         :: lg_bub_file, file_exist
+        logical                                         :: file_exist
         integer, dimension(2)                           :: gsizes, lsizes, start_idx_part
-        integer                                         :: ifile, ierr, tot_data, valid_data, nBub
+        integer                                         :: ifile, ierr, nBub
         real(wp)                                        :: file_time, file_dt
         integer                                         :: file_num_procs, file_tot_part
         integer, dimension(:), allocatable              :: proc_bubble_counts
@@ -883,7 +882,7 @@ contains
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
         integer, dimension(num_procs)                   :: meshtypes
         real(wp)                                        :: dummy_data
-        integer                                         :: i, j
+        integer                                         :: i
         real(wp), dimension(:), allocatable             :: bub_id
         real(wp), dimension(:), allocatable             :: px, py, pz, ppx, ppy, ppz, vx, vy, vz
         real(wp), dimension(:), allocatable             :: radius, rvel, rnot, rmax, rmin, dphidt
@@ -1180,8 +1179,8 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
-                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
+                    if (q_prim_vf(eqn_idx%E + 2)%sf(i, j, k) > maxalph_loc) then
+                        maxalph_loc = q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -1201,10 +1200,10 @@ contains
         thres = 0.9_wp*maxalph_glb
         do k = 0, n
             do j = 0, m
-                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
-                axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
-                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
-                aym = q_prim_vf(E_idx + 2)%sf(j, k, cent)
+                axp = q_prim_vf(eqn_idx%E + 2)%sf(j + 1, k, cent)
+                axm = q_prim_vf(eqn_idx%E + 2)%sf(j, k, cent)
+                ayp = q_prim_vf(eqn_idx%E + 2)%sf(j, k + 1, cent)
+                aym = q_prim_vf(eqn_idx%E + 2)%sf(j, k, cent)
                 if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) .or. (ayp > thres .and. aym < thres) &
                     & .or. (ayp < thres .and. aym > thres)) then
                     if (counter == 0) then
@@ -1284,18 +1283,18 @@ contains
                     gamma = 0._wp
                     pi_inf = 0._wp
                     qv = 0._wp
-                    pres = q_prim_vf(E_idx)%sf(i, j, k)
-                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
+                    pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
+                    Egint = Egint + q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
                     do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                        Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                        Elk = Elk + 0.5_wp*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Egk = Egk + 0.5_wp*q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Elk = Elk + 0.5_wp*q_prim_vf(eqn_idx%E + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
                         if (abs(vel(s)) > maxvel) then
                             maxvel = abs(vel(s))
                         end if
                     end do
-                    do l = 1, adv_idx%end - E_idx
-                        adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                    do l = 1, eqn_idx%adv%end - eqn_idx%E
+                        adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
                         gamma = gamma + adv(l)*gammas(l)
                         pi_inf = pi_inf + adv(l)*pi_infs(l)
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
@@ -1313,7 +1312,7 @@ contains
                     Vl = Vl + adv(1)*dV
                     Vb = Vb + adv(2)*dV
                     pres_av = pres_av + adv(1)*pres*dV
-                    Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
+                    Et = Et + q_cons_vf(eqn_idx%E)%sf(i, j, k)*dV
                 end do
             end do
         end do

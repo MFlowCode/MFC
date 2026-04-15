@@ -28,8 +28,6 @@ module m_derived_variables
     real(wp), allocatable, dimension(:,:), public :: fd_coeff_z
     !> @}
 
-    integer, private :: flg  !< Dimensionality flag: 1 = 3D dataset, 0 = otherwise
-
 contains
 
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
@@ -52,12 +50,6 @@ contains
 
         if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
             allocate (fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
-        end if
-
-        if (p > 0) then
-            flg = 1
-        else
-            flg = 0
         end if
 
     end subroutine s_initialize_derived_variables_module
@@ -116,13 +108,13 @@ contains
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
                     if (alt_soundspeed .neqv. .true.) then
-                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_inf_sf(i, j, &
+                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_inf_sf(i, j, &
                              & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
                     else
-                        blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + pi_infs(2))/gammas(2)
-                        q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, &
-                             & k)/blkmod1 + (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
+                        blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_infs(1))/gammas(1)
+                        blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_infs(2))/gammas(2)
+                        q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(eqn_idx%adv%beg)%sf(i, j, &
+                             & k)/blkmod1 + (1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k))/blkmod2)))
                     end if
 
                     if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
@@ -152,28 +144,28 @@ contains
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
                     if (i == 1) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - q_prim_vf(adv_idx%beg)%sf(j - 1, k, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j + 1, k, l) - q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                        if (q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l) >= 0._wp) then
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j - 1, k, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         else
-                            top = q_prim_vf(adv_idx%beg)%sf(j + 2, k, l) - q_prim_vf(adv_idx%beg)%sf(j + 1, k, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j + 1, k, l) - q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j + 2, k, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j + 1, k, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         end if
                     else if (i == 2) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - q_prim_vf(adv_idx%beg)%sf(j, k - 1, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k + 1, l) - q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                        if (q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l) >= 0._wp) then
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k - 1, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         else
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k + 2, l) - q_prim_vf(adv_idx%beg)%sf(j, k + 1, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k + 1, l) - q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 2, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 1, l)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         end if
                     else
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0._wp) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - q_prim_vf(adv_idx%beg)%sf(j, k, l - 1)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k, l + 1) - q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                        if (q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l) >= 0._wp) then
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l - 1)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         else
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l + 2) - q_prim_vf(adv_idx%beg)%sf(j, k, l + 1)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k, l + 1) - q_prim_vf(adv_idx%beg)%sf(j, k, l)
+                            top = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 2) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 1)
+                            bottom = q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%adv%beg)%sf(j, k, l)
                         end if
                     end if
 
@@ -207,42 +199,6 @@ contains
 
     end subroutine s_derive_flux_limiter
 
-    !> Solve Ax=b via Gaussian elimination with partial pivoting
-    subroutine s_solve_linear_system(A, b, sol, ndim)
-
-        integer, intent(in)                            :: ndim
-        real(wp), dimension(ndim, ndim), intent(inout) :: A
-        real(wp), dimension(ndim), intent(inout)       :: b
-        real(wp), dimension(ndim), intent(out)         :: sol
-        integer                                        :: i, j, k
-
-        ! Forward elimination with partial pivoting
-
-        do i = 1, ndim
-            j = i - 1 + maxloc(abs(A(i:ndim,i)), 1)
-            sol = A(i,:)
-            A(i,:) = A(j,:)
-            A(j,:) = sol
-            sol(1) = b(i)
-            b(i) = b(j)
-            b(j) = sol(1)
-            b(i) = b(i)/A(i, i)
-            A(i,:) = A(i,:)/A(i, i)
-            do k = i + 1, ndim
-                b(k) = b(k) - A(k, i)*b(i)
-                A(k,:) = A(k,:) - A(k, i)*A(i,:)
-            end do
-        end do
-
-        do i = ndim, 1, -1
-            sol(i) = b(i)
-            do k = i + 1, ndim
-                sol(i) = sol(i) - A(i, k)*sol(k)
-            end do
-        end do
-
-    end subroutine s_solve_linear_system
-
     !> Compute the specified component of the vorticity from the primitive variables. From those inputs, it proceeds to calculate
     !! values of the desired vorticity component, which are subsequently stored in derived flow quantity storage variable, q_sf.
     subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
@@ -263,11 +219,11 @@ contains
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
                                 q_sf(j, k, l) = q_sf(j, k, l) + 1._wp/y_cc(k)*(fd_coeff_y(r, &
-                                     & k)*y_cc(r + k)*q_prim_vf(mom_idx%end)%sf(j, r + k, l) - fd_coeff_z(r, &
-                                     & l)*q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l))
+                                     & k)*y_cc(r + k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, l) - fd_coeff_z(r, &
+                                     & l)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l))
                             else
-                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_y(r, k)*q_prim_vf(mom_idx%end)%sf(j, r + k, &
-                                     & l) - fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg + 1)%sf(j, k, r + l)
+                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, &
+                                     & l) - fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l)
                             end if
                         end do
                     end do
@@ -281,11 +237,11 @@ contains
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
-                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)/y_cc(k)*q_prim_vf(mom_idx%beg)%sf(j, k, &
-                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(mom_idx%end)%sf(r + j, k, l)
+                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)/y_cc(k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
                             else
-                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg)%sf(j, k, &
-                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(mom_idx%end)%sf(r + j, k, l)
+                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
                             end if
                         end do
                     end do
@@ -298,8 +254,8 @@ contains
                         q_sf(j, k, l) = 0._wp
 
                         do r = -fd_number, fd_number
-                            q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_x(r, j)*q_prim_vf(mom_idx%beg + 1)%sf(r + j, k, &
-                                 & l) - fd_coeff_y(r, k)*q_prim_vf(mom_idx%beg)%sf(j, r + k, l)
+                            q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(r + j, k, &
+                                 & l) - fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, r + k, l)
                         end do
                     end do
                 end do
@@ -330,13 +286,13 @@ contains
                         do jj = 1, 3
                             ! d()/dx
                             q_jacobian_sf(jj, 1) = q_jacobian_sf(jj, 1) + fd_coeff_x(r, &
-                                          & j)*q_prim_vf(mom_idx%beg + jj - 1)%sf(r + j, k, l)
+                                          & j)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(r + j, k, l)
                             ! d()/dy
-                            q_jacobian_sf(jj, 2) = q_jacobian_sf(jj, 2) + fd_coeff_y(r, k)*q_prim_vf(mom_idx%beg + jj - 1)%sf(j, &
-                                          & r + k, l)
+                            q_jacobian_sf(jj, 2) = q_jacobian_sf(jj, 2) + fd_coeff_y(r, &
+                                          & k)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, r + k, l)
                             ! d()/dz
-                            q_jacobian_sf(jj, 3) = q_jacobian_sf(jj, 3) + fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg + jj - 1)%sf(j, &
-                                          & k, r + l)
+                            q_jacobian_sf(jj, 3) = q_jacobian_sf(jj, 3) + fd_coeff_z(r, &
+                                          & l)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, k, r + l)
                         end do
                     end do
 
@@ -407,11 +363,11 @@ contains
                     do r = -fd_number, fd_number
                         do i = 1, 3
                             ! d()/dx
-                            vgt(i, 1) = vgt(i, 1) + fd_coeff_x(r, j)*q_prim_vf(mom_idx%beg + i - 1)%sf(r + j, k, l)
+                            vgt(i, 1) = vgt(i, 1) + fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(r + j, k, l)
                             ! d()/dy
-                            vgt(i, 2) = vgt(i, 2) + fd_coeff_y(r, k)*q_prim_vf(mom_idx%beg + i - 1)%sf(j, r + k, l)
+                            vgt(i, 2) = vgt(i, 2) + fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, r + k, l)
                             ! d()/dz
-                            vgt(i, 3) = vgt(i, 3) + fd_coeff_z(r, l)*q_prim_vf(mom_idx%beg + i - 1)%sf(j, k, r + l)
+                            vgt(i, 3) = vgt(i, 3) + fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, r + l)
                         end do
                     end do
 
@@ -539,9 +495,9 @@ contains
                     do j = -offset_x%beg, m + offset_x%end
                         q_sf(j, k, l) = 0._wp
 
-                        do i = 1, adv_idx%end - E_idx
-                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + E_idx)%sf(j, k, l)*gm_rho_sf(j, k, &
-                                 & l)/gm_rho_max(1)
+                        do i = 1, eqn_idx%adv%end - eqn_idx%E
+                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, l)*gm_rho_sf(j, &
+                                 & k, l)/gm_rho_max(1)
                         end do
                     end do
                 end do
