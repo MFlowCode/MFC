@@ -561,10 +561,10 @@ class CaseValidator:
 
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
         self.prohibit(ib and num_ibs <= 0, "num_ibs must be >= 1 when ib is enabled")
-        num_patches_max = get_fortran_constants().get("num_patches_max", 1000)
+        num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max", 100000)
         self.prohibit(
-            ib and num_ibs > num_patches_max,
-            f"num_ibs must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
+            ib and num_ibs > num_ib_patches_max,
+            f"num_ibs must be <= {num_ib_patches_max} (num_ib_patches_max in m_constants.fpp)",
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")

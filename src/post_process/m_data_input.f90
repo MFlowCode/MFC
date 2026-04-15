@@ -108,12 +108,13 @@ contains
         integer, intent(in), optional               :: t_step
         character(LEN=len_trim(file_loc_base) + 20) :: file_loc
         logical                                     :: file_exist
-        integer                                     :: ifile, ierr, data_size, var_MOK
+        integer                                     :: ifile, ierr, data_size
 
 #ifdef MFC_MPI
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND)       :: disp
-        integer                             :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, save_index
+        integer(KIND=MPI_OFFSET_KIND)       :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, var_MOK
+        integer                             :: save_index
 #endif
 
         if (.not. ib) return
