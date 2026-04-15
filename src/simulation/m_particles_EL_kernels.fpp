@@ -790,12 +790,8 @@ contains
 
     end subroutine s_compute_qs_fluctuations
 
-    !> Interpolate an Eulerian field to a particle position using barycentric Lagrange interpolation with precomputed weights. Falls
-    !! back to nearest-cell value if the interpolant is non-finite.
-    !! @param pos Particle position
-    !! @param cell Grid cell containing the particle
-    !! @param field_vf Eulerian field to interpolate
-    !! @param field_index Component index in field_vf
+    !> This function interpolates an Eulerian field to a particle position using barycentric Lagrange interpolation with precomputed
+    !! weights. Falls back to nearest-cell value if the interpolant is non-finite.
     function f_interp_barycentric(pos, cell, field_vf, field_index, wx, wy, wz) result(val)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -805,10 +801,12 @@ contains
         type(scalar_field), dimension(:), intent(in) :: field_vf
         type(scalar_field), dimension(:), intent(in) :: wx, wy, wz
         integer, intent(in)                          :: field_index
-        integer                                      :: i, j, k, ix, jy, kz, npts, npts_z, N, a, b
+        integer                                      :: i, j, k, ix, jy, kz, npts, npts_z, N
         integer                                      :: ix_count, jy_count, kz_count
-        real(wp)                                     :: weight, numerator, denominator, xBar, eps
-        real(wp)                                     :: val, local_min, local_max, prod_x, prod_y, prod_z
+        real(wp)                                     :: val, eps, dx, dy, dz
+        real(wp)                                     :: num_z, den_z, num_y, den_y, num_x, den_x
+        real(wp)                                     :: f_val
+        logical                                      :: snap_x, snap_y, snap_z
 
         i = cell(1)
         j = cell(2)
@@ -819,36 +817,71 @@ contains
         npts_z = npts
         if (num_dims == 2) npts_z = 0
         eps = 1.e-12_wp
-        numerator = 0._wp
-        denominator = 0._wp
 
-        ! if (abs(pos(1) - x_cc(i)) <= eps .and. & abs(pos(2) - y_cc(j)) <= eps .and. & abs(pos(3) - z_cc(k)) <= eps) then val =
-        ! field_vf(field_index)%sf(i, j, k) return end if
+        snap_x = abs(pos(1) - x_cc(i)) <= eps
+        snap_y = abs(pos(2) - y_cc(j)) <= eps
+        snap_z = (num_dims == 2) .or. (abs(pos(3) - z_cc(k)) <= eps)
 
+        ! All dimensions snapped - just return cell value
+        if (snap_x .and. snap_y .and. snap_z) then
+            val = field_vf(field_index)%sf(i, j, k)
+            return
+        end if
+
+        num_x = 0._wp
+        den_x = 0._wp
         ix_count = 0
         do ix = i - npts, i + npts
             ix_count = ix_count + 1
+            if (snap_x .and. ix /= i) cycle
+
+            num_y = 0._wp
+            den_y = 0._wp
             jy_count = 0
             do jy = j - npts, j + npts
                 jy_count = jy_count + 1
+                if (snap_y .and. jy /= j) cycle
+
+                num_z = 0._wp
+                den_z = 0._wp
                 kz_count = 0
                 do kz = k - npts_z, k + npts_z
                     kz_count = kz_count + 1
-                    if (num_dims == 3) then
-                        xBar = (pos(1) - x_cc(ix))*(pos(2) - y_cc(jy))*(pos(3) - z_cc(kz))
-                        weight = wx(ix_count)%sf(i, 1, 1)*wy(jy_count)%sf(j, 1, 1)*wz(kz_count)%sf(k, 1, 1)
+                    if (snap_z .and. kz /= k) cycle
+
+                    f_val = field_vf(field_index)%sf(ix, jy, kz)
+
+                    if (snap_z) then
+                        num_z = f_val
+                        den_z = 1._wp
                     else
-                        xBar = (pos(1) - x_cc(ix))*(pos(2) - y_cc(jy))
-                        weight = wx(ix_count)%sf(i, 1, 1)*wy(jy_count)%sf(j, 1, 1)
+                        dz = pos(3) - z_cc(kz)
+                        num_z = num_z + wz(kz_count)%sf(k, 1, 1)/dz*f_val
+                        den_z = den_z + wz(kz_count)%sf(k, 1, 1)/dz
                     end if
-                    weight = weight/xBar
-                    numerator = numerator + weight*field_vf(field_index)%sf(ix, jy, kz)
-                    denominator = denominator + weight
                 end do
+
+                if (snap_y) then
+                    num_y = num_z
+                    den_y = den_z
+                else
+                    dy = pos(2) - y_cc(jy)
+                    num_y = num_y + wy(jy_count)%sf(j, 1, 1)/dy*(num_z/den_z)
+                    den_y = den_y + wy(jy_count)%sf(j, 1, 1)/dy
+                end if
             end do
+
+            if (snap_x) then
+                num_x = num_y
+                den_x = den_y
+            else
+                dx = pos(1) - x_cc(ix)
+                num_x = num_x + wx(ix_count)%sf(i, 1, 1)/dx*(num_y/den_y)
+                den_x = den_x + wx(ix_count)%sf(i, 1, 1)/dx
+            end if
         end do
 
-        val = numerator/denominator
+        val = num_x/den_x
 
         if (.not. ieee_is_finite(val)) then
             val = field_vf(field_index)%sf(i, j, k)
