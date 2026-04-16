@@ -2156,8 +2156,13 @@ contains
         integer :: Re_max, i, j, k, l, q !< Generic loop iterators
 
         ! HLLC star-state helpers / aliases (new)
-        real(wp), dimension(sys_size) :: U_L, U_R, U_star_L, U_star_R
-        real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(20) :: U_L, U_R, U_star_L, U_star_R
+            real(wp), dimension(20) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+        #:else
+            real(wp), dimension(sys_size) :: U_L, U_R, U_star_L, U_star_R
+            real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+        #:endif
         real(wp) :: u_n_HLLC, u_t_HLLC, u_t2_HLLC
 
         real(wp) :: pres_tot_L, pres_tot_R
@@ -2181,7 +2186,11 @@ contains
         integer :: itnn, itnt1, itnt2, itss1, itss2, itt12
 
         ! ADC (HLL -> HLLC)
-        real(wp), dimension(sys_size) :: F_HLL, U_HLL
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(20) :: F_HLL, U_HLL
+        #:else
+            real(wp), dimension(sys_size) :: F_HLL, U_HLL
+        #:endif
         real(wp) :: u_n_HLL_trace, u_t_HLL_trace
         real(wp) :: u_t2_HLL_trace
         real(wp) :: u_n_HLL_cons
@@ -4615,7 +4624,11 @@ contains
                             idwbuff(1)%beg:idwbuff(1)%end, &
                             1:sys_size) :: q_hat_prim_z_vf
 
-        real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+        #:endif
         type(riemann_states_vec3) :: vel
         type(riemann_states) :: rho, pres, E, H
         type(riemann_states) :: gamma, pi_inf, qv
@@ -4647,7 +4660,11 @@ contains
         real(wp) :: tau_qq_L, tau_qq_R
 
         real(wp) :: G_L, G_R
-        real(wp), dimension(strxe - strxb + 1) :: tau_e_L, tau_e_R
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(6) :: tau_e_L, tau_e_R
+        #:else
+            real(wp), dimension(strxe - strxb + 1) :: tau_e_L, tau_e_R
+        #:endif
 
         real(wp) :: alpha1_L_star, alpha1_R_star, alpha2_L_star, alpha2_R_star
         real(wp) :: u_t_star, tau_nt_star
@@ -4670,9 +4687,15 @@ contains
         real(wp) :: u_n_hat, u_t_hat, u_t2_hat
         real(wp) :: tau_nn_hat, tau_nt_hat, tau_tt_hat, tau_qq_hat
         real(wp) :: tau_nt2_hat, tau_t2t2_hat, tau_t1t2_hat
-        real(wp), dimension(num_fluids) :: alpha_hat, alpha_rho_hat
-        real(wp), dimension(num_vels) :: vel_hat
-        real(wp), dimension(strxe - strxb + 1) :: tau_e_hat
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_hat, alpha_rho_hat
+            real(wp), dimension(3) :: vel_hat
+            real(wp), dimension(6) :: tau_e_hat
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_hat, alpha_rho_hat
+            real(wp), dimension(num_vels) :: vel_hat
+            real(wp), dimension(strxe - strxb + 1) :: tau_e_hat
+        #:endif
 
         real(wp) :: pres_hat, blkmod1_hat, blkmod2_hat, K_hat
         real(wp) :: C_hat_1, C_hat_2
