@@ -1060,9 +1060,9 @@ contains
                                              & 1)*dvd(-1)*dvd(-2) + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) + weno_eps
 
                                         if (wenojs) then
-                                            alpha(0) = d_cbL_${XYZ}$ (0, j)/(beta(0)**2._wp)
-                                            alpha(1) = d_cbL_${XYZ}$ (1, j)/(beta(1)**2._wp)
-                                            alpha(2) = d_cbL_${XYZ}$ (2, j)/(beta(2)**2._wp)
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            end do
                                         else if (mapped_weno) then
                                             alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)/(beta(0:weno_num_stencils)**2._wp)
@@ -1120,9 +1120,9 @@ contains
                                              & 0)*dvd(-1) + poly_coef_cbR_${XYZ}$ (j, 2, 1)*dvd(-2)
 
                                         if (wenojs) then
-                                            alpha(0) = d_cbR_${XYZ}$ (0, j)/(beta(0)**2._wp)
-                                            alpha(1) = d_cbR_${XYZ}$ (1, j)/(beta(1)**2._wp)
-                                            alpha(2) = d_cbR_${XYZ}$ (2, j)/(beta(2)**2._wp)
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            end do
                                         else if (mapped_weno) then
                                             alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)/(beta(0:weno_num_stencils)**2._wp)
