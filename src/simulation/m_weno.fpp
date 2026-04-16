@@ -966,18 +966,15 @@ contains
                                             alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
                                         end do
                                     else if (mapped_weno) then
-                                        alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)/(beta(0:weno_num_stencils)**2._wp)
-                                        omega = alpha/sum(alpha)
-                                        alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                              & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                              & *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                              & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils,j))))
+                                        do q = 0, weno_num_stencils
+                                            alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            omega = alpha/sum(alpha)
+                                            alpha(q) = (d_cbL_${XYZ}$ (q, j)*(1._wp + d_cbL_${XYZ}$ (q, &
+                                                  & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbL_${XYZ}$ (q, &
+                                                  & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbL_${XYZ}$ (q, j))))
+                                        end do
                                     else if (wenoz) then
                                         ! Borges, et al. (2008)
-
                                         tau = abs(beta(1) - beta(0))
                                         do q = 0, weno_num_stencils
                                             alpha(q) = d_cbL_${XYZ}$ (q, j)/(1._wp + tau/beta(q)**2._wp)
@@ -998,18 +995,17 @@ contains
                                             alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
                                         end do
                                     else if (mapped_weno) then
-                                        alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)/(beta(0:weno_num_stencils)**2._wp)
-                                        omega = alpha/sum(alpha)
-                                        alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                              & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                              & *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                              & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils,j))))
+                                        do q = 0, weno_num_stencils
+                                            alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            omega = alpha/sum(alpha)
+                                            alpha(q) = (d_cbR_${XYZ}$ (q, j)*(1._wp + d_cbR_${XYZ}$ (q, &
+                                                  & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbR_${XYZ}$ (q, &
+                                                  & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbR_${XYZ}$ (q, j))))
+                                        end do
                                     else if (wenoz) then
-                                        alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)*(1._wp + tau/beta(0:weno_num_stencils))
+                                        do q = 0, weno_num_stencils
+                                            alpha(q) = d_cbR_${XYZ}$ (q, j)*(1._wp + tau/beta(q))
+                                        end do
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -1064,15 +1060,13 @@ contains
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
                                             end do
                                         else if (mapped_weno) then
-                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
-                                            omega = alpha/sum(alpha)
-                                            alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                  & *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils,j))))
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                                omega = alpha/sum(alpha)
+                                                alpha(q) = (d_cbL_${XYZ}$ (q, j)*(1._wp + d_cbL_${XYZ}$ (q, &
+                                                      & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbL_${XYZ}$ (q, &
+                                                      & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbL_${XYZ}$ (q, j))))
+                                            end do
                                         else if (wenoz) then
                                             ! Borges, et al. (2008)
 
@@ -1124,15 +1118,13 @@ contains
                                                 alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
                                             end do
                                         else if (mapped_weno) then
-                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
-                                            omega = alpha/sum(alpha)
-                                            alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                  & *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils,j))))
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                                omega = alpha/sum(alpha)
+                                                alpha(q) = (d_cbR_${XYZ}$ (q, j)*(1._wp + d_cbR_${XYZ}$ (q, &
+                                                      & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbR_${XYZ}$ (q, &
+                                                      & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbR_${XYZ}$ (q, j))))
+                                            end do
                                         else if (wenoz) then
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
@@ -1261,18 +1253,17 @@ contains
                                         end if
 
                                         if (wenojs) then
-                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            end do
                                         else if (mapped_weno) then
-                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
-                                            omega = alpha/sum(alpha)
-                                            alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                  & *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils,j))))
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                                omega = alpha/sum(alpha)
+                                                alpha(q) = (d_cbL_${XYZ}$ (q, j)*(1._wp + d_cbL_${XYZ}$ (q, &
+                                                      & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbL_${XYZ}$ (q, &
+                                                      & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbL_${XYZ}$ (q, j))))
+                                            end do
                                         else if (wenoz) then
                                             ! Castro, et al. (2010) Don & Borges (2013) also helps
                                             tau = abs(beta(3) - beta(0))  ! Equation 50
@@ -1340,15 +1331,13 @@ contains
                                                 alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
                                             end do
                                         else if (mapped_weno) then
-                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
-                                            omega = alpha/sum(alpha)
-                                            alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                  & *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)**2._wp + omega(0:weno_num_stencils)*(1._wp &
-                                                  & - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils,j))))
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                                omega = alpha/sum(alpha)
+                                                alpha(q) = (d_cbR_${XYZ}$ (q, j)*(1._wp + d_cbR_${XYZ}$ (q, &
+                                                      & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbR_${XYZ}$ (q, &
+                                                      & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbR_${XYZ}$ (q, j))))
+                                            end do
                                         else if (wenoz) then
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
