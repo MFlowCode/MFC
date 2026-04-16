@@ -24,30 +24,9 @@ module m_ib_patches
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models, &
         & s_decode_patch_periodicity
 
-    real(wp) :: x_centroid, y_centroid, z_centroid
-    real(wp) :: length_x, length_y, length_z
-    $:GPU_DECLARE(create='[x_centroid, y_centroid, z_centroid]')
-    $:GPU_DECLARE(create='[length_x, length_y, length_z]')
-
-    integer  :: smooth_patch_id
-    real(wp) :: smooth_coeff
-    $:GPU_DECLARE(create='[smooth_patch_id, smooth_coeff]')
-    ! These variables are analogous in both meaning and use to the similarly named components in the ic_patch_parameters type (see
-    ! m_derived_types.f90 for additional details). They are employed as a means to more concisely perform the actions necessary to
-    ! lay out a particular patch on the grid.
-
-    real(wp) :: cart_x, cart_y, cart_z
-    real(wp) :: sph_phi
-    $:GPU_DECLARE(create='[cart_x, cart_y, cart_z, sph_phi]')
+    real(wp) :: cart_y, cart_z
+    $:GPU_DECLARE(create='[cart_y, cart_z]')
     ! Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
-
-    type(bounds_info) :: x_boundary, y_boundary, z_boundary
-    $:GPU_DECLARE(create='[x_boundary, y_boundary, z_boundary]')
-    ! These variables combine the centroid and length parameters associated with a particular patch to yield the locations of the
-    ! patch boundaries in the x-, y- and z-coordinate directions. They are used as a means to concisely perform the actions
-    ! necessary to lay out a particular patch on the grid.
-
-    character(len=5) :: istr  !< string to store int to string result for error checking
 
 contains
 
@@ -540,6 +519,13 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         radius = patch_ib(patch_id)%radius
 
+        ! completely skip particles no in the domain
+        if (center(1) - radius > x_cc(m + gp_layers + 1) .or. center(1) + radius < x_cc(-gp_layers - 1) .or. center(2) &
+            & - radius > y_cc(n + gp_layers + 1) .or. center(2) + radius < y_cc(-gp_layers - 1) .or. center(3) - radius > z_cc(p &
+            & + gp_layers + 1) .or. center(3) + radius < z_cc(-gp_layers - 1)) then
+            return
+        end if
+
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
@@ -773,15 +759,15 @@ contains
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp                   !< integers containing the periodicity projection information
-        integer                            :: i, j, k, il, ir, jl, jr  !< Generic loop iterators
+        integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
+        integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
         integer                            :: cx, cy
         real(wp)                           :: lx(2), ly(2)
         real(wp), dimension(1:2)           :: bbox_min, bbox_max
         real(wp), dimension(1:3)           :: local_corner, world_corner
         real(wp)                           :: eta, threshold
-        real(wp), dimension(1:3)           :: point, local_point, offset
+        real(wp), dimension(1:3)           :: offset
         real(wp), dimension(1:3)           :: center, xy_local
         real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
 
@@ -853,8 +839,8 @@ contains
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
         integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
-        real(wp)                           :: eta, threshold, corner_distance
-        real(wp), dimension(1:3)           :: point, local_point, offset
+        real(wp)                           :: eta, threshold
+        real(wp), dimension(1:3)           :: offset
         real(wp), dimension(1:3)           :: center, xyz_local
         real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
         integer                            :: cx, cy, cz
@@ -936,7 +922,6 @@ contains
     subroutine s_update_ib_rotation_matrix(patch_id)
 
         integer, intent(in)          :: patch_id
-        integer                      :: i
         real(wp), dimension(3, 3, 3) :: rotation
         real(wp)                     :: angle
 
@@ -1001,17 +986,6 @@ contains
         cart = (/cyl(1), cyl(2)*sin(cyl(3)), cyl(2)*cos(cyl(3))/)
 
     end function f_convert_cyl_to_cart
-
-    !> Convert cylindrical coordinates (x, r) to the spherical azimuthal angle phi
-    subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in) :: cyl_x, cyl_y
-
-        sph_phi = atan(cyl_y/cyl_x)
-
-    end subroutine s_convert_cylindrical_to_spherical_coord
 
     subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
 
@@ -1106,8 +1080,7 @@ contains
 
         #:for X in [('x'), ('y')]
             ! check for periodicity
-
-            if (bc_${X}$%beg == BC_PERIODIC) then
+            if (ib_bc_${X}$%beg == BC_PERIODIC) then
                 ${X}$p_lower = -1
                 ${X}$p_upper = 1
             else
@@ -1119,7 +1092,7 @@ contains
 
         ! z only if 3D
         if (present(zp_lower) .and. p /= 0) then
-            if (bc_z%beg == BC_PERIODIC) then
+            if (ib_bc_z%beg == BC_PERIODIC) then
                 zp_lower = -1
                 zp_upper = 1
             else

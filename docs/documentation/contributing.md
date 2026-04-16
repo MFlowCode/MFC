@@ -334,7 +334,7 @@ do l = 0, p
     do k = 0, n
         do j = 0, m
             rho = q_prim_vf(1)%sf(j, k, l)
-            pres = q_prim_vf(E_idx)%sf(j, k, l)
+            pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             ! ... use rho, pres as thread-local ...
         end do
     end do
@@ -369,7 +369,7 @@ do l = 0, p
         do j = 0, m
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
-                alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
+                alpha(i) = q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l)
             end do
         end do
     end do

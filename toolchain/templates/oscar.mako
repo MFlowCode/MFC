@@ -6,6 +6,7 @@
 #SBATCH --nodes=${nodes}
 #SBATCH --tasks-per-node=${tasks_per_node}
 #SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=4g
 #SBATCH --job-name="${name}"
 #SBATCH --time=${walltime}
 % if partition:
@@ -42,7 +43,7 @@ echo
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
         (set -x; ${profiler}                              \
-            mpirun -np ${nodes*tasks_per_node}            \
+            srun                                          \
                    "${target.get_install_binpath(case)}")
     % endif
 

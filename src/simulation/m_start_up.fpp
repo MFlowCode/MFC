@@ -91,7 +91,8 @@ contains
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
-            ib_state_wrt, &
+            collision_model, coefficient_of_restitution, collision_time, &
+            ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
@@ -304,8 +305,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE)  :: status
         integer(KIND=MPI_OFFSET_KIND)        :: disp
         integer(KIND=MPI_OFFSET_KIND)        :: m_MOK, n_MOK, p_MOK
-        integer(KIND=MPI_OFFSET_KIND)        :: WP_MOK, var_MOK, str_MOK
-        integer(KIND=MPI_OFFSET_KIND)        :: NVARS_MOK
+        integer(KIND=MPI_OFFSET_KIND)        :: WP_MOK, var_MOK
         integer(KIND=MPI_OFFSET_KIND)        :: MOK
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
@@ -434,11 +434,9 @@ contains
                 p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -498,11 +496,9 @@ contains
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
@@ -574,31 +570,31 @@ contains
                     call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
                     dyn_pres = 0._wp
-                    do i = mom_idx%beg, mom_idx%end
+                    do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         dyn_pres = dyn_pres + 5.e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
                     end do
 
                     if (chemistry) then
                         do c = 1, num_species
-                            rhoYks(c) = v_vf(chemxb + c - 1)%sf(j, k, l)
+                            rhoYks(c) = v_vf(eqn_idx%species%beg + c - 1)%sf(j, k, l)
                         end do
                     end if
 
                     if (mhd) then
                         if (n == 0) then
-                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
                         else
-                            pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, &
-                                               & l)**2 + v_vf(B_idx%beg + 2)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg + 1)%sf(j, k, &
+                                               & l)**2 + v_vf(eqn_idx%B%beg + 2)%sf(j, k, l)**2)
                         end if
                     end if
 
-                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._stp, dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                            & pres_mag=pres_mag)
+                    call s_compute_pressure(v_vf(eqn_idx%E)%sf(j, k, l), 0._stp, dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, &
+                                            & T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + intxb - 1)%sf(j, k, l) = v_vf(i + advxb - 1)%sf(j, k, &
-                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
+                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
                     end do
                 end do
             end do
@@ -611,7 +607,8 @@ contains
 
         integer, intent(inout)  :: t_step
         real(wp), intent(inout) :: time_avg
-        integer                 :: i
+        integer                 :: i, eta_hh, eta_mm, eta_ss
+        real(wp)                :: eta_sec
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
@@ -640,14 +637,23 @@ contains
 
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
-                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time
+                eta_sec = wall_time_avg*(t_stop - mytime)/max(dt, tiny(dt))
+                eta_hh = int(eta_sec)/3600
+                eta_mm = mod(int(eta_sec), 3600)/60
+                eta_ss = mod(int(eta_sec), 60)
+                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
+                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time, eta_hh, eta_mm, eta_ss
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, "")', &
+                eta_sec = wall_time_avg*real(t_step_stop - t_step, wp)
+                eta_hh = int(eta_sec)/3600
+                eta_mm = mod(int(eta_sec), 3600)/60
+                eta_ss = mod(int(eta_sec), 60)
+                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time
+                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time, eta_hh, &
+                    & eta_mm, eta_ss
             end if
         end if
 
@@ -811,6 +817,9 @@ contains
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
+        ! Write IB kinematic state for restart
+        if (ib .and. proc_rank == 0) call s_write_ib_state_file()
+
         call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
@@ -830,16 +839,15 @@ contains
     !> Initialize all simulation sub-modules in the required dependency order
     impure subroutine s_initialize_modules
 
-        integer  :: m_ds, n_ds, p_ds
-        integer  :: i, j, k, l, x_id, y_id, z_id, ix, iy, iz
-        real(wp) :: temp1, temp2, temp3, temp4
+        integer :: m_ds, n_ds, p_ds
+        integer :: i
 
         call s_initialize_global_parameters_module()
         #:if USING_AMD
             #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
-                           & bc_z%end/) == ${BC}$) .and. adv_idx%end > 20 .and. (.not. chemistry), &
-                           & "CBC module with AMD compiler requires adv_idx%end <= 20 when case optimization is turned off")
+                           & bc_z%end/) == ${BC}$) .and. eqn_idx%adv%end > 20 .and. (.not. chemistry), &
+                           & "CBC module with AMD compiler requires eqn_idx%adv%end <= 20 when case optimization is turned off")
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
                            & bc_z%end/) == ${BC}$) .and. sys_size > 20 .and. (chemistry), &
                            & "CBC module with AMD compiler and chemistry requires sys_size <= 20 when case optimization is turned off")
@@ -906,6 +914,7 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
+            if (t_step_start /= 0) call s_read_ib_restart_data()
             call s_ibm_setup()
             call s_write_ib_data_file(0)
         end if
@@ -1002,6 +1011,11 @@ contains
 
         call s_mpi_bcast_user_inputs()
 
+        ! Save original BCs before decomposition overwrites them with MPI neighbor ranks
+        ib_bc_x = bc_x
+        ib_bc_y = bc_y
+        ib_bc_z = bc_z
+
         call s_initialize_parallel_io()
 
         call s_mpi_decompose_computational_domain()
@@ -1031,7 +1045,7 @@ contains
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
                      & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
                      & polytropic, polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, &
-                     & adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
+                     & adap_dt_max_iters, eqn_idx%n, pi_fac, low_Mach]')
 
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight, R0]')
@@ -1042,12 +1056,13 @@ contains
             end if
         end if
 
-        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
+        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, pi_fac, low_Mach]')
 
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
         $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
+        $:GPU_UPDATE(device='[bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]')
         $:GPU_UPDATE(device='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
@@ -1112,9 +1127,62 @@ contains
 
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
+        if (ib) call s_finalize_ibm_module()
 
         call s_mpi_finalize()
 
     end subroutine s_finalize_modules
+
+    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart. Rank 0 reads the last num_ibs records and
+    !! broadcasts to all ranks. Overwrites patch_ib vel, angular_vel, angles, and centroid.
+    impure subroutine s_read_ib_restart_data()
+
+        character(len=path_len + 2*name_len) :: file_loc
+        integer                              :: i, ios, file_unit, ib_id, ierr
+        real(wp)                             :: time_read
+        real(wp), dimension(3)               :: force_read, torque_read
+        real(wp), dimension(3)               :: vel_read, angular_vel_read, angles_read
+        real(wp)                             :: xc_read, yc_read, zc_read
+        logical                              :: file_exist
+
+        if (proc_rank == 0) then
+            file_loc = trim(case_dir) // '/restart_data/ib_state.dat'
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            print *, "IB Restart File Exists: ", file_exist
+            if (file_exist) then
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                print *, "iostat ", ios
+            else
+                call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+            end if
+
+            ! Read all records; the last num_ibs records are the final state
+            do
+                read (file_unit, iostat=ios) time_read, ib_id, force_read, torque_read, vel_read, angular_vel_read, angles_read, &
+                      & xc_read, yc_read, zc_read
+                if (ios /= 0) exit
+                patch_ib(ib_id)%vel = vel_read
+                patch_ib(ib_id)%angular_vel = angular_vel_read
+                patch_ib(ib_id)%angles = angles_read
+                patch_ib(ib_id)%x_centroid = xc_read
+                patch_ib(ib_id)%y_centroid = yc_read
+                patch_ib(ib_id)%z_centroid = zc_read
+            end do
+
+            close (file_unit)
+        end if
+
+#ifdef MFC_MPI
+        do i = 1, num_ibs
+            call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        end do
+#endif
+
+    end subroutine s_read_ib_restart_data
 
 end module m_start_up

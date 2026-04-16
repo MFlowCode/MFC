@@ -24,12 +24,12 @@ ${helpers.template_prologue()}
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
 % if engine == 'batch':
-. ./mfc.sh load -c tuo -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c tuo -m ${'g' if gpu_enabled else 'c'}
 % endif
 cd - > /dev/null
 echo
 
-% if gpu:
+% if gpu_enabled:
     export MPICH_GPU_SUPPORT_ENABLED=1
 % else:
     export MPICH_GPU_SUPPORT_ENABLED=0
@@ -46,7 +46,7 @@ export HSA_XNACK=0
         (set -x; flux run \
             --nodes=${nodes} --ntasks=${tasks_per_node * nodes} \
             -o spindle.level=off --exclusive \
-            % if gpu:
+            % if gpu_enabled:
                 --gpus-per-task 1 \
             % endif
             ${profiler} "${target.get_install_binpath(case)}")
