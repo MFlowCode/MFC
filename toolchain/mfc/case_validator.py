@@ -1308,12 +1308,24 @@ class CaseValidator:
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_beg not in wall_bcs, f"Isothermal In (bc_{dir}%isothermal_in) requires a wall. Set bc_{dir}%beg to -15 (slip) or -16 (no-slip).")
 
+                # Check that the wall temperature is defined and physically valid (> 0 K)
+                tw_in = self.get(f"bc_{dir}%Twall_in")
+                self.prohibit(tw_in is None, f"Isothermal In (bc_{dir}%isothermal_in) requires a wall temperature to be set (e.g., bc_{dir}%Twall_in).")
+                if tw_in is not None and self._is_numeric(tw_in):
+                    self.prohibit(tw_in <= 0.0, f"Wall temperature bc_{dir}%Twall_in must be strictly positive for thermodynamics (got {tw_in}).")
+
             if isothermal_out:
                 # Prohibit isothermal boundaries if chemistry or diffusion are disabled
                 self.prohibit(not chemistry or not diffusion, f"Isothermal Out (bc_{dir}%isothermal_out) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
 
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_end not in wall_bcs, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall. Set bc_{dir}%end to -15 (slip) or -16 (no-slip).")
+
+                # Check that the wall temperature is defined and physically valid (> 0 K)
+                tw_out = self.get(f"bc_{dir}%Twall_out")
+                self.prohibit(tw_out is None, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall temperature to be set (e.g., bc_{dir}%Twall_out).")
+                if tw_out is not None and self._is_numeric(tw_out):
+                    self.prohibit(tw_out <= 0.0, f"Wall temperature bc_{dir}%Tw_out must be strictly positive for thermodynamics (got {tw_out}).")
 
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""

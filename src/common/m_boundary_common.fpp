@@ -730,7 +730,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. chem_params%diffusion .and. present(q_T_sf)) then
+                if (chemistry .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, p - (j - 1))
                     end do
