@@ -276,12 +276,29 @@ contains
                         end do
                     end if
 
+                    ! flux_src at advxb:advxe is overloaded by design:
+                    !
+                    !   adv_src_alpha_iface:
+                    !     flux_src(advxb:advxe) = per-fluid interface alpha values.
+                    !     Each fluid gets a separate 3D array.
+                    !
+                    !   adv_src_vel_iface:
+                    !     flux_src(advxb) = one shared face-normal interface velocity.
+                    !     advxb+1:advxe are pointer-aliased to advxb so loops over
+                    !     advxb:advxe can keep fluid indexing while still reading one value.
+                    !     Saves (num_fluids - 1) fields.
+                    !
+                    !   adv_src_none:
+                    !     flux_src(advxb:advxe) = zeros. No separate NC advection source term.
+                    !     Allocated for structural consistency with s_finalize_riemann_solver.
                     @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
                              & idwbuff(1)%beg:idwbuff(1)%end, &
                              & idwbuff(2)%beg:idwbuff(2)%end, &
                              & idwbuff(3)%beg:idwbuff(3)%end))
 
-                    if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
+                    if (adv_src_alpha_iface .or. adv_src_none) then
+                        ! Alpha-interface needs separate per-fluid arrays.
+                        ! HLLD (adv_src_none) allocates for structural consistency with s_finalize_riemann_solver.
                         do l = adv_idx%beg + 1, adv_idx%end
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                      & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -318,7 +335,11 @@ contains
                 @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
 
                 if (i == 1) then
-                    if (.not. ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4)) then
+                    if (adv_src_vel_iface) then
+                        ! u-interface: flux_src(advxb) holds one shared face-normal velocity.
+                        ! Pointer-alias advxb+1:advxe to the same memory so loops over
+                        ! advxb:advxe can keep fluid indexing while still reading one value.
+                        ! This saves (num_fluids - 1) 3D field allocations.
                         do l = adv_idx%beg + 1, adv_idx%end
                             flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                             $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
@@ -622,8 +643,7 @@ contains
             @:ALLOCATE(gm_alphaR_n(1:num_dims))
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             @:ALLOCATE(nc_iface_vel_n(1:num_dims))
             do i = 1, num_dims
                 @:ALLOCATE(nc_iface_vel_n(i)%vf(1:num_dims))
@@ -940,8 +960,7 @@ contains
                                       id, irx, iry, irz, is_hat_L)
                 call nvtxEndRange
 
-                if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-                    .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+                if (use_nc_iface_vel) then
                     call s_finalize_nc_iface_vel(nc_iface_vel_n(id)%vf, id)
                 end if
 
@@ -1484,8 +1503,9 @@ contains
 
             select case (current_idir)
             case (1)
-                if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. &
-                    (riemann_solver == 4 .and. .not. hypo_nc_dual_pass)) then
+                if (adv_src_alpha_iface) then
+                    ! Alpha-interface: flux_src(j_adv) supplies interface alpha_k.
+                    ! RHS applies velocity * d(alpha_k)/dx.
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds,local_term_coeff,local_flux1,local_flux2]')
                     do j_adv = advxb, advxe
                         do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
@@ -1498,7 +1518,7 @@ contains
                                 end do; end do; end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    if (riemann_solver == 1 .and. alt_soundspeed .and. .not. bubbles_euler) then
+                    if (alt_soundspeed .and. .not. bubbles_euler) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[k_idx,l_idx,q_idx,local_inv_ds,local_k_term_val,local_flux1,local_flux2]')
                         do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                     local_inv_ds = 1._wp/dx(k_idx)
@@ -1512,10 +1532,11 @@ contains
                                 end do; end do; end do
                         $:END_GPU_PARALLEL_LOOP()
                     end if
-                else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
-                    ! Branch C: dual-pass HLLD skips NC advection
-                else if ((riemann_solver == 1 .and. hll_u_interface) .or. riemann_solver == 2 .or. &
-                         riemann_solver == 3 .or. riemann_solver == 5) then
+                else if (adv_src_none) then
+                    ! No separate NC advection source term.
+                else if (adv_src_vel_iface) then
+                    ! u-interface: flux_src(advxb) supplies one shared face-normal velocity.
+                    ! RHS applies alpha_k * du/dx.
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds,local_term_coeff,local_flux1,local_flux2]')
                     do j_adv = advxb, advxe
                         do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
@@ -1545,8 +1566,9 @@ contains
                 end if
 
             case (2)
-                if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. &
-                    (riemann_solver == 4 .and. .not. hypo_nc_dual_pass)) then
+                if (adv_src_alpha_iface) then
+                    ! Alpha-interface: flux_src(j_adv) supplies interface alpha_k.
+                    ! RHS applies velocity * d(alpha_k)/dy.
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds,local_term_coeff,local_flux1,local_flux2]')
                     do j_adv = advxb, advxe
                         do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
@@ -1559,7 +1581,7 @@ contains
                                 end do; end do; end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    if (riemann_solver == 1 .and. alt_soundspeed .and. .not. bubbles_euler) then
+                    if (alt_soundspeed .and. .not. bubbles_euler) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[k_idx,l_idx,q_idx,local_inv_ds,local_k_term_val,local_flux1,local_flux2]')
                         do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                     local_inv_ds = 1._wp/dy(k_idx)
@@ -1584,10 +1606,11 @@ contains
                             $:END_GPU_PARALLEL_LOOP()
                         end if
                     end if
-                else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
-                    ! Branch C: dual-pass HLLD skips NC advection
-                else if ((riemann_solver == 1 .and. hll_u_interface) .or. riemann_solver == 2 .or. &
-                         riemann_solver == 3 .or. riemann_solver == 5) then
+                else if (adv_src_none) then
+                    ! No separate NC advection source term.
+                else if (adv_src_vel_iface) then
+                    ! u-interface: flux_src(advxb) supplies one shared face-normal velocity.
+                    ! RHS applies alpha_k * du/dy.
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds,local_term_coeff,local_flux1,local_flux2]')
                     do j_adv = advxb, advxe
                         do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
@@ -1686,8 +1709,9 @@ contains
                         end if
                     end if
                 else
-                    if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. &
-                        (riemann_solver == 4 .and. .not. hypo_nc_dual_pass)) then
+                    if (adv_src_alpha_iface) then
+                        ! Alpha-interface: flux_src(j_adv) supplies interface alpha_k.
+                        ! RHS applies velocity * d(alpha_k)/dz.
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds,local_term_coeff,local_flux1,local_flux2]')
                         do j_adv = advxb, advxe
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
@@ -1700,7 +1724,7 @@ contains
                                     end do; end do; end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-                        if (riemann_solver == 1 .and. alt_soundspeed .and. .not. bubbles_euler) then
+                        if (alt_soundspeed .and. .not. bubbles_euler) then
                             $:GPU_PARALLEL_LOOP(collapse=3,private='[k_idx,l_idx,q_idx,local_inv_ds,local_k_term_val,local_flux1,local_flux2]')
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                         local_inv_ds = 1._wp/dz(k_idx)
@@ -1714,10 +1738,11 @@ contains
                                     end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else if (riemann_solver == 4 .and. hypo_nc_dual_pass) then
-                        ! Branch C: dual-pass HLLD skips NC advection
-                    else if ((riemann_solver == 1 .and. hll_u_interface) .or. riemann_solver == 2 .or. &
-                             riemann_solver == 3 .or. riemann_solver == 5) then
+                    else if (adv_src_none) then
+                        ! No separate NC advection source term.
+                    else if (adv_src_vel_iface) then
+                        ! u-interface: flux_src(advxb) supplies one shared face-normal velocity.
+                        ! RHS applies alpha_k * du/dz.
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds,local_term_coeff,local_flux1,local_flux2]')
                         do j_adv = advxb, advxe
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
@@ -2349,7 +2374,7 @@ contains
                         @:DEALLOCATE(flux_src_n(i)%vf(E_idx)%sf)
                     end if
 
-                    if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
+                    if (adv_src_alpha_iface .or. adv_src_none) then
                         do l = adv_idx%beg + 1, adv_idx%end
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
@@ -2368,8 +2393,7 @@ contains
             @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             do i = 1, num_dims
                 do l = 1, num_dims
                     @:DEALLOCATE(nc_iface_vel_n(i)%vf(l)%sf)

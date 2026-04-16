@@ -960,6 +960,7 @@ contains
                                     else if (s_R <= 0._wp) then
                                         flux_src_rs${XYZ}$_vf(j, k, l, i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
                                     else
+                                        ! alpha-interface: per-fluid interface alpha_k
                                         flux_src_rs${XYZ}$_vf(j, k, l, i) = &
                                             (s_R*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                              - s_L*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)) &
@@ -985,10 +986,13 @@ contains
                                     end if
                                 end do
                                 if (0._wp <= s_L) then
+                                    ! u-interface: shared face-normal velocity
                                     flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_L(dir_idx(1))
                                 else if (s_R <= 0._wp) then
+                                    ! u-interface: shared face-normal velocity
                                     flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_R(dir_idx(1))
                                 else
+                                    ! u-interface: shared face-normal velocity
                                     flux_src_rs${XYZ}$_vf(j, k, l, advxb) = &
                                         (s_R*vel_L(dir_idx(1)) - s_L*vel_R(dir_idx(1)))/(s_R - s_L)
                                 end if
@@ -1011,6 +1015,7 @@ contains
                                                                      - s_P*Y_L*rho_L*vel_L(dir_idx(1)) &
                                                                      + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
                                                                     /(s_M - s_P)
+                                    ! chemistry: zeroed (diffusion writes to physical-space directly)
                                     flux_src_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                 end do
                             end if
@@ -1046,6 +1051,7 @@ contains
                                         flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = 0._wp ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
                                     end if
                                 end if
+                                ! MHD: no NC advection quantity exported via flux_src
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                             end if
 
@@ -1679,6 +1685,7 @@ contains
                                     (qL_prim_rs${XYZ}$_vf(j, k, l, i) &
                                      - qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)) &
                                     *s_M*s_P/(s_M - s_P)
+                                ! alpha-interface: per-fluid interface alpha_k
                                 flux_src_rs${XYZ}$_vf(j, k, l, i) = &
                                     (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
                                      - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, i)) &
@@ -1702,6 +1709,7 @@ contains
                                                                      - s_P*Y_L*rho_L*vel_L(dir_idx(1)) &
                                                                      + s_M*s_P*(Y_L*rho_L - Y_R*rho_R)) &
                                                                     /(s_M - s_P)
+                                    ! chemistry: zeroed (diffusion writes to physical-space directly)
                                     flux_src_rs${XYZ}$_vf(j, k, l, i) = 0._wp
                                 end do
                             end if
@@ -1728,6 +1736,7 @@ contains
                                                                                     s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
                                     end do
                                 end if
+                                ! MHD: no NC advection quantity exported via flux_src
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                             end if
 
@@ -2548,6 +2557,7 @@ contains
                                         + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*(xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1))
                                 end do
 
+                                ! u-interface: HLLC face-normal velocity
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! HYPOELASTIC STRESS EVOLUTION FLUX.
@@ -2797,6 +2807,7 @@ contains
                                     !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0._wp
                                 end do
 
+                                ! u-interface: HLLC face-normal velocity
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
@@ -3218,6 +3229,7 @@ contains
                                     !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0._wp
                                 end do
 
+                                ! u-interface: HLLC face-normal velocity
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
@@ -3935,6 +3947,7 @@ contains
                                     end do
                                 end if
 
+                                ! u-interface: HLLC face-normal velocity
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 if (chemistry) then
@@ -3945,6 +3958,7 @@ contains
 
                                         flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*rho_L*Y_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
                                                                         + xi_P*rho_R*Y_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                        ! chemistry: zeroed (diffusion writes to physical-space directly)
                                         flux_src_rs${XYZ}$_vf(j, k, l, i) = 0.0_wp
                                     end do
                                 end if
@@ -4148,6 +4162,7 @@ contains
                                     if (p > 0) vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(3)) = u_t2_HLLC
 
                                     ! Update advection source flux with blended normal velocity
+                                    ! u-interface: ADC-blended HLLC face-normal velocity
                                     flux_src_rs${XYZ}$_vf(j, k, l, advxb) = u_n_HLLC
 
                                     ! Overwrite nc_iface_vel with blended velocities
@@ -4781,6 +4796,7 @@ contains
                                 flux_rs${XYZ}$_vf(j, k, l, i) = 0._wp ! TODO multi-component (zero for now)
                             end do
 
+                            ! MHD HLLD: no separate NC advection quantity exported via flux_src
                             flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                         end do
                     end do
@@ -5732,6 +5748,7 @@ contains
                                 end if
                             #:endif
 
+                            ! Dual-pass HLLD: all NC terms stay inside the Riemann flux
                             flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                         end do
                     end do
@@ -5802,8 +5819,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             @:ALLOCATE(nc_iface_vel_rsx_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
@@ -5837,8 +5853,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             @:ALLOCATE(nc_iface_vel_rsy_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
@@ -5872,8 +5887,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             @:ALLOCATE(nc_iface_vel_rsz_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:num_dims))
@@ -6908,7 +6922,9 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
+            ! Copy the per-fluid flux_src entries when they are structurally present.
+            ! HLLD writes zeros here; these entries are kept for consistency.
+            if (adv_src_alpha_iface .or. adv_src_none) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
@@ -6965,7 +6981,9 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
+            ! Copy the per-fluid flux_src entries when they are structurally present.
+            ! HLLD writes zeros here; these entries are kept for consistency.
+            if (adv_src_alpha_iface .or. adv_src_none) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = advxb + 1, advxe
                     do j = is1%beg, is1%end
@@ -7005,7 +7023,9 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if ((riemann_solver == 1 .and. .not. hll_u_interface) .or. riemann_solver == 4) then
+            ! Copy the per-fluid flux_src entries when they are structurally present.
+            ! HLLD writes zeros here; these entries are kept for consistency.
+            if (adv_src_alpha_iface .or. adv_src_none) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = advxb + 1, advxe
                     do l = is3%beg, is3%end
@@ -7088,8 +7108,7 @@ contains
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             @:DEALLOCATE(nc_iface_vel_rsx_vf)
         end if
         if (qbmm) then
@@ -7105,8 +7124,7 @@ contains
         @:DEALLOCATE(flux_rsy_vf)
         @:DEALLOCATE(flux_src_rsy_vf)
         @:DEALLOCATE(flux_gsrc_rsy_vf)
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             @:DEALLOCATE(nc_iface_vel_rsy_vf)
         end if
         if (qbmm) then
@@ -7122,8 +7140,7 @@ contains
         @:DEALLOCATE(flux_rsz_vf)
         @:DEALLOCATE(flux_src_rsz_vf)
         @:DEALLOCATE(flux_gsrc_rsz_vf)
-        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            .or. (riemann_solver == 1 .and. .not. hll_u_interface .and. alt_soundspeed)) then
+        if (use_nc_iface_vel) then
             @:DEALLOCATE(nc_iface_vel_rsz_vf)
         end if
         if (qbmm) then
