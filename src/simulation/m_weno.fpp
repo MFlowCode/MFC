@@ -1261,7 +1261,6 @@ contains
                                         end if
 
                                         if (wenojs) then
-                                            d_cbR_${XYZ}$ (0:weno_num_stencils,j)/(beta(0:weno_num_stencils)**2._wp)
                                             alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)/(beta(0:weno_num_stencils)**2._wp)
                                         else if (mapped_weno) then
