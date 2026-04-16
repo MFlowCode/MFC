@@ -941,7 +941,7 @@ contains
         if (weno_order == 3 .or. dummy) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[beta, dvd, poly, omega, alpha, tau]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[beta, dvd, poly, omega, alpha, tau, q]')
                     do l = is3_weno%beg, is3_weno%end
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
@@ -962,8 +962,9 @@ contains
                                     beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(-1)*dvd(-1) + weno_eps
 
                                     if (wenojs) then
-                                        alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)/(beta(0:weno_num_stencils)**2._wp)
+                                        do q = 0, weno_num_stencils
+                                            alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                        end do
                                     else if (mapped_weno) then
                                         alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                               & j)/(beta(0:weno_num_stencils)**2._wp)
@@ -978,8 +979,9 @@ contains
                                         ! Borges, et al. (2008)
 
                                         tau = abs(beta(1) - beta(0))
-                                        alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)*(1._wp + tau/beta(0:weno_num_stencils))
+                                        do q = 0, weno_num_stencils
+                                            alpha(q) = d_cbL_${XYZ}$ (q, j)/(1._wp + tau/beta(q)**2._wp)
+                                        end do
                                     end if
 
                                     omega = alpha/sum(alpha)
@@ -992,8 +994,9 @@ contains
                                     poly(1) = v_rs_ws_${XYZ}$ (j, k, l, i) + poly_coef_cbR_${XYZ}$ (j, 1, 0)*dvd(-1)
 
                                     if (wenojs) then
-                                        alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                              & j)/(beta(0:weno_num_stencils)**2._wp)
+                                        do q = 0, weno_num_stencils
+                                            alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                        end do
                                     else if (mapped_weno) then
                                         alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                               & j)/(beta(0:weno_num_stencils)**2._wp)
@@ -1057,8 +1060,9 @@ contains
                                              & 1)*dvd(-1)*dvd(-2) + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) + weno_eps
 
                                         if (wenojs) then
-                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            end do
                                         else if (mapped_weno) then
                                             alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)/(beta(0:weno_num_stencils)**2._wp)
@@ -1114,8 +1118,9 @@ contains
                                              & 0)*dvd(-1) + poly_coef_cbR_${XYZ}$ (j, 2, 1)*dvd(-2)
 
                                         if (wenojs) then
-                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            end do
                                         else if (mapped_weno) then
                                             alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)/(beta(0:weno_num_stencils)**2._wp)
@@ -1252,6 +1257,7 @@ contains
                                         end if
 
                                         if (wenojs) then
+                                            d_cbR_${XYZ}$ (0:weno_num_stencils,j)/(beta(0:weno_num_stencils)**2._wp)
                                             alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)/(beta(0:weno_num_stencils)**2._wp)
                                         else if (mapped_weno) then
@@ -1327,8 +1333,9 @@ contains
                                         end if
 
                                         if (wenojs) then
-                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
-                                                  & j)/(beta(0:weno_num_stencils)**2._wp)
+                                            do q = 0, weno_num_stencils
+                                                alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
+                                            end do
                                         else if (mapped_weno) then
                                             alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, &
                                                   & j)/(beta(0:weno_num_stencils)**2._wp)
