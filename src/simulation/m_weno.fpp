@@ -1104,7 +1104,9 @@ contains
                                             end do
                                         end if
 
-                                        omega = alpha/sum(alpha)
+                                        omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
+                                        omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
+                                        omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
 
                                         vL_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
 
@@ -1143,7 +1145,9 @@ contains
                                             end do
                                         end if
 
-                                        omega = alpha/sum(alpha)
+                                        omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
+                                        omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
+                                        omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
 
                                         vR_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
                                     end do
