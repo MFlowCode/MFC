@@ -937,10 +937,6 @@ contains
                     irx%beg = 0; iry%beg = 0; irz%beg = -1
                 end if
                 irx%end = m; iry%end = n; irz%end = p
-                ! $:GPU_UPDATE(host='[qL_rsx_vf,qR_rsx_vf]')
-                ! print *, "L", qL_rsx_vf(100:300, 0, 0, 1)
-                ! print *, "R", qR_rsx_vf(100:300, 0, 0, 1)
-
                 !Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
                 call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
