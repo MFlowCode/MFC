@@ -72,7 +72,7 @@ contains
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
                     $:GPU_LOOP(parallelism='[seq]')
-                    do i = momxb, E_idx
+                    do i = eqn_idx%mom%beg, eqn_idx%E
                         tau_Re_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
@@ -91,9 +91,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -166,14 +166,15 @@ contains
                             tau_Re(2, 1) = (grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l))/Re_visc(1)
 
                             tau_Re(2, 2) = (4._wp*grad_y_vf(2)%sf(j, k, l) - 2._wp*grad_x_vf(1)%sf(j, k, &
-                                   & l) - 2._wp*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/(3._wp*Re_visc(1))
+                                   & l) - 2._wp*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y_cc(k))/(3._wp*Re_visc(1))
                             ! Viscous flux contribution to momentum and energy equations
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, 2
-                                tau_Re_vf(contxe + i)%sf(j, k, l) = tau_Re_vf(contxe + i)%sf(j, k, l) - tau_Re(2, i)
+                                tau_Re_vf(eqn_idx%cont%end + i)%sf(j, k, l) = tau_Re_vf(eqn_idx%cont%end + i)%sf(j, k, &
+                                          & l) - tau_Re(2, i)
 
-                                tau_Re_vf(E_idx)%sf(j, k, l) = tau_Re_vf(E_idx)%sf(j, k, l) - q_prim_vf(contxe + i)%sf(j, k, &
-                                          & l)*tau_Re(2, i)
+                                tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, &
+                                          & l) - q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l)*tau_Re(2, i)
                             end do
                         end do
                     end do
@@ -193,9 +194,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -264,13 +265,13 @@ contains
                                 end if
                             end if
 
-                            tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, l) + q_prim_vf(momxb + 1)%sf(j, k, &
-                                   & l)/y_cc(k))/Re_visc(2)
+                            tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, &
+                                   & l) + q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y_cc(k))/Re_visc(2)
 
-                            tau_Re_vf(momxb + 1)%sf(j, k, l) = tau_Re_vf(momxb + 1)%sf(j, k, l) - tau_Re(2, 2)
+                            tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - tau_Re(2, 2)
 
-                            tau_Re_vf(E_idx)%sf(j, k, l) = tau_Re_vf(E_idx)%sf(j, k, l) - q_prim_vf(momxb + 1)%sf(j, k, &
-                                      & l)*tau_Re(2, 2)
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, &
+                                      & l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)*tau_Re(2, 2)
                         end do
                     end do
                 end do
@@ -290,9 +291,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -363,15 +364,16 @@ contains
 
                             tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(1)
 
-                            tau_Re(2, 3) = ((grad_z_vf(2)%sf(j, k, l) - q_prim_vf(momxe)%sf(j, k, &
+                            tau_Re(2, 3) = ((grad_z_vf(2)%sf(j, k, l) - q_prim_vf(eqn_idx%mom%end)%sf(j, k, &
                                    & l))/y_cc(k) + grad_y_vf(3)%sf(j, k, l))/Re_visc(1)
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 2, 3
-                                tau_Re_vf(contxe + i)%sf(j, k, l) = tau_Re_vf(contxe + i)%sf(j, k, l) - tau_Re(2, i)
+                                tau_Re_vf(eqn_idx%cont%end + i)%sf(j, k, l) = tau_Re_vf(eqn_idx%cont%end + i)%sf(j, k, &
+                                          & l) - tau_Re(2, i)
 
-                                tau_Re_vf(E_idx)%sf(j, k, l) = tau_Re_vf(E_idx)%sf(j, k, l) - q_prim_vf(contxe + i)%sf(j, k, &
-                                          & l)*tau_Re(2, i)
+                                tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, &
+                                          & l) - q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l)*tau_Re(2, i)
                             end do
                         end do
                     end do
@@ -389,9 +391,9 @@ contains
                             do i = 1, num_fluids
                                 alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                                 if (bubbles_euler .and. num_fluids == 1) then
-                                    alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 else
-                                    alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                    alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
                                 end if
                             end do
 
@@ -462,10 +464,10 @@ contains
 
                             tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(2)
 
-                            tau_Re_vf(momxb + 1)%sf(j, k, l) = tau_Re_vf(momxb + 1)%sf(j, k, l) - tau_Re(2, 2)
+                            tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - tau_Re(2, 2)
 
-                            tau_Re_vf(E_idx)%sf(j, k, l) = tau_Re_vf(E_idx)%sf(j, k, l) - q_prim_vf(momxb + 1)%sf(j, k, &
-                                      & l)*tau_Re(2, 2)
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, &
+                                      & l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)*tau_Re(2, 2)
                         end do
                     end do
                 end do
@@ -494,7 +496,7 @@ contains
         integer                                         :: i, j, k, l
 
         do i = 1, num_dims
-            iv%beg = mom_idx%beg; iv%end = mom_idx%end
+            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
 
             $:GPU_UPDATE(device='[iv]')
 
@@ -521,7 +523,7 @@ contains
                 end if
             end do
         else  ! Compute velocity gradients at cell centers using central finite differences
-            iv%beg = mom_idx%beg; iv%end = mom_idx%end
+            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
             $:GPU_UPDATE(device='[iv]')
 
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
@@ -1316,13 +1318,13 @@ contains
 
         ! compute the velocity gradient tensor
         do l = 1, num_dims
-            velocity_gradient_tensor(l, 1) = (q_prim_vf(momxb + l - 1)%sf(i + 1, j, k) - q_prim_vf(momxb + l - 1)%sf(i - 1, j, &
-                                     & k))/(2._wp*dx(1))
-            velocity_gradient_tensor(l, 2) = (q_prim_vf(momxb + l - 1)%sf(i, j + 1, k) - q_prim_vf(momxb + l - 1)%sf(i, j - 1, &
-                                     & k))/(2._wp*dx(2))
+            velocity_gradient_tensor(l, 1) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + 1, j, &
+                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i - 1, j, k))/(2._wp*dx(1))
+            velocity_gradient_tensor(l, 2) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + 1, &
+                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j - 1, k))/(2._wp*dx(2))
             if (num_dims == 3) then
-                velocity_gradient_tensor(l, 3) = (q_prim_vf(momxb + l - 1)%sf(i, j, k + 1) - q_prim_vf(momxb + l - 1)%sf(i, j, &
-                                         & k - 1))/(2._wp*dx(3))
+                velocity_gradient_tensor(l, 3) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
+                                         & k + 1) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k - 1))/(2._wp*dx(3))
             end if
         end do
 

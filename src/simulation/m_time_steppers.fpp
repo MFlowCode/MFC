@@ -223,27 +223,27 @@ contains
         @:ALLOCATE(q_prim_vf(1:sys_size))
 
         if (.not. igr) then
-            do i = 1, adv_idx%end
+            do i = 1, eqn_idx%adv%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
 
             if (bubbles_euler) then
-                do i = bub_idx%beg, bub_idx%end
+                do i = eqn_idx%bub%beg, eqn_idx%bub%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
                 if (adv_n) then
-                    @:ALLOCATE(q_prim_vf(n_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+                    @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%n))
                 end if
             end if
 
             if (mhd) then
-                do i = B_idx%beg, B_idx%end
+                do i = eqn_idx%B%beg, eqn_idx%B%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -251,7 +251,7 @@ contains
             end if
 
             if (elasticity) then
-                do i = stress_idx%beg, stress_idx%end
+                do i = eqn_idx%stress%beg, eqn_idx%stress%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -259,7 +259,7 @@ contains
             end if
 
             if (hyperelasticity) then
-                do i = xibeg, xiend + 1
+                do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -267,19 +267,19 @@ contains
             end if
 
             if (cont_damage) then
-                @:ALLOCATE(q_prim_vf(damage_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%damage)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(damage_idx))
+                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%damage))
             end if
 
             if (hyper_cleaning) then
-                @:ALLOCATE(q_prim_vf(psi_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%psi)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(psi_idx))
+                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%psi))
             end if
 
             if (model_eqns == 3) then
-                do i = internalEnergies_idx%beg, internalEnergies_idx%end
+                do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -287,13 +287,13 @@ contains
             end if
 
             if (surface_tension) then
-                @:ALLOCATE(q_prim_vf(c_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(c_idx))
+                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%c))
             end if
 
             if (chemistry) then
-                do i = chemxb, chemxe
+                do i = eqn_idx%species%beg, eqn_idx%species%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -394,8 +394,8 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        ! Opening and writing the header of the ib state data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
+        ! Opening the ib state data file (used for restart and diagnostics)
+        if (proc_rank == 0 .and. ib) then
             call s_open_ib_state_file()
         end if
 
@@ -463,7 +463,6 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         real(wp)                :: start, finish
-        integer                 :: dest
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -559,13 +558,6 @@ contains
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
                     ! compute ib forces for fixed immersed boundaries if requested for output
-                else if (ib_state_wrt .and. s == nstage) then
-                    call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                end if
-
-                ! Write IB state to file if requested and at the RK final stage
-                if (proc_rank == 0 .and. ib_state_wrt .and. s == nstage) then
-                    call s_write_ib_state_file()
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -577,7 +569,13 @@ contains
             end if
         end do
 
-        if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
+        !
+        if (ib) then
+            if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
+            if (ib_state_wrt .and. (.not. moving_immersed_boundary_flag)) then
+                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+            end if
+        end if
 
         ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
@@ -587,8 +585,8 @@ contains
 
         wall_time = abs(finish - start)
 
-        if (t_step >= 2) then
-            wall_time_avg = (wall_time + (t_step - 2)*wall_time_avg)/(t_step - 1)
+        if (t_step - t_step_start >= 2) then
+            wall_time_avg = (wall_time + (t_step - t_step_start - 2)*wall_time_avg)/(t_step - t_step_start - 1)
         else
             wall_time_avg = 0._wp
         end if
@@ -599,7 +597,6 @@ contains
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
-        type(vector_field)  :: gm_alpha_qp
 
         call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
 
@@ -643,7 +640,6 @@ contains
         real(wp)               :: c        !< Cell-avg. sound speed
         real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
-        type(vector_field)     :: gm_alpha_qp
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
 
@@ -697,7 +693,7 @@ contains
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = momxb, E_idx
+        do i = eqn_idx%mom%beg, eqn_idx%E
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -733,6 +729,13 @@ contains
                 patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
             end if
 
+            ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
+            ! velocity-dependent collision damping forces are evaluated on the GPU.
+            if (patch_ib(i)%moving_ibm == 2 .and. .not. forces_computed) then
+                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                forces_computed = .true.
+            end if
+
             if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
@@ -742,12 +745,6 @@ contains
                     ! plug in analytic velocities for 1-way coupling, if it exists
                     @:mib_analytical()
                 else if (patch_ib(i)%moving_ibm == 2) then  ! if we are using two-way coupling, apply force and torque
-                    ! compute the force and torque on the IB from the fluid
-                    if (.not. forces_computed) then
-                        call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                        forces_computed = .true.
-                    end if
-
                     ! update the velocity from the force value
                     patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
 
@@ -774,6 +771,7 @@ contains
             end if
         end do
 
+        $:GPU_UPDATE(device='[patch_ib]')
         call s_update_mib(num_ibs)
 
         call nvtxEndRange
@@ -918,44 +916,44 @@ contains
 
         if (.not. igr) then
             ! Deallocating the cell-average primitive variables
-            do i = 1, adv_idx%end
+            do i = 1, eqn_idx%adv%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
 
             if (mhd) then
-                do i = B_idx%beg, B_idx%end
+                do i = eqn_idx%B%beg, eqn_idx%B%end
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do
             end if
 
             if (elasticity) then
-                do i = stress_idx%beg, stress_idx%end
+                do i = eqn_idx%stress%beg, eqn_idx%stress%end
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do
             end if
 
             if (hyperelasticity) then
-                do i = xibeg, xiend + 1
+                do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do
             end if
 
             if (cont_damage) then
-                @:DEALLOCATE(q_prim_vf(damage_idx)%sf)
+                @:DEALLOCATE(q_prim_vf(eqn_idx%damage)%sf)
             end if
 
             if (hyper_cleaning) then
-                @:DEALLOCATE(q_prim_vf(psi_idx)%sf)
+                @:DEALLOCATE(q_prim_vf(eqn_idx%psi)%sf)
             end if
 
             if (bubbles_euler) then
-                do i = bub_idx%beg, bub_idx%end
+                do i = eqn_idx%bub%beg, eqn_idx%bub%end
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do
             end if
 
             if (model_eqns == 3) then
-                do i = internalEnergies_idx%beg, internalEnergies_idx%end
+                do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do
             end if
@@ -975,8 +973,8 @@ contains
             call s_close_run_time_information_file()
         end if
 
-        ! Writing the footer of and closing the IB data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
+        ! Closing the IB state data file
+        if (proc_rank == 0 .and. ib) then
             call s_close_ib_state_file()
         end if
 
