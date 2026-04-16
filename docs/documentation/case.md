@@ -331,6 +331,10 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
+| `coefficient_of_restitution`     | Real    | A number 0 to 1 describing how elastic IB collisions are |
+| `collision_model`     | Integer    | Integer to select the collision model being used for IB collisions. |
+| `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
+| `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
@@ -360,6 +364,14 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
 
 - `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
+
+- `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inellastic collisions while 1 is for perfectly ellastic collisions.
+
+- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collisiono checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
+
+- `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring gonstant used to apply collision forces.
+
+- `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 

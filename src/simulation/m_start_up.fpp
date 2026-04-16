@@ -91,7 +91,8 @@ contains
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
-            ib_state_wrt, &
+            collision_model, coefficient_of_restitution, collision_time, &
+            ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
@@ -816,6 +817,9 @@ contains
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
+        ! Write IB kinematic state for restart
+        if (ib .and. proc_rank == 0) call s_write_ib_state_file()
+
         call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
@@ -910,6 +914,7 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
+            if (t_step_start /= 0) call s_read_ib_restart_data()
             call s_ibm_setup()
             call s_write_ib_data_file(0)
         end if
@@ -1005,6 +1010,11 @@ contains
         end if
 
         call s_mpi_bcast_user_inputs()
+
+        ! Save original BCs before decomposition overwrites them with MPI neighbor ranks
+        ib_bc_x = bc_x
+        ib_bc_y = bc_y
+        ib_bc_z = bc_z
 
         call s_initialize_parallel_io()
 
@@ -1117,9 +1127,62 @@ contains
 
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
+        if (ib) call s_finalize_ibm_module()
 
         call s_mpi_finalize()
 
     end subroutine s_finalize_modules
+
+    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart. Rank 0 reads the last num_ibs records and
+    !! broadcasts to all ranks. Overwrites patch_ib vel, angular_vel, angles, and centroid.
+    impure subroutine s_read_ib_restart_data()
+
+        character(len=path_len + 2*name_len) :: file_loc
+        integer                              :: i, ios, file_unit, ib_id, ierr
+        real(wp)                             :: time_read
+        real(wp), dimension(3)               :: force_read, torque_read
+        real(wp), dimension(3)               :: vel_read, angular_vel_read, angles_read
+        real(wp)                             :: xc_read, yc_read, zc_read
+        logical                              :: file_exist
+
+        if (proc_rank == 0) then
+            file_loc = trim(case_dir) // '/restart_data/ib_state.dat'
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            print *, "IB Restart File Exists: ", file_exist
+            if (file_exist) then
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                print *, "iostat ", ios
+            else
+                call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+            end if
+
+            ! Read all records; the last num_ibs records are the final state
+            do
+                read (file_unit, iostat=ios) time_read, ib_id, force_read, torque_read, vel_read, angular_vel_read, angles_read, &
+                      & xc_read, yc_read, zc_read
+                if (ios /= 0) exit
+                patch_ib(ib_id)%vel = vel_read
+                patch_ib(ib_id)%angular_vel = angular_vel_read
+                patch_ib(ib_id)%angles = angles_read
+                patch_ib(ib_id)%x_centroid = xc_read
+                patch_ib(ib_id)%y_centroid = yc_read
+                patch_ib(ib_id)%z_centroid = zc_read
+            end do
+
+            close (file_unit)
+        end if
+
+#ifdef MFC_MPI
+        do i = 1, num_ibs
+            call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        end do
+#endif
+
+    end subroutine s_read_ib_restart_data
 
 end module m_start_up

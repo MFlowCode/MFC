@@ -19,6 +19,7 @@ module m_ibm
     use m_ib_patches
     use m_viscous
     use m_model
+    use m_collisions
 
     implicit none
 
@@ -57,6 +58,8 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
 
+        if (collision_model > 0) call s_initialize_collisions_module()
+
     end subroutine s_initialize_ibm_module
 
     !> Initializes the values of various IBM variables, such as ghost points and image points.
@@ -79,9 +82,9 @@ contains
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain]')
+        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain]')
+            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
         end if
 
         ! allocate STL models
@@ -268,8 +271,7 @@ contains
                         ! compute the linear velocity of the ghost point due to rotation
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, &
                             & patch_ib(patch_id)%z_centroid]
-                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), &
-                                             & radial_vector, rotation_velocity)
+                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
 
                         ! add only the component of the IB's motion that is normal to the surface
                         vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
@@ -284,8 +286,7 @@ contains
                             & patch_ib(patch_id)%z_centroid]
                         ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear
                         ! velocity
-                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), &
-                                             & radial_vector, rotation_velocity)
+                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
                         do q = 1, 3
                             ! if mibm is 1 or 2, then the boundary may be moving
                             vel_g(q) = patch_ib(patch_id)%vel(q)  ! add the linear velocity
@@ -572,7 +573,6 @@ contains
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             ghost_points_in(local_idx)%ib_patch_id = patch_id
-                            ib_markers%sf(i, j, k) = patch_id
                             ghost_points_in(local_idx)%x_periodicity = xp
                             ghost_points_in(local_idx)%y_periodicity = yp
                             ghost_points_in(local_idx)%z_periodicity = zp
@@ -916,7 +916,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
                             & local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, &
-                            & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[ib_markers, patch_ib, &
+                            & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[patch_ib, &
                             & dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -1006,6 +1006,8 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+
         ! reduce the forces across all MPI ranks
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
         call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
@@ -1026,8 +1028,7 @@ contains
         ! apply the summed forces
         do i = 1, num_ibs
             patch_ib(i)%force(:) = forces(i,:)
-            patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, &
-                     & :))  ! torques must be converted to the local coordinates of the IB
+            patch_ib(i)%torque(:) = torques(i,:)
         end do
 
         call nvtxEndRange
@@ -1042,6 +1043,8 @@ contains
             @:DEALLOCATE(airfoil_grid_u)
             @:DEALLOCATE(airfoil_grid_l)
         end if
+
+        if (collision_model > 0) call s_finalize_collisions_module()
 
     end subroutine s_finalize_ibm_module
 
@@ -1189,7 +1192,7 @@ contains
             ! check domain wraps in x, y,
             #:for X in [('x'), ('y')]
                 ! check for periodicity
-                if (bc_${X}$%beg == BC_PERIODIC) then
+                if (ib_bc_${X}$%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
@@ -1205,7 +1208,7 @@ contains
 
             if (p /= 0) then
                 ! check for periodicity
-                if (bc_z%beg == BC_PERIODIC) then
+                if (ib_bc_z%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%z_centroid < z_domain%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
@@ -1219,18 +1222,5 @@ contains
         end do
 
     end subroutine s_wrap_periodic_ibs
-
-    !> Compute the cross product c = a x b of two 3D vectors
-    subroutine s_cross_product(a, b, c)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)  :: a(3), b(3)
-        real(wp), intent(out) :: c(3)
-
-        c(1) = a(2)*b(3) - a(3)*b(2)
-        c(2) = a(3)*b(1) - a(1)*b(3)
-        c(3) = a(1)*b(2) - a(2)*b(1)
-
-    end subroutine s_cross_product
 
 end module m_ibm

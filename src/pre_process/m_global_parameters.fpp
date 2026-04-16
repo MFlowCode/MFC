@@ -153,11 +153,11 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                               :: ib        !< Turn immersed boundaries on
-    integer                                               :: num_ibs   !< Number of immersed boundaries
-    integer                                               :: Np
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
+    logical                                                  :: ib        !< Turn immersed boundaries on
+    integer                                                  :: num_ibs   !< Number of immersed boundaries
+    integer                                                  :: Np
+    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
+    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -435,7 +435,7 @@ contains
         ib = .false.
         num_ibs = dflt_int
 
-        do i = 1, num_patches_max
+        do i = 1, num_ib_patches_max
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = dflt_real
             patch_ib(i)%y_centroid = dflt_real

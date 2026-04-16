@@ -214,12 +214,19 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+    !> @name Original boundary conditions preserved for immersed boundary code
+    !> (bc_x/y/z get overwritten with MPI neighbor ranks during decomposition)
+    !> @{
+    type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z
+    !> @}
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
+    $:GPU_DECLARE(create='[ib_bc_x%beg, ib_bc_y%beg, ib_bc_z%beg]')
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
+    $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
@@ -329,14 +336,19 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                               :: ib
-    integer                                               :: num_ibs
-    logical                                               :: ib_state_wrt
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
-    integer                                               :: Np
+    logical                                                  :: ib
+    integer                                                  :: num_ibs
+    integer                                                  :: collision_model
+    real(wp)                                                 :: coefficient_of_restitution
+    real(wp)                                                 :: collision_time
+    real(wp)                                                 :: ib_coefficient_of_friction
+    logical                                                  :: ib_state_wrt
+    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
+    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
+    integer                                                  :: Np
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
+    $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
     !> @name Bubble modeling
@@ -622,6 +634,10 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        collision_model = 0
+        coefficient_of_restitution = dflt_real
+        collision_time = dflt_real
+        ib_coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
 
         ! Bubble modeling
@@ -764,7 +780,7 @@ contains
             relativity = .false.
         #:endif
 
-        do i = 1, num_patches_max
+        do i = 1, num_ib_patches_max
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp
