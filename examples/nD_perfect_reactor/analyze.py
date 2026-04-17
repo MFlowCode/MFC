@@ -21,9 +21,9 @@ import sys
 import cantera as ct
 import matplotlib
 import matplotlib.pyplot as plt
-from case import SAVE_COUNT, Tend, dt, sol
 from tqdm import tqdm
 
+from case import SAVE_COUNT, Tend, dt, sol
 from mfc.viz import assemble_silo, discover_timesteps
 
 matplotlib.use("Agg")

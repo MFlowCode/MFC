@@ -1208,8 +1208,9 @@ contains
         end if
 
         ! flux_src: choose exactly one export mode for the NC volume fraction advection term. Developer note: keep exactly one of
-        ! adv_src_alpha_iface, adv_src_vel_iface, and adv_src_none true whenever this logic is modified. HLL Method 1
-        ! (alpha-interface): flux_src(adv_idx%beg:adv_idx%end) carries interface alpha_k per fluid.
+        ! adv_src_alpha_iface, adv_src_vel_iface, and adv_src_none true whenever this logic is modified.
+        !
+        ! HLL Method 1 (alpha-interface): flux_src(adv_idx%beg:adv_idx%end) carries interface alpha_k per fluid.
         adv_src_alpha_iface = (riemann_solver == 1 .and. .not. hll_u_interface)
         ! HLLC, HLL Method 2 (u-interface), exact, LF: flux_src(adv_idx%beg) carries one shared face-normal interface velocity.
         adv_src_vel_iface = (riemann_solver == 1 .and. hll_u_interface) &

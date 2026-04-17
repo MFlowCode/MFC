@@ -1277,10 +1277,10 @@ contains
             type(vector_field), intent(in)                         :: q_cons_vf_arg
             type(vector_field), intent(in)                         :: q_prim_vf_arg
             type(vector_field), intent(in)                         :: flux_src_n_vf_arg
-            real(wp), allocatable, dimension(:,:,:), intent(in) :: Kterm_arg
-            integer                                             :: j_adv, k_idx, l_idx, q_idx
-            real(wp)                                            :: local_inv_ds, local_term_coeff, local_flux1, local_flux2
-            real(wp)                                            :: local_k_term_val
+            real(wp), allocatable, dimension(:,:,:), intent(in)    :: Kterm_arg
+            integer                                                :: j_adv, k_idx, l_idx, q_idx
+            real(wp)                                               :: local_inv_ds, local_term_coeff, local_flux1, local_flux2
+            real(wp)                                               :: local_k_term_val
 
             select case (current_idir)
             case (1)  ! x-direction

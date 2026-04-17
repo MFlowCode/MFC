@@ -201,33 +201,13 @@ contains
             pi_inf = pi_infs(1)
             qv = qvs(1)
         else
-#ifndef MFC_SIMULATION
-            if (hypoelasticity) then
-                ! Pre-processor/post-processor hypo path: FMA-invariant accumulation. Uses delta-from-reference to eliminate
-                ! FMA-dependent ULP differences that the HLLD hypo solver amplifies over many steps.
-                rho = 0._wp; gamma = gammas(1); pi_inf = pi_infs(1); qv = 0._wp
-
-                do i = 1, num_fluids
-                    rho = rho + alpha_rho_K(i)
-                    qv = qv + alpha_rho_K(i)*qvs(i)
-                end do
-
-                do i = 2, num_fluids
-                    gamma = gamma + alpha_K(i)*(gammas(i) - gammas(1))
-                    pi_inf = pi_inf + alpha_K(i)*(pi_infs(i) - pi_infs(1))
-                end do
-            else
-#endif
-                rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
-                do i = 1, num_fluids
-                    rho = rho + alpha_rho_K(i)
-                    gamma = gamma + alpha_K(i)*gammas(i)
-                    pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
-                    qv = qv + alpha_rho_K(i)*qvs(i)
-                end do
-#ifndef MFC_SIMULATION
-            end if
-#endif
+            rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
+            do i = 1, num_fluids
+                rho = rho + alpha_rho_K(i)
+                gamma = gamma + alpha_K(i)*gammas(i)
+                pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
+                qv = qv + alpha_rho_K(i)*qvs(i)
+            end do
         end if
 
 #ifdef MFC_SIMULATION
@@ -941,17 +921,7 @@ contains
                                       & l) + dyn_pres + pres_mag + pi_inf + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                             ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
-                            if (hypoelasticity) then
-                                ! Volatile intermediate prevents FMA contraction of gamma*p + pi_inf. Without this, -O0 vs -O3
-                                ! differ by 1 ULP in E, which HLLD amplifies.
-                                block
-                                    real(wp), volatile :: gamma_p_vol
-                                    gamma_p_vol = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l)
-                                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma_p_vol + dyn_pres + pi_inf + qv
-                                end block
-                            else
-                                q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
-                            end if
+                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler)) then
                             ! Bubble-augmented energy with void fraction correction
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, &
