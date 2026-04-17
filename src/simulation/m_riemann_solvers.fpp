@@ -2054,8 +2054,8 @@ contains
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
                                             E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                             E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            if ((n > 0 .and. p == 0 .and. i == 2) &
-                                                & .or. (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
+                                            ! Additional terms in 2D and 3D
+                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
                                                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
@@ -3215,8 +3215,8 @@ contains
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
                                             E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                             E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            if ((n > 0 .and. p == 0 .and. i == 2) &
-                                                & .or. (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
+                                            ! Additional terms in 2D and 3D
+                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
                                                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
@@ -3515,7 +3515,7 @@ contains
                                             nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_HLLC
                                         end if
                                     end if
-                                else
+                                else  ! not hypoelasticity
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
                                         ! MOMENTUM FLUX.

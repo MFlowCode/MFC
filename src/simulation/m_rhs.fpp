@@ -1020,7 +1020,7 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            else
+            else  ! is_hat_R
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k_loop, l_loop, q_loop, inv_ds, flux_face1]')
                 do j = 1, sys_size
                     do q_loop = 0, p
@@ -1096,7 +1096,7 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            else
+            else  ! is_hat_R
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1]')
                 do j = 1, sys_size
                     do l = 0, p
@@ -1224,7 +1224,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                else
+                else  ! is_hat_R
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1]')
                     do j = 1, sys_size
                         do k = 0, p
