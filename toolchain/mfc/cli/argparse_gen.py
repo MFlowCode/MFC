@@ -93,8 +93,9 @@ def _add_mfc_config_arguments(parser: argparse.ArgumentParser, config):
             )
             parser.add_argument(f"--no-{f.name}", action="store_const", const=gpuConfigOptions.NONE.value, dest=f.name, help=f"Turn the {f.name} option OFF.")
         else:
-            parser.add_argument(f"--{f.name}", action="store_true", help=f"Turn the {f.name} option ON.")
-            parser.add_argument(f"--no-{f.name}", action="store_false", dest=f.name, help=f"Turn the {f.name} option OFF.")
+            cli_name = f.name.replace("_", "-")
+            parser.add_argument(f"--{cli_name}", action="store_true", dest=f.name, help=f"Turn the {f.name} option ON.")
+            parser.add_argument(f"--no-{cli_name}", action="store_false", dest=f.name, help=f"Turn the {f.name} option OFF.")
 
     parser.set_defaults(**{f.name: getattr(config, f.name) for f in dataclasses.fields(config)})
 

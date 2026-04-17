@@ -21,7 +21,7 @@ gh_list_runners() {
 
 # Get a registration token for new runners.
 gh_registration_token() {
-    gh api "orgs/$ORG/actions/runners/registration-token" --jq .token
+    gh api "orgs/$ORG/actions/runners/registration-token" -X POST --jq .token
 }
 
 # Get the latest runner binary version.

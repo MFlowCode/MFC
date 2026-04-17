@@ -237,8 +237,9 @@ class TestShouldRunAllTests(unittest.TestCase):
     def test_input_py_triggers_all(self):
         assert should_run_all_tests({"toolchain/mfc/run/input.py"}) is True
 
-    def test_case_validator_triggers_all(self):
-        assert should_run_all_tests({"toolchain/mfc/case_validator.py"}) is True
+    def test_case_validator_does_not_trigger_all(self):
+        """case_validator.py removed: validation only affects error messages, not test outputs."""
+        assert should_run_all_tests({"toolchain/mfc/case_validator.py"}) is False
 
     def test_cmakelists_triggers_all(self):
         assert should_run_all_tests({"CMakeLists.txt"}) is True
