@@ -12,9 +12,9 @@ import json
 config = {
     "run_time_info": "T",
     # Computational Domain
-    "x_domain%beg": 0,
+    "x_domain%beg": 0.0,
     "x_domain%end": 1.0,
-    "y_domain%beg": 0,
+    "y_domain%beg": 0.0,
     "y_domain%end": 1.0,
     "cyl_coord": "T",
     "m": 24,
