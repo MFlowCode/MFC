@@ -968,7 +968,9 @@ contains
                                     else if (mapped_weno) then
                                         do q = 0, weno_num_stencils
                                             alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
-                                            omega = alpha/sum(alpha)
+                                        end do
+                                        omega = alpha/sum(alpha)
+                                        do q = 0, weno_num_stencils
                                             alpha(q) = (d_cbL_${XYZ}$ (q, j)*(1._wp + d_cbL_${XYZ}$ (q, &
                                                   & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbL_${XYZ}$ (q, &
                                                   & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbL_${XYZ}$ (q, j))))
@@ -997,7 +999,9 @@ contains
                                     else if (mapped_weno) then
                                         do q = 0, weno_num_stencils
                                             alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
-                                            omega = alpha/sum(alpha)
+                                        end do
+                                        omega = alpha/sum(alpha)
+                                        do q = 0, weno_num_stencils
                                             alpha(q) = (d_cbR_${XYZ}$ (q, j)*(1._wp + d_cbR_${XYZ}$ (q, &
                                                   & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbR_${XYZ}$ (q, &
                                                   & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbR_${XYZ}$ (q, j))))
@@ -1062,7 +1066,9 @@ contains
                                         else if (mapped_weno) then
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
-                                                omega = alpha/sum(alpha)
+                                            end do
+                                            omega = alpha/sum(alpha)
+                                            do q = 0, weno_num_stencils
                                                 alpha(q) = (d_cbL_${XYZ}$ (q, j)*(1._wp + d_cbL_${XYZ}$ (q, &
                                                       & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbL_${XYZ}$ (q, &
                                                       & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbL_${XYZ}$ (q, j))))
@@ -1120,7 +1126,9 @@ contains
                                         else if (mapped_weno) then
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
-                                                omega = alpha/sum(alpha)
+                                            end do
+                                            omega = alpha/sum(alpha)
+                                            do q = 0, weno_num_stencils
                                                 alpha(q) = (d_cbR_${XYZ}$ (q, j)*(1._wp + d_cbR_${XYZ}$ (q, &
                                                       & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbR_${XYZ}$ (q, &
                                                       & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbR_${XYZ}$ (q, j))))
@@ -1259,7 +1267,9 @@ contains
                                         else if (mapped_weno) then
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)/(beta(q)**2._wp)
-                                                omega = alpha/sum(alpha)
+                                            end do
+                                            omega = alpha/sum(alpha)
+                                            do q = 0, weno_num_stencils
                                                 alpha(q) = (d_cbL_${XYZ}$ (q, j)*(1._wp + d_cbL_${XYZ}$ (q, &
                                                       & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbL_${XYZ}$ (q, &
                                                       & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbL_${XYZ}$ (q, j))))
@@ -1333,7 +1343,9 @@ contains
                                         else if (mapped_weno) then
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbR_${XYZ}$ (q, j)/(beta(q)**2._wp)
-                                                omega = alpha/sum(alpha)
+                                            end do
+                                            omega = alpha/sum(alpha)
+                                            do q = 0, weno_num_stencils
                                                 alpha(q) = (d_cbR_${XYZ}$ (q, j)*(1._wp + d_cbR_${XYZ}$ (q, &
                                                       & j) - 3._wp*omega(q)) + omega(q)**2._wp)*(omega(q)/(d_cbR_${XYZ}$ (q, &
                                                       & j)**2._wp + omega(q)*(1._wp - 2._wp*d_cbR_${XYZ}$ (q, j))))
