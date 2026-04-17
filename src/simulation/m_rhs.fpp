@@ -1277,10 +1277,10 @@ contains
             type(vector_field), intent(in)                         :: q_cons_vf_arg
             type(vector_field), intent(in)                         :: q_prim_vf_arg
             type(vector_field), intent(in)                         :: flux_src_n_vf_arg
-            real(wp), allocatable, dimension(:,:,:), intent(in)    :: Kterm_arg
-            integer                                                :: j_adv, k_idx, l_idx, q_idx
-            real(wp)                                               :: local_inv_ds, local_term_coeff, local_flux1, local_flux2
-            real(wp)                                               :: local_k_term_val
+            real(wp), allocatable, dimension(:,:,:), intent(in) :: Kterm_arg
+            integer                                             :: j_adv, k_idx, l_idx, q_idx
+            real(wp)                                            :: local_inv_ds, local_term_coeff, local_flux1, local_flux2
+            real(wp)                                            :: local_k_term_val
 
             select case (current_idir)
             case (1)  ! x-direction
@@ -1289,14 +1289,18 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
                     do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
-                        do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
-                            local_inv_ds = 1._wp/dx(k_idx)
-                            local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(k_idx, l_idx, q_idx)
-                            local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(k_idx - 1, l_idx, q_idx)
-                            local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(k_idx, l_idx, q_idx)
-                            rhs_vf_arg(j_adv)%sf(k_idx, l_idx, q_idx) = rhs_vf_arg(j_adv)%sf(k_idx, l_idx, &
-                                       & q_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
-                        end do; end do; end do
+                        do q_idx = 0, p  ! z_extent
+                            do l_idx = 0, n  ! y_extent
+                                do k_idx = 0, m  ! x_extent
+                                    local_inv_ds = 1._wp/dx(k_idx)
+                                    local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(k_idx, l_idx, q_idx)
+                                    local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(k_idx - 1, l_idx, q_idx)
+                                    local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(k_idx, l_idx, q_idx)
+                                    rhs_vf_arg(j_adv)%sf(k_idx, l_idx, q_idx) = rhs_vf_arg(j_adv)%sf(k_idx, l_idx, &
+                                               & q_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
+                                end do
+                            end do
+                        end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                     if (alt_soundspeed .and. .not. bubbles_euler) then
@@ -1353,14 +1357,18 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
                     do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
-                        do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
-                            local_inv_ds = 1._wp/dy(k_idx)
-                            local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(q_idx, k_idx, l_idx)
-                            local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(q_idx, k_idx - 1, l_idx)
-                            local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(q_idx, k_idx, l_idx)
-                            rhs_vf_arg(j_adv)%sf(q_idx, k_idx, l_idx) = rhs_vf_arg(j_adv)%sf(q_idx, k_idx, &
-                                       & l_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
-                        end do; end do; end do
+                        do l_idx = 0, p  ! z_extent
+                            do k_idx = 0, n  ! y_extent
+                                do q_idx = 0, m  ! x_extent
+                                    local_inv_ds = 1._wp/dy(k_idx)
+                                    local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(q_idx, k_idx, l_idx)
+                                    local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(q_idx, k_idx - 1, l_idx)
+                                    local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(q_idx, k_idx, l_idx)
+                                    rhs_vf_arg(j_adv)%sf(q_idx, k_idx, l_idx) = rhs_vf_arg(j_adv)%sf(q_idx, k_idx, &
+                                               & l_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
+                                end do
+                            end do
+                        end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                     if (alt_soundspeed .and. .not. bubbles_euler) then
@@ -1444,14 +1452,18 @@ contains
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
-                            do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
-                                local_inv_ds = 1._wp/dz(k_idx)
-                                local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(l_idx, q_idx, k_idx)
-                                local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx - 1)
-                                local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
-                                rhs_vf_arg(j_adv)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(j_adv)%sf(l_idx, q_idx, &
-                                           & k_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
-                            end do; end do; end do
+                            do k_idx = 0, p  ! z_extent
+                                do q_idx = 0, n  ! y_extent
+                                    do l_idx = 0, m  ! x_extent
+                                        local_inv_ds = 1._wp/dz(k_idx)
+                                        local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(l_idx, q_idx, k_idx)
+                                        local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx - 1)
+                                        local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
+                                        rhs_vf_arg(j_adv)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(j_adv)%sf(l_idx, q_idx, &
+                                                   & k_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
+                                    end do
+                                end do
+                            end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
                         if (alt_soundspeed .and. .not. bubbles_euler) then
@@ -1508,14 +1520,18 @@ contains
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
-                            do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
-                                local_inv_ds = 1._wp/dz(k_idx)
-                                local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(l_idx, q_idx, k_idx)
-                                local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx - 1)
-                                local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
-                                rhs_vf_arg(j_adv)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(j_adv)%sf(l_idx, q_idx, &
-                                           & k_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
-                            end do; end do; end do
+                            do k_idx = 0, p  ! z_extent
+                                do q_idx = 0, n  ! y_extent
+                                    do l_idx = 0, m  ! x_extent
+                                        local_inv_ds = 1._wp/dz(k_idx)
+                                        local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(l_idx, q_idx, k_idx)
+                                        local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx - 1)
+                                        local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
+                                        rhs_vf_arg(j_adv)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(j_adv)%sf(l_idx, q_idx, &
+                                                   & k_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
+                                    end do
+                                end do
+                            end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
                         if (alt_soundspeed .and. .not. bubbles_euler) then

@@ -241,15 +241,15 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, &
-                                    & alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, Ys_L, Ys_R, &
-                                    & xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, &
-                                    & h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, &
-                                    & vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, &
-                                    & c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, &
-                                    & Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, &
-                                    & G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
-                                    & vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, &
-                                    & flux_tau_R, rho_HLL_ex, rhou_n_HLL_ex, rhou_t_HLL_ex, rhou_t2_HLL_ex, u_n_iface, u_t_iface, &
+                                    & alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, &
+                                    & Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
+                                    & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, &
+                                    & pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, &
+                                    & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
+                                    & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
+                                    & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, xi_P, &
+                                    & rho_HLL_ex, rhou_n_HLL_ex, rhou_t_HLL_ex, rhou_t2_HLL_ex, u_n_iface, u_t_iface, &
                                     & u_t2_iface, pTot_L_ex, pTot_R_ex]', copyin='[norm_dir]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -4031,8 +4031,8 @@ contains
                                 vel%R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%cont%end + dir_idx(i))
                             end do
 
-                            vel_rms%L = sum(vel%L**2)
-                            vel_rms%R = sum(vel%R**2)
+                            vel_rms%L = sum(vel%L**2._wp)
+                            vel_rms%R = sum(vel%R**2._wp)
 
                             do i = 1, num_fluids
                                 alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%E + i)

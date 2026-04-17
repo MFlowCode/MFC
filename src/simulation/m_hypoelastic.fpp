@@ -96,6 +96,8 @@ contains
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
         if (idir == 1) then
+            ! calculate velocity gradients + rho_K and G_K TODO: re-organize these loops one by one for GPU efficiency if possible?
+
             $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
@@ -149,6 +151,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
+                ! 3D
                 if (ndirs == 3) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do q = 0, p
@@ -191,8 +194,8 @@ contains
                     do k = 0, m
                         rho_K = 0._wp; G_K = 0._wp
                         do i = 1, num_fluids
-                            rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
-                            G_K = G_K + q_prim_vf(eqn_idx%adv%beg - 1 + i)%sf(k, l, q)*Gs_hypo(i)
+                            rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)  ! alpha_rho_K(1)
+                            G_K = G_K + q_prim_vf(eqn_idx%adv%beg - 1 + i)%sf(k, l, q)*Gs_hypo(i)  ! alpha_K(1) * Gs_hypo(1)
                         end do
 
                         ! Continuum damage: (1-D) scales effective stiffness, D in [0,1]
@@ -201,6 +204,7 @@ contains
                         rho_K_field(k, l, q) = rho_K
                         G_K_field(k, l, q) = G_K
 
+                        ! TODO: take this out if not needed
                         if (G_K < verysmall) then
                             G_K_field(k, l, q) = 0
                         end if
@@ -209,6 +213,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
+            ! apply rhs source term to elastic stress equation
             $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
@@ -316,18 +321,23 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
+                        ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
                         rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) - rho_K_field(k, l, &
                                & q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y_cc(l)*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, &
-                               & q) + (2._wp/3._wp)*G_K_field(k, l, q))
+                               & q) + (2._wp/3._wp)*G_K_field(k, l, q))  ! tau_xx + 2/3*G
 
+                        ! S_xr -= rho * v/r * tau_xr
                         rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) - rho_K_field(k, &
                                & l, q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y_cc(l)*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, &
-                               & l, q)
+                               & l, q)  ! tau_xx
 
+                        ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
                         rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) - rho_K_field(k, &
                                & l, q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, &
-                               & q)/y_cc(l)*(q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))
+                               & q)/y_cc(l)*(q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, &
+                               & q))  ! tau_rr + 2/3*G
 
+                        ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
                         rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + rho_K_field(k, &
                                & l, q)*(-(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, &
                                & q))*(du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q) + q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, &
