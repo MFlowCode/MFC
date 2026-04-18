@@ -1137,6 +1137,8 @@ contains
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
 
+        $:GPU_UPDATE(device='[bc]')
+
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then
             $:GPU_UPDATE(device='[palpha_eps, ptgalpha_eps]')
