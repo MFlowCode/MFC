@@ -220,6 +220,7 @@ module m_global_parameters
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    type(bc_xyz_info)     :: bc
     !> @}
     !> @name Original boundary conditions preserved for immersed boundary code
     !> (bc_x/y/z get overwritten with MPI neighbor ranks during decomposition)

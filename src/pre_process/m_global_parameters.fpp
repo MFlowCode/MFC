@@ -106,6 +106,7 @@ module m_global_parameters
     !> @}
 
     type(int_bounds_info)      :: bc_x, bc_y, bc_z       !< Boundary conditions in the x-, y- and z-coordinate directions
+    type(bc_xyz_info)          :: bc                     !< Combined boundary conditions storage
     integer                    :: shear_num              !< Number of shear stress components
     integer, dimension(3)      :: shear_indices          !< Indices of the stress components that represent shear stress
     integer                    :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions

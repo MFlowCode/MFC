@@ -1439,11 +1439,10 @@ contains
     end subroutine s_beta_reflective
 
     !> Populate ghost cell buffers for the color function and its divergence used in capillary surface tension.
-    impure subroutine s_populate_capillary_buffers(c_divs, bc_type, bc)
+    impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(bc_xyz_info), intent(in)                              :: bc
         integer                                                    :: k, l
 
         !> x-direction

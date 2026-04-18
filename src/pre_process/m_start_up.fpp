@@ -738,6 +738,8 @@ contains
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
 
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
+
     end subroutine s_initialize_mpi_domain
 
     !> @brief Finalizes all pre-process modules, deallocates resources, and shuts down MPI.

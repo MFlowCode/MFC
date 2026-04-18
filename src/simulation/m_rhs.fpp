@@ -396,7 +396,7 @@ contains
                     end do
 
                     if (n > 0) then
-                        do l = mom_idx%beg, mom_idx%end
+                        do l = eqn_idx%mom%beg, eqn_idx%mom%end
                             @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
                             @:ALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &

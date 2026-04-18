@@ -754,7 +754,7 @@ contains
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
-                        do l = 1, E_idx
+                        do l = 1, eqn_idx%E
                             if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                 rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, &
                                        & k) + q_beta(5)%sf(i, j, k))
@@ -769,7 +769,7 @@ contains
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
-                        do l = 1, E_idx
+                        do l = 1, eqn_idx%E
                             if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                 rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + (q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, &
                                        & k))*q_beta(2)%sf(i, j, k)
@@ -782,7 +782,7 @@ contains
         end if
 
         do l = 1, num_dims
-            call s_gradient_dir(q_prim_vf(E_idx)%sf, q_beta(3)%sf, l)
+            call s_gradient_dir(q_prim_vf(eqn_idx%E)%sf, q_beta(3)%sf, l)
 
             ! (q / (1 - beta)) * d(beta)/dt source
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
@@ -790,8 +790,8 @@ contains
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
                         if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - (1._wp - q_beta(1)%sf(i, j, &
-                                   & k))/q_beta(1)%sf(i, j, k)*q_beta(3)%sf(i, j, k)
+                            rhs_vf(eqn_idx%cont%end + l)%sf(i, j, k) = rhs_vf(eqn_idx%cont%end + l)%sf(i, j, &
+                                   & k) - (1._wp - q_beta(1)%sf(i, j, k))/q_beta(1)%sf(i, j, k)*q_beta(3)%sf(i, j, k)
                         end if
                     end do
                 end do
@@ -803,7 +803,7 @@ contains
             do k = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(2)%beg, idwbuff(2)%end
                     do i = idwbuff(1)%beg, idwbuff(1)%end
-                        q_beta(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+                        q_beta(3)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, k)*q_prim_vf(eqn_idx%cont%end + l)%sf(i, j, k)
                     end do
                 end do
             end do
@@ -817,7 +817,7 @@ contains
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
                         if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - q_beta(4)%sf(i, j, &
+                            rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) - q_beta(4)%sf(i, j, &
                                    & k)*(1._wp - q_beta(1)%sf(i, j, k))/q_beta(1)%sf(i, j, k)
                         end if
                     end do
@@ -1010,14 +1010,14 @@ contains
                 if (p == 0) then
                     do j = 1, 2
                         do i = 1, 2
-                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3))*psi_x(i)*psi_y(j)
+                            f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3))*psi_x(i)*psi_y(j)
                         end do
                     end do
                 else
                     do k = 1, 2
                         do j = 1, 2
                             do i = 1, 2
-                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, &
+                                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + i - 1, cell(2) + j - 1, &
                                                               & cell(3) + k - 1)*psi_x(i)*psi_y(j)*psi_z(k)
                             end do
                         end do
@@ -1082,14 +1082,14 @@ contains
                 if (p == 0) then  ! 2D
                     do j = 1, 3
                         do i = 1, 3
-                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3))*psi_x(i)*psi_y(j)
+                            f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3))*psi_x(i)*psi_y(j)
                         end do
                     end do
                 else
                     do k = 1, 3
                         do j = 1, 3
                             do i = 1, 3
-                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, &
+                                f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + i - 2, cell(2) + j - 2, &
                                                               & cell(3) + k - 2)*psi_x(i)*psi_y(j)*psi_z(k)
                             end do
                         end do
@@ -1436,7 +1436,7 @@ contains
                 cell = fd_number - buff_size
                 call s_locate_cell(mtn_pos(k,1:3,2), cell, mtn_s(k,1:3,2))
 
-                if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
+                if (q_prim_vf(eqn_idx%adv%beg)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
                     keep_bubble(k) = 0
                 end if
             end if

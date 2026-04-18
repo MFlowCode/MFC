@@ -1074,6 +1074,8 @@ contains
         call s_mpi_decompose_computational_domain()
         call s_check_inputs_fft()
 
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
+
     end subroutine s_initialize_mpi_domain
 
     !> @brief Destroy FFTW plans, free MPI communicators, and finalize all post-process sub-modules.

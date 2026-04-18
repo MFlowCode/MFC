@@ -1,4 +1,3 @@
-!>
 !! @file
 !! @brief Contains module m_collisions
 
@@ -98,15 +97,15 @@ contains
             call s_decode_patch_periodicity(encoded_pid1, pid1, xp1, yp1, zp1)
             call s_decode_patch_periodicity(encoded_pid2, pid2, xp2, yp2, zp2)
 
-            centroid_1(1) = patch_ib(pid1)%x_centroid + real(xp1, wp)*(x_domain%end - x_domain%beg)
-            centroid_1(2) = patch_ib(pid1)%y_centroid + real(yp1, wp)*(y_domain%end - y_domain%beg)
+            centroid_1(1) = patch_ib(pid1)%x_centroid + real(xp1, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+            centroid_1(2) = patch_ib(pid1)%y_centroid + real(yp1, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
             centroid_1(3) = 0._wp
-            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp2, wp)*(x_domain%end - x_domain%beg)
-            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp2, wp)*(y_domain%end - y_domain%beg)
+            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp2, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp2, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
             centroid_2(3) = 0._wp
             if (num_dims == 3) then
-                centroid_1(3) = patch_ib(pid1)%z_centroid + real(zp1, wp)*(z_domain%end - z_domain%beg)
-                centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp2, wp)*(z_domain%end - z_domain%beg)
+                centroid_1(3) = patch_ib(pid1)%z_centroid + real(zp1, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+                centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp2, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
             end if
 
             normal_vector = centroid_2 - centroid_1
@@ -367,14 +366,15 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]')
         do patch_id = 1, num_ibs
-            #:for X, IDX in [('x', 1), ('y', 3), ('z', 5)]
+            #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
                 ! check if the boundaries are either of the two conditions we should compute collisions with
                 if (ib_bc_${X}$%beg == BC_SLIP_WALL .or. ib_bc_${X}$%beg == BC_NO_SLIP_WALL) then
                     ! get the location of the true IB surface towards the domain boundary
                     edge_location = patch_ib(patch_id)%${X}$_centroid - patch_ib(patch_id)%radius
                     ! check if that edge actually extends out of the comutational domain
-                    if (edge_location < ${X}$_domain%beg) then
-                        overlap_distance = ${X}$_domain%beg - edge_location  ! the distance that the IB extends out of the domain
+                    if (edge_location < glb_bounds(${DIR}$)%beg) then
+                        overlap_distance = glb_bounds(${DIR}$)%beg &
+                                                      & - edge_location  ! the distance that the IB extends out of the domain
                     else
                         overlap_distance = 0._wp
                     end if
@@ -383,8 +383,8 @@ contains
 
                 if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
                     edge_location = patch_ib(patch_id)%${X}$_centroid + patch_ib(patch_id)%radius
-                    if (edge_location > ${X}$_domain%end) then
-                        overlap_distance = edge_location - ${X}$_domain%end
+                    if (edge_location > glb_bounds(${DIR}$)%end) then
+                        overlap_distance = edge_location - glb_bounds(${DIR}$)%end
                     else
                         overlap_distance = 0._wp
                     end if
@@ -416,10 +416,10 @@ contains
                     if (num_dims >= ${ID}$) then
                         if (ib_bc_${X}$%beg /= BC_PERIODIC) then
                             ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
-                            if (collision_location(${ID}$) < ${X}$_domain%beg) then
-                                projected_location(${ID}$) = ${X}$_domain%beg
-                            else if (${X}$_domain%end < collision_location(${ID}$)) then
-                                projected_location(${ID}$) = ${X}$_domain%end - 1.0e-10_wp
+                            if (collision_location(${ID}$) < glb_bounds(${ID}$)%beg) then
+                                projected_location(${ID}$) = glb_bounds(${ID}$)%beg
+                            else if (glb_bounds(${DIR}$)%end < collision_location(${ID}$)) then
+                                projected_location(${ID}$) = glb_bounds(${DIR}$)%end - 1.0e-10_wp
                             end if
                         end if
                     end if

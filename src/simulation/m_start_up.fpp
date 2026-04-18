@@ -1083,6 +1083,8 @@ contains
 
         call s_mpi_decompose_computational_domain()
 
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
+
     end subroutine s_initialize_mpi_domain
 
     !> @brief Transfers initial conservative variable and model parameter data to the GPU device.

@@ -502,7 +502,7 @@ contains
     !> Precomputes cell-centered pressure gradients (dp/dx, dp/dy, dp/dz) at all cell centers using finite-difference coefficients
     !! of the specified order. This avoids scattered memory accesses to the pressure field when computing translational bubble
     !! forces.
-    !! @param q_prim_vf Primitive variables (pressure is at index E_idx)
+    !! @param q_prim_vf Primitive variables (pressure is at index eqn_idx%E)
     subroutine s_compute_pressure_gradients(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -517,7 +517,7 @@ contains
                     grad_p_x(i, j, k) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do r = -fd_number, fd_number
-                        grad_p_x(i, j, k) = grad_p_x(i, j, k) + q_prim_vf(E_idx)%sf(i + r, j, k)*fd_coeff_x_pgrad(r, i)
+                        grad_p_x(i, j, k) = grad_p_x(i, j, k) + q_prim_vf(eqn_idx%E)%sf(i + r, j, k)*fd_coeff_x_pgrad(r, i)
                     end do
                 end do
             end do
@@ -533,7 +533,7 @@ contains
                         grad_p_y(i, j, k) = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
-                            grad_p_y(i, j, k) = grad_p_y(i, j, k) + q_prim_vf(E_idx)%sf(i, j + r, k)*fd_coeff_y_pgrad(r, j)
+                            grad_p_y(i, j, k) = grad_p_y(i, j, k) + q_prim_vf(eqn_idx%E)%sf(i, j + r, k)*fd_coeff_y_pgrad(r, j)
                         end do
                     end do
                 end do
@@ -550,7 +550,7 @@ contains
                         grad_p_z(i, j, k) = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do r = -fd_number, fd_number
-                            grad_p_z(i, j, k) = grad_p_z(i, j, k) + q_prim_vf(E_idx)%sf(i, j, k + r)*fd_coeff_z_pgrad(r, k)
+                            grad_p_z(i, j, k) = grad_p_z(i, j, k) + q_prim_vf(eqn_idx%E)%sf(i, j, k + r)*fd_coeff_z_pgrad(r, k)
                         end do
                     end do
                 end do
@@ -579,25 +579,25 @@ contains
         if (fd_order == 2) then
             if (i == 1) then
                 xi(1) = x_cc(cell(1) - 1)
-                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
+                eta(1) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1) - 1, cell(2), cell(3))
                 xi(2) = x_cc(cell(1))
-                eta(2) = q_prim_vf(momxb)%sf(cell(1), cell(2), cell(3))
+                eta(2) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3))
                 xi(3) = x_cc(cell(1) + 1)
-                eta(3) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
+                eta(3) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1) + 1, cell(2), cell(3))
             else if (i == 2) then
                 xi(1) = y_cc(cell(2) - 1)
-                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
+                eta(1) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) - 1, cell(3))
                 xi(2) = y_cc(cell(2))
-                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2), cell(3))
+                eta(2) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2), cell(3))
                 xi(3) = y_cc(cell(2) + 1)
-                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
+                eta(3) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) + 1, cell(3))
             else if (i == 3) then
                 xi(1) = z_cc(cell(3) - 1)
-                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
+                eta(1) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) - 1)
                 xi(2) = z_cc(cell(3))
-                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3))
+                eta(2) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3))
                 xi(3) = z_cc(cell(3) + 1)
-                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
+                eta(3) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) + 1)
             end if
 
             L(1) = ((pos - xi(2))*(pos - xi(3)))/((xi(1) - xi(2))*(xi(1) - xi(3)))
@@ -608,37 +608,37 @@ contains
         else if (fd_order == 4) then
             if (i == 1) then
                 xi(1) = x_cc(cell(1) - 2)
-                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 2, cell(2), cell(3))
+                eta(1) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1) - 2, cell(2), cell(3))
                 xi(2) = x_cc(cell(1) - 1)
-                eta(2) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
+                eta(2) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1) - 1, cell(2), cell(3))
                 xi(3) = x_cc(cell(1))
-                eta(3) = q_prim_vf(momxb)%sf(cell(1), cell(2), cell(3))
+                eta(3) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3))
                 xi(4) = x_cc(cell(1) + 1)
-                eta(4) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
+                eta(4) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1) + 1, cell(2), cell(3))
                 xi(5) = x_cc(cell(1) + 2)
-                eta(5) = q_prim_vf(momxb)%sf(cell(1) + 2, cell(2), cell(3))
+                eta(5) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1) + 2, cell(2), cell(3))
             else if (i == 2) then
                 xi(1) = y_cc(cell(2) - 2)
-                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 2, cell(3))
+                eta(1) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) - 2, cell(3))
                 xi(2) = y_cc(cell(2) - 1)
-                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
+                eta(2) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) - 1, cell(3))
                 xi(3) = y_cc(cell(2))
-                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2), cell(3))
+                eta(3) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2), cell(3))
                 xi(4) = y_cc(cell(2) + 1)
-                eta(4) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
+                eta(4) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) + 1, cell(3))
                 xi(5) = y_cc(cell(2) + 2)
-                eta(5) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 2, cell(3))
+                eta(5) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) + 2, cell(3))
             else if (i == 3) then
                 xi(1) = z_cc(cell(3) - 2)
-                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 2)
+                eta(1) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) - 2)
                 xi(2) = z_cc(cell(3) - 1)
-                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
+                eta(2) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) - 1)
                 xi(3) = z_cc(cell(3))
-                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3))
+                eta(3) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3))
                 xi(4) = z_cc(cell(3) + 1)
-                eta(4) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
+                eta(4) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) + 1)
                 xi(5) = z_cc(cell(3) + 2)
-                eta(5) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 2)
+                eta(5) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) + 2)
             end if
 
             L(1) = ((pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(4)) &
@@ -683,7 +683,7 @@ contains
         if (fd_order > 1) then
             v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
         else
-            v_rel = vel - q_prim_vf(momxb + i - 1)%sf(cell(1), cell(2), cell(3))
+            v_rel = vel - q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(cell(1), cell(2), cell(3))
         end if
 
         force = 0._wp
