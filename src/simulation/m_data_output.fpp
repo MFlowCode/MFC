@@ -901,7 +901,7 @@ contains
 
         integer, intent(in) :: t_step
 
-    #ifdef MFC_MPI
+#ifdef MFC_MPI
         character(LEN=path_len + 2*name_len) :: file_loc
         integer(kind=MPI_OFFSET_KIND)        :: disp
         integer(kind=MPI_OFFSET_KIND)        :: WP_MOK
@@ -964,7 +964,7 @@ contains
         end do
 
         call MPI_FILE_CLOSE(ifile, ierr)
-    #endif
+#endif
 
     end subroutine s_write_parallel_ib_state
 

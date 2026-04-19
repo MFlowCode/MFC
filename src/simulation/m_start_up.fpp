@@ -818,7 +818,7 @@ contains
         end if
 
         ! Write IB kinematic state for restart
-        if (ib .and. proc_rank == 0) call s_write_ib_state_file()
+        if (ib) call s_write_ib_state_file(t_step)
 
         call nvtxEndRange
         call cpu_time(finish)

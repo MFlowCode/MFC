@@ -1356,7 +1356,6 @@ contains
         real(wp), dimension(:), allocatable             :: vx, vy, vz
         real(wp), dimension(:), allocatable             :: ox, oy, oz
         real(wp), dimension(:), allocatable             :: ax, ay, az
-        real(wp), dimension(:), allocatable             :: rad
         real(wp)                                        :: ib_buf(NFIELDS_PER_IB)
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
         integer, dimension(num_procs)                   :: meshtypes
@@ -1398,7 +1397,6 @@ contains
         allocate (vx(num_ibs), vy(num_ibs), vz(num_ibs))
         allocate (ox(num_ibs), oy(num_ibs), oz(num_ibs))
         allocate (ax(num_ibs), ay(num_ibs), az(num_ibs))
-        allocate (rad(num_ibs))
 
         do i = 1, num_ibs
             ! ib_buf layout: 1=mytime, 2:4=force, 5:7=torque, 8:10=vel, 11:13=angular_vel, 14:16=angles, 17=xc, 18=yc, 19=zc
@@ -1408,7 +1406,6 @@ contains
             ox(i) = ib_data(i, 11); oy(i) = ib_data(i, 12); oz(i) = ib_data(i, 13)
             ax(i) = ib_data(i, 14); ay(i) = ib_data(i, 15); az(i) = ib_data(i, 16)
             px(i) = ib_data(i, 17); py(i) = ib_data(i, 18); pz(i) = ib_data(i, 19)
-            rad(i) = patch_ib(i)%radius
         end do
 
         ! Write Silo point mesh - only rank 0 writes the multi-mesh entry
@@ -1445,10 +1442,9 @@ contains
         call s_write_ib_variable('ib_angle_x', t_step, ax, num_ibs)
         call s_write_ib_variable('ib_angle_y', t_step, ay, num_ibs)
         call s_write_ib_variable('ib_angle_z', t_step, az, num_ibs)
-        call s_write_ib_variable('ib_radius', t_step, rad, num_ibs)
 
         deallocate (ib_data, px, py, pz, fx, fy, fz, tx, ty, tz)
-        deallocate (vx, vy, vz, ox, oy, oz, ax, ay, az, rad)
+        deallocate (vx, vy, vz, ox, oy, oz, ax, ay, az)
 #endif
 
     end subroutine s_write_ib_bodies_to_formatted_database_file
