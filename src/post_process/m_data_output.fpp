@@ -19,8 +19,8 @@ module m_data_output
         & s_open_intf_data_file, s_open_energy_data_file, s_write_grid_to_formatted_database_file, &
         & s_write_variable_to_formatted_database_file, s_write_lag_bubbles_results_to_text, &
         & s_write_lag_bubbles_to_formatted_database_file, s_write_ib_state_files, s_write_intf_data_file, &
-        & s_write_energy_data_file, s_close_formatted_database_file, s_close_intf_data_file, s_close_energy_data_file, &
-        & s_finalize_data_output_module
+        & s_write_energy_data_file, s_write_ib_bodies_to_formatted_database_file, s_close_formatted_database_file, &
+        & s_close_intf_data_file, s_close_energy_data_file, s_finalize_data_output_module
 
     ! Include Silo-HDF5 interface library
     include 'silo_f9x.inc'
