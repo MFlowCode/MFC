@@ -914,10 +914,12 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            if (t_step_start /= 0) call s_read_ib_restart_data(t_step_start)
+            if (t_step_start > 0) call s_read_ib_restart_data(t_step_start)
             call s_ibm_setup()
-            call s_write_ib_data_file(0)
-            call s_write_ib_state_file(0)
+            if (t_step_start == 0) then
+                call s_write_ib_data_file(0)
+                call s_write_ib_state_file(0)
+            end if
         end if
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
