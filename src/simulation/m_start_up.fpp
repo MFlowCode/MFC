@@ -1143,7 +1143,7 @@ contains
         integer, intent(in)                  :: t_step
         character(len=path_len + 2*name_len) :: file_loc
         integer                              :: i, ios, file_unit, ierr
-        integer, parameter                   :: NFIELDS_PER_IB = 19
+        integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
         logical                              :: file_exist
 
