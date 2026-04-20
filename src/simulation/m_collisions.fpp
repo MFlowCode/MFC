@@ -148,7 +148,7 @@ contains
                         $:GPU_ATOMIC(atomic='update')
                         forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
-                        torques(pid2, l) = torques(pid2, l) - torque(l)*patch_ib(pid2)%radius/patch_ib(pid1)%radius
+                        torques(pid2, l) = torques(pid2, l) + torque(l)*patch_ib(pid2)%radius/patch_ib(pid1)%radius
                     end do
                 end if
             end if
