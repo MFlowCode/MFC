@@ -979,7 +979,7 @@ contains
                                         ! Borges, et al. (2008)
                                         tau = abs(beta(1) - beta(0))
                                         do q = 0, weno_num_stencils
-                                            alpha(q) = d_cbL_${XYZ}$ (q, j)/(1._wp + tau/beta(q)**2._wp)
+                                            alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + tau/beta(q))
                                         end do
                                     end if
 
