@@ -917,6 +917,7 @@ contains
             if (t_step_start /= 0) call s_read_ib_restart_data(t_step_start)
             call s_ibm_setup()
             call s_write_ib_data_file(0)
+            call s_write_ib_state_file(0)
         end if
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()

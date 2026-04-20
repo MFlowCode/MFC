@@ -1341,26 +1341,28 @@ contains
 
     end subroutine s_write_energy_data_file
 
-    !> Read IB state from restart_data/ib_state_{t_step}.dat and write a Silo point mesh with per-body scalar fields.
+    !> Read IB state and write a Silo point mesh with per-body scalar fields.
     impure subroutine s_write_ib_bodies_to_formatted_database_file(t_step)
 
         integer, intent(in)                            :: t_step
         character(len=len_trim(case_dir) + 3*name_len) :: file_loc
 
 #ifdef MFC_MPI
-        integer, parameter                              :: NFIELDS_PER_IB = 19
-        real(wp), dimension(:,:), allocatable           :: ib_data  ! (num_ibs, NFIELDS_PER_IB)
-        real(wp), dimension(:), allocatable             :: px, py, pz
-        real(wp), dimension(:), allocatable             :: fx, fy, fz
-        real(wp), dimension(:), allocatable             :: tx, ty, tz
-        real(wp), dimension(:), allocatable             :: vx, vy, vz
-        real(wp), dimension(:), allocatable             :: ox, oy, oz
-        real(wp), dimension(:), allocatable             :: ax, ay, az
+        integer, parameter                              :: NFIELDS_PER_IB = 20
         real(wp)                                        :: ib_buf(NFIELDS_PER_IB)
+        real(wp), dimension(:,:), allocatable           :: ib_data
+        logical                                         :: file_exist
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
         integer, dimension(num_procs)                   :: meshtypes
-        integer                                         :: i, ios, file_unit, ierr
-        logical                                         :: file_exist
+        integer                                         :: i, ios, file_unit
+        integer                                         :: ierr, nBodies
+        real(wp), dimension(:), allocatable             :: px, py, pz
+        real(wp), dimension(:), allocatable             :: force_x, force_y, force_z
+        real(wp), dimension(:), allocatable             :: torque_x, torque_y, torque_z
+        real(wp), dimension(:), allocatable             :: vel_x, vel_y, vel_z
+        real(wp), dimension(:), allocatable             :: omega_x, omega_y, omega_z
+        real(wp), dimension(:), allocatable             :: angle_x, angle_y, angle_z
+        real(wp), dimension(:), allocatable             :: ib_radius
 
         ! Build path to per-timestep IB state file
         write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
@@ -1368,83 +1370,79 @@ contains
 
         inquire (FILE=trim(file_loc), EXIST=file_exist)
         if (.not. file_exist) then
-            ! No IB state file for this timestep - skip silently
-            return
+            call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
         end if
 
-        allocate (ib_data(num_ibs, NFIELDS_PER_IB))
+        nBodies = num_ibs
 
-        ! Rank 0 reads the entire file and broadcasts
-        if (proc_rank == 0) then
-            open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
-            if (ios /= 0) call s_mpi_abort('Cannot open IB state file: ' // trim(file_loc))
+        if (nBodies > 0) then
+            allocate (ib_data(nBodies, NFIELDS_PER_IB))
+            allocate (px(nBodies), py(nBodies), pz(nBodies))
+            allocate (force_x(nBodies), force_y(nBodies), force_z(nBodies))
+            allocate (torque_x(nBodies), torque_y(nBodies), torque_z(nBodies))
+            allocate (vel_x(nBodies), vel_y(nBodies), vel_z(nBodies))
+            allocate (omega_x(nBodies), omega_y(nBodies), omega_z(nBodies))
+            allocate (angle_x(nBodies), angle_y(nBodies), angle_z(nBodies))
+            allocate (ib_radius(nBodies))
 
-            do i = 1, num_ibs
-                read (file_unit, iostat=ios) ib_buf
-                if (ios /= 0) call s_mpi_abort('Error reading IB state file at body ' // trim(file_loc))
-                ib_data(i,:) = ib_buf(:)
+            if (proc_rank == 0) then
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                if (ios /= 0) call s_mpi_abort('Cannot open IB state file: ' // trim(file_loc))
+
+                do i = 1, nBodies
+                    read (file_unit, iostat=ios) ib_buf
+                    if (ios /= 0) call s_mpi_abort('Error reading IB state file')
+                    ib_data(i,:) = ib_buf(:)
+                end do
+
+                close (file_unit)
+            end if
+
+            call MPI_BCAST(ib_data, nBodies*NFIELDS_PER_IB, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+            do i = 1, nBodies
+                force_x(i) = ib_data(i, 2); force_y(i) = ib_data(i, 3); force_z(i) = ib_data(i, 4)
+                torque_x(i) = ib_data(i, 5); torque_y(i) = ib_data(i, 6); torque_z(i) = ib_data(i, 7)
+                vel_x(i) = ib_data(i, 8); vel_y(i) = ib_data(i, 9); vel_z(i) = ib_data(i, 10)
+                omega_x(i) = ib_data(i, 11); omega_y(i) = ib_data(i, 12); omega_z(i) = ib_data(i, 13)
+                angle_x(i) = ib_data(i, 14); angle_y(i) = ib_data(i, 15); angle_z(i) = ib_data(i, 16)
+                px(i) = ib_data(i, 17); py(i) = ib_data(i, 18); pz(i) = ib_data(i, 19)
+                ib_radius(i) = ib_data(i, 20)
             end do
 
-            close (file_unit)
+            if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:ib_bodies'
+                    meshtypes(i) = DB_POINTMESH
+                end do
+                err = DBSET2DSTRLEN(len(meshnames(1)))
+                err = DBPUTMMESH(dbroot, 'ib_bodies', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
+            end if
+
+            err = DBPUTPM(dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+
+            call s_write_ib_variable('ib_force_x', t_step, force_x, nBodies)
+            call s_write_ib_variable('ib_force_y', t_step, force_y, nBodies)
+            call s_write_ib_variable('ib_force_z', t_step, force_z, nBodies)
+            call s_write_ib_variable('ib_torque_x', t_step, torque_x, nBodies)
+            call s_write_ib_variable('ib_torque_y', t_step, torque_y, nBodies)
+            call s_write_ib_variable('ib_torque_z', t_step, torque_z, nBodies)
+            call s_write_ib_variable('ib_vel_x', t_step, vel_x, nBodies)
+            call s_write_ib_variable('ib_vel_y', t_step, vel_y, nBodies)
+            call s_write_ib_variable('ib_vel_z', t_step, vel_z, nBodies)
+            call s_write_ib_variable('ib_omega_x', t_step, omega_x, nBodies)
+            call s_write_ib_variable('ib_omega_y', t_step, omega_y, nBodies)
+            call s_write_ib_variable('ib_omega_z', t_step, omega_z, nBodies)
+            call s_write_ib_variable('ib_angle_x', t_step, angle_x, nBodies)
+            call s_write_ib_variable('ib_angle_y', t_step, angle_y, nBodies)
+            call s_write_ib_variable('ib_angle_z', t_step, angle_z, nBodies)
+            call s_write_ib_variable('ib_radius', t_step, ib_radius, nBodies)
+
+            deallocate (ib_data, px, py, pz, force_x, force_y, force_z)
+            deallocate (torque_x, torque_y, torque_z, vel_x, vel_y, vel_z)
+            deallocate (omega_x, omega_y, omega_z, angle_x, angle_y, angle_z)
+            deallocate (ib_radius)
         end if
-
-        call MPI_BCAST(ib_data, num_ibs*NFIELDS_PER_IB, mpi_p, 0, MPI_COMM_WORLD, ierr)
-
-        ! Extract fields into per-variable arrays
-        allocate (px(num_ibs), py(num_ibs), pz(num_ibs))
-        allocate (fx(num_ibs), fy(num_ibs), fz(num_ibs))
-        allocate (tx(num_ibs), ty(num_ibs), tz(num_ibs))
-        allocate (vx(num_ibs), vy(num_ibs), vz(num_ibs))
-        allocate (ox(num_ibs), oy(num_ibs), oz(num_ibs))
-        allocate (ax(num_ibs), ay(num_ibs), az(num_ibs))
-
-        do i = 1, num_ibs
-            ! ib_buf layout: 1=mytime, 2:4=force, 5:7=torque, 8:10=vel, 11:13=angular_vel, 14:16=angles, 17=xc, 18=yc, 19=zc
-            fx(i) = ib_data(i, 2); fy(i) = ib_data(i, 3); fz(i) = ib_data(i, 4)
-            tx(i) = ib_data(i, 5); ty(i) = ib_data(i, 6); tz(i) = ib_data(i, 7)
-            vx(i) = ib_data(i, 8); vy(i) = ib_data(i, 9); vz(i) = ib_data(i, 10)
-            ox(i) = ib_data(i, 11); oy(i) = ib_data(i, 12); oz(i) = ib_data(i, 13)
-            ax(i) = ib_data(i, 14); ay(i) = ib_data(i, 15); az(i) = ib_data(i, 16)
-            px(i) = ib_data(i, 17); py(i) = ib_data(i, 18); pz(i) = ib_data(i, 19)
-        end do
-
-        ! Write Silo point mesh - only rank 0 writes the multi-mesh entry
-        if (proc_rank == 0) then
-            do i = 1, num_procs
-                write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:ib_bodies'
-                meshtypes(i) = DB_POINTMESH
-            end do
-            err = DBSET2DSTRLEN(len(meshnames(1)))
-            err = DBPUTMMESH(dbroot, 'ib_bodies', 9, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
-        end if
-
-        ! Every rank writes the same full set of IB bodies to its local silo file. This is consistent with how all ranks have
-        ! replicated IB state.
-        if (p > 0) then
-            err = DBPUTPM(dbfile, 'ib_bodies', 9, 3, px, py, pz, num_ibs, DB_DOUBLE, DB_F77NULL, ierr)
-        else
-            err = DBPUTPM(dbfile, 'ib_bodies', 9, 2, px, py, pz, num_ibs, DB_DOUBLE, DB_F77NULL, ierr)
-        end if
-
-        ! Write per-body scalar variables
-        call s_write_ib_variable('ib_force_x', t_step, fx, num_ibs)
-        call s_write_ib_variable('ib_force_y', t_step, fy, num_ibs)
-        call s_write_ib_variable('ib_force_z', t_step, fz, num_ibs)
-        call s_write_ib_variable('ib_torque_x', t_step, tx, num_ibs)
-        call s_write_ib_variable('ib_torque_y', t_step, ty, num_ibs)
-        call s_write_ib_variable('ib_torque_z', t_step, tz, num_ibs)
-        call s_write_ib_variable('ib_vel_x', t_step, vx, num_ibs)
-        call s_write_ib_variable('ib_vel_y', t_step, vy, num_ibs)
-        call s_write_ib_variable('ib_vel_z', t_step, vz, num_ibs)
-        call s_write_ib_variable('ib_angular_vel_x', t_step, ox, num_ibs)
-        call s_write_ib_variable('ib_angular_vel_y', t_step, oy, num_ibs)
-        call s_write_ib_variable('ib_angular_vel_z', t_step, oz, num_ibs)
-        call s_write_ib_variable('ib_angle_x', t_step, ax, num_ibs)
-        call s_write_ib_variable('ib_angle_y', t_step, ay, num_ibs)
-        call s_write_ib_variable('ib_angle_z', t_step, az, num_ibs)
-
-        deallocate (ib_data, px, py, pz, fx, fy, fz, tx, ty, tz)
-        deallocate (vx, vy, vz, ox, oy, oz, ax, ay, az)
 #endif
 
     end subroutine s_write_ib_bodies_to_formatted_database_file

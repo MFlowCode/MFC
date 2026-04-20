@@ -909,7 +909,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE)  :: status
         logical                              :: file_exist
         integer                              :: i
-        integer, parameter                   :: NFIELDS_PER_IB = 19
+        integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
 
         ! Partition IBs across ranks round-robin style
@@ -956,6 +956,7 @@ contains
             ib_buf(17) = patch_ib(i)%x_centroid
             ib_buf(18) = patch_ib(i)%y_centroid
             ib_buf(19) = patch_ib(i)%z_centroid
+            ib_buf(20) = patch_ib(i)%radius
 
             ! Global IB index (i) determines position in file
             disp = int(i - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
@@ -974,7 +975,7 @@ contains
         integer, intent(in)                  :: t_step
         character(LEN=path_len + 2*name_len) :: file_loc
         integer                              :: i, ios, file_unit
-        integer, parameter                   :: NFIELDS_PER_IB = 19
+        integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
 
         call s_create_directory(trim(case_dir) // '/restart_data')
@@ -995,6 +996,7 @@ contains
             ib_buf(17) = patch_ib(i)%x_centroid
             ib_buf(18) = patch_ib(i)%y_centroid
             ib_buf(19) = patch_ib(i)%z_centroid
+            ib_buf(20) = patch_ib(i)%radius
 
             write (file_unit) ib_buf
         end do
