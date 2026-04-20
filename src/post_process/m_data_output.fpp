@@ -1362,7 +1362,7 @@ contains
         real(wp), dimension(:), allocatable             :: vel_x, vel_y, vel_z
         real(wp), dimension(:), allocatable             :: omega_x, omega_y, omega_z
         real(wp), dimension(:), allocatable             :: angle_x, angle_y, angle_z
-        real(wp), dimension(:), allocatable             :: ib_radius
+        real(wp), dimension(:), allocatable             :: ib_diameter
 
         ! Build path to per-timestep IB state file
         write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
@@ -1383,7 +1383,7 @@ contains
             allocate (vel_x(nBodies), vel_y(nBodies), vel_z(nBodies))
             allocate (omega_x(nBodies), omega_y(nBodies), omega_z(nBodies))
             allocate (angle_x(nBodies), angle_y(nBodies), angle_z(nBodies))
-            allocate (ib_radius(nBodies))
+            allocate (ib_diameter(nBodies))
 
             if (proc_rank == 0) then
                 open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
@@ -1407,7 +1407,7 @@ contains
                 omega_x(i) = ib_data(i, 11); omega_y(i) = ib_data(i, 12); omega_z(i) = ib_data(i, 13)
                 angle_x(i) = ib_data(i, 14); angle_y(i) = ib_data(i, 15); angle_z(i) = ib_data(i, 16)
                 px(i) = ib_data(i, 17); py(i) = ib_data(i, 18); pz(i) = ib_data(i, 19)
-                ib_radius(i) = ib_data(i, 20)
+                ib_diameter(i) = ib_data(i, 20)*2.0_wp
             end do
 
             if (proc_rank == 0) then
@@ -1436,12 +1436,12 @@ contains
             call s_write_ib_variable('ib_angle_x', t_step, angle_x, nBodies)
             call s_write_ib_variable('ib_angle_y', t_step, angle_y, nBodies)
             call s_write_ib_variable('ib_angle_z', t_step, angle_z, nBodies)
-            call s_write_ib_variable('ib_radius', t_step, ib_radius, nBodies)
+            call s_write_ib_variable('ib_diameter', t_step, ib_diameter, nBodies)
 
             deallocate (ib_data, px, py, pz, force_x, force_y, force_z)
             deallocate (torque_x, torque_y, torque_z, vel_x, vel_y, vel_z)
             deallocate (omega_x, omega_y, omega_z, angle_x, angle_y, angle_z)
-            deallocate (ib_radius)
+            deallocate (ib_diameter)
         end if
 #endif
 
