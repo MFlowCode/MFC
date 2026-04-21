@@ -270,9 +270,10 @@ module m_derived_types
     end type ic_patch_parameters
 
     type ib_patch_parameters
-
         integer  :: geometry                            !< Type of geometry for the patch
+        integer  :: patch_id
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
+
         !> Centroid locations of intermediate steps in the time_stepper module
         real(wp)                 :: step_x_centroid, step_y_centroid, step_z_centroid
         real(wp), dimension(1:3) :: centroid_offset  !< offset of center of mass from computed cell center for odd-shaped IBs

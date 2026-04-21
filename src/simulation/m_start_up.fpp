@@ -1187,4 +1187,17 @@ contains
 
     end subroutine s_read_ib_restart_data
 
+    subroutine s_reduce_ib_patch_array()
+
+      type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib_gbl
+
+      patch_ib_gbl(:) = patch_ib(:)
+
+      deallocate(patch_ib)
+      allocate(patch_ib(num_local_ibs_max))
+
+      
+
+    end subroutine s_reduce_ib_patch_array
+
 end module m_start_up

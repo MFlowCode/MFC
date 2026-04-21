@@ -338,12 +338,14 @@ module m_global_parameters
     !> @{
     logical                                                  :: ib
     integer                                                  :: num_ibs
+    integer                                                  :: num_local_ibs
     integer                                                  :: collision_model
     real(wp)                                                 :: coefficient_of_restitution
     real(wp)                                                 :: collision_time
     real(wp)                                                 :: ib_coefficient_of_friction
     logical                                                  :: ib_state_wrt
-    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
+    type(ib_patch_parameters), allocatable, dimension(:)     :: patch_ib  !< Immersed boundary patch parameters
+    integer, dimension(num_local_ibs_max)                    :: local_patch_ids !< lookup table of IBs in the local compute domain
     type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
     integer                                                  :: Np
 
@@ -780,7 +782,9 @@ contains
             relativity = .false.
         #:endif
 
+        allocate(patch_ib(num_ib_patches_max))
         do i = 1, num_ib_patches_max
+            patch_ib(i)%patch_id = i
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp
