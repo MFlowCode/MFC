@@ -746,6 +746,8 @@ contains
             if (lag_db_wrt) call s_write_lag_bubbles_to_formatted_database_file(t_step)  ! silo file output
         end if
 
+        if (ib_state_wrt) call s_write_ib_bodies_to_formatted_database_file(t_step)
+
         if (sim_data .and. proc_rank == 0) then
             call s_close_intf_data_file()
             call s_close_energy_data_file()
