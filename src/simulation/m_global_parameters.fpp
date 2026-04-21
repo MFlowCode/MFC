@@ -232,12 +232,11 @@ module m_global_parameters
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
     $:GPU_DECLARE(create='[ib_bc_x%beg, ib_bc_y%beg, ib_bc_z%beg]')
-    $:GPU_DECLARE(create='[bc%x%beg, bc%x%end, bc%y%beg, bc%y%end, bc%z%beg, bc%z%end]')
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
     $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
-    $:GPU_DECLARE(create='[bc]')
 #endif
+    $:GPU_DECLARE(create='[bc]')
 
     logical :: parallel_io       !< Format of the data files
     logical :: file_per_process  !< shared file or not when using parallel io
