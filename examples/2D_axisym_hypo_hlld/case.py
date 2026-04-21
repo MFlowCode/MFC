@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 import json
-import math
 
 # 2D axisymmetric hypoelastic case with HLLD solver.
 # Solid sphere in liquid hit by focused acoustic pulse.
-# Adapted from HLL_new/circle_1_interface for cylindrical coordinates.
-# x = axial, y = radial (axis of symmetry at y = 0).
 
 config = {
     "run_time_info": "T",
     # Computational Domain
-    "x_domain%beg": 0,
+    "x_domain%beg": 0.0,
     "x_domain%end": 1.0,
-    "y_domain%beg": 0,
+    "y_domain%beg": 0.0,
     "y_domain%end": 1.0,
     "cyl_coord": "T",
     "m": 49,
@@ -35,7 +32,6 @@ config = {
     "null_weights": "F",
     "mp_weno": "F",
     "riemann_solver": 4,
-    # "hypo_hll_interface_rhs": "T",
     "wave_speeds": 1,
     "avg_state": 2,
     "bc_x%beg": -2,

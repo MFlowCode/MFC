@@ -1479,11 +1479,171 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_f(name, path, mods=param))
 
     def hypo_example_cases():
-        example_specs = [
-            ("2D -> Hypoelasticity", "examples/2D_hypo_hlld_riemann/case.py"),
-            ("2D -> Axisymmetric -> Hypoelasticity", "examples/2D_axisym_hypo_hlld_riemann/case.py"),
-            ("3D -> Hypoelasticity", "examples/3D_hypo_hlld_riemann/case.py"),
-        ]
+        # Inline Riemann problem configs for hypoelastic solver regression testing.
+        # Two-material pressure discontinuity: liquid (fluid 1) vs solid (fluid 2).
+        # Enriched ICs: non-zero transverse velocity and initial stress to exercise
+        # all solver code paths including shear and geometry source terms.
+        _eps = 1e-8
+        _fl_g = 1.0e00 / (4.4e00 - 1.0e00)
+        _fl_p = 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00)
+        _fluids = {
+            "fluid_pp(1)%gamma": _fl_g,
+            "fluid_pp(1)%pi_inf": _fl_p,
+            "fluid_pp(1)%G": 0.0,
+            "fluid_pp(2)%gamma": _fl_g,
+            "fluid_pp(2)%pi_inf": _fl_p,
+            "fluid_pp(2)%G": 1e7,
+        }
+        _common = {
+            "run_time_info": "T",
+            "t_step_start": 0,
+            "t_step_stop": 10,
+            "t_step_save": 10,
+            "num_patches": 2,
+            "model_eqns": 2,
+            "alt_soundspeed": "F",
+            "num_fluids": 2,
+            "mpp_lim": "T",
+            "mixture_err": "F",
+            "time_stepper": 1,
+            "weno_order": 1,
+            "weno_eps": 1.0e-20,
+            "null_weights": "F",
+            "mp_weno": "F",
+            "riemann_solver": 4,
+            "wave_speeds": 1,
+            "avg_state": 2,
+            "format": 1,
+            "precision": 2,
+            "prim_vars_wrt": "T",
+            "rho_wrt": "T",
+            "parallel_io": "T",
+            "hypoelasticity": "T",
+            "fd_order": 4,
+            **_fluids,
+        }
+        _patch1_2d = {
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 10.0,
+            "patch_icpp(1)%pres": 1e6,
+            "patch_icpp(1)%tau_e(1)": 1e4,
+            "patch_icpp(1)%alpha_rho(1)": 1000 * (1.0 - _eps),
+            "patch_icpp(1)%alpha(1)": 1.0 - _eps,
+            "patch_icpp(1)%alpha_rho(2)": 1000 * _eps,
+            "patch_icpp(1)%alpha(2)": _eps,
+        }
+        _patch2_2d = {
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": -10.0,
+            "patch_icpp(2)%pres": 1e5,
+            "patch_icpp(2)%tau_e(1)": -1e4,
+            "patch_icpp(2)%alpha_rho(1)": 1000 * _eps,
+            "patch_icpp(2)%alpha(1)": _eps,
+            "patch_icpp(2)%alpha_rho(2)": 1000 * (1.0 - _eps),
+            "patch_icpp(2)%alpha(2)": 1.0 - _eps,
+        }
+        base_configs = {
+            "2D -> Hypoelasticity": {
+                **_common,
+                "m": 24,
+                "n": 24,
+                "p": 0,
+                "dt": 6.0e-6,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                **_patch1_2d,
+                **_patch2_2d,
+            },
+            "2D -> Axisymmetric -> Hypoelasticity": {
+                **_common,
+                "m": 24,
+                "n": 24,
+                "p": 0,
+                "dt": 4.0e-6,
+                "cyl_coord": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -2,
+                "bc_x%end": -2,
+                "bc_y%beg": -2,
+                "bc_y%end": -2,
+                **_patch1_2d,
+                **_patch2_2d,
+            },
+            "3D -> Hypoelasticity": {
+                **_common,
+                "m": 24,
+                "n": 24,
+                "p": 24,
+                "dt": 6.0e-6,
+                "cyl_coord": "F",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "z_domain%beg": 0.0,
+                "z_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "bc_z%beg": -3,
+                "bc_z%end": -3,
+                "patch_icpp(1)%geometry": 9,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%z_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%length_z": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 10.0,
+                "patch_icpp(1)%vel(3)": 5.0,
+                "patch_icpp(1)%pres": 1e6,
+                "patch_icpp(1)%tau_e(1)": 1e4,
+                "patch_icpp(1)%alpha_rho(1)": 1000 * (1.0 - _eps),
+                "patch_icpp(1)%alpha(1)": 1.0 - _eps,
+                "patch_icpp(1)%alpha_rho(2)": 1000 * _eps,
+                "patch_icpp(1)%alpha(2)": _eps,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%geometry": 9,
+                "patch_icpp(2)%x_centroid": 0.75,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%z_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%length_y": 1.0,
+                "patch_icpp(2)%length_z": 1.0,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": -10.0,
+                "patch_icpp(2)%vel(3)": -5.0,
+                "patch_icpp(2)%pres": 1e5,
+                "patch_icpp(2)%tau_e(1)": -1e4,
+                "patch_icpp(2)%alpha_rho(1)": 1000 * _eps,
+                "patch_icpp(2)%alpha(1)": _eps,
+                "patch_icpp(2)%alpha_rho(2)": 1000 * (1.0 - _eps),
+                "patch_icpp(2)%alpha(2)": 1.0 - _eps,
+            },
+        }
+
         solver_specs = [
             {"trace": "HLLD", "mods": {"riemann_solver": 4}},
             {"trace": "HLLD -> ADC", "mods": {"riemann_solver": 4, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}},
@@ -1493,14 +1653,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {"trace": "HLL -> u-interface -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T", "hll_u_interface": "T"}},
         ]
 
-        def modify_hypo_example_case(case: dict, solver_mods: dict, alt_soundspeed: str):
+        def apply_solver(case: dict, base_cfg: dict, solver_mods: dict, alt_soundspeed: str):
+            case.update(base_cfg)
             for key in ["riemann_hypo_ADC", "ADC_kappa", "hypo_hll_interface_rhs", "hll_u_interface"]:
                 case.pop(key, None)
-
             case["alt_soundspeed"] = alt_soundspeed
             case.update(solver_mods)
 
-        for base_trace, path in example_specs:
+        for base_trace, base_cfg in base_configs.items():
             for solver_spec in solver_specs:
                 solver_trace = solver_spec["trace"]
                 solver_mods = solver_spec["mods"]
@@ -1523,10 +1683,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(
                         define_case_f(
                             trace,
-                            path,
+                            "",
                             mods={},
                             override_tol=tol,
-                            functor=lambda case, solver_mods=solver_mods, alt_soundspeed=alt_soundspeed: modify_hypo_example_case(case, solver_mods, alt_soundspeed),
+                            functor=lambda case, bc=base_cfg, sm=solver_mods, als=alt_soundspeed: apply_solver(case, bc, sm, als),
                         )
                     )
 
@@ -1601,12 +1761,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
-                "2D_hypo_hlld",  # old acoustic case, replaced by Riemann tests
-                "3D_hypo_hlld",  # old acoustic case, replaced by Riemann tests
-                "2D_axisym_hypo_hlld",  # old acoustic case, replaced by Riemann tests
-                "2D_hypo_hlld_riemann",  # covered by explicit tests in cases.py
-                "3D_hypo_hlld_riemann",  # covered by explicit tests in cases.py
-                "2D_axisym_hypo_hlld_riemann",  # covered by explicit tests in cases.py
+                "2D_hypo_hlld",  # acoustic demo case, not a regression test
+                "3D_hypo_hlld",  # acoustic demo case, not a regression test
+                "2D_axisym_hypo_hlld",  # acoustic demo case, not a regression test
             ]
             if path in casesToSkip:
                 continue

@@ -204,9 +204,8 @@ contains
                         rho_K_field(k, l, q) = rho_K
                         G_K_field(k, l, q) = G_K
 
-                        ! TODO: take this out if not needed
                         if (G_K < verysmall) then
-                            G_K_field(k, l, q) = 0
+                            G_K_field(k, l, q) = 0._wp
                         end if
                     end do
                 end do
@@ -427,7 +426,7 @@ contains
                     G_K_field(k, l, q) = G_K
 
                     if (G_K < verysmall) then
-                        G_K_field(k, l, q) = 0
+                        G_K_field(k, l, q) = 0._wp
                     end if
                 end do
             end do

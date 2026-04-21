@@ -550,7 +550,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
-`riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations (\cite Miyoshi05).
+`riemann_solver = 4` is the HLLD solver for MHD or hypoelasticity simulations. For MHD it resolves 5 of the full seven-wave structure of the MHD equations (\cite Miyoshi05).
 
 - `hll_u_interface`: Selects between two HLL discretizations of volume fraction advection (`riemann_solver = 1`):
   - **Default** (``'F'``): \f$\partial_t \alpha_k + u\,\partial_x \alpha_k = 0\f$

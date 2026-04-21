@@ -3753,22 +3753,39 @@ contains
                                     flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) = F_HLL(eqn_idx%E) + phi*(flux_rs${XYZ}$_vf(j, k, l, &
                                                       & eqn_idx%E) - F_HLL(eqn_idx%E))
 
+                                    ! Momentum: blend (local/physical index mapping via dir_idx)
+                                    flux_rs${XYZ}$_vf(j, k, l, &
+                                                      & eqn_idx%cont%end + dir_idx(1)) = F_HLL(eqn_idx%mom%beg) &
+                                                      & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
+                                                      & eqn_idx%cont%end + dir_idx(1)) - F_HLL(eqn_idx%mom%beg))
+                                    if (n > 0) then
+                                        flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & eqn_idx%cont%end + dir_idx(2)) = F_HLL(eqn_idx%mom%beg + 1) &
+                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & eqn_idx%cont%end + dir_idx(2)) - F_HLL(eqn_idx%mom%beg + 1))
+                                    end if
+                                    if (p > 0) then
+                                        flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & eqn_idx%cont%end + dir_idx(3)) = F_HLL(eqn_idx%mom%beg + 2) &
+                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & eqn_idx%cont%end + dir_idx(3)) - F_HLL(eqn_idx%mom%beg + 2))
+                                    end if
+
                                     ! Volume fractions: blend
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                         flux_rs${XYZ}$_vf(j, k, l, i) = F_HLL(i) + phi*(flux_rs${XYZ}$_vf(j, k, l, i) - F_HLL(i))
                                     end do
 
-                                    ! Stresses: blend tau_nn, tau_t1t1, tau_t2t2, tau_t1t2, tau_qq Keep HLLC (no blend): tau_nt1,
-                                    ! tau_nt2
+                                    ! Stresses: blend all components (local/physical mapping by dimension)
                                     if (n == 0) then
-                                        ! 1D: only tau_nn (eqn_idx%stress%beg in both local and physical basis)
+                                        ! 1D: only tau_nn
                                         flux_rs${XYZ}$_vf(j, k, l, &
                                                           & eqn_idx%stress%beg) = F_HLL(eqn_idx%stress%beg) &
                                                           & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
                                                           & eqn_idx%stress%beg) - F_HLL(eqn_idx%stress%beg))
                                     else if (p == 0) then
-                                        ! 2D: tau_nn and tau_t1t1 (mapped by sweep direction)
+                                        ! 2D: tau_nn, tau_nt, tau_tt (tau_nt at stress%beg+1 in both bases)
                                         if (dir_idx(1) == 1) then
                                             flux_rs${XYZ}$_vf(j, k, l, &
                                                               & eqn_idx%stress%beg) = F_HLL(eqn_idx%stress%beg) &
@@ -3788,19 +3805,29 @@ contains
                                                               & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
                                                               & eqn_idx%stress%beg) - F_HLL(eqn_idx%stress%beg + 2))
                                         end if
+                                        flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & eqn_idx%stress%beg + 1) = F_HLL(eqn_idx%stress%beg + 1) &
+                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & eqn_idx%stress%beg + 1) - F_HLL(eqn_idx%stress%beg + 1))
                                     else
-                                        ! 3D: use existing itnn/itss1/itss2/itt12 mapping
+                                        ! 3D: all 6 components via existing index mapping
                                         flux_rs${XYZ}$_vf(j, k, l, itnn) = F_HLL(eqn_idx%stress%beg) + phi*(flux_rs${XYZ}$_vf(j, &
                                                           & k, l, itnn) - F_HLL(eqn_idx%stress%beg))
+                                        flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & itnt1) = F_HLL(eqn_idx%stress%beg + 1) + phi*(flux_rs${XYZ}$_vf(j, k, &
+                                                          & l, itnt1) - F_HLL(eqn_idx%stress%beg + 1))
                                         flux_rs${XYZ}$_vf(j, k, l, &
                                                           & itss1) = F_HLL(eqn_idx%stress%beg + 2) + phi*(flux_rs${XYZ}$_vf(j, k, &
                                                           & l, itss1) - F_HLL(eqn_idx%stress%beg + 2))
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itss2) = F_HLL(eqn_idx%stress%beg + 5) + phi*(flux_rs${XYZ}$_vf(j, k, &
-                                                          & l, itss2) - F_HLL(eqn_idx%stress%beg + 5))
+                                                          & itnt2) = F_HLL(eqn_idx%stress%beg + 3) + phi*(flux_rs${XYZ}$_vf(j, k, &
+                                                          & l, itnt2) - F_HLL(eqn_idx%stress%beg + 3))
                                         flux_rs${XYZ}$_vf(j, k, l, &
                                                           & itt12) = F_HLL(eqn_idx%stress%beg + 4) + phi*(flux_rs${XYZ}$_vf(j, k, &
                                                           & l, itt12) - F_HLL(eqn_idx%stress%beg + 4))
+                                        flux_rs${XYZ}$_vf(j, k, l, &
+                                                          & itss2) = F_HLL(eqn_idx%stress%beg + 5) + phi*(flux_rs${XYZ}$_vf(j, k, &
+                                                          & l, itss2) - F_HLL(eqn_idx%stress%beg + 5))
                                     end if
                                     if (cyl_coord) then
                                         flux_rs${XYZ}$_vf(j, k, l, &
@@ -4561,8 +4588,8 @@ contains
                                 G_hat = G_hat + alpha_hat(i)*Gs_rs(i)
                             end do
 
-                            E%L = gamma%L*pres%L + pi_inf%L + 5e-1*rho%L*vel_rms%L + qv%L
-                            E%R = gamma%R*pres%R + pi_inf%R + 5e-1*rho%R*vel_rms%R + qv%R
+                            E%L = gamma%L*pres%L + pi_inf%L + 5e-1_wp*rho%L*vel_rms%L + qv%L
+                            E%R = gamma%R*pres%R + pi_inf%R + 5e-1_wp*rho%R*vel_rms%R + qv%R
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1

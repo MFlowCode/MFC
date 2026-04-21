@@ -926,7 +926,7 @@ def _load():
     _r("riemann_hypo_ADC", LOG, {"elasticity"})
     _r("ADC_kappa", REAL, {"elasticity"})
     _r("hypo_hll_interface_rhs", LOG, {"elasticity"})
-    _r("hll_u_interface", LOG, {"elasticity"})
+    _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")

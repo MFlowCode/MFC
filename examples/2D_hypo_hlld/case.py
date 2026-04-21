@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import json
-import math
 
 config = {
-    # Logistics
     "run_time_info": "T",
-    # Computational Domain Parameters
-    "x_domain%beg": 0,
+    # Computational Domain
+    "x_domain%beg": 0.0,
     "x_domain%end": 1.0,
-    "y_domain%beg": 0,
+    "y_domain%beg": 0.0,
     "y_domain%end": 1.0,
     "m": 49,
     "n": 49,
@@ -17,38 +15,27 @@ config = {
     "t_step_start": 0,
     "t_step_stop": 250,
     "t_step_save": 50,
-    # Simulation Algorithm Parameters
+    # Simulation Algorithm
     "num_patches": 2,
     "model_eqns": 2,
     "alt_soundspeed": "F",
     "num_fluids": 2,
-    # "mpp_lim": "F",
     "mpp_lim": "T",
     "mixture_err": "F",
     "time_stepper": 1,
     "weno_order": 1,
     "weno_eps": 1.0e-20,
-    # "mapped_weno": "T",
     "null_weights": "F",
     "mp_weno": "F",
-    # "riemann_solver": 2,
     "riemann_solver": 4,
-    # "riemann_hypo_ADC": 'T',
-    # "ADC_kappa": 1.0,
     "wave_speeds": 1,
     "avg_state": 2,
-    # "bc_x%beg": -6,
-    # "bc_x%end": -6,
-    # "bc_y%beg": -6,
-    # "bc_y%end": -6,
     "bc_x%beg": -3,
     "bc_x%end": -3,
     "bc_y%beg": -3,
     "bc_y%end": -3,
-    # !!! BC=-6 doesn't work with 1st order upwind !!!
-    # Formatted Database Files Structure Parameters
+    # Output
     "format": 1,
-    # "format": 2,
     "precision": 2,
     "prim_vars_wrt": "T",
     "rho_wrt": "T",
@@ -56,7 +43,7 @@ config = {
     # Hypoelasticity
     "hypoelasticity": "T",
     "fd_order": 4,
-    # Patch 1 Liquid
+    # Patch 1: Liquid background
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": 0.5,
     "patch_icpp(1)%y_centroid": 0.5,
@@ -70,7 +57,7 @@ config = {
     "patch_icpp(1)%alpha(1)": 1.0 - 1e-8,
     "patch_icpp(1)%alpha_rho(2)": 1000 * 1e-8,
     "patch_icpp(1)%alpha(2)": 1e-8,
-    # Patch 1 Solid
+    # Patch 2: Solid circle
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%geometry": 2,
     "patch_icpp(2)%x_centroid": 0.6,
@@ -84,9 +71,6 @@ config = {
     "patch_icpp(2)%alpha(1)": 1e-8,
     "patch_icpp(2)%alpha_rho(2)": 1000 * (1.0 - 1e-8),
     "patch_icpp(2)%alpha(2)": 1.0 - 1e-8,
-    # "patch_icpp(2)%smoothen": "T",
-    # "patch_icpp(2)%smooth_patch_id": 1,
-    # "patch_icpp(2)%smooth_coeff": 4.0e00,
     # Acoustic source
     "acoustic_source": "T",
     "num_source": 1,

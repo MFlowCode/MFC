@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 import json
-import math
+
+# 3D hypoelastic case with HLLD solver.
+# Solid sphere in liquid hit by focused acoustic pulse.
 
 config = {
-    # Logistics
     "run_time_info": "T",
-    # Computational Domain Parameters
-    "x_domain%beg": 0,
+    # Computational Domain
+    "x_domain%beg": 0.0,
     "x_domain%end": 1.0,
-    "y_domain%beg": 0,
+    "y_domain%beg": 0.0,
     "y_domain%end": 1.0,
-    "z_domain%beg": 0,
+    "z_domain%beg": 0.0,
     "z_domain%end": 1.0,
     "m": 24,
     "n": 24,
