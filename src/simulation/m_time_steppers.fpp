@@ -395,11 +395,6 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        ! Opening the ib state data file (used for restart and diagnostics)
-        if (proc_rank == 0 .and. ib) then
-            call s_open_ib_state_file()
-        end if
-
         ! Allocating arrays to store the bc types
         @:ALLOCATE(bc_type(1:num_dims,1:2))
 
@@ -972,11 +967,6 @@ contains
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_close_run_time_information_file()
-        end if
-
-        ! Closing the IB state data file
-        if (proc_rank == 0 .and. ib) then
-            call s_close_ib_state_file()
         end if
 
     end subroutine s_finalize_time_steppers_module
