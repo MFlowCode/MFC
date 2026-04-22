@@ -13,6 +13,7 @@ import tarfile
 import tempfile
 import types
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from .. import state
@@ -87,29 +88,28 @@ class TestCollectSources(_StateSandbox):
         self.assertNotIn("p_all", names)
 
 
+@contextmanager
+def _run_archive(fmt: str):
+    from . import archive as archive_mod
+
+    src = tempfile.mkdtemp()
+    dest_root = tempfile.mkdtemp()
+    try:
+        state.gARG["archive"] = dest_root
+        state.gARG["archive_format"] = fmt
+        case = _make_fake_case(src)
+        archive_mod.archive(case, _fake_targets())
+        entries = sorted(os.listdir(dest_root))
+        assert len(entries) == 1, f"expected one archive entry, got {entries}"
+        yield os.path.join(dest_root, entries[0])
+    finally:
+        shutil.rmtree(src, ignore_errors=True)
+        shutil.rmtree(dest_root, ignore_errors=True)
+
+
 class TestArchiveFormats(_StateSandbox):
-    from contextlib import contextmanager as _cm
-
-    @_cm
-    def _run_archive(self, fmt: str):
-        from . import archive as archive_mod
-
-        src = tempfile.mkdtemp()
-        dest_root = tempfile.mkdtemp()
-        try:
-            state.gARG["archive"] = dest_root
-            state.gARG["archive_format"] = fmt
-            case = _make_fake_case(src)
-            archive_mod.archive(case, _fake_targets())
-            entries = sorted(os.listdir(dest_root))
-            self.assertEqual(len(entries), 1, f"expected one archive entry, got {entries}")
-            yield os.path.join(dest_root, entries[0])
-        finally:
-            shutil.rmtree(src, ignore_errors=True)
-            shutil.rmtree(dest_root, ignore_errors=True)
-
     def test_format_dir(self):
-        with self._run_archive("dir") as path:
+        with _run_archive("dir") as path:
             self.assertTrue(os.path.isdir(path))
             self.assertTrue(os.path.isfile(os.path.join(path, "manifest.yaml")))
             self.assertTrue(os.path.isfile(os.path.join(path, "case.py")))
@@ -118,7 +118,7 @@ class TestArchiveFormats(_StateSandbox):
             self.assertTrue(os.path.isfile(os.path.join(path, "D", "output.dat")))
 
     def test_format_tar(self):
-        with self._run_archive("tar") as path:
+        with _run_archive("tar") as path:
             self.assertTrue(path.endswith(".tar"))
             self.assertTrue(tarfile.is_tarfile(path))
             with tarfile.open(path) as tf:
@@ -136,7 +136,7 @@ class TestArchiveFormats(_StateSandbox):
         except (FileNotFoundError, subprocess.TimeoutExpired):
             self.skipTest("tar --zstd not available")
 
-        with self._run_archive("tar.zst") as path:
+        with _run_archive("tar.zst") as path:
             self.assertTrue(path.endswith(".tar.zst"))
             self.assertGreater(os.path.getsize(path), 0)
 
@@ -172,6 +172,20 @@ class TestArchiveBehavior(_StateSandbox):
 
             with self.assertRaises(MFCException):
                 archive_mod.archive(case, _fake_targets())
+
+    def test_output_summary_outside_case_dir_is_skipped(self):
+        collect = _collect_sources_fn()
+
+        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as elsewhere:
+            outside = os.path.join(elsewhere, "summary.yaml")
+            with open(outside, "w") as f:
+                f.write("k: v\n")
+
+            state.gARG["output_summary"] = outside
+            case = _make_fake_case(src)
+            sources = collect(case, _fake_targets())
+
+        self.assertNotIn(outside, sources)
 
 
 if __name__ == "__main__":

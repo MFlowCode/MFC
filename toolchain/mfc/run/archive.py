@@ -55,8 +55,14 @@ def __collect_sources(case: input.MFCInputFile, targets) -> list:
     if os.path.isfile(out_file):
         sources.append(out_file)
 
-    if ARG("output_summary") is not None and os.path.isfile(ARG("output_summary")):
-        sources.append(os.path.abspath(ARG("output_summary")))
+    summary = ARG("output_summary")
+    if summary is not None and os.path.isfile(summary):
+        summary_abs = os.path.abspath(summary)
+        dirpath_abs = os.path.abspath(dirpath)
+        if os.path.commonpath([summary_abs, dirpath_abs]) == dirpath_abs:
+            sources.append(summary_abs)
+        else:
+            cons.print(f"[yellow]Archive: skipping output_summary outside case dir: {summary_abs}[/yellow]")
 
     for dirname in ARTIFACT_DIRNAMES:
         candidate_dir = os.path.join(dirpath, dirname)
@@ -113,12 +119,11 @@ def __write_tar(sources: list, case: input.MFCInputFile, dest: str, compressed: 
     dirpath = case.dirpath
     arcroot = os.path.basename(dest).removesuffix(".tar.zst").removesuffix(".tar")
 
-    def arcname(path: str) -> str:
+    def rel_for(path: str) -> str:
         try:
-            rel = os.path.relpath(path, dirpath)
+            return os.path.relpath(path, dirpath)
         except ValueError:
-            rel = os.path.basename(path)
-        return os.path.join(arcroot, rel)
+            return os.path.basename(path)
 
     if compressed:
         if not does_command_exist("tar"):
@@ -129,7 +134,9 @@ def __write_tar(sources: list, case: input.MFCInputFile, dest: str, compressed: 
             os.makedirs(staging_root, exist_ok=True)
 
             for src in sources:
-                rel = arcname(src)[len(arcroot) + 1 :]
+                rel = rel_for(src)
+                if rel.startswith(".."):
+                    raise MFCException(f"Archive: refusing to include source outside case dir: {src}")
                 target = os.path.join(staging_root, rel)
                 os.makedirs(os.path.dirname(target), exist_ok=True)
                 if os.path.isdir(src):
@@ -149,7 +156,10 @@ def __write_tar(sources: list, case: input.MFCInputFile, dest: str, compressed: 
 
     with tarfile.open(dest, "w") as tf:
         for src in sources:
-            tf.add(src, arcname=arcname(src))
+            rel = rel_for(src)
+            if rel.startswith(".."):
+                raise MFCException(f"Archive: refusing to include source outside case dir: {src}")
+            tf.add(src, arcname=os.path.join(arcroot, rel))
         tf.add(manifest_file, arcname=os.path.join(arcroot, "manifest.yaml"))
 
 
@@ -166,8 +176,10 @@ def archive(case: input.MFCInputFile, targets) -> None:
     archive_root = os.path.abspath(os.path.expanduser(archive_root))
     os.makedirs(archive_root, exist_ok=True)
 
-    suffix = {"dir": "", "tar": ".tar", "tar.zst": ".tar.zst"}[archive_format]
-    dest = os.path.join(archive_root, stem + suffix)
+    suffix_map = {"dir": "", "tar": ".tar", "tar.zst": ".tar.zst"}
+    if archive_format not in suffix_map:
+        raise MFCException(f"Archive: unsupported format '{archive_format}'. Must be one of: {', '.join(suffix_map)}.")
+    dest = os.path.join(archive_root, stem + suffix_map[archive_format])
 
     if os.path.exists(dest):
         raise MFCException(f"Archive: destination already exists: {dest}")
@@ -179,11 +191,11 @@ def archive(case: input.MFCInputFile, targets) -> None:
 
     cons.print()
     cons.print(f"[bold]Archiving[/bold] to [magenta]{dest}[/magenta] ({archive_format})")
-    cons.indent()
 
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tmp:
         manifest_path = tmp.name
 
+    cons.indent()
     try:
         manifest = __build_manifest(case, targets, sources, dest, archive_format)
         file_dump_yaml(manifest_path, manifest)
@@ -196,6 +208,6 @@ def archive(case: input.MFCInputFile, targets) -> None:
 
         cons.print(f"Wrote [magenta]{len(sources)}[/magenta] artifact(s) + manifest.yaml.")
     finally:
+        cons.unindent()
         if os.path.isfile(manifest_path):
             os.unlink(manifest_path)
-        cons.unindent()
