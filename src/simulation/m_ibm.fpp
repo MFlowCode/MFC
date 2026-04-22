@@ -923,7 +923,7 @@ contains
                 do k = 0, p
                     encoded_ib_idx = ib_markers%sf(i, j, k)
                     if (encoded_ib_idx /= 0) then
-                        call s_decode_patch_id(encoded_ib_idx, ib_dx)
+                        call s_decode_patch_id(encoded_ib_idx, ib_idx)
 
                         ! get the vector pointing to the grid cell from the IB centroid
                         if (num_dims == 3) then
