@@ -109,7 +109,7 @@ contains
         radius = patch_ib(patch_id)%radius
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -221,7 +221,7 @@ contains
         end if
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -376,7 +376,7 @@ contains
         end if
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -466,7 +466,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -527,7 +527,7 @@ contains
         end if
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -586,7 +586,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -656,7 +656,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers - 1
         jl = -gp_layers - 1
@@ -724,7 +724,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -781,7 +781,7 @@ contains
         threshold = patch_ib(patch_id)%model_threshold
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         il = -gp_layers - 1
         jl = -gp_layers - 1
@@ -858,7 +858,7 @@ contains
         rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers - 1
         jl = -gp_layers - 1
