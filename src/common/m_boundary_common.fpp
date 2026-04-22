@@ -42,21 +42,24 @@ contains
     !> Allocate and set up boundary condition buffer arrays for all coordinate directions.
     impure subroutine s_initialize_boundary_common_module()
 
-        integer :: i, j
+        integer :: i, j, sys_size_alloc
 
         @:ALLOCATE(bc_buffers(1:3, 1:2))
 
         if (bc_io) then
-            @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
-            @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size, 0:n, 0:p))
+            sys_size_alloc = sys_size
+            if (chemistry) sys_size_alloc = sys_size + 1
+
+            @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size_alloc, 0:n, 0:p))
+            @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size_alloc, 0:n, 0:p))
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                 if (n > 0) then
-                    @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-                    @:ALLOCATE(bc_buffers(2,2)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+                    @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size_alloc,0:p))
+                    @:ALLOCATE(bc_buffers(2,2)%sf(-buff_size:m+buff_size,1:sys_size_alloc,0:p))
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                         if (p > 0) then
-                            @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                            @:ALLOCATE(bc_buffers(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                            @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size_alloc))
+                            @:ALLOCATE(bc_buffers(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size_alloc))
                         end if
                     #:endif
                 end if
@@ -71,34 +74,35 @@ contains
     end subroutine s_initialize_boundary_common_module
 
     !> Populate the buffers of the primitive variables based on the selected boundary conditions.
-    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in)
+    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
         integer                                                                                              :: k, l
+        type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
         ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
 
         if (bc_x%beg >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in, q_T_sf)
         else
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 1)%sf(0, k, l)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                        call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l, q_T_sf)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
+                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
+                        call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, 1, -1, k, l)
+                        call s_slip_wall(q_prim_vf, 1, -1, k, l, q_T_sf)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, 1, -1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 1, -1, k, l, q_T_sf)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, 1, -1, k, l)
+                        call s_dirichlet(q_prim_vf, 1, -1, k, l, q_T_sf)
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 1)%sf(0, k, &
@@ -111,24 +115,24 @@ contains
         end if
 
         if (bc_x%end >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb_in, mv_in)
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb_in, mv_in, q_T_sf)
         else
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (int(bc_type(1, 2)%sf(0, k, l)))
                     case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)  ! Ghost-cell extrap. BC at end
-                        call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l, q_T_sf)
                     case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
+                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
+                        call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in, q_T_sf)
                     case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, 1, 1, k, l)
+                        call s_slip_wall(q_prim_vf, 1, 1, k, l, q_T_sf)
                     case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, 1, 1, k, l)
+                        call s_no_slip_wall(q_prim_vf, 1, 1, k, l, q_T_sf)
                     case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, 1, 1, k, l)
+                        call s_dirichlet(q_prim_vf, 1, 1, k, l, q_T_sf)
                     end select
 
                     if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 2)%sf(0, k, &
@@ -146,26 +150,26 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bc_y%beg >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb_in, mv_in)
+                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb_in, mv_in, q_T_sf)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = 0, p
                     do k = -buff_size, m + buff_size
                         select case (int(bc_type(2, 1)%sf(k, 0, l)))
                         case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l)
+                            call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l, q_T_sf)
                         case (BC_AXIS)
                             call s_axis(q_prim_vf, pb_in, mv_in, k, l)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
+                            call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
+                            call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 2, -1, k, l)
+                            call s_slip_wall(q_prim_vf, 2, -1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 2, -1, k, l)
+                            call s_no_slip_wall(q_prim_vf, 2, -1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, -1, k, l)
+                            call s_dirichlet(q_prim_vf, 2, -1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 1)%sf(k, 0, &
@@ -178,24 +182,24 @@ contains
             end if
 
             if (bc_y%end >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb_in, mv_in)
+                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb_in, mv_in, q_T_sf)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = 0, p
                     do k = -buff_size, m + buff_size
                         select case (int(bc_type(2, 2)%sf(k, 0, l)))
                         case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l)
+                            call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l, q_T_sf)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
+                            call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
+                            call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 2, 1, k, l)
+                            call s_slip_wall(q_prim_vf, 2, 1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 2, 1, k, l)
+                            call s_no_slip_wall(q_prim_vf, 2, 1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, 1, k, l)
+                            call s_dirichlet(q_prim_vf, 2, 1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 2)%sf(k, 0, &
@@ -214,24 +218,24 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (bc_z%beg >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb_in, mv_in)
+                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb_in, mv_in, q_T_sf)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
                         select case (int(bc_type(3, 1)%sf(k, l, 0)))
                         case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l)
+                            call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l, q_T_sf)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
+                            call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
+                            call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 3, -1, k, l)
+                            call s_slip_wall(q_prim_vf, 3, -1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 3, -1, k, l)
+                            call s_no_slip_wall(q_prim_vf, 3, -1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, -1, k, l)
+                            call s_dirichlet(q_prim_vf, 3, -1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 1)%sf(k, l, &
@@ -244,24 +248,24 @@ contains
             end if
 
             if (bc_z%end >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in)
+                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in, q_T_sf)
             else
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
                         select case (int(bc_type(3, 2)%sf(k, l, 0)))
                         case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l)
+                            call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l, q_T_sf)
                         case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
+                            call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
+                            call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in, q_T_sf)
                         case (BC_SlIP_WALL)
-                            call s_slip_wall(q_prim_vf, 3, 1, k, l)
+                            call s_slip_wall(q_prim_vf, 3, 1, k, l, q_T_sf)
                         case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 3, 1, k, l)
+                            call s_no_slip_wall(q_prim_vf, 3, 1, k, l, q_T_sf)
                         case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, 1, k, l)
+                            call s_dirichlet(q_prim_vf, 3, 1, k, l, q_T_sf)
                         end select
 
                         if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 2)%sf(k, l, &
@@ -277,13 +281,14 @@ contains
     end subroutine s_populate_variables_buffers
 
     !> Fill ghost cells by copying the nearest boundary cell value along the specified direction.
-    subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                    :: bc_dir, bc_loc
         integer, intent(in)                                    :: k, l
         integer                                                :: j, i
+        type(scalar_field), optional, intent(inout)            :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
@@ -292,12 +297,22 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
+                    end do
+                end if
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
+                    end do
+                end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             if (bc_loc == -1) then  !< bc_y%beg
@@ -306,12 +321,23 @@ contains
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
+                    end do
+                end if
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
+                    end do
+                end if
             end if
         else if (bc_dir == 3) then  !< z-direction
             if (bc_loc == -1) then  !< bc_z%beg
@@ -320,19 +346,29 @@ contains
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
+                    end do
+                end if
             else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
+                    end do
+                end if
             end if
         end if
 
     end subroutine s_ghost_cell_extrapolation
 
     !> Apply reflective (symmetry) boundary conditions by mirroring primitive variables and flipping the normal velocity component.
-    subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
+    subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
@@ -340,6 +376,7 @@ contains
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
         integer, intent(in)                                                                                  :: k, l
         integer                                                                                              :: j, q, i
+        type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -353,6 +390,10 @@ contains
                     do i = eqn_idx%mom%beg + 1, sys_size
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
                     end do
+
+                    if (chemistry .and. present(q_T_sf)) then
+                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
+                    end if
 
                     if (elasticity) then
                         do i = 1, shear_BC_flip_num
@@ -387,6 +428,10 @@ contains
                     do i = eqn_idx%mom%beg + 1, sys_size
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
+
+                    if (chemistry .and. present(q_T_sf)) then
+                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                    end if
 
                     if (elasticity) then
                         do i = 1, shear_BC_flip_num
@@ -423,6 +468,10 @@ contains
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l)
                     end do
 
+                    if (chemistry .and. present(q_T_sf)) then
+                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
+                    end if
+
                     if (elasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, -j, l) = -q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, &
@@ -456,6 +505,10 @@ contains
                     do i = eqn_idx%mom%beg + 2, sys_size
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
                     end do
+
+                    if (chemistry .and. present(q_T_sf)) then
+                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                    end if
 
                     if (elasticity) then
                         do i = 1, shear_BC_flip_num
@@ -493,6 +546,10 @@ contains
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
                     end do
 
+                    if (chemistry .and. present(q_T_sf)) then
+                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
+                    end if
+
                     if (elasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, -j) = -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, &
@@ -527,6 +584,10 @@ contains
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
                     end do
 
+                    if (chemistry .and. present(q_T_sf)) then
+                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
+                    end if
+
                     if (elasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p + j) = -q_prim_vf(shear_BC_flip_indices(3, &
@@ -555,7 +616,7 @@ contains
     end subroutine s_symmetry
 
     !> Apply periodic boundary conditions by copying values from the opposite domain boundary.
-    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in)
+    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
@@ -563,6 +624,7 @@ contains
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
         integer, intent(in)                                                                                  :: k, l
         integer                                                                                              :: j, q, i
+        type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -571,6 +633,12 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
+                    end do
+                end if
 
                 if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
@@ -588,6 +656,12 @@ contains
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(j - 1, k, l)
+                    end do
+                end if
 
                 if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
@@ -608,6 +682,12 @@ contains
                     end do
                 end do
 
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, n - (j - 1), l)
+                    end do
+                end if
+
                 if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
@@ -624,6 +704,12 @@ contains
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, j - 1, l)
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, j - 1, l)
+                    end do
+                end if
 
                 if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
@@ -644,6 +730,12 @@ contains
                     end do
                 end do
 
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, p - (j - 1))
+                    end do
+                end if
+
                 if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
                         do q = 1, nnode
@@ -660,6 +752,12 @@ contains
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, j - 1)
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, j - 1)
+                    end do
+                end if
 
                 if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
                     do i = 1, nb
@@ -732,13 +830,14 @@ contains
     end subroutine s_axis
 
     !> Apply slip wall boundary conditions by extrapolating scalars and reflecting the wall-normal velocity component.
-    subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_slip_wall',parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                    :: bc_dir, bc_loc
         integer, intent(in)                                    :: k, l
         integer                                                :: j, i
+        type(scalar_field), optional, intent(inout)            :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -751,6 +850,18 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_x%isothermal_in) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
+                        end do
+                    end if
+                end if
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -761,6 +872,18 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_x%isothermal_out) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
+                        end do
+                    end if
+                end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             if (bc_loc == -1) then  !< bc_y%beg
@@ -773,6 +896,18 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_y%isothermal_in) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
+                        end do
+                    end if
+                end if
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -783,6 +918,18 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_y%isothermal_out) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
+                        end do
+                    end if
+                end if
             end if
         else if (bc_dir == 3) then  !< z-direction
             if (bc_loc == -1) then  !< bc_z%beg
@@ -795,6 +942,18 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_z%isothermal_in) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
+                        end do
+                    end if
+                end if
             else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -805,13 +964,25 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_z%isothermal_out) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
+                        end do
+                    end if
+                end if
             end if
         end if
 
     end subroutine s_slip_wall
 
     !> Apply no-slip wall boundary conditions by reflecting and negating all velocity components at the wall.
-    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_no_slip_wall',parallelism='[seq]', cray_inline=True)
 
@@ -819,6 +990,7 @@ contains
         integer, intent(in)                                    :: bc_dir, bc_loc
         integer, intent(in)                                    :: k, l
         integer                                                :: j, i
+        type(scalar_field), optional, intent(inout)            :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -835,6 +1007,18 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_x%isothermal_in) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
+                        end do
+                    end if
+                end if
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -849,6 +1033,18 @@ contains
                         end if
                     end do
                 end do
+
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_x%isothermal_out) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
+                        end do
+                    end if
+                end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             if (bc_loc == -1) then  !< bc_y%beg
@@ -865,6 +1061,17 @@ contains
                         end if
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_y%isothermal_in) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
+                        end do
+                    end if
+                end if
             else  !< bc_y%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -879,6 +1086,17 @@ contains
                         end if
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_y%isothermal_out) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
+                        end do
+                    end if
+                end if
             end if
         else if (bc_dir == 3) then  !< z-direction
             if (bc_loc == -1) then  !< bc_z%beg
@@ -895,6 +1113,17 @@ contains
                         end if
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_z%isothermal_in) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
+                        end do
+                    end if
+                end if
             else  !< bc_z%end
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -909,19 +1138,31 @@ contains
                         end if
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    if (bc_z%isothermal_out) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
+                        end do
+                    else
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
+                        end do
+                    end if
+                end if
             end if
         end if
 
     end subroutine s_no_slip_wall
 
     !> Apply Dirichlet boundary conditions by prescribing ghost cell values from stored boundary buffers.
-    subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l)
+    subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_dirichlet',parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                    :: bc_dir, bc_loc
         integer, intent(in)                                    :: k, l
         integer                                                :: j, i
+        type(scalar_field), optional, intent(inout)            :: q_T_sf
 
 #ifdef MFC_SIMULATION
         if (bc_dir == 1) then  !< x-direction
@@ -931,12 +1172,22 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(-j, k, l) = bc_buffers(1, 1)%sf(sys_size + 1, k, l)
+                    end do
+                end if
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
                         q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)
                     end do
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    do j = 1, buff_size
+                        q_T_sf%sf(m + j, k, l) = bc_buffers(1, 2)%sf(sys_size + 1, k, l)
+                    end do
+                end if
             end if
         else if (bc_dir == 2) then  !< y-direction
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
@@ -946,12 +1197,22 @@ contains
                             q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)
                         end do
                     end do
+                    if (chemistry .and. present(q_T_sf)) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, sys_size + 1, l)
+                        end do
+                    end if
                 else  !< bc_y%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)
                         end do
                     end do
+                    if (chemistry .and. present(q_T_sf)) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, sys_size + 1, l)
+                        end do
+                    end if
                 end if
             #:endif
         else if (bc_dir == 3) then  !< z-direction
@@ -962,17 +1223,27 @@ contains
                             q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)
                         end do
                     end do
+                    if (chemistry .and. present(q_T_sf)) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, sys_size + 1)
+                        end do
+                    end if
                 else  !< bc_z%end
                     do i = 1, sys_size
                         do j = 1, buff_size
                             q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)
                         end do
                     end do
+                    if (chemistry .and. present(q_T_sf)) then
+                        do j = 1, buff_size
+                            q_T_sf%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, sys_size + 1)
+                        end do
+                    end if
                 end if
             #:endif
         end if
 #else
-        call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
+        call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 #endif
 
     end subroutine s_dirichlet
@@ -1578,7 +1849,7 @@ contains
     end subroutine s_create_mpi_types
 
     !> Write boundary condition type and buffer data to serial (unformatted) restart files.
-    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in)
+    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -1587,6 +1858,7 @@ contains
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_path
         character(len=10)                                          :: status
+        type(scalar_field), optional, intent(in)                   :: q_T_sf
 
         if (old_grid_in) then
             status = 'old'
@@ -1594,7 +1866,7 @@ contains
             status = 'new'
         end if
 
-        call s_pack_boundary_condition_buffers(q_prim_vf)
+        call s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
 
         file_path = trim(step_dirpath) // '/bc_type.dat'
         open (1, FILE=trim(file_path), form='unformatted', STATUS=status)
@@ -1617,12 +1889,13 @@ contains
     end subroutine s_write_serial_boundary_condition_files
 
     !> Write boundary condition type and buffer data to per-rank parallel files using MPI I/O.
-    subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+    subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_loc, file_path
+        type(scalar_field), intent(in), optional                   :: q_T_sf
 
 #ifdef MFC_MPI
         integer          :: ierr
@@ -1631,7 +1904,7 @@ contains
         logical          :: dir_check
         integer          :: nelements
 
-        call s_pack_boundary_condition_buffers(q_prim_vf)
+        call s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
 
         file_loc = trim(case_dir) // '/restart_data/boundary_conditions'
         if (proc_rank == 0) then
@@ -1783,10 +2056,11 @@ contains
     end subroutine s_read_parallel_boundary_condition_files
 
     !> Pack primitive variable boundary slices into bc_buffers arrays for serialization.
-    subroutine s_pack_boundary_condition_buffers(q_prim_vf)
+    subroutine s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer                                             :: i, j, k
+        type(scalar_field), intent(in), optional            :: q_T_sf
 
         do k = 0, p
             do j = 0, n
@@ -1794,6 +2068,10 @@ contains
                     bc_buffers(1, 1)%sf(i, j, k) = q_prim_vf(i)%sf(0, j, k)
                     bc_buffers(1, 2)%sf(i, j, k) = q_prim_vf(i)%sf(m, j, k)
                 end do
+                if (chemistry .and. present(q_T_sf)) then
+                    bc_buffers(1, 1)%sf(sys_size + 1, j, k) = q_T_sf%sf(0, j, k)
+                    bc_buffers(1, 2)%sf(sys_size + 1, j, k) = q_T_sf%sf(m, j, k)
+                end if
             end do
         end do
 
@@ -1806,6 +2084,12 @@ contains
                             bc_buffers(2, 2)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
                         end do
                     end do
+                    if (chemistry .and. present(q_T_sf)) then
+                        do i = 0, m
+                            bc_buffers(2, 1)%sf(i, sys_size + 1, k) = q_T_sf%sf(i, 0, k)
+                            bc_buffers(2, 2)%sf(i, sys_size + 1, k) = q_T_sf%sf(i, n, k)
+                        end do
+                    end if
                 end do
 
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
@@ -1818,6 +2102,14 @@ contains
                                 end do
                             end do
                         end do
+                        if (chemistry .and. present(q_T_sf)) then
+                            do j = 0, n
+                                do i = 0, m
+                                    bc_buffers(3, 1)%sf(i, j, sys_size + 1) = q_T_sf%sf(i, j, 0)
+                                    bc_buffers(3, 2)%sf(i, j, sys_size + 1) = q_T_sf%sf(i, j, p)
+                                end do
+                            end do
+                        end if
                     end if
                 #:endif
             end if

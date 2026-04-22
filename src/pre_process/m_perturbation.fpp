@@ -84,15 +84,16 @@ contains
     end subroutine s_perturb_surrounding_flow
 
     !> Iteratively smooth all primitive variable fields using a discrete elliptic (Laplacian) filter.
-    impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
+    impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), optional, intent(inout)                :: q_T_sf
         integer                                                    :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters
             ! Communication of buffer regions and apply boundary conditions
-            call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf)
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf, q_T_sf)
 
             ! Perform smoothing and store in temp array
             if (n == 0) then

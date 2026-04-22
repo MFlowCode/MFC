@@ -569,7 +569,11 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
+        if (chemistry) then
+            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type, q_T_sf)
+        else
+            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
+        end if
 
         call cpu_time(finish)
 
