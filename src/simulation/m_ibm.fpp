@@ -886,7 +886,7 @@ contains
 
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
-        integer                                                        :: i, j, k, l, encoded_ib_idx, fluid_idx
+        integer                                                        :: i, j, k, l, encoded_ib_idx, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3)                                :: forces, torques
         real(wp), dimension(1:3,1:3)                                   :: viscous_stress_div, viscous_stress_div_1, &
              & viscous_stress_div_2  ! viscous stress tensor with temp vectors to hold divergence calculations
