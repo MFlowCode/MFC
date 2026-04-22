@@ -13,6 +13,7 @@ from ..build import REQUIRED_TARGETS, SIMULATION, build, get_targets
 from ..common import MFC_ROOT_DIR, MFC_TEMPLATE_DIR, MFCException, does_command_exist, file_dump_yaml, file_read, file_write, format_list_to_string, isspace, system
 from ..printer import cons
 from ..state import ARG, ARGS, CFG, gpuConfigOptions
+from . import archive as archive_mod
 from . import input, queues
 
 
@@ -191,3 +192,9 @@ def run(targets=None, case=None):
             cons.print("[bold]Executing simulation...[/bold]")
 
         __execute_job_script(qsystem)
+
+        if ARG("archive") is not None:
+            if isinstance(qsystem, queues.InteractiveSystem):
+                archive_mod.archive(case, targets)
+            else:
+                cons.print("[yellow]--archive is ignored for batch submissions (outputs are produced asynchronously).[/yellow]")
