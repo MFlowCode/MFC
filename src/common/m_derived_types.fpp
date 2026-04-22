@@ -271,7 +271,7 @@ module m_derived_types
 
     type ib_patch_parameters
         integer  :: geometry                            !< Type of geometry for the patch
-        integer  :: patch_id
+        integer  :: gbl_patch_id
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
 
         !> Centroid locations of intermediate steps in the time_stepper module

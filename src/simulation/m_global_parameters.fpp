@@ -338,7 +338,7 @@ module m_global_parameters
     !> @{
     logical                                              :: ib
     integer                                              :: num_ibs  !< number of IBs that the current processor is aware of
-    integer                                              :: num_gbl  !< number of IBs in the overall simulation
+    integer                                              :: num_gbl_ibs  !< number of IBs in the overall simulation
     integer                                              :: num_local_ibs  !< number of IBs that lie inside the processor domain
     integer                                              :: collision_model
     real(wp)                                             :: coefficient_of_restitution
@@ -350,7 +350,7 @@ module m_global_parameters
     type(vec3_dt), allocatable, dimension(:)             :: airfoil_grid_u, airfoil_grid_l
     integer                                              :: Np
 
-    $:GPU_DECLARE(create='[ib, num_ibs, num_gbl, num_local_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l, local_ib_patch_ids]')
+    $:GPU_DECLARE(create='[ib, num_ibs, num_gbl_ibs, num_local_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l, local_ib_patch_ids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 

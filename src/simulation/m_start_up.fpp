@@ -1253,7 +1253,7 @@ contains
                 ! Repack local patch IDs; sentinel -1 marks unused slots
                 send_buf = -1
                 do i = 1, num_ibs
-                    send_buf(i) = patch_ib(i)%patch_id
+                    send_buf(i) = patch_ib(i)%gbl_patch_id
                 end do
 
                 ! Step 1: send to +${X}$ neighbor, receive from -${X}$ neighbor
@@ -1267,7 +1267,7 @@ contains
                     if (recv_id < 0) exit
                     found = .false.
                     do k = 1, num_ibs
-                        if (patch_ib(k)%patch_id == recv_id) then
+                        if (patch_ib(k)%gbl_patch_id == recv_id) then
                             found = .true.
                             exit
                         end if
@@ -1290,7 +1290,7 @@ contains
                     if (recv_id < 0) exit
                     found = .false.
                     do k = 1, num_ibs
-                        if (patch_ib(k)%patch_id == recv_id) then
+                        if (patch_ib(k)%gbl_patch_id == recv_id) then
                             found = .true.
                             exit
                         end if

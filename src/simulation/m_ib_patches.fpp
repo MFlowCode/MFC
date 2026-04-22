@@ -1039,7 +1039,7 @@ contains
         temp_y_per = y_periodicity; if (y_periodicity == -1) temp_y_per = 2
         temp_z_per = z_periodicity; if (z_periodicity == -1) temp_z_per = 2
 
-        offset = (num_ibs + 1)*temp_x_per + 3*(num_ibs + 1)*temp_y_per + 9*(num_ibs + 1)*temp_z_per
+        offset = (num_gbl_ibs + 1)*temp_x_per + 3*(num_gbl_ibs + 1)*temp_y_per + 9*(num_gbl_ibs + 1)*temp_z_per
         encoded_patch_id = patch_id + offset
 
     end subroutine s_encode_patch_periodicity
@@ -1053,7 +1053,7 @@ contains
         integer, intent(out) :: patch_id, x_periodicity, y_periodicity, z_periodicity
         integer              :: offset, remainder, xp, yp, zp, base
 
-        base = num_ibs + 1
+        base = num_gbl_ibs + 1
 
         patch_id = mod(encoded_patch_id - 1, base) + 1
         offset = (encoded_patch_id - patch_id)/base
