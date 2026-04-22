@@ -1,188 +1,246 @@
 #!/usr/bin/env python3
-# Head-on binary droplet coalescence — We = 2, Re ~ 236.
-#
-# Two water droplets (D = 306 um) in air collide along the x-axis.
-# Ported from an OpenFOAM interFoam simulation (temp/ directory).
-#
-# Nondimensional parameters follow Meng (2016) convention:
-#   rho_l = 100, rho_g = 1, sigma = 0.72
-#   gamma_l = 4.4, pi_inf_l = 100;  gamma_g = 1.4, pi_inf_g = 0
-#   D = 1, R = 0.5, p_gas = 1.0, p_liq = 1 + sigma/R = 2.44
-#   Ur = sqrt(We * sigma / (rho_l * D)) = 0.12
-#   Re = rho_l * Ur * D / mu_l = 236
-#
-# 3 patches: gas background + two spherical droplets (no hardcoded IC needed).
+# Phase 1 drainage validation case — acoustic_demulsification project
+#   Geometry:  2D axisymmetric, head-on collision of two equal droplets
+#   Fluids  :  tetradecane drops in nitrogen ambient
+#   Target  :  resolve gas-film drainage; compare h_min(t) to Klaseboer 2000
+#   Stop    :  when h_min reaches ~100–200 nm (before numerical rupture)
+# Roadmap reference: +Projects/acoustic_demulsification/simulation_roadmap.md
+# (Phase 1 — Drainage validation)
+# Run:
+#   ./mfc.sh run case.py -n <N>          # single node
+#   ./mfc.sh run case.py --gpu -n <N>    # GPU build
+# Knobs at top of file:
+#   SCHEME         — 'wenoz' or 'muscl_thinc'
+#   DX_FINE        — cell size in drainage film (m); start 10 nm
+#   DX_BULK        — cell size in bulk (m); start 1 micron
+#   FILM_HALF      — axial half-width of the uniform fine zone (m)
+#   WE             — target Weber number (default 30)
 
-import math
 import json
+import math
 
-# --- Nondimensional parameters (Meng 2016) ---
-rho_l = 100.0
-rho_g = 1.0
-sigma = 0.72
-gamma_l, pi_inf_l = 4.4, 100.0
-gamma_g, pi_inf_g = 1.4, 0.0
-p_gas = 1.0
+# User-facing knobs
 
-D = 1.0
-R = D / 2.0
-p_liq = p_gas + sigma / R  # Laplace pressure jump
+SCHEME = "wenoz"  # 'wenoz' | 'muscl_thinc'
+DX_FINE = 10e-9  # 10 nm — film cell size target
+DX_BULK = 1e-6  #  1 um — bulk cell size target
+FILM_HALF = 2e-6  # ± half-width of the uniform fine zone on the axis (m)
+WE = 30.0  # Weber number (coalescence regime)
 
-# Collision parameters
-We = 2.0
-Re = 236.0
-Ur = math.sqrt(We * sigma / (rho_l * D))  # ~0.12 relative velocity
-Ud = Ur / 2.0  # each droplet moves at half the relative velocity
+# For quick debugging, set coarser values, e.g. DX_FINE=40e-9, DX_BULK=4e-6.
 
-# Viscosity (matching Re = 236)
-mu_l = rho_l * Ur * D / Re   # ~0.05085
-mu_g = mu_l / 48.1           # ~0.001057 (physical viscosity ratio water/air)
+# Physical constants (tetradecane / nitrogen at ~25 C)
 
-# Domain: 9D x 6D x 6D centered at origin
-x0, x1 = -4.5, 4.5
-y0, y1 = -3.0, 3.0
-z0, z1 = -3.0, 3.0
+# Tetradecane (liquid)
+rho_l = 762.0  # kg/m^3
+mu_l = 2.1e-3  # Pa*s
+sigma = 0.027  # N/m (≈ 27 mN/m)
 
-# Grid: 10 cells/D
-Nx = 179   # 90 cells in x (9D * 10)
-Ny = 119   # 60 cells in y (6D * 10)
-Nz = 119   # 60 cells in z (6D * 10)
+# Stiffened-gas fit for tetradecane: gamma = 4.4, p_inf = 3.0e8 Pa
+# => c_l = sqrt(gamma*(p+p_inf)/rho) ≈ 1316 m/s at 1 atm — matches bulk data.
+gamma_l = 4.4
+pi_inf_l = 3.0e8
 
-eps = 1e-9
+# Nitrogen (ideal gas)
+rho_g = 1.165  # kg/m^3 at 1 atm, 20 C
+gamma_g = 1.4
+pi_inf_g = 0.0
 
-# Droplet placement: centers at (+-sep, 0, 0)
-# Minimal gap (~0.3D) to avoid wake-induced deformation before contact
-sep = 0.65 * D  # center-to-center = 1.3D, surface gap = 0.3D
+p_amb = 1.01325e5  # 1 atm
 
-# Time stepping
-dx = (x1 - x0) / (Nx + 1)
-c_l = math.sqrt(gamma_l * (p_gas + pi_inf_l) / rho_l)  # ~2.11
-mydt = 0.1 * dx / c_l  # CFL = 0.1
+# Droplet geometry and kinematics
 
-# Collision timescale = D / Ur ~ 8.33
-# Run for ~11 collision times (matching 5ms OpenFOAM end time)
-t_end = 11.0 * D / Ur  # ~92
-Nt = int(math.ceil(t_end / mydt))
-Ns = max(1, Nt // 100)  # ~100 output frames
+D = 300e-6  # droplet diameter, 300 um
+R = D / 2.0  # radius, 150 um
 
-# Configuration case dictionary
-data = {
-    # Logistics
-    "run_time_info": "T",
-    # Computational Domain
-    "x_domain%beg": x0,
-    "x_domain%end": x1,
-    "y_domain%beg": y0,
-    "y_domain%end": y1,
-    "z_domain%beg": z0,
-    "z_domain%end": z1,
-    "m": Nx,
-    "n": Ny,
-    "p": Nz,
-    "cyl_coord": "F",
-    "dt": mydt,
-    "t_step_start": 0,
-    "t_step_stop": Nt,
-    "t_step_save": Ns,
-    # Simulation Algorithm
-    "model_eqns": 3,
-    "alt_soundspeed": "F",
-    "mixture_err": "T",
-    "mpp_lim": "F",
-    "time_stepper": 3,
-    "weno_order": 3,
-    "avg_state": 2,
-    "weno_eps": 1e-16,
-    "mapped_weno": "T",
-    "null_weights": "F",
-    "mp_weno": "F",
-    "weno_Re_flux": "T",
-    "riemann_solver": 2,
-    "wave_speeds": 1,
-    "viscous": "T",
-    "bc_x%beg": -6,
-    "bc_x%end": -6,
-    "bc_y%beg": -6,
-    "bc_y%end": -6,
-    "bc_z%beg": -6,
-    "bc_z%end": -6,
-    "num_patches": 3,
+# Weber number: We = rho_l * U_rel^2 * D / sigma,  U_rel = 2U per Qian & Law.
+# U_rel^2 = We*sigma/(rho_l*D)
+#         = 30 * 0.027 / (762 * 3e-4)
+#         = 0.810   / 0.2286
+#         = 3.5433 m^2/s^2
+# U_rel   = 1.8823 m/s  ->  U = 0.9412 m/s per droplet
+U_rel = math.sqrt(WE * sigma / (rho_l * D))
+U = 0.5 * U_rel
+
+# Initial axial gap between droplet surfaces (pre-drainage), and centers.
+gap0 = 20e-6  # 20 um initial gap — leaves inertial approach + drainage
+x_center = R + 0.5 * gap0  # droplet centers at x = +/- x_center
+
+# Domain & grid
+
+# Axial extent — big enough that outgoing waves don't reflect back onto the film.
+# Keep a few D each side of the droplets.
+Lx_half = 5.0 * R  # = 750 um axial half-domain
+Ly_max = 3.0 * R  # = 450 um radial extent
+
+# Uniform fine zone in x: [-FILM_HALF, +FILM_HALF] at DX_FINE.
+# Stretched zone: DX_FINE -> DX_BULK, geometric growth handled by MFC stretch_x.
+# Cell-count estimate (for sanity; MFC's hyperbolic stretch won't be exactly geometric):
+#     N_fine = 2*FILM_HALF / DX_FINE
+#     N_stretch (each side) ~ ln(DX_BULK/DX_FINE)/ln(r)   with r = 1.1 -> ~48
+N_fine = int(2 * FILM_HALF / DX_FINE)  #  400 for defaults
+N_stretch = int(math.ceil(math.log(DX_BULK / DX_FINE) / math.log(1.1)))  # ~48 each side
+Nx = N_fine + 2 * N_stretch  # 496 for defaults
+
+# Radial: fine near axis (film rim), coarsens outward.
+# Same strategy on y (positive only, because axisymmetric).
+N_fine_r = int(4 * FILM_HALF / DX_FINE)  # 800 cells out to 8 um
+N_stretch_r = int(math.ceil(math.log(DX_BULK / DX_FINE) / math.log(1.1)))  # ~48
+Ny = N_fine_r + N_stretch_r  # 848 for defaults
+
+# NOTE: These are generous baselines for a grid-convergence study.
+#       On first debug runs, set DX_FINE=40e-9, DX_BULK=4e-6 to cut Nx,Ny by ~4x.
+
+# Time integration
+
+# Characteristic times:
+#   tau_inertia  = D / U_rel  = 3e-4 / 1.8823 ≈ 1.59e-4 s
+#   tau_cap      = sqrt(rho_l D^3 / sigma)     ≈ 8.73e-4 s
+# Want to simulate until h_min ~ 100–200 nm. Experience says ~1–2 * tau_inertia.
+t_stop = 2.0e-4  # 200 us
+t_save = 5.0e-6  # 40 frames
+
+# Numerical scheme switches
+
+# WENO-Z 5 is the default from MFC 5.0 paper; MUSCL+THINC is the fallback if
+# interface width exceeds ~5 cells or if we see early numerical rupture.
+if SCHEME == "wenoz":
+    recon = {
+        "recon_type": 1,
+        "weno_order": 5,
+        "weno_eps": 1e-6,
+        "mapped_weno": "F",
+        "wenoz": "T",
+        "mp_weno": "T",
+        "teno": "F",
+    }
+elif SCHEME == "muscl_thinc":
+    recon = {
+        "recon_type": 2,
+        "muscl_order": 2,
+        "muscl_lim": 4,  # Van Leer
+        "int_comp": "T",  # THINC interface compression
+        "ic_eps": 1e-4,
+        "ic_beta": 1.6,
+    }
+else:
+    raise ValueError(f"Unknown SCHEME: {SCHEME!r}")
+
+# MFC input deck
+
+eps = 1e-9  # avoid exactly 0/1 volume fractions
+
+case = {
+    # grid
+    "x_domain%beg": -Lx_half,
+    "x_domain%end": +Lx_half,
+    "y_domain%beg": 0.0,
+    "y_domain%end": +Ly_max,
+    "m": Nx - 1,  # MFC uses zero-based cell-count (m = Nx-1)
+    "n": Ny - 1,
+    "p": 0,  # 2D
+    "cyl_coord": "T",  # 2D axisymmetric: x is axial, y is radial
+    # Grid stretching — fine uniform zone in [-FILM_HALF, +FILM_HALF], stretched outside.
+    "stretch_x": "T",
+    "a_x": 4.0,
+    "x_a": -FILM_HALF,
+    "x_b": +FILM_HALF,
+    "loops_x": 2,
+    "stretch_y": "T",
+    "a_y": 4.0,
+    "y_a": 0.0,
+    "y_b": 4.0 * FILM_HALF,  # keep fine near the axis / film rim
+    "loops_y": 2,
+    # boundary conditions
+    # Axial (x): outflow/extrapolation on both ends.
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    # Radial (y): axisymmetric at y=0, outflow at y_max.
+    "bc_y%beg": -2,  # reflective / axis
+    "bc_y%end": -3,
+    # time integration
+    "time_stepper": 3,  # TVD-RK3
+    "cfl_adap_dt": "T",
+    "cfl_target": 0.3,  # conservative; tighten/loosen after first runs
+    "t_stop": t_stop,
+    "t_save": t_save,
+    # physical model
+    "model_eqns": 2,  # 5-equation (Allaire) diffuse interface
     "num_fluids": 2,
-    "weno_avg": "T",
+    "num_patches": 3,
+    "mixture_err": "T",
+    "mpp_lim": "T",
+    "avg_state": 2,
+    "riemann_solver": 2,  # HLLC
+    "wave_speeds": 1,
+    **recon,
+    # surface tension
     "surface_tension": "T",
-    # Database Structure Parameters
-    "format": 1,
-    "precision": 2,
-    "alpha_wrt(1)": "T",
-    "cf_wrt": "T",
-    "vel_wrt(1)": "T",
-    "vel_wrt(2)": "T",
-    "vel_wrt(3)": "T",
-    "parallel_io": "T",
     "sigma": sigma,
-    # Fluid Parameters (Liquid — fluid 1)
-    "fluid_pp(1)%gamma": 1.0 / (gamma_l - 1.0),
-    "fluid_pp(1)%pi_inf": gamma_l * pi_inf_l / (gamma_l - 1.0),
-    "fluid_pp(1)%Re(1)": 1.0 / mu_l,
-    # Fluid Parameters (Gas — fluid 2)
-    "fluid_pp(2)%gamma": 1.0 / (gamma_g - 1.0),
+    # fluids (index 1 = tetradecane, 2 = nitrogen)
+    "fluid_pp(1)%gamma": 1.0 / (gamma_l - 1.0),  # 1/(4.4-1) = 0.2941
+    "fluid_pp(1)%pi_inf": gamma_l * pi_inf_l / (gamma_l - 1.0),  # 4.4*3e8/3.4 ≈ 3.882e8
+    "fluid_pp(2)%gamma": 1.0 / (gamma_g - 1.0),  # 1/(1.4-1) = 2.5
     "fluid_pp(2)%pi_inf": 0.0,
-    "fluid_pp(2)%Re(1)": 1.0 / mu_g,
-    # ===== Patch 1: Gas background (fills entire domain) =====
-    "patch_icpp(1)%geometry": 9,
+    # patch 1: nitrogen background filling the whole domain
+    "patch_icpp(1)%geometry": 3,  # rectangle (2D)
     "patch_icpp(1)%x_centroid": 0.0,
-    "patch_icpp(1)%y_centroid": 0.0,
-    "patch_icpp(1)%z_centroid": 0.0,
-    "patch_icpp(1)%length_x": x1 - x0,
-    "patch_icpp(1)%length_y": y1 - y0,
-    "patch_icpp(1)%length_z": z1 - z0,
+    "patch_icpp(1)%y_centroid": Ly_max / 2.0,
+    "patch_icpp(1)%length_x": 2.5 * Lx_half,  # cover w/ margin
+    "patch_icpp(1)%length_y": 2.0 * Ly_max,
     "patch_icpp(1)%vel(1)": 0.0,
     "patch_icpp(1)%vel(2)": 0.0,
-    "patch_icpp(1)%vel(3)": 0.0,
-    "patch_icpp(1)%pres": p_gas,
+    "patch_icpp(1)%pres": p_amb,
     "patch_icpp(1)%alpha_rho(1)": eps * rho_l,
     "patch_icpp(1)%alpha_rho(2)": (1.0 - eps) * rho_g,
     "patch_icpp(1)%alpha(1)": eps,
     "patch_icpp(1)%alpha(2)": 1.0 - eps,
-    "patch_icpp(1)%cf_val": 0,
-    # ===== Patch 2: Left droplet (center at -sep, moves in +x) =====
-    "patch_icpp(2)%geometry": 8,
-    "patch_icpp(2)%x_centroid": -sep,
-    "patch_icpp(2)%y_centroid": 0.0,
-    "patch_icpp(2)%z_centroid": 0.0,
-    "patch_icpp(2)%radius": R,
+    "patch_icpp(1)%cf_val": 0.0,
+    # patch 2: left droplet, moving in +x
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.95,
-    "patch_icpp(2)%vel(1)": Ud,
+    "patch_icpp(2)%smooth_coeff": 0.5,
+    "patch_icpp(2)%geometry": 2,  # circle (axisymmetric disk becomes a sphere)
+    "patch_icpp(2)%x_centroid": -x_center,
+    "patch_icpp(2)%y_centroid": 0.0,
+    "patch_icpp(2)%radius": R,
+    "patch_icpp(2)%vel(1)": +U,
     "patch_icpp(2)%vel(2)": 0.0,
-    "patch_icpp(2)%vel(3)": 0.0,
-    "patch_icpp(2)%pres": p_liq,
+    "patch_icpp(2)%pres": p_amb,
     "patch_icpp(2)%alpha_rho(1)": (1.0 - eps) * rho_l,
     "patch_icpp(2)%alpha_rho(2)": eps * rho_g,
     "patch_icpp(2)%alpha(1)": 1.0 - eps,
     "patch_icpp(2)%alpha(2)": eps,
-    "patch_icpp(2)%cf_val": 1,
-    # ===== Patch 3: Right droplet (center at +sep, moves in -x) =====
-    "patch_icpp(3)%geometry": 8,
-    "patch_icpp(3)%x_centroid": sep,
-    "patch_icpp(3)%y_centroid": 0.0,
-    "patch_icpp(3)%z_centroid": 0.0,
-    "patch_icpp(3)%radius": R,
+    "patch_icpp(2)%cf_val": 1.0,
+    # patch 3: right droplet, moving in -x
     "patch_icpp(3)%alter_patch(1)": "T",
     "patch_icpp(3)%smoothen": "T",
     "patch_icpp(3)%smooth_patch_id": 1,
-    "patch_icpp(3)%smooth_coeff": 0.95,
-    "patch_icpp(3)%vel(1)": -Ud,
+    "patch_icpp(3)%smooth_coeff": 0.5,
+    "patch_icpp(3)%geometry": 2,
+    "patch_icpp(3)%x_centroid": +x_center,
+    "patch_icpp(3)%y_centroid": 0.0,
+    "patch_icpp(3)%radius": R,
+    "patch_icpp(3)%vel(1)": -U,
     "patch_icpp(3)%vel(2)": 0.0,
-    "patch_icpp(3)%vel(3)": 0.0,
-    "patch_icpp(3)%pres": p_liq,
+    "patch_icpp(3)%pres": p_amb,
     "patch_icpp(3)%alpha_rho(1)": (1.0 - eps) * rho_l,
     "patch_icpp(3)%alpha_rho(2)": eps * rho_g,
     "patch_icpp(3)%alpha(1)": 1.0 - eps,
     "patch_icpp(3)%alpha(2)": eps,
-    "patch_icpp(3)%cf_val": 1,
+    "patch_icpp(3)%cf_val": 1.0,
 }
 
-print(json.dumps(data))
+# Derived-quantity banner (printed to stderr on --case-optimization runs)
+# Printed here as a comment for humans; MFC only reads the JSON below.
+#   U_rel  = 1.8823 m/s          (We = 30, head-on: U_rel = 2U)
+#   U      = 0.9412 m/s per drop
+#   h_c    = (A R / sigma)^(1/3) = 38 nm  (A = 1e-20 J)
+#   tau_i  = D/U_rel             ≈ 1.59e-4 s
+#   tau_s  = sqrt(rho D^3/sigma) ≈ 8.73e-4 s
+#   Re     = rho U_rel D / mu    ≈ 205
+#   Nx     = N_fine + 2*N_stretch  (defaults: 400 + 96 = 496)
+#   Ny     = N_fine_r + N_stretch_r (defaults: 800 + 48 = 848)
+
+print(json.dumps(case))
