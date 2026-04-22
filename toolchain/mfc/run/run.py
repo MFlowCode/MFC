@@ -143,10 +143,9 @@ def __execute_job_script(qsystem: queues.QueueSystem):
 
     # For interactive runs on Unix, tee output to a .out file so users get
     # the same log file that batch runs produce via the scheduler.
-    if isinstance(qsystem, queues.InteractiveSystem) and os.name != 'nt':
+    if isinstance(qsystem, queues.InteractiveSystem) and os.name != "nt":
         out_filepath = os.path.abspath(os.path.join(cwd, f"{ARG('name')}.out"))
-        cmd = ["/bin/bash", "-c",
-               f"set -o pipefail; {shlex.join([str(x) for x in cmd])} 2>&1 | tee {shlex.quote(out_filepath)}"]
+        cmd = ["/bin/bash", "-c", f"set -o pipefail; {shlex.join([str(x) for x in cmd])} 2>&1 | tee {shlex.quote(out_filepath)}"]
 
     # Execute the job script with appropriate output handling
     # At verbosity >= 2, show print_cmd=True for system() calls
