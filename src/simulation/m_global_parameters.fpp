@@ -336,20 +336,21 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                                  :: ib
-    integer                                                  :: num_ibs
-    integer                                                  :: num_local_ibs
-    integer                                                  :: collision_model
-    real(wp)                                                 :: coefficient_of_restitution
-    real(wp)                                                 :: collision_time
-    real(wp)                                                 :: ib_coefficient_of_friction
-    logical                                                  :: ib_state_wrt
-    type(ib_patch_parameters), allocatable, dimension(:)     :: patch_ib  !< Immersed boundary patch parameters
-    integer, dimension(num_local_ibs_max)                    :: local_patch_ids !< lookup table of IBs in the local compute domain
-    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
-    integer                                                  :: Np
+    logical                                              :: ib
+    integer                                              :: num_ibs  !< number of IBs that the current processor is aware of
+    integer                                              :: num_gbl  !< number of IBs in the overall simulation
+    integer                                              :: num_local_ibs  !< number of IBs that lie inside the processor domain
+    integer                                              :: collision_model
+    real(wp)                                             :: coefficient_of_restitution
+    real(wp)                                             :: collision_time
+    real(wp)                                             :: ib_coefficient_of_friction
+    logical                                              :: ib_state_wrt
+    type(ib_patch_parameters), allocatable, dimension(:) :: patch_ib  !< Immersed boundary patch parameters
+    integer, dimension(num_local_ibs_max)                :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
+    type(vec3_dt), allocatable, dimension(:)             :: airfoil_grid_u, airfoil_grid_l
+    integer                                              :: Np
 
-    $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
+    $:GPU_DECLARE(create='[ib, num_ibs, num_gbl, num_local_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l, local_ib_patch_ids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
@@ -782,7 +783,7 @@ contains
             relativity = .false.
         #:endif
 
-        allocate(patch_ib(num_ib_patches_max))
+        allocate (patch_ib(num_ib_patches_max))
         do i = 1, num_ib_patches_max
             patch_ib(i)%patch_id = i
             patch_ib(i)%geometry = dflt_int

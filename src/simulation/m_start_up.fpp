@@ -39,6 +39,7 @@ module m_start_up
 
     use m_nvtx
     use m_ibm
+    use m_collisions
     use m_compile_specific
     use m_checker_common
     use m_checker
@@ -915,6 +916,7 @@ contains
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             if (t_step_start > 0) call s_read_ib_restart_data(t_step_start)
+            call s_reduce_ib_patch_array()
             call s_ibm_setup()
             if (t_step_start == 0) then
                 call s_write_ib_data_file(0)
@@ -1189,15 +1191,120 @@ contains
 
     subroutine s_reduce_ib_patch_array()
 
-      type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib_gbl
+        type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib_gbl
+        real(wp), dimension(3)                                   :: collision_location
+        integer                                                  :: i, j
+        integer                                                  :: num_aware_ibs
 
-      patch_ib_gbl(:) = patch_ib(:)
+        patch_ib_gbl(:) = patch_ib(:)
 
-      deallocate(patch_ib)
-      allocate(patch_ib(num_local_ibs_max))
+        deallocate (patch_ib)
+        if (num_dims == 3) then
+            num_aware_ibs = num_local_ibs_max*27
+        else
+            num_aware_ibs = num_local_ibs_max*9
+        end if
+        allocate (patch_ib(num_aware_ibs))
 
-      
+#ifdef MFC_MPI
+        ! fallback for 1-rank case
+        if (num_proc == 1) then
+            patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
+        else
+            ! determine the set of patches owned by local rank
+            num_local_ibs = 0
+            do i = 1, num_ib_patches_max
+                collision_location = [patch_ib_gbl(i)%x_centroid, patch_ib_gbl(i)%y_centroid, 0._wp]
+                if (num_dims == 3) collision_location(3) = patch_ib_gbl(i)%z_centroid
+                if (f_local_rank_owns_collision(collision_location)) then
+                    num_local_ibs = num_local_ibs + 1
+                    patch_ib(j) = patch_ib_gbl(i)
+                    local_ib_patch_ids(j) = j
+                end if
+            end do
+            num_gbl_ibs = num_ibs
+            num_ibs = num_local_ibs
+
+            ! collect the patches from neighboring
+            call s_communicate_ib_patches(patch_ib_gbl, num_aware_ibs)
+        end if
+#else
+        ! reduce the size of the array for local simulation in no-MPI case
+        patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
+#endif
 
     end subroutine s_reduce_ib_patch_array
+
+    !> Exchanges local IB patch IDs with face-neighbors in each axis direction so that each rank acquires the patch data for IBs
+    !! owned by its immediate neighbors.
+    subroutine s_communicate_ib_patches(patch_ib_gbl, num_aware_ibs)
+
+        type(ib_patch_parameters), dimension(num_ib_patches_max), intent(in) :: patch_ib_gbl
+        integer, intent(in)                                                  :: num_aware_ibs
+
+#ifdef MFC_MPI
+        integer, dimension(num_aware_ibs) :: send_buf, recv_buf
+        integer                           :: i, k, recv_id, send_neighbor, recv_neighbor
+        integer                           :: ierr
+        logical                           :: found
+
+        #:for X, ID, TAG in [('x', 1, 100), ('y', 2, 102), ('z', 3, 104)]
+            if (num_dims >= ${ID}$) then
+                ! Repack local patch IDs; sentinel -1 marks unused slots
+                send_buf = -1
+                do i = 1, num_ibs
+                    send_buf(i) = patch_ib(i)%patch_id
+                end do
+
+                ! Step 1: send to +${X}$ neighbor, receive from -${X}$ neighbor
+                send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+                recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
+                recv_buf = -1
+                call MPI_SENDRECV(send_buf, num_aware_ibs, MPI_INTEGER, send_neighbor, ${TAG}$, recv_buf, num_aware_ibs, &
+                                  & MPI_INTEGER, recv_neighbor, ${TAG}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                do i = 1, num_aware_ibs
+                    recv_id = recv_buf(i)
+                    if (recv_id < 0) exit
+                    found = .false.
+                    do k = 1, num_ibs
+                        if (patch_ib(k)%patch_id == recv_id) then
+                            found = .true.
+                            exit
+                        end if
+                    end do
+                    if (.not. found) then
+                        num_ibs = num_ibs + 1
+                        @:ASSERT(num_ibs <= num_aware_ibs, 'patch_ib overflow in ${X}$+ IB communication')
+                        patch_ib(num_ibs) = patch_ib_gbl(recv_id)
+                    end if
+                end do
+
+                ! Step 2: send to -${X}$ neighbor, receive from +${X}$ neighbor (same send_buf: original local list)
+                send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
+                recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+                recv_buf = -1
+                call MPI_SENDRECV(send_buf, num_aware_ibs, MPI_INTEGER, send_neighbor, ${TAG + 1}$, recv_buf, num_aware_ibs, &
+                                  & MPI_INTEGER, recv_neighbor, ${TAG + 1}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                do i = 1, num_aware_ibs
+                    recv_id = recv_buf(i)
+                    if (recv_id < 0) exit
+                    found = .false.
+                    do k = 1, num_ibs
+                        if (patch_ib(k)%patch_id == recv_id) then
+                            found = .true.
+                            exit
+                        end if
+                    end do
+                    if (.not. found) then
+                        num_ibs = num_ibs + 1
+                        @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in ${X}$- IB communication')
+                        patch_ib(num_ibs) = patch_ib_gbl(recv_id)
+                    end if
+                end do
+            end if
+        #:endfor
+#endif
+
+    end subroutine s_communicate_ib_patches
 
 end module m_start_up

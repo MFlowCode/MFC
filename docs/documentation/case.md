@@ -638,7 +638,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `alpha_wrt(i)`          | Logical | Add the volume fraction of fluid $i$ to the database	|
 | `gamma_wrt`             | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
-| `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputing the state as a point mesh to SILO files. |
+| `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
 | `c_wrt`                 | Logical | Add the sound speed to the database	 |
