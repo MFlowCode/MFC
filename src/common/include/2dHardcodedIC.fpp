@@ -8,8 +8,16 @@
     real(wp) :: sinA, cosA
     real(wp) :: r_sq
 
+    ! # 291 - Shear/Thermal Layer Case
+    real(wp) :: delta_shear, u_max, u_mean
+    real(wp) :: T_wall, T_inf, P_atm, T_loc
+    real(wp) :: delta_th, R_mix
+    real(wp) :: Y_N2, Y_O2, MW_N2, MW_O2
+    real(wp) :: bottom_blend_u, bottom_blend_T
+
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
+
     ! # 208
     real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
 
@@ -305,6 +313,32 @@
             q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, &
                       & 0) = 112.99092883944267*((0.1/0.3))*x_cc(i)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
         end if
+    case (291)  ! Isothermal Flat Plate
+        T_inf = 1125.0_wp
+        T_wall = 600.0_wp
+        P_atm = 101325.0_wp
+
+        ! Boundary/Shear Layer thicknesses
+        delta_th = 0.0003_wp  ! Thermal BL thickness
+        delta_shear = 8e-3_wp  ! Velocity BL thickness
+
+        u_max = 50.0_wp  ! Freestream Velocity (m/s)
+
+        MW_N2 = 28.0134e-3_wp
+        MW_O2 = 31.999e-3_wp
+        Y_N2 = 0.767_wp
+        Y_O2 = 0.233_wp
+        R_mix = 8.314462618_wp*((Y_N2/MW_N2) + (Y_O2/MW_O2))
+        bottom_blend_u = tanh(y_cc(j)/delta_shear)
+        bottom_blend_T = tanh(y_cc(j)/delta_th)
+        u_mean = u_max*bottom_blend_u
+        T_loc = T_wall + (T_inf - T_wall)*bottom_blend_T
+        q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = P_atm/(R_mix*T_loc)
+        q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = u_mean
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
+        q_prim_vf(eqn_idx%E)%sf(i, j, 0) = P_atm
+        q_prim_vf(eqn_idx%species%beg)%sf(i, j, 0) = Y_O2
+        q_prim_vf(eqn_idx%species%end)%sf(i, j, 0) = Y_N2
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)

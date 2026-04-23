@@ -574,7 +574,7 @@ contains
 
         if (igr .or. dummy) then
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in)
+            call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
             call nvtxEndRange
         end if
         if (.not. igr .or. dummy) then
@@ -583,7 +583,7 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in)
+            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
             call nvtxEndRange
         end if
 
@@ -745,7 +745,7 @@ contains
                 ! RHS for diffusion
                 if (chemistry .and. chem_params%diffusion) then
                     call nvtxStartRange("RHS-CHEM-DIFFUSION")
-                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz)
+                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
                     call nvtxEndRange
                 end if
 
