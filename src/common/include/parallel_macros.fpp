@@ -69,12 +69,13 @@
         #:endif
         #:set cray_noinline_directive = ('!DIR$ NOINLINE ' + function_name).strip('\n')
 #ifdef _CRAYFTN
+        $:cray_noinline_directive
 #if MFC_OpenACC
         $:acc_directive
 #elif MFC_OpenMP
         $:omp_directive
 #else
-        $:cray_noinline_directive
+
 #endif
         #! On non-Cray CPU builds (no _CRAYFTN, no MFC_OpenACC, no MFC_OpenMP), nothing is
         #! emitted — intentional, since !DIR$ NOINLINE is a Cray-specific directive.
@@ -89,12 +90,13 @@
         #:endif
         #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
 #ifdef _CRAYFTN
+        $:cray_directive
 #if MFC_OpenACC
         $:acc_directive
 #elif MFC_OpenMP
         $:omp_directive
 #else
-        $:cray_directive
+
 #endif
 #elif MFC_OpenACC
         $:acc_directive
