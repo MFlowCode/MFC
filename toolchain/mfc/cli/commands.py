@@ -304,7 +304,6 @@ RUN_COMMAND = Command(
         ),
         Argument(
             name="archive",
-            short="A",
             help="(Interactive) Archive case inputs and outputs to PATH after the run completes.",
             default=None,
             metavar="PATH",
@@ -349,8 +348,8 @@ RUN_COMMAND = Command(
         Example("./mfc.sh run case.py -n 4", "Run with 4 MPI ranks"),
         Example("./mfc.sh run case.py --case-optimization -j 8", "10x faster with case optimization!"),
         Example("./mfc.sh run case.py -e batch -N 2 -n 4", "Submit batch job: 2 nodes, 4 ranks/node"),
-        Example("./mfc.sh run case.py -A /mnt/nas/mfc-runs", "Archive run into /mnt/nas/mfc-runs/<name>-<timestamp>/"),
-        Example("./mfc.sh run case.py -A /mnt/nas/mfc-runs --archive-format tar.zst", "Archive as a compressed tarball"),
+        Example("./mfc.sh run case.py --archive /mnt/nas/mfc-runs", "Archive run into /mnt/nas/mfc-runs/<name>-<timestamp>/"),
+        Example("./mfc.sh run case.py --archive /mnt/nas/mfc-runs --archive-format tar.zst", "Archive as a compressed tarball"),
     ],
     key_options=[
         ("--case-optimization", "Hard-code params for 10x speedup!"),
@@ -359,7 +358,7 @@ RUN_COMMAND = Command(
         ("-e, --engine", "interactive or batch"),
         ("-a, --account", "Account to charge (batch)"),
         ("-w, --walltime", "Wall time limit (batch)"),
-        ("-A, --archive PATH", "Archive inputs+outputs after interactive run"),
+        ("--archive PATH", "Archive inputs+outputs after interactive run"),
         ("--archive-format FMT", "Archive format: dir, tar, tar.zst"),
     ],
 )
