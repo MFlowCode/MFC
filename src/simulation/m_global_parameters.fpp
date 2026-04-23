@@ -786,7 +786,7 @@ contains
 
         allocate (patch_ib(num_ib_patches_max))
         do i = 1, num_ib_patches_max
-            patch_ib(i)%patch_id = i
+            patch_ib(i)%gbl_patch_id = i
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp

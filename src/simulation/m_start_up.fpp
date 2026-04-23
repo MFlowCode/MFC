@@ -1214,7 +1214,7 @@ contains
 
 #ifdef MFC_MPI
         ! fallback for 1-rank case
-        if (num_proc == 1) then
+        if (num_procs == 1) then
             patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
         else
             ! determine the set of patches owned by local rank
@@ -1256,7 +1256,11 @@ contains
 
     subroutine get_neighbor_bounds()
 
+        real(wp) :: send_val, recv_val
+        integer  :: send_neighbor, recv_neighbor, ierr
+
         ! Default: no neighbor in any direction
+
         neighbor_domain_x%beg = -huge(0._wp)
         neighbor_domain_x%end = huge(0._wp)
         neighbor_domain_y%beg = -huge(0._wp)
@@ -1265,9 +1269,6 @@ contains
         neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
-        real(wp) :: send_val, recv_val
-        integer  :: send_neighbor, recv_neighbor, ierr
-
         #:for X, ID, TAG, DIM in [('x', 1, 100, 'm'), ('y', 2, 102, 'n'), ('z', 3, 104, 'p')]
             if (num_dims >= ${ID}$) then
                 ! Step 1: broadcast left edge (-1 face) rightward; receive left neighbor's left edge -> neighbor_domain_${X}$%beg
