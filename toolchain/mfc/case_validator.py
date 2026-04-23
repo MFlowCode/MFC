@@ -360,9 +360,13 @@ class CaseValidator:
         if recon_type != 2:
             return
 
-        weno_log_params = ["mapped_weno", "wenoz", "wenoz_q", "teno", "teno_CT", "mp_weno", "weno_avg", "null_weights", "weno_Re_flux"]
+        weno_log_params = ["mapped_weno", "wenoz", "teno", "mp_weno", "weno_avg", "null_weights", "weno_Re_flux"]
         for param in weno_log_params:
             self.prohibit(self.get(param) == "T", f"recon_type = 2 (MUSCL) is not compatible with {param} = T")
+
+        weno_numeric_params = ["wenoz_q", "teno_CT", "weno_eps"]
+        for param in weno_numeric_params:
+            self.prohibit(self.is_set(param), f"recon_type = 2 (MUSCL) is not compatible with {param}")
 
         weno_order = self.get("weno_order")
         self.prohibit(weno_order is not None and weno_order != 0, f"recon_type = 2 (MUSCL) requires weno_order unset or 0, but got {weno_order}")
