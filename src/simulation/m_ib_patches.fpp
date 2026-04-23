@@ -1049,9 +1049,10 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: encoded_patch_id
-        integer, intent(out) :: patch_id, x_periodicity, y_periodicity, z_periodicity
-        integer              :: offset, remainder, xp, yp, zp, base
+        integer, intent(in)            :: encoded_patch_id
+        integer, intent(out)           :: patch_id
+        integer, intent(out), optional :: x_periodicity, y_periodicity, z_periodicity
+        integer                        :: offset, remainder, xp, yp, zp, base
 
         base = num_ibs + 1
 
@@ -1064,9 +1065,11 @@ contains
         zp = remainder/3
 
         ! Reverse map: 2 -> -1, 0 -> 0, 1 -> 1
-        x_periodicity = xp; if (xp == 2) x_periodicity = -1
-        y_periodicity = yp; if (yp == 2) y_periodicity = -1
-        z_periodicity = zp; if (zp == 2) z_periodicity = -1
+        if (present(x_periodicity) .and. present(y_periodicity) .and. present(z_periodicity)) then
+            x_periodicity = xp; if (xp == 2) x_periodicity = -1
+            y_periodicity = yp; if (yp == 2) y_periodicity = -1
+            z_periodicity = zp; if (zp == 2) z_periodicity = -1
+        end if
 
     end subroutine s_decode_patch_periodicity
 
