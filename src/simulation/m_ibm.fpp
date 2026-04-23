@@ -1223,4 +1223,47 @@ contains
 
     end subroutine s_wrap_periodic_ibs
 
+    !> @brief passes ownership of IBs to neighbor processors
+    subroutine s_handoff_ib_ownership()
+
+        integer, dimension(num_ibs) :: communication_directions
+        integer                     :: i, ib_idx
+        real(wp)                    :: position
+
+        #:if defined('MFC_MPI')
+            if (num_procs > 1) then
+                communication_directions = 0
+
+                ! identify particles that have left the local domain and log the direction of communication
+                do i = 1, num_local_ibs
+                    ib_idx = local_ib_patch_ids(i)
+                    #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+                        if (num_dims >= ${ID}$) then
+                            position = patch_ib(ib_idx)%${X}$_centroid
+                            if (bc_${X}$%beg < 0 .and. bc_${X}$%beg /= BC_PERIODIC) then
+                                ! if it is outside the domain in one direction, project it somewhere inside so at least one rank
+                                ! owns it
+                                if (position < ${X}$_domain%beg) then
+                                    position = ${X}$_domain%beg
+                                else if (${X}$_domain%end < position) then
+                                    position = ${X}$_domain%end - 1.0e-10_wp
+                                end if
+                            end if
+
+                            if (position < ${X}$_domain%beg) then
+                                communication_directions(i) = -${ID}$
+                            else if (${X}$_domain%end < position) then
+                                communication_directions(i) = ${ID}$
+                            end if
+                        end if
+                    #:endfor
+                end do
+
+                #:for X, DIM in [('x', '1'), ('y', '2'), ('z', '3')]
+                #:endfor
+            end if
+        #:endif
+
+    end subroutine s_handoff_ib_ownership
+
 end module m_ibm

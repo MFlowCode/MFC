@@ -1189,14 +1189,18 @@ contains
 
     end subroutine s_read_ib_restart_data
 
+    !> @brief takes the patch_ib struct array that contains all global IB patches and reduces to only contain patches that are in
+    !! the local computational domain.
     subroutine s_reduce_ib_patch_array()
 
         type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib_gbl
-        real(wp), dimension(3)                                   :: collision_location
+        real(wp)                                                 :: position
         integer                                                  :: i, j
         integer                                                  :: num_aware_ibs
+        logical                                                  :: is_in_neighborhood, is_local
 
         patch_ib_gbl(:) = patch_ib(:)
+        call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
 
         deallocate (patch_ib)
         if (num_dims == 3) then
@@ -1206,6 +1210,8 @@ contains
         end if
         allocate (patch_ib(num_aware_ibs))
 
+        num_gbl_ibs = num_ibs
+
 #ifdef MFC_MPI
         ! fallback for 1-rank case
         if (num_proc == 1) then
@@ -1213,20 +1219,33 @@ contains
         else
             ! determine the set of patches owned by local rank
             num_local_ibs = 0
+            num_ibs = 0
             do i = 1, num_ib_patches_max
-                collision_location = [patch_ib_gbl(i)%x_centroid, patch_ib_gbl(i)%y_centroid, 0._wp]
-                if (num_dims == 3) collision_location(3) = patch_ib_gbl(i)%z_centroid
-                if (f_local_rank_owns_collision(collision_location)) then
-                    num_local_ibs = num_local_ibs + 1
-                    patch_ib(j) = patch_ib_gbl(i)
-                    local_ib_patch_ids(j) = j
+                ! catch the edge case where th collision lies just outside the computational domain
+                is_in_neighborhood = .true.
+                is_local = .true.
+
+                #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+                    if (num_dims >= ${ID}$) then
+                        position = patch_ib_gbl(i)%${X}$_centroid
+                        if (neighbor_domain_${X}$%beg > position .or. position > neighbor_domain_${X}$%end) then
+                            is_in_neighborhood = .false.
+                            is_local = .false.
+                        else if (${X}$_domain%beg > position .or. position > ${X}$_domain%end) then
+                            is_local = .false.
+                        end if
+                    end if
+                #:endfor
+
+                if (is_in_neighborhood) then
+                    num_ibs = num_ibs + 1
+                    patch_ib(num_ibs) = patch_ib_gbl(i)
+                    if (is_local) then
+                        num_local_ibs = num_local_ibs + 1
+                        local_ib_patch_ids(num_local_ibs) = num_ibs
+                    end if
                 end if
             end do
-            num_gbl_ibs = num_ibs
-            num_ibs = num_local_ibs
-
-            ! collect the patches from neighboring
-            call s_communicate_ib_patches(patch_ib_gbl, num_aware_ibs)
         end if
 #else
         ! reduce the size of the array for local simulation in no-MPI case
@@ -1235,76 +1254,44 @@ contains
 
     end subroutine s_reduce_ib_patch_array
 
-    !> Exchanges local IB patch IDs with face-neighbors in each axis direction so that each rank acquires the patch data for IBs
-    !! owned by its immediate neighbors.
-    subroutine s_communicate_ib_patches(patch_ib_gbl, num_aware_ibs)
+    subroutine get_neighbor_bounds()
 
-        type(ib_patch_parameters), dimension(num_ib_patches_max), intent(in) :: patch_ib_gbl
-        integer, intent(in)                                                  :: num_aware_ibs
+        ! Default: no neighbor in any direction
+        neighbor_domain_x%beg = -huge(0._wp)
+        neighbor_domain_x%end = huge(0._wp)
+        neighbor_domain_y%beg = -huge(0._wp)
+        neighbor_domain_y%end = huge(0._wp)
+        neighbor_domain_z%beg = -huge(0._wp)
+        neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
-        integer, dimension(num_aware_ibs) :: send_buf, recv_buf
-        integer                           :: i, k, recv_id, send_neighbor, recv_neighbor
-        integer                           :: ierr
-        logical                           :: found
+        real(wp) :: send_val, recv_val
+        integer  :: send_neighbor, recv_neighbor, ierr
 
-        #:for X, ID, TAG in [('x', 1, 100), ('y', 2, 102), ('z', 3, 104)]
+        #:for X, ID, TAG, DIM in [('x', 1, 100, 'm'), ('y', 2, 102, 'n'), ('z', 3, 104, 'p')]
             if (num_dims >= ${ID}$) then
-                ! Repack local patch IDs; sentinel -1 marks unused slots
-                send_buf = -1
-                do i = 1, num_ibs
-                    send_buf(i) = patch_ib(i)%gbl_patch_id
-                end do
-
-                ! Step 1: send to +${X}$ neighbor, receive from -${X}$ neighbor
+                ! Step 1: broadcast left edge (-1 face) rightward; receive left neighbor's left edge -> neighbor_domain_${X}$%beg
+                send_val = ${X}$_cb(-1)
                 send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
                 recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
-                recv_buf = -1
-                call MPI_SENDRECV(send_buf, num_aware_ibs, MPI_INTEGER, send_neighbor, ${TAG}$, recv_buf, num_aware_ibs, &
-                                  & MPI_INTEGER, recv_neighbor, ${TAG}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                do i = 1, num_aware_ibs
-                    recv_id = recv_buf(i)
-                    if (recv_id < 0) exit
-                    found = .false.
-                    do k = 1, num_ibs
-                        if (patch_ib(k)%gbl_patch_id == recv_id) then
-                            found = .true.
-                            exit
-                        end if
-                    end do
-                    if (.not. found) then
-                        num_ibs = num_ibs + 1
-                        @:ASSERT(num_ibs <= num_aware_ibs, 'patch_ib overflow in ${X}$+ IB communication')
-                        patch_ib(num_ibs) = patch_ib_gbl(recv_id)
-                    end if
-                end do
+                recv_val = -huge(0._wp)
+                call MPI_SENDRECV(send_val, 1, mpi_p, send_neighbor, ${TAG}$, recv_val, 1, mpi_p, recv_neighbor, ${TAG}$, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                neighbor_domain_${X}$%beg = recv_val
 
-                ! Step 2: send to -${X}$ neighbor, receive from +${X}$ neighbor (same send_buf: original local list)
+                ! Step 2: broadcast right edge (${DIM}$ face) leftward; receive right neighbor's right edge ->
+                ! neighbor_domain_${X}$%end
+                send_val = ${X}$_cb(${DIM}$)
                 send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
                 recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
-                recv_buf = -1
-                call MPI_SENDRECV(send_buf, num_aware_ibs, MPI_INTEGER, send_neighbor, ${TAG + 1}$, recv_buf, num_aware_ibs, &
-                                  & MPI_INTEGER, recv_neighbor, ${TAG + 1}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                do i = 1, num_aware_ibs
-                    recv_id = recv_buf(i)
-                    if (recv_id < 0) exit
-                    found = .false.
-                    do k = 1, num_ibs
-                        if (patch_ib(k)%gbl_patch_id == recv_id) then
-                            found = .true.
-                            exit
-                        end if
-                    end do
-                    if (.not. found) then
-                        num_ibs = num_ibs + 1
-                        @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in ${X}$- IB communication')
-                        patch_ib(num_ibs) = patch_ib_gbl(recv_id)
-                    end if
-                end do
+                recv_val = huge(0._wp)
+                call MPI_SENDRECV(send_val, 1, mpi_p, send_neighbor, ${TAG + 1}$, recv_val, 1, mpi_p, recv_neighbor, ${TAG + 1}$, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                neighbor_domain_${X}$%end = recv_val
             end if
         #:endfor
 #endif
 
-    end subroutine s_communicate_ib_patches
+    end subroutine get_neighbor_bounds
 
 end module m_start_up

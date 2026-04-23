@@ -200,12 +200,10 @@ module m_derived_types
 
     type :: t_model_array
         ! Original CPU-side fields (unchanged)
-        type(t_model), allocatable              :: model                    !< STL/OBJ geometry model
-        real(wp), allocatable, dimension(:,:,:) :: boundary_v               !< Boundary vertices
-        real(wp), allocatable, dimension(:,:)   :: interpolated_boundary_v  !< Interpolated boundary vertices
-        integer                                 :: boundary_edge_count      !< Number of boundary edges
-        integer                                 :: total_vertices           !< Total vertex count
-        integer                                 :: interpolate              !< Interpolation flag
+        type(t_model), allocatable              :: model                !< STL/OBJ geometry model
+        real(wp), allocatable, dimension(:,:,:) :: boundary_v           !< Boundary vertices
+        integer                                 :: boundary_edge_count  !< Number of boundary edges
+        integer                                 :: total_vertices       !< Total vertex count
 
         ! GPU-friendly flattened arrays
         integer                                 :: ntrs   !< Copy of model%ntrs

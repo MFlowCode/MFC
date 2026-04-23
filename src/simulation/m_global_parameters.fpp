@@ -229,7 +229,8 @@ module m_global_parameters
     $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
-    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
+    type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
+    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z]')
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
     logical  :: parallel_io       !< Format of the data files
