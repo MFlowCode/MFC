@@ -51,6 +51,21 @@
         molar_mass_inv = y1/31.998_wp + y2/18.01508_wp + y3/16.04256_wp + y4/28.0134_wp
 
         q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5/(temp*8.3144626_wp*1000.0_wp*molar_mass_inv)
+
+    case(191)  ! 1D Dual Isothermal case
+
+        q_prim_vf(eqn_idx%E)%sf(i, 0, 0) = 101325.0_wp
+        q_prim_vf(eqn_idx%mom%beg)%sf(i, 0, 0) = 0.0_wp
+        q_prim_vf(eqn_idx%species%beg)%sf(i, 0, 0) = 1.0_wp
+
+        if (x_cc(i) <= 0.025_wp) then
+            temp = 700.0_wp + ((1000.0_wp - 700.0_wp)/0.025_wp)*x_cc(i)
+        else
+            temp = 1200.0_wp + ((900.0_wp - 1000.0_wp)/0.025_wp)*(x_cc(i) - 0.025_wp)
+        end if
+
+        molar_mass_inv = 1.0_wp/2.01588_wp
+        q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 101325.0_wp/(temp*8.3144626_wp*1000.0_wp*molar_mass_inv)
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch " // trim(iStr))

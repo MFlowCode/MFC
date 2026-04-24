@@ -37,14 +37,16 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
-            & 'cyl_coord','mpp_lim','hypoelasticity', 'relax', 'parallel_io',  &
-            & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
-            & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
-            & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
-            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
-            & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
-            & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
+        #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',   &
+            & 'cyl_coord','mpp_lim','hypoelasticity', 'relax', 'parallel_io',     &
+            & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',              &
+            & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',  &
+            & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',          &
+            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                        &
+            & 'bc_x%isothermal_in', 'bc_y%isothermal_in', 'bc_z%isothermal_in',   &
+            & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out',&
+            & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',   &
+            & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage',    &
             & 'igr', 'down_sample', 'simplex_perturb','fft_wrt', 'hyper_cleaning' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
@@ -57,7 +59,9 @@ contains
             & 'perturb_flow_mag', 'pref', 'rhoref', 'poly_sigma', 'R0ref',     &
             & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV', 'palpha_eps',    &
             & 'ptgalpha_eps', 'sigma', 'pi_fac', 'mixlayer_vel_coef', 'Bx0',   &
-            & 'mixlayer_perturb_k0']
+            & 'mixlayer_perturb_k0', 'bc_x%Twall_in', 'bc_x%Twall_out',        &
+            & 'bc_y%Twall_in', 'bc_y%Twall_out', 'bc_z%Twall_in',              &
+            & 'bc_z%Twall_out']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

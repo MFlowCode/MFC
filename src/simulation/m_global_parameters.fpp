@@ -750,6 +750,13 @@ contains
             bc_${dir}$%grcbc_vel_out = .false.
         #:endfor
 
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%isothermal_in = .false.
+            bc_${dir}$%isothermal_out = .false.
+            bc_${dir}$%Twall_in = dflt_real
+            bc_${dir}$%Twall_out = dflt_real
+        #:endfor
+
         ! Lagrangian subgrid bubble model
         bubbles_lagrange = .false.
         lag_params%solver_approach = dflt_int

@@ -633,12 +633,13 @@ contains
     end subroutine s_write_serial_data_files
 
     !> Write grid and conservative variable data files in parallel via MPI I/O
-    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
         integer, intent(in)                                         :: t_step
         type(scalar_field), intent(inout), optional                 :: beta
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        type(scalar_field), intent(inout), optional                 :: q_T_sf
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size

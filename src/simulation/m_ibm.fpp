@@ -886,7 +886,7 @@ contains
 
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
-        integer                                                        :: i, j, k, l, ib_idx, fluid_idx
+        integer                                                        :: i, j, k, l, encoded_ib_idx, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3)                                :: forces, torques
         real(wp), dimension(1:3,1:3)                                   :: viscous_stress_div, viscous_stress_div_1, &
              & viscous_stress_div_2  ! viscous stress tensor with temp vectors to hold divergence calculations
@@ -914,15 +914,17 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
+        $:GPU_PARALLEL_LOOP(private='[ib_idx, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
                             & local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, &
                             & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[patch_ib, &
                             & dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    ib_idx = ib_markers%sf(i, j, k)
-                    if (ib_idx /= 0) then
+                    encoded_ib_idx = ib_markers%sf(i, j, k)
+                    if (encoded_ib_idx /= 0) then
+                        call s_decode_patch_periodicity(encoded_ib_idx, ib_idx)
+
                         ! get the vector pointing to the grid cell from the IB centroid
                         if (num_dims == 3) then
                             radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, &
