@@ -1012,7 +1012,7 @@ contains
 #else
             "on CPUs"
 #endif
-        else 
+        else
             allocate (patch_ib(num_ib_patches_max))
         end if
 
@@ -1202,7 +1202,6 @@ contains
         logical                                                  :: is_in_neighborhood, is_local
 
         patch_ib_gbl(:) = patch_ib(:)
-        print *, "Starting"
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
 
         deallocate (patch_ib)
@@ -1223,18 +1222,18 @@ contains
             ! determine the set of patches owned by local rank
             num_local_ibs = 0
             num_ibs = 0
-            do i = 1, num_ib_patches_max
+            do i = 1, num_gbl_ibs
                 ! catch the edge case where th collision lies just outside the computational domain
                 is_in_neighborhood = .true.
                 is_local = .true.
 
-                #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+                #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
                     if (num_dims >= ${ID}$) then
                         position = patch_ib_gbl(i)%${X}$_centroid
                         if (neighbor_domain_${X}$%beg > position .or. position > neighbor_domain_${X}$%end) then
                             is_in_neighborhood = .false.
                             is_local = .false.
-                        else if (${X}$_domain%beg > position .or. position > ${X}$_domain%end) then
+                        else if (${X}$_cb(-1) > position .or. position > ${X}$_cb(${DIM}$)) then
                             is_local = .false.
                         end if
                     end if

@@ -983,10 +983,11 @@ contains
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
-        allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
+        allocate (stl_bounding_boxes(num_gbl_ibs,1:3,1:3))
 
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
+                print *, proc_rank, patch_id, num_ibs, patch_ib(patch_id)%geometry
                 allocate (models(patch_id)%model)
                 print *, " * Reading model: " // trim(patch_ib(patch_id)%model_filepath)
 
