@@ -2,7 +2,8 @@
 Tests for the archive module.
 
 Covers source collection, archive format round-trips (dir, tar, tar.zst),
-the no-op path when --archive is unset, and destination-collision errors.
+the no-op path when --archive is unset, destination-collision tally
+fallback, and plan_archive() error cases.
 """
 
 import datetime
@@ -98,7 +99,8 @@ def _run_archive(fmt: str):
         state.gARG["archive"] = dest_root
         state.gARG["archive_format"] = fmt
         case = _make_fake_case(src)
-        archive_mod.archive(case, _fake_targets())
+        plan = archive_mod.plan_archive()
+        archive_mod.archive(plan, case, _fake_targets())
         entries = sorted(os.listdir(dest_root))
         assert len(entries) == 1, f"expected one archive entry, got {entries}"
         yield os.path.join(dest_root, entries[0])
@@ -147,31 +149,43 @@ class TestArchiveFormats(_StateSandbox):
 
 
 class TestArchiveBehavior(_StateSandbox):
-    def test_noop_when_archive_arg_unset(self):
+    def test_plan_returns_none_when_archive_unset(self):
         from . import archive as archive_mod
 
-        with tempfile.TemporaryDirectory() as src:
-            state.gARG["archive"] = None
-            state.gARG["archive_format"] = "dir"
-            case = _make_fake_case(src)
-            archive_mod.archive(case, _fake_targets())
+        state.gARG["archive"] = None
+        state.gARG["archive_format"] = "dir"
+        self.assertIsNone(archive_mod.plan_archive())
 
-    def test_destination_exists_raises(self):
+    def test_plan_bad_format_raises(self):
         from ..common import MFCException
+        from . import archive as archive_mod
+
+        with tempfile.TemporaryDirectory() as dest_root:
+            state.gARG["archive"] = dest_root
+            state.gARG["archive_format"] = "bogus"
+            with self.assertRaises(MFCException):
+                archive_mod.plan_archive()
+
+    def test_plan_collision_gets_tally_suffix(self):
         from . import archive as archive_mod
 
         fixed = datetime.datetime(2026, 1, 1, 12, 0, 0)
 
-        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dest_root, patch("mfc.run.archive.datetime.datetime") as MockDT:
+        with tempfile.TemporaryDirectory() as dest_root, patch("mfc.run.archive.datetime.datetime") as MockDT:
             MockDT.now.return_value = fixed
             state.gARG["archive"] = dest_root
             state.gARG["archive_format"] = "dir"
-            case = _make_fake_case(src)
 
-            archive_mod.archive(case, _fake_targets())
+            plan1 = archive_mod.plan_archive()
+            os.makedirs(plan1.dest)  # simulate an existing archive at that path
+            plan2 = archive_mod.plan_archive()
+            os.makedirs(plan2.dest)
+            plan3 = archive_mod.plan_archive()
 
-            with self.assertRaises(MFCException):
-                archive_mod.archive(case, _fake_targets())
+        self.assertTrue(plan2.dest.endswith("-2"))
+        self.assertTrue(plan3.dest.endswith("-3"))
+        self.assertNotEqual(plan1.dest, plan2.dest)
+        self.assertNotEqual(plan2.dest, plan3.dest)
 
     def test_output_summary_outside_case_dir_is_skipped(self):
         collect = _collect_sources_fn()

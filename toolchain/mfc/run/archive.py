@@ -163,26 +163,61 @@ def __write_tar(sources: list, case: input.MFCInputFile, dest: str, compressed: 
         tf.add(manifest_file, arcname=os.path.join(arcroot, "manifest.yaml"))
 
 
-def archive(case: input.MFCInputFile, targets) -> None:
+@dataclasses.dataclass
+class ArchivePlan:
+    dest: str
+    archive_format: str
+    stem: str
+
+
+def plan_archive():
+    """Validate --archive settings and reserve a unique destination path.
+
+    Runs before the simulation executes so bad paths, bad formats, or
+    unwritable roots fail fast. Returns None if --archive is unset.
+
+    If the computed <archive_root>/<name>-<timestamp>[.suffix] already
+    exists, appends "-2", "-3", ... to the stem until a free name is
+    found, so two runs starting in the same second never collide.
+    """
     archive_root = ARG("archive")
     if archive_root is None:
-        return
+        return None
 
     archive_format = ARG("archive_format") or "dir"
-    name = ARG("name")
-    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    stem = f"{name}-{timestamp}"
-
-    archive_root = os.path.abspath(os.path.expanduser(archive_root))
-    os.makedirs(archive_root, exist_ok=True)
-
     suffix_map = {"dir": "", "tar": ".tar", "tar.zst": ".tar.zst"}
     if archive_format not in suffix_map:
         raise MFCException(f"Archive: unsupported format '{archive_format}'. Must be one of: {', '.join(suffix_map)}.")
-    dest = os.path.join(archive_root, stem + suffix_map[archive_format])
+    suffix = suffix_map[archive_format]
 
-    if os.path.exists(dest):
-        raise MFCException(f"Archive: destination already exists: {dest}")
+    name = ARG("name")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    base_stem = f"{name}-{timestamp}"
+
+    archive_root = os.path.abspath(os.path.expanduser(archive_root))
+    try:
+        os.makedirs(archive_root, exist_ok=True)
+    except OSError as e:
+        raise MFCException(f"Archive: cannot create archive root {archive_root}: {e}") from e
+
+    stem = base_stem
+    dest = os.path.join(archive_root, stem + suffix)
+    counter = 2
+    while os.path.exists(dest):
+        stem = f"{base_stem}-{counter}"
+        dest = os.path.join(archive_root, stem + suffix)
+        counter += 1
+
+    if stem != base_stem:
+        cons.print(f"[yellow]Archive: destination existed, using {os.path.basename(dest)} to avoid collision.[/yellow]")
+
+    return ArchivePlan(dest=dest, archive_format=archive_format, stem=stem)
+
+
+def archive(plan: "ArchivePlan", case: input.MFCInputFile, targets) -> None:
+    """Write the planned archive. Caller must have obtained `plan` via plan_archive()."""
+    dest = plan.dest
+    archive_format = plan.archive_format
 
     sources = __collect_sources(case, targets)
     if not sources:
