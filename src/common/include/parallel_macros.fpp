@@ -63,6 +63,9 @@
                                       & extraAccArgs=extraAccArgs)
     #:set omp_directive = OMP_ROUTINE(function_name=function_name, nohost=nohost, extraOmpArgs=extraOmpArgs)
 
+    #:set cray_noinline_directive = ''
+    #:set cray_directive = ''
+
     #:if cray_noinline == True
         #:if not isinstance(function_name, str)
             #:stop "When using cray_noinline, function name must be given and given as a string"

@@ -731,6 +731,11 @@ class CaseValidator:
 
     def check_weno_simulation(self):
         """Checks WENO-specific constraints for simulation"""
+        recon_type = self.get("recon_type", 1)
+        # WENO_TYPE = 1
+        if recon_type != 1:
+            return
+
         weno_order = self.get("weno_order")
         weno_eps = self.get("weno_eps")
         wenoz = self.get("wenoz", "F") == "T"
