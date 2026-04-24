@@ -510,16 +510,12 @@ contains
         real(wp)                 :: radius
         real(wp), dimension(1:3) :: center
 
-        ! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
-
-        ! Transferring spherical patch's radius, centroid, smoothing patch identity and smoothing coefficient information
-
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         radius = patch_ib(patch_id)%radius
 
-        ! completely skip particles no in the domain
+        ! completely skip particles not in the domain
         if (center(1) - radius > x_cc(m + gp_layers + 1) .or. center(1) + radius < x_cc(-gp_layers - 1) .or. center(2) &
             & - radius > y_cc(n + gp_layers + 1) .or. center(2) + radius < y_cc(-gp_layers - 1) .or. center(3) - radius > z_cc(p &
             & + gp_layers + 1) .or. center(3) + radius < z_cc(-gp_layers - 1)) then
@@ -542,18 +538,12 @@ contains
 
         ! Checking whether the sphere covers a particular cell in the domain and verifying whether the current patch has permission
         ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, cart_y, cart_z]', copyin='[encoded_patch_id, center, radius]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k]', copyin='[encoded_patch_id, center, radius]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
-                    if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                    else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
-                    end if
                     ! Updating the patch identities bookkeeping variable
-                    if (((x_cc(i) - center(1))**2 + (cart_y - center(2))**2 + (cart_z - center(3))**2 <= radius**2)) then
+                    if (((x_cc(i) - center(1))**2 + (y_cc(j) - center(2))**2 + (z_cc(k) - center(3))**2 <= radius**2)) then
                         ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do

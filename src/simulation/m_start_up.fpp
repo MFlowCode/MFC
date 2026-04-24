@@ -1242,6 +1242,7 @@ contains
                 if (is_in_neighborhood) then
                     num_ibs = num_ibs + 1
                     patch_ib(num_ibs) = patch_ib_gbl(i)
+                    patch_ib(num_ibs)%gbl_patch_id = i
                     if (is_local) then
                         num_local_ibs = num_local_ibs + 1
                         local_ib_patch_ids(num_local_ibs) = num_ibs

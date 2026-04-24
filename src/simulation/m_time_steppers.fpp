@@ -566,9 +566,10 @@ contains
 
         !
         if (ib) then
-            if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
-            call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
-            if (ib_state_wrt .and. (.not. moving_immersed_boundary_flag)) then
+            if (moving_immersed_boundary_flag) then
+                call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
+                call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
+            else if (ib_state_wrt) then
                 call s_compute_ib_forces(q_prim_vf, fluid_pp)
             end if
         end if
