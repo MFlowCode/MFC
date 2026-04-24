@@ -1204,9 +1204,9 @@ contains
 
         deallocate (patch_ib)
         if (num_dims == 3) then
-            num_aware_ibs = num_local_ibs_max*27
+            num_aware_ibs = min(num_local_ibs_max*27, num_ib_patches_max)
         else
-            num_aware_ibs = num_local_ibs_max*9
+            num_aware_ibs = min(num_local_ibs_max*9, num_ib_patches_max)
         end if
         allocate (patch_ib(num_aware_ibs))
 
