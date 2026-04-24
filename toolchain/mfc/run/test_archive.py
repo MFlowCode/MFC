@@ -99,7 +99,7 @@ def _run_archive(fmt: str):
         state.gARG["archive"] = dest_root
         state.gARG["archive_format"] = fmt
         case = _make_fake_case(src)
-        plan = archive_mod.plan_archive()
+        plan = archive_mod.plan_archive(case)
         archive_mod.archive(plan, case, _fake_targets())
         entries = sorted(os.listdir(dest_root))
         assert len(entries) == 1, f"expected one archive entry, got {entries}"
@@ -154,33 +154,54 @@ class TestArchiveBehavior(_StateSandbox):
 
         state.gARG["archive"] = None
         state.gARG["archive_format"] = "dir"
-        self.assertIsNone(archive_mod.plan_archive())
+        # No case needed since plan_archive returns before touching it.
+        self.assertIsNone(archive_mod.plan_archive(case=None))
 
     def test_plan_bad_format_raises(self):
         from ..common import MFCException
         from . import archive as archive_mod
 
-        with tempfile.TemporaryDirectory() as dest_root:
+        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dest_root:
             state.gARG["archive"] = dest_root
             state.gARG["archive_format"] = "bogus"
+            case = _make_fake_case(src)
             with self.assertRaises(MFCException):
-                archive_mod.plan_archive()
+                archive_mod.plan_archive(case)
+
+    def test_plan_uses_case_dir_name_as_stem(self):
+        from . import archive as archive_mod
+
+        fixed = datetime.datetime(2026, 1, 1, 12, 0, 0)
+
+        with tempfile.TemporaryDirectory() as parent, tempfile.TemporaryDirectory() as dest_root, patch("mfc.run.archive.datetime.datetime") as MockDT:
+            MockDT.now.return_value = fixed
+            case_dir = os.path.join(parent, "my_cool_case")
+            os.makedirs(case_dir)
+            state.gARG["archive"] = dest_root
+            state.gARG["archive_format"] = "dir"
+            case = _make_fake_case(case_dir)
+
+            plan = archive_mod.plan_archive(case)
+
+        self.assertEqual(plan.stem, "my_cool_case-20260101-120000")
+        self.assertTrue(plan.dest.endswith("my_cool_case-20260101-120000"))
 
     def test_plan_collision_gets_tally_suffix(self):
         from . import archive as archive_mod
 
         fixed = datetime.datetime(2026, 1, 1, 12, 0, 0)
 
-        with tempfile.TemporaryDirectory() as dest_root, patch("mfc.run.archive.datetime.datetime") as MockDT:
+        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dest_root, patch("mfc.run.archive.datetime.datetime") as MockDT:
             MockDT.now.return_value = fixed
             state.gARG["archive"] = dest_root
             state.gARG["archive_format"] = "dir"
+            case = _make_fake_case(src)
 
-            plan1 = archive_mod.plan_archive()
+            plan1 = archive_mod.plan_archive(case)
             os.makedirs(plan1.dest)  # simulate an existing archive at that path
-            plan2 = archive_mod.plan_archive()
+            plan2 = archive_mod.plan_archive(case)
             os.makedirs(plan2.dest)
-            plan3 = archive_mod.plan_archive()
+            plan3 = archive_mod.plan_archive(case)
 
         self.assertTrue(plan2.dest.endswith("-2"))
         self.assertTrue(plan3.dest.endswith("-3"))

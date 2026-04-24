@@ -176,7 +176,7 @@ def run(targets=None, case=None):
     archive_plan = None
     if ARG("archive") is not None:
         if isinstance(qsystem, queues.InteractiveSystem):
-            archive_plan = archive_mod.plan_archive()
+            archive_plan = archive_mod.plan_archive(case)
             if verbosity >= 1:
                 cons.print(f"  [dim]Archive destination: {archive_plan.dest}[/dim]")
         else:

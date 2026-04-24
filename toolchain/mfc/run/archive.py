@@ -170,15 +170,21 @@ class ArchivePlan:
     stem: str
 
 
-def plan_archive():
+def plan_archive(case):
     """Validate --archive settings and reserve a unique destination path.
 
     Runs before the simulation executes so bad paths, bad formats, or
     unwritable roots fail fast. Returns None if --archive is unset.
 
-    If the computed <archive_root>/<name>-<timestamp>[.suffix] already
-    exists, appends "-2", "-3", ... to the stem until a free name is
-    found, so two runs starting in the same second never collide.
+    The stem is `<case_dir_name>-<timestamp>` where `case_dir_name` is
+    the basename of the directory holding case.py. This way archives
+    from different cases dropped in the same archive root are
+    self-identifying (e.g. 1D_sodshocktube-20260424-123045) rather
+    than all sharing the generic --name default.
+
+    If the computed path already exists, appends "-2", "-3", ... to
+    the stem until a free name is found, so two runs starting in the
+    same second never collide.
     """
     archive_root = ARG("archive")
     if archive_root is None:
@@ -190,9 +196,12 @@ def plan_archive():
         raise MFCException(f"Archive: unsupported format '{archive_format}'. Must be one of: {', '.join(suffix_map)}.")
     suffix = suffix_map[archive_format]
 
-    name = ARG("name")
+    # Derive the stem from the case's parent directory name so archives
+    # from different cases are distinguishable. Fall back to "case" if
+    # the case somehow lives at the filesystem root.
+    case_dir_name = os.path.basename(os.path.abspath(case.dirpath).rstrip(os.sep)) or "case"
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    base_stem = f"{name}-{timestamp}"
+    base_stem = f"{case_dir_name}-{timestamp}"
 
     archive_root = os.path.abspath(os.path.expanduser(archive_root))
     try:
