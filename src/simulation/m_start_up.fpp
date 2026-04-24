@@ -1012,6 +1012,8 @@ contains
 #else
             "on CPUs"
 #endif
+        else 
+            allocate (patch_ib(num_ib_patches_max))
         end if
 
         call s_mpi_bcast_user_inputs()
@@ -1200,6 +1202,7 @@ contains
         logical                                                  :: is_in_neighborhood, is_local
 
         patch_ib_gbl(:) = patch_ib(:)
+        print *, "Starting"
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
 
         deallocate (patch_ib)
