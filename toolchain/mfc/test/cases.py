@@ -1558,6 +1558,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case["t_step_stop"] = 50
                     case["t_step_save"] = 50
 
+                if case.get("recon_type") == 2:
+                    for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT"):
+                        case[k] = None
+
                 caseSize = case["m"] * max(case["n"], 1) * max(case["p"], 1)
                 if caseSize > 25 * 25:
                     if case["n"] == 0 and case["p"] == 0:
