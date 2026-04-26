@@ -117,6 +117,8 @@ _ATTR_DESCS = {
     "grcbc_in": "Enable GRCBC inlet",
     "grcbc_out": "Enable GRCBC outlet",
     "grcbc_vel_out": "Enable GRCBC velocity outlet",
+    "isothermal_in": "Enable isothermal wall at the domain entrance (minimum coordinate)",
+    "isothermal_out": "Enable isothermal wall at the domain exit (maximum coordinate)",
     # Acoustic
     "loc": "Location",
     "mag": "Magnitude",
@@ -402,6 +404,8 @@ HINTS = {
         "ve1": "Boundary velocity component 1 at domain end",
         "ve2": "Boundary velocity component 2 at domain end",
         "ve3": "Boundary velocity component 3 at domain end",
+        "Twall_in": "Temperature of the entrance-side isothermal wall.",
+        "Twall_out": "Temperature of the exit-side isothermal wall.",
     },
     "patch_bc": {
         "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
@@ -1248,6 +1252,11 @@ def _load():
         for j in range(1, 4):
             _r(f"{px}vel_in({j})", REAL, {"bc"})
             _r(f"{px}vel_out({j})", REAL, {"bc"})
+
+        for a in ["Twall_in", "Twall_out"]:
+            _r(f"{px}{a}", REAL, {"bc"})
+        for a in ["isothermal_in", "isothermal_out"]:
+            _r(f"{px}{a}", LOG, {"bc"})
 
     # patch_bc (10 BC patches)
     for i in range(1, NB + 1):

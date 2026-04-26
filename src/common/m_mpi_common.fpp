@@ -43,6 +43,8 @@ contains
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
+        else if (chemistry .and. chem_params%diffusion) then
+            v_size = sys_size + 1
         else
             v_size = sys_size
         end if
@@ -494,7 +496,7 @@ contains
 
     !> The goal of this procedure is to populate the buffers of the cell-average conservative variables by communicating with the
     !! neighboring processors.
-    subroutine s_mpi_sendrecv_variables_buffers(q_comm, mpi_dir, pbc_loc, nVar, pb_in, mv_in)
+    subroutine s_mpi_sendrecv_variables_buffers(q_comm, mpi_dir, pbc_loc, nVar, pb_in, mv_in, q_T_sf)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
@@ -504,8 +506,9 @@ contains
         type(int_bounds_info) :: boundary_conditions(1:3)
         integer :: beg_end(1:2), grid_dims(1:3)
         integer :: dst_proc, src_proc, recv_tag, send_tag
-        logical :: beg_end_geq_0, qbmm_comm
+        logical :: beg_end_geq_0, qbmm_comm, chem_diff_comm
         integer :: pack_offset, unpack_offset
+        type(scalar_field), optional, intent(inout) :: q_T_sf
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
@@ -513,10 +516,16 @@ contains
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
         qbmm_comm = .false.
+        chem_diff_comm = .false.
 
         if (present(pb_in) .and. present(mv_in) .and. qbmm .and. .not. polytropic) then
             qbmm_comm = .true.
             v_size = nVar + 2*nb*nnode
+            buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
+                             & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
+        else if (present(q_T_sf) .and. chemistry .and. chem_params%diffusion) then
+            chem_diff_comm = .true.
+            v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         else
@@ -571,6 +580,19 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
+                    if (chem_diff_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, buff_size - 1
+                                    r = nVar + v_size*(j + buff_size*(k + (n + 1)*l))
+                                    buff_send(r) = real(q_T_sf%sf(j + pack_offset, k, l), kind=wp)
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                         do l = 0, p
@@ -615,6 +637,19 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+
+                    if (chem_diff_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                        do l = 0, p
+                            do k = 0, buff_size - 1
+                                do j = -buff_size, m + buff_size
+                                    r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*(k + buff_size*l))
+                                    buff_send(r) = real(q_T_sf%sf(j, k + pack_offset, l), kind=wp)
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
@@ -663,6 +698,20 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+
+                    if (chem_diff_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                        do l = 0, buff_size - 1
+                            do k = -buff_size, n + buff_size
+                                do j = -buff_size, m + buff_size
+                                    r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
+                                                       & + 2*buff_size + 1)*l))
+                                    buff_send(r) = real(q_T_sf%sf(j, k, l + pack_offset), kind=wp)
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
@@ -762,6 +811,25 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
+                    if (chem_diff_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                        do l = 0, p
+                            do k = 0, n
+                                do j = -buff_size, -1
+                                    r = nVar + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
+                                    q_T_sf%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER)
+                                    if (ieee_is_nan(q_T_sf%sf(j + unpack_offset, k, l))) then
+                                        print *, "Error", j, k, l
+                                        call s_mpi_abort("NaN(s) in recv")
+                                    end if
+#endif
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do l = 0, p
@@ -812,6 +880,25 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+
+                    if (chem_diff_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                        do l = 0, p
+                            do k = -buff_size, -1
+                                do j = -buff_size, m + buff_size
+                                    r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
+                                    q_T_sf%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER)
+                                    if (ieee_is_nan(q_T_sf%sf(j, k + unpack_offset, l))) then
+                                        print *, "Error", j, k, l
+                                        call s_mpi_abort("NaN(s) in recv")
+                                    end if
+#endif
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
@@ -866,6 +953,26 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+
+                    if (chem_diff_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                        do l = -buff_size, -1
+                            do k = -buff_size, n + buff_size
+                                do j = -buff_size, m + buff_size
+                                    r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
+                                                       & + 2*buff_size + 1)*(l + buff_size)))
+                                    q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER)
+                                    if (ieee_is_nan(q_T_sf%sf(j, k, l + unpack_offset))) then
+                                        print *, "Error", j, k, l
+                                        call s_mpi_abort("NaN(s) in recv")
+                                    end if
+#endif
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
