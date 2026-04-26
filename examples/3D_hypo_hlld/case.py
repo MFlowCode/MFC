@@ -2,7 +2,12 @@
 import json
 
 # 3D hypoelastic case with HLLD solver.
-# Solid sphere in liquid hit by focused acoustic pulse.
+# Epoxy sphere in water hit by focused acoustic pulse.
+# Water: gamma=4.4, pi_inf=6.0e8, G=0
+# Epoxy: gamma=4.4, pi_inf=2.4e9, rho=1180, G=1.5e9
+
+gamma_w, pi_inf_w, rho_w = 4.4, 6.0e8, 1000.0
+gamma_e, pi_inf_e, rho_e = 4.4, 2.4e9, 1180.0
 
 config = {
     "run_time_info": "T",
@@ -13,36 +18,37 @@ config = {
     "y_domain%end": 1.0,
     "z_domain%beg": 0.0,
     "z_domain%end": 1.0,
-    "m": 24,
-    "n": 24,
-    "p": 24,
+    "m": 49,
+    "n": 49,
+    "p": 49,
     "cyl_coord": "F",
-    "dt": 6.0e-6,
+    "dt": 3.0e-6,
     "t_step_start": 0,
-    "t_step_stop": 150,
+    "t_step_stop": 200,
     "t_step_save": 50,
-    # Simulation Algorithm Parameters
+    # Simulation Algorithm
     "num_patches": 2,
     "model_eqns": 2,
     "alt_soundspeed": "F",
     "num_fluids": 2,
-    "mpp_lim": "T",
+    "mpp_lim": "F",
     "mixture_err": "F",
-    "time_stepper": 1,
-    "weno_order": 1,
-    "weno_eps": 1.0e-20,
+    "time_stepper": 3,
+    "weno_order": 5,
+    "weno_eps": 1.0e-16,
+    "mapped_weno": "T",
     "null_weights": "F",
     "mp_weno": "F",
     "riemann_solver": 4,
     "wave_speeds": 1,
     "avg_state": 2,
-    "bc_x%beg": -3,
-    "bc_x%end": -3,
-    "bc_y%beg": -3,
-    "bc_y%end": -3,
-    "bc_z%beg": -3,
-    "bc_z%end": -3,
-    # Formatted Database Files Structure Parameters
+    "bc_x%beg": -6,
+    "bc_x%end": -6,
+    "bc_y%beg": -6,
+    "bc_y%end": -6,
+    "bc_z%beg": -6,
+    "bc_z%end": -6,
+    # Output
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
@@ -51,7 +57,7 @@ config = {
     # Hypoelasticity
     "hypoelasticity": "T",
     "fd_order": 4,
-    # Patch 1: Background liquid (3D box)
+    # Patch 1: Water background (3D box)
     "patch_icpp(1)%geometry": 9,
     "patch_icpp(1)%x_centroid": 0.5,
     "patch_icpp(1)%y_centroid": 0.5,
@@ -64,27 +70,32 @@ config = {
     "patch_icpp(1)%vel(3)": 0.0,
     "patch_icpp(1)%pres": 1e05,
     "patch_icpp(1)%tau_e(1)": 0.0,
-    "patch_icpp(1)%alpha_rho(1)": 1000 * (1.0 - 1e-8),
+    "patch_icpp(1)%alpha_rho(1)": rho_w * (1.0 - 1e-8),
     "patch_icpp(1)%alpha(1)": 1.0 - 1e-8,
-    "patch_icpp(1)%alpha_rho(2)": 1000 * 1e-8,
+    "patch_icpp(1)%alpha_rho(2)": rho_e * 1e-8,
     "patch_icpp(1)%alpha(2)": 1e-8,
-    # Patch 2: Solid sphere
+    # Patch 2: Epoxy cube
     "patch_icpp(2)%alter_patch(1)": "T",
-    "patch_icpp(2)%geometry": 8,
+    "patch_icpp(2)%geometry": 9,
     "patch_icpp(2)%x_centroid": 0.6,
     "patch_icpp(2)%y_centroid": 0.5,
     "patch_icpp(2)%z_centroid": 0.5,
-    "patch_icpp(2)%radius": 0.1,
+    "patch_icpp(2)%length_x": 0.2,
+    "patch_icpp(2)%length_y": 0.2,
+    "patch_icpp(2)%length_z": 0.2,
+    "patch_icpp(2)%smoothen": "T",
+    "patch_icpp(2)%smooth_patch_id": 1,
+    "patch_icpp(2)%smooth_coeff": 2.0,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
     "patch_icpp(2)%vel(3)": 0.0,
     "patch_icpp(2)%pres": 1e05,
     "patch_icpp(2)%tau_e(1)": 0.0,
-    "patch_icpp(2)%alpha_rho(1)": 1000 * 1e-8,
+    "patch_icpp(2)%alpha_rho(1)": rho_w * 1e-8,
     "patch_icpp(2)%alpha(1)": 1e-8,
-    "patch_icpp(2)%alpha_rho(2)": 1000 * (1.0 - 1e-8),
+    "patch_icpp(2)%alpha_rho(2)": rho_e * (1.0 - 1e-8),
     "patch_icpp(2)%alpha(2)": 1.0 - 1e-8,
-    # Acoustic source (support 7 = 3D focused)
+    # Acoustic source (3D focused)
     "acoustic_source": "T",
     "num_source": 1,
     "acoustic(1)%support": 7,
@@ -99,12 +110,12 @@ config = {
     "acoustic(1)%gauss_sigma_time": 4e-5,
     "acoustic(1)%delay": 2e-4,
     # Fluids Physical Parameters
-    "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
-    "fluid_pp(1)%pi_inf": 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00),
+    "fluid_pp(1)%gamma": 1.0 / (gamma_w - 1.0),
+    "fluid_pp(1)%pi_inf": gamma_w * pi_inf_w / (gamma_w - 1.0),
     "fluid_pp(1)%G": 0.0,
-    "fluid_pp(2)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
-    "fluid_pp(2)%pi_inf": 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00),
-    "fluid_pp(2)%G": 1e9,
+    "fluid_pp(2)%gamma": 1.0 / (gamma_e - 1.0),
+    "fluid_pp(2)%pi_inf": gamma_e * pi_inf_e / (gamma_e - 1.0),
+    "fluid_pp(2)%G": 1.5e9,
 }
 
 print(json.dumps(config, indent=4))
