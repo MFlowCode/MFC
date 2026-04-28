@@ -914,10 +914,10 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            if (cfl_dt) then
-                if (n_start > 0) call s_read_ib_restart_data(n_start)
-            else
-                if (t_step_start > 0) call s_read_ib_restart_data(t_step_start)
+            if (cfl_dt .and. n_start > 0) then
+                call s_read_ib_restart_data(n_start)
+            else if (t_step_start > 0) then
+                call s_read_ib_restart_data(t_step_start)
             end if
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
