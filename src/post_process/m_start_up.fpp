@@ -180,16 +180,13 @@ contains
         ! Populating the grid and conservative variables
         call s_read_data_files(t_step)
 
-        ! Populating the buffer regions of the grid and conservative variables
-        if (buff_size > 0) then
-            call s_populate_grid_variables_buffers()
-            call s_populate_variables_buffers(bc_type, q_cons_vf)
-        end if
-
-        ! Initialize the Temperature cache.
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
 
-        ! Converting the conservative variables to the primitive ones
+        if (buff_size > 0) then
+            call s_populate_grid_variables_buffers()
+            call s_populate_variables_buffers(bc_type, q_cons_vf, q_T_sf=q_T_sf)
+        end if
+
         call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
 
     end subroutine s_perform_time_step

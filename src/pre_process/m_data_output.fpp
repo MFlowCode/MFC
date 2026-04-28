@@ -34,14 +34,14 @@ module m_data_output
     abstract interface
 
         !> Interface for the conservative data
-        !! @param q_cons_vf Conservative variables
-        impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type)
+        impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type, q_T_sf)
 
             import :: scalar_field, integer_field, sys_size, m, n, p, pres_field, num_dims
 
             ! Conservative variables
             type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf, q_prim_vf
             type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+            type(scalar_field), intent(inout), optional                 :: q_T_sf
 
         end subroutine s_write_abstract_data_files
     end interface
@@ -55,10 +55,7 @@ module m_data_output
 contains
 
     !> Writes grid and initial condition data files to the "0" time-step directory in the local processor rank folder
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf Primitive variables
-    !! @param bc_type Boundary condition types
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_prim_vf
 
@@ -67,19 +64,18 @@ contains
         logical                                                     :: file_exist
         character(LEN=15)                                           :: FMT
         character(LEN=3)                                            :: status
-
-        !> Used to store the number, in character form, of the currently manipulated conservative variable data file
-        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-        character(LEN=len_trim(t_step_dir) + name_len)           :: file_loc
-        integer                                                  :: i, j, k, l, r, c
-        integer                                                  :: t_step
-        real(wp), dimension(nb)                                  :: nRtmp
-        real(wp)                                                 :: nbub
-        real(wp)                                                 :: gamma, lit_gamma, pi_inf, qv
-        real(wp)                                                 :: rho
-        real(wp)                                                 :: pres, T
-        real(wp)                                                 :: rhoYks(1:num_species)
-        real(wp)                                                 :: pres_mag
+        character(LEN=int(floor(log10(real(sys_size, wp)))) + 1)    :: file_num
+        character(LEN=len_trim(t_step_dir) + name_len)              :: file_loc
+        integer                                                     :: i, j, k, l, r, c
+        integer                                                     :: t_step
+        real(wp), dimension(nb)                                     :: nRtmp
+        real(wp)                                                    :: nbub
+        real(wp)                                                    :: gamma, lit_gamma, pi_inf, qv
+        real(wp)                                                    :: rho
+        real(wp)                                                    :: pres, T
+        real(wp)                                                    :: rhoYks(1:num_species)
+        real(wp)                                                    :: pres_mag
+        type(scalar_field), intent(inout), optional                 :: q_T_sf
 
         pres_mag = 0._wp
 
@@ -99,7 +95,7 @@ contains
             if (igr) then
                 call s_write_serial_boundary_condition_files(q_cons_vf, bc_type, t_step_dir, old_grid)
             else
-                call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir, old_grid)
+                call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir, old_grid, q_T_sf)
             end if
         end if
 
@@ -403,14 +399,12 @@ contains
     end subroutine s_write_serial_data_files
 
     !> Writes grid and initial condition data files in parallel to the "0" time-step directory in the local processor rank folder
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf Primitive variables
-    !! @param bc_type Boundary condition types
-    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type, q_T_sf)
 
         ! Conservative variables
         type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf, q_prim_vf
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        type(scalar_field), optional, intent(inout)                 :: q_T_sf
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size
@@ -608,7 +602,7 @@ contains
             if (igr) then
                 call s_write_parallel_boundary_condition_files(q_cons_vf, bc_type)
             else
-                call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
+                call s_write_parallel_boundary_condition_files(q_prim_vf, bc_type, q_T_sf)
             end if
         end if
 

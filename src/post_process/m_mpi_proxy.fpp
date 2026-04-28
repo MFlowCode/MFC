@@ -77,16 +77,18 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'cyl_coord', 'mpp_lim', 'mixture_err',                  &
-            & 'alt_soundspeed', 'hypoelasticity', 'mhd', 'parallel_io',        &
-            & 'rho_wrt', 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',         &
-            & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt', &
-            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt','chem_wrt_T', &
-            & 'bubbles_euler', 'qbmm', 'polytropic', 'polydisperse',           &
-            & 'file_per_process', 'relax', 'cf_wrt', 'igr', 'liutex_wrt',      &
-            & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
-            & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
-            & 'output_partial_domain', 'relativity', 'cont_damage', 'bc_io',   &
+        #:for VAR in [ 'cyl_coord', 'mpp_lim', 'mixture_err',                     &
+            & 'alt_soundspeed', 'hypoelasticity', 'mhd', 'parallel_io',           &
+            & 'rho_wrt', 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',            &
+            & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt',    &
+            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt','chem_wrt_T',    &
+            & 'bubbles_euler', 'qbmm', 'polytropic', 'polydisperse',              &
+            & 'file_per_process', 'relax', 'cf_wrt', 'igr', 'liutex_wrt',         &
+            & 'bc_x%isothermal_in', 'bc_y%isothermal_in', 'bc_z%isothermal_in',   &
+            & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out',&
+            & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',             &
+            & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',           &
+            & 'output_partial_domain', 'relativity', 'cont_damage', 'bc_io',      &
             & 'down_sample','fft_wrt', 'hyper_cleaning', 'ib_state_wrt']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
@@ -128,9 +130,11 @@ contains
         end if
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop',   &
-            & 'x_output%beg', 'x_output%end', 'y_output%beg', &
-            & 'y_output%end', 'z_output%beg', 'z_output%end']
+            & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop',      &
+            & 'x_output%beg', 'x_output%end', 'y_output%beg',    &
+            & 'y_output%end', 'z_output%beg', 'z_output%end',    &
+            & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in',&
+            & 'bc_y%Twall_out','bc_z%Twall_in', 'bc_z%Twall_out' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(schlieren_alpha(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
