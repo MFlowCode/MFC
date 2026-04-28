@@ -260,7 +260,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-
             if (bc%z%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in, q_T_sf)
             else
