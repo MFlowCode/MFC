@@ -540,6 +540,9 @@ contains
 
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
+            if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
+                & 3)*dt/rk_coef(s, 4))
+
             if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
             if (model_eqns == 3 .and. (.not. relax)) then
@@ -702,6 +705,33 @@ contains
         call nvtxEndRange
 
     end subroutine s_apply_bodyforces
+
+    subroutine s_apply_synthetic_turbulence_force(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
+
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
+        real(wp), intent(in)                                     :: ldt  !< local dt
+        integer                                                  :: i, j, k, l
+
+        call nvtxStartRange("RHS-SYNTHETICFORCE")
+        call s_compute_synthetic_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = eqn_idx%mom%beg, eqn_idx%E
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call nvtxEndRange
+
+    end subroutine s_apply_synthetic_turbulence_force
 
     !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
     subroutine s_propagate_immersed_boundaries(s)
