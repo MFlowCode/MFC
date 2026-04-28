@@ -445,6 +445,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `mp_weno`                  | Logical | Monotonicity preserving WENO |
 | `muscl_order`              | Integer | MUSCL order [1,2] |
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
+| `muscl_eps`                | Real    | MUSCL limiter slope-product threshold (default: hard-coded thresholds; set to 0 for textbook behavior) |
 | `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
 | `int_comp`                 | Logical | THINC Interface Compression |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
@@ -545,6 +546,10 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 
 - `muscl_lim` specifies the slope limiter that is used in 2nd order MUSCL Reconstruction by an integer from 1 through 5.
 `muscl_lim = 1`, `2`, `3`, `4`, and `5` correspond to minmod, monotonized central, Van Albada, Van Leer, and SUPERBEE, respectively.
+
+- `muscl_eps` controls the slope-product activation threshold for all MUSCL limiters.
+When not set (default), the threshold is 1e-9 for minmod/MC, and 1e-6 for others.
+Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate whenever both slopes have the same sign.
 
 - `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
 
@@ -1081,8 +1086,20 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
+### 18. Chemistry-Specific Boundary Conditions
 
-### 18. GPU Performance (NVIDIA UVM)
+| Parameter          | Type    | Description                                                                 |
+| ---:               | :----:  | :---                                                                        |
+| `bc_[x,y,z]%%isothermal_in`    | Logical | Enable isothermal wall at the domain entrance (minimum coordinate).         |
+| `bc_[x,y,z]%%isothermal_out`   | Logical | Enable isothermal wall at the domain exit (maximum coordinate).             |
+| `bc_[x,y,z]%%Twall_in`         | Real    | Temperature [K] of the entrance isothermal wall.                            |
+| `bc_[x,y,z]%%Twall_out`        | Real    | Temperature [K] of the exit isothermal wall.                                |
+
+This boundary condition can be used for fixed-temperature (isothermal) walls at the domain extremities. It is exclusively available for reacting flows and requires chemistry to be enabled. It properly evaluates heat and species fluxes at the interface when ``chemistry = 'T'``, ``chem_params%%diffusion = 'T'``, and the corresponding domain boundary is set to a slip wall (`bc_[x,y,z]%%[beg,end]` = -15) or a no-slip wall (`bc_[x,y,z]%%[beg,end]` = -16).
+
+
+
+### 19. GPU Performance (NVIDIA UVM)
 
 | Parameter                  | Type    | Description                                              |
 | ---:                       | :---:   | :---                                                     |

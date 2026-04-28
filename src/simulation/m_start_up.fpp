@@ -83,7 +83,7 @@ contains
 
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, mpp_lim, time_stepper, weno_eps, &
+            model_eqns, mpp_lim, time_stepper, weno_eps, muscl_eps, &
             rdma_mpi, teno_CT, mp_weno, weno_avg, &
             riemann_solver, riemann_hypo_ADC, ADC_kappa, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
@@ -1073,6 +1073,11 @@ contains
         $:GPU_UPDATE(device='[bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
+
+        $:GPU_UPDATE(device='[bc_x%isothermal_in, bc_x%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_x%Twall_in, bc_x%Twall_out, bc_y%Twall_in, bc_y%Twall_out, bc_z%Twall_in, bc_z%Twall_out]')
 
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then

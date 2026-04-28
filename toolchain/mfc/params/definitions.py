@@ -117,6 +117,8 @@ _ATTR_DESCS = {
     "grcbc_in": "Enable GRCBC inlet",
     "grcbc_out": "Enable GRCBC outlet",
     "grcbc_vel_out": "Enable GRCBC velocity outlet",
+    "isothermal_in": "Enable isothermal wall at the domain entrance (minimum coordinate)",
+    "isothermal_out": "Enable isothermal wall at the domain exit (maximum coordinate)",
     # Acoustic
     "loc": "Location",
     "mag": "Magnitude",
@@ -258,6 +260,7 @@ _SIMPLE_DESCS = {
     "recon_type": "Reconstruction type",
     "muscl_order": "MUSCL reconstruction order",
     "muscl_lim": "MUSCL limiter type",
+    "muscl_eps": "MUSCL limiter slope-product threshold",
     "low_Mach": "Low Mach number correction",
     "bubble_model": "Bubble dynamics model",
     "Ca": "Cavitation number",
@@ -406,6 +409,8 @@ HINTS = {
         "ve1": "Boundary velocity component 1 at domain end",
         "ve2": "Boundary velocity component 2 at domain end",
         "ve3": "Boundary velocity component 3 at domain end",
+        "Twall_in": "Temperature of the entrance-side isothermal wall.",
+        "Twall_out": "Temperature of the exit-side isothermal wall.",
     },
     "patch_bc": {
         "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
@@ -657,6 +662,8 @@ CONSTRAINTS = {
     "cfl_target": {"min": 0},
     # WENO
     "weno_eps": {"min": 0},
+    # MUSCL
+    "muscl_eps": {"min": 0},
     # Physics (must be non-negative)
     "R0ref": {"min": 0},
     "sigma": {"min": 0},
@@ -889,6 +896,7 @@ def _load():
     _r("recon_type", INT)
     _r("muscl_order", INT)
     _r("muscl_lim", INT)
+    _r("muscl_eps", REAL)
     _r("weno_eps", REAL, {"weno"}, math=r"\f$\varepsilon\f$")
     _r("teno_CT", REAL, {"weno"}, math=r"\f$C_T\f$")
     _r("wenoz_q", REAL, {"weno"})
@@ -1279,6 +1287,11 @@ def _load():
         for j in range(1, 4):
             _r(f"{px}vel_in({j})", REAL, {"bc"})
             _r(f"{px}vel_out({j})", REAL, {"bc"})
+
+        for a in ["Twall_in", "Twall_out"]:
+            _r(f"{px}{a}", REAL, {"bc"})
+        for a in ["isothermal_in", "isothermal_out"]:
+            _r(f"{px}{a}", LOG, {"bc"})
 
     # patch_bc (10 BC patches)
     for i in range(1, NB + 1):
