@@ -909,7 +909,7 @@ contains
         integer                              :: ifile, ierr
         integer, dimension(MPI_STATUS_SIZE)  :: status
         logical                              :: file_exist
-        integer                              :: i
+        integer                              :: i, ib_idx
         integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
 
