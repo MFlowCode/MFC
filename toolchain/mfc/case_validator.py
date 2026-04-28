@@ -753,12 +753,15 @@ class CaseValidator:
         """Checks MUSCL-specific constraints for simulation"""
         muscl_order = self.get("muscl_order")
         muscl_lim = self.get("muscl_lim")
+        muscl_eps = self.get("muscl_eps")
 
         if muscl_order is None:
             return
 
         self.prohibit(muscl_order == 2 and muscl_lim is None, "muscl_lim must be defined if using muscl_order = 2")
         self.prohibit(muscl_lim is not None and (muscl_lim < 1 or muscl_lim > 5), "muscl_lim must be 1, 2, 3, 4, or 5")
+        if muscl_eps is not None:
+            self.prohibit(muscl_eps < 0, "muscl_eps must be >= 0 (use 0 for textbook limiter behavior)")
 
     def check_model_eqns_simulation(self):
         """Checks model equation constraints specific to simulation"""

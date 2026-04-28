@@ -312,6 +312,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     stack.pop()
                 for muscl_lim in [2, 3, 4, 5]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
+                stack.push("muscl_eps=0", {"muscl_eps": 0})
+                for muscl_lim in [1, 2, 3, 4, 5]:
+                    cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
+                stack.pop()
             stack.pop()
 
     def alter_riemann_solvers(num_fluids):
