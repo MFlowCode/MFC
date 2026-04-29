@@ -1513,10 +1513,6 @@ contains
                 end if
             end do
             num_ibs = output_idx
-
-            if (num_local_ibs /= local_output_idx) then
-                print *, proc_rank, " diff num local ", num_local_ibs, local_output_idx
-            end if
             num_local_ibs = local_output_idx
 
             ! Broadcast newly-owned patches to all neighborhood neighbors (including corners/edges).
