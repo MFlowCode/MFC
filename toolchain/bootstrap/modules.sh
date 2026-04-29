@@ -119,6 +119,13 @@ if [ $(echo "$VARIABLES" | grep = | wc -c) -gt 0 ]; then
     export $(eval "echo $VARIABLES") > /dev/null
 fi
 
+UNLOAD_MODULES="$(__extract "$u_c-all-unload") $(__extract "$u_c-$cg-unload")"
+UNLOAD_MODULES=$(echo "$UNLOAD_MODULES" | xargs)
+if [ -n "$UNLOAD_MODULES" ]; then
+    log " $ module unload $UNLOAD_MODULES"
+    module unload $UNLOAD_MODULES
+fi
+
 # Don't check for Cray paths on Carpenter, otherwise do check if they exist
 if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' 'famd' ] ; then
     ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
