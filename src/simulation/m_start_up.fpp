@@ -1206,6 +1206,16 @@ contains
         integer                                                  :: num_aware_ibs
         logical                                                  :: is_in_neighborhood, is_local
 
+        ! do all set up for moving immersed boundaries
+
+        moving_immersed_boundary_flag = .false.
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) then
+                moving_immersed_boundary_flag = .true.
+                exit
+            end if
+        end do
+
         patch_ib_gbl(:) = patch_ib(:)
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
 

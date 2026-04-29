@@ -552,7 +552,6 @@ contains
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
-                    ! compute ib forces for fixed immersed boundaries if requested for output
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -716,6 +715,8 @@ contains
 
         forces_computed = .false.
 
+        if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
+
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -728,11 +729,6 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm == 2 .and. .not. forces_computed) then
-                call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                forces_computed = .true.
-            end if
-
             if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &

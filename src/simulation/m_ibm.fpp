@@ -71,11 +71,9 @@ contains
         call nvtxStartRange("SETUP-IBM-MODULE")
 
         ! do all set up for moving immersed boundaries
-        moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
-                moving_immersed_boundary_flag = .true.
             end if
             call s_update_ib_rotation_matrix(i)
         end do
@@ -122,6 +120,8 @@ contains
         call s_compute_interpolation_coeffs(ghost_points)
 
         call nvtxEndRange
+
+        ! print *, proc_rank, num_local_ibs, num_ibs, num_gbl_ibs
 
     end subroutine s_ibm_setup
 
