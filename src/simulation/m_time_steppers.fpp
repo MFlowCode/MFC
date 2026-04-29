@@ -563,7 +563,6 @@ contains
             end if
         end do
 
-        !
         if (ib) then
             if (moving_immersed_boundary_flag) then
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc

@@ -1218,6 +1218,7 @@ contains
 
         patch_ib_gbl(:) = patch_ib(:)
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
+        call s_compute_ib_neighbor_ranks()  ! build lookup of all 26 neighbor MPI ranks
 
         deallocate (patch_ib)
         if (num_dims == 3) then
@@ -1271,6 +1272,92 @@ contains
 #endif
 
     end subroutine s_reduce_ib_patch_array
+
+    !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all 26 neighbor domains. Uses two rounds of MPI_SENDRECV cascades -
+    !! face neighbors are known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2.
+    subroutine s_compute_ib_neighbor_ranks()
+
+#ifdef MFC_MPI
+        integer               :: ierr
+        integer, dimension(4) :: buf4
+        integer, dimension(2) :: buf2, rbuf2
+
+        ib_neighbor_ranks = MPI_PROC_NULL
+        ib_neighbor_ranks(0, 0, 0) = proc_rank
+
+        ! Face neighbors - already known from domain decomposition
+        ib_neighbor_ranks(-1, 0, 0) = bc_x%beg
+        ib_neighbor_ranks(+1, 0, 0) = bc_x%end
+        if (num_dims >= 2) then
+            ib_neighbor_ranks(0, -1, 0) = bc_y%beg
+            ib_neighbor_ranks(0, +1, 0) = bc_y%end
+        end if
+        if (num_dims == 3) then
+            ib_neighbor_ranks(0, 0, -1) = bc_z%beg
+            ib_neighbor_ranks(0, 0, +1) = bc_z%end
+        end if
+
+        if (num_dims >= 2) then
+            ! Round 1a: exchange y/z face ranks with +/-x face neighbors -> xy and xz edge ranks
+            buf4 = [bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]
+
+            ! Send to -x, receive from +x -> edges (+1,+/-1,0) and (+1,0,+/-1)
+            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 310, buf4, 4, MPI_INTEGER, &
+                              & merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 310, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_x%end >= 0) then
+                ib_neighbor_ranks(+1, -1, 0) = buf4(1)
+                ib_neighbor_ranks(+1, +1, 0) = buf4(2)
+                ib_neighbor_ranks(+1, 0, -1) = buf4(3)
+                ib_neighbor_ranks(+1, 0, +1) = buf4(4)
+            end if
+
+            ! Restore buf4, then send to +x, receive from -x -> edges (-1,+/-1,0) and (-1,0,+/-1)
+            buf4 = [bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]
+            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 311, buf4, 4, MPI_INTEGER, &
+                              & merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 311, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_x%beg >= 0) then
+                ib_neighbor_ranks(-1, -1, 0) = buf4(1)
+                ib_neighbor_ranks(-1, +1, 0) = buf4(2)
+                ib_neighbor_ranks(-1, 0, -1) = buf4(3)
+                ib_neighbor_ranks(-1, 0, +1) = buf4(4)
+            end if
+        end if
+
+        if (num_dims == 3) then
+            ! Round 1b: exchange z face ranks with +/-y face neighbors -> yz edge ranks
+            buf2 = [bc_z%beg, bc_z%end]
+
+            call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(bc_y%beg, MPI_PROC_NULL, bc_y%beg >= 0), 312, rbuf2, 2, MPI_INTEGER, &
+                              & merge(bc_y%end, MPI_PROC_NULL, bc_y%end >= 0), 312, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_y%end >= 0) then
+                ib_neighbor_ranks(0, +1, -1) = rbuf2(1)
+                ib_neighbor_ranks(0, +1, +1) = rbuf2(2)
+            end if
+
+            call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(bc_y%end, MPI_PROC_NULL, bc_y%end >= 0), 313, rbuf2, 2, MPI_INTEGER, &
+                              & merge(bc_y%beg, MPI_PROC_NULL, bc_y%beg >= 0), 313, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_y%beg >= 0) then
+                ib_neighbor_ranks(0, -1, -1) = rbuf2(1)
+                ib_neighbor_ranks(0, -1, +1) = rbuf2(2)
+            end if
+
+            ! Round 2: exchange z face ranks with xy-diagonal edge neighbors -> corner ranks Each of the 4 xy diagonals gives 2
+            ! corners (the +/-z variants). Pattern: send buf2 to mirror diagonal, receive from this diagonal -> that edge's z face
+            ! ranks.
+            #:for DX, DY, MDX, MDY, TAG in [(1,1,-1,-1,320), (1,-1,-1,1,321), (-1,1,1,-1,322), (-1,-1,1,1,323)]
+                call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(ib_neighbor_ranks(${MDX}$, ${MDY}$, 0), MPI_PROC_NULL, &
+                                  & ib_neighbor_ranks(${MDX}$, ${MDY}$, 0) >= 0), ${TAG}$, rbuf2, 2, MPI_INTEGER, &
+                                  & merge(ib_neighbor_ranks(${DX}$, ${DY}$, 0), MPI_PROC_NULL, ib_neighbor_ranks(${DX}$, ${DY}$, &
+                                  & 0) >= 0), ${TAG}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                if (ib_neighbor_ranks(${DX}$, ${DY}$, 0) >= 0) then
+                    ib_neighbor_ranks(${DX}$, ${DY}$, -1) = rbuf2(1)
+                    ib_neighbor_ranks(${DX}$, ${DY}$, +1) = rbuf2(2)
+                end if
+            #:endfor
+        end if
+#endif
+
+    end subroutine s_compute_ib_neighbor_ranks
 
     subroutine get_neighbor_bounds()
 

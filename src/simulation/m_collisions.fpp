@@ -19,7 +19,8 @@ module m_collisions
 
     implicit none
 
-    private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module
+    private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
+        & f_local_rank_owns_collision
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
@@ -405,35 +406,35 @@ contains
         logical                            :: owns_collision
         real(wp), dimension(3)             :: projected_location
 
-        #:if defined('MFC_MPI')
-            if (num_procs == 1) then
-                owns_collision = .true.
-            else
-                projected_location(:) = collision_location(:)
+#ifdef MFC_MPI
+        if (num_procs == 1) then
+            owns_collision = .true.
+        else
+            projected_location(:) = collision_location(:)
 
-                ! catch the edge case where th collision lies just outside the computational domain
-                #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-                    if (num_dims >= ${ID}$) then
-                        if (ib_bc_${X}$%beg /= BC_PERIODIC) then
-                            ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
-                            if (collision_location(${ID}$) < ${X}$_domain%beg) then
-                                projected_location(${ID}$) = ${X}$_domain%beg
-                            else if (${X}$_domain%end < collision_location(${ID}$)) then
-                                projected_location(${ID}$) = ${X}$_domain%end - 1.0e-10_wp
-                            end if
+            ! catch the edge case where th collision lies just outside the computational domain
+            #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+                if (num_dims >= ${ID}$) then
+                    if (ib_bc_${X}$%beg /= BC_PERIODIC) then
+                        ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
+                        if (collision_location(${ID}$) < ${X}$_domain%beg) then
+                            projected_location(${ID}$) = ${X}$_domain%beg
+                        else if (${X}$_domain%end < collision_location(${ID}$)) then
+                            projected_location(${ID}$) = ${X}$_domain%end - 1.0e-10_wp
                         end if
                     end if
-                #:endfor
+                end if
+            #:endfor
 
-                ! the object that contains the collision location owns the collisions
-                owns_collision = x_cb(-1) <= projected_location(1) .and. projected_location(1) < x_cb(m)
-                owns_collision = owns_collision .and. y_cb(-1) <= projected_location(2) .and. projected_location(2) < y_cb(n)
-                if (num_dims == 3) owns_collision = owns_collision .and. z_cb(-1) <= projected_location(3) &
-                    & .and. projected_location(3) < z_cb(p)
-            end if
-        #:else
-            owns_collision = .true.
-        #:endif
+            ! the object that contains the collision location owns the collisions
+            owns_collision = x_cb(-1) <= projected_location(1) .and. projected_location(1) < x_cb(m)
+            owns_collision = owns_collision .and. y_cb(-1) <= projected_location(2) .and. projected_location(2) < y_cb(n)
+            if (num_dims == 3) owns_collision = owns_collision .and. z_cb(-1) <= projected_location(3) .and. projected_location(3) &
+                & < z_cb(p)
+        end if
+#else
+        owns_collision = .true.
+#endif
 
     end function f_local_rank_owns_collision
 

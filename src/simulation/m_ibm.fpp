@@ -1470,149 +1470,146 @@ contains
         integer                               :: pack_pos, unpack_pos, buf_size, patch_bytes
         integer                               :: send_neighbor, recv_neighbor, ierr
         integer                               :: dx, dy, dz, tag, nbr_idx, nreqs
-        integer, dimension(3)                 :: nbr_coords
         real(wp)                              :: position
         real(wp), dimension(3)                :: centroid
         logical                               :: is_new, already_known
         type(ib_patch_parameters)             :: tmp_patch
         integer, dimension(num_local_ibs_max) :: local_ib_idx_old
-        ! 26 neighbors max in 3D; each gets its own recv buffer and a request handle for send + recv
+        ! 26 neighbors max in 3D (8 in 2D); each gets its own recv buffer
         integer, parameter             :: max_nbrs = 26
         character(len=1), allocatable  :: send_buf(:), recv_bufs(:,:)
         integer, dimension(2*max_nbrs) :: requests
         integer, dimension(max_nbrs)   :: recv_neighbor_list
 
-        #:if defined('MFC_MPI')
-            if (num_procs > 1) then
-                ! save a copy of the local IB's global indices to cross-reference for later.
-                old_num_local_ibs = num_local_ibs
-                do i = 1, num_local_ibs
-                    local_ib_idx_old(i) = patch_ib(local_ib_patch_ids(i))%gbl_patch_id
-                end do
+#ifdef MFC_MPI
+        if (num_procs > 1) then
+            ! save a copy of the local IB's global indices to cross-reference for later.
+            local_ib_idx_old = 0
+            old_num_local_ibs = num_local_ibs
+            do i = 1, num_local_ibs
+                local_ib_idx_old(i) = patch_ib(local_ib_patch_ids(i))%gbl_patch_id
+            end do
 
-                ! delete any particles that no longer need to be tracked and coalesce the array
-                output_idx = 0
-                local_output_idx = 0
-                do i = 1, num_ibs
-                    #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-                        if (patch_ib(i)%${X}$_centroid < neighbor_domain_${X}$%beg .or. neighbor_domain_${X}$%end < patch_ib(i) &
-                            & %${X}$_centroid) then
-                            cycle
-                        end if
-                    #:endfor
+            ! delete any particles that no longer need to be tracked and coalesce the array
+            output_idx = 0
+            local_output_idx = 0
+            do i = 1, num_ibs
+                ! delete if not in neighborhood
+                #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+                    if (patch_ib(i)%${X}$_centroid < neighbor_domain_${X}$%beg .or. neighbor_domain_${X}$%end < patch_ib(i) &
+                        & %${X}$_centroid) then
+                        cycle
+                    end if
+                #:endfor
+                output_idx = output_idx + 1
+                if (i /= output_idx) patch_ib(output_idx) = patch_ib(i)
 
-                    output_idx = output_idx + 1
-                    if (i /= output_idx) patch_ib(output_idx) = patch_ib(i)
-                    centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
-                    if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
-                    if (f_local_rank_owns_collision(centroid)) then
-                        local_output_idx = local_output_idx + 1
-                        local_ib_patch_ids(local_output_idx) = output_idx
+                ! check if in local domain
+                centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
+                if (f_local_rank_owns_collision(centroid)) then
+                    local_output_idx = local_output_idx + 1
+                    local_ib_patch_ids(local_output_idx) = output_idx
+                end if
+            end do
+            num_ibs = output_idx
+
+            if (num_local_ibs /= local_output_idx) then
+                print *, proc_rank, " diff num local ", num_local_ibs, local_output_idx
+            end if
+            num_local_ibs = local_output_idx
+
+            ! Broadcast newly-owned patches to all neighborhood neighbors (including corners/edges).
+            patch_bytes = storage_size(tmp_patch)/8
+            buf_size = storage_size(0)/8 + patch_bytes*num_local_ibs_max
+            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs))
+
+            ! Write placeholder count at position 0
+            pack_pos = 0
+            call MPI_PACK(0, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+
+            ! pack new patches and count them
+            new_count = 0
+            do i = 1, num_local_ibs
+                k = local_ib_patch_ids(i)
+                is_new = .true.
+                do j = 1, old_num_local_ibs
+                    if (patch_ib(k)%gbl_patch_id == local_ib_idx_old(j)) then
+                        is_new = .false.
+                        exit
                     end if
                 end do
-                num_ibs = output_idx
-                num_local_ibs = local_output_idx
+                if (is_new) then
+                    print *, proc_rank, " New Owner ", patch_ib(k)%gbl_patch_id
+                    call MPI_PACK(patch_ib(k), patch_bytes, MPI_BYTE, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    new_count = new_count + 1
+                end if
+            end do
 
-                ! Broadcast newly-owned patches to all neighborhood neighbors (including corners/edges).
-                patch_bytes = storage_size(tmp_patch)/8
-                buf_size = storage_size(0)/8 + patch_bytes*num_local_ibs_max
-                allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs))
+            ! Overwrite the placeholder with the real count
+            pack_pos = 0
+            call MPI_PACK(new_count, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+            pack_pos = storage_size(0)/8 + new_count*patch_bytes
 
-                ! Write placeholder count at position 0
-                pack_pos = 0
-                call MPI_PACK(0, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+            ! Post all receives first, then sends, using pre-built ib_neighbor_ranks lookup. Tags: 200 + (dx+1)*9 + (dy+1)*3 +
+            ! (dz+1)
+            nreqs = 0
+            nbr_idx = 0
+            do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)
+                do dy = -1, 1
+                    do dx = -1, 1
+                        if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
+                        nbr_idx = nbr_idx + 1
+                        tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
+                        recv_neighbor = ib_neighbor_ranks(-dx, -dy, -dz)
+                        recv_neighbor_list(nbr_idx) = recv_neighbor
+                        nreqs = nreqs + 1
+                        call MPI_IRECV(recv_bufs(:,nbr_idx), buf_size, MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, &
+                                       & requests(nreqs), ierr)
+                    end do
+                end do
+            end do
 
-                ! Single pass: pack new patches and count them
-                new_count = 0
-                do i = 1, num_local_ibs
-                    k = local_ib_patch_ids(i)
-                    is_new = .true.
-                    do j = 1, old_num_local_ibs
-                        if (patch_ib(k)%gbl_patch_id == local_ib_idx_old(j)) then
-                            is_new = .false.
+            do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)
+                do dy = -1, 1
+                    do dx = -1, 1
+                        if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
+                        tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
+                        send_neighbor = ib_neighbor_ranks(dx, dy, dz)
+                        nreqs = nreqs + 1
+                        call MPI_ISEND(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, MPI_COMM_WORLD, requests(nreqs), ierr)
+                    end do
+                end do
+            end do
+
+            call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
+
+            ! Unpack all received buffers
+            do nbr_idx = 1, merge(26, 8, num_dims == 3)
+                if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
+                unpack_pos = 0
+                call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                do i = 1, recv_count
+                    call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
+                                    & ierr)
+                    already_known = .false.
+                    do j = 1, num_ibs
+                        if (patch_ib(j)%gbl_patch_id == tmp_patch%gbl_patch_id) then
+                            already_known = .true.
                             exit
                         end if
                     end do
-                    if (is_new) then
-                        call MPI_PACK(patch_ib(k), patch_bytes, MPI_BYTE, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                        new_count = new_count + 1
+                    if (.not. already_known) then
+                        num_ibs = num_ibs + 1
+                        @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
+                        patch_ib(num_ibs) = tmp_patch
                     end if
                 end do
+            end do
 
-                ! Overwrite the placeholder with the real count
-                pack_pos = 0
-                call MPI_PACK(new_count, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                pack_pos = storage_size(0)/8 + new_count*patch_bytes
-
-                ! Post all receives first, then all sends, so they are all in flight together. Tags 200..226: tag = 200 + (dx+1)*9 +
-                ! (dy+1)*3 + (dz+1)
-                nreqs = 0
-                nbr_idx = 0
-                do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)
-                    do dy = -1, 1
-                        do dx = -1, 1
-                            if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
-                            nbr_idx = nbr_idx + 1
-                            tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
-
-                            ! Receive from the mirror direction
-                            nbr_coords = proc_coords - [dx, dy, dz]
-                            call MPI_CART_RANK(MPI_COMM_CART, nbr_coords, recv_neighbor, ierr)
-                            if (ierr /= MPI_SUCCESS) recv_neighbor = MPI_PROC_NULL
-                            recv_neighbor_list(nbr_idx) = recv_neighbor
-
-                            nreqs = nreqs + 1
-                            call MPI_IRECV(recv_bufs(:,nbr_idx), buf_size, MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, &
-                                           & requests(nreqs), ierr)
-                        end do
-                    end do
-                end do
-
-                do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)
-                    do dy = -1, 1
-                        do dx = -1, 1
-                            if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
-                            tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
-
-                            nbr_coords = proc_coords + [dx, dy, dz]
-                            call MPI_CART_RANK(MPI_COMM_CART, nbr_coords, send_neighbor, ierr)
-                            if (ierr /= MPI_SUCCESS) send_neighbor = MPI_PROC_NULL
-
-                            nreqs = nreqs + 1
-                            call MPI_ISEND(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, MPI_COMM_WORLD, requests(nreqs), &
-                                           & ierr)
-                        end do
-                    end do
-                end do
-
-                call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
-
-                ! Unpack all received buffers
-                do nbr_idx = 1, merge(26, 8, num_dims == 3)
-                    if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
-                    unpack_pos = 0
-                    call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                    do i = 1, recv_count
-                        call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, &
-                                        & MPI_COMM_WORLD, ierr)
-                        already_known = .false.
-                        do j = 1, num_ibs
-                            if (patch_ib(j)%gbl_patch_id == tmp_patch%gbl_patch_id) then
-                                already_known = .true.
-                                exit
-                            end if
-                        end do
-                        if (.not. already_known) then
-                            num_ibs = num_ibs + 1
-                            @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
-                            patch_ib(num_ibs) = tmp_patch
-                        end if
-                    end do
-                end do
-
-                deallocate (send_buf, recv_bufs)
-            end if
-        #:endif
+            deallocate (send_buf, recv_bufs)
+        end if
+#endif
 
     end subroutine s_handoff_ib_ownership
 

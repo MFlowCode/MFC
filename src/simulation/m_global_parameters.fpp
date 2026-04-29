@@ -348,6 +348,7 @@ module m_global_parameters
     logical                                              :: ib_state_wrt
     type(ib_patch_parameters), allocatable, dimension(:) :: patch_ib  !< Immersed boundary patch parameters
     integer, dimension(num_local_ibs_max)                :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
+    integer, dimension(-1:1,-1:1,-1:1)                   :: ib_neighbor_ranks  !< MPI ranks of all 26 neighbor domains
     type(vec3_dt), allocatable, dimension(:)             :: airfoil_grid_u, airfoil_grid_l
     integer                                              :: Np
 
