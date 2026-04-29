@@ -1444,18 +1444,18 @@ contains
     !> Write a single IB point-variable to the Silo database slave and master files.
     subroutine s_write_ib_variable(varname, t_step, data, nBodies)
 
-        character(len=*), intent(in)  :: varname
-        integer, intent(in)           :: t_step
+        character(len=*), intent(in)       :: varname
+        integer, intent(in)                :: t_step
         real(wp), dimension(:), intent(in) :: data
-        integer, intent(in)           :: nBodies
-        character(len=4*name_len)     :: var_name_entry
-        integer                       :: var_type_entry, ierr
+        integer, intent(in)                :: nBodies
+        character(len=4*name_len)          :: var_name_entry
+        integer                            :: var_type_entry, ierr
 
         write (var_name_entry, '(A,I0,A)') '../p0/', t_step, '.silo:' // trim(varname)
         var_type_entry = DB_POINTVAR
         err = DBSET2DSTRLEN(len(var_name_entry))
-        err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), 1, var_name_entry, len_trim(var_name_entry), &
-                        & var_type_entry, DB_F77NULL, ierr)
+        err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), 1, var_name_entry, len_trim(var_name_entry), var_type_entry, &
+                        & DB_F77NULL, ierr)
 
         err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
 
