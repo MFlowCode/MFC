@@ -1562,6 +1562,8 @@ contains
                         nbr_idx = nbr_idx + 1
                         tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
                         recv_neighbor = ib_neighbor_ranks(-dx, -dy, -dz)
+                        recv_neighbor_list(nbr_idx) = MPI_PROC_NULL
+                        if (recv_neighbor < 0) cycle
                         recv_neighbor_list(nbr_idx) = recv_neighbor
                         nreqs = nreqs + 1
                         call MPI_IRECV(recv_bufs(:,nbr_idx), buf_size, MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, &
@@ -1576,6 +1578,7 @@ contains
                         if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
                         tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
                         send_neighbor = ib_neighbor_ranks(dx, dy, dz)
+                        if (send_neighbor < 0) cycle
                         nreqs = nreqs + 1
                         call MPI_ISEND(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, MPI_COMM_WORLD, requests(nreqs), ierr)
                     end do
