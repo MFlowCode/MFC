@@ -1507,7 +1507,7 @@ contains
                 ! check if in local domain
                 centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
-                if (f_local_rank_owns_collision(centroid)) then
+                if (f_local_rank_owns_location(centroid)) then
                     local_output_idx = local_output_idx + 1
                     local_ib_patch_ids(local_output_idx) = output_idx
                 end if

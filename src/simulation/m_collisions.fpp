@@ -20,7 +20,7 @@ module m_collisions
     implicit none
 
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_local_rank_owns_collision
+        & f_local_rank_owns_location, f_neighborhood_ranks_own_location
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
@@ -114,7 +114,7 @@ contains
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(normal_vector)
             if (overlap_distance > 0._wp) then  ! if the two patches are close enough to collide
                 normal_vector = normal_vector/norm2(normal_vector)
-                if (f_local_rank_owns_collision(centroid_1)) then
+                if (f_local_rank_owns_location(centroid_1)) then
                     ! compute constants of the collision
                     effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))
                     k = spring_stiffness*effective_mass
@@ -193,7 +193,7 @@ contains
                 ! ensure the local rank owns that collision before proceeding
                 collision_location = [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, 0._wp]
                 if (num_dims == 3) collision_location(3) = patch_ib(patch_id)%z_centroid
-                if (f_local_rank_owns_collision(collision_location)) then
+                if (f_local_rank_owns_location(collision_location)) then
                     k = spring_stiffness*patch_ib(patch_id)%mass
                     eta = damping_parameter*patch_ib(patch_id)%mass
 
@@ -398,45 +398,78 @@ contains
     end subroutine s_detect_wall_collisions
 
     !> @brief function checks if this local MPI processor owns this specific collision
-    function f_local_rank_owns_collision(collision_location) result(owns_collision)
+    function f_local_rank_owns_location(location) result(owns_collision)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(3), intent(in) :: collision_location
+        real(wp), dimension(3), intent(in) :: location
         logical                            :: owns_collision
         real(wp), dimension(3)             :: projected_location
 
+        owns_collision = .true.
+
 #ifdef MFC_MPI
-        if (num_procs == 1) then
-            owns_collision = .true.
-        else
-            projected_location(:) = collision_location(:)
+        if (num_procs > 1) then
+            projected_location(:) = location(:)
 
             ! catch the edge case where th collision lies just outside the computational domain
-            #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
                 if (num_dims >= ${ID}$) then
                     if (ib_bc_${X}$%beg /= BC_PERIODIC) then
                         ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
-                        if (collision_location(${ID}$) < ${X}$_domain%beg) then
+                        if (location(${ID}$) < ${X}$_domain%beg) then
                             projected_location(${ID}$) = ${X}$_domain%beg
-                        else if (${X}$_domain%end < collision_location(${ID}$)) then
+                        else if (${X}$_domain%end < location(${ID}$)) then
                             projected_location(${ID}$) = ${X}$_domain%end - 1.0e-10_wp
                         end if
                     end if
+                    owns_collision = owns_collision .and. ${X}$_cb(-1) <= projected_location(${ID}$) &
+                        & .and. projected_location(${ID}$) < ${X}$_cb(${DIM}$)
                 end if
             #:endfor
-
-            ! the object that contains the collision location owns the collisions
-            owns_collision = x_cb(-1) <= projected_location(1) .and. projected_location(1) < x_cb(m)
-            owns_collision = owns_collision .and. y_cb(-1) <= projected_location(2) .and. projected_location(2) < y_cb(n)
-            if (num_dims == 3) owns_collision = owns_collision .and. z_cb(-1) <= projected_location(3) .and. projected_location(3) &
-                & < z_cb(p)
         end if
-#else
-        owns_collision = .true.
 #endif
 
-    end function f_local_rank_owns_collision
+    end function f_local_rank_owns_location
+
+    !> @brief function checks if this local MPI processor owns this specific collision
+    function f_neighborhood_ranks_own_location(location) result(owns_collision)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: location
+        logical                            :: owns_collision, periodic_owner
+        real(wp)                           :: temp_neighbor_domain
+        integer                            :: i
+
+        owns_collision = .true.
+
+#ifdef MFC_MPI
+        if (num_procs > 2) then
+            ! catch the edge case where th collision lies just outside the computational domain
+            owns_collision = .true.
+            #:for X, ID in [('x', 1), ('y', 2,), ('z', 3,)]
+                if (num_dims >= ${ID}$) then
+                    if (ib_bc_${X}$%beg == BC_PERIODIC .and. neighbor_domain_${X}$%beg > neighbor_domain_${X}$%end) then
+                        ! project right side to the left
+                        temp_neighbor_domain = neighbor_domain_${X}$%end + (${X}$_domain%end - ${X}$_domain%beg)
+                        periodic_owner = neighbor_domain_${X}$%beg <= location(${ID}$) .and. location(${ID}$) < temp_neighbor_domain
+                        ! project the left side to the right
+                        temp_neighbor_domain = neighbor_domain_${X}$%beg - (${X}$_domain%end - ${X}$_domain%beg)
+                        periodic_owner = periodic_owner .or. temp_neighbor_domain <= location(${ID}$) .and. location(${ID}$) &
+                            & < neighbor_domain_${X}$%end
+
+                        owns_collision = owns_collision .and. periodic_owner
+                    else
+                        owns_collision = owns_collision .and. neighbor_domain_${X}$%beg <= location(${ID}$) .and. location(${ID}$) &
+                            & < neighbor_domain_${X}$%end
+                    end if
+                end if
+            #:endfor
+        end if
+#endif
+
+    end function f_neighborhood_ranks_own_location
 
     subroutine s_finalize_collisions_module()
 
