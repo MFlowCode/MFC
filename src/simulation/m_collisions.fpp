@@ -456,8 +456,8 @@ contains
                         periodic_owner = neighbor_domain_${X}$%beg <= location(${ID}$) .and. location(${ID}$) < temp_neighbor_domain
                         ! project the left side to the right
                         temp_neighbor_domain = neighbor_domain_${X}$%beg - (${X}$_domain%end - ${X}$_domain%beg)
-                        periodic_owner = periodic_owner .or. temp_neighbor_domain <= location(${ID}$) .and. location(${ID}$) &
-                            & < neighbor_domain_${X}$%end
+                        periodic_owner = periodic_owner .or. (temp_neighbor_domain <= location(${ID}$) .and. location(${ID}$) &
+                                                              & < neighbor_domain_${X}$%end)
 
                         owns_collision = owns_collision .and. periodic_owner
                     else
