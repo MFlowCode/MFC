@@ -305,7 +305,7 @@ class Case:
 ! parameterize the velocity and rotation rate of a moving IB.
 
 #:def mib_analytical()
-gbl_id == patch_ib(i)$gbl_patch_id) then
+gbl_id = patch_ib(i)$gbl_patch_id
 {f"{chr(10)}{chr(10)}".join(srcs)}
 #:enddef
 """
