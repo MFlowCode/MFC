@@ -1360,108 +1360,6 @@ contains
 
     end subroutine s_communicate_ib_forces
 
-    !> Alternative force reduction using two non-blocking all-to-neighbor broadcasts. Phase 1: every rank sends its full force array
-    !! to all 26 neighborhood neighbors simultaneously. After MPI_WAITALL, each rank sums contributions from neighbors for its owned
-    !! particles. Phase 2: each rank sends its finalized owned-particle forces (by gbl_patch_id) back to all neighbors
-    !! simultaneously. After MPI_WAITALL, each rank overwrites ghost-particle forces with the authoritative values from the owning
-    !! rank. Not currently called - available for benchmarking against s_communicate_ib_forces.
-    !     subroutine s_communicate_ib_forces_scatter(forces, torques)
-
-    !         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
-
-    ! #ifdef MFC_MPI integer, parameter :: max_nbrs = 26 integer :: i, j, k, nbr_idx, nreqs, pack_pos, unpack_pos integer ::
-    ! buf_size, entry_bytes, ierr, recv_count, pid integer :: send_neighbor, recv_neighbor, dx, dy, dz, tag integer, dimension(3) ::
-    ! nbr_coords logical :: is_owned real(wp), dimension(3) :: fval, tval real(wp), dimension(num_ibs, 3) :: forces_total,
-    ! torques_total integer, dimension(max_nbrs) :: recv_neighbor_list integer, dimension(2*max_nbrs) :: requests character(len=1),
-    ! allocatable :: send_buf(:), recv_bufs(:,:) character(len=1), allocatable :: owned_send_buf(:), owned_recv_bufs(:,:) integer ::
-    ! owned_buf_size
-
-    !         if (num_procs == 1) return
-
-    ! ! Buffer sized to hold count + (gbl_patch_id, forces, torques) per particle entry_bytes = storage_size(0)/8 +
-    ! 6*storage_size(0._wp)/8 buf_size = storage_size(0)/8 + entry_bytes*num_ibs owned_buf_size = storage_size(0)/8 +
-    ! entry_bytes*num_local_ibs_max allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs), owned_send_buf(owned_buf_size), & &
-    ! owned_recv_bufs(owned_buf_size, max_nbrs))
-
-    ! ! Phase 1: pack full local force array and broadcast to all neighborhood neighbors. pack_pos = 0 call MPI_PACK(num_ibs, 1,
-    ! MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr) do i = 1, num_ibs call MPI_PACK(patch_ib(i)%gbl_patch_id, 1,
-    ! MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr) fval(:) = forces(i,:); tval(:) = torques(i,:) call
-    ! MPI_PACK(fval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr) call MPI_PACK(tval, 3, mpi_p, send_buf, buf_size,
-    ! pack_pos, MPI_COMM_WORLD, ierr) end do
-
-    ! nreqs = 0 nbr_idx = 0 do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3) do dy = -1, 1 do dx = -1, 1 if (dx == 0
-    ! .and. dy == 0 .and. dz == 0) cycle nbr_idx = nbr_idx + 1 tag = 400 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
-
-    ! nbr_coords = proc_coords - [dx, dy, dz] call MPI_CART_RANK(MPI_COMM_CART, nbr_coords, recv_neighbor, ierr) if (ierr /=
-    ! MPI_SUCCESS) recv_neighbor = MPI_PROC_NULL recv_neighbor_list(nbr_idx) = recv_neighbor
-
-    ! nreqs = nreqs + 1 call MPI_IRECV(recv_bufs(:,nbr_idx), buf_size, MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, & &
-    ! requests(nreqs), ierr) end do end do end do
-
-    ! do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3) do dy = -1, 1 do dx = -1, 1 if (dx == 0 .and. dy == 0 .and. dz
-    ! == 0) cycle tag = 400 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
-
-    ! nbr_coords = proc_coords + [dx, dy, dz] call MPI_CART_RANK(MPI_COMM_CART, nbr_coords, send_neighbor, ierr) if (ierr /=
-    ! MPI_SUCCESS) send_neighbor = MPI_PROC_NULL
-
-    ! nreqs = nreqs + 1 call MPI_ISEND(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, MPI_COMM_WORLD, requests(nreqs), ierr)
-    ! end do end do end do
-
-    !         call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
-
-    ! ! Local reduction: for each owned particle, sum contributions from all neighbors. forces_total = forces torques_total =
-    ! torques do nbr_idx = 1, merge(26, 8, num_dims == 3) if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle unpack_pos = 0
-    ! call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr) do i = 1,
-    ! recv_count call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr) call
-    ! MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr) call
-    ! MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr) ! Only accumulate for particles
-    ! this rank owns do k = 1, num_local_ibs j = local_ib_patch_ids(k) if (patch_ib(j)%gbl_patch_id == pid) then forces_total(j,:) =
-    ! forces_total(j,:) + fval(:) torques_total(j,:) = torques_total(j,:) + tval(:) exit end if end do end do end do
-
-    ! ! Write totals back for owned particles only do k = 1, num_local_ibs j = local_ib_patch_ids(k) forces(j,:) = forces_total(j,:)
-    ! torques(j,:) = torques_total(j,:) end do
-
-    ! ! Phase 2: pack finalized owned-particle forces and back-broadcast to all neighbors. pack_pos = 0 call MPI_PACK(num_local_ibs,
-    ! 1, MPI_INTEGER, owned_send_buf, owned_buf_size, pack_pos, MPI_COMM_WORLD, ierr) do k = 1, num_local_ibs j =
-    ! local_ib_patch_ids(k) call MPI_PACK(patch_ib(j)%gbl_patch_id, 1, MPI_INTEGER, owned_send_buf, owned_buf_size, pack_pos,
-    ! MPI_COMM_WORLD, ierr) fval(:) = forces(j,:); tval(:) = torques(j,:) call MPI_PACK(fval, 3, mpi_p, owned_send_buf,
-    ! owned_buf_size, pack_pos, MPI_COMM_WORLD, ierr) call MPI_PACK(tval, 3, mpi_p, owned_send_buf, owned_buf_size, pack_pos,
-    ! MPI_COMM_WORLD, ierr) end do
-
-    ! nreqs = 0 nbr_idx = 0 do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3) do dy = -1, 1 do dx = -1, 1 if (dx == 0
-    ! .and. dy == 0 .and. dz == 0) cycle nbr_idx = nbr_idx + 1 tag = 427 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
-
-    ! nbr_coords = proc_coords - [dx, dy, dz] call MPI_CART_RANK(MPI_COMM_CART, nbr_coords, recv_neighbor, ierr) if (ierr /=
-    ! MPI_SUCCESS) recv_neighbor = MPI_PROC_NULL recv_neighbor_list(nbr_idx) = recv_neighbor
-
-    ! nreqs = nreqs + 1 call MPI_IRECV(owned_recv_bufs(:,nbr_idx), owned_buf_size, MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, &
-    ! & requests(nreqs), ierr) end do end do end do
-
-    ! do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3) do dy = -1, 1 do dx = -1, 1 if (dx == 0 .and. dy == 0 .and. dz
-    ! == 0) cycle tag = 427 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
-
-    ! nbr_coords = proc_coords + [dx, dy, dz] call MPI_CART_RANK(MPI_COMM_CART, nbr_coords, send_neighbor, ierr) if (ierr /=
-    ! MPI_SUCCESS) send_neighbor = MPI_PROC_NULL
-
-    ! nreqs = nreqs + 1 call MPI_ISEND(owned_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, MPI_COMM_WORLD, requests(nreqs),
-    ! ierr) end do end do end do
-
-    !         call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
-
-    ! ! Overwrite ghost-particle forces with authoritative values from the owning rank. do nbr_idx = 1, merge(26, 8, num_dims == 3)
-    ! if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle unpack_pos = 0 call MPI_UNPACK(owned_recv_bufs(:,nbr_idx),
-    ! owned_buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, & & ierr) do i = 1, recv_count call
-    ! MPI_UNPACK(owned_recv_bufs(:,nbr_idx), owned_buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr) call
-    ! MPI_UNPACK(owned_recv_bufs(:,nbr_idx), owned_buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr) call
-    ! MPI_UNPACK(owned_recv_bufs(:,nbr_idx), owned_buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr) ! Only overwrite
-    ! ghost particles (not owned ones - this rank's total is authoritative) do j = 1, num_ibs if (patch_ib(j)%gbl_patch_id == pid)
-    ! then is_owned = .false. do k = 1, num_local_ibs if (local_ib_patch_ids(k) == j) then is_owned = .true. exit end if end do if
-    ! (.not. is_owned) then forces(j,:) = fval(:) torques(j,:) = tval(:) end if exit end if end do end do end do
-
-    ! deallocate (send_buf, recv_bufs, owned_send_buf, owned_recv_bufs) #endif
-
-    !     end subroutine s_communicate_ib_forces_scatter
-
     subroutine s_handoff_ib_ownership()
 
         integer                               :: i, j, k, output_idx, local_output_idx
@@ -1494,28 +1392,25 @@ contains
             output_idx = 0
             local_output_idx = 0
             do i = 1, num_ibs
-                ! delete if not in neighborhood
-                #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-                    if (patch_ib(i)%${X}$_centroid < neighbor_domain_${X}$%beg .or. neighbor_domain_${X}$%end < patch_ib(i) &
-                        & %${X}$_centroid) then
-                        cycle
-                    end if
-                #:endfor
-                output_idx = output_idx + 1
-                if (i /= output_idx) patch_ib(output_idx) = patch_ib(i)
-
-                ! check if in local domain
                 centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
-                if (f_local_rank_owns_location(centroid)) then
-                    local_output_idx = local_output_idx + 1
-                    local_ib_patch_ids(local_output_idx) = output_idx
+
+                ! delete if not in neighborhood
+                if (f_neighborhood_ranks_own_location(centroid)) then
+                    output_idx = output_idx + 1
+                    if (i /= output_idx) patch_ib(output_idx) = patch_ib(i)
+
+                    ! check if in local domain
+                    if (f_local_rank_owns_location(centroid)) then
+                        local_output_idx = local_output_idx + 1
+                        local_ib_patch_ids(local_output_idx) = output_idx
+                    end if
                 end if
             end do
             num_ibs = output_idx
             num_local_ibs = local_output_idx
 
-            ! Broadcast newly-owned patches to all neighborhood neighbors (including corners/edges).
+            ! Broadcast newly-owned patches to all neighborhood neighbors
             patch_bytes = storage_size(tmp_patch)/8
             buf_size = storage_size(0)/8 + patch_bytes*num_local_ibs_max
             allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs))
@@ -1536,7 +1431,7 @@ contains
                     end if
                 end do
                 if (is_new) then
-                    print *, proc_rank, " New Owner ", patch_ib(k)%gbl_patch_id
+                    print *, proc_rank, " New Owner ", patch_ib(k)%gbl_patch_id  ! TODO :: REMOVE THIS DEBUG PRINT
                     call MPI_PACK(patch_ib(k), patch_bytes, MPI_BYTE, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     new_count = new_count + 1
                 end if
@@ -1547,8 +1442,7 @@ contains
             call MPI_PACK(new_count, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
             pack_pos = storage_size(0)/8 + new_count*patch_bytes
 
-            ! Post all receives first, then sends, using pre-built ib_neighbor_ranks lookup. Tags: 200 + (dx+1)*9 + (dy+1)*3 +
-            ! (dz+1)
+            ! Post all receives first, then sends
             nreqs = 0
             nbr_idx = 0
             do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)

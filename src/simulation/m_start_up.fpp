@@ -1205,7 +1205,7 @@ contains
     subroutine s_reduce_ib_patch_array()
 
         type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib_gbl
-        real(wp)                                                 :: position
+        real(wp), dimension(3)                                   :: centroid
         integer                                                  :: i, j
         integer                                                  :: num_aware_ibs
         logical                                                  :: is_in_neighborhood, is_local
@@ -1247,23 +1247,14 @@ contains
                 is_in_neighborhood = .true.
                 is_local = .true.
 
-                #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
-                    if (num_dims >= ${ID}$) then
-                        position = patch_ib_gbl(i)%${X}$_centroid
-                        if (neighbor_domain_${X}$%beg > position .or. position > neighbor_domain_${X}$%end) then
-                            is_in_neighborhood = .false.
-                            is_local = .false.
-                        else if (${X}$_cb(-1) > position .or. position > ${X}$_cb(${DIM}$)) then
-                            is_local = .false.
-                        end if
-                    end if
-                #:endfor
+                centroid = [patch_ib_gbl(i)%x_centroid, patch_ib_gbl(i)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = patch_ib_gbl(i)%z_centroid
 
-                if (is_in_neighborhood) then
+                if (f_neighborhood_ranks_own_location(centroid)) then
                     num_ibs = num_ibs + 1
                     patch_ib(num_ibs) = patch_ib_gbl(i)
                     patch_ib(num_ibs)%gbl_patch_id = i
-                    if (is_local) then
+                    if (f_local_rank_owns_location(centroid)) then
                         num_local_ibs = num_local_ibs + 1
                         local_ib_patch_ids(num_local_ibs) = num_ibs
                     end if
