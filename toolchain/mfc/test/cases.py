@@ -1326,6 +1326,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "lag_params%write_bubbles": "T",
                             "lag_params%write_bubbles_stats": "T",
                             "lag_params%write_void_evol": "T",
+                            "lag_params%valmaxvoid": 0.99,
+                            "lag_params%nBubs_glb": 1,
                             "polytropic": "F",
                             "bub_pp%R0ref": 1.0,
                             "bub_pp%p0ref": 1.0,
@@ -1349,7 +1351,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
                     if len(dimInfo[0]) == 2:
-                        stack.push("", {"acoustic(1)%support": 2})
+                        stack.push("", {"acoustic(1)%support": 2, "lag_params%charwidth": 2, "lag_params%charNz": 25})
                     else:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
@@ -1364,6 +1366,49 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("adap_dt=T", {"adap_dt": "T"})
 
                     cases.append(define_case_d(stack, "", {}))
+
+                    if len(dimInfo[0]) == 3 and couplingMethod == 2:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push("Inertial Bubbles",
+                                   {
+                                       "lag_params%vel_model": 2,
+                                       "viscous": "T",
+                                       "fluid_pp(1)%Re(1)": 100.0,
+                                       "fluid_pp(2)%Re(1)": 100.0
+                                       },
+                                   )
+                        if adap_dt == "F":
+                            inertial_matrix = [(d, f) for d in [0, 1, 2] for f in [1, 2, 4]]
+                        else:
+                            inertial_matrix = [(0, 1), (1, 2), (2, 4)]
+                        for dragModel, fdOrder in inertial_matrix:
+                            stack.push(f"drag_model={dragModel}", {"lag_params%drag_model": dragModel})
+                            stack.push(f"fd_order={fdOrder}", {"fd_order": fdOrder})
+                            cases.append(define_case_d(stack, "", {}))
+                            stack.pop()
+                            stack.pop()
+                        stack.pop()
+
+                    if len(dimInfo[0]) == 2 and couplingMethod == 1:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push("Inertial Bubbles",
+                                   {
+                                       "lag_params%vel_model": 2,
+                                       "lag_params%drag_model": 2,
+                                       "fd_order": 2,
+                                       "viscous": "T",
+                                       "fluid_pp(1)%Re(1)": 100.0,
+                                       "fluid_pp(2)%Re(1)": 100.0
+                                       },
+                                   )
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
 
                     stack.pop()
 

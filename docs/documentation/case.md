@@ -899,23 +899,30 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 #### 9.2 Volume-Averaged Bubble Model
 
-| Parameter             | Type    | Description                                               |
-| ---:                  | :---:   | :---                                                      |
-| `bubbles_lagrange`    | Logical | Lagrangian subgrid bubble model switch                    |
-| `nBubs_glb`           | Integer | Global number of bubbles                                  |
-| `solver_approach`     | Integer | 1: One-way coupling, 2: two-way coupling                  |
-| `cluster_type`        | Integer | Method to find p_inf                                      |
-| `pressure_corrector`  | Logical | Cell pressure correction term                             |
-| `smooth_type`         | Integer | Smoothing function. 1: Gaussian, 2:Delta 3x3              |
-| `heatTransfer_model`  | Logical | Activates the interface heat transfer model               |
-| `massTransfer_model`  | Logical | Activates the interface mass transfer model               |
-| `write_bubbles`       | Logical | Write files to track the bubble evolution each time step  |
-| `write_bubbles_stats` | Logical | Write the maximum and minimum radius of each bubble       |
-| `epsilonb`            | Real    | Standard deviation scaling for the gaussian function      |
-| `charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)    |
-| `valmaxvoid`          | Real    | Maximum void fraction permitted                           |
+| Parameter             | Type    | Description                                                    |
+| ---:                  | :---:   | :---                                                           |
+| `bubbles_lagrange`    | Logical | Lagrangian subgrid bubble model switch                         |
+| `nBubs_glb`           | Integer | Global number of bubbles                                       |
+| `solver_approach`     | Integer | 1: One-way coupling, 2: two-way coupling                       |
+| `cluster_type`        | Integer | Method to find p_inf                                           |
+| `pressure_corrector`  | Logical | Cell pressure correction term                                  |
+| `smooth_type`         | Integer | Smoothing function. 1: Gaussian, 2:Delta 3x3                   |
+| `heatTransfer_model`  | Logical | Activates the interface heat transfer model                    |
+| `massTransfer_model`  | Logical | Activates the interface mass transfer model                    |
+| `write_bubbles`       | Logical | Write files to track the bubble evolution each time step       |
+| `write_bubbles_stats` | Logical | Write the maximum and minimum radius of each bubble            |
+| `write_void_evol`     | Logical | Write stats about the void fraction evolution over time        |
+| `epsilonb`            | Real    | Standard deviation scaling for the gaussian function           |
+| `charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)         |
+| `charNz`              | Integer | Number of cells in the virtual depth direction                 |
+| `valmaxvoid`          | Real    | Maximum void fraction permitted                                |
+| `vel_model`           | Integer | Model for translational motion (default 0, disabled)           |
+| `drag_model`          | Integer | Model for drag force (default 0, disabled)                     |
+| `gravity_force`       | Logical | Enable gravity force (default false)                           |
+| `pressure_force`      | Logical | Enable pressure force (default true)                           |
+| `input_path`          | String  | Path to bubble input file (default: `./input/lag_bubbles.dat`) |
 
-- `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
+- `nBubs_glb` Total number of bubbles.
 
 - `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
 
@@ -926,6 +933,11 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on (\cite Preston07).
 
 - `massTransfer_model` Activates the mass transfer model at the bubble's interface based on (\cite Preston07).
+
+- `vel_model` Activates translational motion of bubbles: [1] enables tracer bubbles and [2] enables Newton's second law.
+    - `drag_model` defines the drag model: [0] No drag (default), [1] Stoke's slip drag, [2] Stoke's no-slip drag, [3] Levich drag
+    - `gravity_force` enables gravitation acceleration of the bubbles.
+    - `pressure_force` enables the acceleration of the bubbles by pressure gradient.
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 

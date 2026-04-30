@@ -1095,12 +1095,18 @@ class CaseValidator:
             return
 
         n = self.get("n", 0)
+        p = self.get("p", 0)
         file_per_process = self.get("file_per_process", "F") == "T"
         model_eqns = self.get("model_eqns")
         cluster_type = self.get("lag_params%cluster_type")
         smooth_type = self.get("lag_params%smooth_type")
         polytropic = self.get("polytropic", "F") == "T"
         thermal = self.get("thermal")
+        vel_model = self.get("lag_params%vel_model", 0)
+        drag_model = self.get("lag_params%drag_model", 0)
+        charNz = self.get("lag_params%charNz", 0)
+        charWidth = self.get("lag_params%charwidth", 0)
+        fd_order = self.get("fd_order", 0)
 
         self.prohibit(n is not None and n == 0, "bubbles_lagrange accepts 2D and 3D simulations only")
         self.prohibit(file_per_process, "file_per_process must be false for bubbles_lagrange")
@@ -1108,6 +1114,11 @@ class CaseValidator:
         self.prohibit(polytropic, "bubbles_lagrange requires polytropic = F")
         self.prohibit(thermal is not None and thermal != 3, "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
+        self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
+        self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, or 2")
+        self.prohibit(charNz <= 0 and p == 0, "lag_params%charNz must be positive for 2D bubbles_lagrange")
+        self.prohibit(charWidth <= 0 and p == 0, "lag_params%charwidth must be positive for 2D bubbles_lagrange")
+        self.prohibit(fd_order == 0 and vel_model > 0, "Non-zero lag_params%vel_model requires fd_order to be set")
 
     def check_continuum_damage(self):
         """Checks continuum damage model parameters (simulation)"""

@@ -21,6 +21,7 @@ mu_host = 1e-3  # Dynamic viscosity - Pa.s
 c_host = 1475.0  # speed of sound - m/s
 rho_host = 1000  # density kg/m3
 T_host = 298  # temperature K
+patm = 101325.0  # Atmospheric pressure - Pa
 
 # Lagrangian bubbles' properties
 R_uni = 8314  # Universal gas constant - J/kmol/K
@@ -37,26 +38,20 @@ diffVapor = 2.5e-5  # Diffusivity coefficient of the vapor - m2/s
 sigBubble = 0.069  # Surface tension of the bubble - N/m
 mu_g = 1.48e-5
 
-# Acoustic source properties
-patm = 101325.0  # Atmospheric pressure - Pa
-pamp = 1.0e5  # Amplitude of the acoustic source - Pa
-freq = 300e03  # Source frequency - Hz
-wlen = c_host / freq  # Wavelength - m
-
 # Body forces
 g0 = 9.81 * x0 / c0 / c0  # Gravitational acceleration - m/s2
-g_back = -30 * g0
+g_back = -5 * g0
 
 # Domain and time set up
 
 xb = -2.5e-3  # Domain boundaries - m (x direction)
 xe = 2.5e-3
-yb = -10e-3  # Domain boundaries - m (y direction)
-ye = 10e-3
+yb = -2.5e-3  # Domain boundaries - m (y direction)
+ye = 2.5e-3
 z_virtual = 5.0e-3  # Virtual depth (z direction)
 
 Nx = 50  # number of elements into x direction
-Ny = 200  # number of elements into y direction
+Ny = 50  # number of elements into y direction
 
 # Configuring case dictionary
 print(
@@ -78,8 +73,8 @@ print(
             "cfl_adap_dt": "T",
             "cfl_target": 0.4,
             "n_start": 0,
-            "t_stop": 1000,
-            "t_save": 10,
+            "t_stop": 2500,
+            "t_save": 25,
             # Simulation Algorithm Parameters
             "model_eqns": 2,
             "time_stepper": 3,
@@ -126,7 +121,7 @@ print(
             "lag_params%vel_model": 2,
             "lag_params%drag_model": 1,
             "lag_params%pressure_force": "T",
-            "lag_params%gravity_force": "T",
+            "lag_params%gravity_force": "F",
             "lag_params%solver_approach": 1,
             "lag_params%cluster_type": 2,
             "lag_params%pressure_corrector": "F",

@@ -175,11 +175,9 @@ data = {
     # Lagrangian Bubbles
     "bubbles_lagrange": "T",
     "fd_order": 4,
-    "bubble_model": 2,
+    "bubble_model": 0,
     "thermal": 3,
     "polytropic": "F",
-    "adap_dt": "T",
-    "adap_dt_max_iters": 500,
     "lag_params%nBubs_glb": 10000,
     "lag_params%vel_model": 2,
     "lag_params%drag_model": 1,

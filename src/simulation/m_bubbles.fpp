@@ -557,16 +557,6 @@ contains
                                 fVel(l) = fVel(l) + h*aTemp(l)
                                 fPos(l) = fPos(l) + h*fVel(l)
                             end do
-                        case (3)
-                            do l = 1, num_dims
-                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_g, fmass_v, fRe, fRho, cell, l, &
-                                                             & q_prim_vf)
-                                aTemp(l) = 2._wp*f_bTemp/(fmass_g + fmass_v) - 3._wp*fV*fVel(l)/fR
-                            end do
-                            do l = 1, num_dims
-                                fVel(l) = fVel(l) + h*aTemp(l)
-                                fPos(l) = fPos(l) + h*fVel(l)
-                            end do
                         end select
                     end if
 
