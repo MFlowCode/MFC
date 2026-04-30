@@ -450,7 +450,7 @@ contains
             owns_collision = .true.
             #:for X, ID in [('x', 1), ('y', 2,), ('z', 3,)]
                 if (num_dims >= ${ID}$) then
-                    if (ib_bc_${X}$%beg == BC_PERIODIC .and. neighbor_domain_${X}$%beg > neighbor_domain_${X}$%end) then
+                    if (ib_bc_${X}$%beg == BC_PERIODIC .and. neighbor_domain_${X}$%beg >= neighbor_domain_${X}$%end) then
                         ! project right side to the left
                         temp_neighbor_domain = neighbor_domain_${X}$%end + (${X}$_domain%end - ${X}$_domain%beg)
                         periodic_owner = neighbor_domain_${X}$%beg <= location(${ID}$) .and. location(${ID}$) < temp_neighbor_domain
