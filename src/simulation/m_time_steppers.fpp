@@ -708,6 +708,7 @@ contains
 
         integer, intent(in) :: s
         integer             :: i
+        integer             :: gbl_id  ! used for analytic ib patch motion
         logical             :: forces_computed
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
