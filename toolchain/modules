@@ -39,6 +39,7 @@ p-all python/3.12.5
 p-cpu gcc/12.3.0 openmpi/4.1.5
 p-gpu python/3.12.5 nvhpc/24.5 hpcx/2.19-cuda cuda/12.1.1
 p-gpu MFC_CUDA_CC=70,75,80,89,90 NVHPC_CUDA_HOME=$CUDA_HOME CC=nvc CXX=nvc++ FC=nvfortran
+p-gpu-unload xalt
 
 f     OLCF Frontier
 f-all cpe/25.03 rocm/6.3.1

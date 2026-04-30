@@ -1372,14 +1372,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
 
-                        stack.push("Inertial Bubbles",
-                                   {
-                                       "lag_params%vel_model": 2,
-                                       "viscous": "T",
-                                       "fluid_pp(1)%Re(1)": 100.0,
-                                       "fluid_pp(2)%Re(1)": 100.0
-                                       },
-                                   )
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
                         if adap_dt == "F":
                             inertial_matrix = [(d, f) for d in [0, 1, 2] for f in [1, 2, 4]]
                         else:
@@ -1397,16 +1393,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
 
-                        stack.push("Inertial Bubbles",
-                                   {
-                                       "lag_params%vel_model": 2,
-                                       "lag_params%drag_model": 2,
-                                       "fd_order": 2,
-                                       "viscous": "T",
-                                       "fluid_pp(1)%Re(1)": 100.0,
-                                       "fluid_pp(2)%Re(1)": 100.0
-                                       },
-                                   )
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "lag_params%drag_model": 2, "fd_order": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
 
