@@ -1228,7 +1228,12 @@ contains
         end if
         allocate (patch_ib(num_aware_ibs))
 
+        ! assign defaults to all values
         num_gbl_ibs = num_ibs
+        num_local_ibs = num_ibs
+        do i = 1, num_ibs
+            local_ib_patch_ids(i) = i
+        end do
 
 #ifdef MFC_MPI
         ! fallback for 1-rank case
