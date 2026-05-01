@@ -63,25 +63,21 @@
                                       & extraAccArgs=extraAccArgs)
     #:set omp_directive = OMP_ROUTINE(function_name=function_name, nohost=nohost, extraOmpArgs=extraOmpArgs)
 
-    #:set cray_noinline_directive = ''
-    #:set cray_directive = ''
-
     #:if cray_noinline == True
         #:if not isinstance(function_name, str)
             #:stop "When using cray_noinline, function name must be given and given as a string"
         #:endif
         #:set cray_noinline_directive = ('!DIR$ NOINLINE ' + function_name).strip('\n')
 #ifdef _CRAYFTN
-        $:cray_noinline_directive
 #if MFC_OpenACC
         $:acc_directive
 #elif MFC_OpenMP
         $:omp_directive
 #else
+        $:cray_noinline_directive
+#endif
         #! On non-Cray CPU builds (no _CRAYFTN, no MFC_OpenACC, no MFC_OpenMP), nothing is
         #! emitted — intentional, since !DIR$ NOINLINE is a Cray-specific directive.
-#endif
-
 #elif MFC_OpenACC
         $:acc_directive
 #elif MFC_OpenMP
@@ -93,12 +89,12 @@
         #:endif
         #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
 #ifdef _CRAYFTN
-        $:cray_directive
 #if MFC_OpenACC
         $:acc_directive
 #elif MFC_OpenMP
         $:omp_directive
 #else
+        $:cray_directive
 #endif
 #elif MFC_OpenACC
         $:acc_directive
