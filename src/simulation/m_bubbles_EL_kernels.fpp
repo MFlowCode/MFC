@@ -568,13 +568,14 @@ contains
     !! @return v Interpolated velocity at the position of the bubble
     function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
+        $:GPU_ROUTINE(function_name='f_interpolate_velocity', parallelism='[seq]', cray_noinline=True)
+
         real(wp), intent(in)                                :: pos
         integer, dimension(3), intent(in)                   :: cell
         integer, intent(in)                                 :: i
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp)                                            :: v
-        real(wp), dimension(fd_order + 1)                   :: xi, eta, L
+        real(wp), dimension(5)                              :: xi, eta, L
 
         if (fd_order == 2) then
             if (i == 1) then

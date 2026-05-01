@@ -43,6 +43,10 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
+    !> q_beta indices to communicate: 1=void fraction, 2=d(beta)/dt, 5=energy source
+    integer :: beta_vars(1:3) = [1, 2, 5]
+    $:GPU_DECLARE(create='[beta_vars]')
+
 contains
 
     !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
@@ -82,6 +86,8 @@ contains
         $:GPU_ENTER_DATA(create='[capture:buff_recv]')
 #endif
 #endif
+
+        $:GPU_UPDATE(device='[beta_vars]')
 
     end subroutine s_initialize_mpi_common_module
 

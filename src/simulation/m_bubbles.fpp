@@ -540,7 +540,7 @@ contains
                         select case (lag_vel_model)
                         case (1)
                             do l = 1, num_dims
-                                vTemp(l) = f_interpolate_velocity(fR, cell, l, q_prim_vf)
+                                vTemp(l) = f_interpolate_velocity(fPos(l), cell, l, q_prim_vf)
                             end do
                             do l = 1, num_dims
                                 fVel(l) = vTemp(l)
