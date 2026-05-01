@@ -594,11 +594,11 @@ contains
                 eta(3) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) + 1, cell(3))
             else if (i == 3) then
                 xi(1) = z_cc(cell(3) - 1)
-                eta(1) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) - 1)
+                eta(1) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3) - 1)
                 xi(2) = z_cc(cell(3))
-                eta(2) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3))
+                eta(2) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3))
                 xi(3) = z_cc(cell(3) + 1)
-                eta(3) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) + 1)
+                eta(3) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3) + 1)
             end if
 
             L(1) = ((pos - xi(2))*(pos - xi(3)))/((xi(1) - xi(2))*(xi(1) - xi(3)))
@@ -631,15 +631,15 @@ contains
                 eta(5) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(cell(1), cell(2) + 2, cell(3))
             else if (i == 3) then
                 xi(1) = z_cc(cell(3) - 2)
-                eta(1) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) - 2)
+                eta(1) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3) - 2)
                 xi(2) = z_cc(cell(3) - 1)
-                eta(2) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) - 1)
+                eta(2) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3) - 1)
                 xi(3) = z_cc(cell(3))
-                eta(3) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3))
+                eta(3) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3))
                 xi(4) = z_cc(cell(3) + 1)
-                eta(4) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) + 1)
+                eta(4) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3) + 1)
                 xi(5) = z_cc(cell(3) + 2)
-                eta(5) = q_prim_vf(eqn_idx%mom%beg)%sf(cell(1), cell(2), cell(3) + 2)
+                eta(5) = q_prim_vf(eqn_idx%mom%end)%sf(cell(1), cell(2), cell(3) + 2)
             end if
 
             L(1) = ((pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(4)) &
