@@ -328,6 +328,7 @@ class CaseValidator:
     def check_weno(self):
         """Checks constraints regarding WENO order"""
         recon_type = self.get("recon_type", 1)
+        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
 
         # WENO_TYPE = 1
         if recon_type != 1:
@@ -352,6 +353,8 @@ class CaseValidator:
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
         recon_type = self.get("recon_type", 1)
+        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
+
         int_comp = self.get("int_comp", "F") == "T"
 
         self.prohibit(int_comp and recon_type != 2, "int_comp (THINC interface compression) requires recon_type = 2 (MUSCL)")
@@ -732,6 +735,8 @@ class CaseValidator:
     def check_weno_simulation(self):
         """Checks WENO-specific constraints for simulation"""
         recon_type = self.get("recon_type", 1)
+        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
+
         # WENO_TYPE = 1
         if recon_type != 1:
             return
@@ -771,6 +776,8 @@ class CaseValidator:
     def check_muscl_simulation(self):
         """Checks MUSCL-specific constraints for simulation"""
         recon_type = self.get("recon_type", 1)
+        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
+
         # MUSCL_TYPE = 2
         if recon_type != 2:
             return
