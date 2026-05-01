@@ -770,6 +770,11 @@ class CaseValidator:
 
     def check_muscl_simulation(self):
         """Checks MUSCL-specific constraints for simulation"""
+        recon_type = self.get("recon_type", 1)
+        # MUSCL_TYPE = 2
+        if recon_type != 2:
+            return
+
         muscl_order = self.get("muscl_order")
         muscl_lim = self.get("muscl_lim")
 
