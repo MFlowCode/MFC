@@ -39,6 +39,7 @@ module m_start_up
 
     use m_nvtx
     use m_ibm
+    use m_model
     use m_collisions
     use m_compile_specific
     use m_checker_common
@@ -916,6 +917,7 @@ contains
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             if (t_step_start > 0) call s_read_ib_restart_data(t_step_start)
+            call s_instantiate_STL_models()
             call s_reduce_ib_patch_array()
             call s_ibm_setup()
             if (t_step_start == 0) then

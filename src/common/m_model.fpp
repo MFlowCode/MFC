@@ -983,13 +983,13 @@ contains
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
-        allocate (stl_bounding_boxes(num_gbl_ibs,1:3,1:3))
+        num_gbl_ibs = num_ibs
+        allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
 
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
-                print *, proc_rank, patch_id, num_ibs, patch_ib(patch_id)%geometry
                 allocate (models(patch_id)%model)
-                print *, " * Reading model: " // trim(patch_ib(patch_id)%model_filepath)
+                if (proc_rank == 0) print *, " * Reading model: " // trim(patch_ib(patch_id)%model_filepath)
 
                 model = f_model_read(patch_ib(patch_id)%model_filepath)
                 params%scale(:) = patch_ib(patch_id)%model_scale(:)
@@ -1002,9 +1002,7 @@ contains
                     params%scale(:) = 1._wp
                 end if
 
-                if (proc_rank == 0) then
-                    print *, " * Transforming model."
-                end if
+                if (proc_rank == 0) print *, " * Transforming model."
 
                 ! Get the model center before transforming the model
                 bbox_old = f_create_bbox(model)
