@@ -337,20 +337,21 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                              :: ib
-    integer                                              :: num_ibs  !< number of IBs that the current processor is aware of
-    integer                                              :: num_gbl_ibs  !< number of IBs in the overall simulation
-    integer                                              :: num_local_ibs  !< number of IBs that lie inside the processor domain
-    integer                                              :: collision_model
-    real(wp)                                             :: coefficient_of_restitution
-    real(wp)                                             :: collision_time
-    real(wp)                                             :: ib_coefficient_of_friction
-    logical                                              :: ib_state_wrt
+    logical :: ib
+    integer :: num_ibs                                                !< number of IBs that the current processor is aware of
+    integer :: num_gbl_ibs                                            !< number of IBs in the overall simulation
+    integer :: num_local_ibs                                          !< number of IBs that lie inside the processor domain
+    integer :: ib_awareness_radius                                    !< neighborhood radius in ranks (1 = immediate neighbors)
+    integer :: collision_model
+    real(wp) :: coefficient_of_restitution
+    real(wp) :: collision_time
+    real(wp) :: ib_coefficient_of_friction
+    logical :: ib_state_wrt
     type(ib_patch_parameters), allocatable, dimension(:) :: patch_ib  !< Immersed boundary patch parameters
-    integer, dimension(num_local_ibs_max)                :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
-    integer, dimension(-1:1,-1:1,-1:1)                   :: ib_neighbor_ranks  !< MPI ranks of all 26 neighbor domains
-    type(vec3_dt), allocatable, dimension(:)             :: airfoil_grid_u, airfoil_grid_l
-    integer                                              :: Np
+    integer, dimension(num_local_ibs_max) :: local_ib_patch_ids       !< lookup table of IBs in the local compute domain
+    integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks       !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
+    type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    integer :: Np
 
     $:GPU_DECLARE(create='[ib, num_ibs, num_gbl_ibs, num_local_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l, local_ib_patch_ids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
@@ -639,6 +640,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        ib_awareness_radius = 1
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real

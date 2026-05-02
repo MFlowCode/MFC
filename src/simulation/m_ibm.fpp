@@ -1234,8 +1234,8 @@ contains
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
 #ifdef MFC_MPI
-        integer                       :: i, j, pack_pos, unpack_pos, buf_size, ierr
-        integer                       :: send_neighbor, recv_neighbor, recv_count, pid
+        integer                       :: i, j, k, pack_pos, unpack_pos, buf_size, ierr
+        integer                       :: send_neighbor, recv_neighbor, recv_count, pid, tag
         real(wp), dimension(3)        :: fval, tval
         real(wp), allocatable         :: recv_forces_snap(:,:), recv_torques_snap(:,:)
         character(len=1), allocatable :: send_buf(:), recv_buf(:)
@@ -1246,72 +1246,48 @@ contains
         allocate (send_buf(buf_size), recv_buf(buf_size), recv_forces_snap(num_ibs, 3), recv_torques_snap(num_ibs, 3))
 
         ! Accumulation phase: propagate contributions toward the high-index corner.
-        #:for X, ID, TAG1, TAG2 in [('x', 1, 300, 302), ('y', 2, 304, 306), ('z', 3, 308, 310)]
+        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
             if (num_dims >= ${ID}$) then
                 send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
                 recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
 
-                ! Pass 1: send current forces to +${X}$ neighbor; receive from -${X}$ neighbor and add. Save what was received as
-                ! recv_snap for double-count removal in pass 2.
                 recv_forces_snap = 0._wp
                 recv_torques_snap = 0._wp
-                pack_pos = 0
-                call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                do i = 1, num_ibs
-                    call MPI_PACK(patch_ib(i)%gbl_patch_id, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    fval(:) = forces(i,:); tval(:) = torques(i,:)
-                    call MPI_PACK(fval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(tval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                end do
-                call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, ${TAG1}$, recv_buf, buf_size, MPI_PACKED, &
-                                  & recv_neighbor, ${TAG1}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                if (recv_neighbor /= MPI_PROC_NULL) then
-                    unpack_pos = 0
-                    call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                    do i = 1, recv_count
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                        do j = 1, num_ibs
-                            if (patch_ib(j)%gbl_patch_id == pid) then
-                                recv_forces_snap(j,:) = fval(:)
-                                recv_torques_snap(j,:) = tval(:)
-                                forces(j,:) = forces(j,:) + fval(:)
-                                torques(j,:) = torques(j,:) + tval(:)
-                                exit
-                            end if
-                        end do
-                    end do
-                end if
+                tag = 300
 
-                ! Pass 2: send post-pass-1 forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
-                ! subtract recv_snap to remove the pass-1 contribution that was already counted, leaving only the 2-hop delta.
-                pack_pos = 0
-                call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                do i = 1, num_ibs
-                    call MPI_PACK(patch_ib(i)%gbl_patch_id, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    fval(:) = forces(i,:); tval(:) = torques(i,:)
-                    call MPI_PACK(fval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(tval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                end do
-                call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, ${TAG2}$, recv_buf, buf_size, MPI_PACKED, &
-                                  & recv_neighbor, ${TAG2}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                if (recv_neighbor /= MPI_PROC_NULL) then
-                    unpack_pos = 0
-                    call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                    do i = 1, recv_count
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                        do j = 1, num_ibs
-                            if (patch_ib(j)%gbl_patch_id == pid) then
-                                forces(j,:) = forces(j,:) + fval(:) - recv_forces_snap(j,:)
-                                torques(j,:) = torques(j,:) + tval(:) - recv_torques_snap(j,:)
-                                exit
-                            end if
-                        end do
+                do k = 1, (2*ib_awareness_radius) - 1
+                    ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
+                    pack_pos = 0
+                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    do i = 1, num_ibs
+                        call MPI_PACK(patch_ib(i)%gbl_patch_id, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                        fval(:) = forces(i,:); tval(:) = torques(i,:)
+                        call MPI_PACK(fval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                        call MPI_PACK(tval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     end do
-                end if
+                    call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, recv_buf, buf_size, MPI_PACKED, &
+                                      & recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    if (recv_neighbor /= MPI_PROC_NULL) then
+                        unpack_pos = 0
+                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        do i = 1, recv_count
+                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
+                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
+                            do j = 1, num_ibs
+                                if (patch_ib(j)%gbl_patch_id == pid) then
+                                    ! add forces and subtract recv_snap prevent double-counting
+                                    forces(j,:) = forces(j,:) + fval(:) - recv_forces_snap(j,:)
+                                    torques(j,:) = torques(j,:) + tval(:) - recv_torques_snap(j,:)
+                                    recv_forces_snap(j,:) = fval(:)
+                                    recv_torques_snap(j,:) = tval(:)
+                                    exit
+                                end if
+                            end do
+                        end do
+                    end if
+                    tag = tag + 2
+                end do
             end if
         #:endfor
 
