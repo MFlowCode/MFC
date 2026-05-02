@@ -92,7 +92,7 @@ contains
             x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
-            ib, num_ibs, patch_ib, &
+            ib, num_ibs, ib_neighborhood_radius, patch_ib, &
             collision_model, coefficient_of_restitution, collision_time, &
             ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
@@ -1223,7 +1223,7 @@ contains
         call s_compute_ib_neighbor_ranks()  ! build lookup of all neighbor MPI ranks
 
         deallocate (patch_ib)
-        num_aware_ibs = min(num_local_ibs_max*(2*ib_awareness_radius + 1)**num_dims, num_ib_patches_max)
+        num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
         allocate (patch_ib(num_aware_ibs))
 
         ! assign defaults to all values
@@ -1290,7 +1290,7 @@ contains
         integer, dimension(2) :: buf2, rbuf2
 #endif
 
-        ax = ib_awareness_radius
+        ax = ib_neighborhood_radius
 
         if (allocated(ib_neighbor_ranks)) deallocate (ib_neighbor_ranks)
         allocate (ib_neighbor_ranks(-ax:ax,-ax:ax,-ax:ax))
@@ -1453,13 +1453,13 @@ contains
         neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
-        ! For each direction, propagate the left/right boundary edges outward ib_awareness_radius hops. After k rounds: beg_val =
+        ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =
         ! left edge of the rank k hops to the left; end_val = right edge of the rank k hops to the right.
         #:for X, ID, TAG, DIM in [('x', 1, 100, 'm'), ('y', 2, 102, 'n'), ('z', 3, 104, 'p')]
             if (num_dims >= ${ID}$) then
                 beg_val = ${X}$_cb(-1)
                 end_val = ${X}$_cb(${DIM}$)
-                do k = 1, ib_awareness_radius
+                do k = 1, ib_neighborhood_radius
                     send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
                     recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
                     recv_val = -huge(0._wp)

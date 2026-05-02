@@ -1255,7 +1255,7 @@ contains
                 recv_torques_snap = 0._wp
                 tag = 300
 
-                do k = 1, (2*ib_awareness_radius) - 1
+                do k = 1, 2*ib_neighborhood_radius
                     ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
                     pack_pos = 0
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
@@ -1291,15 +1291,13 @@ contains
             end if
         #:endfor
 
-        ! Back-propagation phase: for each dimension, 2 passes receiving from the high-index neighbor. Each pass overwrites local
-        ! forces with the neighbor's accumulated total. Two passes ensure the total reaches 2 hops back, covering the full
-        ! neighborhood.
-        #:for X, ID, TAG1, TAG2 in [('x', 1, 312, 314), ('y', 2, 316, 318), ('z', 3, 320, 322)]
+        ! Send final sums back to neighbors in -X direction
+        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
             if (num_dims >= ${ID}$) then
                 send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
                 recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
 
-                #:for TAG in [TAG1, TAG2]
+                do k = 1, 2*ib_neighborhood_radius
                     pack_pos = 0
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     do i = 1, num_ibs
@@ -1308,8 +1306,8 @@ contains
                         call MPI_PACK(fval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                         call MPI_PACK(tval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     end do
-                    call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, ${TAG}$, recv_buf, buf_size, MPI_PACKED, &
-                                      & recv_neighbor, ${TAG}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, recv_buf, buf_size, MPI_PACKED, &
+                                      & recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     if (recv_neighbor /= MPI_PROC_NULL) then
                         unpack_pos = 0
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -1326,7 +1324,8 @@ contains
                             end do
                         end do
                     end if
-                #:endfor
+                    tag = tag + 2
+                end do
             end if
         #:endfor
 

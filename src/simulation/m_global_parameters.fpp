@@ -341,7 +341,7 @@ module m_global_parameters
     integer :: num_ibs                                                !< number of IBs that the current processor is aware of
     integer :: num_gbl_ibs                                            !< number of IBs in the overall simulation
     integer :: num_local_ibs                                          !< number of IBs that lie inside the processor domain
-    integer :: ib_awareness_radius                                    !< neighborhood radius in ranks (1 = immediate neighbors)
+    integer :: ib_neighborhood_radius                                 !< neighborhood radius in ranks (1 = immediate neighbors)
     integer :: collision_model
     real(wp) :: coefficient_of_restitution
     real(wp) :: collision_time
@@ -640,7 +640,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
-        ib_awareness_radius = 1
+        ib_neighborhood_radius = 1
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real

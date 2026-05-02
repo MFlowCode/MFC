@@ -312,6 +312,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
 | `num_ibs`            | Integer | Number of immersed boundary patches |
+| `ib_neighborhood_radius` | Integer | Paramter that controls the neighborhood size for IB detection. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -372,6 +373,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring gonstant used to apply collision forces.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
+
+- `ib_neighborhood_radius` controls the size fo the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IB's up to 1 ranks away. This paramter is required to strong-scale a case when IB's eventually grow to be larger than one full processor domain wide.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
