@@ -908,7 +908,7 @@ contains
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
-        ! Reshaping inputted data based on dimensional splitting direction
+        ! Reshaping input data based on dimensional splitting direction
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
