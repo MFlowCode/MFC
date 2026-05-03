@@ -217,7 +217,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(2) :: alpha_rho, alpha
+            real(wp), dimension(3) :: alpha_rho, alpha
         #:else
             real(wp), dimension(num_fluids) :: alpha_rho, alpha
         #:endif
