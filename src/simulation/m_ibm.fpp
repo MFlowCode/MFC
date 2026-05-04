@@ -1107,35 +1107,33 @@ contains
     end subroutine s_compute_centroid_offset
 
     !> Computes the moment of inertia for an immersed boundary
-    subroutine s_compute_moment_of_inertia(ib_marker, axis)
+    subroutine s_compute_moment_of_inertia(ib_idx, axis)
 
         real(wp), dimension(3), intent(in) :: axis  !< the axis about which we compute the moment. Only required in 3D.
-        integer, intent(in)                :: ib_marker
+        integer, intent(in)                :: ib_idx
         real(wp)                           :: moment, distance_to_axis, cell_volume
         real(wp), dimension(3)             :: position, closest_point_along_axis, vector_to_axis, normal_axis
-        integer                            :: i, j, k, count
+        integer                            :: i, j, k, count, ib_marker
 
         if (p == 0) then
             normal_axis = [0, 0, 1]
         else if (sqrt(sum(axis**2)) < sgm_eps) then
             ! if the object is not actually rotating at this time, return a dummy value and exit
-            patch_ib(ib_marker)%moment = 1._wp
+            patch_ib(ib_idx)%moment = 1._wp
             return
         else
             normal_axis = axis/sqrt(sum(axis))
         end if
 
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
-        if (patch_ib(ib_marker)%geometry == 2) then  ! circle
-            patch_ib(ib_marker)%moment = 0.5_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
-        else if (patch_ib(ib_marker)%geometry == 3) then  ! rectangle
-            patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
-                     & %length_y**2)/6._wp
-        else if (patch_ib(ib_marker)%geometry == 6) then  ! ellipse
-            patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
-                     & %length_y**2)
-        else if (patch_ib(ib_marker)%geometry == 8) then  ! sphere
-            patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
+        if (patch_ib(ib_idx)%geometry == 2) then  ! circle
+            patch_ib(ib_idx)%moment = 0.5_wp*patch_ib(ib_idx)%mass*(patch_ib(ib_idx)%radius)**2
+        else if (patch_ib(ib_idx)%geometry == 3) then  ! rectangle
+            patch_ib(ib_idx)%moment = patch_ib(ib_idx)%mass*(patch_ib(ib_idx)%length_x**2 + patch_ib(ib_idx) %length_y**2)/6._wp
+        else if (patch_ib(ib_idx)%geometry == 6) then  ! ellipse
+            patch_ib(ib_idx)%moment = 0.0625_wp*patch_ib(ib_idx)%mass*(patch_ib(ib_idx)%length_x**2 + patch_ib(ib_idx) %length_y**2)
+        else if (patch_ib(ib_idx)%geometry == 8) then  ! sphere
+            patch_ib(ib_idx)%moment = 0.4*patch_ib(ib_idx)%mass*(patch_ib(ib_idx)%radius)**2
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
             moment = 0._wp
@@ -1144,6 +1142,8 @@ contains
             if (p /= 0) then
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
+
+            ib_marker = patch_ib(ib_idx)%gbl_patch_id
 
             $:GPU_PARALLEL_LOOP(private='[position, closest_point_along_axis, vector_to_axis, distance_to_axis]', copy='[moment, &
                                 & count]', copyin='[ib_marker, cell_volume, normal_axis]', collapse=3)
@@ -1155,12 +1155,12 @@ contains
                             count = count + 1  ! increment the count of total cells in the boundary
 
                             ! get the position in local coordinates so that the axis passes through 0, 0, 0
-                            if (p == 0) then
-                                position = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_marker)%x_centroid, &
-                                                 & patch_ib(ib_marker)%y_centroid, 0._wp]
+                            if (num_dims < 3) then
+                                position = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, &
+                                                 & 0._wp]
                             else
-                                position = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_marker)%x_centroid, &
-                                                 & patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid]
+                                position = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, &
+                                                 & patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid]
                             end if
 
                             ! project the position along the axis to find the closest distance to the rotation axis
@@ -1178,8 +1178,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             ! write the final moment assuming the points are all uniform density
-            patch_ib(ib_marker)%moment = moment*patch_ib(ib_marker)%mass/(count*cell_volume)
-            $:GPU_UPDATE(device='[patch_ib(ib_marker)%moment]')
+            patch_ib(ib_idx)%moment = moment*patch_ib(ib_idx)%mass/(count*cell_volume)
         end if
 
     end subroutine s_compute_moment_of_inertia
@@ -1505,5 +1504,22 @@ contains
 #endif
 
     end subroutine s_handoff_ib_ownership
+
+    subroutine get_neighborhood_idx(gbl_idx, neighborhood_idx)
+
+        integer, intent(in)  :: gbl_idx
+        integer, intent(out) :: neighborhood_idx
+        integer              :: i
+
+        neighborhood_idx = -1
+
+        do i = 1, num_ibs
+            if (patch_ib(i)%gbl_patch_id == gbl_idx) then
+                neighborhood_idx = i
+                exit
+            end if
+        end do
+
+    end subroutine get_neighborhood_idx
 
 end module m_ibm
