@@ -170,27 +170,26 @@ contains
                                     slope = 0._wp
 
                                     if (muscl_lim == 1) then  ! minmod
-                                        if (slopeL*slopeR > 1e-9_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = min(abs(slopeL), abs(slopeR))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
                                     else if (muscl_lim == 2) then  ! MC
-                                        if (slopeL*slopeR > 1e-9_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = min(2._wp*abs(slopeL), 2._wp*abs(slopeR))
                                             slope = min(slope, 5e-1_wp*(abs(slopeL) + abs(slopeR)))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
                                     else if (muscl_lim == 3) then  ! Van Albada
-                                        if (abs(slopeL) > 1e-6_wp .and. abs(slopeR) > 1e-6_wp .and. abs(slopeL + slopeR) &
-                                            & > 1e-6_wp .and. slopeL*slopeR > 1e-6_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2._wp + slopeR**2._wp)
                                         end if
                                     else if (muscl_lim == 4) then  ! Van Leer
-                                        if (abs(slopeL + slopeR) > 1.e-6_wp .and. slopeL*slopeR > 1.e-6_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = 2._wp*slopeL*slopeR/(slopeL + slopeR)
                                         end if
                                     else if (muscl_lim == 5) then  ! SUPERBEE
-                                        if (slopeL*slopeR > 1e-6_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
                                                                & 2._wp*abs(slopeR)))
                                         end if
