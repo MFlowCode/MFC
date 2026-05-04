@@ -370,7 +370,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
         stack.pop()
 
-        stack.push("muscl_order=2", {"muscl_order": 2, "recon_type": 2, "weno_order": 0})
+        stack.push("muscl_order=2", {"muscl_order": 2, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
         stack.push("int_comp=1", {"int_comp": 1})
         cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
         stack.pop()
