@@ -28,6 +28,7 @@ module m_global_parameters
     integer                 :: t_step_old     !< Existing IC/grid folder
     ! Computational Domain Parameters
     integer :: proc_rank  !< Rank of the local processor
+    $:GPU_DECLARE(create='[num_procs, proc_rank]')
     !> @name Number of cells in the x-, y- and z-directions, respectively
     !> @{
     integer :: m, n, p
