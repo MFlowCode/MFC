@@ -572,7 +572,7 @@ contains
                             ghost_points_in(local_idx)%loc = [i, j, k]
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
-                            call get_neighborhood_idx(patch_id, neighborhood_patch_id)
+                            call s_get_neighborhood_idx(patch_id, neighborhood_patch_id)
                             ghost_points_in(local_idx)%ib_patch_id = neighborhood_patch_id
                             ghost_points_in(local_idx)%x_periodicity = xp
                             ghost_points_in(local_idx)%y_periodicity = yp
@@ -1274,15 +1274,13 @@ contains
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                        do j = 1, num_ibs
-                            if (patch_ib(j)%gbl_patch_id == pid) then
-                                recv_forces_snap(j,:) = fval(:)
-                                recv_torques_snap(j,:) = tval(:)
-                                forces(j,:) = forces(j,:) + fval(:)
-                                torques(j,:) = torques(j,:) + tval(:)
-                                exit
-                            end if
-                        end do
+                        call s_get_neighborhood_idx(pid, j)
+                        if (j > 0) then
+                            recv_forces_snap(j,:) = fval(:)
+                            recv_torques_snap(j,:) = tval(:)
+                            forces(j,:) = forces(j,:) + fval(:)
+                            torques(j,:) = torques(j,:) + tval(:)
+                        end if
                     end do
                 end if
 
@@ -1305,13 +1303,11 @@ contains
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                        do j = 1, num_ibs
-                            if (patch_ib(j)%gbl_patch_id == pid) then
-                                forces(j,:) = forces(j,:) + fval(:) - recv_forces_snap(j,:)
-                                torques(j,:) = torques(j,:) + tval(:) - recv_torques_snap(j,:)
-                                exit
-                            end if
-                        end do
+                        call s_get_neighborhood_idx(pid, j)
+                        if (j > 0) then
+                            forces(j,:) = forces(j,:) + fval(:) - recv_forces_snap(j,:)
+                            torques(j,:) = torques(j,:) + tval(:) - recv_torques_snap(j,:)
+                        end if
                     end do
                 end if
             end if
@@ -1343,13 +1339,11 @@ contains
                             call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                             call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
                             call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                            do j = 1, num_ibs
-                                if (patch_ib(j)%gbl_patch_id == pid) then
-                                    forces(j,:) = fval(:)
-                                    torques(j,:) = tval(:)
-                                    exit
-                                end if
-                            end do
+                            call s_get_neighborhood_idx(pid, j)
+                            if (j > 0) then
+                                forces(j,:) = fval(:)
+                                torques(j,:) = tval(:)
+                            end if
                         end do
                     end if
                 #:endfor
@@ -1369,9 +1363,8 @@ contains
         integer                               :: pack_pos, unpack_pos, buf_size, patch_bytes
         integer                               :: send_neighbor, recv_neighbor, ierr
         integer                               :: dx, dy, dz, tag, nbr_idx, nreqs
-        real(wp)                              :: position
         real(wp), dimension(3)                :: centroid
-        logical                               :: is_new, already_known
+        logical                               :: is_new
         type(ib_patch_parameters)             :: tmp_patch
         integer, dimension(num_local_ibs_max) :: local_ib_idx_old
         ! 26 neighbors max in 3D (8 in 2D); each gets its own recv buffer
@@ -1486,14 +1479,8 @@ contains
                 do i = 1, recv_count
                     call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
                                     & ierr)
-                    already_known = .false.
-                    do j = 1, num_ibs
-                        if (patch_ib(j)%gbl_patch_id == tmp_patch%gbl_patch_id) then
-                            already_known = .true.
-                            exit
-                        end if
-                    end do
-                    if (.not. already_known) then
+                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j)
+                    if (j < 0) then
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
                         patch_ib(num_ibs) = tmp_patch
@@ -1507,13 +1494,15 @@ contains
 
     end subroutine s_handoff_ib_ownership
 
-    subroutine get_neighborhood_idx(gbl_idx, neighborhood_idx)
+    subroutine s_get_neighborhood_idx(gbl_idx, neighborhood_idx)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in)  :: gbl_idx
         integer, intent(out) :: neighborhood_idx
         integer              :: i
+
+        neighborhood_idx = -1
 
         do i = 1, num_ibs
             if (patch_ib(i)%gbl_patch_id == gbl_idx) then
@@ -1522,6 +1511,6 @@ contains
             end if
         end do
 
-    end subroutine get_neighborhood_idx
+    end subroutine s_get_neighborhood_idx
 
 end module m_ibm
