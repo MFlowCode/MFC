@@ -535,7 +535,7 @@ contains
         integer                                              :: i, j, k, ii, jj, kk, gp_layers_z  !< Iterator variables
         integer                                              :: xp, yp, zp                        !< periodicities
         integer                                              :: count, count_i, local_idx
-        integer                                              :: patch_id, encoded_patch_id
+        integer                                              :: patch_id, encoded_patch_id, neighborhood_patch_id
         logical                                              :: is_gp
 
         count = 0
@@ -543,9 +543,9 @@ contains
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, xp, yp, zp]', &
-                            & copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, gp_layers_z]', &
-                                & collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, neighborhood_patch_id, &
+                            & xp, yp, zp]', copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, &
+                            & gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -572,11 +572,12 @@ contains
                             ghost_points_in(local_idx)%loc = [i, j, k]
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
-                            ghost_points_in(local_idx)%ib_patch_id = patch_id
+                            call get_neighborhood_idx(patch_id, neighborhood_patch_id)
+                            ghost_points_in(local_idx)%ib_patch_id = neighborhood_patch_id
                             ghost_points_in(local_idx)%x_periodicity = xp
                             ghost_points_in(local_idx)%y_periodicity = yp
                             ghost_points_in(local_idx)%z_periodicity = zp
-                            ghost_points_in(local_idx)%slip = patch_ib(patch_id)%slip
+                            ghost_points_in(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
 
                             if ((x_cc(i) - dx(i)) < x_domain%beg) then
                                 ghost_points_in(local_idx)%DB(1) = -1
@@ -719,9 +720,10 @@ contains
 
     !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
+                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
 
-        & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Primitive Variables
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_in, mv_in
         type(ghost_point), intent(in) :: gp
@@ -1507,11 +1509,11 @@ contains
 
     subroutine get_neighborhood_idx(gbl_idx, neighborhood_idx)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in)  :: gbl_idx
         integer, intent(out) :: neighborhood_idx
         integer              :: i
-
-        neighborhood_idx = -1
 
         do i = 1, num_ibs
             if (patch_ib(i)%gbl_patch_id == gbl_idx) then
