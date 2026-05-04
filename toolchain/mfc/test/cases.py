@@ -300,11 +300,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     def alter_muscl():
         for muscl_order in [1, 2]:
-            stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0})
+            stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
 
             if muscl_order == 2:
                 for muscl_lim in [2, 3, 4, 5]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
+                stack.push("muscl_eps=0", {"muscl_eps": 0})
+                for muscl_lim in [1, 2, 3, 4, 5]:
+                    cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
+                stack.pop()
             stack.pop()
 
     def alter_riemann_solvers(num_fluids):
@@ -1574,7 +1578,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
-                "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "1D_qbmm",
+                "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
             ]
             if path in casesToSkip:
                 continue
@@ -1589,6 +1594,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50
                     case["t_step_save"] = 50
+
+                if case.get("recon_type") == 2:
+                    for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT"):
+                        case[k] = None
 
                 caseSize = case["m"] * max(case["n"], 1) * max(case["p"], 1)
                 if caseSize > 25 * 25:
@@ -1618,6 +1627,112 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-10),
                 )
             )
+
+        stack.push(
+            "1D -> Chemistry -> Dual Isothermal Wall Gradient",
+            {
+                "m": 49,
+                "n": 0,  # 1D case
+                "p": 0,
+                "dt": 8.0e-08,
+                "num_patches": 1,
+                "num_fluids": 1,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 0.05,
+                "bc_x%beg": -16,  # Left Isothermal Wall
+                "bc_x%end": -16,  # Right Isothermal Wall
+                "bc_x%isothermal_in": "T",
+                "bc_x%Twall_in": 600.0,
+                "bc_x%isothermal_out": "T",
+                "bc_x%Twall_out": 900.0,
+                "weno_order": 5,
+                "weno_eps": 1e-16,
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "time_stepper": 3,
+                "chemistry": "T",
+                "chem_params%diffusion": "T",
+                "chem_params%reactions": "F",
+                "chem_wrt_T": "T",
+                "cantera_file": "h2o2.yaml",
+                "viscous": "T",
+                "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%Re(1)": 100000,
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%hcid": 191,
+                "patch_icpp(1)%x_centroid": 0.025,
+                "patch_icpp(1)%length_x": 0.05,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%pres": 101325.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(1)%Y(1)": 1.0,
+                "t_step_start": 0,
+                "t_step_stop": 1000,
+                "t_step_save": 1000,
+            },
+        )
+
+        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+
+        stack.pop()
+
+        stack.push(
+            "2D -> Chemistry -> Isothermal Wall",
+            {
+                "m": 49,
+                "n": 49,
+                "dt": 4.0e-08,
+                "num_patches": 1,
+                "num_fluids": 1,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 0.05,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 0.05,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -16,
+                "bc_y%end": -3,
+                "bc_y%isothermal_in": "T",
+                "bc_y%Twall_in": 600.0,
+                "weno_order": 5,
+                "weno_eps": 1e-16,
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "time_stepper": 3,
+                "chemistry": "T",
+                "chem_params%diffusion": "T",
+                "chem_params%reactions": "F",
+                "chem_wrt_T": "T",
+                "cantera_file": "h2o2.yaml",
+                "viscous": "T",
+                "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%Re(1)": 100000,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%hcid": 291,
+                "patch_icpp(1)%x_centroid": 0.025,
+                "patch_icpp(1)%y_centroid": 0.025,
+                "patch_icpp(1)%length_x": 0.05,
+                "patch_icpp(1)%length_y": 0.05,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 101325.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(1)%Y(1)": 1.0,
+                "t_step_start": 0,
+                "t_step_stop": 50,
+                "t_step_save": 50,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        stack.pop()
 
         stack.push(
             "1D -> Chemistry -> MultiComponent Diffusion",
@@ -1658,7 +1773,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "t_step_save": 50,
             },
         )
-        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-9)))
+        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
 
         stack.pop()
 

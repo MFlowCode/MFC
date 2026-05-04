@@ -27,7 +27,8 @@
             "m_chemistry",
             "m_acoustic_src",
             "m_body_forces",
-            "m_pressure_relaxation"
+            "m_pressure_relaxation",
+            "m_collisions"
         ]
     },
     {

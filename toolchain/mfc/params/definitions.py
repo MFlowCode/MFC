@@ -27,7 +27,8 @@ def _fc(name: str) -> int:
 NF = _fc("num_fluids_max")  # fluid_pp
 NPR = _fc("num_probes_max")  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max")  # patch_bc
-NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp, patch_ib (Fortran array bound)
+NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp (Fortran array bound)
+NIB = _fc("num_ib_patches_max")  # patch_ib (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -116,6 +117,8 @@ _ATTR_DESCS = {
     "grcbc_in": "Enable GRCBC inlet",
     "grcbc_out": "Enable GRCBC outlet",
     "grcbc_vel_out": "Enable GRCBC velocity outlet",
+    "isothermal_in": "Enable isothermal wall at the domain entrance (minimum coordinate)",
+    "isothermal_out": "Enable isothermal wall at the domain exit (maximum coordinate)",
     # Acoustic
     "loc": "Location",
     "mag": "Magnitude",
@@ -223,6 +226,10 @@ _SIMPLE_DESCS = {
     "hyperelasticity": "Enable hyperelastic model",
     "relativity": "Enable special relativity",
     "ib": "Enable immersed boundaries",
+    "collision_model": "Collision model for immersed boundaries (0=none, 1=soft sphere)",
+    "coefficient_of_restitution": "Coefficient of restitution for IB collisions",
+    "collision_time": "Characteristic collision time for IB collisions",
+    "ib_coefficient_of_friction": "Coefficient of friction for IB collisions",
     "acoustic_source": "Enable acoustic sources",
     # Output
     "parallel_io": "Enable parallel I/O",
@@ -249,6 +256,7 @@ _SIMPLE_DESCS = {
     "recon_type": "Reconstruction type",
     "muscl_order": "MUSCL reconstruction order",
     "muscl_lim": "MUSCL limiter type",
+    "muscl_eps": "MUSCL limiter slope-product threshold",
     "low_Mach": "Low Mach number correction",
     "bubble_model": "Bubble dynamics model",
     "Ca": "Cavitation number",
@@ -397,6 +405,8 @@ HINTS = {
         "ve1": "Boundary velocity component 1 at domain end",
         "ve2": "Boundary velocity component 2 at domain end",
         "ve3": "Boundary velocity component 3 at domain end",
+        "Twall_in": "Temperature of the entrance-side isothermal wall.",
+        "Twall_out": "Temperature of the exit-side isothermal wall.",
     },
     "patch_bc": {
         "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
@@ -652,6 +662,8 @@ CONSTRAINTS = {
     "cfl_target": {"min": 0},
     # WENO
     "weno_eps": {"min": 0},
+    # MUSCL
+    "muscl_eps": {"min": 0},
     # Physics (must be non-negative)
     "R0ref": {"min": 0},
     "sigma": {"min": 0},
@@ -710,6 +722,11 @@ DEPENDENCIES = {
     "ib": {
         "when_true": {
             "requires": ["num_ibs"],
+        }
+    },
+    "collision_model": {
+        "when_set": {
+            "requires": ["ib", "coefficient_of_restitution", "collision_time"],
         }
     },
     "acoustic_source": {
@@ -856,6 +873,7 @@ def _load():
     _r("recon_type", INT)
     _r("muscl_order", INT)
     _r("muscl_lim", INT)
+    _r("muscl_eps", REAL)
     _r("weno_eps", REAL, {"weno"}, math=r"\f$\varepsilon\f$")
     _r("teno_CT", REAL, {"weno"}, math=r"\f$C_T\f$")
     _r("wenoz_q", REAL, {"weno"})
@@ -906,6 +924,10 @@ def _load():
     # Immersed boundary
     _r("num_ibs", INT, {"ib"})
     _r("ib", LOG, {"ib"})
+    _r("collision_model", INT, {"ib"})
+    _r("coefficient_of_restitution", REAL, {"ib"})
+    _r("collision_time", REAL, {"ib"})
+    _r("ib_coefficient_of_friction", REAL, {"ib"})
 
     # Probes
     for n in ["num_probes", "num_integrals"]:
@@ -1155,7 +1177,7 @@ def _load():
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
     # max_index is None so the parameter registry stays compact (no enumeration).
-    # The Fortran-side upper bound (num_patches_max in m_constants.fpp) is parsed
+    # The Fortran-side upper bound (num_ib_patches_max in m_constants.fpp) is parsed
     # and enforced by the case_validator, not by max_index here.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
@@ -1181,7 +1203,7 @@ def _load():
             base_name="patch_ib",
             attrs=_ib_attrs,
             tags=_ib_tags,
-            max_index=NUM_PATCHES_MAX,
+            max_index=NIB,
         )
     )
 
@@ -1238,6 +1260,11 @@ def _load():
         for j in range(1, 4):
             _r(f"{px}vel_in({j})", REAL, {"bc"})
             _r(f"{px}vel_out({j})", REAL, {"bc"})
+
+        for a in ["Twall_in", "Twall_out"]:
+            _r(f"{px}{a}", REAL, {"bc"})
+        for a in ["isothermal_in", "isothermal_out"]:
+            _r(f"{px}{a}", LOG, {"bc"})
 
     # patch_bc (10 BC patches)
     for i in range(1, NB + 1):

@@ -160,12 +160,13 @@ contains
     end subroutine s_compute_chemistry_reaction_flux
 
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
-    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz)
+    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         type(int_bounds_info), intent(in)                      :: irx, iry, irz
         integer, intent(in)                                    :: idir
+        type(scalar_field), intent(in)                         :: q_T_sf
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
@@ -180,7 +181,7 @@ contains
         #:endif
 
         real(wp)              :: Mass_Diffu_Energy
-        real(wp)              :: MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
+        real(wp)              :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
         real(wp)              :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
         real(wp)              :: Cp_L, Cp_R
         real(wp)              :: diffusivity_L, diffusivity_R, diffusivity_cell
@@ -202,8 +203,8 @@ contains
                 $:GPU_PARALLEL_LOOP(collapse=3,  private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, &
                                     & mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, &
                                     & h_l, h_r, Xs_cell, h_k, dXk_dxi, Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, &
-                                    & Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, &
-                                    & lambda_Cell, dT_dxi, grid_spacing]', copyin='[offsets]')
+                                    & T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, &
+                                    & dT_dxi, grid_spacing]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
                         do x = isc1%beg, isc1%end
@@ -234,18 +235,14 @@ contains
                             call get_mole_fractions(MW_L, Ys_L, Xs_L)
                             call get_mole_fractions(MW_R, Ys_R, Xs_R)
 
-                            ! Calculate gas constants and thermodynamic properties
-                            Rgas_L = gas_constant/MW_L
-                            Rgas_R = gas_constant/MW_R
-
                             P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
                             P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_L = q_prim_qp(1)%sf(x, y, z)
                             rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
-                            T_L = P_L/rho_L/Rgas_L
-                            T_R = P_R/rho_R/Rgas_R
+                            T_L = q_T_sf%sf(x, y, z)
+                            T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_cell = 0.5_wp*(rho_L + rho_R)
                             dT_dxi = (T_R - T_L)/grid_spacing
@@ -341,9 +338,9 @@ contains
             else if (chem_params%transport_model == 2) then
                 ! Note: Added ALL scalars and 'i'/'eqn' to private list to prevent race conditions.
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, dYk_dxi, Mass_Diffu_Flux, &
-                                    & grid_spacing, MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, P_L, P_R, rho_L, rho_R, rho_cell, T_L, &
-                                    & T_R, Cp_L, Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, &
-                                    & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
+                                    & grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, Cp_R, &
+                                    & hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, diffusivity_R, &
+                                    & diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
                         do x = isc1%beg, isc1%end
@@ -371,18 +368,14 @@ contains
                             call get_mixture_molecular_weight(Ys_R, MW_R)
                             MW_cell = 0.5_wp*(MW_L + MW_R)
 
-                            ! Calculate gas constants and thermodynamic properties
-                            Rgas_L = gas_constant/MW_L
-                            Rgas_R = gas_constant/MW_R
-
                             P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
                             P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_L = q_prim_qp(1)%sf(x, y, z)
                             rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
-                            T_L = P_L/rho_L/Rgas_L
-                            T_R = P_R/rho_R/Rgas_R
+                            T_L = q_T_sf%sf(x, y, z)
+                            T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
                             rho_cell = 0.5_wp*(rho_L + rho_R)
 

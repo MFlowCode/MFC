@@ -108,12 +108,13 @@ contains
         integer, intent(in), optional               :: t_step
         character(LEN=len_trim(file_loc_base) + 20) :: file_loc
         logical                                     :: file_exist
-        integer                                     :: ifile, ierr, data_size, var_MOK
+        integer                                     :: ifile, ierr, data_size
 
 #ifdef MFC_MPI
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND)       :: disp
-        integer                             :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, save_index
+        integer(KIND=MPI_OFFSET_KIND)       :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, var_MOK
+        integer                             :: save_index
 #endif
 
         if (.not. ib) return
@@ -210,13 +211,17 @@ contains
             call s_assign_default_bc_type(bc_type)
         end if
 
-        call s_read_grid_data_direction(t_step_dir, 'x', x_cb, dx, x_cc, m)
+        ! Pass explicit slices so the dummy `dimension(-1:)` / `dimension(0:)` arguments map to the correct interior indices of the
+        ! actual arrays. Without slicing, when offset_x%beg or buff_size > 0 (i.e. format=1 parallel 3D ranks), Fortran's
+        ! assumed-shape re-mapping shifts the read by that many slots and leaves the last interior cells uninitialized - corrupting
+        ! downstream ghost-cell extrapolation.
+        call s_read_grid_data_direction(t_step_dir, 'x', x_cb(-1:m), dx(0:m), x_cc(0:m), m)
 
         if (n > 0) then
-            call s_read_grid_data_direction(t_step_dir, 'y', y_cb, dy, y_cc, n)
+            call s_read_grid_data_direction(t_step_dir, 'y', y_cb(-1:n), dy(0:n), y_cc(0:n), n)
 
             if (p > 0) then
-                call s_read_grid_data_direction(t_step_dir, 'z', z_cb, dz, z_cc, p)
+                call s_read_grid_data_direction(t_step_dir, 'z', z_cb(-1:p), dz(0:p), z_cc(0:p), p)
             end if
         end if
 

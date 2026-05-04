@@ -112,6 +112,8 @@ module m_derived_types
         real(wp), dimension(3)              :: vel_in, vel_out
         real(wp), dimension(num_fluids_max) :: alpha_rho_in, alpha_in
         logical                             :: grcbc_in, grcbc_out, grcbc_vel_out
+        logical                             :: isothermal_in, isothermal_out
+        real(wp)                            :: Twall_in, Twall_out
     end type int_bounds_info
 
     !> Groups the x, y, z boundary condition begin/end codes for passing as a single argument.

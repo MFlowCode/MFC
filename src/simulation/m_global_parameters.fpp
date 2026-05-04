@@ -148,23 +148,24 @@ module m_global_parameters
     logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
-    real(wp) :: weno_eps         !< Binding for the WENO nonlinear weights
-    real(wp) :: teno_CT          !< Smoothness threshold for TENO
-    logical  :: mp_weno          !< Monotonicity preserving (MP) WENO
-    logical  :: weno_avg         !< Average left/right cell-boundary states
-    logical  :: weno_Re_flux     !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer  :: riemann_solver   !< Riemann solver algorithm
-    integer  :: low_Mach         !< Low Mach number fix to HLLC Riemann solver
-    integer  :: wave_speeds      !< Wave speeds estimation method
-    integer  :: avg_state        !< Average state evaluation method
-    logical  :: alt_soundspeed   !< Alternate mixture sound speed
-    logical  :: null_weights     !< Null undesired WENO weights
-    logical  :: mixture_err      !< Mixture properties correction
-    logical  :: hypoelasticity   !< hypoelasticity modeling
-    logical  :: hyperelasticity  !< hyperelasticity modeling
-    integer  :: int_comp         !< Interface compression: 0=off, 1=THINC, 2=MTHINC
-    real(wp) :: ic_eps           !< THINC Epsilon to compress on surface cells
-    real(wp) :: ic_beta          !< THINC Sharpness Parameter
+    real(wp)           :: muscl_eps                    !< MUSCL limiter slope-product threshold
+    real(wp)           :: weno_eps                     !< Binding for the WENO nonlinear weights
+    real(wp)           :: teno_CT                      !< Smoothness threshold for TENO
+    logical            :: mp_weno                      !< Monotonicity preserving (MP) WENO
+    logical            :: weno_avg                     !< Average left/right cell-boundary states
+    logical            :: weno_Re_flux                 !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer            :: riemann_solver               !< Riemann solver algorithm
+    integer            :: low_Mach                     !< Low Mach number fix to HLLC Riemann solver
+    integer            :: wave_speeds                  !< Wave speeds estimation method
+    integer            :: avg_state                    !< Average state evaluation method
+    logical            :: alt_soundspeed               !< Alternate mixture sound speed
+    logical            :: null_weights                 !< Null undesired WENO weights
+    logical            :: mixture_err                  !< Mixture properties correction
+    logical            :: hypoelasticity               !< hypoelasticity modeling
+    logical            :: hyperelasticity              !< hyperelasticity modeling
+    integer            :: int_comp                     !< Interface compression: 0=off, 1=THINC, 2=MTHINC
+    real(wp)           :: ic_eps                       !< THINC Epsilon to compress on surface cells
+    real(wp)           :: ic_beta                      !< THINC Sharpness Parameter
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer            :: hyper_model                  !< hyperelasticity solver algorithm
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
@@ -198,6 +199,7 @@ module m_global_parameters
         $:GPU_DECLARE(create='[recon_type, muscl_order, muscl_polyn, muscl_lim]')
     #:endif
 
+    $:GPU_DECLARE(create='[muscl_eps]')
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
@@ -215,12 +217,19 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+    !> @name Original boundary conditions preserved for immersed boundary code
+    !> (bc_x/y/z get overwritten with MPI neighbor ranks during decomposition)
+    !> @{
+    type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z
+    !> @}
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
+    $:GPU_DECLARE(create='[ib_bc_x%beg, ib_bc_y%beg, ib_bc_z%beg]')
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
+    $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
@@ -330,14 +339,19 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                               :: ib
-    integer                                               :: num_ibs
-    logical                                               :: ib_state_wrt
-    type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)              :: airfoil_grid_u, airfoil_grid_l
-    integer                                               :: Np
+    logical                                                  :: ib
+    integer                                                  :: num_ibs
+    integer                                                  :: collision_model
+    real(wp)                                                 :: coefficient_of_restitution
+    real(wp)                                                 :: collision_time
+    real(wp)                                                 :: ib_coefficient_of_friction
+    logical                                                  :: ib_state_wrt
+    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
+    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
+    integer                                                  :: Np
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
+    $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
     !> @name Bubble modeling
@@ -510,6 +524,7 @@ contains
         model_eqns = dflt_int
         mpp_lim = .false.
         time_stepper = dflt_int
+        muscl_eps = dflt_real
         weno_eps = dflt_real
         teno_CT = dflt_real
         mp_weno = .false.
@@ -623,6 +638,10 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        collision_model = 0
+        coefficient_of_restitution = dflt_real
+        collision_time = dflt_real
+        ib_coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
 
         ! Bubble modeling
@@ -735,6 +754,13 @@ contains
             bc_${dir}$%grcbc_vel_out = .false.
         #:endfor
 
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%isothermal_in = .false.
+            bc_${dir}$%isothermal_out = .false.
+            bc_${dir}$%Twall_in = dflt_real
+            bc_${dir}$%Twall_out = dflt_real
+        #:endfor
+
         ! Lagrangian subgrid bubble model
         bubbles_lagrange = .false.
         lag_params%solver_approach = dflt_int
@@ -765,7 +791,7 @@ contains
             relativity = .false.
         #:endif
 
-        do i = 1, num_patches_max
+        do i = 1, num_ib_patches_max
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp
@@ -832,6 +858,15 @@ contains
             $:GPU_UPDATE(device='[num_dims, num_vels, num_fluids]')
             $:GPU_UPDATE(device='[igr, igr_order, igr_iter_solver]')
         #:endif
+
+        ! muscl_eps: use per-limiter defaults when user did not set it
+        if (f_is_default(muscl_eps)) then
+            if (muscl_lim <= 2) then
+                muscl_eps = 1e-9_wp  ! minmod, MC
+            else
+                muscl_eps = 1e-6_wp  ! Van Albada, Van Leer, SUPERBEE
+            end if
+        end if
 
         ! Initialize counts: viscous fluids, surface-tension interfaces, curvature interfaces
         Re_size = 0
@@ -1198,6 +1233,7 @@ contains
         #:endif
 
         $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')
+        $:GPU_UPDATE(device='[muscl_eps]')
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau]')
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')

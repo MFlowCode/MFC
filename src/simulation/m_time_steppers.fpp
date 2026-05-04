@@ -394,11 +394,6 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        ! Opening and writing the header of the ib state data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
-            call s_open_ib_state_file()
-        end if
-
         if (cfl_dt) then
             @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
         end if
@@ -558,13 +553,6 @@ contains
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
                     ! compute ib forces for fixed immersed boundaries if requested for output
-                else if (ib_state_wrt .and. s == nstage) then
-                    call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                end if
-
-                ! Write IB state to file if requested and at the RK final stage
-                if (proc_rank == 0 .and. ib_state_wrt .and. s == nstage) then
-                    call s_write_ib_state_file()
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -576,7 +564,13 @@ contains
             end if
         end do
 
-        if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
+        !
+        if (ib) then
+            if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
+            if (ib_state_wrt .and. (.not. moving_immersed_boundary_flag)) then
+                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+            end if
+        end if
 
         ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
@@ -605,7 +599,7 @@ contains
             call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, divu)
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
         else if (bubbles_lagrange) then
-            call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
             call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
             call s_transfer_data_to_tmp()
             call s_smear_voidfraction()
@@ -730,6 +724,13 @@ contains
                 patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
             end if
 
+            ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
+            ! velocity-dependent collision damping forces are evaluated on the GPU.
+            if (patch_ib(i)%moving_ibm == 2 .and. .not. forces_computed) then
+                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                forces_computed = .true.
+            end if
+
             if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
@@ -739,12 +740,6 @@ contains
                     ! plug in analytic velocities for 1-way coupling, if it exists
                     @:mib_analytical()
                 else if (patch_ib(i)%moving_ibm == 2) then  ! if we are using two-way coupling, apply force and torque
-                    ! compute the force and torque on the IB from the fluid
-                    if (.not. forces_computed) then
-                        call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                        forces_computed = .true.
-                    end if
-
                     ! update the velocity from the force value
                     patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
 
@@ -771,6 +766,7 @@ contains
             end if
         end do
 
+        $:GPU_UPDATE(device='[patch_ib]')
         call s_update_mib(num_ibs)
 
         call nvtxEndRange
@@ -970,11 +966,6 @@ contains
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_close_run_time_information_file()
-        end if
-
-        ! Writing the footer of and closing the IB data file
-        if (proc_rank == 0 .and. ib_state_wrt) then
-            call s_close_ib_state_file()
         end if
 
     end subroutine s_finalize_time_steppers_module

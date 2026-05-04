@@ -73,6 +73,7 @@ DESCRIPTIONS = {
     "recon_type": "Reconstruction type",
     "muscl_order": "Order of MUSCL reconstruction",
     "muscl_lim": "MUSCL limiter type",
+    "muscl_eps": "MUSCL limiter slope-product threshold",
     # Riemann solver
     "riemann_solver": "Riemann solver",
     "wave_speeds": "Wave speed estimates",
@@ -250,6 +251,10 @@ DESCRIPTIONS = {
     "lag_mg_wrt": "Write bubble gas mass",
     "lag_betaT_wrt": "Write bubble heat transfer coefficient",
     "lag_betaC_wrt": "Write bubble mass transfer coefficient",
+    "coefficient_of_restitution": "Real number describing the elasticity of collisions from 0 (perfectly ineleastic) to 1 (perfectly elastic)",
+    "collision_model": "Integer selecting the collision model being used. 0 for no collision. 1 for soft-sphere collisions",
+    "collision_time": "Amount of simulation time each collision will take to resolve",
+    "ib_coefficient_of_friction": "coefficient of friction used in IB collisions",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters
@@ -367,6 +372,10 @@ PATTERNS = [
     (r"bc_([xyz])%grcbc_in", "Enable GRCBC at {0}-inlet"),
     (r"bc_([xyz])%grcbc_out", "Enable GRCBC at {0}-outlet"),
     (r"bc_([xyz])%grcbc_vel_out", "Enable GRCBC velocity at {0}-outlet"),
+    (r"bc_([xyz])%isothermal_in", "Enable isothermal wall at {0}-inlet"),
+    (r"bc_([xyz])%isothermal_out", "Enable isothermal wall at {0}-outlet"),
+    (r"bc_([xyz])%Twall_in", "Wall temperature at {0}-inlet"),
+    (r"bc_([xyz])%Twall_out", "Wall temperature at {0}-outlet"),
     # patch_bc patterns
     (r"patch_bc\((\d+)\)%geometry", "Geometry type for BC patch {0}"),
     (r"patch_bc\((\d+)\)%type", "BC type for patch {0}"),
