@@ -55,7 +55,8 @@ contains
 
         ! D_xx = du/dx
         if (j - 1 >= j_lo .and. j + 1 <= j_hi) then
-            D_xx = (q_prim_vf(eqn_idx%mom%beg)%sf(j + 1, k, l) - q_prim_vf(eqn_idx%mom%beg)%sf(j - 1, k, l))/(x_cc(j + 1) - x_cc(j - 1))
+            D_xx = (q_prim_vf(eqn_idx%mom%beg)%sf(j + 1, k, l) - q_prim_vf(eqn_idx%mom%beg)%sf(j - 1, k, &
+                    & l))/(x_cc(j + 1) - x_cc(j - 1))
         else if (j + 1 <= j_hi) then
             D_xx = (q_prim_vf(eqn_idx%mom%beg)%sf(j + 1, k, l) - q_prim_vf(eqn_idx%mom%beg)%sf(j, k, l))/(x_cc(j + 1) - x_cc(j))
         else if (j - 1 >= j_lo) then
@@ -67,11 +68,14 @@ contains
         ! D_yy = dv/dy (2D and 3D only)
         if (n > 0) then
             if (k - 1 >= k_lo .and. k + 1 <= k_hi) then
-                D_yy = (q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k - 1, l))/(y_cc(k + 1) - y_cc(k - 1))
+                D_yy = (q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k - 1, &
+                        & l))/(y_cc(k + 1) - y_cc(k - 1))
             else if (k + 1 <= k_hi) then
-                D_yy = (q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l))/(y_cc(k + 1) - y_cc(k))
+                D_yy = (q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
+                        & l))/(y_cc(k + 1) - y_cc(k))
             else if (k - 1 >= k_lo) then
-                D_yy = (q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k - 1, l))/(y_cc(k) - y_cc(k - 1))
+                D_yy = (q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k - 1, &
+                        & l))/(y_cc(k) - y_cc(k - 1))
             else
                 D_yy = 0._wp
             end if
@@ -82,11 +86,14 @@ contains
         ! D_zz = dw/dz (3D only)
         if (p > 0) then
             if (l - 1 >= l_lo .and. l + 1 <= l_hi) then
-                D_zz = (q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l - 1))/(z_cc(l + 1) - z_cc(l - 1))
+                D_zz = (q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
+                        & l - 1))/(z_cc(l + 1) - z_cc(l - 1))
             else if (l + 1 <= l_hi) then
-                D_zz = (q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l))/(z_cc(l + 1) - z_cc(l))
+                D_zz = (q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
+                        & l))/(z_cc(l + 1) - z_cc(l))
             else if (l - 1 >= l_lo) then
-                D_zz = (q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l - 1))/(z_cc(l) - z_cc(l - 1))
+                D_zz = (q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
+                        & l - 1))/(z_cc(l) - z_cc(l - 1))
             else
                 D_zz = 0._wp
             end if
@@ -103,11 +110,12 @@ contains
             else
                 D_xy = 0._wp
                 if (k - 1 >= k_lo .and. k + 1 <= k_hi) then
-                    D_xy = 0.5_wp*(q_prim_vf(eqn_idx%mom%beg)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%mom%beg)%sf(j, k - 1, l))/(y_cc(k + 1) - y_cc(k - 1))
+                    D_xy = 0.5_wp*(q_prim_vf(eqn_idx%mom%beg)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%mom%beg)%sf(j, k - 1, &
+                                   & l))/(y_cc(k + 1) - y_cc(k - 1))
                 end if
                 if (j - 1 >= j_lo .and. j + 1 <= j_hi) then
-                    D_xy = D_xy + 0.5_wp*(q_prim_vf(eqn_idx%mom%beg + 1)%sf(j + 1, k, l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j - 1, k, &
-                                          & l))/(x_cc(j + 1) - x_cc(j - 1))
+                    D_xy = D_xy + 0.5_wp*(q_prim_vf(eqn_idx%mom%beg + 1)%sf(j + 1, k, &
+                                          & l) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j - 1, k, l))/(x_cc(j + 1) - x_cc(j - 1))
                 end if
             end if
         else
