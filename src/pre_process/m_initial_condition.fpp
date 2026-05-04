@@ -49,7 +49,7 @@ contains
         end do
 
         if (chemistry) then
-            allocate (q_T_sf%sf(0:m,0:n,0:p))
+            allocate (q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
         allocate (patch_id_fp(0:m,0:n,0:p))
@@ -102,14 +102,14 @@ contains
 
         ! Initial damage state is always zero
         if (cont_damage) then
-            q_cons_vf(damage_idx)%sf = 0._wp
-            q_prim_vf(damage_idx)%sf = 0._wp
+            q_cons_vf(eqn_idx%damage)%sf = 0._wp
+            q_prim_vf(eqn_idx%damage)%sf = 0._wp
         end if
 
         ! Initial hyper_cleaning state is always zero TODO more general
         if (hyper_cleaning) then
-            q_cons_vf(psi_idx)%sf = 0._wp
-            q_prim_vf(psi_idx)%sf = 0._wp
+            q_cons_vf(eqn_idx%psi)%sf = 0._wp
+            q_prim_vf(eqn_idx%psi)%sf = 0._wp
         end if
 
         ! Setting default values for patch identities bookkeeping variable. This is necessary to avoid any confusion in the
@@ -138,11 +138,16 @@ contains
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_perturb_mixlayer(q_prim_vf)
         if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
-        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
+
+        if (elliptic_smoothing .and. chemistry) then
+            call s_elliptic_smoothing(q_prim_vf, bc_type, q_T_sf)
+            call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
+        else if (elliptic_smoothing) then
+            call s_elliptic_smoothing(q_prim_vf, bc_type)
+        end if
 
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
-
-        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             call s_initialize_mv(q_cons_vf, mv%sf)

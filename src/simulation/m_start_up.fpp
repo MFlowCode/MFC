@@ -83,7 +83,7 @@ contains
 
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, mpp_lim, time_stepper, weno_eps, &
+            model_eqns, mpp_lim, time_stepper, weno_eps, muscl_eps, &
             rdma_mpi, teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
@@ -91,7 +91,8 @@ contains
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
-            ib_state_wrt, &
+            collision_model, coefficient_of_restitution, collision_time, &
+            ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
@@ -435,7 +436,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
@@ -497,7 +498,7 @@ contains
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
                 if (bubbles_euler .or. elasticity) then
-                    do i = 1, sys_size  ! adv_idx%end
+                    do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
@@ -569,31 +570,31 @@ contains
                     call s_convert_to_mixture_variables(v_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
 
                     dyn_pres = 0._wp
-                    do i = mom_idx%beg, mom_idx%end
+                    do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         dyn_pres = dyn_pres + 5.e-1_wp*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
                     end do
 
                     if (chemistry) then
                         do c = 1, num_species
-                            rhoYks(c) = v_vf(chemxb + c - 1)%sf(j, k, l)
+                            rhoYks(c) = v_vf(eqn_idx%species%beg + c - 1)%sf(j, k, l)
                         end do
                     end if
 
                     if (mhd) then
                         if (n == 0) then
-                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(Bx0**2 + v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
                         else
-                            pres_mag = 0.5_wp*(v_vf(B_idx%beg)%sf(j, k, l)**2 + v_vf(B_idx%beg + 1)%sf(j, k, &
-                                               & l)**2 + v_vf(B_idx%beg + 2)%sf(j, k, l)**2)
+                            pres_mag = 0.5_wp*(v_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + v_vf(eqn_idx%B%beg + 1)%sf(j, k, &
+                                               & l)**2 + v_vf(eqn_idx%B%beg + 2)%sf(j, k, l)**2)
                         end if
                     end if
 
-                    call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0._stp, dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                            & pres_mag=pres_mag)
+                    call s_compute_pressure(v_vf(eqn_idx%E)%sf(j, k, l), 0._stp, dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, &
+                                            & T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + intxb - 1)%sf(j, k, l) = v_vf(i + advxb - 1)%sf(j, k, &
-                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
+                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
                     end do
                 end do
             end do
@@ -816,6 +817,9 @@ contains
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
+        ! Write IB kinematic state for restart
+        if (ib) call s_write_ib_state_file(save_count)
+
         call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
@@ -842,8 +846,8 @@ contains
         #:if USING_AMD
             #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
-                           & bc_z%end/) == ${BC}$) .and. adv_idx%end > 20 .and. (.not. chemistry), &
-                           & "CBC module with AMD compiler requires adv_idx%end <= 20 when case optimization is turned off")
+                           & bc_z%end/) == ${BC}$) .and. eqn_idx%adv%end > 20 .and. (.not. chemistry), &
+                           & "CBC module with AMD compiler requires eqn_idx%adv%end <= 20 when case optimization is turned off")
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
                            & bc_z%end/) == ${BC}$) .and. sys_size > 20 .and. (chemistry), &
                            & "CBC module with AMD compiler and chemistry requires sys_size <= 20 when case optimization is turned off")
@@ -910,8 +914,16 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
+            if (cfl_dt .and. n_start > 0) then
+                call s_read_ib_restart_data(n_start)
+            else if (t_step_start > 0) then
+                call s_read_ib_restart_data(t_step_start)
+            end if
             call s_ibm_setup()
-            call s_write_ib_data_file(0)
+            if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
+                call s_write_ib_data_file(0)
+                call s_write_ib_state_file(0)
+            end if
         end if
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
@@ -1006,6 +1018,11 @@ contains
 
         call s_mpi_bcast_user_inputs()
 
+        ! Save original BCs before decomposition overwrites them with MPI neighbor ranks
+        ib_bc_x = bc_x
+        ib_bc_y = bc_y
+        ib_bc_z = bc_z
+
         call s_initialize_parallel_io()
 
         call s_mpi_decompose_computational_domain()
@@ -1035,7 +1052,7 @@ contains
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
                      & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
                      & polytropic, polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, &
-                     & adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
+                     & adap_dt_max_iters, eqn_idx%n, pi_fac, low_Mach]')
 
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight, R0]')
@@ -1046,12 +1063,13 @@ contains
             end if
         end if
 
-        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, n_idx, pi_fac, low_Mach]')
+        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, pi_fac, low_Mach]')
 
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
         $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
+        $:GPU_UPDATE(device='[bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]')
         $:GPU_UPDATE(device='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
@@ -1059,6 +1077,11 @@ contains
         $:GPU_UPDATE(device='[bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
+
+        $:GPU_UPDATE(device='[bc_x%isothermal_in, bc_x%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_x%Twall_in, bc_x%Twall_out, bc_y%Twall_in, bc_y%Twall_out, bc_z%Twall_in, bc_z%Twall_out]')
 
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then
@@ -1116,9 +1139,61 @@ contains
 
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
+        if (ib) call s_finalize_ibm_module()
 
         call s_mpi_finalize()
 
     end subroutine s_finalize_modules
+
+    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart. Rank 0 reads the last num_ibs records and
+    !! broadcasts to all ranks. Overwrites patch_ib vel, angular_vel, angles, and centroid.
+    impure subroutine s_read_ib_restart_data(t_step)
+
+        integer, intent(in)                  :: t_step
+        character(len=path_len + 2*name_len) :: file_loc
+        integer                              :: i, ios, file_unit, ierr
+        integer, parameter                   :: NFIELDS_PER_IB = 20
+        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+        logical                              :: file_exist
+
+        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+        file_loc = trim(case_dir) // trim(file_loc)
+
+        if (proc_rank == 0) then
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (.not. file_exist) then
+                call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+            end if
+
+            open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+            if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
+
+            do i = 1, num_ibs
+                read (file_unit, iostat=ios) ib_buf
+                if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
+
+                patch_ib(i)%vel = ib_buf(8:10)
+                patch_ib(i)%angular_vel = ib_buf(11:13)
+                patch_ib(i)%angles = ib_buf(14:16)
+                patch_ib(i)%x_centroid = ib_buf(17)
+                patch_ib(i)%y_centroid = ib_buf(18)
+                patch_ib(i)%z_centroid = ib_buf(19)
+            end do
+
+            close (file_unit)
+        end if
+
+#ifdef MFC_MPI
+        do i = 1, num_ibs
+            call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        end do
+#endif
+
+    end subroutine s_read_ib_restart_data
 
 end module m_start_up
