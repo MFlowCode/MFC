@@ -56,6 +56,18 @@ contains
 
     end function f_log_cosh
 
+    !> @brief Stable difference: log_cosh(a+h) - log_cosh(a-h) = 2*atanh(tanh(a)*tanh(h)). Avoids catastrophic cancellation when h
+    !! is small relative to a.
+    function f_log_cosh_diff(a, h) result(res)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: a, h
+        real(wp)             :: res
+
+        res = 2._wp*atanh(tanh(a)*tanh(h))
+
+    end function f_log_cosh_diff
+
     !> @brief Analytical 1-D integral of the THINC function
     function f_thinc_integral_1d(a, b) result(res)
 
@@ -66,7 +78,7 @@ contains
         if (abs(b) < verysmall) then
             res = 5e-1_wp*(1._wp + tanh(a))
         else
-            res = 5e-1_wp + (f_log_cosh(a + 5e-1_wp*b) - f_log_cosh(a - 5e-1_wp*b))/(2._wp*b)
+            res = 5e-1_wp + f_log_cosh_diff(a, 5e-1_wp*b)/(2._wp*b)
         end if
 
     end function f_thinc_integral_1d
