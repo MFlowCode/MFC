@@ -10,6 +10,7 @@ module m_hb_function
 
     use m_derived_types      !< Definitions of the derived types
     use m_global_parameters  !< Definitions of the global parameters
+    use m_constants          !< verysmall
 
     implicit none
 
@@ -34,11 +35,18 @@ contains
         real(wp), intent(in) :: mu_min_val, mu_max_val
         real(wp), intent(in) :: shear_rate, hb_m_val
         real(wp)             :: mu
-        real(wp)             :: yield_term, power_law_term, exp_term
+        real(wp)             :: yield_term, power_law_term, g_eff
 
-        exp_term = exp(-hb_m_val*shear_rate)
-        yield_term = tau0*(1._wp - exp_term)/shear_rate
-        power_law_term = K_val*(shear_rate**(nn_val - 1._wp))
+        ! Guard shear_rate == 0: naive formula gives 0/0 (yield) and 0^(nn-1) (power-law). Analytic limits: (1-exp(-m*g))/g -> m as
+        ! g->0 (L'Hopital); for the power-law term use g_eff = max(g, verysmall) so nn<1 fluids get a large-but-finite viscosity at
+        ! rest, consistent with mu_max clamping.
+        g_eff = max(shear_rate, verysmall)
+        if (shear_rate <= verysmall) then
+            yield_term = tau0*hb_m_val
+        else
+            yield_term = tau0*(1._wp - exp(-hb_m_val*shear_rate))/shear_rate
+        end if
+        power_law_term = K_val*(g_eff**(nn_val - 1._wp))
 
         mu = yield_term + power_law_term
         mu = max(mu, mu_min_val)
