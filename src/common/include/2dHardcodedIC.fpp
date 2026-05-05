@@ -280,7 +280,7 @@
     case (270)  ! 2D extrusion of 1D profile from external data
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
         @: HardcodedReadValues()
-    case (271)  ! Premixed Flame Vortices interctiom
+    case (271)  ! Premixed Flame Vortices Interaction
         @: HardcodedReadValues()
         x1c = 0.0027_wp
         y1c = 0.005_wp
@@ -296,9 +296,9 @@
 
         u2c = cvortex*((y_cc(j) - y2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
         v2c = -cvortex*((x_cc(i) - x2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
-        q_prim_vf(momxb)%sf(i, j, 0) = q_prim_vf(momxb)%sf(i, j, 0) + u1c + u2c
-        q_prim_vf(momxe)%sf(i, j, 0) = v1c + v2c
-    case (272)  ! Prexmied flame instability
+        q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) + u1c + u2c
+        q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, 0) = v1c + v2c
+    case (272)  ! Premixed Flame Instability
         @: HardcodedReadValues()
 
         y_center = y0_ref
@@ -310,14 +310,14 @@
 
         if (x_mapped <= x_coords(1)) then
             do v = 1, sys_size - 1
-                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = stored_values(1, 1, v)
+                q_prim_vf(v + merge(1, 0, v >= eqn_idx%mom%end))%sf(i, j, 0) = stored_values(1, 1, v)
             end do
-            q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+            q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
         else if (x_mapped >= x_coords(xRows)) then
             do v = 1, sys_size - 1
-                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = stored_values(xRows, 1, v)
+                q_prim_vf(v + merge(1, 0, v >= eqn_idx%mom%end))%sf(i, j, 0) = stored_values(xRows, 1, v)
             end do
-            q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+            q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
         else
             idx_lo = 1; idx_hi = xRows
             do while (idx_hi - idx_lo > 1)
@@ -332,10 +332,10 @@
             interp_wt = (x_mapped - x_coords(idx_lo))/(x_coords(idx_hi) - x_coords(idx_lo))  ! weight in [0,1)
 
             do v = 1, sys_size - 1
-                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = (1.0_wp - interp_wt)*stored_values(idx_lo, 1, &
+                q_prim_vf(v + merge(1, 0, v >= eqn_idx%mom%end))%sf(i, j, 0) = (1.0_wp - interp_wt)*stored_values(idx_lo, 1, &
                           & v) + interp_wt*stored_values(idx_hi, 1, v)
             end do
-            q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+            q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
         end if
     case (280)  ! Isentropic vortex
         ! This is patch is hard-coded for test suite optimization used in the 2D_isentropicvortex case: This analytic patch uses

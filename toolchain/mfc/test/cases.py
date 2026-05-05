@@ -1548,7 +1548,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_qbmm",
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
-                "2D_premixed_flame_vortex",  
+                "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
             ]
             if path in casesToSkip:
