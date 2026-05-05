@@ -76,7 +76,7 @@ contains
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
             & 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
             & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters', &
-            & 'adap_dt_max_iters', 'collision_model' ]
+            & 'adap_dt_max_iters', 'collision_model', 'ib_neighborhood_radius' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

@@ -1249,7 +1249,6 @@ contains
                 ! catch the edge case where th collision lies just outside the computational domain
                 is_in_neighborhood = .true.
                 is_local = .true.
-
                 centroid = [patch_ib_gbl(i)%x_centroid, patch_ib_gbl(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = patch_ib_gbl(i)%z_centroid
 
