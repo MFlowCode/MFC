@@ -177,7 +177,7 @@ contains
     !! @param grad_x_vf Optional pre-computed x-direction gradients
     !! @param grad_y_vf Optional pre-computed y-direction gradients
     !! @param grad_z_vf Optional pre-computed z-direction gradients
-    pure subroutine s_compute_re_visc(q_prim_vf, alpha_visc, j, k, l, Re_visc_per_phase, grad_x_vf, grad_y_vf, grad_z_vf)
+    subroutine s_compute_re_visc(q_prim_vf, alpha_visc, j, k, l, Re_visc_per_phase, grad_x_vf, grad_y_vf, grad_z_vf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -281,7 +281,7 @@ contains
     !! @param alpha Volume fractions
     !! @param Re_per_phase Per-phase Re_visc = 1/mu
     !! @param Re_mix Output: mixture Re (shear and bulk)
-    pure subroutine s_compute_mixture_re(alpha, Re_per_phase, Re_mix)
+    subroutine s_compute_mixture_re(alpha, Re_per_phase, Re_mix)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
