@@ -14,7 +14,7 @@ module m_re_visc
 
     implicit none
 
-    private; public :: s_compute_re_visc, s_compute_mixture_re
+    private; public :: s_compute_re_visc, s_compute_mixture_re, s_compute_velocity_gradients_at_cell
 
 contains
 
