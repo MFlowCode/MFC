@@ -208,7 +208,7 @@ contains
                 if (1._wp - eta < sgm_eps) patch_id_fp(i, 0, 0) = patch_id
             end if
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_line_segment
 
@@ -272,7 +272,7 @@ contains
                 end if
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_spiral
 
@@ -327,7 +327,7 @@ contains
                 end if
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_circle
 
@@ -384,7 +384,7 @@ contains
                 end if
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_varcircle
 
@@ -447,7 +447,7 @@ contains
                 end do
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_3dvarcircle
 
@@ -503,7 +503,7 @@ contains
                 end if
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_ellipse
 
@@ -574,7 +574,7 @@ contains
                 end do
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_ellipsoid
 
@@ -644,7 +644,7 @@ contains
                 end if
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_rectangle
 
@@ -703,7 +703,7 @@ contains
                 end if
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_sweep_line
 
@@ -772,7 +772,7 @@ contains
                 end if
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_2D_TaylorGreen_Vortex
 
@@ -826,7 +826,7 @@ contains
                 end if
             end if
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_1D_bubble_pulse
 
@@ -1014,7 +1014,7 @@ contains
                 end do
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_sphere
 
@@ -1084,7 +1084,7 @@ contains
                 end do
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_cuboid
 
@@ -1179,7 +1179,7 @@ contains
                 end do
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_cylinder
 
@@ -1250,7 +1250,7 @@ contains
                 end do
             end do
         end do
-        @:HardcodedDellacation()
+        @:HardcodedDeallocation()
 
     end subroutine s_icpp_sweep_plane
 

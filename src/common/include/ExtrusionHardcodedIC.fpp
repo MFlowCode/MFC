@@ -10,8 +10,8 @@
 !>
 !> **File Reading Operations:**
 !> - Reads primitive variable data from multiple files with pattern:
-!> `prim.<file_number>.00.<timestep>.dat` where timestep uses `zeros_default` padding
-!> - Files are read from directory specified by `init_dir` parameter
+!> `prim.<file_number>.00.<file_extension>.dat`
+!> - Files are read from directory specified by `files_dir` parameter
 !> - Supports 1D, 2D, and 3D computational domains
 !>
 !> **Grid Structure Detection:**
@@ -31,25 +31,23 @@
 !> - Uses files_loaded flag to prevent redundant file operations
 !> - Preserves data across multiple macro calls within same simulation
 !>
-!> @note File pattern uses `zeros_default` parameter (default: "000000") for timestep padding
-!> @note Directory path is hardcoded in `init_dir` parameter - modify as needed
+!> @note File pattern timestep field is controlled by the `file_extension` parameter
+!> @note Directory path is set via the `files_dir` parameter
 !> @warning Aborts execution if file reading errors occur.
 
 #:def HardcodedDimensionsExtrusion()
     integer                                 :: xRows, yRows, nRows, iix, iiy, max_files
-    integer                                 :: f, iter, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
-    real(wp)                                :: x_len, x_step, y_len, y_step
+    integer                                 :: f, iter, unit, unit2, idx, idy, index_x, index_y, jump, line_count
+    real(wp)                                :: x_step, y_step
     real(wp)                                :: dummy_x, dummy_y, dummy_z, x0, y0
     integer                                 :: global_offset_x, global_offset_y  !< MPI subdomain offset
     real(wp)                                :: delta_x, delta_y
     character(len=300), dimension(sys_size) :: fileNames                         !< Arrays to store all data from files
-    character(len=200)                      :: errmsg
     real(wp), allocatable                   :: stored_values(:,:,:)
     real(wp), allocatable                   :: x_coords(:), y_coords(:)
     logical                                 :: files_loaded = .false.
-    real(wp)                                :: domain_xstart, domain_xend, domain_ystart, domain_yend
+    real(wp)                                :: domain_xstart
     character(len=20)                       :: file_num_str                      !< For storing the file number as a string
-    character(len=20)                       :: zeros_part                        !< For the trailing zeros part
     integer                                 :: ios
     integer                                 :: ios2
 #:enddef
@@ -192,7 +190,7 @@
     end select
 #:enddef
 
-#:def HardcodedDellacation()
+#:def HardcodedDeallocation()
     if (allocated(stored_values)) then
         @:DEALLOCATE(stored_values)
         @:DEALLOCATE(x_coords)
