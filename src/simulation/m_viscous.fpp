@@ -74,7 +74,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum , &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, Re_visc_nn, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -168,7 +168,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum , &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, Re_visc_nn, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -255,7 +255,7 @@ contains
         if (p == 0) return
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (shear_stress) then  ! Shear stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, Re_visc_nn, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -345,7 +345,7 @@ contains
             end if
 
             if (bulk_stress) then  ! Bulk stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, Re_visc_nn, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end

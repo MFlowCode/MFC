@@ -883,7 +883,11 @@ class CaseValidator:
     def check_non_newtonian(self):
         """Checks constraints on non-Newtonian fluid parameters"""
         viscous = self.get("viscous", "F") == "T"
+        igr = self.get("igr", "F") == "T"
         num_fluids = self.get("num_fluids", 1)
+
+        any_nn = any(self.get(f"fluid_pp({i})%non_newtonian", "F") == "T" for i in range(1, num_fluids + 1))
+        self.prohibit(any_nn and igr, "non_newtonian is not supported with igr (primitive variable storage is not allocated in IGR mode)")
 
         for i in range(1, num_fluids + 1):
             nn_flag = self.get(f"fluid_pp({i})%non_newtonian", "F") == "T"
@@ -898,6 +902,10 @@ class CaseValidator:
             mu_min = self.get(f"fluid_pp({i})%mu_min")
             mu_max = self.get(f"fluid_pp({i})%mu_max")
             hb_m = self.get(f"fluid_pp({i})%hb_m")
+
+            self.prohibit(K is None, f"fluid_pp({i})%K must be set when non_newtonian = T")
+            self.prohibit(nn is None, f"fluid_pp({i})%nn must be set when non_newtonian = T")
+            self.prohibit(hb_m is None, f"fluid_pp({i})%hb_m must be set when non_newtonian = T")
 
             self.prohibit(K is not None and K <= 0, f"fluid_pp({i})%K (consistency index) must be > 0")
             self.prohibit(nn is not None and nn <= 0, f"fluid_pp({i})%nn (flow behavior index) must be > 0")
@@ -2111,6 +2119,7 @@ class CaseValidator:
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
         self.check_viscosity()
+        self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
         self.check_acoustic_source()
