@@ -226,6 +226,7 @@ _SIMPLE_DESCS = {
     "hyperelasticity": "Enable hyperelastic model",
     "relativity": "Enable special relativity",
     "ib": "Enable immersed boundaries",
+    "ib_neighborhood_radius": "Neighborhood radius in ranks for IB awareness",
     "collision_model": "Collision model for immersed boundaries (0=none, 1=soft sphere)",
     "coefficient_of_restitution": "Coefficient of restitution for IB collisions",
     "collision_time": "Characteristic collision time for IB collisions",
@@ -664,6 +665,7 @@ CONSTRAINTS = {
     "num_fluids": {"min": 1, "max": NF},
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
+    "ib_neighborhood_radius": {"min": 1},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "num_integrals": {"min": 1},
@@ -915,6 +917,7 @@ def _load():
 
     # Immersed boundary
     _r("num_ibs", INT, {"ib"})
+    _r("ib_neighborhood_radius", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})

@@ -752,7 +752,7 @@ contains
         integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
         integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: spc, encoded_patch_id
-        integer                            :: cx, cy
+        integer                            :: cx, cy, gbl_patch_id
         real(wp)                           :: lx(2), ly(2)
         real(wp), dimension(1:2)           :: bbox_min, bbox_max
         real(wp), dimension(1:3)           :: local_corner, world_corner
@@ -761,6 +761,7 @@ contains
         real(wp), dimension(1:3)           :: center, xy_local
         real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
 
+        gbl_patch_id = patch_ib(patch_id)%gbl_patch_id
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -779,10 +780,10 @@ contains
         jr = n + gp_layers + 1
 
         ! Local-space bounding box extents (min=1, max=2 in the third index)
-        lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)
-        lx(2) = stl_bounding_boxes(patch_id, 1, 3) + offset(1)
-        ly(1) = stl_bounding_boxes(patch_id, 2, 1) + offset(2)
-        ly(2) = stl_bounding_boxes(patch_id, 2, 3) + offset(2)
+        lx(1) = stl_bounding_boxes(gbl_patch_id, 1, 1) + offset(1)
+        lx(2) = stl_bounding_boxes(gbl_patch_id, 1, 3) + offset(1)
+        ly(1) = stl_bounding_boxes(gbl_patch_id, 2, 1) + offset(2)
+        ly(2) = stl_bounding_boxes(gbl_patch_id, 2, 3) + offset(2)
 
         bbox_min = 1e12
         bbox_max = -1e12
@@ -809,7 +810,7 @@ contains
                 xy_local = matmul(inverse_rotation, xy_local)
                 xy_local = xy_local - offset
 
-                eta = f_model_is_inside_flat(gpu_ntrs(patch_id), patch_id, xy_local)
+                eta = f_model_is_inside_flat(gpu_ntrs(gbl_patch_id), gbl_patch_id, xy_local)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
                 if (eta > threshold) then
@@ -828,7 +829,7 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
         integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
-        integer                            :: spc, encoded_patch_id
+        integer                            :: spc, encoded_patch_id, gbl_patch_id
         real(wp)                           :: eta, threshold
         real(wp), dimension(1:3)           :: offset
         real(wp), dimension(1:3)           :: center, xyz_local
@@ -837,6 +838,7 @@ contains
         real(wp)                           :: lx(2), ly(2), lz(2)
         real(wp), dimension(1:3)           :: bbox_min, bbox_max, local_corner, world_corner
 
+        gbl_patch_id = patch_ib(patch_id)%gbl_patch_id
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -858,12 +860,12 @@ contains
         kr = p + gp_layers + 1
 
         ! Local-space bounding box extents (min=1, max=2 in the third index)
-        lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)
-        lx(2) = stl_bounding_boxes(patch_id, 1, 3) + offset(1)
-        ly(1) = stl_bounding_boxes(patch_id, 2, 1) + offset(2)
-        ly(2) = stl_bounding_boxes(patch_id, 2, 3) + offset(2)
-        lz(1) = stl_bounding_boxes(patch_id, 3, 1) + offset(3)
-        lz(2) = stl_bounding_boxes(patch_id, 3, 3) + offset(3)
+        lx(1) = stl_bounding_boxes(gbl_patch_id, 1, 1) + offset(1)
+        lx(2) = stl_bounding_boxes(gbl_patch_id, 1, 3) + offset(1)
+        ly(1) = stl_bounding_boxes(gbl_patch_id, 2, 1) + offset(2)
+        ly(2) = stl_bounding_boxes(gbl_patch_id, 2, 3) + offset(2)
+        lz(1) = stl_bounding_boxes(gbl_patch_id, 3, 1) + offset(3)
+        lz(2) = stl_bounding_boxes(gbl_patch_id, 3, 3) + offset(3)
 
         bbox_min = 1e12
         bbox_max = -1e12
@@ -896,7 +898,7 @@ contains
                     xyz_local = matmul(inverse_rotation, xyz_local)
                     xyz_local = xyz_local - offset
 
-                    eta = f_model_is_inside_flat(gpu_ntrs(patch_id), patch_id, xyz_local)
+                    eta = f_model_is_inside_flat(gpu_ntrs(gbl_patch_id), gbl_patch_id, xyz_local)
 
                     if (eta > patch_ib(patch_id)%model_threshold) then
                         ib_markers%sf(i, j, k) = encoded_patch_id

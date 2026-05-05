@@ -39,6 +39,7 @@ module m_start_up
 
     use m_nvtx
     use m_ibm
+    use m_model
     use m_collisions
     use m_compile_specific
     use m_checker_common
@@ -91,7 +92,7 @@ contains
             x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
-            ib, num_ibs, patch_ib, &
+            ib, num_ibs, ib_neighborhood_radius, patch_ib, &
             collision_model, coefficient_of_restitution, collision_time, &
             ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
@@ -920,6 +921,7 @@ contains
             else if (t_step_start > 0) then
                 call s_read_ib_restart_data(t_step_start)
             end if
+            call s_instantiate_STL_models()
             call s_reduce_ib_patch_array()
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
@@ -1222,17 +1224,18 @@ contains
 
         patch_ib_gbl(:) = patch_ib(:)
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
-        call s_compute_ib_neighbor_ranks()  ! build lookup of all 26 neighbor MPI ranks
+        call s_compute_ib_neighbor_ranks()  ! build lookup of all neighbor MPI ranks
 
         deallocate (patch_ib)
-        if (num_dims == 3) then
-            num_aware_ibs = min(num_local_ibs_max*27, num_ib_patches_max)
-        else
-            num_aware_ibs = min(num_local_ibs_max*9, num_ib_patches_max)
-        end if
+        num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
         allocate (patch_ib(num_aware_ibs))
 
+        ! assign defaults to all values
         num_gbl_ibs = num_ibs
+        num_local_ibs = num_ibs
+        do i = 1, num_ibs
+            local_ib_patch_ids(i) = i
+        end do
 
 #ifdef MFC_MPI
         ! fallback for 1-rank case
@@ -1268,19 +1271,29 @@ contains
 
     end subroutine s_reduce_ib_patch_array
 
-    !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all 26 neighbor domains. Uses two rounds of MPI_SENDRECV cascades -
-    !! face neighbors are known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2.
+    !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all neighbor domains. Uses two rounds of MPI_SENDRECV cascades - face
+    !! neighbors are known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2.
     subroutine s_compute_ib_neighbor_ranks()
+
+        integer                :: ax, k, nbr_idx, nreqs, sx, sy, sz, dx, dy, dz
+        integer, allocatable   :: send_table(:,:,:), recv_tables(:,:,:,:)
+        integer, dimension(52) :: requests
 
 #ifdef MFC_MPI
         integer               :: ierr
         integer, dimension(4) :: buf4
         integer, dimension(2) :: buf2, rbuf2
+#endif
 
+        ax = ib_neighborhood_radius
+
+        if (allocated(ib_neighbor_ranks)) deallocate (ib_neighbor_ranks)
+        allocate (ib_neighbor_ranks(-ax:ax,-ax:ax,-ax:ax))
         ib_neighbor_ranks = MPI_PROC_NULL
         ib_neighbor_ranks(0, 0, 0) = proc_rank
 
-        ! Face neighbors - already known from domain decomposition
+#ifdef MFC_MPI
+        ! Fill radius-1 entries: face neighbors are known from domain decomposition
         ib_neighbor_ranks(-1, 0, 0) = bc_x%beg
         ib_neighbor_ranks(+1, 0, 0) = bc_x%end
         if (num_dims >= 2) then
@@ -1336,7 +1349,7 @@ contains
                 ib_neighbor_ranks(0, -1, +1) = rbuf2(2)
             end if
 
-            ! Round 2: exchange z face ranks with xy-diagonal edge neighbors -> corner ranks Each of the 4 xy diagonals gives 2
+            ! Round 2: exchange z face ranks with xy-diagonal edge neighbors -> corner ranks. Each of the 4 xy diagonals gives 2
             ! corners (the +/-z variants). Pattern: send buf2 to mirror diagonal, receive from this diagonal -> that edge's z face
             ! ranks.
             #:for DX, DY, MDX, MDY, TAG in [(1,1,-1,-1,320), (1,-1,-1,1,321), (-1,1,1,-1,322), (-1,-1,1,1,323)]
@@ -1350,16 +1363,82 @@ contains
                 end if
             #:endfor
         end if
+
+        ! For radius > 1: extend the table by iterative 26-neighbor full-table exchanges. In each round, every rank broadcasts its
+        ! current table to all 26 immediate neighbors. Their entry at offset (dx,dy,dz) from them = our entry at
+        ! (dx+sx,dy+sy,dz+sz). One extension round fills the entire next shell, so ax-1 rounds suffice.
+        if (ax > 1) then
+            allocate (send_table(-ax:ax,-ax:ax,-ax:ax))
+            allocate (recv_tables(-ax:ax,-ax:ax,-ax:ax,1:26))
+
+            do k = 2, ax
+                send_table = ib_neighbor_ranks
+
+                nreqs = 0
+                nbr_idx = 0
+                do sz = -1, 1
+                    do sy = -1, 1
+                        do sx = -1, 1
+                            if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
+                            nbr_idx = nbr_idx + 1
+                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            nreqs = nreqs + 1
+                            call MPI_IRECV(recv_tables(:,:,:,nbr_idx), (2*ax + 1)**3, MPI_INTEGER, ib_neighbor_ranks(sx, sy, sz), &
+                                           & 400, MPI_COMM_WORLD, requests(nreqs), ierr)
+                        end do
+                    end do
+                end do
+
+                do sz = -1, 1
+                    do sy = -1, 1
+                        do sx = -1, 1
+                            if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
+                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            nreqs = nreqs + 1
+                            call MPI_ISEND(send_table, (2*ax + 1)**3, MPI_INTEGER, ib_neighbor_ranks(sx, sy, sz), 400, &
+                                           & MPI_COMM_WORLD, requests(nreqs), ierr)
+                        end do
+                    end do
+                end do
+
+                call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
+
+                nbr_idx = 0
+                do sz = -1, 1
+                    do sy = -1, 1
+                        do sx = -1, 1
+                            if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
+                            nbr_idx = nbr_idx + 1
+                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            do dz = -ax, ax
+                                do dy = -ax, ax
+                                    do dx = -ax, ax
+                                        if (recv_tables(dx, dy, dz, nbr_idx) == MPI_PROC_NULL) cycle
+                                        if (dx + sx < -ax .or. dx + sx > ax) cycle
+                                        if (dy + sy < -ax .or. dy + sy > ax) cycle
+                                        if (dz + sz < -ax .or. dz + sz > ax) cycle
+                                        if (ib_neighbor_ranks(dx + sx, dy + sy, dz + sz) /= MPI_PROC_NULL) cycle
+                                        ib_neighbor_ranks(dx + sx, dy + sy, dz + sz) = recv_tables(dx, dy, dz, nbr_idx)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+
+            deallocate (send_table, recv_tables)
+        end if
 #endif
 
     end subroutine s_compute_ib_neighbor_ranks
 
     subroutine get_neighbor_bounds()
 
-        real(wp) :: send_val, recv_val
-        integer  :: send_neighbor, recv_neighbor, ierr
+        real(wp) :: beg_val, end_val, recv_val
+        integer  :: k, send_neighbor, recv_neighbor, ierr
 
-        ! Default: no neighbor in any direction
+        ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
 
         neighbor_domain_x%beg = -huge(0._wp)
         neighbor_domain_x%end = huge(0._wp)
@@ -1369,26 +1448,29 @@ contains
         neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
+        ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =
+        ! left edge of the rank k hops to the left; end_val = right edge of the rank k hops to the right.
         #:for X, ID, TAG, DIM in [('x', 1, 100, 'm'), ('y', 2, 102, 'n'), ('z', 3, 104, 'p')]
             if (num_dims >= ${ID}$) then
-                ! Step 1: broadcast left edge (-1 face) rightward; receive left neighbor's left edge -> neighbor_domain_${X}$%beg
-                send_val = ${X}$_cb(-1)
-                send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
-                recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
-                recv_val = -huge(0._wp)
-                call MPI_SENDRECV(send_val, 1, mpi_p, send_neighbor, ${TAG}$, recv_val, 1, mpi_p, recv_neighbor, ${TAG}$, &
-                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                neighbor_domain_${X}$%beg = recv_val
+                beg_val = ${X}$_cb(-1)
+                end_val = ${X}$_cb(${DIM}$)
+                do k = 1, ib_neighborhood_radius
+                    send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+                    recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
+                    recv_val = -huge(0._wp)
+                    call MPI_SENDRECV(beg_val, 1, mpi_p, send_neighbor, ${TAG}$, recv_val, 1, mpi_p, recv_neighbor, ${TAG}$, &
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    beg_val = recv_val
 
-                ! Step 2: broadcast right edge (${DIM}$ face) leftward; receive right neighbor's right edge ->
-                ! neighbor_domain_${X}$%end
-                send_val = ${X}$_cb(${DIM}$)
-                send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
-                recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
-                recv_val = huge(0._wp)
-                call MPI_SENDRECV(send_val, 1, mpi_p, send_neighbor, ${TAG + 1}$, recv_val, 1, mpi_p, recv_neighbor, ${TAG + 1}$, &
-                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                neighbor_domain_${X}$%end = recv_val
+                    send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
+                    recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+                    recv_val = huge(0._wp)
+                    call MPI_SENDRECV(end_val, 1, mpi_p, send_neighbor, ${TAG + 1}$, recv_val, 1, mpi_p, recv_neighbor, &
+                                      & ${TAG + 1}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end_val = recv_val
+                end do
+                neighbor_domain_${X}$%beg = beg_val
+                neighbor_domain_${X}$%end = end_val
             end if
         #:endfor
 #endif
