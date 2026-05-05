@@ -19,6 +19,7 @@ module m_ibm
     use m_ib_patches
     use m_viscous
     use m_hb_function
+    use m_re_visc
     use m_model
     use m_collisions
 
@@ -914,6 +915,7 @@ contains
              & viscous_stress_div_2  ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution
         real(wp)                 :: cell_volume, dx, dy, dz, dynamic_viscosity
+        real(wp)                 :: D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, shear_rate, local_mu
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: dynamic_viscosities
@@ -929,10 +931,7 @@ contains
         if (viscous) then
             do fluid_idx = 1, num_fluids
                 if (fluid_pp(fluid_idx)%non_newtonian) then
-                    ! Non-Newtonian: compute reference viscosity at gdot = 1
-                    dynamic_viscosities(fluid_idx) = f_compute_hb_viscosity(fluid_pp(fluid_idx)%tau0, fluid_pp(fluid_idx)%K, &
-                                        & fluid_pp(fluid_idx)%nn, fluid_pp(fluid_idx)%mu_min, fluid_pp(fluid_idx)%mu_max, 1._wp, &
-                                        & fluid_pp(fluid_idx)%hb_m)
+                    dynamic_viscosities(fluid_idx) = 0._wp  ! computed per-cell from local shear rate
                 else if (fluid_pp(fluid_idx)%Re(1) > 0._wp) then
                     dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
                 else
@@ -943,8 +942,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[ib_idx, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
                             & local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, &
-                            & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[patch_ib, &
-                            & dynamic_viscosities]', collapse=3)
+                            & viscous_stress_div_2, dx, dy, dz, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, shear_rate, local_mu]', &
+                            & copy='[forces, torques]', copyin='[patch_ib, dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -986,11 +985,23 @@ contains
                         ! get the viscous stress and add its contribution if that is considered
                         if (viscous) then
                             ! compute the volume-weighted local dynamic viscosity
+                            if (any_non_newtonian) then
+                                call s_compute_velocity_gradients_at_cell(q_prim_vf, i, j, k, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                                shear_rate = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                            end if
                             dynamic_viscosity = 0._wp
                             do fluid_idx = 1, num_fluids
-                                ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
-                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, j, &
-                                    & k)*dynamic_viscosities(fluid_idx))
+                                if (fluid_pp(fluid_idx)%non_newtonian) then
+                                    local_mu = f_compute_hb_viscosity(fluid_pp(fluid_idx)%tau0, fluid_pp(fluid_idx)%K, &
+                                                                      & fluid_pp(fluid_idx)%nn, fluid_pp(fluid_idx)%mu_min, &
+                                                                      & fluid_pp(fluid_idx)%mu_max, shear_rate, &
+                                                                      & fluid_pp(fluid_idx)%hb_m)
+                                    dynamic_viscosity = dynamic_viscosity + q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, j, &
+                                        & k)*local_mu
+                                else
+                                    dynamic_viscosity = dynamic_viscosity + q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, j, &
+                                        & k)*dynamic_viscosities(fluid_idx)
+                                end if
                             end do
 
                             ! get the linear force components first
