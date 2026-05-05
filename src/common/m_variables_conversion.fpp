@@ -43,6 +43,16 @@ module m_variables_conversion
     $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
 #endif
 
+#ifndef MFC_SIMULATION
+  type(integer_field), public :: ghost_points_index
+  type(scalar_field),  public :: pressure_ghost_point
+  $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
+#else
+    type(integer_field), public :: ghost_points_index
+    type(scalar_field),  public :: pressure_ghost_point
+    $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
+#endif
+
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
     real(wp), allocatable, dimension(:,:) :: Res_vc
@@ -359,6 +369,20 @@ contains
 
             $:GPU_UPDATE(device='[Res_vc, Re_idx, Re_size]')
         end if
+
+    if (p > 0) then
+        @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:p))
+        @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:p))
+    else
+        @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:0))
+        @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:0))
+    end if
+
+    ghost_points_index%sf = 0
+    pressure_ghost_point%sf = 0.0_wp
+
+    @:ACC_SETUP_SFs(ghost_points_index)
+    @:ACC_SETUP_SFs(pressure_ghost_point)
 #endif
 
         if (bubbles_euler) then
@@ -466,12 +490,13 @@ contains
 
     !> Convert conserved variables (rho*alpha, rho*u, E, alpha) to primitives (rho, u, p, alpha). Conversion depends on model_eqns:
     !! each model has different variable sets and EOS.
-    subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds)
+    subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds, t_step, stage)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
         type(scalar_field), intent(inout)                      :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: ibounds
+        integer, optional, intent(in) :: t_step, stage
 
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
@@ -502,7 +527,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
-                            & df_dW, iter]')
+                            & df_dW, iter, pressure_ghost_point, ghost_points_index]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -671,7 +696,17 @@ contains
                     end if
 
                     call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_pres_K, &
-                                            & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+                                       & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+
+#ifdef MFC_SIMULATION
+                   !         if (.not. (t_step == 0 .and. stage == 1)) then
+                   !             if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0 .and. l <= p) then
+                   !                 if (ghost_points_index%sf(j, k, l) == 1) then
+                   !                     pres = pressure_ghost_point%sf(j, k, l)
+                   !                 end if
+                   !             end if
+                   !         end if
+#endif
 
                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
 
@@ -1232,6 +1267,8 @@ contains
 
 #ifdef MFC_SIMULATION
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
+        @:DEALLOCATE(ghost_points_index%sf)
+        @:DEALLOCATE(pressure_ghost_point%sf)
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if

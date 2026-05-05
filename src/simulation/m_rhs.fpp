@@ -579,7 +579,7 @@ contains
         end if
         if (.not. igr .or. dummy) then
             call nvtxStartRange("RHS-CONVERT")
-            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint, t_step= t_step, stage = stage)
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
