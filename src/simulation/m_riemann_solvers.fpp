@@ -2050,15 +2050,13 @@ contains
                                     end do
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic contribution to energy if G large enough
-                                        if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            end if
+                                        ! Elastic contribution to energy (unconditional, clamped denominator)
+                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
+                                        ! Additional terms in 2D and 3D
+                                        if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
                                         end if
                                     end do
                                 end if
@@ -2121,14 +2119,14 @@ contains
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                        s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
-                                                  & ))/rho_L), &
-                                                  & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
-                                                  & + tau_e_R(dir_idx_tau(1)))/rho_R))
-                                        s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1) &
-                                                  & ))/rho_R), &
-                                                  & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
-                                                  & + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                        s_L = min(vel_L(dir_idx(1)) - sqrt(max(verysmall, &
+                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)), &
+                                                  & vel_R(dir_idx(1)) - sqrt(max(verysmall, &
+                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)))
+                                        s_R = max(vel_R(dir_idx(1)) + sqrt(max(verysmall, &
+                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)), &
+                                                  & vel_L(dir_idx(1)) + sqrt(max(verysmall, &
+                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
                                                & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
                                                & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &
@@ -3211,15 +3209,13 @@ contains
                                     end do
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic contribution to energy if G large enough
-                                        if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            end if
+                                        ! Elastic contribution to energy (unconditional, clamped denominator)
+                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
+                                        ! Additional terms in 2D and 3D
+                                        if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
                                         end if
                                     end do
                                 end if
@@ -3285,14 +3281,14 @@ contains
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                        s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
-                                                  & ))/rho_L), &
-                                                  & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
-                                                  & + tau_e_R(dir_idx_tau(1)))/rho_R))
-                                        s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1) &
-                                                  & ))/rho_R), &
-                                                  & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
-                                                  & + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                        s_L = min(vel_L(dir_idx(1)) - sqrt(max(verysmall, &
+                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)), &
+                                                  & vel_R(dir_idx(1)) - sqrt(max(verysmall, &
+                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)))
+                                        s_R = max(vel_R(dir_idx(1)) + sqrt(max(verysmall, &
+                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)), &
+                                                  & vel_L(dir_idx(1)) + sqrt(max(verysmall, &
+                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
                                                & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
                                                & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &
@@ -4593,15 +4589,14 @@ contains
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                ! Elastic contribution to energy if G large enough
-                                if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                    E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                    E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                    ! Shear terms doubled: 2D/2D-axisym i==2 only; 3D i==2,4,5
-                                    if ((n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
-                                        E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                        E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                    end if
+                                ! Elastic contribution to energy if G large enough Elastic contribution to energy (unconditional,
+                                ! clamped denominator)
+                                E%L = E%L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+                                E%R = E%R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
+                                ! Shear terms doubled: 2D/2D-axisym i==2 only; 3D i==2,4,5
+                                if ((n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
+                                    E%L = E%L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+                                    E%R = E%R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
                                 end if
                             end do
 
@@ -4615,10 +4610,10 @@ contains
                             call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R, &
                                                           & qv%R)
 
-                            S_L = min(u_n_L - sqrt(c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L), &
-                                      & u_n_R - sqrt(c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R))
-                            S_R = max(u_n_R + sqrt(c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R), &
-                                      & u_n_L + sqrt(c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L))
+                            S_L = min(u_n_L - sqrt(max(verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L)), &
+                                      & u_n_R - sqrt(max(verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R)))
+                            S_R = max(u_n_R + sqrt(max(verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R)), &
+                                      & u_n_L + sqrt(max(verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L)))
 
                             ! Two-component 2D only (enforced by checker restrictions)
 
