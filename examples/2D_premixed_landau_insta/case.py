@@ -5,12 +5,8 @@ import json
 import math
 import os
 
-import cantera as ct
-
 current_dir = os.path.dirname(os.path.abspath(__file__))
 ctfile = "h2o2.yaml"
-sol_L = ct.Solution(ctfile)
-sol_L.TPX = 300, 101325, "H:1"
 
 Lx = 0.0155147
 Ly = 0.00775735

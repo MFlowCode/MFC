@@ -42,7 +42,7 @@
     real(wp)                                :: dummy_x, dummy_y, dummy_z, x0, y0
     integer                                 :: global_offset_x, global_offset_y  !< MPI subdomain offset
     real(wp)                                :: delta_x, delta_y
-    character(len=150), dimension(sys_size) :: fileNames                         !< Arrays to store all data from files
+    character(len=300), dimension(sys_size) :: fileNames                         !< Arrays to store all data from files
     character(len=200)                      :: errmsg
     real(wp), allocatable                   :: stored_values(:,:,:)
     real(wp), allocatable                   :: x_coords(:), y_coords(:)
@@ -50,8 +50,8 @@
     real(wp)                                :: domain_xstart, domain_xend, domain_ystart, domain_yend
     character(len=20)                       :: file_num_str                      !< For storing the file number as a string
     character(len=20)                       :: zeros_part                        !< For the trailing zeros part
-    integer                                 :: ios = 0
-    integer                                 :: ios2 = 0
+    integer                                 :: ios
+    integer                                 :: ios2
 #:enddef
 
 #:def HardcodedReadValues()
@@ -201,4 +201,6 @@
     if (allocated(y_coords)) then
         @:DEALLOCATE(y_coords)
     end if
+
+    files_loaded = .false.
 #:enddef
