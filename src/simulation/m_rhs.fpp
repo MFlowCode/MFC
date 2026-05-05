@@ -655,7 +655,7 @@ contains
                 call nvtxStartRange("RHS-RECONSTRUCTION")
 
                 if (.not. surface_tension) then
-                    if (all(Re_size == 0)) then
+                    if (all(Re_size == 0) .or. int_comp > 0) then
                         ! Reconstruct densitiess
                         iv%beg = 1; iv%end = sys_size
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(1:sys_size), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &

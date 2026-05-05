@@ -391,10 +391,6 @@ class CaseValidator:
         self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
         self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
         self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
-        viscous = self.get("viscous", "F") == "T"
-        surface_tension = self.get("surface_tension", "F") == "T"
-        self.prohibit(int_comp != 0 and viscous, "int_comp > 0 is not supported with viscosity (reconstruction is split; compression would be silently skipped)")
-        self.prohibit(int_comp != 0 and surface_tension, "int_comp > 0 is not supported with surface tension (reconstruction is split; compression would be silently skipped)")
 
         recon_type = self.get("recon_type", 1)
         if recon_type == 1:  # WENO
