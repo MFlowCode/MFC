@@ -98,7 +98,7 @@
             ! Calculate offsets
             domain_xstart = x_coords(1)
             x_step = x_cc(1) - x_cc(0)
-            delta_x = merge(x_cc(0) - domain_xstart, x_cc(index_x) - domain_xstart + x_step/2.0, num_dims == 1)
+            delta_x = merge(x_cc(0) - domain_xstart, x_cc(index_x) - domain_xstart, num_dims == 1)
             global_offset_x = nint(abs(delta_x)/x_step)
         case (3)  ! 3D case - determine grid structure
             ! Find yRows by counting rows with same x
@@ -158,8 +158,8 @@
             ! Calculate offsets
             x_step = x_cc(1) - x_cc(0)
             y_step = y_cc(1) - y_cc(0)
-            delta_x = x_cc(index_x) - x_coords(1) + x_step/2.0_wp
-            delta_y = y_cc(index_y) - y_coords(1) + y_step/2.0_wp
+            delta_x = x_cc(index_x) - x_coords(1)
+            delta_y = y_cc(index_y) - y_coords(1)
             global_offset_x = nint(abs(delta_x)/x_step)
             global_offset_y = nint(abs(delta_y)/y_step)
         end select
