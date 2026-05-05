@@ -43,13 +43,13 @@ contains
                 do i = 0, m
                     call random_number(rand_real)
 
-                    perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
+                    perturb_alpha = q_prim_vf(eqn_idx%E + perturb_sph_fluid)%sf(i, j, k)
 
                     ! Perturb partial density fields to match perturbed volume fraction fields when the volume fraction is not near
                     ! 0 or 1
                     if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
                         do l = 1, num_fluids
-                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
+                            q_prim_vf(l)%sf(i, j, k) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)*fluid_rho(l)
                         end do
                     end if
                 end do
@@ -72,10 +72,10 @@ contains
                 do i = 0, m
                     call random_number(rand_real)
                     rand_real = rand_real*perturb_flow_mag
-                    q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
+                    q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = rand_real*q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k)
+                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k)
                     if (bubbles_euler) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
+                        q_prim_vf(eqn_idx%alf)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(eqn_idx%alf)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -84,15 +84,16 @@ contains
     end subroutine s_perturb_surrounding_flow
 
     !> Iteratively smooth all primitive variable fields using a discrete elliptic (Laplacian) filter.
-    impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
+    impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), optional, intent(inout)                :: q_T_sf
         integer                                                    :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters
             ! Communication of buffer regions and apply boundary conditions
-            call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf)
+            call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf, q_T_sf)
 
             ! Perform smoothing and store in temp array
             if (n == 0) then
@@ -181,11 +182,12 @@ contains
 
                             vel_rsm = 0._wp
                             do q = 1, num_dims
-                                vel_rsm = vel_rsm + q_prim_vf(momxb + q - 1)%sf(j, k, l)**2._wp
+                                vel_rsm = vel_rsm + q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l)**2._wp
                             end do
                             vel_rsm = sqrt(vel_rsm)
 
-                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = q_prim_vf(momxb + i - 1)%sf(j, k, l) + vel_rsm*scale*mag
+                            q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
+                                      & l) + vel_rsm*scale*mag
                         end do
                     end do
                 end do
@@ -215,8 +217,8 @@ contains
                                 zl = freq*(z_cc(l) + ofs(i, 3))
                                 mag = f_simplex3d(xl, yl, zl)
                             end if
-                            q_prim_vf(contxb + i - 1)%sf(j, k, l) = q_prim_vf(contxb + i - 1)%sf(j, k, &
-                                      & l) + q_prim_vf(contxb + i - 1)%sf(j, k, l)*scale*mag
+                            q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l) = q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, &
+                                      & l) + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)*scale*mag
                         end do
                     end do
                 end do
@@ -295,9 +297,9 @@ contains
                         alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) + khat(3)*z_cc(l)) + 2._wp*pi*phi
                         velfluc = 2._wp*q*sig*cos(alpha)
                         velfluc = matmul(Lmat, velfluc)
-                        q_prim_vf(momxb)%sf(j, r, l) = q_prim_vf(momxb)%sf(j, r, l) + velfluc(1)
-                        q_prim_vf(momxb + 1)%sf(j, r, l) = q_prim_vf(momxb + 1)%sf(j, r, l) + velfluc(2)
-                        q_prim_vf(momxb + 2)%sf(j, r, l) = q_prim_vf(momxb + 2)%sf(j, r, l) + velfluc(3)
+                        q_prim_vf(eqn_idx%mom%beg)%sf(j, r, l) = q_prim_vf(eqn_idx%mom%beg)%sf(j, r, l) + velfluc(1)
+                        q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, r, l) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, r, l) + velfluc(2)
+                        q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, r, l) = q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, r, l) + velfluc(3)
                     end do
                 end do
             end do

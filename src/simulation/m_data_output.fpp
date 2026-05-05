@@ -24,15 +24,13 @@ module m_data_output
 
     private
     public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_com_files, s_open_probe_files, &
-        & s_open_ib_state_file, s_write_run_time_information, s_write_data_files, s_write_serial_data_files, &
-        & s_write_parallel_data_files, s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, &
-        & s_close_run_time_information_file, s_close_com_files, s_close_probe_files, s_close_ib_state_file, &
-        & s_finalize_data_output_module
+        & s_write_run_time_information, s_write_data_files, s_write_serial_data_files, s_write_parallel_data_files, &
+        & s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, s_close_run_time_information_file, &
+        & s_close_com_files, s_close_probe_files, s_finalize_data_output_module
 
-    integer                                       :: ib_state_unit = -1  !< I/O unit for IB state binary file
-    real(wp), allocatable, dimension(:,:,:)       :: icfl_sf             !< ICFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: vcfl_sf             !< VCFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: Rc_sf               !< Rc stability criterion
+    real(wp), allocatable, dimension(:,:,:)       :: icfl_sf  !< ICFL stability criterion
+    real(wp), allocatable, dimension(:,:,:)       :: vcfl_sf  !< VCFL stability criterion
+    real(wp), allocatable, dimension(:,:,:)       :: Rc_sf    !< Rc stability criterion
     real(wp), public, allocatable, dimension(:,:) :: c_mass
     $:GPU_DECLARE(create='[icfl_sf, vcfl_sf, Rc_sf, c_mass]')
 
@@ -160,19 +158,6 @@ contains
         end if
 
     end subroutine s_open_probe_files
-
-    !> Open the immersed boundary state file for binary output
-    impure subroutine s_open_ib_state_file
-
-        character(len=path_len + 2*name_len) :: file_loc
-        integer                              :: ios
-
-        write (file_loc, '(A)') 'ib_state.dat'
-        file_loc = trim(case_dir) // '/D/' // trim(file_loc)
-        open (newunit=ib_state_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
-        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
-
-    end subroutine s_open_ib_state_file
 
     !> Write stability criteria extrema to the run-time information file at the given time step
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
@@ -400,9 +385,10 @@ contains
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:, :, :)]')
             end do
-            ! q_prim_vf(bubxb) stores the value of nb needed in riemann solvers, so replace with true primitive value (=1._wp)
+            ! q_prim_vf(eqn_idx%bub%beg) stores the value of nb needed in riemann solvers, so replace with true primitive value
+            ! (=1._wp)
             if (qbmm) then
-                q_prim_vf(bubxb)%sf = 1._wp
+                q_prim_vf(eqn_idx%bub%beg)%sf = 1._wp
             end if
         end if
 
@@ -414,7 +400,7 @@ contains
                     open (2, FILE=trim(file_path))
                     do j = 0, m
                         ! todo: revisit change here
-                        if (((i >= adv_idx%beg) .and. (i <= adv_idx%end))) then
+                        if (((i >= eqn_idx%adv%beg) .and. (i <= eqn_idx%adv%end))) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else
                             write (2, FMT) x_cb(j), q_prim_vf(i)%sf(j, 0, 0)
@@ -532,8 +518,8 @@ contains
 
                     do j = 0, m
                         do k = 0, n
-                            if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) .or. ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
-                                & ) then
+                            if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
+                                & .and. (i <= eqn_idx%adv%end))) then
                                 write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
                                 write (2, FMT) x_cb(j), y_cb(k), q_prim_vf(i)%sf(j, k, 0)
@@ -627,8 +613,9 @@ contains
                     do j = 0, m
                         do k = 0, n
                             do l = 0, p
-                                if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) .or. ((i >= adv_idx%beg) &
-                                    & .and. (i <= adv_idx%end)) .or. ((i >= chemxb) .and. (i <= chemxe))) then
+                                if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
+                                    & .and. (i <= eqn_idx%adv%end)) .or. ((i >= eqn_idx%species%beg) &
+                                    & .and. (i <= eqn_idx%species%end))) then
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
                                 else
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)
@@ -646,12 +633,13 @@ contains
     end subroutine s_write_serial_data_files
 
     !> Write grid and conservative variable data files in parallel via MPI I/O
-    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
         integer, intent(in)                                         :: t_step
         type(scalar_field), intent(inout), optional                 :: beta
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        type(scalar_field), intent(inout), optional                 :: q_T_sf
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size
@@ -909,15 +897,125 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> Write IB state records to D/ib_state.dat (rank 0 only)
-    impure subroutine s_write_ib_state_file()
+    !> Writes the IB state information out to file
+    subroutine s_write_parallel_ib_state(t_step)
 
-        integer :: i
+        integer, intent(in) :: t_step
+
+#ifdef MFC_MPI
+        character(LEN=path_len + 2*name_len) :: file_loc
+        integer(kind=MPI_OFFSET_KIND)        :: disp
+        integer(kind=MPI_OFFSET_KIND)        :: WP_MOK
+        integer                              :: ifile, ierr
+        integer, dimension(MPI_STATUS_SIZE)  :: status
+        logical                              :: file_exist
+        integer                              :: i
+        integer, parameter                   :: NFIELDS_PER_IB = 20
+        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+
+        ! Partition IBs across ranks round-robin style
+        integer :: ib_start, ib_end, nibs_per_rank, remainder
+
+        WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
+
+        if (proc_rank == 0) then
+            call s_create_directory(trim(case_dir) // '/restart_data')
+        end if
+        call s_mpi_barrier()
+
+        ! Divide num_ibs across num_procs
+        nibs_per_rank = num_ibs/num_procs
+        remainder = mod(num_ibs, num_procs)
+
+        ! Ranks < remainder get one extra IB
+        if (proc_rank < remainder) then
+            ib_start = proc_rank*(nibs_per_rank + 1) + 1
+            ib_end = ib_start + nibs_per_rank  ! nibs_per_rank + 1 total
+        else
+            ib_start = remainder*(nibs_per_rank + 1) + (proc_rank - remainder)*nibs_per_rank + 1
+            ib_end = ib_start + nibs_per_rank - 1
+        end if
+
+        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+        file_loc = trim(case_dir) // trim(file_loc)
+
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (file_exist .and. proc_rank == 0) then
+            call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+        end if
+        call s_mpi_barrier()
+
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+
+        do i = ib_start, ib_end
+            ib_buf(1) = mytime
+            ib_buf(2:4) = patch_ib(i)%force(1:3)
+            ib_buf(5:7) = patch_ib(i)%torque(1:3)
+            ib_buf(8:10) = patch_ib(i)%vel(1:3)
+            ib_buf(11:13) = patch_ib(i)%angular_vel(1:3)
+            ib_buf(14:16) = patch_ib(i)%angles(1:3)
+            ib_buf(17) = patch_ib(i)%x_centroid
+            ib_buf(18) = patch_ib(i)%y_centroid
+            ib_buf(19) = patch_ib(i)%z_centroid
+            ib_buf(20) = patch_ib(i)%radius
+
+            ! Global IB index (i) determines position in file
+            disp = int(i - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+
+            call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
+        end do
+
+        call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+
+    end subroutine s_write_parallel_ib_state
+
+    !> Write IB state data to a per-timestep serial (unformatted) file
+    subroutine s_write_serial_ib_state(t_step)
+
+        integer, intent(in)                  :: t_step
+        character(LEN=path_len + 2*name_len) :: file_loc
+        integer                              :: i, ios, file_unit
+        integer, parameter                   :: NFIELDS_PER_IB = 20
+        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+
+        call s_create_directory(trim(case_dir) // '/restart_data')
+
+        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+        file_loc = trim(case_dir) // trim(file_loc)
+
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
 
         do i = 1, num_ibs
-            write (ib_state_unit) mytime, i, patch_ib(i)%force, patch_ib(i)%torque, patch_ib(i)%vel, patch_ib(i)%angular_vel, &
-                   & patch_ib(i)%angles, patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid
+            ib_buf(1) = mytime
+            ib_buf(2:4) = patch_ib(i)%force(1:3)
+            ib_buf(5:7) = patch_ib(i)%torque(1:3)
+            ib_buf(8:10) = patch_ib(i)%vel(1:3)
+            ib_buf(11:13) = patch_ib(i)%angular_vel(1:3)
+            ib_buf(14:16) = patch_ib(i)%angles(1:3)
+            ib_buf(17) = patch_ib(i)%x_centroid
+            ib_buf(18) = patch_ib(i)%y_centroid
+            ib_buf(19) = patch_ib(i)%z_centroid
+            ib_buf(20) = patch_ib(i)%radius
+
+            write (file_unit) ib_buf
         end do
+
+        close (file_unit)
+
+    end subroutine s_write_serial_ib_state
+
+    !> @brief Writes IB state records to restart_data/ib_state.dat. Must be called only on rank 0.
+    impure subroutine s_write_ib_state_file(time_step)
+
+        integer, intent(in) :: time_step
+
+        if (parallel_io) then
+            call s_write_parallel_ib_state(time_step)
+        else
+            call s_write_serial_ib_state(time_step)
+        end if
 
     end subroutine s_write_ib_state_file
 
@@ -1050,7 +1148,7 @@ contains
 
                     if (chemistry) then
                         do d = 1, num_species
-                            rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k, l)
+                            rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k, l)
                         end do
                     end if
 
@@ -1062,43 +1160,44 @@ contains
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, rho, gamma, pi_inf, qv)
                     end if
                     do s = 1, num_vels
-                        vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
+                        vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k, l)/rho
                     end do
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                     if (elasticity) then
                         if (cont_damage) then
-                            damage_state = q_cons_vf(damage_idx)%sf(j - 2, k, l)
+                            damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k, l)
                             G_local = G_local*max((1._wp - damage_state), 0._wp)
                         end if
 
-                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), q_cons_vf(alf_idx)%sf(j - 2, k, l), dyn_p, pi_inf, &
-                                                & gamma, rho, qv, rhoYks(:), pres, T, q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                                                & q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G_local)
+                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), dyn_p, &
+                                                & pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
+                                                & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
+                                                & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
                     else
-                        call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k, l), q_cons_vf(alf_idx)%sf(j - 2, k, l), dyn_p, &
-                                                & pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
+                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                     end if
 
                     if (model_eqns == 4) then
                         lit_gamma = gammas(1)
                     else if (elasticity) then
-                        tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
+                        tau_e(1) = q_cons_vf(eqn_idx%stress%end)%sf(j - 2, k, l)/rho
                     end if
 
                     if (bubbles_euler) then
-                        alf = q_cons_vf(alf_idx)%sf(j - 2, k, l)
+                        alf = q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l)
                         if (num_fluids == 3) then
-                            alfgr = q_cons_vf(alf_idx - 1)%sf(j - 2, k, l)
+                            alfgr = q_cons_vf(eqn_idx%alf - 1)%sf(j - 2, k, l)
                         end if
                         do s = 1, nb
-                            nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k, l)
-                            nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
+                            nR(s) = q_cons_vf(qbmm_idx%rs(s))%sf(j - 2, k, l)
+                            nRdot(s) = q_cons_vf(qbmm_idx%vs(s))%sf(j - 2, k, l)
                         end do
 
                         if (adv_n) then
-                            nbub = q_cons_vf(n_idx)%sf(j - 2, k, l)
+                            nbub = q_cons_vf(eqn_idx%n)%sf(j - 2, k, l)
                         else
                             nR3 = 0._wp
                             do s = 1, nb
@@ -1111,11 +1210,11 @@ contains
                         print *, 'In probe, nbub: ', nbub
 #endif
                         if (qbmm) then
-                            M00 = q_cons_vf(bub_idx%moms(1, 1))%sf(j - 2, k, l)/nbub
-                            M10 = q_cons_vf(bub_idx%moms(1, 2))%sf(j - 2, k, l)/nbub
-                            M01 = q_cons_vf(bub_idx%moms(1, 3))%sf(j - 2, k, l)/nbub
-                            M20 = q_cons_vf(bub_idx%moms(1, 4))%sf(j - 2, k, l)/nbub
-                            M02 = q_cons_vf(bub_idx%moms(1, 6))%sf(j - 2, k, l)/nbub
+                            M00 = q_cons_vf(qbmm_idx%moms(1, 1))%sf(j - 2, k, l)/nbub
+                            M10 = q_cons_vf(qbmm_idx%moms(1, 2))%sf(j - 2, k, l)/nbub
+                            M01 = q_cons_vf(qbmm_idx%moms(1, 3))%sf(j - 2, k, l)/nbub
+                            M20 = q_cons_vf(qbmm_idx%moms(1, 4))%sf(j - 2, k, l)/nbub
+                            M02 = q_cons_vf(qbmm_idx%moms(1, 6))%sf(j - 2, k, l)/nbub
 
                             M10 = M10/M00
                             M01 = M01/M00
@@ -1141,7 +1240,7 @@ contains
             else if (p == 0) then
                 if (chemistry) then
                     do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
+                        rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
                     end do
                 end if
 
@@ -1165,24 +1264,24 @@ contains
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, rho, gamma, pi_inf, qv, Re, G_local, &
                                                             & fluid_pp(:)%G)
                         do s = 1, num_vels
-                            vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
+                            vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                         if (elasticity) then
                             if (cont_damage) then
-                                damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l)
+                                damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l)
                                 G_local = G_local*max((1._wp - damage_state), 0._wp)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                            call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l), &
                                                     & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                    & q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
-                                                    & q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G_local)
+                                                    & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
+                                                    & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
                         else
-                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
-                                                    & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
+                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                         end if
 
                         if (model_eqns == 4) then
@@ -1194,14 +1293,14 @@ contains
                         end if
 
                         if (bubbles_euler) then
-                            alf = q_cons_vf(alf_idx)%sf(j - 2, k - 2, l)
+                            alf = q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l)
                             do s = 1, nb
-                                nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
-                                nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k - 2, l)
+                                nR(s) = q_cons_vf(qbmm_idx%rs(s))%sf(j - 2, k - 2, l)
+                                nRdot(s) = q_cons_vf(qbmm_idx%vs(s))%sf(j - 2, k - 2, l)
                             end do
 
                             if (adv_n) then
-                                nbub = q_cons_vf(n_idx)%sf(j - 2, k - 2, l)
+                                nbub = q_cons_vf(eqn_idx%n)%sf(j - 2, k - 2, l)
                             else
                                 nR3 = 0._wp
                                 do s = 1, nb
@@ -1246,30 +1345,31 @@ contains
                             call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, rho, gamma, pi_inf, qv, Re, &
                                                                 & G_local, fluid_pp(:)%G)
                             do s = 1, num_vels
-                                vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
+                                vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
 
                             dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                             if (chemistry) then
                                 do d = 1, num_species
-                                    rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l - 2)
+                                    rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l - 2)
                                 end do
                             end if
 
                             if (elasticity) then
                                 if (cont_damage) then
-                                    damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l - 2)
+                                    damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l - 2)
                                     G_local = G_local*max((1._wp - damage_state), 0._wp)
                                 end if
 
-                                call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l - 2), q_cons_vf(alf_idx)%sf(j - 2, k - 2, &
-                                                        & l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                        & q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
-                                                        & q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                                call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l - 2), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
+                                                        & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                                                        & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), G_local)
                             else
-                                call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), q_cons_vf(alf_idx)%sf(j - 2, &
-                                                        & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
+                                                        & rho, qv, rhoYks, pres, T)
                             end if
 
                             ! Compute mixture sound speed
@@ -1389,11 +1489,11 @@ contains
                             npts = npts + 1
                             call s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
                             do s = 1, num_vels
-                                vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
+                                vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j, k, l)/rho
                             end do
 
-                            pres = ((q_cons_vf(E_idx)%sf(j, k, l) - 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, k, &
-                                    & l)**2._wp)/rho)/(1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf - qv)/gamma
+                            pres = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                    & l)**2._wp)/rho)/(1._wp - q_cons_vf(eqn_idx%alf)%sf(j, k, l)) - pi_inf - qv)/gamma
                             int_pres = int_pres + (pres - 1._wp)**2._wp
                         end if
                     end do
@@ -1452,11 +1552,11 @@ contains
                                 npts = npts + 1
                                 call s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
                                 do s = 1, num_vels
-                                    vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
+                                    vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j, k, l)/rho
                                 end do
 
-                                pres = ((q_cons_vf(E_idx)%sf(j, k, l) - 0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, k, &
-                                        & l)**2._wp)/rho)/(1._wp - q_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf - qv)/gamma
+                                pres = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                        & l)**2._wp)/rho)/(1._wp - q_cons_vf(eqn_idx%alf)%sf(j, k, l)) - pi_inf - qv)/gamma
                                 int_pres = int_pres + abs(pres - 1._wp)
                                 max_pres = max(max_pres, abs(pres - 1._wp))
                             end if
@@ -1530,13 +1630,6 @@ contains
         end do
 
     end subroutine s_close_probe_files
-
-    !> Close the immersed boundary state file
-    impure subroutine s_close_ib_state_file
-
-        close (ib_state_unit)
-
-    end subroutine s_close_ib_state_file
 
     !> Initialize the data output module
     impure subroutine s_initialize_data_output_module

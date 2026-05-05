@@ -19,8 +19,8 @@ module m_data_output
         & s_open_intf_data_file, s_open_energy_data_file, s_write_grid_to_formatted_database_file, &
         & s_write_variable_to_formatted_database_file, s_write_lag_bubbles_results_to_text, &
         & s_write_lag_bubbles_to_formatted_database_file, s_write_ib_state_files, s_write_intf_data_file, &
-        & s_write_energy_data_file, s_close_formatted_database_file, s_close_intf_data_file, s_close_energy_data_file, &
-        & s_finalize_data_output_module
+        & s_write_energy_data_file, s_write_ib_bodies_to_formatted_database_file, s_close_formatted_database_file, &
+        & s_close_intf_data_file, s_close_energy_data_file, s_finalize_data_output_module
 
     ! Include Silo-HDF5 interface library
     include 'silo_f9x.inc'
@@ -247,15 +247,15 @@ contains
             if (relativity .and. (rho_wrt .or. prim_vars_wrt)) dbvars = dbvars + 1
             if (relativity .and. (rho_wrt .or. cons_vars_wrt)) dbvars = dbvars + 1
 
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (mom_wrt(i) .or. cons_vars_wrt) dbvars = dbvars + 1
             end do
 
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (vel_wrt(i) .or. prim_vars_wrt) dbvars = dbvars + 1
             end do
 
-            do i = 1, E_idx - mom_idx%beg
+            do i = 1, eqn_idx%E - eqn_idx%mom%beg
                 if (flux_wrt(i)) dbvars = dbvars + 1
             end do
 
@@ -1179,8 +1179,8 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    if (q_prim_vf(E_idx + 2)%sf(i, j, k) > maxalph_loc) then
-                        maxalph_loc = q_prim_vf(E_idx + 2)%sf(i, j, k)
+                    if (q_prim_vf(eqn_idx%E + 2)%sf(i, j, k) > maxalph_loc) then
+                        maxalph_loc = q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)
                     end if
                 end do
             end do
@@ -1200,10 +1200,10 @@ contains
         thres = 0.9_wp*maxalph_glb
         do k = 0, n
             do j = 0, m
-                axp = q_prim_vf(E_idx + 2)%sf(j + 1, k, cent)
-                axm = q_prim_vf(E_idx + 2)%sf(j, k, cent)
-                ayp = q_prim_vf(E_idx + 2)%sf(j, k + 1, cent)
-                aym = q_prim_vf(E_idx + 2)%sf(j, k, cent)
+                axp = q_prim_vf(eqn_idx%E + 2)%sf(j + 1, k, cent)
+                axm = q_prim_vf(eqn_idx%E + 2)%sf(j, k, cent)
+                ayp = q_prim_vf(eqn_idx%E + 2)%sf(j, k + 1, cent)
+                aym = q_prim_vf(eqn_idx%E + 2)%sf(j, k, cent)
                 if ((axp > thres .and. axm < thres) .or. (axp < thres .and. axm > thres) .or. (ayp > thres .and. aym < thres) &
                     & .or. (ayp < thres .and. aym > thres)) then
                     if (counter == 0) then
@@ -1283,18 +1283,18 @@ contains
                     gamma = 0._wp
                     pi_inf = 0._wp
                     qv = 0._wp
-                    pres = q_prim_vf(E_idx)%sf(i, j, k)
-                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
+                    pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
+                    Egint = Egint + q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
                     do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
-                        Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
-                        Elk = Elk + 0.5_wp*q_prim_vf(E_idx + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Egk = Egk + 0.5_wp*q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
+                        Elk = Elk + 0.5_wp*q_prim_vf(eqn_idx%E + 1)%sf(i, j, k)*q_prim_vf(1)%sf(i, j, k)*vel(s)*vel(s)*dV
                         if (abs(vel(s)) > maxvel) then
                             maxvel = abs(vel(s))
                         end if
                     end do
-                    do l = 1, adv_idx%end - E_idx
-                        adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                    do l = 1, eqn_idx%adv%end - eqn_idx%E
+                        adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
                         gamma = gamma + adv(l)*gammas(l)
                         pi_inf = pi_inf + adv(l)*pi_infs(l)
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
@@ -1312,7 +1312,7 @@ contains
                     Vl = Vl + adv(1)*dV
                     Vb = Vb + adv(2)*dV
                     pres_av = pres_av + adv(1)*pres*dV
-                    Et = Et + q_cons_vf(E_idx)%sf(i, j, k)*dV
+                    Et = Et + q_cons_vf(eqn_idx%E)%sf(i, j, k)*dV
                 end do
             end do
         end do
@@ -1340,6 +1340,137 @@ contains
         end if
 
     end subroutine s_write_energy_data_file
+
+    !> Read IB state and write a Silo point mesh with per-body scalar fields.
+    impure subroutine s_write_ib_bodies_to_formatted_database_file(t_step)
+
+        integer, intent(in)                            :: t_step
+        character(len=len_trim(case_dir) + 3*name_len) :: file_loc
+
+#ifdef MFC_MPI
+        integer, parameter                              :: NFIELDS_PER_IB = 20
+        real(wp)                                        :: ib_buf(NFIELDS_PER_IB)
+        real(wp), dimension(:,:), allocatable           :: ib_data
+        logical                                         :: file_exist
+        character(LEN=4*name_len), dimension(num_procs) :: meshnames
+        integer, dimension(num_procs)                   :: meshtypes
+        integer                                         :: i, ios, file_unit
+        integer                                         :: ierr, nBodies
+        real(wp), dimension(:), allocatable             :: px, py, pz
+        real(wp), dimension(:), allocatable             :: force_x, force_y, force_z
+        real(wp), dimension(:), allocatable             :: torque_x, torque_y, torque_z
+        real(wp), dimension(:), allocatable             :: vel_x, vel_y, vel_z
+        real(wp), dimension(:), allocatable             :: omega_x, omega_y, omega_z
+        real(wp), dimension(:), allocatable             :: angle_x, angle_y, angle_z
+        real(wp), dimension(:), allocatable             :: ib_diameter
+
+        ! Build path to per-timestep IB state file
+        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+        file_loc = trim(case_dir) // trim(file_loc)
+
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (.not. file_exist) then
+            call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
+        end if
+
+        nBodies = num_ibs
+
+        if (nBodies > 0) then
+            allocate (ib_data(nBodies, NFIELDS_PER_IB))
+            allocate (px(nBodies), py(nBodies), pz(nBodies))
+            allocate (force_x(nBodies), force_y(nBodies), force_z(nBodies))
+            allocate (torque_x(nBodies), torque_y(nBodies), torque_z(nBodies))
+            allocate (vel_x(nBodies), vel_y(nBodies), vel_z(nBodies))
+            allocate (omega_x(nBodies), omega_y(nBodies), omega_z(nBodies))
+            allocate (angle_x(nBodies), angle_y(nBodies), angle_z(nBodies))
+            allocate (ib_diameter(nBodies))
+
+            if (proc_rank == 0) then
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                if (ios /= 0) call s_mpi_abort('Cannot open IB state file: ' // trim(file_loc))
+
+                do i = 1, nBodies
+                    read (file_unit, iostat=ios) ib_buf
+                    if (ios /= 0) call s_mpi_abort('Error reading IB state file')
+                    ib_data(i,:) = ib_buf(:)
+                end do
+
+                close (file_unit)
+            end if
+
+            call MPI_BCAST(ib_data, nBodies*NFIELDS_PER_IB, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+            do i = 1, nBodies
+                force_x(i) = ib_data(i, 2); force_y(i) = ib_data(i, 3); force_z(i) = ib_data(i, 4)
+                torque_x(i) = ib_data(i, 5); torque_y(i) = ib_data(i, 6); torque_z(i) = ib_data(i, 7)
+                vel_x(i) = ib_data(i, 8); vel_y(i) = ib_data(i, 9); vel_z(i) = ib_data(i, 10)
+                omega_x(i) = ib_data(i, 11); omega_y(i) = ib_data(i, 12); omega_z(i) = ib_data(i, 13)
+                angle_x(i) = ib_data(i, 14); angle_y(i) = ib_data(i, 15); angle_z(i) = ib_data(i, 16)
+                px(i) = ib_data(i, 17); py(i) = ib_data(i, 18); pz(i) = ib_data(i, 19)
+                ib_diameter(i) = ib_data(i, 20)*2.0_wp
+            end do
+
+            if (proc_rank == 0) then
+                do i = 1, num_procs
+                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:ib_bodies'
+                    meshtypes(i) = DB_POINTMESH
+                end do
+                err = DBSET2DSTRLEN(len(meshnames(1)))
+                err = DBPUTMMESH(dbroot, 'ib_bodies', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
+            end if
+
+            err = DBPUTPM(dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+
+            call s_write_ib_variable('ib_force_x', t_step, force_x, nBodies)
+            call s_write_ib_variable('ib_force_y', t_step, force_y, nBodies)
+            call s_write_ib_variable('ib_force_z', t_step, force_z, nBodies)
+            call s_write_ib_variable('ib_torque_x', t_step, torque_x, nBodies)
+            call s_write_ib_variable('ib_torque_y', t_step, torque_y, nBodies)
+            call s_write_ib_variable('ib_torque_z', t_step, torque_z, nBodies)
+            call s_write_ib_variable('ib_vel_x', t_step, vel_x, nBodies)
+            call s_write_ib_variable('ib_vel_y', t_step, vel_y, nBodies)
+            call s_write_ib_variable('ib_vel_z', t_step, vel_z, nBodies)
+            call s_write_ib_variable('ib_omega_x', t_step, omega_x, nBodies)
+            call s_write_ib_variable('ib_omega_y', t_step, omega_y, nBodies)
+            call s_write_ib_variable('ib_omega_z', t_step, omega_z, nBodies)
+            call s_write_ib_variable('ib_angle_x', t_step, angle_x, nBodies)
+            call s_write_ib_variable('ib_angle_y', t_step, angle_y, nBodies)
+            call s_write_ib_variable('ib_angle_z', t_step, angle_z, nBodies)
+            call s_write_ib_variable('ib_diameter', t_step, ib_diameter, nBodies)
+
+            deallocate (ib_data, px, py, pz, force_x, force_y, force_z)
+            deallocate (torque_x, torque_y, torque_z, vel_x, vel_y, vel_z)
+            deallocate (omega_x, omega_y, omega_z, angle_x, angle_y, angle_z)
+            deallocate (ib_diameter)
+        end if
+#endif
+
+    end subroutine s_write_ib_bodies_to_formatted_database_file
+
+    !> Write a single IB point-variable to the Silo database slave and master files.
+    subroutine s_write_ib_variable(varname, t_step, data, nBodies)
+
+        character(len=*), intent(in)                    :: varname
+        integer, intent(in)                             :: t_step
+        real(wp), dimension(:), intent(in)              :: data
+        integer, intent(in)                             :: nBodies
+        character(len=4*name_len), dimension(num_procs) :: var_names
+        integer, dimension(num_procs)                   :: var_types
+        integer                                         :: ierr, i
+
+        if (proc_rank == 0) then
+            do i = 1, num_procs
+                write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:' // trim(varname)
+                var_types(i) = DB_POINTVAR
+            end do
+            err = DBSET2DSTRLEN(len(var_names(1)))
+            err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), num_procs, var_names, len_trim(var_names), var_types, &
+                            & DB_F77NULL, ierr)
+        end if
+
+        err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+
+    end subroutine s_write_ib_variable
 
     !> Close the formatted database slave file and, for the root process, the master file.
     impure subroutine s_close_formatted_database_file()

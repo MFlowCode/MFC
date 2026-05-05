@@ -170,27 +170,26 @@ contains
                                     slope = 0._wp
 
                                     if (muscl_lim == 1) then  ! minmod
-                                        if (slopeL*slopeR > 1e-9_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = min(abs(slopeL), abs(slopeR))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
                                     else if (muscl_lim == 2) then  ! MC
-                                        if (slopeL*slopeR > 1e-9_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = min(2._wp*abs(slopeL), 2._wp*abs(slopeR))
                                             slope = min(slope, 5e-1_wp*(abs(slopeL) + abs(slopeR)))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
                                     else if (muscl_lim == 3) then  ! Van Albada
-                                        if (abs(slopeL) > 1e-6_wp .and. abs(slopeR) > 1e-6_wp .and. abs(slopeL + slopeR) &
-                                            & > 1e-6_wp .and. slopeL*slopeR > 1e-6_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2._wp + slopeR**2._wp)
                                         end if
                                     else if (muscl_lim == 4) then  ! Van Leer
-                                        if (abs(slopeL + slopeR) > 1.e-6_wp .and. slopeL*slopeR > 1.e-6_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = 2._wp*slopeL*slopeR/(slopeL + slopeR)
                                         end if
                                     else if (muscl_lim == 5) then  ! SUPERBEE
-                                        if (slopeL*slopeR > 1e-6_wp) then
+                                        if (slopeL*slopeR > muscl_eps) then
                                             slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
                                                                & 2._wp*abs(slopeR)))
                                         end if
@@ -235,9 +234,9 @@ contains
                 do l = is3_muscl%beg, is3_muscl%end
                     do k = is2_muscl%beg, is2_muscl%end
                         do j = is1_muscl%beg, is1_muscl%end
-                            aCL = v_rs_ws_${XYZ}$_muscl(j - 1, k, l, advxb)
-                            aC = v_rs_ws_${XYZ}$_muscl(j, k, l, advxb)
-                            aCR = v_rs_ws_${XYZ}$_muscl(j + 1, k, l, advxb)
+                            aCL = v_rs_ws_${XYZ}$_muscl(j - 1, k, l, eqn_idx%adv%beg)
+                            aC = v_rs_ws_${XYZ}$_muscl(j, k, l, eqn_idx%adv%beg)
+                            aCR = v_rs_ws_${XYZ}$_muscl(j + 1, k, l, eqn_idx%adv%beg)
 
                             moncon = (aCR - aC)*(aC - aCL)
 
@@ -260,23 +259,25 @@ contains
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*A)
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vL_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, &
-                                                  & l, advxb)*aTHINC
-                                vL_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
-                                vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%beg)/vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg)*aTHINC
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%end)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%adv%beg))*(1._wp - aTHINC)
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1 - aTHINC
 
                                 ! Right reconstruction
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*(tanh(ic_beta) + A)/(1._wp + A*tanh(ic_beta)))
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vR_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, &
-                                                  & l, advxb)*aTHINC
-                                vR_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
-                                vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
-                                vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%beg)/vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg)*aTHINC
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%cont%end)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, &
+                                                  & eqn_idx%adv%beg))*(1._wp - aTHINC)
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
+                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1 - aTHINC
                             end if
                         end do
                     end do

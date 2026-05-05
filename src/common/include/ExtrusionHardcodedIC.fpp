@@ -24,8 +24,8 @@
 !>
 !> **Data Assignment:**
 !> - Populates q_prim_vf primitive variable arrays with file data
-!> - Handles momentum component indexing with special treatment for momxe
-!> - Sets momxe component to zero for 2D/3D cases
+!> - Handles momentum component indexing with special treatment for eqn_idx%mom%end
+!> - Sets eqn_idx%mom%end component to zero for 2D/3D cases
 !>
 !> **State Management:**
 !> - Uses files_loaded flag to prevent redundant file operations
@@ -177,18 +177,18 @@
     case (2)
         idx = i + 1 + global_offset_x - index_x
         do f = 1, sys_size - 1
-            jump = merge(1, 0, f >= momxe)
+            jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, 1, f)
         end do
-        q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
     case (3)
         idx = i + 1 + global_offset_x - index_x
         idy = j + 1 + global_offset_y - index_y
         do f = 1, sys_size - 1
-            jump = merge(1, 0, f >= momxe)
+            jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, k) = stored_values(idx, idy, f)
         end do
-        q_prim_vf(momxe)%sf(i, j, k) = 0.0_wp
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = 0.0_wp
     end select
 #:enddef
 
