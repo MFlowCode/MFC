@@ -1282,7 +1282,6 @@ contains
         integer               :: ierr
         integer, dimension(4) :: buf4
         integer, dimension(2) :: buf2, rbuf2
-#endif
 
         ax = ib_neighborhood_radius
 
@@ -1291,7 +1290,6 @@ contains
         ib_neighbor_ranks = MPI_PROC_NULL
         ib_neighbor_ranks(0, 0, 0) = proc_rank
 
-#ifdef MFC_MPI
         ! Fill radius-1 entries: face neighbors are known from domain decomposition
         ib_neighbor_ranks(-1, 0, 0) = bc_x%beg
         ib_neighbor_ranks(+1, 0, 0) = bc_x%end
