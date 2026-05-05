@@ -709,11 +709,8 @@ contains
         integer, intent(in) :: s
         integer             :: i
         integer             :: gbl_id  ! used for analytic ib patch motion
-        logical             :: forces_computed
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
-
-        forces_computed = .false.
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
