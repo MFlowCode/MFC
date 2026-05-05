@@ -130,6 +130,14 @@ contains
                                & l) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j - 1, k, l))/(x_cc(j + 1) - x_cc(j - 1)))
             else
                 D_xz = 0._wp
+                if (l - 1 >= l_lo .and. l + 1 <= l_hi) then
+                    D_xz = 0.5_wp*(q_prim_vf(eqn_idx%mom%beg)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                   & l - 1))/(z_cc(l + 1) - z_cc(l - 1))
+                end if
+                if (j - 1 >= j_lo .and. j + 1 <= j_hi) then
+                    D_xz = D_xz + 0.5_wp*(q_prim_vf(eqn_idx%mom%beg + 2)%sf(j + 1, k, &
+                                          & l) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j - 1, k, l))/(x_cc(j + 1) - x_cc(j - 1))
+                end if
             end if
         else
             D_xz = 0._wp
@@ -143,6 +151,14 @@ contains
                                & l) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k - 1, l))/(y_cc(k + 1) - y_cc(k - 1)))
             else
                 D_yz = 0._wp
+                if (l - 1 >= l_lo .and. l + 1 <= l_hi) then
+                    D_yz = 0.5_wp*(q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l + 1) - q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
+                                   & l - 1))/(z_cc(l + 1) - z_cc(l - 1))
+                end if
+                if (k - 1 >= k_lo .and. k + 1 <= k_hi) then
+                    D_yz = D_yz + 0.5_wp*(q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, k + 1, l) - q_prim_vf(eqn_idx%mom%beg + 2)%sf(j, &
+                                          & k - 1, l))/(y_cc(k + 1) - y_cc(k - 1))
+                end if
             end if
         else
             D_yz = 0._wp

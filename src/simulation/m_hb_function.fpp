@@ -42,7 +42,7 @@ contains
 
         mu = yield_term + power_law_term
         mu = max(mu, mu_min_val)
-        if (mu_max_val > 0._wp) mu = min(mu, mu_max_val)
+        if (mu_max_val > dflt_real) mu = min(mu, mu_max_val)
 
     end function f_compute_hb_viscosity
 
@@ -64,9 +64,6 @@ contains
 
         ! 2*D_ij*D_ij = 2*(D_xx^2+D_yy^2+D_zz^2+2*(D_xy^2+D_xz^2+D_yz^2))
         shear_rate = sqrt(2._wp*(D_xx*D_xx + D_yy*D_yy + D_zz*D_zz + 2._wp*(D_xy*D_xy + D_xz*D_xz + D_yz*D_yz)))
-
-        ! Clamp for numerical safety
-        shear_rate = min(max(shear_rate, 1.0e-2_wp), 1.0e5_wp)
 
     end function f_compute_shear_rate_from_components
 
