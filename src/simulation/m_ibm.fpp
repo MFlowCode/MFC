@@ -1275,16 +1275,14 @@ contains
                             call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                             call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
                             call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                            do j = 1, num_ibs
-                                if (patch_ib(j)%gbl_patch_id == pid) then
-                                    ! add forces and subtract recv_snap prevent double-counting
-                                    forces(j,:) = forces(j,:) + fval(:) - recv_forces_snap(j,:)
-                                    torques(j,:) = torques(j,:) + tval(:) - recv_torques_snap(j,:)
-                                    recv_forces_snap(j,:) = fval(:)
-                                    recv_torques_snap(j,:) = tval(:)
-                                    exit
-                                end if
-                            end do
+                            call s_get_neighborhood_idx(pid, j)
+                            if (j > 0) then
+                                ! add forces and subtract recv_snap prevent double-counting
+                                forces(j,:) = forces(j,:) + fval(:) - recv_forces_snap(j,:)
+                                torques(j,:) = torques(j,:) + tval(:) - recv_torques_snap(j,:)
+                                recv_forces_snap(j,:) = fval(:)
+                                recv_torques_snap(j,:) = tval(:)
+                            end if
                         end do
                     end if
                     tag = tag + 2
