@@ -658,10 +658,11 @@ contains
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
                         else
-                            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_K_sum
+                            ! Reduced energy Ẽ = E - pi_inf; add pi_inf back for physical H.
+                            E = gamma*pres + 5.e-1_wp*rho*vel_K_sum
                         end if
 
-                        H = (E + pres)/rho
+                        H = (E + pi_inf + pres)/rho
 
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv_local, vel_K_sum, 0._wp, c, qv)
@@ -890,7 +891,7 @@ contains
                             end do
                         else
                             flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                & eqn_idx%E) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt + dqv_dt &
+                                                & eqn_idx%E) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dqv_dt &
                                                 & + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
                         end if
 

@@ -429,10 +429,11 @@ contains
                                 H_R = (E_R + pres_R - pres_mag%R) &
                                        & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             else
-                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
+                                ! Reduced energy Ẽ = E - pi_inf; add pi_inf back for physical H.
+                                E_L = gamma_L*pres_L + 5.e-1*rho_L*vel_L_rms + qv_L
+                                E_R = gamma_R*pres_R + 5.e-1*rho_R*vel_R_rms + qv_R
+                                H_L = (E_L + pi_inf_L + pres_L)/rho_L
+                                H_R = (E_R + pi_inf_R + pres_R)/rho_R
                             end if
 
                             ! elastic energy update
@@ -1119,10 +1120,11 @@ contains
                                 H_R = (E_R + pres_R - pres_mag%R) &
                                        & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             else
-                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
+                                ! Reduced energy Ẽ = E - pi_inf; add pi_inf back for physical H.
+                                E_L = gamma_L*pres_L + 5.e-1*rho_L*vel_L_rms + qv_L
+                                E_R = gamma_R*pres_R + 5.e-1*rho_R*vel_R_rms + qv_R
+                                H_L = (E_L + pi_inf_L + pres_L)/rho_L
+                                H_R = (E_R + pi_inf_R + pres_R)/rho_R
                             end if
 
                             ! elastic energy update
@@ -1966,6 +1968,7 @@ contains
                                     end do
                                 end if
 
+                                ! E_L/E_R are physical E (include pi_inf) for model_eqns=3
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
 
@@ -2040,8 +2043,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical star velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(0.5_wp, s_S))
@@ -2331,8 +2334,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
@@ -2688,8 +2691,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
@@ -2988,11 +2991,12 @@ contains
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
                                 else
-                                    E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                    E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
+                                    ! Reduced energy Ẽ = E - pi_inf_mix; add pi_inf back for physical enthalpy H.
+                                    E_L = gamma_L*pres_L + 5.e-1*rho_L*vel_L_rms + qv_L
+                                    E_R = gamma_R*pres_R + 5.e-1*rho_R*vel_R_rms + qv_R
 
-                                    H_L = (E_L + pres_L)/rho_L
-                                    H_R = (E_R + pres_R)/rho_R
+                                    H_L = (E_L + pi_inf_L + pres_L)/rho_L
+                                    H_R = (E_R + pi_inf_R + pres_R)/rho_R
                                 end if
 
                                 ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
@@ -3051,8 +3055,8 @@ contains
                                     end do
                                 end if
 
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
+                                H_L = (E_L + pi_inf_L + pres_L)/rho_L
+                                H_R = (E_R + pi_inf_R + pres_R)/rho_R
 
                                 @:compute_average_state()
 
@@ -3127,8 +3131,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))

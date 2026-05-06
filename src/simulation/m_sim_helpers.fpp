@@ -121,8 +121,10 @@ contains
         end do
 
         if (igr) then
+            ! igr passes q_cons_vf which stores Ẽ = E - pi_inf_mix; drop pi_inf from recovery.
             E = q_prim_vf(eqn_idx%E)%sf(j, k, l)
-            pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
+            pres = (E - qv - 5.e-1_wp*rho*vel_sum)/gamma
+            E = E + pi_inf  ! Ẽ → physical E for H below
         else
             pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv

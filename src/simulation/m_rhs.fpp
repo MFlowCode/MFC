@@ -1118,9 +1118,9 @@ contains
             type(vector_field), intent(in)                         :: flux_src_n_vf_arg
             ! CORRECTED DECLARATION FOR Kterm_arg:
             real(wp), allocatable, dimension(:,:,:), intent(in) :: Kterm_arg
-            integer                                             :: j_adv, k_idx, l_idx, q_idx
+            integer                                             :: j_adv, k_idx, l_idx, q_idx, i_fluid
             real(wp)                                            :: local_inv_ds, local_term_coeff, local_flux1, local_flux2
-            real(wp)                                            :: local_q_cons_val, local_k_term_val
+            real(wp)                                            :: local_q_cons_val, local_k_term_val, pi_inf_src
             logical                                             :: use_standard_riemann
 
             select case (current_idir)
@@ -1188,6 +1188,44 @@ contains
                                            & q_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                             end do; end do; end do
                         end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if
+                ! Ẽ non-conservative source for model_eqns=2: S_Ẽ = -\Sigma_i \pi_inf_i * rhs(\alpha_i)
+                if (model_eqns == 2 .and. (bubbles_euler .neqv. .true.) .and. .not. mhd) then
+                    if (use_standard_riemann) then
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
+                                            & pi_inf_src, i_fluid]')
+                        do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
+                            local_inv_ds = 1._wp/dx(k_idx)
+                            local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + 1)%sf(k_idx, l_idx, q_idx)
+                            pi_inf_src = 0._wp
+                            do i_fluid = 1, num_fluids
+                                pi_inf_src = pi_inf_src + pi_infs(i_fluid)*(flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(k_idx - 1, l_idx, &
+                                                                  & q_idx) - flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(k_idx, l_idx, q_idx))
+                            end do
+                            rhs_vf_arg(eqn_idx%E)%sf(k_idx, l_idx, q_idx) = rhs_vf_arg(eqn_idx%E)%sf(k_idx, l_idx, &
+                                       & q_idx) - local_inv_ds*local_term_coeff*pi_inf_src
+                        end do; end do; end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    else
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, pi_inf_src, i_fluid]')
+                        do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
+                            local_inv_ds = 1._wp/dx(k_idx)
+                            pi_inf_src = 0._wp
+                            do i_fluid = 1, num_fluids
+                                pi_inf_src = pi_inf_src + pi_infs(i_fluid)*q_cons_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(k_idx, l_idx, &
+                                                                  & q_idx)*(flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(k_idx, l_idx, &
+                                                                  & q_idx) - flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(k_idx - 1, l_idx, q_idx))
+                            end do
+                            rhs_vf_arg(eqn_idx%E)%sf(k_idx, l_idx, q_idx) = rhs_vf_arg(eqn_idx%E)%sf(k_idx, l_idx, &
+                                       & q_idx) - local_inv_ds*pi_inf_src
+                        end do; end do; end do
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 end if
@@ -1267,6 +1305,44 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 end if
+                ! Ẽ non-conservative source for model_eqns=2: S_Ẽ = -\Sigma_i \pi_inf_i * rhs(\alpha_i)
+                if (model_eqns == 2 .and. (bubbles_euler .neqv. .true.) .and. .not. mhd) then
+                    if (use_standard_riemann) then
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
+                                            & pi_inf_src, i_fluid]')
+                        do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
+                            local_inv_ds = 1._wp/dy(k_idx)
+                            local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + 2)%sf(q_idx, k_idx, l_idx)
+                            pi_inf_src = 0._wp
+                            do i_fluid = 1, num_fluids
+                                pi_inf_src = pi_inf_src + pi_infs(i_fluid)*(flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(q_idx, k_idx - 1, &
+                                                                  & l_idx) - flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(q_idx, k_idx, l_idx))
+                            end do
+                            rhs_vf_arg(eqn_idx%E)%sf(q_idx, k_idx, l_idx) = rhs_vf_arg(eqn_idx%E)%sf(q_idx, k_idx, &
+                                       & l_idx) - local_inv_ds*local_term_coeff*pi_inf_src
+                        end do; end do; end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    else
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, pi_inf_src, i_fluid]')
+                        do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
+                            local_inv_ds = 1._wp/dy(k_idx)
+                            pi_inf_src = 0._wp
+                            do i_fluid = 1, num_fluids
+                                pi_inf_src = pi_inf_src + pi_infs(i_fluid)*q_cons_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(q_idx, k_idx, &
+                                                                  & l_idx)*(flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(q_idx, k_idx, &
+                                                                  & l_idx) - flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(q_idx, k_idx - 1, l_idx))
+                            end do
+                            rhs_vf_arg(eqn_idx%E)%sf(q_idx, k_idx, l_idx) = rhs_vf_arg(eqn_idx%E)%sf(q_idx, k_idx, &
+                                       & l_idx) - local_inv_ds*pi_inf_src
+                        end do; end do; end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if
             case (3)
                 ! z-direction: loops l_idx (x), q_idx (y), k_idx (z); sf(l_idx, q_idx, k_idx); dz(k_idx); Kterm(l_idx,q_idx,k_idx)
                 if (grid_geometry == 3) then
@@ -1337,6 +1413,44 @@ contains
                                            & k_idx) + local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                             end do; end do; end do
                         end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if
+                ! Ẽ non-conservative source for model_eqns=2: S_Ẽ = -\Sigma_i \pi_inf_i * rhs(\alpha_i)
+                if (model_eqns == 2 .and. (bubbles_euler .neqv. .true.) .and. .not. mhd) then
+                    if (use_standard_riemann) then
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
+                                            & pi_inf_src, i_fluid]')
+                        do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
+                            local_inv_ds = 1._wp/dz(k_idx)
+                            local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + 3)%sf(l_idx, q_idx, k_idx)
+                            pi_inf_src = 0._wp
+                            do i_fluid = 1, num_fluids
+                                pi_inf_src = pi_inf_src + pi_infs(i_fluid)*(flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(l_idx, q_idx, &
+                                                                  & k_idx - 1) - flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid &
+                                                                  & - 1)%sf(l_idx, q_idx, k_idx))
+                            end do
+                            rhs_vf_arg(eqn_idx%E)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(eqn_idx%E)%sf(l_idx, q_idx, &
+                                       & k_idx) - local_inv_ds*local_term_coeff*pi_inf_src
+                        end do; end do; end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    else
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, pi_inf_src, i_fluid]')
+                        do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
+                            local_inv_ds = 1._wp/dz(k_idx)
+                            pi_inf_src = 0._wp
+                            do i_fluid = 1, num_fluids
+                                pi_inf_src = pi_inf_src + pi_infs(i_fluid)*q_cons_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(l_idx, q_idx, &
+                                                                  & k_idx)*(flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(l_idx, q_idx, &
+                                                                  & k_idx) - flux_src_n_vf_arg%vf(eqn_idx%adv%beg + i_fluid - 1) &
+                                                                  & %sf(l_idx, q_idx, k_idx - 1))
+                            end do
+                            rhs_vf_arg(eqn_idx%E)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(eqn_idx%E)%sf(l_idx, q_idx, &
+                                       & k_idx) - local_inv_ds*pi_inf_src
+                        end do; end do; end do
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 end if
