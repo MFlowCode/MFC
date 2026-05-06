@@ -2040,8 +2040,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical star velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(0.5_wp, s_S))
@@ -2331,8 +2331,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
@@ -2688,8 +2688,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
@@ -3127,8 +3127,8 @@ contains
                                 s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
 
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
