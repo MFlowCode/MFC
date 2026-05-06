@@ -912,6 +912,7 @@ class CaseValidator:
             self.prohibit(tau0 is not None and tau0 < 0, f"fluid_pp({i})%tau0 (yield stress) must be >= 0")
             self.prohibit(mu_min is not None and mu_min < 0, f"fluid_pp({i})%mu_min must be >= 0")
             self.prohibit(mu_max is not None and mu_min is not None and mu_max <= mu_min, f"fluid_pp({i})%mu_max must be > mu_min")
+            self.prohibit(nn is not None and nn < 1 and mu_max is None, f"fluid_pp({i})%mu_max must be set for shear-thinning (nn < 1) to bound viscosity at zero shear rate")
             self.prohibit(hb_m is not None and hb_m <= 0, f"fluid_pp({i})%hb_m (Papanastasiou parameter) must be > 0")
 
     def check_mhd_simulation(self):

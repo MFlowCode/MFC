@@ -425,6 +425,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
                 cases.append(define_case_d(stack, "shear-thinning", {}))
                 cases.append(define_case_d(stack, "Bingham", {"fluid_pp(1)%tau0": 0.1, "fluid_pp(1)%nn": 1.0, "fluid_pp(1)%K": 0.01}))
+                cases.append(define_case_d(stack, "shear-thinning+weno_Re_flux", {"weno_Re_flux": "T"}))
                 stack.pop()
 
             if num_fluids == 2:

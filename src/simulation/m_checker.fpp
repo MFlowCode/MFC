@@ -109,12 +109,15 @@ contains
         do i = 1, num_fluids
             if (fluid_pp(i)%non_newtonian) then
                 @:PROHIBIT(.not. viscous, "Non-Newtonian fluid requires viscosity to be enabled")
+                @:PROHIBIT(igr, "Non-Newtonian viscosity is not supported with igr")
                 @:PROHIBIT(fluid_pp(i)%K <= 0._wp, "Non-Newtonian fluid consistency index K must be > 0")
                 @:PROHIBIT(fluid_pp(i)%nn <= 0._wp, "Non-Newtonian fluid flow behavior index nn must be > 0")
                 @:PROHIBIT(fluid_pp(i)%tau0 < 0._wp, "Non-Newtonian fluid yield stress tau0 must be >= 0")
                 @:PROHIBIT(fluid_pp(i)%mu_min < 0._wp, "Non-Newtonian fluid mu_min must be >= 0")
                 @:PROHIBIT(.not. f_is_default(fluid_pp(i)%mu_max) .and. fluid_pp(i)%mu_max <= fluid_pp(i)%mu_min, &
                            & "Non-Newtonian fluid mu_max must be > mu_min when set")
+                @:PROHIBIT(fluid_pp(i)%nn < 1._wp .and. f_is_default(fluid_pp(i)%mu_max), &
+                           & "Shear-thinning (nn < 1) requires mu_max to bound viscosity at zero shear rate")
                 @:PROHIBIT(fluid_pp(i)%hb_m <= 0._wp, "Non-Newtonian Papanastasiou parameter hb_m must be > 0")
             end if
         end do
