@@ -300,7 +300,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     def alter_muscl():
         for muscl_order in [1, 2]:
-            stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0})
+            stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
 
             if muscl_order == 1:
                 for int_comp in ["T", "F"]:
@@ -1783,6 +1783,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50
                     case["t_step_save"] = 50
+
+                if case.get("recon_type") == 2:
+                    for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT"):
+                        case[k] = None
 
                 caseSize = case["m"] * max(case["n"], 1) * max(case["p"], 1)
                 if caseSize > 25 * 25:

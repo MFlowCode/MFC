@@ -818,7 +818,7 @@ contains
         end if
 
         ! Write IB kinematic state for restart
-        if (ib) call s_write_ib_state_file(t_step)
+        if (ib) call s_write_ib_state_file(save_count)
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -914,9 +914,13 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            if (t_step_start > 0) call s_read_ib_restart_data(t_step_start)
+            if (cfl_dt .and. n_start > 0) then
+                call s_read_ib_restart_data(n_start)
+            else if (t_step_start > 0) then
+                call s_read_ib_restart_data(t_step_start)
+            end if
             call s_ibm_setup()
-            if (t_step_start == 0) then
+            if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
                 call s_write_ib_data_file(0)
                 call s_write_ib_state_file(0)
             end if

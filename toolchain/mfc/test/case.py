@@ -161,7 +161,9 @@ class TestCase(case.Case):
         self.ppn = ppn or 1
         self.override_tol = override_tol
         self.restart_check = restart_check
-        super().__init__({**BASE_CFG.copy(), **mods})
+        merge = {**BASE_CFG.copy(), **mods}
+        merge = {key: val for key, val in merge.items() if val is not None}
+        super().__init__(merge)
 
     def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
         if gpus is not None and len(gpus) != 0:

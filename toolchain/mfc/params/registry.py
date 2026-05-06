@@ -233,7 +233,11 @@ class ParamRegistry:
         if param.name in self._params:
             existing = self._params[param.name]
             if existing.param_type != param.param_type:
-                raise ValueError(f"Type mismatch for '{param.name}'")
+                raise ValueError(
+                    f"Type mismatch for '{param.name}': "
+                    f"existing type is {existing.param_type!r}, "
+                    f"new type is {param.param_type!r}"
+                )
             existing.tags.update(param.tags)
             for tag in param.tags:
                 self._by_tag[tag].add(param.name)

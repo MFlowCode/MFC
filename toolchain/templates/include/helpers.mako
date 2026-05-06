@@ -99,6 +99,10 @@ END
         exit 1
     fi
 
+% if target.name == 'post_process':
+    python3 "${MFC_ROOT_DIR}/toolchain/templates/include/generate_silo_series.py" '${os.path.dirname(input)}'
+% endif
+
     % if output_summary:
 
         cd '${MFC_ROOT_DIR}'

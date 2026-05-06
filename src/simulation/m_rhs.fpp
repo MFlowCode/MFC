@@ -68,7 +68,7 @@ module m_rhs
     $:GPU_DECLARE(create='[tau_Re_vf]')
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical source). These are computed by applying the
-    !! chosen Riemann problem solver .on the left and right cell-boundary values of the primitive variables
+    !! chosen Riemann problem solver on the left and right cell-boundary values of the primitive variables
     !> @{
     type(vector_field), allocatable, dimension(:) :: flux_n
     type(vector_field), allocatable, dimension(:) :: flux_src_n

@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Shared bubble-dynamics procedures (radial acceleration, wall pressure, sound speed) for ensemble- and volume-averaged
-!! models
+!> @brief Bubble-dynamics procedures for ensemble- and volume-averaged models
 module m_bubbles
 
     use m_derived_types

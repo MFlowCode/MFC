@@ -883,7 +883,7 @@ contains
         #:endif
 
         ! muscl_eps: use per-limiter defaults when user did not set it
-        if (muscl_eps == dflt_real) then
+        if (f_is_default(muscl_eps)) then
             if (muscl_lim <= 2) then
                 muscl_eps = 1e-9_wp  ! minmod, MC
             else
