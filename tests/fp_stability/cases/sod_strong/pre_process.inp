@@ -1,7 +1,7 @@
 &user_inputs
 x_domain%beg = 0.0
 x_domain%end = 1.0
-m = 24
+m = 49
 n = 0
 p = 0
 t_step_start = 0

@@ -2,13 +2,13 @@
 run_time_info = F
 x_domain%beg = 0.0
 x_domain%end = 1.0
-m = 24
+m = 49
 n = 0
 p = 0
-dt = 0.0001
+dt = 0.00005
 t_step_start = 0
-t_step_stop = 5
-t_step_save = 5
+t_step_stop = 10
+t_step_save = 10
 model_eqns = 2
 num_fluids = 1
 mpp_lim = F
