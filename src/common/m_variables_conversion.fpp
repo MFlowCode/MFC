@@ -104,12 +104,8 @@ contains
             if (mhd) then
                 ! MHD pressure: subtract magnetic pressure from total energy
                 pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
-            else if (model_eqns == 2 .and. (bubbles_euler .neqv. .true.)) then
-                ! Allaire et al. (JCP 2002): store reduced energy Ẽ = E - pi_inf_mix so that p = (Ẽ - KE - qv)/gamma avoids
-                ! cancellation when pi_inf_mix >> p.
-                pres = (energy - dyn_p - qv)/gamma
             else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
-                ! model_eqns=1 or 3: physical E stored, p = (E - pi_inf - KE - qv)/gamma
+                ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002): p from mixture EOS
                 pres = (energy - dyn_p - pi_inf - qv)/gamma
             else if ((model_eqns /= 4) .and. bubbles_euler) then
                 ! Bubble-augmented pressure with void fraction correction
@@ -923,11 +919,8 @@ contains
                             ! MHD energy includes magnetic pressure contribution
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, &
                                       & l) + dyn_pres + pres_mag + pi_inf + qv
-                        else if (model_eqns == 2 .and. (bubbles_euler .neqv. .true.)) then
-                            ! Store reduced energy Ẽ = gamma*p + KE + qv (no pi_inf) for numerical stability.
-                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
-                            ! model_eqns=1 or 3: store physical E = gamma*p + pi_inf + KE + qv
+                            ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler)) then
                             ! Bubble-augmented energy with void fraction correction
