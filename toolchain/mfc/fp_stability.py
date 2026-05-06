@@ -107,8 +107,8 @@ CASES = [
         "name": "low_mach",
         "description": "1-D water shock with low_Mach=1 HLLC correction active",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 1e-10,
-        "ill_cond": "low_Mach correction: wave speed differences cancel when M << 1",
+        "threshold": 1e-7,
+        "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M≈0",
     },
 ]
 

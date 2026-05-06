@@ -16,7 +16,6 @@ precision = 2
 parallel_io = F
 bubbles_euler = T
 nb = 1
-bubble_model = 3
 polytropic = T
 polydisperse = F
 thermal = 3
