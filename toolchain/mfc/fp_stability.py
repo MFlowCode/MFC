@@ -571,10 +571,8 @@ def _emit_github_summary(results: list, n_samples: int):
                     cols.append("—")
                 elif d == float("inf"):
                     cols.append("💥 crash")
-                elif d > r["threshold"]:
-                    cols.append(f"❌ {d:.2e}")
                 else:
-                    cols.append(f"✅ {d:.2e}")
+                    cols.append(f"{d:.2e}")
             md.append(f"| `{r['name']}` | {' | '.join(cols)} |")
         md.append("")
 
