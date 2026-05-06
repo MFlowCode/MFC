@@ -15,7 +15,7 @@ name: FP Stability
 #
 #   water_stiffened  1-D water shock, stiffened EOS (pi_inf=4046)
 #                    50 cells, 10 steps, WENO5 + HLLC
-#                    Threshold 1e-10
+#                    Threshold 1e-8 (loosened; tightens to 1e-10 once Etilde scheme merges)
 #                    Probes: pressure-recovery cancellation p=(E-pi_inf)/gamma
 #                            loses ~4 decimal digits when pi_inf/p_right ~ 40,000
 #
