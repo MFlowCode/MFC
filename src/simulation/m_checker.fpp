@@ -36,6 +36,8 @@ contains
 
         call s_check_inputs_time_stepping
 
+        call s_check_inputs_hll_non_conservative
+
         call s_check_inputs_hypo_branch
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
@@ -106,38 +108,41 @@ contains
 
     end subroutine s_check_inputs_nvidia_uvm
 
-    impure subroutine s_check_inputs_hypo_branch
+    impure subroutine s_check_inputs_hll_non_conservative
 
         @:PROHIBIT((riemann_solver == 1) .and. hll_u_interface .and. cyl_coord .and. p > 0, &
                    & "HLL Method 2 is not supported for 3D cylindrical geometry")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. (.not. hll_u_interface) .and. cyl_coord .and. p == 0, &
+                   & "alt_soundspeed with HLL Method 1 is not supported for 2D axisymmetric geometry")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. cyl_coord .and. p > 0, &
+                   & "alt_soundspeed with HLL is not currently supported for 3D cylindrical geometry")
+
+    end subroutine s_check_inputs_hll_non_conservative
+
+    impure subroutine s_check_inputs_hypo_branch
+
+        @:PROHIBIT(hypoelasticity .and. cyl_coord .and. p > 0, "3D cylindrical hypoelasticity is not supported")
+
+        ! Hypoelasticity solver restrictions
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 3, &
                    & "Exact Riemann (riemann_solver = 3) is not supported with hypoelasticity")
-        @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. cyl_coord .and. p > 0, &
-                   & "3D cylindrical hypoelastic HLLC is not supported")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. n == 0, &
                    & "HLLD hypoelasticity requires at least 2D (n must be > 0)")
-        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. cyl_coord .and. p > 0, &
-                   & "3D cylindrical hypoelastic HLLD is not supported")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
                    & "HLLD hypoelasticity currently requires exactly 2 fluid components")
         @:PROHIBIT(riemann_solver == 4 .and. (.not. mhd) .and. (.not. hypoelasticity), &
                    & "HLLD is only available for MHD or hypoelasticity")
+
+        ! Feature flag prerequisites
         @:PROHIBIT(riemann_hypo_ADC .and. .not. hypoelasticity, "riemann_hypo_ADC requires hypoelasticity = T")
         @:PROHIBIT(riemann_hypo_ADC .and. riemann_solver /= 2 .and. riemann_solver /= 4, &
                    & "riemann_hypo_ADC only applies to hypo HLLC/HLLD")
         @:PROHIBIT(hypo_hll_interface_rhs .and. .not. hypoelasticity, "hypo_hll_interface_rhs requires hypoelasticity = T")
         @:PROHIBIT(hypo_hll_interface_rhs .and. riemann_solver /= 1, &
                    & "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
-        @:PROHIBIT(hypo_hll_interface_rhs .and. cyl_coord .and. p > 0, &
-                   & "3D cylindrical interface-consistent hypo RHS is not supported")
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. .not. hypoelasticity, &
                    & "alt_soundspeed with HLLD requires hypoelasticity = T")
-        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. num_fluids /= 2, &
-                   & "alt_soundspeed with HLLD requires exactly 2 fluid components")
-        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. (.not. hll_u_interface) .and. cyl_coord .and. p == 0, &
-                   & "alt_soundspeed with HLL Method 1 is not supported for 2D axisymmetric geometry")
-        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1 .and. cyl_coord .and. p > 0, &
-                   & "alt_soundspeed with HLL is not currently supported for 3D cylindrical geometry")
+        @:PROHIBIT(hypoelasticity .and. igr, "Hypoelasticity is not compatible with IGR")
 
     end subroutine s_check_inputs_hypo_branch
 

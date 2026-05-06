@@ -782,8 +782,8 @@ contains
 
                 ! RHS additions for hypoelasticity
                 if (hypo_nc_finite_diff) then
-                    call nvtxStartRange("RHS-HYPOELASTICITY-LEGACY")
-                    call s_compute_hypoelastic_rhs_legacy(id, q_prim_qp%vf, rhs_vf)
+                    call nvtxStartRange("RHS-HYPOELASTICITY-FD-PER-SWEEP")
+                    call s_compute_hypoelastic_rhs_finite_diff_per_sweep(id, q_prim_qp%vf, rhs_vf)
                     call nvtxEndRange
                 end if
 
@@ -1282,6 +1282,14 @@ contains
             real(wp)                                               :: local_inv_ds, local_term_coeff, local_flux1, local_flux2
             real(wp)                                               :: local_k_term_val
 
+            ! Three mutually exclusive modes for the NC volume fraction advection source term:
+
+            !   adv_src_alpha_iface - HLL Method 1: flux_src carries per-fluid interface alpha_k
+
+            !   adv_src_vel_iface   - HLLC, HLL Method 2, Exact, LF: flux_src carries shared face-normal velocity
+
+            !   adv_src_none        - HLLD: MHD has no volume fractions; hypo uses dual-pass Riemann flux
+
             select case (current_idir)
             case (1)  ! x-direction
                 if (adv_src_alpha_iface) then
@@ -1303,7 +1311,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    if (alt_soundspeed .and. .not. bubbles_euler) then
+                    if (alt_soundspeed) then  ! K*div(u) correction
                         $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                             & local_flux1, local_flux2]')
                         do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
@@ -1318,8 +1326,6 @@ contains
                         end do; end do; end do
                         $:END_GPU_PARALLEL_LOOP()
                     end if
-                else if (adv_src_none) then
-                    ! No separate NC advection source term.
                 else if (adv_src_vel_iface) then
                     ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dx.
                     $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
@@ -1335,7 +1341,7 @@ contains
                         end do; end do; end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    if (alt_soundspeed .and. .not. bubbles_euler) then
+                    if (alt_soundspeed) then  ! K*div(u) correction
                         $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                             & local_flux1, local_flux2]')
                         do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
@@ -1371,7 +1377,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    if (alt_soundspeed .and. .not. bubbles_euler) then
+                    if (alt_soundspeed) then  ! K*div(u) correction
                         $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                             & local_flux1, local_flux2]')
                         do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
@@ -1399,8 +1405,6 @@ contains
                             $:END_GPU_PARALLEL_LOOP()
                         end if
                     end if
-                else if (adv_src_none) then
-                    ! No separate NC advection source term.
                 else if (adv_src_vel_iface) then
                     ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dy.
                     $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
@@ -1416,7 +1420,7 @@ contains
                         end do; end do; end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    if (alt_soundspeed .and. .not. bubbles_euler) then
+                    if (alt_soundspeed) then  ! K*div(u) correction
                         $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                             & local_flux1, local_flux2]')
                         do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
@@ -1466,7 +1470,7 @@ contains
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-                        if (alt_soundspeed .and. .not. bubbles_euler) then
+                        if (alt_soundspeed) then  ! K*div(u) correction
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                                 & local_flux1, local_flux2]')
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
@@ -1481,8 +1485,6 @@ contains
                             end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else if (adv_src_none) then
-                        ! No separate NC advection source term.
                     else if (adv_src_vel_iface) then
                         ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dz.
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
@@ -1498,7 +1500,7 @@ contains
                             end do; end do; end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-                        if (alt_soundspeed .and. .not. bubbles_euler) then
+                        if (alt_soundspeed) then  ! K*div(u) correction
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                                 & local_flux1, local_flux2]')
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
@@ -1534,7 +1536,7 @@ contains
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-                        if (alt_soundspeed .and. .not. bubbles_euler) then
+                        if (alt_soundspeed) then  ! K*div(u) correction
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                                 & local_flux1, local_flux2]')
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
@@ -1549,8 +1551,6 @@ contains
                             end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else if (adv_src_none) then
-                        ! No separate NC advection source term.
                     else if (adv_src_vel_iface) then
                         ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dz.
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
@@ -1566,7 +1566,7 @@ contains
                             end do; end do; end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-                        if (alt_soundspeed .and. .not. bubbles_euler) then
+                        if (alt_soundspeed) then  ! K*div(u) correction
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                                 & local_flux1, local_flux2]')
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m

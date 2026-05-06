@@ -399,23 +399,12 @@ contains
             @:PREFER_GPU(rhs_hatL_vf)
             @:PREFER_GPU(rhs_hatR_vf)
 
-            if (igr) then
-                do i = 1, sys_size
-                    @:ALLOCATE(rhs_hatL_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
-                    @:ALLOCATE(rhs_hatR_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
-                    @:ACC_SETUP_SFs(rhs_hatL_vf(i))
-                    @:ACC_SETUP_SFs(rhs_hatR_vf(i))
-                    @:PREFER_GPU(rhs_hatL_vf(i)%sf)
-                    @:PREFER_GPU(rhs_hatR_vf(i)%sf)
-                end do
-            else
-                do i = 1, sys_size
-                    @:ALLOCATE(rhs_hatL_vf(i)%sf(0:m, 0:n, 0:p))
-                    @:ALLOCATE(rhs_hatR_vf(i)%sf(0:m, 0:n, 0:p))
-                    @:ACC_SETUP_SFs(rhs_hatL_vf(i))
-                    @:ACC_SETUP_SFs(rhs_hatR_vf(i))
-                end do
-            end if
+            do i = 1, sys_size
+                @:ALLOCATE(rhs_hatL_vf(i)%sf(0:m, 0:n, 0:p))
+                @:ALLOCATE(rhs_hatR_vf(i)%sf(0:m, 0:n, 0:p))
+                @:ACC_SETUP_SFs(rhs_hatL_vf(i))
+                @:ACC_SETUP_SFs(rhs_hatR_vf(i))
+            end do
         end if
 
         ! Opening and writing the header of the run-time information file

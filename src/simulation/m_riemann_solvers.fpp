@@ -228,10 +228,6 @@ contains
         integer                   :: i, j, k, l, q  !< Generic loop iterators
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
-        real(wp) :: rho_HLL_ex, rhou_n_HLL_ex, rhou_t_HLL_ex, rhou_t2_HLL_ex
-        real(wp) :: u_n_iface, u_t_iface, u_t2_iface
-        real(wp) :: pTot_L_ex, pTot_R_ex
-
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
             & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -248,9 +244,8 @@ contains
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
                                     & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, xi_P, &
-                                    & rho_HLL_ex, rhou_n_HLL_ex, rhou_t_HLL_ex, rhou_t2_HLL_ex, u_n_iface, u_t_iface, u_t2_iface, &
-                                    & pTot_L_ex, pTot_R_ex]', copyin='[norm_dir]')
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, &
+                                        & xi_P]', copyin='[norm_dir]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -711,6 +706,7 @@ contains
                                 end do
                             end if
 
+                            ! Export interface velocity for NC RHS
                             if (hypo_nc_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
@@ -726,8 +722,7 @@ contains
                                 end do
                             end if
 
-                            if (.not. hll_u_interface) then
-                                ! Advection flux and source: interface velocity for volume fraction transport
+                            if (.not. hll_u_interface) then  ! HLL Method 1: per-fluid alpha interface flux
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                     if (0._wp <= s_L .or. s_R <= 0._wp) then
@@ -745,7 +740,7 @@ contains
                                                               & i) - s_L*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))/(s_R - s_L)
                                     end if
                                 end do
-                            else
+                            else  ! HLL Method 2: shared velocity interface flux
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                     if (0._wp <= s_L) then
@@ -1867,7 +1862,7 @@ contains
         real(wp) :: zcoef, pcorr           !< low Mach number correction
         integer  :: Re_max, i, j, k, l, q  !< Generic loop iterators
 
-        ! HLLC star-state helpers / aliases (new)
+        ! HLLC star-state helpers
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(20) :: U_L, U_R, U_star_L, U_star_R
             real(wp), dimension(20) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
@@ -1892,18 +1887,16 @@ contains
         real(wp) :: E_L_star, E_R_star
         real(wp) :: S_Mid
         integer  :: mom_n, mom_t1, mom_t2
-        integer  :: itnn, itnt1, itnt2, itss1, itss2, itt12
+        integer  :: idx_phys
 
         ! ADC (HLL -> HLLC)
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20) :: F_HLL, U_HLL
+            real(wp), dimension(20) :: F_HLL
         #:else
-            real(wp), dimension(sys_size) :: F_HLL, U_HLL
+            real(wp), dimension(sys_size) :: F_HLL
         #:endif
         real(wp)            :: u_n_HLL_trace, u_t_HLL_trace
         real(wp)            :: u_t2_HLL_trace
-        real(wp)            :: u_n_HLL_cons
-        real(wp)            :: rho_HLL
         real(wp)            :: p_face_HLL, tau_qq_face_HLL, tau_nn_HLL
         real(wp)            :: phi
         real(wp)            :: Sigma_L, Sigma_R, dSigma, Sigma_ref
@@ -2962,10 +2955,11 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 else
-                    ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection
+                    ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection Private list split across
+                    ! _hllc_p1/p2/p3 for Fypp line-length limits
                     #:set _hllc_p1 = '[Re_max, i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, ptilde_L, ptilde_R, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, flux_ene_e, flux_tau_L, flux_tau_R,'
-                    #:set _hllc_p2 = 'U_L, U_R, U_star_L, U_star_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, denom_L, denom_R, fac_L, fac_R, rho_L_star, rho_R_star, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star, E_L_star, E_R_star, S_Mid, mom_n, mom_t1, mom_t2, itnn, itnt1, itnt2, itss1, itss2, itt12,'
-                    #:set _hllc_p3 = 'F_HLL, U_HLL, u_n_HLL_trace, u_t_HLL_trace, u_t2_HLL_trace, u_n_HLL_cons, rho_HLL, p_face_HLL, tau_qq_face_HLL, tau_nn_HLL, phi, Sigma_L, Sigma_R, dSigma, Sigma_ref, a_L_ref, a_R_ref, a_ref, du_t, dtau_nt, du_t2, dtau_nt2, sensor_ptot, sensor_vt, sensor_tnt, sensor_combined]'
+                    #:set _hllc_p2 = 'U_L, U_R, U_star_L, U_star_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, denom_L, denom_R, fac_L, fac_R, rho_L_star, rho_R_star, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star, E_L_star, E_R_star, S_Mid, mom_n, mom_t1, mom_t2,'
+                    #:set _hllc_p3 = 'F_HLL, u_n_HLL_trace, u_t_HLL_trace, u_t2_HLL_trace, p_face_HLL, tau_qq_face_HLL, tau_nn_HLL, phi, Sigma_L, Sigma_R, dSigma, Sigma_ref, a_L_ref, a_R_ref, a_ref, du_t, dtau_nt, du_t2, dtau_nt2, sensor_ptot, sensor_vt, sensor_tnt, sensor_combined, idx_phys]'
                     $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_p1 + _hllc_p2 + _hllc_p3, copyin='[is1, is2, is3]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
@@ -3001,65 +2995,19 @@ contains
                                         tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%stress%beg - 1 + i)
                                     end do
 
-                                    if (n == 0) then
-                                        tau_nn_L = tau_e_L(1)
-                                        tau_nn_R = tau_e_R(1)
-                                        u_n_L = vel_L(1)
-                                        u_n_R = vel_R(1)
-                                    else if (p == 0) then
-                                        tau_nt_L = tau_e_L(2)
-                                        tau_nt_R = tau_e_R(2)
-                                        if (dir_idx(1) == 1) then
-                                            tau_nn_L = tau_e_L(1)
-                                            tau_nn_R = tau_e_R(1)
-                                            tau_tt_L = tau_e_L(3)
-                                            tau_tt_R = tau_e_R(3)
-                                            u_n_L = vel_L(1)
-                                            u_n_R = vel_R(1)
-                                            u_t_L = vel_L(2)
-                                            u_t_R = vel_R(2)
-                                        else
-                                            tau_nn_L = tau_e_L(3)
-                                            tau_nn_R = tau_e_R(3)
-                                            tau_tt_L = tau_e_L(1)
-                                            tau_tt_R = tau_e_R(1)
-                                            u_n_L = vel_L(2)
-                                            u_n_R = vel_R(2)
-                                            u_t_L = vel_L(1)
-                                            u_t_R = vel_R(1)
-                                        end if
-                                    else
-                                        if (dir_idx(1) == 1) then
-                                            u_n_L = vel_L(1); u_n_R = vel_R(1)
-                                            u_t_L = vel_L(2); u_t_R = vel_R(2)
-                                            u_t2_L = vel_L(3); u_t2_R = vel_R(3)
-                                            tau_nn_L = tau_e_L(1); tau_nn_R = tau_e_R(1)
-                                            tau_nt_L = tau_e_L(2); tau_nt_R = tau_e_R(2)
-                                            tau_nt2_L = tau_e_L(4); tau_nt2_R = tau_e_R(4)
-                                            tau_tt_L = tau_e_L(3); tau_tt_R = tau_e_R(3)
-                                            tau_t2t2_L = tau_e_L(6); tau_t2t2_R = tau_e_R(6)
-                                            tau_t1t2_L = tau_e_L(5); tau_t1t2_R = tau_e_R(5)
-                                        else if (dir_idx(1) == 2) then
-                                            u_n_L = vel_L(2); u_n_R = vel_R(2)
-                                            u_t_L = vel_L(1); u_t_R = vel_R(1)
-                                            u_t2_L = vel_L(3); u_t2_R = vel_R(3)
-                                            tau_nn_L = tau_e_L(3); tau_nn_R = tau_e_R(3)
-                                            tau_nt_L = tau_e_L(2); tau_nt_R = tau_e_R(2)
-                                            tau_nt2_L = tau_e_L(5); tau_nt2_R = tau_e_R(5)
-                                            tau_tt_L = tau_e_L(1); tau_tt_R = tau_e_R(1)
-                                            tau_t2t2_L = tau_e_L(6); tau_t2t2_R = tau_e_R(6)
-                                            tau_t1t2_L = tau_e_L(4); tau_t1t2_R = tau_e_R(4)
-                                        else
-                                            u_n_L = vel_L(3); u_n_R = vel_R(3)
-                                            u_t_L = vel_L(1); u_t_R = vel_R(1)
-                                            u_t2_L = vel_L(2); u_t2_R = vel_R(2)
-                                            tau_nn_L = tau_e_L(6); tau_nn_R = tau_e_R(6)
-                                            tau_nt_L = tau_e_L(4); tau_nt_R = tau_e_R(4)
-                                            tau_nt2_L = tau_e_L(5); tau_nt2_R = tau_e_R(5)
-                                            tau_tt_L = tau_e_L(1); tau_tt_R = tau_e_R(1)
-                                            tau_t2t2_L = tau_e_L(3); tau_t2t2_R = tau_e_R(3)
-                                            tau_t1t2_L = tau_e_L(2); tau_t1t2_R = tau_e_R(2)
-                                        end if
+                                    ! Map physical-basis arrays to directional aliases via stress_perm/dir_idx
+                                    u_n_L = vel_L(dir_idx(1)); u_n_R = vel_R(dir_idx(1))
+                                    tau_nn_L = tau_e_L(stress_perm(1)); tau_nn_R = tau_e_R(stress_perm(1))
+                                    if (n > 0) then
+                                        u_t_L = vel_L(dir_idx(2)); u_t_R = vel_R(dir_idx(2))
+                                        tau_nt_L = tau_e_L(stress_perm(2)); tau_nt_R = tau_e_R(stress_perm(2))
+                                        tau_tt_L = tau_e_L(stress_perm(3)); tau_tt_R = tau_e_R(stress_perm(3))
+                                    end if
+                                    if (p > 0) then
+                                        u_t2_L = vel_L(dir_idx(3)); u_t2_R = vel_R(dir_idx(3))
+                                        tau_nt2_L = tau_e_L(stress_perm(4)); tau_nt2_R = tau_e_R(stress_perm(4))
+                                        tau_t1t2_L = tau_e_L(stress_perm(5)); tau_t1t2_R = tau_e_R(stress_perm(5))
+                                        tau_t2t2_L = tau_e_L(stress_perm(6)); tau_t2t2_R = tau_e_R(stress_perm(6))
                                     end if
                                     pres_tot_L = pres_L - tau_nn_L
                                     pres_tot_R = pres_R - tau_nn_R
@@ -3433,44 +3381,34 @@ contains
                                                               & + s_P*(xi_R - 1._wp))
                                         end if
                                     else
-                                        if (dir_idx(1) == 1) then
-                                            itnn = eqn_idx%stress%beg; itnt1 = eqn_idx%stress%beg + 1; itnt2 = eqn_idx%stress%beg &
-                                                & + 3
-                                            itss1 = eqn_idx%stress%beg + 2; itss2 = eqn_idx%stress%beg &
-                                                & + 5; itt12 = eqn_idx%stress%beg + 4
-                                        else if (dir_idx(1) == 2) then
-                                            itnn = eqn_idx%stress%beg + 2; itnt1 = eqn_idx%stress%beg &
-                                                & + 1; itnt2 = eqn_idx%stress%beg + 4
-                                            itss1 = eqn_idx%stress%beg; itss2 = eqn_idx%stress%beg &
-                                                & + 5; itt12 = eqn_idx%stress%beg + 3
-                                        else
-                                            itnn = eqn_idx%stress%beg + 5; itnt1 = eqn_idx%stress%beg &
-                                                & + 3; itnt2 = eqn_idx%stress%beg + 4
-                                            itss1 = eqn_idx%stress%beg; itss2 = eqn_idx%stress%beg &
-                                                & + 2; itt12 = eqn_idx%stress%beg + 1
-                                        end if
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itnn) = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                          & eqn_idx%stress%beg - 1 + stress_perm(1)) &
+                                                          & = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
                                                           & + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itnt1) = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L &
+                                                          & eqn_idx%stress%beg - 1 + stress_perm(2)) &
+                                                          & = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L &
                                                           & + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
                                                           & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R &
                                                           & + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itnt2) = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt2_L &
+                                                          & eqn_idx%stress%beg - 1 + stress_perm(4)) &
+                                                          & = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt2_L &
                                                           & + s_M*(rho_L*xi_L*tau_nt2_star - rho_L*tau_nt2_L)) &
                                                           & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt2_R &
                                                           & + s_P*(rho_R*xi_R*tau_nt2_star - rho_R*tau_nt2_R))
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itss1) = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                          & eqn_idx%stress%beg - 1 + stress_perm(3)) &
+                                                          & = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
                                                           & + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itss2) = xi_M*rho_L*tau_t2t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp) &
-                                                          & ) + xi_P*rho_R*tau_t2t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                          & eqn_idx%stress%beg - 1 + stress_perm(6)) &
+                                                          & = xi_M*rho_L*tau_t2t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                          & + xi_P*rho_R*tau_t2t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itt12) = xi_M*rho_L*tau_t1t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp) &
-                                                          & ) + xi_P*rho_R*tau_t1t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                          & eqn_idx%stress%beg - 1 + stress_perm(5)) &
+                                                          & = xi_M*rho_L*tau_t1t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                          & + xi_P*rho_R*tau_t1t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                     end if
                                     if (cyl_coord) then
                                         flux_rs${XYZ}$_vf(j, k, l, &
@@ -3486,31 +3424,9 @@ contains
                                     else
                                         u_n_HLLC = s_S*(xi_M*xi_L + xi_P*xi_R); u_t_HLLC = u_t_star; u_t2_HLLC = u_t2_star
                                     end if
-                                    if (num_dims == 1) then
-                                        nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                    else if (num_dims == 2) then
-                                        if (dir_idx(1) == 1) then
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
-                                        else
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
-                                        end if
-                                    else
-                                        if (dir_idx(1) == 1) then
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
-                                        else if (dir_idx(1) == 2) then
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
-                                        else
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t2_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_HLLC
-                                        end if
-                                    end if
+                                    nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(1)) = u_n_HLLC
+                                    if (n > 0) nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(2)) = u_t_HLLC
+                                    if (p > 0) nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(3)) = u_t2_HLLC
                                 else  ! not hypoelasticity
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -3622,21 +3538,22 @@ contains
                                         F_R(eqn_idx%adv%beg - 1 + i) = alpha_R(i)*u_n_R
                                     end do
 
-                                    U_L(eqn_idx%mom%beg) = rho_L*u_n_L
-                                    U_R(eqn_idx%mom%beg) = rho_R*u_n_R
-                                    F_L(eqn_idx%mom%beg) = rho_L*u_n_L*u_n_L + pres_tot_L
-                                    F_R(eqn_idx%mom%beg) = rho_R*u_n_R*u_n_R + pres_tot_R
+                                    ! Momentum U/F in physical order via dir_idx
+                                    U_L(eqn_idx%cont%end + dir_idx(1)) = rho_L*u_n_L
+                                    U_R(eqn_idx%cont%end + dir_idx(1)) = rho_R*u_n_R
+                                    F_L(eqn_idx%cont%end + dir_idx(1)) = rho_L*u_n_L*u_n_L + pres_tot_L
+                                    F_R(eqn_idx%cont%end + dir_idx(1)) = rho_R*u_n_R*u_n_R + pres_tot_R
                                     if (n > 0) then
-                                        U_L(eqn_idx%mom%beg + 1) = rho_L*u_t_L
-                                        U_R(eqn_idx%mom%beg + 1) = rho_R*u_t_R
-                                        F_L(eqn_idx%mom%beg + 1) = rho_L*u_n_L*u_t_L - tau_nt_L
-                                        F_R(eqn_idx%mom%beg + 1) = rho_R*u_n_R*u_t_R - tau_nt_R
+                                        U_L(eqn_idx%cont%end + dir_idx(2)) = rho_L*u_t_L
+                                        U_R(eqn_idx%cont%end + dir_idx(2)) = rho_R*u_t_R
+                                        F_L(eqn_idx%cont%end + dir_idx(2)) = rho_L*u_n_L*u_t_L - tau_nt_L
+                                        F_R(eqn_idx%cont%end + dir_idx(2)) = rho_R*u_n_R*u_t_R - tau_nt_R
                                     end if
                                     if (p > 0) then
-                                        U_L(eqn_idx%mom%beg + 2) = rho_L*u_t2_L
-                                        U_R(eqn_idx%mom%beg + 2) = rho_R*u_t2_R
-                                        F_L(eqn_idx%mom%beg + 2) = rho_L*u_n_L*u_t2_L - tau_nt2_L
-                                        F_R(eqn_idx%mom%beg + 2) = rho_R*u_n_R*u_t2_R - tau_nt2_R
+                                        U_L(eqn_idx%cont%end + dir_idx(3)) = rho_L*u_t2_L
+                                        U_R(eqn_idx%cont%end + dir_idx(3)) = rho_R*u_t2_R
+                                        F_L(eqn_idx%cont%end + dir_idx(3)) = rho_L*u_n_L*u_t2_L - tau_nt2_L
+                                        F_R(eqn_idx%cont%end + dir_idx(3)) = rho_R*u_n_R*u_t2_R - tau_nt2_R
                                     end if
 
                                     U_L(eqn_idx%E) = E_L
@@ -3644,34 +3561,15 @@ contains
                                     F_L(eqn_idx%E) = (E_L + pres_tot_L)*u_n_L - u_t_L*tau_nt_L - u_t2_L*tau_nt2_L
                                     F_R(eqn_idx%E) = (E_R + pres_tot_R)*u_n_R - u_t_R*tau_nt_R - u_t2_R*tau_nt2_R
 
-                                    U_L(eqn_idx%stress%beg) = rho_L*tau_nn_L
-                                    U_R(eqn_idx%stress%beg) = rho_R*tau_nn_R
-                                    F_L(eqn_idx%stress%beg) = rho_L*u_n_L*tau_nn_L
-                                    F_R(eqn_idx%stress%beg) = rho_R*u_n_R*tau_nn_R
-                                    if (n > 0) then
-                                        U_L(eqn_idx%stress%beg + 1) = rho_L*tau_nt_L
-                                        U_R(eqn_idx%stress%beg + 1) = rho_R*tau_nt_R
-                                        F_L(eqn_idx%stress%beg + 1) = rho_L*u_n_L*tau_nt_L
-                                        F_R(eqn_idx%stress%beg + 1) = rho_R*u_n_R*tau_nt_R
-                                        U_L(eqn_idx%stress%beg + 2) = rho_L*tau_tt_L
-                                        U_R(eqn_idx%stress%beg + 2) = rho_R*tau_tt_R
-                                        F_L(eqn_idx%stress%beg + 2) = rho_L*u_n_L*tau_tt_L
-                                        F_R(eqn_idx%stress%beg + 2) = rho_R*u_n_R*tau_tt_R
-                                    end if
-                                    if (p > 0) then
-                                        U_L(eqn_idx%stress%beg + 3) = rho_L*tau_nt2_L
-                                        U_R(eqn_idx%stress%beg + 3) = rho_R*tau_nt2_R
-                                        F_L(eqn_idx%stress%beg + 3) = rho_L*u_n_L*tau_nt2_L
-                                        F_R(eqn_idx%stress%beg + 3) = rho_R*u_n_R*tau_nt2_R
-                                        U_L(eqn_idx%stress%beg + 4) = rho_L*tau_t1t2_L
-                                        U_R(eqn_idx%stress%beg + 4) = rho_R*tau_t1t2_R
-                                        F_L(eqn_idx%stress%beg + 4) = rho_L*u_n_L*tau_t1t2_L
-                                        F_R(eqn_idx%stress%beg + 4) = rho_R*u_n_R*tau_t1t2_R
-                                        U_L(eqn_idx%stress%beg + 5) = rho_L*tau_t2t2_L
-                                        U_R(eqn_idx%stress%beg + 5) = rho_R*tau_t2t2_R
-                                        F_L(eqn_idx%stress%beg + 5) = rho_L*u_n_L*tau_t2t2_L
-                                        F_R(eqn_idx%stress%beg + 5) = rho_R*u_n_R*tau_t2t2_R
-                                    end if
+                                    ! Stress U/F in physical order via stress_perm: U = rho*tau, F = rho*u_n*tau
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1 - merge(1, 0, cyl_coord)
+                                        idx_phys = eqn_idx%stress%beg - 1 + stress_perm(i)
+                                        U_L(idx_phys) = rho_L*tau_e_L(stress_perm(i))
+                                        U_R(idx_phys) = rho_R*tau_e_R(stress_perm(i))
+                                        F_L(idx_phys) = rho_L*u_n_L*tau_e_L(stress_perm(i))
+                                        F_R(idx_phys) = rho_R*u_n_R*tau_e_R(stress_perm(i))
+                                    end do
                                     if (cyl_coord) then
                                         U_L(eqn_idx%stress%end) = rho_L*tau_qq_L
                                         U_R(eqn_idx%stress%end) = rho_R*tau_qq_R
@@ -3679,37 +3577,24 @@ contains
                                         F_R(eqn_idx%stress%end) = rho_R*u_n_R*tau_qq_R
                                     end if
 
-                                    ! Compute F_HLL and U_HLL
+                                    ! Compute F_HLL (physical order) and HLL trace velocities
                                     if (s_L >= 0._wp) then
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, sys_size
                                             F_HLL(i) = F_L(i)
-                                            U_HLL(i) = U_L(i)
                                         end do
-                                        rho_HLL = rho_L
                                         u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L; u_t2_HLL_trace = u_t2_L
-                                        u_n_HLL_cons = u_n_L
                                     else if (s_R <= 0._wp) then
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, sys_size
                                             F_HLL(i) = F_R(i)
-                                            U_HLL(i) = U_R(i)
                                         end do
-                                        rho_HLL = rho_R
                                         u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R; u_t2_HLL_trace = u_t2_R
-                                        u_n_HLL_cons = u_n_R
                                     else
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, sys_size
                                             F_HLL(i) = (s_R*F_L(i) - s_L*F_R(i) + s_L*s_R*(U_R(i) - U_L(i)))/(s_R - s_L + verysmall)
-                                            U_HLL(i) = (s_R*U_R(i) - s_L*U_L(i) - (F_R(i) - F_L(i)))/(s_R - s_L + verysmall)
                                         end do
-                                        rho_HLL = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, eqn_idx%cont%end
-                                            rho_HLL = rho_HLL + U_HLL(i)
-                                        end do
-                                        u_n_HLL_cons = U_HLL(eqn_idx%mom%beg)/(rho_HLL + verysmall)
                                         u_n_HLL_trace = (s_R*u_n_L - s_L*u_n_R)/(s_R - s_L + verysmall)
                                         u_t_HLL_trace = 0._wp; u_t2_HLL_trace = 0._wp
                                         if (n > 0) u_t_HLL_trace = (s_R*u_t_L - s_L*u_t_R)/(s_R - s_L + verysmall)
@@ -3738,99 +3623,11 @@ contains
                                     sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
                                     phi = exp(-(sensor_combined**ADC_power))
 
-                                    ! Blend selected flux components Partial densities: blend (same indices in local and physical
-                                    ! basis)
+                                    ! Blend all flux components: F_HLL is in physical order
                                     $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%cont%end
+                                    do i = 1, sys_size
                                         flux_rs${XYZ}$_vf(j, k, l, i) = F_HLL(i) + phi*(flux_rs${XYZ}$_vf(j, k, l, i) - F_HLL(i))
                                     end do
-
-                                    ! Energy: blend
-                                    flux_rs${XYZ}$_vf(j, k, l, eqn_idx%E) = F_HLL(eqn_idx%E) + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%E) - F_HLL(eqn_idx%E))
-
-                                    ! Momentum: blend (local/physical index mapping via dir_idx)
-                                    flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%cont%end + dir_idx(1)) = F_HLL(eqn_idx%mom%beg) &
-                                                      & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%cont%end + dir_idx(1)) - F_HLL(eqn_idx%mom%beg))
-                                    if (n > 0) then
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%cont%end + dir_idx(2)) = F_HLL(eqn_idx%mom%beg + 1) &
-                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%cont%end + dir_idx(2)) - F_HLL(eqn_idx%mom%beg + 1))
-                                    end if
-                                    if (p > 0) then
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%cont%end + dir_idx(3)) = F_HLL(eqn_idx%mom%beg + 2) &
-                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%cont%end + dir_idx(3)) - F_HLL(eqn_idx%mom%beg + 2))
-                                    end if
-
-                                    ! Volume fractions: blend
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_rs${XYZ}$_vf(j, k, l, i) = F_HLL(i) + phi*(flux_rs${XYZ}$_vf(j, k, l, i) - F_HLL(i))
-                                    end do
-
-                                    ! Stresses: blend all components (local/physical mapping by dimension)
-                                    if (n == 0) then
-                                        ! 1D: only tau_nn
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%stress%beg) = F_HLL(eqn_idx%stress%beg) &
-                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%stress%beg) - F_HLL(eqn_idx%stress%beg))
-                                    else if (p == 0) then
-                                        ! 2D: tau_nn, tau_nt, tau_tt (tau_nt at stress%beg+1 in both bases)
-                                        if (dir_idx(1) == 1) then
-                                            flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg) = F_HLL(eqn_idx%stress%beg) &
-                                                              & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg) - F_HLL(eqn_idx%stress%beg))
-                                            flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg + 2) = F_HLL(eqn_idx%stress%beg + 2) &
-                                                              & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg + 2) - F_HLL(eqn_idx%stress%beg + 2))
-                                        else
-                                            flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg + 2) = F_HLL(eqn_idx%stress%beg) &
-                                                              & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg + 2) - F_HLL(eqn_idx%stress%beg))
-                                            flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg) = F_HLL(eqn_idx%stress%beg + 2) &
-                                                              & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                              & eqn_idx%stress%beg) - F_HLL(eqn_idx%stress%beg + 2))
-                                        end if
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%stress%beg + 1) = F_HLL(eqn_idx%stress%beg + 1) &
-                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%stress%beg + 1) - F_HLL(eqn_idx%stress%beg + 1))
-                                    else
-                                        ! 3D: all 6 components via existing index mapping
-                                        flux_rs${XYZ}$_vf(j, k, l, itnn) = F_HLL(eqn_idx%stress%beg) + phi*(flux_rs${XYZ}$_vf(j, &
-                                                          & k, l, itnn) - F_HLL(eqn_idx%stress%beg))
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itnt1) = F_HLL(eqn_idx%stress%beg + 1) + phi*(flux_rs${XYZ}$_vf(j, k, &
-                                                          & l, itnt1) - F_HLL(eqn_idx%stress%beg + 1))
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itss1) = F_HLL(eqn_idx%stress%beg + 2) + phi*(flux_rs${XYZ}$_vf(j, k, &
-                                                          & l, itss1) - F_HLL(eqn_idx%stress%beg + 2))
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itnt2) = F_HLL(eqn_idx%stress%beg + 3) + phi*(flux_rs${XYZ}$_vf(j, k, &
-                                                          & l, itnt2) - F_HLL(eqn_idx%stress%beg + 3))
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itt12) = F_HLL(eqn_idx%stress%beg + 4) + phi*(flux_rs${XYZ}$_vf(j, k, &
-                                                          & l, itt12) - F_HLL(eqn_idx%stress%beg + 4))
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & itss2) = F_HLL(eqn_idx%stress%beg + 5) + phi*(flux_rs${XYZ}$_vf(j, k, &
-                                                          & l, itss2) - F_HLL(eqn_idx%stress%beg + 5))
-                                    end if
-                                    if (cyl_coord) then
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%stress%end) = F_HLL(eqn_idx%stress%end) &
-                                                          & + phi*(flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%stress%end) - F_HLL(eqn_idx%stress%end))
-                                    end if
 
                                     ! Blend interface velocities (scalar HLL traces)
                                     u_n_HLLC = u_n_HLL_trace + phi*(u_n_HLLC - u_n_HLL_trace)
@@ -3842,36 +3639,13 @@ contains
                                     if (n > 0) vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(2)) = u_t_HLLC
                                     if (p > 0) vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(3)) = u_t2_HLLC
 
-                                    ! Update advection source flux with blended normal velocity u-interface: ADC-blended HLLC
-                                    ! face-normal velocity
+                                    ! Update advection source flux with ADC-blended face-normal velocity
                                     flux_src_rs${XYZ}$_vf(j, k, l, eqn_idx%adv%beg) = u_n_HLLC
 
                                     ! Overwrite nc_iface_vel with blended velocities
-                                    if (num_dims == 1) then
-                                        nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                    else if (num_dims == 2) then
-                                        if (dir_idx(1) == 1) then
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
-                                        else
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
-                                        end if
-                                    else
-                                        if (dir_idx(1) == 1) then
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
-                                        else if (dir_idx(1) == 2) then
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_t2_HLLC
-                                        else
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t2_HLLC
-                                            nc_iface_vel_rs${XYZ}$_vf(j, k, l, 3) = u_n_HLLC
-                                        end if
-                                    end if
+                                    nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(1)) = u_n_HLLC
+                                    if (n > 0) nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(2)) = u_t_HLLC
+                                    if (p > 0) nc_iface_vel_rs${XYZ}$_vf(j, k, l, dir_idx(3)) = u_t2_HLLC
                                 end if
                                 ! END HLLC-ADC
 
@@ -4460,81 +4234,36 @@ contains
                             tau_t2t2_L = 0._wp; tau_t2t2_R = 0._wp; tau_t2t2_hat = 0._wp
                             tau_t1t2_L = 0._wp; tau_t1t2_R = 0._wp; tau_t1t2_hat = 0._wp
 
+                            ! Map physical-basis arrays to directional aliases via stress_perm/dir_idx
+                            u_n_L = vel%L(dir_idx(1)); u_n_R = vel%R(dir_idx(1))
+                            u_n_hat = vel_hat(dir_idx(1))
+                            tau_nn_L = tau_e_L(stress_perm(1)); tau_nn_R = tau_e_R(stress_perm(1))
+                            tau_nn_hat = tau_e_hat(stress_perm(1))
                             if (n == 0) then
                                 ncomp = 11
-                                tau_nn_L = tau_e_L(1)
-                                tau_nn_R = tau_e_R(1)
-                                u_n_L = vel%L(1)
-                                u_n_R = vel%R(1)
-                                u_n_hat = vel_hat(1)
-                                u_t_L = 0._wp; u_t_R = 0._wp; u_t_hat = 0._wp
-                                tau_nt_L = 0._wp; tau_nt_R = 0._wp; tau_nt_hat = 0._wp
-                                tau_tt_L = 0._wp; tau_tt_R = 0._wp; tau_tt_hat = 0._wp
                             else if (p == 0) then
                                 ncomp = 11
-                                tau_nt_L = tau_e_L(2)
-                                tau_nt_R = tau_e_R(2)
-                                tau_nt_hat = tau_e_hat(2)
-                                if (dir_idx(1) == 1) then
-                                    tau_nn_L = tau_e_L(1); tau_nn_R = tau_e_R(1)
-                                    tau_tt_L = tau_e_L(3); tau_tt_R = tau_e_R(3)
-                                    u_n_L = vel%L(1); u_n_R = vel%R(1)
-                                    u_t_L = vel%L(2); u_t_R = vel%R(2)
-                                    tau_nn_hat = tau_e_hat(1); tau_tt_hat = tau_e_hat(3)
-                                    u_n_hat = vel_hat(1); u_t_hat = vel_hat(2)
-                                else
-                                    tau_nn_L = tau_e_L(3); tau_nn_R = tau_e_R(3)
-                                    tau_tt_L = tau_e_L(1); tau_tt_R = tau_e_R(1)
-                                    u_n_L = vel%L(2); u_n_R = vel%R(2)
-                                    u_t_L = vel%L(1); u_t_R = vel%R(1)
-                                    tau_nn_hat = tau_e_hat(3); tau_tt_hat = tau_e_hat(1)
-                                    u_n_hat = vel_hat(2); u_t_hat = vel_hat(1)
-                                end if
+                                u_t_L = vel%L(dir_idx(2)); u_t_R = vel%R(dir_idx(2))
+                                u_t_hat = vel_hat(dir_idx(2))
+                                tau_nt_L = tau_e_L(stress_perm(2)); tau_nt_R = tau_e_R(stress_perm(2))
+                                tau_nt_hat = tau_e_hat(stress_perm(2))
+                                tau_tt_L = tau_e_L(stress_perm(3)); tau_tt_R = tau_e_R(stress_perm(3))
+                                tau_tt_hat = tau_e_hat(stress_perm(3))
                             else
                                 ncomp = 14
-                                if (dir_idx(1) == 1) then
-                                    u_n_L = vel%L(1); u_n_R = vel%R(1)
-                                    u_t_L = vel%L(2); u_t_R = vel%R(2)
-                                    u_t2_L = vel%L(3); u_t2_R = vel%R(3)
-                                    tau_nn_L = tau_e_L(1); tau_nn_R = tau_e_R(1)
-                                    tau_nt_L = tau_e_L(2); tau_nt_R = tau_e_R(2)
-                                    tau_nt2_L = tau_e_L(4); tau_nt2_R = tau_e_R(4)
-                                    tau_tt_L = tau_e_L(3); tau_tt_R = tau_e_R(3)
-                                    tau_t2t2_L = tau_e_L(6); tau_t2t2_R = tau_e_R(6)
-                                    tau_t1t2_L = tau_e_L(5); tau_t1t2_R = tau_e_R(5)
-                                    u_n_hat = vel_hat(1); u_t_hat = vel_hat(2); u_t2_hat = vel_hat(3)
-                                    tau_nn_hat = tau_e_hat(1); tau_nt_hat = tau_e_hat(2)
-                                    tau_nt2_hat = tau_e_hat(4); tau_tt_hat = tau_e_hat(3)
-                                    tau_t2t2_hat = tau_e_hat(6); tau_t1t2_hat = tau_e_hat(5)
-                                else if (dir_idx(1) == 2) then
-                                    u_n_L = vel%L(2); u_n_R = vel%R(2)
-                                    u_t_L = vel%L(1); u_t_R = vel%R(1)
-                                    u_t2_L = vel%L(3); u_t2_R = vel%R(3)
-                                    tau_nn_L = tau_e_L(3); tau_nn_R = tau_e_R(3)
-                                    tau_nt_L = tau_e_L(2); tau_nt_R = tau_e_R(2)
-                                    tau_nt2_L = tau_e_L(5); tau_nt2_R = tau_e_R(5)
-                                    tau_tt_L = tau_e_L(1); tau_tt_R = tau_e_R(1)
-                                    tau_t2t2_L = tau_e_L(6); tau_t2t2_R = tau_e_R(6)
-                                    tau_t1t2_L = tau_e_L(4); tau_t1t2_R = tau_e_R(4)
-                                    u_n_hat = vel_hat(2); u_t_hat = vel_hat(1); u_t2_hat = vel_hat(3)
-                                    tau_nn_hat = tau_e_hat(3); tau_nt_hat = tau_e_hat(2)
-                                    tau_nt2_hat = tau_e_hat(5); tau_tt_hat = tau_e_hat(1)
-                                    tau_t2t2_hat = tau_e_hat(6); tau_t1t2_hat = tau_e_hat(4)
-                                else
-                                    u_n_L = vel%L(3); u_n_R = vel%R(3)
-                                    u_t_L = vel%L(1); u_t_R = vel%R(1)
-                                    u_t2_L = vel%L(2); u_t2_R = vel%R(2)
-                                    tau_nn_L = tau_e_L(6); tau_nn_R = tau_e_R(6)
-                                    tau_nt_L = tau_e_L(4); tau_nt_R = tau_e_R(4)
-                                    tau_nt2_L = tau_e_L(5); tau_nt2_R = tau_e_R(5)
-                                    tau_tt_L = tau_e_L(1); tau_tt_R = tau_e_R(1)
-                                    tau_t2t2_L = tau_e_L(3); tau_t2t2_R = tau_e_R(3)
-                                    tau_t1t2_L = tau_e_L(2); tau_t1t2_R = tau_e_R(2)
-                                    u_n_hat = vel_hat(3); u_t_hat = vel_hat(1); u_t2_hat = vel_hat(2)
-                                    tau_nn_hat = tau_e_hat(6); tau_nt_hat = tau_e_hat(4)
-                                    tau_nt2_hat = tau_e_hat(5); tau_tt_hat = tau_e_hat(1)
-                                    tau_t2t2_hat = tau_e_hat(3); tau_t1t2_hat = tau_e_hat(2)
-                                end if
+                                u_t_L = vel%L(dir_idx(2)); u_t_R = vel%R(dir_idx(2))
+                                u_t2_L = vel%L(dir_idx(3)); u_t2_R = vel%R(dir_idx(3))
+                                u_t_hat = vel_hat(dir_idx(2)); u_t2_hat = vel_hat(dir_idx(3))
+                                tau_nt_L = tau_e_L(stress_perm(2)); tau_nt_R = tau_e_R(stress_perm(2))
+                                tau_nt_hat = tau_e_hat(stress_perm(2))
+                                tau_tt_L = tau_e_L(stress_perm(3)); tau_tt_R = tau_e_R(stress_perm(3))
+                                tau_tt_hat = tau_e_hat(stress_perm(3))
+                                tau_nt2_L = tau_e_L(stress_perm(4)); tau_nt2_R = tau_e_R(stress_perm(4))
+                                tau_nt2_hat = tau_e_hat(stress_perm(4))
+                                tau_t1t2_L = tau_e_L(stress_perm(5)); tau_t1t2_R = tau_e_R(stress_perm(5))
+                                tau_t1t2_hat = tau_e_hat(stress_perm(5))
+                                tau_t2t2_L = tau_e_L(stress_perm(6)); tau_t2t2_R = tau_e_R(stress_perm(6))
+                                tau_t2t2_hat = tau_e_hat(stress_perm(6))
                             end if
                             if (cyl_coord) then
                                 tau_qq_L = tau_e_L(eqn_idx%stress%end - eqn_idx%stress%beg + 1)
@@ -5297,12 +5026,18 @@ contains
         $:GPU_UPDATE(device='[is1, is2, is3]')
 
         if (elasticity) then
+            ! dir_idx_tau(1:3) = (nn, nt, nt2): face-normal stress row for wave speeds and momentum flux. stress_perm(1:n_stress) =
+            ! full tensor permutation mapping F_HLL local basis index -> physical storage index. Local order: (nn, nt, tt, nt2,
+            ! t1t2, t2t2). In 2D only entries 1-3 are used.
             if (norm_dir == 1) then
                 dir_idx_tau = (/1, 2, 4/)
+                stress_perm = (/1, 2, 3, 4, 5, 6/)
             else if (norm_dir == 2) then
                 dir_idx_tau = (/3, 2, 5/)
+                stress_perm = (/3, 2, 1, 5, 4, 6/)
             else
                 dir_idx_tau = (/6, 4, 5/)
+                stress_perm = (/6, 4, 1, 5, 2, 3/)
             end if
         end if
 
@@ -5310,7 +5045,7 @@ contains
         ! for stuff in the same module
         $:GPU_UPDATE(device='[isx, isy, isz]')
         ! for stuff in different modules
-        $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau]')
+        $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
         ! Population of Buffers in x-direction
         if (norm_dir == 1) then

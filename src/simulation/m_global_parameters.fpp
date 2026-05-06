@@ -310,10 +310,11 @@ module m_global_parameters
     !> @{
     integer, dimension(3)  :: dir_idx
     real(wp), dimension(3) :: dir_flg
-    integer, dimension(3)  :: dir_idx_tau  !< used for hypoelasticity=true
+    integer, dimension(3)  :: dir_idx_tau  !< (nn, nt, nt2) stress indices for wave speeds and momentum flux
+    integer, dimension(6)  :: stress_perm  !< Full tensor permutation: local basis → physical storage index
     !> @}
 
-    $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
+    $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
     $:GPU_DECLARE(create='[buff_size]')
@@ -1295,7 +1296,7 @@ contains
         #:endif
 
         $:GPU_UPDATE(device='[muscl_eps]')
-        $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau]')
+        $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')
 

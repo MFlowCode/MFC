@@ -14,8 +14,9 @@ module m_hypoelastic
 
     implicit none
 
-    private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, s_compute_hypoelastic_rhs_legacy, &
-        & s_compute_hypoelastic_rhs_iface, s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_damage_state
+    private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, &
+        & s_compute_hypoelastic_rhs_finite_diff_per_sweep, s_compute_hypoelastic_rhs_iface, &
+        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_damage_state
 
     real(wp), allocatable, dimension(:) :: Gs_hypo
     $:GPU_DECLARE(create='[Gs_hypo]')
@@ -84,7 +85,7 @@ contains
     !! @param idir Dimension splitting index
     !! @param q_prim_vf Primitive variables
     !! @param rhs_vf rhs variables
-    subroutine s_compute_hypoelastic_rhs_legacy(idir, q_prim_vf, rhs_vf)
+    subroutine s_compute_hypoelastic_rhs_finite_diff_per_sweep(idir, q_prim_vf, rhs_vf)
 
         integer, intent(in)                                    :: idir
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
@@ -348,7 +349,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-    end subroutine s_compute_hypoelastic_rhs_legacy
+    end subroutine s_compute_hypoelastic_rhs_finite_diff_per_sweep
 
     !> Interface-consistent hypoelastic RHS (Mode 2: HLL/HLLC). Uses interface velocities from the Riemann solver to compute
     !! velocity gradients. Called once after all dimensional sweeps. Supports 1D, 2D Cartesian, 2D axisymmetric, and 3D Cartesian.
@@ -361,9 +362,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(vector_field), dimension(:), intent(in)           :: nc_iface_vel_n
         real(wp)                                               :: rho_K, G_K
-        real(wp)                                               :: A_x, B_x, C_x, D_x, E_x, F_x, H_x, J1_x, J2_x
-        real(wp)                                               :: A_y, B_y, C_y, D_y, E_y, F_y, H_y, J1_y, J2_y
-        real(wp)                                               :: A_z, B_z, C_z, D_z, E_z, F_z, H_z, J1_z, J2_z
+        real(wp)                                               :: trace, shear, shear2, diag, diag_z, offdiag, cross1, cross2
         real(wp)                                               :: txx, txy, tyy, txz, tyz, tzz
         integer                                                :: i, k, l, q, r
         integer                                                :: ndirs
@@ -477,8 +476,8 @@ contains
         end if
 
         if (ndirs == 3 .and. .not. cyl_coord) then
-            $:GPU_PARALLEL_LOOP(collapse=3,private='[txx, txy, tyy, txz, tyz, tzz, A_x, B_x, C_y, D_y, C_z, D_z, B_y, H_z, J1_z, &
-                                & J2_z, H_y, J1_y, J2_y, B_z, C_x, D_x, A_y, E_z, F_z, E_x, F_x, E_y, F_y, A_z, H_x, J1_x, J2_x]')
+            $:GPU_PARALLEL_LOOP(collapse=3,private='[txx, txy, tyy, txz, tyz, tzz, trace, shear, shear2, diag, diag_z, offdiag, &
+                                & cross1, cross2]')
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -490,52 +489,51 @@ contains
                         tzz = q_prim_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)
 
                         ! z-direction contributions to tau_xx
-                        C_z = -(2._wp/3._wp*G_K_field(k, l, q) + txx)
-                        D_z = 2._wp*txz
+                        trace = -(2._wp/3._wp*G_K_field(k, l, q) + txx)
+                        shear = 2._wp*txz
                         rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) + rho_K_field(k, l, &
-                               & q)*(C_z*dw_dz_hypo(k, l, q) + D_z*du_dz_hypo(k, l, q))
+                               & q)*(trace*dw_dz_hypo(k, l, q) + shear*du_dz_hypo(k, l, q))
 
                         ! z-direction contributions to tau_xy
-                        H_z = -txy
-                        J1_z = tyz
-                        J2_z = txz
+                        offdiag = -txy
+                        cross1 = tyz
+                        cross2 = txz
                         rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(H_z*dw_dz_hypo(k, l, q) + J1_z*du_dz_hypo(k, l, q) + J2_z*dv_dz_hypo(k, l, q))
+                               & l, q)*(offdiag*dw_dz_hypo(k, l, q) + cross1*du_dz_hypo(k, l, q) + cross2*dv_dz_hypo(k, l, q))
 
-                        ! tau_yy: z-direction contributions
-                        E_z = -(2._wp/3._wp*G_K_field(k, l, q) + tyy)
-                        F_z = 2._wp*tyz
+                        ! z-direction contributions to tau_yy
+                        trace = -(2._wp/3._wp*G_K_field(k, l, q) + tyy)
+                        shear = 2._wp*tyz
                         rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(E_z*dw_dz_hypo(k, l, q) + F_z*dv_dz_hypo(k, l, q))
+                               & l, q)*(trace*dw_dz_hypo(k, l, q) + shear*dv_dz_hypo(k, l, q))
 
                         ! tau_xz (stress%beg+3)
-                        B_x = G_K_field(k, l, q) + txx
-                        H_y = -txz
-                        J1_y = tyz
-                        J2_y = txy
-                        B_z = G_K_field(k, l, q) + tzz
+                        diag = G_K_field(k, l, q) + txx
+                        offdiag = -txz
+                        cross1 = tyz
+                        cross2 = txy
+                        diag_z = G_K_field(k, l, q) + tzz
                         rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(B_x*dw_dx_hypo(k, l, q) + H_y*dv_dy_hypo(k, l, q) + J1_y*du_dy_hypo(k, l, &
-                               & q) + J2_y*dw_dy_hypo(k, l, q) + B_z*du_dz_hypo(k, l, q))
+                               & l, q)*(diag*dw_dx_hypo(k, l, q) + offdiag*dv_dy_hypo(k, l, q) + cross1*du_dy_hypo(k, l, &
+                               & q) + cross2*dw_dy_hypo(k, l, q) + diag_z*du_dz_hypo(k, l, q))
 
                         ! tau_yz (stress%beg+4)
-                        H_x = -tyz
-                        J1_x = txz
-                        J2_x = txy
-                        B_y = G_K_field(k, l, q) + tyy
+                        offdiag = -tyz
+                        cross1 = txz
+                        cross2 = txy
+                        diag = G_K_field(k, l, q) + tyy
                         rhs_vf(eqn_idx%stress%beg + 4)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 4)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(H_x*du_dx_hypo(k, l, q) + J1_x*dv_dx_hypo(k, l, q) + J2_x*dw_dx_hypo(k, l, &
-                               & q) + B_y*dw_dy_hypo(k, l, q) + B_z*dv_dz_hypo(k, l, q))
+                               & l, q)*(offdiag*du_dx_hypo(k, l, q) + cross1*dv_dx_hypo(k, l, q) + cross2*dw_dx_hypo(k, l, &
+                               & q) + diag*dw_dy_hypo(k, l, q) + diag_z*dv_dz_hypo(k, l, q))
 
                         ! tau_zz (stress%beg+5)
-                        E_x = -(2._wp/3._wp*G_K_field(k, l, q) + tzz)
-                        F_x = 2._wp*txz
-                        E_y = -(2._wp/3._wp*G_K_field(k, l, q) + tzz)
-                        F_y = 2._wp*tyz
-                        A_z = 4._wp/3._wp*G_K_field(k, l, q) + tzz
+                        trace = -(2._wp/3._wp*G_K_field(k, l, q) + tzz)
+                        shear = 2._wp*txz
+                        shear2 = 2._wp*tyz
+                        diag = 4._wp/3._wp*G_K_field(k, l, q) + tzz
                         rhs_vf(eqn_idx%stress%beg + 5)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 5)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(E_x*du_dx_hypo(k, l, q) + F_x*dw_dx_hypo(k, l, q) + E_y*dv_dy_hypo(k, l, &
-                               & q) + F_y*dw_dy_hypo(k, l, q) + A_z*dw_dz_hypo(k, l, q))
+                               & l, q)*(trace*du_dx_hypo(k, l, q) + shear*dw_dx_hypo(k, l, q) + trace*dv_dy_hypo(k, l, &
+                               & q) + shear2*dw_dy_hypo(k, l, q) + diag*dw_dz_hypo(k, l, q))
                     end do
                 end do
             end do
@@ -548,6 +546,14 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs_iface
 
+    !> Axisymmetric geometric source terms for the hypoelastic stress evolution, using interface velocities. Adds the v/r and div(u)
+    !! contributions that arise in cylindrical (r-z) coordinates: tau_xx, tau_xr, tau_rr get a -rho*(v/r) source; tau_thetatheta
+    !! gets a combined divergence and hoop-stress source. Called from s_compute_hypoelastic_rhs_iface when grid_geometry == 2.
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
+    !! @param nc_iface_vel_x_vf Interface velocities in x-direction
+    !! @param nc_iface_vel_y_vf Interface velocities in y-direction
+    !! @param weight Sub-step weighting factor
     subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, nc_iface_vel_x_vf, nc_iface_vel_y_vf, weight)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
