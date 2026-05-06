@@ -22,6 +22,8 @@ E. verrou_dd_line on failure, after dd_sym (--no-dd-line to skip)
    Further bisects to exact *source lines* within the responsible functions.
 
 Logs are saved to fp-stability-logs/ and uploaded as CI artifacts.
+On GitHub Actions: a step summary table and ::warning:: file annotations
+are emitted automatically so failing source lines appear in the PR diff.
 
 Requires:
   - Verrou-enabled Valgrind at $VERROU_HOME/bin/valgrind
@@ -37,6 +39,7 @@ Usage:
 
 import glob
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -54,6 +57,9 @@ CASES_DIR = os.path.join(MFC_ROOT_DIR, "tests", "fp_stability", "cases")
 # Mantissa-bit levels for the VPREC sweep (C).
 # 52 = full double, 23 = single, 16 = half-ish, 10 = ultra-low.
 VPREC_MANTISSA_BITS = [52, 23, 16, 10]
+
+# Matches "path/file.f90:123" or "path/file.fpp:123-456" in dd_line rddmin_summary.
+_LOC_RE = re.compile(r"(\S+\.(?:f90|fpp|c|cpp|h|F90))\s*:(\d+)(?:-(\d+))?", re.IGNORECASE)
 
 # Each case:
 #   name         - subdirectory under CASES_DIR
@@ -297,6 +303,37 @@ def _dd_env(verrou_bin: str) -> dict:
     return env
 
 
+def _parse_rddmin_locs(summary_path: str) -> list:
+    """Extract [(rel_path, start_line, end_line)] from a dd_line rddmin_summary."""
+    if not os.path.isfile(summary_path):
+        return []
+    locs = []
+    with open(summary_path) as fh:
+        for line in fh:
+            m = _LOC_RE.search(line)
+            if not m:
+                continue
+            path = m.group(1)
+            start = int(m.group(2))
+            end = int(m.group(3)) if m.group(3) else start
+            try:
+                rel = os.path.relpath(path, MFC_ROOT_DIR)
+                if rel.startswith(".."):
+                    rel = path
+            except ValueError:
+                rel = path
+            locs.append((rel.replace("\\", "/"), start, end))
+    return locs
+
+
+def _parse_rddmin_syms(summary_path: str) -> list:
+    """Extract symbol/function names from a dd_sym rddmin_summary."""
+    if not os.path.isfile(summary_path):
+        return []
+    with open(summary_path) as fh:
+        return [ln.strip() for ln in fh if ln.strip()]
+
+
 def _run_dd_tool(
     dd_bin: str,
     dd_dir: str,
@@ -306,31 +343,35 @@ def _run_dd_tool(
     log_name: str,
     summary_subdir: str,
     label: str,
-):
-    """Generic runner for verrou_dd_sym / verrou_dd_line."""
+) -> list:
+    """Generic runner for verrou_dd_sym / verrou_dd_line. Returns raw summary lines."""
     log_file = os.path.join(dd_dir, log_name)
     cmd = [dd_bin, "--nruns=10", "--rddmin=d", "--reference-rounding=nearest", dd_run_sh, dd_cmp_py]
     cons.print(f"  [dim]running {label} (--nruns=10 --rddmin=d)...[/dim]")
     with open(log_file, "w") as f:
         result = subprocess.run(cmd, cwd=dd_dir, env=env, stdout=f, stderr=subprocess.STDOUT, check=False)
+    summary_path = os.path.join(dd_dir, summary_subdir, "rddmin_summary")
+    summary_lines = []
     if result.returncode == 0:
-        summary_path = os.path.join(dd_dir, summary_subdir, "rddmin_summary")
         if os.path.isfile(summary_path):
-            cons.print(f"  [bold yellow]{label} result[/bold yellow]:")
             with open(summary_path) as f:
-                for line in f:
-                    cons.print(f"    {line.rstrip()}")
+                summary_lines = f.readlines()
+            cons.print(f"  [bold yellow]{label} result[/bold yellow]:")
+            for line in summary_lines:
+                cons.print(f"    {line.rstrip()}")
         else:
             cons.print(f"  [dim]{label} done; see {log_file}[/dim]")
     else:
         cons.print(f"  [bold yellow]{label} exited {result.returncode}[/bold yellow] (see {log_file})")
+    return summary_lines
 
 
-def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str):
+def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str) -> list:
+    """Run verrou_dd_sym; return list of responsible symbol names."""
     dd_bin = _find_dd_sym(verrou_bin)
     if not dd_bin:
         cons.print("  [dim]verrou_dd_sym not found; skipping delta-debug[/dim]")
-        return
+        return []
 
     dd_dir = os.path.join(log_dir, case["name"])
     os.makedirs(dd_dir, exist_ok=True)
@@ -340,13 +381,15 @@ def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_di
     _write_dd_cmp_py(dd_cmp_py, case["compare"], case["threshold"])
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_sym.log", "dd.sym", "verrou_dd_sym")
     cons.print(f"  [dim]dd_sym logs: {dd_dir}[/dim]")
+    return _parse_rddmin_syms(os.path.join(dd_dir, "dd.sym", "rddmin_summary"))
 
 
-def _run_dd_line(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str):
+def _run_dd_line(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str) -> list:
+    """Run verrou_dd_line; return list of (rel_path, start_line, end_line) tuples."""
     dd_bin = _find_dd_line(verrou_bin)
     if not dd_bin:
         cons.print("  [dim]verrou_dd_line not found; skipping line-level debug[/dim]")
-        return
+        return []
 
     # Reuse scripts written by dd_sym (or write them now if dd_sym was skipped).
     dd_dir = os.path.join(log_dir, case["name"])
@@ -357,6 +400,7 @@ def _run_dd_line(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_d
         _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
         _write_dd_cmp_py(dd_cmp_py, case["compare"], case["threshold"])
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_line.log", "dd.line", "verrou_dd_line")
+    return _parse_rddmin_locs(os.path.join(dd_dir, "dd.line", "rddmin_summary"))
 
 
 def _run_case(
@@ -370,7 +414,7 @@ def _run_case(
     run_vprec: bool,
     run_dd_sym: bool,
     run_dd_line: bool,
-) -> bool:
+) -> dict:
     name = case["name"]
     threshold = case["threshold"]
     compare = case["compare"]
@@ -383,7 +427,16 @@ def _run_case(
     cons.print(f"  threshold: {threshold:.0e}")
 
     work_dir = tempfile.mkdtemp(prefix=f"mfc-fps-{name}-")
-    passed = False
+    result = {
+        "name": name,
+        "passed": False,
+        "max_dev": float("inf"),
+        "threshold": threshold,
+        "float_proxy": None,
+        "vprec": [],
+        "dd_sym_syms": [],
+        "dd_line_locs": [],
+    }
     try:
         cons.print("  [dim]running pre_process...[/dim]")
         shutil.copy2(os.path.join(case_dir, "simulation.inp"), work_dir)
@@ -404,6 +457,8 @@ def _run_case(
             max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
 
         passed = max_dev <= threshold
+        result["passed"] = passed
+        result["max_dev"] = max_dev
         tag = "[bold green]PASS[/bold green]" if passed else "[bold red]FAIL[/bold red]"
         cons.print(f"  {tag}  max_dev={max_dev:.3e}  threshold={threshold:.0e}")
 
@@ -411,6 +466,7 @@ def _run_case(
         if run_float:
             try:
                 fdev = _run_float_proxy(case, verrou_bin, sim_bin, work_dir, ref_dir)
+                result["float_proxy"] = fdev
                 cons.print(f"  float proxy: dev={fdev:.3e}  (single-precision sensitivity)")
             except MFCException as exc:
                 cons.print(f"  [dim]float proxy error: {exc}[/dim]")
@@ -419,6 +475,7 @@ def _run_case(
         if run_vprec:
             cons.print("  VPREC precision sweep:")
             vprec_results = _run_vprec_sweep(case, verrou_bin, sim_bin, work_dir, ref_dir)
+            result["vprec"] = vprec_results
             labels = {52: "double", 23: "single", 16: "~half", 10: "ultra-low"}
             for bits, dev in vprec_results:
                 label = labels.get(bits, "")
@@ -434,12 +491,12 @@ def _run_case(
         if not passed:
             if run_dd_sym:
                 try:
-                    _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir)
+                    result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir)
                 except Exception as exc:
                     cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
             if run_dd_line:
                 try:
-                    _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir)
+                    result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir)
                 except Exception as exc:
                     cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
     finally:
@@ -447,7 +504,104 @@ def _run_case(
 
     cons.unindent()
     cons.print()
-    return passed
+    return result
+
+
+def _emit_github_annotations(results: list):
+    """Emit GitHub ::warning:: annotations for dd_line source locations.
+
+    Only runs inside GitHub Actions (GITHUB_ACTIONS env var set). Annotations
+    appear inline on the responsible source lines in the PR diff view.
+    """
+    if not os.environ.get("GITHUB_ACTIONS"):
+        return
+    for r in results:
+        if r["passed"]:
+            continue
+        for rel_path, start, end in r.get("dd_line_locs", []):
+            loc = f"file={rel_path},line={start}"
+            if end != start:
+                loc += f",endLine={end}"
+            title = f"FP instability [{r['name']}]"
+            msg = f"max_dev={r['max_dev']:.2e} exceeds threshold {r['threshold']:.0e} under random rounding"
+            print(f"::warning {loc},title={title}::{msg}", flush=True)
+
+
+def _emit_github_summary(results: list, n_samples: int):
+    """Write a markdown results table to GITHUB_STEP_SUMMARY.
+
+    Visible directly in the Actions run UI without downloading artifacts.
+    Includes: pass/fail, max_dev, float proxy, VPREC sweep (failing levels),
+    and dd_line source locations for any failing cases.
+    """
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+
+    n_pass = sum(1 for r in results if r["passed"])
+    n_fail = len(results) - n_pass
+
+    md = []
+    md.append("## FP Stability Results\n")
+    md.append(f"**{n_pass} passed, {n_fail} failed** — {n_samples} random-rounding samples per case\n")
+
+    # Main results table
+    md.append("| Case | Status | max\\_dev | threshold | Float proxy |")
+    md.append("|------|:------:|--------:|--------:|--------:|")
+    for r in results:
+        status = "✅" if r["passed"] else "❌"
+        fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "—"
+        md.append(f"| `{r['name']}` | {status} | {r['max_dev']:.2e} | {r['threshold']:.0e} | {fp} |")
+    md.append("")
+
+    # VPREC sweep — one column per bit level, ❌ where dev > threshold
+    if any(r["vprec"] for r in results):
+        _labels = {52: "52b", 23: "23b", 16: "16b", 10: "10b"}
+        header = " | ".join(_labels[b] for b in VPREC_MANTISSA_BITS)
+        sep = " | ".join(":---:" for _ in VPREC_MANTISSA_BITS)
+        md.append("### VPREC precision sweep\n")
+        md.append(f"| Case | {header} |")
+        md.append(f"|------|{sep}|")
+        for r in results:
+            vmap = {b: d for b, d in r["vprec"]}
+            cols = []
+            for b in VPREC_MANTISSA_BITS:
+                d = vmap.get(b)
+                if d is None:
+                    cols.append("—")
+                elif d == float("inf"):
+                    cols.append("💥 crash")
+                elif d > r["threshold"]:
+                    cols.append(f"❌ {d:.2e}")
+                else:
+                    cols.append(f"✅ {d:.2e}")
+            md.append(f"| `{r['name']}` | {' | '.join(cols)} |")
+        md.append("")
+
+    # dd_line instability sources (only for failing cases)
+    failing_with_locs = [r for r in results if not r["passed"] and r["dd_line_locs"]]
+    if failing_with_locs:
+        md.append("### Instability sources (dd\\_line)\n")
+        for r in failing_with_locs:
+            md.append(f"**`{r['name']}`**\n")
+            for rel_path, start, end in r["dd_line_locs"]:
+                loc = f"{rel_path}:{start}" if start == end else f"{rel_path}:{start}-{end}"
+                md.append(f"- `{loc}`")
+            md.append("")
+
+    # dd_sym function names (collapsed, since less actionable than dd_line)
+    failing_with_syms = [r for r in results if not r["passed"] and r["dd_sym_syms"]]
+    if failing_with_syms:
+        md.append("<details>")
+        md.append("<summary>Responsible functions (dd_sym)</summary>\n")
+        for r in failing_with_syms:
+            md.append(f"\n**`{r['name']}`**\n")
+            for sym in r["dd_sym_syms"]:
+                md.append(f"- `{sym}`")
+        md.append("\n</details>\n")
+
+    with open(summary_path, "a") as f:
+        f.write("\n".join(md) + "\n")
 
 
 def fp_stability():
@@ -496,7 +650,7 @@ def fp_stability():
     results = []
     for case in CASES:
         try:
-            ok = _run_case(
+            r = _run_case(
                 case,
                 verrou_bin,
                 sim_bin,
@@ -510,19 +664,31 @@ def fp_stability():
             )
         except MFCException as exc:
             cons.print(f"  [bold red]ERROR[/bold red]: {exc}")
-            ok = False
-        results.append((case["name"], ok))
+            r = {
+                "name": case["name"],
+                "passed": False,
+                "max_dev": float("inf"),
+                "threshold": case["threshold"],
+                "float_proxy": None,
+                "vprec": [],
+                "dd_sym_syms": [],
+                "dd_line_locs": [],
+            }
+        results.append(r)
 
     elapsed = time.time() - start
-    n_pass = sum(1 for _, ok in results if ok)
+    n_pass = sum(1 for r in results if r["passed"])
     n_fail = len(results) - n_pass
 
     cons.print(f"[bold]Results[/bold] ({elapsed:.0f}s):  [green]{n_pass} passed[/green]  [red]{n_fail} failed[/red]")
-    for name, ok in results:
-        mark = "[green]✓[/green]" if ok else "[red]✗[/red]"
-        cons.print(f"  {mark} {name}")
+    for r in results:
+        mark = "[green]✓[/green]" if r["passed"] else "[red]✗[/red]"
+        cons.print(f"  {mark} {r['name']}")
 
     if n_fail > 0:
         cons.print(f"\n  dd_sym/dd_line logs in: {log_dir}")
+
+    _emit_github_summary(results, n_samples)
+    _emit_github_annotations(results)
 
     sys.exit(0 if n_fail == 0 else 1)
