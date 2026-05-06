@@ -1222,7 +1222,7 @@ contains
             end if
         end do
 
-        patch_ib_gbl(:) = patch_ib(:)
+        patch_ib_gbl(1:num_ibs) = patch_ib(1:num_ibs)
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
         call s_compute_ib_neighbor_ranks()  ! build lookup of all neighbor MPI ranks
 
@@ -1280,7 +1280,7 @@ contains
 
 #ifdef MFC_MPI
         integer               :: ierr
-        integer, dimension(4) :: buf4
+        integer, dimension(4) :: buf4, rbuf4
         integer, dimension(2) :: buf2, rbuf2
 
         ax = ib_neighborhood_radius
@@ -1307,24 +1307,22 @@ contains
             buf4 = [bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]
 
             ! Send to -x, receive from +x -> edges (+1,+/-1,0) and (+1,0,+/-1)
-            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 310, buf4, 4, MPI_INTEGER, &
+            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 310, rbuf4, 4, MPI_INTEGER, &
                               & merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 310, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             if (bc_x%end >= 0) then
-                ib_neighbor_ranks(+1, -1, 0) = buf4(1)
-                ib_neighbor_ranks(+1, +1, 0) = buf4(2)
-                ib_neighbor_ranks(+1, 0, -1) = buf4(3)
-                ib_neighbor_ranks(+1, 0, +1) = buf4(4)
+                ib_neighbor_ranks(+1, -1, 0) = rbuf4(1)
+                ib_neighbor_ranks(+1, +1, 0) = rbuf4(2)
+                ib_neighbor_ranks(+1, 0, -1) = rbuf4(3)
+                ib_neighbor_ranks(+1, 0, +1) = rbuf4(4)
             end if
 
-            ! Restore buf4, then send to +x, receive from -x -> edges (-1,+/-1,0) and (-1,0,+/-1)
-            buf4 = [bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]
-            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 311, buf4, 4, MPI_INTEGER, &
+            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 311, rbuf4, 4, MPI_INTEGER, &
                               & merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 311, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             if (bc_x%beg >= 0) then
-                ib_neighbor_ranks(-1, -1, 0) = buf4(1)
-                ib_neighbor_ranks(-1, +1, 0) = buf4(2)
-                ib_neighbor_ranks(-1, 0, -1) = buf4(3)
-                ib_neighbor_ranks(-1, 0, +1) = buf4(4)
+                ib_neighbor_ranks(-1, -1, 0) = rbuf4(1)
+                ib_neighbor_ranks(-1, +1, 0) = rbuf4(2)
+                ib_neighbor_ranks(-1, 0, -1) = rbuf4(3)
+                ib_neighbor_ranks(-1, 0, +1) = rbuf4(4)
             end if
         end if
 
