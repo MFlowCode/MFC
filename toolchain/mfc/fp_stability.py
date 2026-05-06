@@ -366,7 +366,7 @@ def _run_dd_tool(
     return summary_lines
 
 
-def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str) -> list:
+def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str, threshold: float = None) -> list:
     """Run verrou_dd_sym; return list of responsible symbol names."""
     dd_bin = _find_dd_sym(verrou_bin)
     if not dd_bin:
@@ -378,27 +378,30 @@ def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_di
     dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
     dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
     _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
-    _write_dd_cmp_py(dd_cmp_py, case["compare"], case["threshold"])
+    _write_dd_cmp_py(dd_cmp_py, case["compare"], threshold if threshold is not None else case["threshold"])
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_sym.log", "dd.sym", "verrou_dd_sym")
     cons.print(f"  [dim]dd_sym logs: {dd_dir}[/dim]")
     return _parse_rddmin_syms(os.path.join(dd_dir, "dd.sym", "rddmin_summary"))
 
 
-def _run_dd_line(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str) -> list:
+def _run_dd_line(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str, threshold: float = None) -> list:
     """Run verrou_dd_line; return list of (rel_path, start_line, end_line) tuples."""
     dd_bin = _find_dd_line(verrou_bin)
     if not dd_bin:
         cons.print("  [dim]verrou_dd_line not found; skipping line-level debug[/dim]")
         return []
 
-    # Reuse scripts written by dd_sym (or write them now if dd_sym was skipped).
     dd_dir = os.path.join(log_dir, case["name"])
     os.makedirs(dd_dir, exist_ok=True)
     dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
     dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
+    effective_threshold = threshold if threshold is not None else case["threshold"]
     if not os.path.isfile(dd_run_sh):
         _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
-        _write_dd_cmp_py(dd_cmp_py, case["compare"], case["threshold"])
+        _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
+    else:
+        # dd_sym already wrote dd_cmp.py with its threshold; rewrite with ours if different
+        _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_line.log", "dd.line", "verrou_dd_line")
     return _parse_rddmin_locs(os.path.join(dd_dir, "dd.line", "rddmin_summary"))
 
@@ -487,18 +490,20 @@ def _run_case(
                     marker = "  [red]FAIL[/red]"
                 cons.print(f"    {bits:2d} bits{label_str}: dev={dev:.3e}{marker}")
 
-        # --- D/E: delta-debug on failure ---
-        if not passed:
-            if run_dd_sym:
-                try:
-                    result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir)
-                except Exception as exc:
-                    cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
-            if run_dd_line:
-                try:
-                    result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir)
-                except Exception as exc:
-                    cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
+        # --- D/E: delta-debug — always run to find FP hotspots, even on pass.
+        # Use a sensitivity threshold (max_dev/10) so we isolate lines responsible
+        # for the dominant instability rather than needing a full threshold breach.
+        sensitivity = max(max_dev / 10.0, 1e-15) if max_dev > 0 else 1e-15
+        if run_dd_sym:
+            try:
+                result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=sensitivity)
+            except Exception as exc:
+                cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
+        if run_dd_line:
+            try:
+                result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=sensitivity)
+            except Exception as exc:
+                cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
         cons.unindent()
@@ -515,14 +520,13 @@ def _emit_github_annotations(results: list):
     if not os.environ.get("GITHUB_ACTIONS"):
         return
     for r in results:
-        if r["passed"]:
-            continue
-        for rel_path, start, end in r.get("dd_line_locs", []):
+        status = "FAIL" if not r["passed"] else "hotspot"
+        for rel_path, start, end in r.get("dd_line_locs", [])[:10]:
             loc = f"file={rel_path},line={start}"
             if end != start:
                 loc += f",endLine={end}"
-            title = f"FP instability [{r['name']}]"
-            msg = f"max_dev={r['max_dev']:.2e} exceeds threshold {r['threshold']:.0e} under random rounding"
+            title = f"FP {status} [{r['name']}]"
+            msg = f"max_dev={r['max_dev']:.2e} (threshold {r['threshold']:.0e})"
             print(f"::warning {loc},title={title}::{msg}", flush=True)
 
 
@@ -575,23 +579,24 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append(f"| `{r['name']}` | {' | '.join(cols)} |")
         md.append("")
 
-    # dd_line instability sources (only for failing cases)
-    failing_with_locs = [r for r in results if not r["passed"] and r["dd_line_locs"]]
-    if failing_with_locs:
-        md.append("### Instability sources (dd\\_line)\n")
-        for r in failing_with_locs:
-            md.append(f"**`{r['name']}`**\n")
-            for rel_path, start, end in r["dd_line_locs"]:
+    # dd_line hotspot sources — always shown (top 10 per case)
+    cases_with_locs = [r for r in results if r["dd_line_locs"]]
+    if cases_with_locs:
+        md.append("### Top FP hotspots (dd\\_line)\n")
+        for r in cases_with_locs:
+            status = "❌ FAIL" if not r["passed"] else "✅ pass"
+            md.append(f"**`{r['name']}`** ({status})\n")
+            for rel_path, start, end in r["dd_line_locs"][:10]:
                 loc = f"{rel_path}:{start}" if start == end else f"{rel_path}:{start}-{end}"
                 md.append(f"- `{loc}`")
             md.append("")
 
     # dd_sym function names (collapsed, since less actionable than dd_line)
-    failing_with_syms = [r for r in results if not r["passed"] and r["dd_sym_syms"]]
-    if failing_with_syms:
+    cases_with_syms = [r for r in results if r["dd_sym_syms"]]
+    if cases_with_syms:
         md.append("<details>")
         md.append("<summary>Responsible functions (dd_sym)</summary>\n")
-        for r in failing_with_syms:
+        for r in cases_with_syms:
             md.append(f"\n**`{r['name']}`**\n")
             for sym in r["dd_sym_syms"]:
                 md.append(f"- `{sym}`")
