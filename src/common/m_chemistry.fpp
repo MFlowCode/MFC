@@ -19,8 +19,9 @@ module m_chemistry
     implicit none
 
     #:if USING_AMD
-        real(wp) :: molecular_weights_nonparameter(10) = (/2.016, 1.008, 15.999, 31.998, 17.007, 18.015, 33.006, 34.014, 39.95, &
-             & 28.014/)
+        ! Species order from sandiego.yaml: [H2, H, O2, O, OH, HO2, H2O2, H2O, N2, Ar]
+        real(wp) :: molecular_weights_nonparameter(10) = (/2.016_wp, 1.008_wp, 31.998_wp, 15.999_wp, 17.007_wp, 33.006_wp, &
+             & 34.014_wp, 18.015_wp, 28.014_wp, 39.948_wp/)
         $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
     #:endif
 
