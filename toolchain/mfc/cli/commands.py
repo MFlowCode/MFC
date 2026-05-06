@@ -900,6 +900,65 @@ COUNT_DIFF_COMMAND = Command(
     include_common=["targets", "mfc_config", "jobs", "verbose", "debug_log"],
 )
 
+FP_STABILITY_COMMAND = Command(
+    name="fp-stability",
+    help="Run floating-point stability tests using Verrou.",
+    description=(
+        "Runs each registered test case N times under Verrou's random IEEE-754 "
+        "rounding mode and compares against a nearest-rounding reference run.  "
+        "Reports the max L∞ deviation and PASS/FAIL against per-case thresholds.\n\n"
+        "Requires a Verrou-enabled Valgrind at $VERROU_HOME/bin/valgrind "
+        "(defaults to $HOME/.local/verrou).  The simulation and pre_process "
+        "binaries must be serial (no-MPI, no-GPU) debug builds.\n\n"
+        "Current test cases:\n"
+        "  sod_strong      1-D Sod p_L/p_R=100,000 — HLLC xi-factor cancellation\n"
+        "  water_stiffened 1-D water shock (pi_inf=4046) — pressure-recovery cancellation\n"
+    ),
+    include_common=["mfc_config", "verbose", "debug_log"],
+    arguments=[
+        Argument(
+            name="sim-binary",
+            help="Path to a serial simulation binary (debug, no-MPI). Auto-discovered from build/install/ if omitted.",
+            default=None,
+            metavar="PATH",
+        ),
+        Argument(
+            name="pre-binary",
+            help="Path to a serial pre_process binary (no-MPI). Auto-discovered from build/install/ if omitted.",
+            default=None,
+            metavar="PATH",
+        ),
+        Argument(
+            name="verrou-binary",
+            help="Path to a Verrou-enabled valgrind binary. Defaults to $VERROU_HOME/bin/valgrind or $HOME/.local/verrou/bin/valgrind.",
+            default=None,
+            metavar="PATH",
+        ),
+        Argument(
+            name="samples",
+            short="N",
+            help="Number of random-rounding simulation runs per test case.",
+            type=int,
+            default=5,
+            metavar="N",
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh fp-stability", "Auto-discover binaries and run all cases"),
+        Example(
+            "./mfc.sh fp-stability --sim-binary build/install/abc123/bin/simulation",
+            "Specify simulation binary explicitly",
+        ),
+        Example("./mfc.sh fp-stability -N 10", "Run 10 random-rounding samples per case"),
+    ],
+    key_options=[
+        ("--sim-binary PATH", "Serial simulation binary (debug, no-MPI)"),
+        ("--pre-binary PATH", "Serial pre_process binary"),
+        ("--verrou-binary PATH", "Verrou-enabled valgrind"),
+        ("-N, --samples N", "Random-rounding samples per case (default: 5)"),
+    ],
+)
+
 VIZ_COMMAND = Command(
     name="viz",
     help="Visualize post-processed MFC output.",
@@ -1372,6 +1431,7 @@ started, run `./mfc.sh build -h`.""",
         BENCH_DIFF_COMMAND,
         COUNT_COMMAND,
         COUNT_DIFF_COMMAND,
+        FP_STABILITY_COMMAND,
     ],
     common_sets=[
         COMMON_TARGETS,
