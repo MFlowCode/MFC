@@ -1,0 +1,83 @@
+name: FP Stability
+
+# Runs the Verrou-based floating-point stability suite.
+#
+# What it tests (./mfc.sh fp-stability):
+#   sod_strong       1-D Sod shock, p_L/p_R=100,000, ideal gas
+#                    25 cells, 5 steps, WENO5 + HLLC
+#                    Compares density & energy vs. threshold 1e-10
+#                    Probes: HLLC xi-factor cancellation near sonic contact
+#                            (s_L - vel_L)/(s_L - s_S) when s_L ≈ s_S
+#
+#   water_stiffened  1-D water shock, stiffened EOS (pi_inf=4046)
+#                    25 cells, 5 steps, WENO5 + HLLC
+#                    Compares density & pressure vs. threshold 1e-10
+#                    Probes: pressure-recovery cancellation p=(E-pi_inf)/gamma
+#                            loses ~4 decimal digits when pi_inf/p_right ~ 40,000
+#
+# For each case: 1 nearest-rounding reference run + N random-rounding runs.
+# PASS if max L∞ deviation across all N samples stays below threshold.
+#
+# Verrou (Valgrind 3.26.0 + edf-hpc/verrou@a58d434) is built once and cached.
+# Build takes ~20 min uncached; cached runs restore in ~30 s.
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'   # Weekly Monday 5 AM UTC
+  workflow_dispatch:       # Manual trigger
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fp-stability:
+    name: Floating-Point Stability (Verrou)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Cache Verrou
+        id: cache-verrou
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/verrou
+          key: verrou-a58d434-valgrind-3.26.0-${{ runner.os }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            build-essential automake python3 libc6-dbg \
+            cmake gfortran
+
+      - name: Build Verrou
+        if: steps.cache-verrou.outputs.cache-hit != 'true'
+        run: |
+          cd /tmp
+          wget -q https://sourceware.org/pub/valgrind/valgrind-3.26.0.tar.bz2
+          tar xf valgrind-3.26.0.tar.bz2
+
+          git clone https://github.com/edf-hpc/verrou.git
+          git -C verrou checkout a58d434
+
+          # Merge Verrou into Valgrind source tree and patch
+          cp -r verrou valgrind-3.26.0/verrou
+          cd valgrind-3.26.0
+          cat verrou/valgrind.*diff | patch -p1
+
+          ./autogen.sh
+          ./configure --enable-only64bit --prefix="$HOME/.local/verrou"
+          make -j"$(nproc)"
+          make install
+
+      - name: Verify Verrou
+        run: ~/.local/verrou/bin/valgrind --version
+
+      - name: Build MFC (debug, serial)
+        run: ./mfc.sh build -t pre_process simulation --no-mpi --debug -j"$(nproc)"
+
+      - name: Run FP Stability Suite
+        run: ./mfc.sh fp-stability -N 5
