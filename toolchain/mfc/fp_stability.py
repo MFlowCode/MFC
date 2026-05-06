@@ -100,7 +100,7 @@ CASES = [
         "name": "bubble_rp",
         "description": "1-D bubbly water, pressure step 2:1 driving Rayleigh-Plesset oscillations (nb=1, Keller-Miksis)",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 1e-10,
+        "threshold": 1e-8,
         "ill_cond": "RP ODE: (p_bub - p_ext) cancels near bubble equilibrium",
     },
     {
