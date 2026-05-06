@@ -62,9 +62,10 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a, h
-        real(wp)             :: res
+        real(wp)             :: res, t
 
-        res = 2._wp*atanh(tanh(a)*tanh(h))
+        t = tanh(a)*tanh(h)
+        res = 2._wp*atanh(sign(min(abs(t), 1._wp - epsilon(1._wp)), t))
 
     end function f_log_cosh_diff
 
