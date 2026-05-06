@@ -2,6 +2,7 @@
 !! @file
 !! @brief Contains module m_ibm
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the
@@ -919,8 +920,12 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: dynamic_viscosities
+            logical, dimension(3)  :: is_non_newtonian
+            real(wp), dimension(3) :: hb_tau0, hb_K, hb_nn, hb_mu_min, hb_mu_max, hb_m_arr
         #:else
             real(wp), dimension(num_fluids) :: dynamic_viscosities
+            logical, dimension(num_fluids)  :: is_non_newtonian
+            real(wp), dimension(num_fluids) :: hb_tau0, hb_K, hb_nn, hb_mu_min, hb_mu_max, hb_m_arr
         #:endif
 
         call nvtxStartRange("COMPUTE-IB-FORCES")
@@ -937,13 +942,21 @@ contains
                 else
                     dynamic_viscosities(fluid_idx) = 0._wp
                 end if
+                is_non_newtonian(fluid_idx) = fluid_pp(fluid_idx)%non_newtonian
+                hb_tau0(fluid_idx) = fluid_pp(fluid_idx)%tau0
+                hb_K(fluid_idx) = fluid_pp(fluid_idx)%K
+                hb_nn(fluid_idx) = fluid_pp(fluid_idx)%nn
+                hb_mu_min(fluid_idx) = fluid_pp(fluid_idx)%mu_min
+                hb_mu_max(fluid_idx) = fluid_pp(fluid_idx)%mu_max
+                hb_m_arr(fluid_idx) = fluid_pp(fluid_idx)%hb_m
             end do
         end if
 
         $:GPU_PARALLEL_LOOP(private='[ib_idx, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
                             & local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, &
                             & viscous_stress_div_2, dx, dy, dz, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, shear_rate, local_mu]', &
-                            & copy='[forces, torques]', copyin='[patch_ib, dynamic_viscosities]', collapse=3)
+                            & copy='[forces, torques]', copyin='[patch_ib, dynamic_viscosities, is_non_newtonian, hb_tau0, hb_K, &
+                            & hb_nn, hb_mu_min, hb_mu_max, hb_m_arr]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -991,11 +1004,10 @@ contains
                             end if
                             dynamic_viscosity = 0._wp
                             do fluid_idx = 1, num_fluids
-                                if (fluid_pp(fluid_idx)%non_newtonian) then
-                                    local_mu = f_compute_hb_viscosity(fluid_pp(fluid_idx)%tau0, fluid_pp(fluid_idx)%K, &
-                                                                      & fluid_pp(fluid_idx)%nn, fluid_pp(fluid_idx)%mu_min, &
-                                                                      & fluid_pp(fluid_idx)%mu_max, shear_rate, &
-                                                                      & fluid_pp(fluid_idx)%hb_m)
+                                if (is_non_newtonian(fluid_idx)) then
+                                    local_mu = f_compute_hb_viscosity(hb_tau0(fluid_idx), hb_K(fluid_idx), hb_nn(fluid_idx), &
+                                                                      & hb_mu_min(fluid_idx), hb_mu_max(fluid_idx), shear_rate, &
+                                                                      & hb_m_arr(fluid_idx))
                                     dynamic_viscosity = dynamic_viscosity + q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, j, &
                                         & k)*local_mu
                                 else
