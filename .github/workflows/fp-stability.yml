@@ -25,10 +25,6 @@ on:
   push:
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   fp-stability:
     name: Floating-Point Stability (Verrou)
