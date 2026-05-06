@@ -2,6 +2,7 @@
 !! @file m_re_visc.f90
 !! @brief Contains module m_re_visc
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module contains routines that compute viscosity-related quantities for both Newtonian and non-Newtonian fluids.
