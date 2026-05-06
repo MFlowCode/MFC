@@ -30,31 +30,13 @@ module m_thinc
     real(wp) :: gq3_pts(3) = [-5e-1_wp*0.7745966692414834_wp, 0._wp, 5e-1_wp*0.7745966692414834_wp]
     !> Weights: 5/18, 8/18, 5/18
     real(wp) :: gq3_wts(3) = [5._wp/18._wp, 8._wp/18._wp, 5._wp/18._wp]
-    !> ln(2)
-    real(wp) :: ln2 = 0.6931471805599453_wp
-    $:GPU_DECLARE(create='[gq3_pts, gq3_wts, ln2]')
+    $:GPU_DECLARE(copyin='[gq3_pts, gq3_wts]')
 
     real(wp), allocatable, dimension(:,:,:,:) :: mthinc_nhat !> Unit normal vector
     real(wp), allocatable, dimension(:,:,:)   :: mthinc_d    !> Interface position parameter
     $:GPU_DECLARE(create='[mthinc_nhat, mthinc_d]')
 
 contains
-
-    !> @brief Stable computation of ln(cosh(x))
-    function f_log_cosh(x) result(res)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: x
-        real(wp)             :: res, ax
-
-        ax = abs(x)
-        if (ax > 20._wp) then
-            res = ax - ln2
-        else
-            res = ax + log(1._wp + exp(-2._wp*ax)) - ln2
-        end if
-
-    end function f_log_cosh
 
     !> @brief Stable difference: log_cosh(a+h) - log_cosh(a-h) = 2*atanh(tanh(a)*tanh(h)). Avoids catastrophic cancellation when h
     !! is small relative to a.
