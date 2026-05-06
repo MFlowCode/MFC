@@ -1598,7 +1598,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={**common_mods}, override_tol=5e-3))
+        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={**common_mods}, override_tol=10 ** (-5)))
 
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",
