@@ -82,7 +82,7 @@ contains
     !> Compute the pressure from the appropriate equation of state
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
 
-        $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', cray_noinline=True)
+        $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', cray_inline=True)
 
         real(stp), intent(in)           :: energy, alf
         real(wp), intent(in)            :: dyn_p
@@ -501,7 +501,6 @@ contains
         real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
         real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
         integer                :: iter                     !< Newton-Raphson iteration counter
-
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
                             & df_dW, iter]')

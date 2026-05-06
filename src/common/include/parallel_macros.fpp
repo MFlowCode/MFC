@@ -67,10 +67,11 @@
         #:if not isinstance(function_name, str)
             #:stop "When using cray_noinline, function name must be given and given as a string"
         #:endif
-        #:set cray_noinline_directive = ('!DIR$ NOINLINE ' + function_name).strip('\n')
+        #:set cray_noinline_directive = ('!DIR$ INLINENEVER ' + function_name).strip('\n')
 #ifdef _CRAYFTN
 #if MFC_OpenACC
         $:acc_directive
+        $:cray_noinline_directive
 #elif MFC_OpenMP
         $:omp_directive
 #else
@@ -91,6 +92,7 @@
 #ifdef _CRAYFTN
 #if MFC_OpenACC
         $:acc_directive
+        $:cray_directive
 #elif MFC_OpenMP
         $:omp_directive
 #else
@@ -98,6 +100,7 @@
 #endif
 #elif MFC_OpenACC
         $:acc_directive
+        $:cray_directive
 #elif MFC_OpenMP
         $:omp_directive
 #endif
