@@ -108,7 +108,7 @@ def _find_verrou() -> str:
 
 
 def _find_binary(name: str) -> str:
-    install_dir = os.path.join(os.getcwd(), "build", "install")
+    install_dir = os.path.join(MFC_ROOT_DIR, "build", "install")
     candidates = glob.glob(os.path.join(install_dir, "*", "bin", name))
     return max(candidates, key=os.path.getmtime) if candidates else ""
 
@@ -501,9 +501,8 @@ def _run_case(
                     cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
-
-    cons.unindent()
-    cons.print()
+        cons.unindent()
+        cons.print()
     return result
 
 
