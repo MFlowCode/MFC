@@ -96,6 +96,20 @@ CASES = [
         "threshold": 1e-10,
         "ill_cond": "Mixed-cell pressure recovery: E-alpha_w*gamma_w*pi_inf cancels when alpha_w<<1",
     },
+    {
+        "name": "bubble_rp",
+        "description": "1-D bubbly water, pressure step 2:1 driving Rayleigh-Plesset oscillations (nb=1, Keller-Miksis)",
+        "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
+        "threshold": 1e-10,
+        "ill_cond": "RP ODE: (p_bub - p_ext) cancels near bubble equilibrium",
+    },
+    {
+        "name": "low_mach",
+        "description": "1-D water shock with low_Mach=1 HLLC correction active",
+        "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
+        "threshold": 1e-10,
+        "ill_cond": "low_Mach correction: wave speed differences cancel when M << 1",
+    },
 ]
 
 
@@ -346,8 +360,8 @@ def _run_dd_tool(
 ) -> list:
     """Generic runner for verrou_dd_sym / verrou_dd_line. Returns raw summary lines."""
     log_file = os.path.join(dd_dir, log_name)
-    cmd = [dd_bin, "--nruns=10", "--rddmin=d", "--reference-rounding=nearest", dd_run_sh, dd_cmp_py]
-    cons.print(f"  [dim]running {label} (--nruns=10 --rddmin=d)...[/dim]")
+    cmd = [dd_bin, "--nruns=20", "--rddmin=d", "--reference-rounding=nearest", dd_run_sh, dd_cmp_py]
+    cons.print(f"  [dim]running {label} (--nruns=20 --rddmin=d)...[/dim]")
     with open(log_file, "w") as f:
         result = subprocess.run(cmd, cwd=dd_dir, env=env, stdout=f, stderr=subprocess.STDOUT, check=False)
     summary_path = os.path.join(dd_dir, summary_subdir, "rddmin_summary")
@@ -451,14 +465,16 @@ def _run_case(
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, ref_dir, rounding_mode="nearest")
 
         # --- A: random-rounding stability samples ---
-        max_dev = 0.0
+        devs = []
         cons.print(f"  [dim]random-rounding runs (N={n_samples})...[/dim]")
         for i in range(n_samples):
             run_dir = os.path.join(work_dir, f"run_{i:02d}")
             os.makedirs(run_dir)
             _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="random")
-            max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
+            devs.append(_max_diff_np(ref_dir, run_dir, compare))
 
+        max_dev = max(devs)
+        median_dev = sorted(devs)[len(devs) // 2]
         passed = max_dev <= threshold
         result["passed"] = passed
         result["max_dev"] = max_dev
@@ -490,16 +506,23 @@ def _run_case(
                     marker = "  [red]FAIL[/red]"
                 cons.print(f"    {bits:2d} bits{label_str}: dev={dev:.3e}{marker}")
 
-        # --- D/E: delta-debug — always run to find FP hotspots, even on pass.
-        # Use a sensitivity threshold (max_dev/10) so we isolate lines responsible
-        # for the dominant instability rather than needing a full threshold breach.
-        sensitivity = max(max_dev / 10.0, 1e-15) if max_dev > 0 else 1e-15
-        if run_dd_sym:
+        # --- D/E: delta-debug to find FP hotspots.
+        # Use median_dev/2 as the dd comparison threshold so ~half of individual
+        # random-rounding runs trigger DIFFERENT, giving the bisection a reliable
+        # signal.  Skip entirely when median_dev < 1e-12: at that level the
+        # instability is at or near machine epsilon and bisection cannot converge.
+        _DD_MIN = 1e-12
+        sensitivity = median_dev / 2.0 if median_dev >= _DD_MIN else 0.0
+        if sensitivity > 0 and (run_dd_sym or run_dd_line):
+            cons.print(f"  [dim]dd sensitivity: {sensitivity:.1e} (median={median_dev:.1e})[/dim]")
+        elif run_dd_sym or run_dd_line:
+            cons.print(f"  [dim]skipping dd: median_dev={median_dev:.1e} < {_DD_MIN:.0e}[/dim]")
+        if sensitivity > 0 and run_dd_sym:
             try:
                 result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=sensitivity)
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
-        if run_dd_line:
+        if sensitivity > 0 and run_dd_line:
             try:
                 result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=sensitivity)
             except Exception as exc:
