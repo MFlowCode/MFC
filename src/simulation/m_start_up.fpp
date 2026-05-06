@@ -1233,7 +1233,7 @@ contains
         ! assign defaults to all values
         num_gbl_ibs = num_ibs
         num_local_ibs = num_ibs
-        do i = 1, num_ibs
+        do i = 1, num_local_ibs_max
             local_ib_patch_ids(i) = i
         end do
 
