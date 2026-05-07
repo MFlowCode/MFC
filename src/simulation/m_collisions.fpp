@@ -62,7 +62,8 @@ contains
 
         ! get is distance used in the force calculation with each IB and each wall
         call s_detect_wall_collisions()
-        call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
+        ! call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
+        call s_detect_ib_collisions_n2(num_considered_collisions)
 
         select case (collision_model)
         case (1)  ! soft sphere model
@@ -98,6 +99,8 @@ contains
             encoded_pid2 = collision_lookup(i, 4)
             call s_decode_patch_periodicity(encoded_pid1, pid1, xp1, yp1, zp1)
             call s_decode_patch_periodicity(encoded_pid2, pid2, xp2, yp2, zp2)
+            ! call s_get_neighborhood_idx(pid1, pid1) ! global patch ID -> local index call s_get_neighborhood_idx(pid2, pid2)
+            if (pid1 <= 0 .or. pid2 <= 0) cycle
 
             centroid_1(1) = patch_ib(pid1)%x_centroid + real(xp1, wp)*(x_domain%end - x_domain%beg)
             centroid_1(2) = patch_ib(pid1)%y_centroid + real(yp1, wp)*(y_domain%end - y_domain%beg)
