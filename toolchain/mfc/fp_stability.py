@@ -21,6 +21,19 @@ D. verrou_dd_sym on failure (--no-dd-sym to skip)
 E. verrou_dd_line on failure, after dd_sym (--no-dd-line to skip)
    Further bisects to exact *source lines* within the responsible functions.
 
+F. Cancellation detection (--no-cancellation to skip)
+   One run with --check-cancellation=yes; reports MFC source lines that
+   produce catastrophic cancellation (subtraction of nearly-equal doubles).
+   Uses --cc-gen-file for structured per-line output.
+
+G. MCA significant-bits estimate (--no-mca to skip)
+   N runs with --backend=mcaquad; max deviation vs nearest-rounding
+   reference gives a lower bound on significant bits: s = -log2(dev/scale).
+
+H. Float-max overflow detection (--no-float-max to skip)
+   One run with --check-max-float=yes; reports locations where a
+   double→float conversion would overflow to ±Inf.
+
 Logs are saved to fp-stability-logs/ and uploaded as CI artifacts.
 On GitHub Actions: a step summary table and ::warning:: file annotations
 are emitted automatically so failing source lines appear in the PR diff.
@@ -38,6 +51,7 @@ Usage:
 """
 
 import glob
+import math
 import os
 import re
 import shutil
@@ -60,6 +74,12 @@ VPREC_MANTISSA_BITS = [52, 23, 16, 10]
 
 # Matches "path/file.f90:123" or "path/file.fpp:123-456" in dd_line rddmin_summary.
 _LOC_RE = re.compile(r"(\S+\.(?:f90|fpp|c|cpp|h|F90))\s*:(\d+)(?:-(\d+))?", re.IGNORECASE)
+
+# Files to exclude from cancellation / float-max reports (runtime loaders, XALT).
+_EXTERNAL_SRCS = ("xalt", "dl-init", "ld-linux", "libc.so", "libm.so")
+
+# Matches the first "at" frame in a Valgrind stack trace: "(file.fpp:LINE)".
+_VGFRAME_RE = re.compile(r"\(([^):]+\.(?:fpp|f90|F90|c|cpp))\s*:(\d+)\)")
 
 # Each case:
 #   name         - subdirectory under CASES_DIR
@@ -204,6 +224,140 @@ def _max_diff_np(ref_dir: str, run_dir: str, compare_files: list) -> float:
         run = np.loadtxt(run_p)[:, 1]
         total = max(total, float(np.max(np.abs(ref - run))))
     return total
+
+
+def _max_abs_np(ref_dir: str, compare_files: list) -> float:
+    """Return the maximum absolute value across all reference output files."""
+    import numpy as np
+
+    total = 0.0
+    for fname in compare_files:
+        ref_p = os.path.join(ref_dir, fname)
+        if not os.path.exists(ref_p):
+            continue
+        ref = np.loadtxt(ref_p)[:, 1]
+        total = max(total, float(np.max(np.abs(ref))))
+    return total
+
+
+def _parse_cancel_gen(gen_path: str) -> list:
+    """Parse cc-gen-file TSV (file\\tline\\tsymbol) → sorted unique [(fname, line)] for MFC sources."""
+    if not os.path.isfile(gen_path):
+        return []
+    locs = []
+    seen = set()
+    with open(gen_path) as fh:
+        for raw in fh:
+            parts = raw.rstrip("\n").split("\t")
+            if len(parts) < 2:
+                continue
+            fname = parts[0].strip()
+            if any(ext in fname for ext in _EXTERNAL_SRCS):
+                continue
+            if not fname.endswith((".fpp", ".f90", ".F90", ".c", ".cpp")):
+                continue
+            try:
+                lineno = int(parts[1].strip())
+            except ValueError:
+                continue
+            key = (fname, lineno)
+            if key not in seen:
+                seen.add(key)
+                locs.append(key)
+    return locs
+
+
+def _parse_vg_error_locs(log_path: str, error_keyword: str) -> list:
+    """Extract first MFC-source frame from each Valgrind error matching error_keyword."""
+    if not os.path.isfile(log_path):
+        return []
+    locs = []
+    seen = set()
+    in_error = False
+    with open(log_path) as fh:
+        for raw in fh:
+            line = re.sub(r"^==\d+== ?", "", raw)
+            if error_keyword in line:
+                in_error = True
+                continue
+            if in_error:
+                if "   at " in line or "   by " in line:
+                    m = _VGFRAME_RE.search(line)
+                    if m:
+                        fname = m.group(1)
+                        if any(ext in fname for ext in _EXTERNAL_SRCS):
+                            continue
+                        lineno = int(m.group(2))
+                        key = (fname, lineno)
+                        if key not in seen:
+                            seen.add(key)
+                            locs.append(key)
+                        in_error = False
+                elif line.strip() == "":
+                    in_error = False
+    return locs
+
+
+def _run_cancellation_check(case: dict, verrou_bin: str, sim_bin: str, work_dir: str) -> list:
+    """Run with --check-cancellation=yes; return [(fname, line)] of MFC cancellation sites."""
+    run_dir = os.path.join(work_dir, "cancellation")
+    os.makedirs(run_dir, exist_ok=True)
+    gen_path = os.path.join(run_dir, "cancel_gen.txt")
+    flags = [
+        "--check-cancellation=yes",
+        "--cc-threshold-double=10",
+        f"--cc-gen-file={gen_path}",
+    ]
+    try:
+        _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="nearest", extra_flags=flags)
+    except MFCException:
+        pass
+    return _parse_cancel_gen(gen_path)
+
+
+def _run_mca_samples(
+    case: dict,
+    verrou_bin: str,
+    sim_bin: str,
+    work_dir: str,
+    ref_dir: str,
+    n_mca: int,
+) -> tuple:
+    """Run N mcaquad samples; return (max_dev, sig_bits_lower_bound)."""
+    compare = case["compare"]
+    ref_scale = _max_abs_np(ref_dir, compare)
+    max_dev = 0.0
+    flags = ["--backend=mcaquad", "--mca-mode=mca"]
+    for i in range(n_mca):
+        run_dir = os.path.join(work_dir, f"mca_{i:02d}")
+        os.makedirs(run_dir, exist_ok=True)
+        try:
+            _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, extra_flags=flags)
+            max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
+        except MFCException:
+            pass
+    sig_bits = None
+    if max_dev > 0.0 and ref_scale > 0.0:
+        sig_bits = max(0, int(math.floor(-math.log2(max_dev / ref_scale))))
+    return max_dev, sig_bits
+
+
+def _run_float_max_check(case: dict, verrou_bin: str, sim_bin: str, work_dir: str) -> list:
+    """Run with --check-max-float=yes; return [(fname, line)] of overflow sites."""
+    run_dir = os.path.join(work_dir, "float_max")
+    os.makedirs(run_dir, exist_ok=True)
+    try:
+        _run_simulation_verrou(
+            verrou_bin,
+            sim_bin,
+            work_dir,
+            run_dir,
+            rounding_mode="nearest",
+            extra_flags=["--check-max-float=yes"],
+        )
+    except MFCException:
+        pass
+    return _parse_vg_error_locs(os.path.join(run_dir, "verrou.log"), "Max float")
 
 
 def _run_float_proxy(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, ref_dir: str) -> float:
@@ -440,6 +594,9 @@ def _run_case(
     run_vprec: bool,
     run_dd_sym: bool,
     run_dd_line: bool,
+    run_cancellation: bool,
+    run_mca: bool,
+    run_float_max: bool,
 ) -> dict:
     name = case["name"]
     threshold = case["threshold"]
@@ -462,6 +619,10 @@ def _run_case(
         "vprec": [],
         "dd_sym_syms": [],
         "dd_line_locs": [],
+        "cancellation_locs": [],
+        "mca_dev": None,
+        "mca_sigbits": None,
+        "float_max_locs": [],
     }
     try:
         cons.print("  [dim]running pre_process...[/dim]")
@@ -537,6 +698,45 @@ def _run_case(
                 result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=dd_threshold)
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
+
+        # --- F: cancellation detection ---
+        if run_cancellation:
+            cons.print("  [dim]cancellation detection...[/dim]")
+            try:
+                locs = _run_cancellation_check(case, verrou_bin, sim_bin, work_dir)
+                result["cancellation_locs"] = locs
+                if locs:
+                    cons.print(f"  cancellation: {len(locs)} unique source location(s)")
+                else:
+                    cons.print("  cancellation: none detected")
+            except Exception as exc:
+                cons.print(f"  [bold yellow]cancellation check error[/bold yellow]: {exc}")
+
+        # --- G: MCA significant-bits estimate ---
+        if run_mca:
+            cons.print(f"  [dim]MCA significant-bits estimate (N={n_samples})...[/dim]")
+            try:
+                mca_dev, mca_sigbits = _run_mca_samples(case, verrou_bin, sim_bin, work_dir, ref_dir, n_samples)
+                result["mca_dev"] = mca_dev
+                result["mca_sigbits"] = mca_sigbits
+                bits_str = f"~{mca_sigbits} sig bits" if mca_sigbits is not None else "n/a"
+                cons.print(f"  MCA: dev={mca_dev:.3e}  ({bits_str})")
+            except Exception as exc:
+                cons.print(f"  [bold yellow]MCA error[/bold yellow]: {exc}")
+
+        # --- H: float-max overflow detection ---
+        if run_float_max:
+            cons.print("  [dim]float-max overflow check...[/dim]")
+            try:
+                locs = _run_float_max_check(case, verrou_bin, sim_bin, work_dir)
+                result["float_max_locs"] = locs
+                if locs:
+                    cons.print(f"  [bold yellow]float-max[/bold yellow]: {len(locs)} overflow site(s)")
+                else:
+                    cons.print("  float-max: no overflows")
+            except Exception as exc:
+                cons.print(f"  [bold yellow]float-max check error[/bold yellow]: {exc}")
+
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
         cons.unindent()
@@ -582,12 +782,13 @@ def _emit_github_summary(results: list, n_samples: int):
     md.append(f"**{n_pass} passed, {n_fail} failed** — {n_samples} random-rounding samples per case\n")
 
     # Main results table
-    md.append("| Case | Status | max\\_dev | threshold | Float proxy |")
-    md.append("|------|:------:|--------:|--------:|--------:|")
+    md.append("| Case | Status | max\\_dev | threshold | Float proxy | MCA sig bits |")
+    md.append("|------|:------:|--------:|--------:|--------:|:------:|")
     for r in results:
         status = "✅" if r["passed"] else "❌"
         fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "—"
-        md.append(f"| `{r['name']}` | {status} | {r['max_dev']:.2e} | {r['threshold']:.0e} | {fp} |")
+        sb = str(r["mca_sigbits"]) if r.get("mca_sigbits") is not None else "—"
+        md.append(f"| `{r['name']}` | {status} | {r['max_dev']:.2e} | {r['threshold']:.0e} | {fp} | {sb} |")
     md.append("")
 
     # VPREC sweep — one column per bit level, ❌ where dev > threshold
@@ -635,6 +836,26 @@ def _emit_github_summary(results: list, n_samples: int):
                 md.append(f"- `{sym}`")
         md.append("\n</details>\n")
 
+    # Cancellation hotspots
+    cases_with_cancel = [r for r in results if r.get("cancellation_locs")]
+    if cases_with_cancel:
+        md.append("### Catastrophic cancellation sites\n")
+        for r in cases_with_cancel:
+            md.append(f"**`{r['name']}`** — {len(r['cancellation_locs'])} site(s)\n")
+            for fname, lineno in r["cancellation_locs"][:15]:
+                md.append(f"- `{fname}:{lineno}`")
+            md.append("")
+
+    # Float-max overflow sites
+    cases_with_fmax = [r for r in results if r.get("float_max_locs")]
+    if cases_with_fmax:
+        md.append("### Float32 overflow sites (check\\_max\\_float)\n")
+        for r in cases_with_fmax:
+            md.append(f"**`{r['name']}`** — {len(r['float_max_locs'])} site(s)\n")
+            for fname, lineno in r["float_max_locs"][:10]:
+                md.append(f"- `{fname}:{lineno}`")
+            md.append("")
+
     with open(summary_path, "a") as f:
         f.write("\n".join(md) + "\n")
 
@@ -658,6 +879,9 @@ def fp_stability():
     run_vprec = not ARG("no_vprec")
     run_dd_sym = not ARG("no_dd_sym")
     run_dd_line = not ARG("no_dd_line")
+    run_cancellation = not ARG("no_cancellation")
+    run_mca = not ARG("no_mca")
+    run_float_max = not ARG("no_float_max")
 
     log_dir = os.path.join(os.getcwd(), "fp-stability-logs")
     os.makedirs(log_dir, exist_ok=True)
@@ -677,6 +901,12 @@ def fp_stability():
         features.append("dd_sym")
     if run_dd_line:
         features.append("dd_line")
+    if run_cancellation:
+        features.append("cancellation")
+    if run_mca:
+        features.append("mca-sigbits")
+    if run_float_max:
+        features.append("float-max")
     cons.print(f"  features:    {', '.join(features) if features else 'stability only'}")
     cons.print(f"  logs:        {log_dir}")
     cons.print()
@@ -696,6 +926,9 @@ def fp_stability():
                 run_vprec,
                 run_dd_sym,
                 run_dd_line,
+                run_cancellation,
+                run_mca,
+                run_float_max,
             )
         except MFCException as exc:
             cons.print(f"  [bold red]ERROR[/bold red]: {exc}")
@@ -708,6 +941,10 @@ def fp_stability():
                 "vprec": [],
                 "dd_sym_syms": [],
                 "dd_line_locs": [],
+                "cancellation_locs": [],
+                "mca_dev": None,
+                "mca_sigbits": None,
+                "float_max_locs": [],
             }
         results.append(r)
 

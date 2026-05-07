@@ -920,6 +920,9 @@ FP_STABILITY_COMMAND = Command(
         "  vprec sweep    Runs at mantissa bits [52, 23, 16, 10] (precision floor curve)\n"
         "  dd_sym         verrou_dd_sym bisection to responsible functions (on failure)\n"
         "  dd_line        verrou_dd_line bisection to responsible source lines (on failure)\n"
+        "  cancellation   --check-cancellation detection of catastrophic cancellation sites\n"
+        "  mca-sigbits    Monte Carlo Arithmetic (mcaquad) significant-bits lower bound\n"
+        "  float-max      --check-max-float detection of double→float overflow sites\n"
     ),
     include_common=["mfc_config", "verbose", "debug_log"],
     arguments=[
@@ -977,6 +980,27 @@ FP_STABILITY_COMMAND = Command(
             default=False,
             dest="no_dd_line",
         ),
+        Argument(
+            name="no-cancellation",
+            help="Skip --check-cancellation catastrophic-cancellation detection.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_cancellation",
+        ),
+        Argument(
+            name="no-mca",
+            help="Skip Monte Carlo Arithmetic (mcaquad) significant-bits estimate.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_mca",
+        ),
+        Argument(
+            name="no-float-max",
+            help="Skip --check-max-float float32 overflow detection.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_float_max",
+        ),
     ],
     examples=[
         Example("./mfc.sh fp-stability", "Auto-discover binaries and run all cases"),
@@ -986,6 +1010,7 @@ FP_STABILITY_COMMAND = Command(
         ),
         Example("./mfc.sh fp-stability -N 10", "Run 10 random-rounding samples per case"),
         Example("./mfc.sh fp-stability --no-vprec --no-dd-line", "Skip VPREC sweep and line debug"),
+        Example("./mfc.sh fp-stability --no-cancellation --no-mca --no-float-max", "Skip new analysis passes"),
     ],
     key_options=[
         ("--sim-binary PATH", "Serial simulation binary (debug, no-MPI)"),
@@ -996,6 +1021,9 @@ FP_STABILITY_COMMAND = Command(
         ("--no-vprec", "Skip VPREC mantissa-bit sweep"),
         ("--no-dd-sym", "Skip verrou_dd_sym on failure"),
         ("--no-dd-line", "Skip verrou_dd_line on failure"),
+        ("--no-cancellation", "Skip cancellation detection"),
+        ("--no-mca", "Skip MCA significant-bits estimate"),
+        ("--no-float-max", "Skip float32 overflow detection"),
     ],
 )
 
