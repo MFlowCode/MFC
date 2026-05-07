@@ -368,6 +368,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
         if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
             cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
+            stack.push(
+                "surface_tension=T",
+                {
+                    "surface_tension": "T",
+                    "sigma": 1,
+                    "patch_icpp(1)%cf_val": 1,
+                    "patch_icpp(2)%cf_val": 0,
+                    "patch_icpp(3)%cf_val": 1,
+                },
+            )
+            cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+            stack.pop()
         stack.pop()
 
         stack.push("muscl_order=2", {"muscl_order": 2, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
