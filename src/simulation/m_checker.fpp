@@ -35,6 +35,7 @@ contains
         end if
 
         call s_check_inputs_time_stepping
+        call s_check_inputs_interface_compression
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
 
@@ -105,5 +106,14 @@ contains
 #endif
 
     end subroutine s_check_inputs_nvidia_uvm
+
+    !> Checks constraints on interface compression parameters
+    impure subroutine s_check_inputs_interface_compression
+
+        @:PROHIBIT(int_comp /= 0 .and. model_eqns == 3, &
+                   & "int_comp > 0 is not supported with model_eqns = 3: THINC does not update " &
+                   & // "per-fluid internal energies, leaving thermodynamically inconsistent face states")
+
+    end subroutine s_check_inputs_interface_compression
 
 end module m_checker
