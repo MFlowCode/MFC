@@ -847,11 +847,13 @@ contains
             end if
         #:endfor
 
-        ! Detect whether grid spacing is uniform (enables cancellation-free sum-of-squares beta)
+        ! Detect whether grid spacing is uniform (enables cancellation-free sum-of-squares beta). Tolerance uses sqrt(epsilon) so it
+        ! works in both double and single precision: ~1.5e-8 relative in double, ~3.5e-4 in single - above FP noise, below real
+        ! stretching.
         uniform_grid(weno_dir) = .true.
         h0 = (s_cb(s) - s_cb(0))/real(s, wp)
         do i = 0, s - 1
-            if (abs((s_cb(i + 1) - s_cb(i)) - h0) > 1.0e-10_wp*abs(h0)) then
+            if (abs((s_cb(i + 1) - s_cb(i)) - h0) > sqrt(epsilon(h0))*abs(h0)) then
                 uniform_grid(weno_dir) = .false.
                 exit
             end if
