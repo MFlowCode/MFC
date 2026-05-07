@@ -239,10 +239,12 @@ def _write_dd_run_sh(path: str, verrou_bin: str, sim_bin: str, ic_dir: str):
     """Generate dd_run.sh for verrou_dd_sym / verrou_dd_line.
 
     verrou_dd_* calls: dd_run.sh RUNDIR and injects function/line exclusion via
-    VERROU_EXCLUDE / VERROU_SOURCE environment variables.  We hardcode
-    --rounding-mode=float so each bisection step is deterministic: float mode
-    (round-to-nearest-float) gives the same deviation every call, which lets the
-    bisection converge reliably with --nruns=1.
+    VERROU_EXCLUDE / VERROU_SOURCE environment variables.  For test runs, we use
+    --rounding-mode=float (deterministic, same deviation every call, --nruns=1 suffices).
+    For the reference run, verrou_dd_sym sets VERROU_ROUNDING_MODE=nearest in the
+    environment — we honour that so the reference is a stable nearest-rounding baseline
+    to compare against.  CLI --rounding-mode would override the env var and break the
+    reference, so we pass the mode via ${VERROU_ROUNDING_MODE:-float} instead.
     """
     content = textwrap.dedent(f"""\
         #!/usr/bin/env bash
@@ -262,8 +264,13 @@ def _write_dd_run_sh(path: str, verrou_bin: str, sim_bin: str, ic_dir: str):
         done
         mkdir -p "$TMPDIR_RUN/D"
 
+        # verrou_dd_sym sets VERROU_ROUNDING_MODE=nearest for its reference run and
+        # leaves it unset for test runs.  Defaulting to float gives deterministic
+        # test steps while letting the reference use nearest-rounding.
+        ROUND="${{VERROU_ROUNDING_MODE:-float}}"
+
         cd "$TMPDIR_RUN"
-        "$VERROU_BIN" --tool=verrou --error-limit=no --rounding-mode=float "$SIM_BIN"
+        "$VERROU_BIN" --tool=verrou --error-limit=no --rounding-mode="$ROUND" "$SIM_BIN"
         rc=$?
 
         [ -d "$TMPDIR_RUN/D" ] && cp -a "$TMPDIR_RUN/D/." "$RUNDIR/"
