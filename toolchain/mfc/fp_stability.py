@@ -745,22 +745,33 @@ def _run_case(
 
 
 def _emit_github_annotations(results: list):
-    """Emit GitHub ::warning:: annotations for dd_line source locations.
+    """Emit GitHub annotations for FP hotspots.
 
     Only runs inside GitHub Actions (GITHUB_ACTIONS env var set). Annotations
     appear inline on the responsible source lines in the PR diff view.
+
+    Up to 3 dd_line locations are emitted as ::warning:: per case (minimal
+    responsible lines from delta-debug).  Up to 3 cancellation sites per case
+    are emitted as ::notice:: so the diff also highlights subtraction-
+    cancellation hotspots identified by --check-cancellation.
     """
     if not os.environ.get("GITHUB_ACTIONS"):
         return
     for r in results:
         status = "FAIL" if not r["passed"] else "hotspot"
-        for rel_path, start, end in r.get("dd_line_locs", [])[:10]:
+        dev_str = f"max_dev={r['max_dev']:.2e} (threshold {r['threshold']:.0e})"
+
+        for rel_path, start, end in r.get("dd_line_locs", [])[:3]:
             loc = f"file={rel_path},line={start}"
             if end != start:
                 loc += f",endLine={end}"
             title = f"FP {status} [{r['name']}]"
-            msg = f"max_dev={r['max_dev']:.2e} (threshold {r['threshold']:.0e})"
-            print(f"::warning {loc},title={title}::{msg}", flush=True)
+            print(f"::warning {loc},title={title}::{dev_str}", flush=True)
+
+        for fname, lineno in r.get("cancellation_locs", [])[:3]:
+            loc = f"file={fname},line={lineno}"
+            title = f"FP cancellation [{r['name']}]"
+            print(f"::notice {loc},title={title}::catastrophic cancellation site", flush=True)
 
 
 def _emit_github_summary(results: list, n_samples: int):
