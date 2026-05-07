@@ -57,7 +57,7 @@ data = {
     "recon_type": 2,
     "muscl_order": 2,
     "muscl_lim": 4,
-    "int_comp": "T",
+    "int_comp": 1,
     "avg_state": 2,
     "riemann_solver": 2,
     "wave_speeds": 1,

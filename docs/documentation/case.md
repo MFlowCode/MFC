@@ -446,8 +446,8 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `muscl_order`              | Integer | MUSCL order [1,2] |
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
 | `muscl_eps`                | Real    | MUSCL limiter slope-product threshold (default: hard-coded thresholds; set to 0 for textbook behavior) |
+| `int_comp`                 | Integer | Interface Compression [0] Off [1] THINC [2] MTHINC (default 0) |
 | `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
-| `int_comp`                 | Logical | THINC Interface Compression |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
 | `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
@@ -547,7 +547,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 When not set (default), the threshold is 1e-9 for minmod/MC, and 1e-6 for others.
 Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate whenever both slopes have the same sign.
 
-- `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
+- `int_comp` activates interface compression using [1] THINC or [2] MTHINC (default off) used in variable reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
