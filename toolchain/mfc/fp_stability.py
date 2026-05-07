@@ -81,6 +81,35 @@ _EXTERNAL_SRCS = ("xalt", "dl-init", "ld-linux", "libc.so", "libm.so")
 # Matches the first "at" frame in a Valgrind stack trace: "(file.fpp:LINE)".
 _VGFRAME_RE = re.compile(r"\(([^):]+\.(?:fpp|f90|F90|c|cpp))\s*:(\d+)\)")
 
+
+def _get_source_context(fname: str, lineno: int, context: int = 2) -> str:
+    """Return a annotated source snippet around lineno, or '' if file not found.
+
+    fname may be a bare basename (e.g. 'm_weno.fpp') or a relative path.
+    Searches recursively under MFC_ROOT_DIR/src/ first, then the whole tree.
+    """
+    if os.path.isabs(fname) and os.path.isfile(fname):
+        candidates = [fname]
+    else:
+        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
+        if not candidates:
+            candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "**", os.path.basename(fname)), recursive=True)
+    if not candidates:
+        return ""
+    try:
+        with open(candidates[0]) as fh:
+            lines = fh.readlines()
+    except OSError:
+        return ""
+    start = max(0, lineno - context - 1)
+    end = min(len(lines), lineno + context)
+    rows = []
+    for i, line in enumerate(lines[start:end], start=start + 1):
+        marker = ">" if i == lineno else " "
+        rows.append(f"{marker}{i:5d} | {line.rstrip()}")
+    return "\n".join(rows)
+
+
 # Each case:
 #   name         - subdirectory under CASES_DIR
 #   description  - human-readable purpose
@@ -824,7 +853,7 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append(f"| `{r['name']}` | {' | '.join(cols)} |")
         md.append("")
 
-    # dd_line hotspot sources — always shown (top 10 per case)
+    # dd_line hotspot sources — always shown (top 10 per case) with source context
     cases_with_locs = [r for r in results if r["dd_line_locs"]]
     if cases_with_locs:
         md.append("### Top FP hotspots (dd\\_line)\n")
@@ -834,6 +863,12 @@ def _emit_github_summary(results: list, n_samples: int):
             for rel_path, start, end in r["dd_line_locs"][:10]:
                 loc = f"{rel_path}:{start}" if start == end else f"{rel_path}:{start}-{end}"
                 md.append(f"- `{loc}`")
+                snippet = _get_source_context(rel_path, start)
+                if snippet:
+                    md.append("  ```fortran")
+                    for line in snippet.splitlines():
+                        md.append(f"  {line}")
+                    md.append("  ```")
             md.append("")
 
     # dd_sym function names (collapsed, since less actionable than dd_line)
@@ -855,6 +890,12 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append(f"**`{r['name']}`** — {len(r['cancellation_locs'])} site(s)\n")
             for fname, lineno in r["cancellation_locs"][:15]:
                 md.append(f"- `{fname}:{lineno}`")
+                snippet = _get_source_context(fname, lineno)
+                if snippet:
+                    md.append("  ```fortran")
+                    for line in snippet.splitlines():
+                        md.append(f"  {line}")
+                    md.append("  ```")
             md.append("")
 
     # Float-max overflow sites
@@ -885,7 +926,7 @@ def fp_stability():
     if not pp_bin or not os.path.isfile(pp_bin):
         raise MFCException("pre_process binary not found. Build with --no-mpi, or pass --pre-binary.")
 
-    n_samples = ARG("samples") or 5
+    n_samples = ARG("samples")
     run_float = not ARG("no_float_proxy")
     run_vprec = not ARG("no_vprec")
     run_dd_sym = not ARG("no_dd_sym")
@@ -894,7 +935,7 @@ def fp_stability():
     run_mca = not ARG("no_mca")
     run_float_max = not ARG("no_float_max")
 
-    log_dir = os.path.join(os.getcwd(), "fp-stability-logs")
+    log_dir = os.path.join(MFC_ROOT_DIR, "fp-stability-logs")
     os.makedirs(log_dir, exist_ok=True)
 
     cons.print()
