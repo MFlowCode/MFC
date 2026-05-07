@@ -238,9 +238,11 @@ def _run_vprec_sweep(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, r
 def _write_dd_run_sh(path: str, verrou_bin: str, sim_bin: str, ic_dir: str):
     """Generate dd_run.sh for verrou_dd_sym / verrou_dd_line.
 
-    verrou_dd_* calls: dd_run.sh RUNDIR
-    It sets VERROU_ROUNDING_MODE / VERROU_EXCLUDE / VERROU_SOURCE etc. in the
-    environment; the script just invokes verrou and copies D/ output to RUNDIR.
+    verrou_dd_* calls: dd_run.sh RUNDIR and injects function/line exclusion via
+    VERROU_EXCLUDE / VERROU_SOURCE environment variables.  We hardcode
+    --rounding-mode=float so each bisection step is deterministic: float mode
+    (round-to-nearest-float) gives the same deviation every call, which lets the
+    bisection converge reliably with --nruns=1.
     """
     content = textwrap.dedent(f"""\
         #!/usr/bin/env bash
@@ -261,7 +263,7 @@ def _write_dd_run_sh(path: str, verrou_bin: str, sim_bin: str, ic_dir: str):
         mkdir -p "$TMPDIR_RUN/D"
 
         cd "$TMPDIR_RUN"
-        "$VERROU_BIN" --tool=verrou --error-limit=no "$SIM_BIN"
+        "$VERROU_BIN" --tool=verrou --error-limit=no --rounding-mode=float "$SIM_BIN"
         rc=$?
 
         [ -d "$TMPDIR_RUN/D" ] && cp -a "$TMPDIR_RUN/D/." "$RUNDIR/"
@@ -360,8 +362,8 @@ def _run_dd_tool(
 ) -> list:
     """Generic runner for verrou_dd_sym / verrou_dd_line. Returns raw summary lines."""
     log_file = os.path.join(dd_dir, log_name)
-    cmd = [dd_bin, "--nruns=20", "--rddmin=d", "--reference-rounding=nearest", dd_run_sh, dd_cmp_py]
-    cons.print(f"  [dim]running {label} (--nruns=20 --rddmin=d)...[/dim]")
+    cmd = [dd_bin, "--nruns=1", "--rddmin=d", "--reference-rounding=nearest", dd_run_sh, dd_cmp_py]
+    cons.print(f"  [dim]running {label} (--nruns=1 float-mode --rddmin=d)...[/dim]")
     with open(log_file, "w") as f:
         result = subprocess.run(cmd, cwd=dd_dir, env=env, stdout=f, stderr=subprocess.STDOUT, check=False)
     summary_path = os.path.join(dd_dir, summary_subdir, "rddmin_summary")
@@ -465,16 +467,14 @@ def _run_case(
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, ref_dir, rounding_mode="nearest")
 
         # --- A: random-rounding stability samples ---
-        devs = []
+        max_dev = 0.0
         cons.print(f"  [dim]random-rounding runs (N={n_samples})...[/dim]")
         for i in range(n_samples):
             run_dir = os.path.join(work_dir, f"run_{i:02d}")
             os.makedirs(run_dir)
             _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="random")
-            devs.append(_max_diff_np(ref_dir, run_dir, compare))
+            max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
 
-        max_dev = max(devs)
-        median_dev = sorted(devs)[len(devs) // 2]
         passed = max_dev <= threshold
         result["passed"] = passed
         result["max_dev"] = max_dev
@@ -506,25 +506,28 @@ def _run_case(
                     marker = "  [red]FAIL[/red]"
                 cons.print(f"    {bits:2d} bits{label_str}: dev={dev:.3e}{marker}")
 
-        # --- D/E: delta-debug to find FP hotspots.
-        # Use median_dev/2 as the dd comparison threshold so ~half of individual
-        # random-rounding runs trigger DIFFERENT, giving the bisection a reliable
-        # signal.  Skip entirely when median_dev < 1e-12: at that level the
-        # instability is at or near machine epsilon and bisection cannot converge.
-        _DD_MIN = 1e-12
-        sensitivity = median_dev / 2.0 if median_dev >= _DD_MIN else 0.0
-        if sensitivity > 0 and (run_dd_sym or run_dd_line):
-            cons.print(f"  [dim]dd sensitivity: {sensitivity:.1e} (median={median_dev:.1e})[/dim]")
+        # --- D/E: delta-debug with float mode to find FP hotspots.
+        # dd_run.sh uses --rounding-mode=float (deterministic single-precision),
+        # so each bisection step is consistent and --nruns=1 suffices.  Threshold
+        # = float_proxy/10: the full instrumented set produces ~float_proxy
+        # deviation; excluding the responsible function drops it to near zero;
+        # any subset missing the responsible function gives SAME.
+        # Skip when float_proxy is unavailable or too small to localize.
+        float_proxy = result.get("float_proxy")
+        _DD_FLOAT_MIN = 1e-6
+        dd_threshold = float_proxy / 10.0 if float_proxy and float_proxy >= _DD_FLOAT_MIN else 0.0
+        if dd_threshold > 0 and (run_dd_sym or run_dd_line):
+            cons.print(f"  [dim]dd threshold: {dd_threshold:.1e} (float_proxy={float_proxy:.1e})[/dim]")
         elif run_dd_sym or run_dd_line:
-            cons.print(f"  [dim]skipping dd: median_dev={median_dev:.1e} < {_DD_MIN:.0e}[/dim]")
-        if sensitivity > 0 and run_dd_sym:
+            cons.print(f"  [dim]skipping dd: float_proxy={float_proxy} < {_DD_FLOAT_MIN:.0e}[/dim]")
+        if dd_threshold > 0 and run_dd_sym:
             try:
-                result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=sensitivity)
+                result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=dd_threshold)
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
-        if sensitivity > 0 and run_dd_line:
+        if dd_threshold > 0 and run_dd_line:
             try:
-                result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=sensitivity)
+                result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=dd_threshold)
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
     finally:
