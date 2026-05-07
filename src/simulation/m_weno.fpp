@@ -14,6 +14,7 @@ module m_weno
 
     use m_mpi_proxy
     use m_thinc, only: s_thinc_compression
+    use m_nvtx
 
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
