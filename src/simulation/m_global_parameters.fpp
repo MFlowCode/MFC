@@ -1063,6 +1063,8 @@ contains
                 end if
             end do
 
+            if (any_non_newtonian) shear_stress = .true.
+
             $:GPU_UPDATE(device='[Re_size, Re_size_max, shear_stress, bulk_stress, any_non_newtonian]')
             $:GPU_UPDATE(device='[fluid_pp]')
 
