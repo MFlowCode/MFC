@@ -17,8 +17,12 @@
 % if account:
 #SBATCH --account=${account}
 % endif
-#SBATCH --partition=batch
-#SBATCH --qos=hackathon
+% if partition:
+#SBATCH --partition=${partition}
+% endif
+% if quality_of_service:
+#SBATCH --qos=${quality_of_service}
+% endif
 % if email:
 #SBATCH --mail-user=${email}
 #SBATCH --mail-type="BEGIN, END, FAIL"
