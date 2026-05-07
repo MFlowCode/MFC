@@ -92,7 +92,7 @@ if [ "$device" = "cpu" ]; then
         frontier|frontier_amd)
             sbatch_device_opts="\
 #SBATCH -n 32
-#SBATCH -p service"
+#SBATCH -p batch"
             ;;
     esac
 elif [ "$device" = "gpu" ]; then
@@ -120,7 +120,7 @@ elif [ "$device" = "gpu" ]; then
         frontier|frontier_amd)
             sbatch_device_opts="\
 #SBATCH -n 8
-#SBATCH -p service"
+#SBATCH -p batch"
             ;;
     esac
 else
