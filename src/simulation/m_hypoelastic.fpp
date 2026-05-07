@@ -226,23 +226,17 @@ contains
                 do l = 0, n
                     do k = 0, m
                         rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) + rho_K_field(k, l, &
-                               & q)*(q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*du_dy_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*du_dy_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dv_dy_hypo(k, l, q) - 2._wp*G_K_field(k, l, &
-                               & q)*(1._wp/3._wp)*dv_dy_hypo(k, l, q))
+                               & q)*(2._wp*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*du_dy_hypo(k, l, &
+                               & q) - q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dv_dy_hypo(k, l, q) - (2._wp/3._wp)*G_K_field(k, &
+                               & l, q)*dv_dy_hypo(k, l, q))
 
                         rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*du_dx_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dv_dx_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*du_dx_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*du_dy_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dv_dy_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dv_dy_hypo(k, l, q) + 2._wp*G_K_field(k, l, &
-                               & q)*(1._wp/2._wp)*(du_dy_hypo(k, l, q) + dv_dx_hypo(k, l, q)))
+                               & l, q)*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dv_dx_hypo(k, l, &
+                               & q) + q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*du_dy_hypo(k, l, q) + G_K_field(k, l, &
+                               & q)*(du_dy_hypo(k, l, q) + dv_dx_hypo(k, l, q)))
 
                         rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dv_dx_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dv_dx_hypo(k, l, &
+                               & l, q)*(2._wp*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dv_dx_hypo(k, l, &
                                & q) - q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*du_dx_hypo(k, l, &
                                & q) + q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + 2._wp*G_K_field(k, l, &
                                & q)*(dv_dy_hypo(k, l, q) - (1._wp/3._wp)*(du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q))))
@@ -256,10 +250,9 @@ contains
                 do l = 0, n
                     do k = 0, m
                         rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) + rho_K_field(k, l, &
-                               & q)*(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*du_dz_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*du_dz_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dw_dz_hypo(k, l, q) - 2._wp*G_K_field(k, l, &
-                               & q)*(1._wp/3._wp)*dw_dz_hypo(k, l, q))
+                               & q)*(2._wp*q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*du_dz_hypo(k, l, &
+                               & q) - q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dw_dz_hypo(k, l, q) - (2._wp/3._wp)*G_K_field(k, &
+                               & l, q)*dw_dz_hypo(k, l, q))
 
                         rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) + rho_K_field(k, &
                                & l, q)*(q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*du_dz_hypo(k, l, &
@@ -267,38 +260,28 @@ contains
                                & q) - q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dw_dz_hypo(k, l, q))
 
                         rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*dv_dz_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*dv_dz_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*dw_dz_hypo(k, l, q) - 2._wp*G_K_field(k, l, &
-                               & q)*(1._wp/3._wp)*dw_dz_hypo(k, l, q))
+                               & l, q)*(2._wp*q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*dv_dz_hypo(k, l, &
+                               & q) - q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*dw_dz_hypo(k, l, &
+                               & q) - (2._wp/3._wp)*G_K_field(k, l, q)*dw_dz_hypo(k, l, q))
 
                         rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + rho_K_field(k, &
-                               & l, q)*(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*du_dx_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dw_dx_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*du_dx_hypo(k, l, &
+                               & l, q)*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dw_dx_hypo(k, l, &
                                & q) + q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*du_dy_hypo(k, l, &
                                & q) + q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dw_dy_hypo(k, l, &
                                & q) - q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*dv_dy_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)*du_dz_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*dw_dz_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*dw_dz_hypo(k, l, q) + 2._wp*G_K_field(k, l, &
-                               & q)*(1._wp/2._wp)*(du_dz_hypo(k, l, q) + dw_dx_hypo(k, l, q)))
+                               & q) + q_prim_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)*du_dz_hypo(k, l, q) + G_K_field(k, l, &
+                               & q)*(du_dz_hypo(k, l, q) + dw_dx_hypo(k, l, q)))
 
                         rhs_vf(eqn_idx%stress%beg + 4)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 4)%sf(k, l, q) + rho_K_field(k, &
                                & l, q)*(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)*dv_dx_hypo(k, l, &
                                & q) + q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dw_dx_hypo(k, l, &
                                & q) - q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*du_dx_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*dv_dy_hypo(k, l, &
                                & q) + q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*dw_dy_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*dv_dy_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)*dv_dz_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*dw_dz_hypo(k, l, &
-                               & q) - q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)*dw_dz_hypo(k, l, q) + 2._wp*G_K_field(k, l, &
-                               & q)*(1._wp/2._wp)*(dv_dz_hypo(k, l, q) + dw_dy_hypo(k, l, q)))
+                               & q) + q_prim_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)*dv_dz_hypo(k, l, q) + G_K_field(k, l, &
+                               & q)*(dv_dz_hypo(k, l, q) + dw_dy_hypo(k, l, q)))
 
                         rhs_vf(eqn_idx%stress%end)%sf(k, l, q) = rhs_vf(eqn_idx%stress%end)%sf(k, l, q) + rho_K_field(k, l, &
-                               & q)*(q_prim_vf(eqn_idx%stress%end - 2)%sf(k, l, q)*dw_dx_hypo(k, l, &
-                               & q) + q_prim_vf(eqn_idx%stress%end - 2)%sf(k, l, q)*dw_dx_hypo(k, l, &
+                               & q)*(2._wp*q_prim_vf(eqn_idx%stress%end - 2)%sf(k, l, q)*dw_dx_hypo(k, l, &
                                & q) - q_prim_vf(eqn_idx%stress%end)%sf(k, l, q)*du_dx_hypo(k, l, &
                                & q) + 2._wp*q_prim_vf(eqn_idx%stress%end - 1)%sf(k, l, q)*dw_dy_hypo(k, l, &
                                & q) - q_prim_vf(eqn_idx%stress%end)%sf(k, l, q)*dv_dy_hypo(k, l, &
