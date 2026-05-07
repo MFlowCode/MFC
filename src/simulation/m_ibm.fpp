@@ -998,8 +998,7 @@ contains
                                     call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, &
                                                                          & j, k + 1)
                                     viscous_stress_div(3,1:3) = (viscous_stress_div_2(3,1:3) - viscous_stress_div_1(3, &
-                                                       & 1:3))/(2._wp*dz) &
-                                                       &  ! get z derivative of the third-row of viscous stress tensor
+                                                       & 1:3))/(2._wp*dz)
                                     local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, &
                                                              & 1:3)  ! add the z components of the divergence to the force
                                 end if
