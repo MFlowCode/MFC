@@ -437,6 +437,7 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "check_continuum_damage",
         "check_grcbc",
         "check_hyperelasticity",
+        "check_interface_compression",
         "check_ibm",
         "check_igr_simulation",
         "check_mhd_simulation",

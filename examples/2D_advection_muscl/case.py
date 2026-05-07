@@ -30,7 +30,7 @@ print(
             "recon_type": 2,
             "muscl_order": 2,
             "muscl_lim": 2,
-            "int_comp": "T",
+            "int_comp": 1,
             "null_weights": "F",
             "riemann_solver": 2,
             "wave_speeds": 1,

@@ -16,8 +16,9 @@ module m_muscl
 
     use m_mpi_proxy
     use m_helper
+    use m_thinc
 
-    private; public :: s_initialize_muscl_module, s_muscl, s_finalize_muscl_module, s_interface_compression
+    private; public :: s_initialize_muscl_module, s_muscl, s_finalize_muscl_module
 
     integer :: v_size
     $:GPU_DECLARE(create='[v_size]')
@@ -209,84 +210,18 @@ contains
             #:endfor
         end if
 
-        if (int_comp) then
-            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, &
-                                         & is1_muscl_d, is2_muscl_d, is3_muscl_d)
+        if (int_comp > 0 .and. v_size >= eqn_idx%adv%end) then
+            call nvtxStartRange("WENO-INTCOMP")
+            #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (muscl_dir == ${MUSCL_DIR}$) then
+                    call s_thinc_compression(v_rs_ws_${XYZ}$_muscl, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, &
+                                             & vR_rs_vf_z, muscl_dir, is1_muscl, is2_muscl, is3_muscl)
+                end if
+            #:endfor
+            call nvtxEndRange()
         end if
 
     end subroutine s_muscl
-
-    !> Apply THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces
-    subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, muscl_dir, &
-
-        & is1_muscl_d, is2_muscl_d, is3_muscl_d)
-
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
-             & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(in)               :: muscl_dir
-        type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
-        integer                           :: j, k, l
-        real(wp)                          :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C, sign, moncon
-
-        #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (muscl_dir == ${MUSCL_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, aCL, aC, aCR, aTHINC, moncon, sign, qmin, qmax]')
-                do l = is3_muscl%beg, is3_muscl%end
-                    do k = is2_muscl%beg, is2_muscl%end
-                        do j = is1_muscl%beg, is1_muscl%end
-                            aCL = v_rs_ws_${XYZ}$_muscl(j - 1, k, l, eqn_idx%adv%beg)
-                            aC = v_rs_ws_${XYZ}$_muscl(j, k, l, eqn_idx%adv%beg)
-                            aCR = v_rs_ws_${XYZ}$_muscl(j + 1, k, l, eqn_idx%adv%beg)
-
-                            moncon = (aCR - aC)*(aC - aCL)
-
-                            if (aC >= ic_eps .and. aC <= 1._wp - ic_eps .and. moncon > moncon_cutoff) then  ! Interface cell
-
-                                if (aCR - aCL > 0._wp) then
-                                    sign = 1._wp
-                                else
-                                    sign = -1._wp
-                                end if
-
-                                qmin = min(aCR, aCL)
-                                qmax = max(aCR, aCL) - qmin
-
-                                C = (aC - qmin + sgm_eps)/(qmax + sgm_eps)
-                                B = exp(sign*ic_beta*(2._wp*C - 1._wp))
-                                A = (B/cosh(ic_beta) - 1._wp)/tanh(ic_beta)
-
-                                ! Left reconstruction
-                                aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*A)
-                                if (aTHINC < ic_eps) aTHINC = ic_eps
-                                if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & eqn_idx%cont%beg)/vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg)*aTHINC
-                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & eqn_idx%cont%end)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & eqn_idx%adv%beg))*(1._wp - aTHINC)
-                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
-                                vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1 - aTHINC
-
-                                ! Right reconstruction
-                                aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*(tanh(ic_beta) + A)/(1._wp + A*tanh(ic_beta)))
-                                if (aTHINC < ic_eps) aTHINC = ic_eps
-                                if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & eqn_idx%cont%beg)/vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg)*aTHINC
-                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & eqn_idx%cont%end)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, &
-                                                  & eqn_idx%adv%beg))*(1._wp - aTHINC)
-                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
-                                vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1 - aTHINC
-                            end if
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        #:endfor
-
-    end subroutine s_interface_compression
 
     !> Reshape cell-averaged variable data into direction-local work arrays for MUSCL reconstruction
     subroutine s_initialize_muscl(v_vf, muscl_dir)

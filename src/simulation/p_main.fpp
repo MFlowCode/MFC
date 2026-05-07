@@ -3,11 +3,6 @@
 !! @brief Contains program p_main
 
 !> @brief Quasi-conservative, shock- and interface- capturing finite-volume scheme for the multicomponent Navier-Stokes equations.
-!! The system is augmented with the relevant advection equations to capture the material interfaces and closed by the stiffened
-!! equation of state as well as any required mixture relations. The effects of surface tension are included and modeled through a
-!! volume force that acts across the diffuse material interface regions. The implementation specifics of surface tension may be
-!! found in the work by Perigaud and Saurel (2005). Note that both viscous and capillarity effects are only available in the volume
-!! fraction model.
 program p_main
 
     use m_global_parameters

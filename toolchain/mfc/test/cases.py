@@ -302,14 +302,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for muscl_order in [1, 2]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
 
-            if muscl_order == 1:
-                for int_comp in ["T", "F"]:
-                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {"int_comp": int_comp}))
-            elif muscl_order == 2:
-                for int_comp in ["T", "F"]:
-                    stack.push(f"int_comp={int_comp}", {"int_comp": int_comp})
-                    cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
-                    stack.pop()
+            if muscl_order == 2:
                 for muscl_lim in [2, 3, 4, 5]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
                 stack.push("muscl_eps=0", {"muscl_eps": 0})
@@ -352,6 +345,43 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_int_comp(dimInfo):
+        eps = 1e-6
+        sharp_ic = {
+            "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
+            "patch_icpp(1)%alpha(1)": 1.0 - eps,
+            "patch_icpp(1)%alpha_rho(2)": eps,
+            "patch_icpp(1)%alpha(2)": eps,
+            "patch_icpp(2)%alpha_rho(1)": 1.0 - eps,
+            "patch_icpp(2)%alpha(1)": 1.0 - eps,
+            "patch_icpp(2)%alpha_rho(2)": eps,
+            "patch_icpp(2)%alpha(2)": eps,
+            "patch_icpp(3)%alpha_rho(1)": eps,
+            "patch_icpp(3)%alpha(1)": eps,
+            "patch_icpp(3)%alpha_rho(2)": 1.0 - eps,
+            "patch_icpp(3)%alpha(2)": 1.0 - eps,
+        }
+
+        stack.push("", sharp_ic)
+
+        stack.push("weno_order=5", {"weno_order": 5})
+        cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+        if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+            cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
+        stack.pop()
+
+        stack.push("muscl_order=2", {"muscl_order": 2, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
+        stack.push("int_comp=1", {"int_comp": 1})
+        cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
+        stack.pop()
+        if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+            stack.push("int_comp=2", {"int_comp": 2})
+            cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
+            stack.pop()
+        stack.pop()
+
+        stack.pop()  # sharp IC
+
     def alter_num_fluids(dimInfo):
         for num_fluids in [1, 2]:
             stack.push(f"{num_fluids} Fluid(s)", {"num_fluids": num_fluids})
@@ -385,6 +415,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
                 alter_igr()
+
+            if num_fluids == 2:
+                alter_int_comp(dimInfo)
 
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
