@@ -38,7 +38,8 @@ class TestParamRegistry(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             reg.register(ParamDef(name="test", param_type=ParamType.REAL))
 
-        self.assertIn("Type mismatch", str(ctx.exception))
+        self.assertIn("existing type is", str(ctx.exception))
+        self.assertIn("new type is", str(ctx.exception))
 
     def test_get_params_by_tag(self):
         """get_params_by_tag should return params with that tag."""

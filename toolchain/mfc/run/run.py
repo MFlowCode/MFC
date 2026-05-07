@@ -13,6 +13,7 @@ from ..build import REQUIRED_TARGETS, SIMULATION, build, get_targets
 from ..common import MFC_ROOT_DIR, MFC_TEMPLATE_DIR, MFCException, does_command_exist, file_dump_yaml, file_read, file_write, format_list_to_string, isspace, system
 from ..printer import cons
 from ..state import ARG, ARGS, CFG, gpuConfigOptions
+from . import archive as archive_mod
 from . import input, queues
 
 
@@ -168,6 +169,19 @@ def run(targets=None, case=None):
     qsystem = queues.get_system()
     cons.print(f"Using queue system [magenta]{qsystem.name}[/magenta].")
 
+    # Pre-flight --archive: validate the path, format, and reserve a
+    # unique destination BEFORE pre_process runs. Failing here saves
+    # the user a full simulation if the archive settings are bad.
+    # Batch jobs skip archiving entirely (outputs land asynchronously).
+    archive_plan = None
+    if ARG("archive") is not None:
+        if isinstance(qsystem, queues.InteractiveSystem):
+            archive_plan = archive_mod.plan_archive(case)
+            if verbosity >= 1:
+                cons.print(f"  [dim]Archive destination: {archive_plan.dest}[/dim]")
+        else:
+            cons.print("[yellow]--archive is ignored for batch submissions (outputs are produced asynchronously).[/yellow]")
+
     # At verbosity >= 1, show more details about what's happening
     if verbosity >= 1:
         cons.print(f"  [dim]Targets: {', '.join(t.name for t in targets)}[/dim]")
@@ -191,3 +205,6 @@ def run(targets=None, case=None):
             cons.print("[bold]Executing simulation...[/bold]")
 
         __execute_job_script(qsystem)
+
+        if archive_plan is not None:
+            archive_mod.archive(archive_plan, case, targets)

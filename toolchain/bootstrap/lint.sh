@@ -37,6 +37,7 @@ if [ "$RUN_TESTS" = true ]; then
     python3 -m unittest mfc.params_tests.test_registry mfc.params_tests.test_definitions mfc.params_tests.test_validate mfc.params_tests.test_integration -v
     python3 -m unittest mfc.cli.test_cli -v
     python3 -m unittest mfc.viz.test_viz -v
+    python3 -m unittest mfc.run.test_archive -v
     cd - > /dev/null
 fi
 

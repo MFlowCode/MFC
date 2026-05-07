@@ -336,6 +336,13 @@ contains
             #:endfor
         #:endfor
 
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%isothermal_in = .false.
+            bc_${dir}$%isothermal_out = .false.
+            bc_${dir}$%Twall_in = dflt_real
+            bc_${dir}$%Twall_out = dflt_real
+        #:endfor
+
         chem_params%gamma_method = 1
         chem_params%transport_model = 1
 

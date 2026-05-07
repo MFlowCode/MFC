@@ -83,7 +83,7 @@ contains
 
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, mpp_lim, time_stepper, weno_eps, &
+            model_eqns, mpp_lim, time_stepper, weno_eps, muscl_eps, &
             rdma_mpi, teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
             bc_x, bc_y, bc_z, &
@@ -818,7 +818,7 @@ contains
         end if
 
         ! Write IB kinematic state for restart
-        if (ib .and. proc_rank == 0) call s_write_ib_state_file()
+        if (ib) call s_write_ib_state_file(save_count)
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -914,9 +914,16 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            if (t_step_start /= 0) call s_read_ib_restart_data()
+            if (cfl_dt .and. n_start > 0) then
+                call s_read_ib_restart_data(n_start)
+            else if (t_step_start > 0) then
+                call s_read_ib_restart_data(t_step_start)
+            end if
             call s_ibm_setup()
-            call s_write_ib_data_file(0)
+            if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
+                call s_write_ib_data_file(0)
+                call s_write_ib_state_file(0)
+            end if
         end if
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
@@ -1071,6 +1078,11 @@ contains
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
 
+        $:GPU_UPDATE(device='[bc_x%isothermal_in, bc_x%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')
+        $:GPU_UPDATE(device='[bc_x%Twall_in, bc_x%Twall_out, bc_y%Twall_in, bc_y%Twall_out, bc_z%Twall_in, bc_z%Twall_out]')
+
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then
             $:GPU_UPDATE(device='[palpha_eps, ptgalpha_eps]')
@@ -1135,38 +1147,37 @@ contains
 
     !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart. Rank 0 reads the last num_ibs records and
     !! broadcasts to all ranks. Overwrites patch_ib vel, angular_vel, angles, and centroid.
-    impure subroutine s_read_ib_restart_data()
+    impure subroutine s_read_ib_restart_data(t_step)
 
+        integer, intent(in)                  :: t_step
         character(len=path_len + 2*name_len) :: file_loc
-        integer                              :: i, ios, file_unit, ib_id, ierr
-        real(wp)                             :: time_read
-        real(wp), dimension(3)               :: force_read, torque_read
-        real(wp), dimension(3)               :: vel_read, angular_vel_read, angles_read
-        real(wp)                             :: xc_read, yc_read, zc_read
+        integer                              :: i, ios, file_unit, ierr
+        integer, parameter                   :: NFIELDS_PER_IB = 20
+        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
         logical                              :: file_exist
 
+        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+        file_loc = trim(case_dir) // trim(file_loc)
+
         if (proc_rank == 0) then
-            file_loc = trim(case_dir) // '/restart_data/ib_state.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
-            print *, "IB Restart File Exists: ", file_exist
-            if (file_exist) then
-                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
-                print *, "iostat ", ios
-            else
+            if (.not. file_exist) then
                 call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
             end if
 
-            ! Read all records; the last num_ibs records are the final state
-            do
-                read (file_unit, iostat=ios) time_read, ib_id, force_read, torque_read, vel_read, angular_vel_read, angles_read, &
-                      & xc_read, yc_read, zc_read
-                if (ios /= 0) exit
-                patch_ib(ib_id)%vel = vel_read
-                patch_ib(ib_id)%angular_vel = angular_vel_read
-                patch_ib(ib_id)%angles = angles_read
-                patch_ib(ib_id)%x_centroid = xc_read
-                patch_ib(ib_id)%y_centroid = yc_read
-                patch_ib(ib_id)%z_centroid = zc_read
+            open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+            if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
+
+            do i = 1, num_ibs
+                read (file_unit, iostat=ios) ib_buf
+                if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
+
+                patch_ib(i)%vel = ib_buf(8:10)
+                patch_ib(i)%angular_vel = ib_buf(11:13)
+                patch_ib(i)%angles = ib_buf(14:16)
+                patch_ib(i)%x_centroid = ib_buf(17)
+                patch_ib(i)%y_centroid = ib_buf(18)
+                patch_ib(i)%z_centroid = ib_buf(19)
             end do
 
             close (file_unit)

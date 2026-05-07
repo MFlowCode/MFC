@@ -180,6 +180,14 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     if [ "$USE_UV" = "1" ]; then
         # UV_LINK_MODE=copy avoids slow hardlink failures on cross-filesystem installs (common on HPC)
         export UV_LINK_MODE=copy
+        # On GitHub Actions self-hosted runners, the default uv cache (~/.cache/uv)
+        # often lives on a shared NFS $HOME (e.g. OLCF /ccs/home), where uv's
+        # file-lock implementation hits "os error 524" when concurrent runners on
+        # different nodes contend for the same .lock. Redirect to node-local
+        # storage in CI only, so non-CI users keep their normal reusable cache.
+        if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ -w "${TMPDIR:-/tmp}" ]; then
+            export UV_CACHE_DIR="${TMPDIR:-/tmp}/uv-cache-${USER:-$(id -un)}"
+        fi
         log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
 
         if [ "$verbose" = "1" ]; then

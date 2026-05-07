@@ -87,6 +87,7 @@ print(
             "precision": 2,
             "prim_vars_wrt": "T",
             "E_wrt": "T",
+            "ib_state_wrt": "T",
             "parallel_io": "T",
             # Patch: Constant Tube filled with air
             # Specify the cylindrical air tube grid geometry
@@ -128,7 +129,7 @@ print(
             "patch_ib(1)%angular_vel(1)": 0.0,  # x-axis rotational velocity in radians per second
             "patch_ib(1)%angular_vel(2)": 0.0,  # y-axis rotation
             "patch_ib(1)%angular_vel(3)": 0.0,  # z-axis rotation
-            "patch_ib(1)%mass": 0.5,  # z-axis rotation
+            "patch_ib(1)%mass": 0.25,  # z-axis rotation
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
