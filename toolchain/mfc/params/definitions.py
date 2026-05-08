@@ -612,6 +612,10 @@ CONSTRAINTS = {
         "choices": [1, 2, 3, 4, 5],
         "value_labels": {1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
     },
+    "int_comp": {
+        "choices": [0, 1, 2],
+        "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
+    },
     # Time stepping
     "time_stepper": {
         "choices": [1, 2, 3],
@@ -1060,11 +1064,11 @@ def _load():
         "mixture_err",
         "rdma_mpi",
         "igr_pres_lim",
-        "int_comp",
         "nv_uvm_out_of_core",
         "nv_uvm_pref_gpu",
     ]:
         _r(n, LOG)
+    _r("int_comp", INT)
     _r("case_dir", STR)
 
     # Body force

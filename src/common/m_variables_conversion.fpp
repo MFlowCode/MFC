@@ -1375,9 +1375,6 @@ contains
 #ifdef MFC_DEBUG
         if (disc < 0._wp) then
             print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, B(1), B(2), B(3), h, term, disc
-#ifdef MFC_MPI
-            call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')
-#endif
         end if
 #endif
 

@@ -14,7 +14,8 @@ module m_weno
     ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
-    use m_muscl
+    use m_thinc, only: s_thinc_compression
+    use m_nvtx
 
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
@@ -178,6 +179,7 @@ contains
     !! @param is Index bounds in the s-direction
     subroutine s_compute_weno_coefficients(weno_dir, is)
 
+        ! Compute WENO coefficients for a given coordinate direction. Shu (1997)
         integer, intent(in)               :: weno_dir
         type(int_bounds_info), intent(in) :: is
         integer                           :: s
@@ -361,7 +363,7 @@ contains
                             d_cbL_${XYZ}$ (0:1,s) = 0._wp; d_cbL_${XYZ}$ (2, s) = 1._wp
                         end if
                     end if
-                else  ! WENO7
+                else
                     if (.not. teno) then
                         do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
                             ! Reference: Shu (1997) "Essentially Non-Oscillatory and Weighted Essentially Non-Oscillatory Schemes
@@ -823,7 +825,7 @@ contains
                                                & + 5*y(3)**2*y(4)**2))/(5*(y(1) + y(2))**2*(y(1) + y(2) + y(3))**2*(y(1) + y(2) &
                                                & + y(3) + y(4))**2)
                         end do
-                    else  ! TENO (only supports uniform grid)
+                    else
                         ! (Fu, et al., 2016) Table 2 (for right flux)
                         d_cbL_${XYZ}$ (0,:) = 18._wp/35._wp
                         d_cbL_${XYZ}$ (1,:) = 3._wp/35._wp
@@ -1073,23 +1075,22 @@ contains
                                             end do
                                         else if (wenoz) then
                                             ! Borges, et al. (2008)
-
                                             tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 0, weno_num_stencils
-                                                ! Equation 28 (note: weno_eps was already added to beta)
+                                            do q = 0, weno_num_stencils  ! Equation 28 (note: weno_eps was already added to beta)
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q)))
                                             end do
                                         else if (teno) then
                                             ! Fu, et al. (2016) Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
-                                            tau = abs(beta(2) - beta(0))
+                                            tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = 1._wp + tau/beta(q)  ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
-                                                alpha(q) = (alpha(q)**3._wp) &
-                                                      & **2._wp  ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                                ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                                alpha(q) = 1._wp + tau/beta(q)
+                                                ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                                alpha(q) = (alpha(q)**3._wp)**2._wp
                                             end do
-                                            omega = alpha/sum(alpha)  ! Equation 25 (reuse omega as xi)
+                                            omega = alpha/sum(alpha)
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
@@ -1237,7 +1238,7 @@ contains
                                                  & 2)*dvd(-1)*dvd(-3) + beta_coef_${XYZ}$ (j, 3, &
                                                  & 3)*dvd(-2)*dvd(-2) + beta_coef_${XYZ}$ (j, 3, &
                                                  & 4)*dvd(-2)*dvd(-3) + beta_coef_${XYZ}$ (j, 3, 5)*dvd(-3)*dvd(-3) + weno_eps
-                                        else  ! TENO
+                                        else
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
                                                 ! High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu
                                                 ! & Tang, 2019) Section 3.2
@@ -1382,9 +1383,15 @@ contains
             #:endif
         end if
 
-        if (int_comp .and. v_size >= eqn_idx%adv%end) then
-            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, weno_dir, &
-                                         & is1_weno_d, is2_weno_d, is3_weno_d)
+        if (int_comp > 0 .and. v_size >= eqn_idx%adv%end) then
+            call nvtxStartRange("WENO-INTCOMP")
+            #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (weno_dir == ${WENO_DIR}$) then
+                    call s_thinc_compression(v_rs_ws_${XYZ}$, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, &
+                                             & vR_rs_vf_z, weno_dir, is1_weno, is2_weno, is3_weno)
+                end if
+            #:endfor
+            call nvtxEndRange()
         end if
 
     end subroutine s_weno
@@ -1472,18 +1479,12 @@ contains
 
         ! The left and right upper bounds (UL), medians, large curvatures, minima, and maxima of the WENO-reconstructed values of
         ! the cell- average variables.
-        real(wp) :: vL_UL, vR_UL
-        real(wp) :: vL_MD, vR_MD
-        real(wp) :: vL_LC, vR_LC
-        real(wp) :: vL_min, vR_min
-        real(wp) :: vL_max, vR_max
-        !> Max CFL stability parameter (CFL < 1/(1+alpha)) Determines the maximum Courant-Friedrichs-Lewy (CFL) number that may be
-        !! utilized with the scheme. In theory, for stability, a CFL number less than 1/(1+alpha) is necessary. The default value
-        !! for alpha is 2.
-        real(wp), parameter :: alpha = 2._wp
-
-        !> Determines the amount of freedom available from utilizing a large value for the local curvature. The default value for
-        !! beta is 4/3.
+        real(wp)            :: vL_UL, vR_UL
+        real(wp)            :: vL_MD, vR_MD
+        real(wp)            :: vL_LC, vR_LC
+        real(wp)            :: vL_min, vR_min
+        real(wp)            :: vL_max, vR_max
+        real(wp), parameter :: alpha = 2._wp       !< Max CFL stability parameter (CFL < 1/(1+alpha))
         real(wp), parameter :: beta = 4._wp/3._wp  !< Local curvature freedom parameter
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp

@@ -152,24 +152,25 @@ module m_global_parameters
     logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
-    real(wp)           :: muscl_eps                    !< MUSCL limiter slope-product threshold
-    real(wp)           :: weno_eps                     !< Binding for the WENO nonlinear weights
-    real(wp)           :: teno_CT                      !< Smoothness threshold for TENO
-    logical            :: mp_weno                      !< Monotonicity preserving (MP) WENO
-    logical            :: weno_avg                     !< Average left/right cell-boundary states
-    logical            :: weno_Re_flux                 !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer            :: riemann_solver               !< Riemann solver algorithm
-    integer            :: low_Mach                     !< Low Mach number fix to HLLC Riemann solver
-    integer            :: wave_speeds                  !< Wave speeds estimation method
-    integer            :: avg_state                    !< Average state evaluation method
-    logical            :: alt_soundspeed               !< Alternate mixture sound speed
-    logical            :: null_weights                 !< Null undesired WENO weights
-    logical            :: mixture_err                  !< Mixture properties correction
-    logical            :: hypoelasticity               !< hypoelasticity modeling
-    logical            :: hyperelasticity              !< hyperelasticity modeling
-    logical            :: int_comp                     !< THINC interface compression
-    real(wp)           :: ic_eps                       !< THINC Epsilon to compress on surface cells
-    real(wp)           :: ic_beta                      !< THINC Sharpness Parameter
+    real(wp) :: muscl_eps        !< MUSCL limiter slope-product threshold
+    real(wp) :: weno_eps         !< Binding for the WENO nonlinear weights
+    real(wp) :: teno_CT          !< Smoothness threshold for TENO
+    logical  :: mp_weno          !< Monotonicity preserving (MP) WENO
+    logical  :: weno_avg         !< Average left/right cell-boundary states
+    logical  :: weno_Re_flux     !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer  :: riemann_solver   !< Riemann solver algorithm
+    integer  :: low_Mach         !< Low Mach number fix to HLLC Riemann solver
+    integer  :: wave_speeds      !< Wave speeds estimation method
+    integer  :: avg_state        !< Average state evaluation method
+    logical  :: alt_soundspeed   !< Alternate mixture sound speed
+    logical  :: null_weights     !< Null undesired WENO weights
+    logical  :: mixture_err      !< Mixture properties correction
+    logical  :: hypoelasticity   !< hypoelasticity modeling
+    logical  :: hyperelasticity  !< hyperelasticity modeling
+    integer  :: int_comp         !< Interface compression: 0=off, 1=THINC, 2=MTHINC
+    real(wp) :: ic_eps           !< THINC Epsilon to compress on surface cells
+    real(wp) :: ic_beta          !< THINC Sharpness Parameter
+    $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer            :: hyper_model                  !< hyperelasticity solver algorithm
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
@@ -572,7 +573,7 @@ contains
         ptgalpha_eps = dflt_real
         hypoelasticity = .false.
         hyperelasticity = .false.
-        int_comp = .false.
+        int_comp = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
         elasticity = .false.
@@ -1213,8 +1214,11 @@ contains
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
         Np = 0
 
-        if (elasticity) fd_number = max(1, fd_order/2)
-        if (mhd) then  ! TODO merge with above; waiting for hyperelasticity PR
+        if (elasticity) then
+            fd_number = max(1, fd_order/2)
+        end if
+
+        if (mhd) then
             fd_number = max(1, fd_order/2)
         end if
         if (probe_wrt) fd_number = max(1, fd_order/2)
@@ -1235,7 +1239,7 @@ contains
             grid_geometry = 1
         else if (cyl_coord .and. p == 0) then  ! Axisymmetric cylindrical grid
             grid_geometry = 2
-        else  ! Fully 3D cylindrical grid
+        else
             grid_geometry = 3
         end if
 
@@ -1266,6 +1270,7 @@ contains
             $:GPU_UPDATE(device='[num_fluids, num_dims, viscous, num_vels, nb, muscl_lim]')
         #:endif
 
+        $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')
         $:GPU_UPDATE(device='[muscl_eps]')
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau]')
 

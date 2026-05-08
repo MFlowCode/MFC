@@ -15,6 +15,7 @@ module m_start_up
     use m_variables_conversion
     use m_weno
     use m_muscl
+    use m_thinc
     use m_riemann_solvers
     use m_cbc
     use m_boundary_common
@@ -191,9 +192,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the starting time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
-        logical :: file_exist
-        ! Logical used to check the existence of the data files
-
+        logical :: file_exist                               !< Logical used to check the existence of the input file
         integer :: i, r
 
         ! Confirming that the directory from which the initial condition and the grid data files are to be read in exists and
@@ -1000,7 +999,7 @@ contains
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
-
+        if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
         if (hypoelasticity) call s_initialize_hypoelastic_module()
@@ -1193,6 +1192,7 @@ contains
                 call s_finalize_muscl_module()
             end if
         end if
+        if (int_comp > 0) call s_finalize_thinc_module()
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()

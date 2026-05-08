@@ -2539,7 +2539,6 @@ contains
         ! Populate global domain boundaries with stretched grids
         call s_mpi_allreduce_min(x_cb(-1), glb_bounds(1)%beg)
         call s_mpi_allreduce_max(x_cb(m), glb_bounds(1)%end)
-
         if (n > 0) then
             call s_mpi_allreduce_min(y_cb(-1), glb_bounds(2)%beg)
             call s_mpi_allreduce_max(y_cb(n), glb_bounds(2)%end)

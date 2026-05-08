@@ -36,7 +36,6 @@ print(
             "recon_type": 2,
             "muscl_order": 2,
             "muscl_lim": 2,
-            "int_comp": "T",
             "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,

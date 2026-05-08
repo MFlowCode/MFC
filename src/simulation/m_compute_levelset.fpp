@@ -30,7 +30,8 @@ contains
         !  3D Patch Geometries
 
         if (p > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', &
+                                & copyin='[patch_ib(1:num_ibs), Np, glb_bounds]')
             do i = 1, num_gps
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
@@ -51,7 +52,8 @@ contains
 
             ! 2D Patch Geometries
         else if (n > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', &
+                                & copyin='[Np, patch_ib(1:num_ibs), glb_bounds]')
             do i = 1, num_gps
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
