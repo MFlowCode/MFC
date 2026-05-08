@@ -759,6 +759,7 @@ if (MFC_SIMULATION)
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_mpi_common.fpp.f90"
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_start_up.fpp.f90"
             PROPERTIES COMPILE_OPTIONS "-Oipa0"
         )
     endif()
