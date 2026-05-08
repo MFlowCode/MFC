@@ -29,9 +29,9 @@ name: FP Stability
 
 on:
   push:
-    branches: [master, fp-stability]
-  schedule:
-    - cron: "0 3 * * 1"
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 jobs:
