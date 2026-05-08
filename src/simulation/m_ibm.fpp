@@ -201,7 +201,6 @@ contains
                 k = gp%loc(2)
                 l = gp%loc(3)
                 patch_id = ghost_points(i)%ib_patch_id
-                call s_decode_patch_periodicity(patch_id, patch_id)
 
                 ! Calculate physical location of GP
                 if (p > 0) then
