@@ -735,10 +735,12 @@ if (MFC_PRE_PROCESS)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         target_compile_options(pre_process PRIVATE -hfp0)
         # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
-        # ipa_processing. The crash is nondeterministic and can hit any file via
-        # cross-file inlining, so disable IPA for the whole target. Safe for
-        # pre_process (CPU-only, no thermochem IPA requirements).
-        target_compile_options(pre_process PRIVATE -Oipa0)
+        # ipa_processing on GitHub Actions runners. Only manifests in CI (runner
+        # memory layout triggers the nondeterministic crash). Guard with
+        # GITHUB_ACTIONS so local Frontier builds keep full IPA performance.
+        if (DEFINED ENV{GITHUB_ACTIONS})
+            target_compile_options(pre_process PRIVATE -Oipa0)
+        endif()
     endif()
 endif()
 
@@ -747,15 +749,14 @@ if (MFC_SIMULATION)
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
     # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
-    # ipa_processing. The crash is nondeterministic — IPA inlines across all
-    # files in the target, so any file can become the crash site.
+    # ipa_processing on GitHub Actions runners. Only manifests in CI.
     # For non-OpenMP builds: disable IPA for the entire target (safe, no IPA
     # requirements). For OpenMP builds: thermochem uses !DIR$ INLINEALWAYS
     # which requires IPA for device-call inlining, so we cannot disable IPA
     # globally. Instead apply -Oipa0 per-file to the known crash sites.
     # On OpenACC the pyrometheus patch emits !$acc routine seq (no IPA needed).
     # See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND DEFINED ENV{GITHUB_ACTIONS})
         if (NOT MFC_OpenMP)
             target_compile_options(simulation PRIVATE -Oipa0)
         else()
