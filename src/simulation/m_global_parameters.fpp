@@ -148,35 +148,35 @@ module m_global_parameters
     logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
-    real(wp) :: muscl_eps        !< MUSCL limiter slope-product threshold
-    real(wp) :: weno_eps         !< Binding for the WENO nonlinear weights
-    real(wp) :: teno_CT          !< Smoothness threshold for TENO
-    logical  :: mp_weno          !< Monotonicity preserving (MP) WENO
-    logical  :: weno_avg         !< Average left/right cell-boundary states
-    logical  :: weno_Re_flux     !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer  :: riemann_solver   !< Riemann solver algorithm
-    logical            :: riemann_hypo_ADC
-    real(wp)           :: ADC_kappa
-    logical            :: hll_u_interface              !< T = HLL Method 2 (u-interface), F = HLL Method 1 (alpha-interface)
-    logical            :: hypo_hll_interface_rhs       !< When T, HLL hypo uses interface-consistent RHS instead of legacy FD
-    logical            :: hypo_nc_finite_diff
-    logical            :: hypo_nc_interface
-    logical            :: hypo_nc_dual_pass
-    logical            :: adv_src_alpha_iface          !< flux_src exports per-fluid interface alpha
-    logical            :: adv_src_vel_iface            !< flux_src exports shared face-normal interface velocity
-    logical            :: adv_src_none                 !< flux_src exports no NC advection quantity
-    logical            :: use_nc_iface_vel             !< nc_iface_vel exports interface velocities needed outside flux_src
-    integer  :: low_Mach         !< Low Mach number fix to HLLC Riemann solver
-    integer  :: wave_speeds      !< Wave speeds estimation method
-    integer  :: avg_state        !< Average state evaluation method
-    logical  :: alt_soundspeed   !< Alternate mixture sound speed
-    logical  :: null_weights     !< Null undesired WENO weights
-    logical  :: mixture_err      !< Mixture properties correction
-    logical  :: hypoelasticity   !< hypoelasticity modeling
-    logical  :: hyperelasticity  !< hyperelasticity modeling
-    integer  :: int_comp         !< Interface compression: 0=off, 1=THINC, 2=MTHINC
-    real(wp) :: ic_eps           !< THINC Epsilon to compress on surface cells
-    real(wp) :: ic_beta          !< THINC Sharpness Parameter
+    real(wp) :: muscl_eps               !< MUSCL limiter slope-product threshold
+    real(wp) :: weno_eps                !< Binding for the WENO nonlinear weights
+    real(wp) :: teno_CT                 !< Smoothness threshold for TENO
+    logical  :: mp_weno                 !< Monotonicity preserving (MP) WENO
+    logical  :: weno_avg                !< Average left/right cell-boundary states
+    logical  :: weno_Re_flux            !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer  :: riemann_solver          !< Riemann solver algorithm
+    logical  :: riemann_hypo_ADC
+    real(wp) :: ADC_kappa
+    logical  :: hll_u_interface         !< T = HLL Method 2 (u-interface), F = HLL Method 1 (alpha-interface)
+    logical  :: hypo_hll_interface_rhs  !< When T, HLL hypo uses interface-consistent RHS instead of legacy FD
+    logical  :: hypo_nc_finite_diff
+    logical  :: hypo_nc_interface
+    logical  :: hypo_nc_dual_pass
+    logical  :: adv_src_alpha_iface     !< flux_src exports per-fluid interface alpha
+    logical  :: adv_src_vel_iface       !< flux_src exports shared face-normal interface velocity
+    logical  :: adv_src_none            !< flux_src exports no NC advection quantity
+    logical  :: use_nc_iface_vel        !< nc_iface_vel exports interface velocities needed outside flux_src
+    integer  :: low_Mach                !< Low Mach number fix to HLLC Riemann solver
+    integer  :: wave_speeds             !< Wave speeds estimation method
+    integer  :: avg_state               !< Average state evaluation method
+    logical  :: alt_soundspeed          !< Alternate mixture sound speed
+    logical  :: null_weights            !< Null undesired WENO weights
+    logical  :: mixture_err             !< Mixture properties correction
+    logical  :: hypoelasticity          !< hypoelasticity modeling
+    logical  :: hyperelasticity         !< hyperelasticity modeling
+    integer  :: int_comp                !< Interface compression: 0=off, 1=THINC, 2=MTHINC
+    real(wp) :: ic_eps                  !< THINC Epsilon to compress on surface cells
+    real(wp) :: ic_beta                 !< THINC Sharpness Parameter
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer            :: hyper_model                  !< hyperelasticity solver algorithm
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
