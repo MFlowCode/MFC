@@ -52,13 +52,25 @@ def __profiler_prepend() -> typing.List[str]:
 
         return ["rocprof-compute", "profile", "-n", ARG("name").replace("-", "_").replace(".", "_")] + ARG("rcu") + ["--"]
 
-    if ARG("rsys") is not None:
-        if not does_command_exist("rocprof"):
-            raise MFCException("Failed to locate [bold red]ROCM rocprof-systems[/bold red] (rocprof-systems).")
-
-        return ["rocprof"] + ARG("rsys")
-
     return []
+
+
+def __rsys_profiler_str() -> str:
+    if not does_command_exist("rocprof"):
+        raise MFCException("Failed to locate [bold red]ROCM rocprof-systems[/bold red] (rocprof-systems).")
+
+    # Write a wrapper script so $SLURM_PROCID is expanded inside each srun task
+    # rather than by the calling shell (which would give every rank rank 0's value).
+    extra = shlex.join(ARG("rsys")) if ARG("rsys") else ""
+    wrapper_path = os.path.abspath(os.path.join(os.path.dirname(ARG("input")), "rocprof_wrapper.sh"))
+    wrapper_lines = [
+        "#!/bin/bash",
+        "RANK=${SLURM_PROCID:-${FLUX_TASK_RANK:-${OMPI_COMM_WORLD_RANK:-0}}}",
+        f'exec rocprof -o "rocprof_rank_${{RANK}}.csv" {extra} "$@"',
+    ]
+    file_write(wrapper_path, "\n".join(wrapper_lines) + "\n")
+    os.chmod(wrapper_path, 0o755)
+    return wrapper_path
 
 
 def get_baked_templates() -> dict:
@@ -111,7 +123,7 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         MFC_ROOT_DIR=MFC_ROOT_DIR,
         SIMULATION=SIMULATION,
         qsystem=queues.get_system(),
-        profiler=shlex.join(__profiler_prepend()),
+        profiler=__rsys_profiler_str() if ARG("rsys") is not None else shlex.join(__profiler_prepend()),
         gpu_enabled=gpu_enabled,
         gpu_acc=gpu_acc,
         gpu_mp=gpu_mp,

@@ -1253,15 +1253,18 @@ contains
 
 #ifdef MFC_MPI
         integer                       :: i, j, k, pack_pos, unpack_pos, buf_size, ierr
-        integer                       :: send_neighbor, recv_neighbor, recv_count, pid, tag
-        real(wp), dimension(3)        :: fval, tval
+        integer                       :: send_neighbor, recv_neighbor, recv_count, tag
         real(wp), allocatable         :: recv_forces_snap(:,:), recv_torques_snap(:,:)
         character(len=1), allocatable :: send_buf(:), recv_buf(:)
+        integer, allocatable          :: send_ids(:), recv_ids(:)
+        real(wp), allocatable         :: send_ft(:,:), recv_ft(:,:)
 
         if (num_procs == 1) return
 
         buf_size = storage_size(0)/8 + (storage_size(0)/8 + 6*storage_size(0._wp)/8)*size(patch_ib)
         allocate (send_buf(buf_size), recv_buf(buf_size), recv_forces_snap(num_ibs, 3), recv_torques_snap(num_ibs, 3))
+        @:ALLOCATE(send_ids(num_ibs), send_ft(num_ibs, 6))
+        allocate (recv_ids(size(patch_ib)), recv_ft(size(patch_ib), 6))
 
         ! Accumulation phase: propagate contributions toward the high-index corner.
         #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
@@ -1276,32 +1279,38 @@ contains
                 do k = 1, 2*ib_neighborhood_radius
                     ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
                     pack_pos = 0
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
                     do i = 1, num_ibs
-                        call MPI_PACK(patch_ib(i)%gbl_patch_id, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                        fval(:) = forces(i,:); tval(:) = torques(i,:)
-                        call MPI_PACK(fval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                        call MPI_PACK(tval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                        send_ids(i) = patch_ib(i)%gbl_patch_id
+                        send_ft(i,1:3) = forces(i,:)
+                        send_ft(i,4:6) = torques(i,:)
                     end do
+                    $:END_GPU_PARALLEL_LOOP()
+                    $:GPU_UPDATE(host='[send_ids, send_ft]')
+                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, recv_buf, buf_size, MPI_PACKED, &
                                       & recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     if (recv_neighbor /= MPI_PROC_NULL) then
                         unpack_pos = 0
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
+                        ! $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques,
+                        ! recv_forces_snap, recv_torques_snap]')
                         do i = 1, recv_count
-                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                            call s_get_neighborhood_idx(pid, j)
+                            call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
                                 ! add forces and subtract recv_snap prevent double-counting
-                                forces(j,:) = forces(j,:) + fval(:) - recv_forces_snap(j,:)
-                                torques(j,:) = torques(j,:) + tval(:) - recv_torques_snap(j,:)
-                                recv_forces_snap(j,:) = fval(:)
-                                recv_torques_snap(j,:) = tval(:)
+                                forces(j,:) = forces(j,:) + recv_ft(i,1:3) - recv_forces_snap(j,:)
+                                torques(j,:) = torques(j,:) + recv_ft(i,4:6) - recv_torques_snap(j,:)
+                                recv_forces_snap(j,:) = recv_ft(i,1:3)
+                                recv_torques_snap(j,:) = recv_ft(i,4:6)
                             end if
                         end do
+                        ! $:END_GPU_PARALLEL_LOOP()
                     end if
                     tag = tag + 2
                 end do
@@ -1316,35 +1325,40 @@ contains
 
                 do k = 1, 2*ib_neighborhood_radius
                     pack_pos = 0
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    $:GPU_PARALLEL_LOOP(private='[i]', copy='[send_ids, send_ft]', copyin='[forces, torques]')
                     do i = 1, num_ibs
-                        call MPI_PACK(patch_ib(i)%gbl_patch_id, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                        fval(:) = forces(i,:); tval(:) = torques(i,:)
-                        call MPI_PACK(fval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                        call MPI_PACK(tval, 3, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                        send_ids(i) = patch_ib(i)%gbl_patch_id
+                        send_ft(i,1:3) = forces(i,:)
+                        send_ft(i,4:6) = torques(i,:)
                     end do
+                    $:END_GPU_PARALLEL_LOOP()
+                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, recv_buf, buf_size, MPI_PACKED, &
                                       & recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     if (recv_neighbor /= MPI_PROC_NULL) then
                         unpack_pos = 0
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
+                        ! $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
                         do i = 1, recv_count
-                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, pid, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, fval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                            call MPI_UNPACK(recv_buf, buf_size, unpack_pos, tval, 3, mpi_p, MPI_COMM_WORLD, ierr)
-                            call s_get_neighborhood_idx(pid, j)
+                            call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
-                                forces(j,:) = fval(:)
-                                torques(j,:) = tval(:)
+                                forces(j,:) = recv_ft(i,1:3)
+                                torques(j,:) = recv_ft(i,4:6)
                             end if
                         end do
+                        ! $:END_GPU_PARALLEL_LOOP()
                     end if
                     tag = tag + 2
                 end do
             end if
         #:endfor
 
-        deallocate (send_buf, recv_buf, recv_forces_snap, recv_torques_snap)
+        @:DEALLOCATE(send_ids, send_ft)
+        deallocate (send_buf, recv_buf, recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
 #endif
 
     end subroutine s_communicate_ib_forces
