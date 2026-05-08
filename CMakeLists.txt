@@ -748,13 +748,25 @@ if (MFC_SIMULATION)
                      MPI FFTW OpenACC OpenMP)
     # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
     # ipa_processing. The crash is nondeterministic — IPA inlines across all
-    # files in the target, so any file can become the crash site. Per-file
-    # -Oipa0 via set_source_files_properties is insufficient.
-    # Not applied to Cray+OpenMP because thermochem uses !DIR$ INLINEALWAYS,
-    # which requires IPA to inline device calls. On OpenACC the pyrometheus
-    # patch emits !$acc routine seq instead (no IPA needed). See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
-        target_compile_options(simulation PRIVATE -Oipa0)
+    # files in the target, so any file can become the crash site.
+    # For non-OpenMP builds: disable IPA for the entire target (safe, no IPA
+    # requirements). For OpenMP builds: thermochem uses !DIR$ INLINEALWAYS
+    # which requires IPA for device-call inlining, so we cannot disable IPA
+    # globally. Instead apply -Oipa0 per-file to the known crash sites.
+    # On OpenACC the pyrometheus patch emits !$acc routine seq (no IPA needed).
+    # See PR #1286.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        if (NOT MFC_OpenMP)
+            target_compile_options(simulation PRIVATE -Oipa0)
+        else()
+            set_source_files_properties(
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_mpi_common.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_start_up.fpp.f90"
+                PROPERTIES COMPILE_OPTIONS "-Oipa0"
+            )
+        endif()
     endif()
 endif()
 
