@@ -734,6 +734,12 @@ if (MFC_PRE_PROCESS)
                      MPI)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         target_compile_options(pre_process PRIVATE -hfp0)
+        # CCE 19.0.0 IPA workaround: m_mpi_common triggers bring_routine_resident
+        # SIGSEGV in optcg during ipa_processing. See simulation block below for details.
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/pre_process/m_mpi_common.fpp.f90"
+            PROPERTIES COMPILE_OPTIONS "-Oipa0"
+        )
     endif()
 endif()
 
@@ -744,7 +750,7 @@ if (MFC_SIMULATION)
     # CCE 19.0.0 IPA workaround: disable interprocedural analysis for files
     # that trigger compiler crashes during IPA:
     #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
-    #   m_phase_change: bring_routine_resident SIGSEGV
+    #   m_phase_change, m_mpi_common: bring_routine_resident SIGSEGV
     # Not applied to Cray+OpenMP because thermochem uses !DIR$ INLINEALWAYS,
     # which requires IPA to inline device calls. On OpenACC the pyrometheus
     # patch emits !$acc routine seq instead (no IPA needed). See PR #1286.
@@ -752,6 +758,7 @@ if (MFC_SIMULATION)
         set_source_files_properties(
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_mpi_common.fpp.f90"
             PROPERTIES COMPILE_OPTIONS "-Oipa0"
         )
     endif()
