@@ -25,13 +25,16 @@ module m_ibm
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module
+    ; public :: ib_gbl_idx_lookup, s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module
 
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
+
+    integer, dimension(:), allocatable :: ib_gbl_idx_lookup
+    $:GPU_DECLARE(create='[ib_gbl_idx_lookup]')
 
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
@@ -84,6 +87,9 @@ contains
         if (p /= 0) then
             $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
         end if
+        ib_gbl_idx_lookup = -1
+        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
+        call s_update_ib_lookup()
 
         ! recompute the new ib_patch locations and broadcast them.
         ib_markers%sf = 0._wp
@@ -117,8 +123,6 @@ contains
         call s_compute_interpolation_coeffs(ghost_points)
 
         call nvtxEndRange
-
-        ! print *, proc_rank, num_local_ibs, num_ibs, num_gbl_ibs
 
     end subroutine s_ibm_setup
 
@@ -248,8 +252,6 @@ contains
                         q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
                                   & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
                                   & *dot_product(patch_ib(patch_id) %force/patch_ib(patch_id)%mass, gp%levelset_norm))
-                        ! q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, & & l) + pres_IP/(1._wp -
-                        ! 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP)) ! TODO :: REMOVE ME
                     end do
                 end if
 
@@ -1052,6 +1054,7 @@ contains
     impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
+        @:DEALLOCATE(ib_gbl_idx_lookup)
         if (allocated(airfoil_grid_u)) then
             @:DEALLOCATE(airfoil_grid_u)
             @:DEALLOCATE(airfoil_grid_l)
@@ -1282,6 +1285,7 @@ contains
                     end do
                     call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, recv_buf, buf_size, MPI_PACKED, &
                                       & recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
                     if (recv_neighbor /= MPI_PROC_NULL) then
                         unpack_pos = 0
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -1479,6 +1483,7 @@ contains
             end do
 
             deallocate (send_buf, recv_bufs)
+            call s_update_ib_lookup()
         end if
 #endif
 
@@ -1492,15 +1497,21 @@ contains
         integer, intent(out) :: neighborhood_idx
         integer              :: i
 
-        neighborhood_idx = -1
-
-        do i = 1, num_ibs
-            if (patch_ib(i)%gbl_patch_id == gbl_idx) then
-                neighborhood_idx = i
-                exit
-            end if
-        end do
+        neighborhood_idx = ib_gbl_idx_lookup(gbl_idx)
 
     end subroutine s_get_neighborhood_idx
+
+    subroutine s_update_ib_lookup()
+
+        integer :: i
+
+        $:GPU_PARALLEL_LOOP(private='[i]')
+        do i = 1, num_ibs
+            ib_gbl_idx_lookup(patch_ib(i)%gbl_patch_id) = i
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[ib_gbl_idx_lookup]')
+
+    end subroutine s_update_ib_lookup
 
 end module m_ibm

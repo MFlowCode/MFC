@@ -1268,6 +1268,8 @@ contains
         patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
 #endif
 
+        @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
+
     end subroutine s_reduce_ib_patch_array
 
     !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all neighbor domains. Uses two rounds of MPI_SENDRECV cascades - face
