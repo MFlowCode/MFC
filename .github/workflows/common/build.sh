@@ -26,8 +26,8 @@ fi
 # Phoenix: always start fresh to avoid SIGILL from stale binaries compiled
 # on a different microarchitecture.
 # Frontier: wipe only compiled Fortran staging/install slugs; preserve dep
-# dirs (silo, hdf5, lapack, fftw) which were built on the login node and
-# cannot be re-fetched from a compute node (no internet).
+# dirs (silo, hdf5, lapack, fftw, hipfort) which were built on the login node
+# and cannot be re-fetched from a compute node (no internet).
 if [ "$job_cluster" = "phoenix" ]; then
     source .github/scripts/clean-build.sh
     clean_build
@@ -36,7 +36,7 @@ elif [ "$job_cluster" = "frontier" ] || [ "$job_cluster" = "frontier_amd" ]; the
         if [ -d "$_dir" ]; then
             for _sub in "$_dir"*/; do
                 _name=$(basename "$_sub")
-                case "$_name" in silo|hdf5|lapack|fftw) continue ;; esac
+                case "$_name" in silo|hdf5|lapack|fftw|hipfort) continue ;; esac
                 rm -rf "$_sub"
             done
         fi
