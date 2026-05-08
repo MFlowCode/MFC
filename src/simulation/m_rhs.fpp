@@ -1827,13 +1827,11 @@ contains
                     end if
                 end if
 
-                if (cyl_coord) then
-                    do i = 1, num_dims
-                        @:DEALLOCATE(tau_re_vf(eqn_idx%cont%end + i)%sf)
-                    end do
-                    @:DEALLOCATE(tau_re_vf(eqn_idx%E)%sf)
-                    @:DEALLOCATE(tau_re_vf)
-                end if
+                do i = 1, num_dims
+                    @:DEALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf)
+                end do
+                @:DEALLOCATE(tau_Re_vf(eqn_idx%E)%sf)
+                @:DEALLOCATE(tau_Re_vf)
             end if
             @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
             @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)

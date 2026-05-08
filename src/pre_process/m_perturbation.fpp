@@ -63,7 +63,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer                                                :: i, j, k
-        real(wp)                                               :: rand_real
+        real(wp)                                               :: rand_real, v_beg
 
         call random_seed()
 
@@ -72,8 +72,9 @@ contains
                 do i = 0, m
                     call random_number(rand_real)
                     rand_real = rand_real*perturb_flow_mag
-                    q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = rand_real*q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k)
-                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k)
+                    v_beg = q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k)
+                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k) = (1._wp + rand_real)*v_beg
+                    if (num_vels > 1) q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = rand_real*v_beg
                     if (bubbles_euler) then
                         q_prim_vf(eqn_idx%alf)%sf(i, j, k) = (1._wp + rand_real)*q_prim_vf(eqn_idx%alf)%sf(i, j, k)
                     end if
