@@ -25,9 +25,23 @@ fi
 # source code is built here on the compute node.
 # Phoenix: always start fresh to avoid SIGILL from stale binaries compiled
 # on a different microarchitecture.
+# Frontier: wipe only compiled Fortran staging/install slugs; preserve dep
+# dirs (silo, hdf5, lapack, fftw, hipfort) which were built on the login node
+# and cannot be re-fetched from a compute node (no internet).
 if [ "$job_cluster" = "phoenix" ]; then
     source .github/scripts/clean-build.sh
     clean_build
+elif [ "$job_cluster" = "frontier" ] || [ "$job_cluster" = "frontier_amd" ]; then
+    for _dir in build/staging/ build/install/; do
+        if [ -d "$_dir" ]; then
+            for _sub in "$_dir"*/; do
+                _name=$(basename "$_sub")
+                case "$_name" in silo|hdf5|lapack|fftw|hipfort) continue ;; esac
+                rm -rf "$_sub"
+            done
+        fi
+    done
+    unset _dir _sub _name
 fi
 
 source .github/scripts/retry-build.sh
