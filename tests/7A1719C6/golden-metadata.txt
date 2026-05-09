@@ -1,12 +1,12 @@
-This file was created on 2026-05-08 08:52:19.744866.
+This file was created on 2026-05-05 19:48:52.638233.
 
 mfc.sh:
 
-    Invocation: test --generate --only 10DE58AA -j 4
+    Invocation: test --generate --only 7A1719C6 -j 4
     Lock:       mpi=No & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        60515904cc5a675c44181509db5ae5d0f0893927 on MTHINC-fix (dirty)
+    Git:        5b52d836fe47a1399f72790553a212947de5b5e6 on MTHINC (dirty)
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
@@ -16,9 +16,9 @@ syscheck:
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -40,7 +40,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+syscheck:
 
     CMake Configuration:
     
@@ -50,9 +50,9 @@ simulation:
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -126,7 +126,7 @@ CPU:
     Core(s) per socket:                      96
     Socket(s):                               2
     Stepping:                                1
-    CPU(s) scaling MHz:                      26%
+    CPU(s) scaling MHz:                      68%
     CPU max MHz:                             3900.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4800.00

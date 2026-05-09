@@ -670,7 +670,16 @@ contains
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
                     end if
                 else
-                    if (all(Re_size == 0)) then
+                    if (int_comp > 0) then
+                        ! THINC reads cont and adv from v_rs_ws; must reconstruct full sys_size range to populate both
+                        iv%beg = 1; iv%end = sys_size
+                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(1:sys_size), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
+                        ! Surface tension requires first-order energy; overwrite the higher-order result from the full pass above
+                        iv%beg = eqn_idx%E; iv%end = eqn_idx%E
+                        call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(eqn_idx%E), qL_rsx_vf, qL_rsy_vf, &
+                            & qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
+                    else if (all(Re_size == 0)) then
                         iv%beg = 1; iv%end = eqn_idx%E - 1
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
