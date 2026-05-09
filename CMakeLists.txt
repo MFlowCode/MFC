@@ -735,12 +735,10 @@ if (MFC_PRE_PROCESS)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         target_compile_options(pre_process PRIVATE -hfp0)
         # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
-        # ipa_processing on GitHub Actions runners. Only manifests in CI (runner
-        # memory layout triggers the nondeterministic crash). Guard with
-        # GITHUB_ACTIONS so local Frontier builds keep full IPA performance.
-        if (DEFINED ENV{GITHUB_ACTIONS})
-            target_compile_options(pre_process PRIVATE -Oipa0)
-        endif()
+        # ipa_processing. Nondeterministic — any file can become the crash site
+        # via cross-file inlining. Safe to disable IPA for the whole target
+        # (CPU-only, no GPU device-call requirements). See PR #1286.
+        target_compile_options(pre_process PRIVATE -Oipa0)
     endif()
 endif()
 
@@ -748,8 +746,7 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 optcg ICE on GitHub Actions runners: IPA inlining triggers two
-    # distinct crashes in optcg:
+    # CCE 19.0.0 optcg ICE: IPA inlining triggers two distinct crashes:
     #   m_bubbles_EL:  castIsValid assertion (InstCombine/foldIntegerTypedPHI)
     #   m_phase_change, m_mpi_common, m_start_up: bring_routine_resident SIGSEGV
     # GPU builds: apply -Oipa0 per-file to known crash sites. Whole-target
@@ -758,7 +755,7 @@ if (MFC_SIMULATION)
     # CPU builds: disable IPA for the whole target (safe — no GPU requirements,
     # and the crash is nondeterministic so any file can become the crash site).
     # See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND DEFINED ENV{GITHUB_ACTIONS})
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         if (MFC_OpenACC OR MFC_OpenMP)
             set_source_files_properties(
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
