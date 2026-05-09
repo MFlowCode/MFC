@@ -900,7 +900,7 @@ This formulation enables HLLD to be used with the non-conservative terms that af
 For details on how the Riemann solvers discretize non-conservative terms (volume fraction advection, Kapila \f$K\,\nabla\!\cdot\!\mathbf{u}\f$, and hypoelastic velocity gradients) and hand off interface quantities to the RHS, see the notes in `misc/dev_notes/`:
 
 - `HLL_HLLC_non_conservative_terms_derivations.md` — Mathematical derivation of HLL Method 1 (alpha-interface), Method 2 (u-interface), and HLLC transport traces, including the \f$S_M\zeta_K\f$ star-branch construction and ADC blending.
-- `Riemann_and_RHS_source_terms_explanations.md` — Code dataflow: which arrays carry what between `m_riemann_solvers` and `m_rhs`, overloading of `flux_src`, the three NC advection modes (`adv_src_alpha_iface`, `adv_src_vel_iface`, `adv_src_none`), and the `nc_iface_vel` second export channel.
+- `Riemann_and_RHS_source_terms_explanations.md` — Code dataflow: which arrays carry what between m_riemann_solvers and m_rhs, overloading of flux_src, the three NC advection modes (adv_src_alpha_iface, adv_src_vel_iface, adv_src_none), and the nc_iface_vel second export channel.
 
 ### 15.3 Time Integration
 
