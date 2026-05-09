@@ -388,9 +388,14 @@ class CaseValidator:
         int_comp = self.get("int_comp", 0)
         n = self.get("n", 0)
         num_fluids = self.get("num_fluids", 0)
+        model_eqns = self.get("model_eqns", 2)
         self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
         self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
         self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
+        self.prohibit(
+            int_comp != 0 and model_eqns == 3,
+            "int_comp > 0 is not supported with model_eqns = 3: THINC does not update per-fluid internal energies, leaving thermodynamically inconsistent face states",
+        )
 
         recon_type = self.get("recon_type", 1)
         if recon_type == 1:  # WENO

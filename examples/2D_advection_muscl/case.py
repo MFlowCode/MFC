@@ -21,7 +21,7 @@ print(
             "t_step_save": 100,
             # Simulation Algorithm Parameters
             "num_patches": 2,
-            "model_eqns": 3,
+            "model_eqns": 2,
             "alt_soundspeed": "F",
             "num_fluids": 2,
             "mpp_lim": "T",

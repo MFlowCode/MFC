@@ -17,6 +17,7 @@ module m_muscl
     use m_mpi_proxy
     use m_helper
     use m_thinc
+    use m_nvtx
 
     private; public :: s_initialize_muscl_module, s_muscl, s_finalize_muscl_module
 

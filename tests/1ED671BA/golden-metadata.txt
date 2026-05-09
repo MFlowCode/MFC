@@ -1,35 +1,35 @@
-This file was created on 2026-05-08 08:52:19.744866.
+This file was created on 2026-05-07 19:29:27.400047.
 
 mfc.sh:
 
-    Invocation: test --generate --only 10DE58AA -j 4
-    Lock:       mpi=No & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        60515904cc5a675c44181509db5ae5d0f0893927 on MTHINC-fix (dirty)
+    Invocation: test --generate --only 25EEEF0E 1ED671BA -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        e6cd3c18cae817832b613466ef4f23b9eddfbea9 on MTHINC (dirty)
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on login-phoenix-gnr-1.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-03-018-10-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC-modules/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -44,7 +44,7 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.26.5 on login-phoenix-gnr-1.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-03-018-10-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
@@ -56,14 +56,14 @@ simulation:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC-modules/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -74,30 +74,30 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
-        CMake v3.26.5 on login-phoenix-gnr-1.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-03-018-10-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC-modules/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -126,7 +126,7 @@ CPU:
     Core(s) per socket:                      96
     Socket(s):                               2
     Stepping:                                1
-    CPU(s) scaling MHz:                      26%
+    CPU(s) scaling MHz:                      30%
     CPU max MHz:                             3900.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4800.00
