@@ -748,17 +748,17 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
-    # ipa_processing on GitHub Actions runners. Only manifests in CI.
-    # CPU builds: safe to disable IPA for the entire target (no GPU device-call
-    # requirements). GPU builds (OpenACC or OpenMP): whole-target -Oipa0 breaks
-    # cross-file !$acc routine / !DIR$ INLINEALWAYS device registration, causing
-    # runtime aborts. Apply -Oipa0 per-file to the known crash sites only.
-    # See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND DEFINED ENV{GITHUB_ACTIONS})
-        if (NOT MFC_OpenACC AND NOT MFC_OpenMP)
-            target_compile_options(simulation PRIVATE -Oipa0)
-        else()
+    # CCE 19.0.0 optcg ICE: two distinct crashes triggered by IPA inlining:
+    #   m_bubbles_EL:  castIsValid assertion (InstCombine/foldIntegerTypedPHI)
+    #   m_phase_change, m_mpi_common, m_start_up: bring_routine_resident SIGSEGV
+    # Both crash locally and in CI on GPU builds. Apply -Oipa0 per-file
+    # unconditionally to the known crash sites (IPA cross-file inlining triggers
+    # the ICE; per-file disabling prevents it without affecting other files).
+    # CPU-only builds in CI additionally disable IPA for the whole target
+    # (safe — no GPU device-call requirements, and the crash is nondeterministic
+    # so any file can become the crash site). See PR #1286.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        if (MFC_OpenACC OR MFC_OpenMP)
             set_source_files_properties(
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
@@ -766,6 +766,8 @@ if (MFC_SIMULATION)
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_start_up.fpp.f90"
                 PROPERTIES COMPILE_OPTIONS "-Oipa0"
             )
+        elseif (DEFINED ENV{GITHUB_ACTIONS})
+            target_compile_options(simulation PRIVATE -Oipa0)
         endif()
     endif()
 endif()
