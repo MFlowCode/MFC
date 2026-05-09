@@ -750,14 +750,13 @@ if (MFC_SIMULATION)
                      MPI FFTW OpenACC OpenMP)
     # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
     # ipa_processing on GitHub Actions runners. Only manifests in CI.
-    # For non-OpenMP builds: disable IPA for the entire target (safe, no IPA
-    # requirements). For OpenMP builds: thermochem uses !DIR$ INLINEALWAYS
-    # which requires IPA for device-call inlining, so we cannot disable IPA
-    # globally. Instead apply -Oipa0 per-file to the known crash sites.
-    # On OpenACC the pyrometheus patch emits !$acc routine seq (no IPA needed).
+    # CPU builds: safe to disable IPA for the entire target (no GPU device-call
+    # requirements). GPU builds (OpenACC or OpenMP): whole-target -Oipa0 breaks
+    # cross-file !$acc routine / !DIR$ INLINEALWAYS device registration, causing
+    # runtime aborts. Apply -Oipa0 per-file to the known crash sites only.
     # See PR #1286.
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND DEFINED ENV{GITHUB_ACTIONS})
-        if (NOT MFC_OpenMP)
+        if (NOT MFC_OpenACC AND NOT MFC_OpenMP)
             target_compile_options(simulation PRIVATE -Oipa0)
         else()
             set_source_files_properties(
