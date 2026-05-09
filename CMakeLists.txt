@@ -734,6 +734,11 @@ if (MFC_PRE_PROCESS)
                      MPI)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         target_compile_options(pre_process PRIVATE -hfp0)
+        # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
+        # ipa_processing. Nondeterministic — any file can become the crash site
+        # via cross-file inlining. Safe to disable IPA for the whole target
+        # (CPU-only, no GPU device-call requirements). See PR #1286.
+        target_compile_options(pre_process PRIVATE -Oipa0)
     endif()
 endif()
 
@@ -741,19 +746,27 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 IPA workaround: disable interprocedural analysis for files
-    # that trigger compiler crashes during IPA:
-    #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
-    #   m_phase_change: bring_routine_resident SIGSEGV
-    # Not applied to Cray+OpenMP because thermochem uses !DIR$ INLINEALWAYS,
-    # which requires IPA to inline device calls. On OpenACC the pyrometheus
-    # patch emits !$acc routine seq instead (no IPA needed). See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
-        set_source_files_properties(
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
-            PROPERTIES COMPILE_OPTIONS "-Oipa0"
-        )
+    # CCE 19.0.0 optcg ICE: IPA inlining triggers two distinct crashes:
+    #   m_bubbles_EL:  castIsValid assertion (InstCombine/foldIntegerTypedPHI)
+    #   m_phase_change, m_mpi_common, m_start_up: bring_routine_resident SIGSEGV
+    # GPU builds: apply -Oipa0 per-file to known crash sites. Whole-target
+    # -Oipa0 is not safe for GPU builds — it breaks cross-file !$acc routine /
+    # !DIR$ INLINEALWAYS device-call registration, causing runtime aborts.
+    # CPU builds: disable IPA for the whole target (safe — no GPU requirements,
+    # and the crash is nondeterministic so any file can become the crash site).
+    # See PR #1286.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        if (MFC_OpenACC OR MFC_OpenMP)
+            set_source_files_properties(
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_mpi_common.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_start_up.fpp.f90"
+                PROPERTIES COMPILE_OPTIONS "-Oipa0"
+            )
+        else()
+            target_compile_options(simulation PRIVATE -Oipa0)
+        endif()
     endif()
 endif()
 
