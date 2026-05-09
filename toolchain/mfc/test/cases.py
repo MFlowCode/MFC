@@ -1723,7 +1723,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "",
                             mods={},
                             override_tol=tol,
-                            functor=lambda case, bc=base_cfg, sm=solver_mods, als=alt_soundspeed: apply_solver(case, bc, sm, als),
+                            functor=lambda case, bc=base_cfg, sm=solver_mods, alt_ss=alt_soundspeed: apply_solver(case, bc, sm, alt_ss),
                         )
                     )
 
