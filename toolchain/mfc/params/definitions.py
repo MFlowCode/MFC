@@ -623,8 +623,8 @@ CONSTRAINTS = {
     },
     # Riemann solver
     "riemann_solver": {
-        "choices": [1, 2, 3, 4, 5],
-        "value_labels": {1: "HLL", 2: "HLLC", 3: "Exact", 4: "HLLD", 5: "Lax-Friedrichs"},
+        "choices": [1, 2, 4, 5],
+        "value_labels": {1: "HLL", 2: "HLLC", 4: "HLLD", 5: "Lax-Friedrichs"},
     },
     "wave_speeds": {
         "choices": [1, 2],
