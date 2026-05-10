@@ -1815,7 +1815,7 @@ contains
                                         & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
                                         & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
                                         & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP]')
+                                        & xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2043,6 +2043,8 @@ contains
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
                                 xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
                                 xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
+                                xi_L_m1 = (s_S - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R_m1 = (s_S - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical star velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(0.5_wp, s_S))
@@ -2074,8 +2076,8 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, eqn_idx%cont%end
                                     flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                      & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) + xi_P*qR_prim_rs${XYZ}$_vf(j &
-                                                      & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, &
+                                                      & k, l, i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end do
 
                                 ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
@@ -2122,8 +2124,8 @@ contains
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, &
                                                          & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) &
-                                                         & *(s_S*(xi_MP*(xi_L - 1) + 1) - vel_L(dir_idx(i)))) &
-                                                         & + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*(xi_PP*(xi_R - 1) &
+                                                         & *(s_S*(xi_MP*xi_L_m1 + 1) - vel_L(dir_idx(i)))) &
+                                                         & + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*(s_S*(xi_PP*xi_R_m1 &
                                                          & + 1) - vel_R(dir_idx(i))))
                                 end do
 
@@ -2230,8 +2232,8 @@ contains
                                         & G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
                                         & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
                                         & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, &
-                                        & Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]')
+                                        & xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, &
+                                        & Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2334,6 +2336,8 @@ contains
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
                                 xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
                                 xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
+                                xi_L_m1 = (s_S - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R_m1 = (s_S - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
@@ -2342,8 +2346,8 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, eqn_idx%cont%end
                                     flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & i) = xi_M*alpha_rho_L(i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                      & + xi_P*alpha_rho_R(i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & i) = xi_M*alpha_rho_L(i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                      & + xi_P*alpha_rho_R(i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end do
 
                                 ! Momentum flux. f = \rho u u + p I, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
@@ -2374,8 +2378,8 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%alf, eqn_idx%alf  ! only advect the void fraction
                                     flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                      & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) + xi_P*qR_prim_rs${XYZ}$_vf(j &
-                                                      & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, &
+                                                      & k, l, i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end do
 
                                 ! Advection velocity source: interface velocity for volume fraction transport
@@ -2392,9 +2396,9 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%bub%beg, eqn_idx%bub%end
                                         flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                          & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                          & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
                                                           & + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                          & i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                          & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                     end do
                                 end if
 
@@ -2450,9 +2454,9 @@ contains
                                         & rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, &
                                         & qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, &
                                         & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, &
-                                        & xi_P, xi_L, xi_R, xi_MP, xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, &
-                                        & R3V2Lbar, R3V2Rbar, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, &
-                                        & Phi_avg, h_iL, h_iR, h_avg_2]')
+                                        & xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, &
+                                        & R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, &
+                                        & Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2691,6 +2695,8 @@ contains
                                 ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
                                 xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
                                 xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
+                                xi_L_m1 = (s_S - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R_m1 = (s_S - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
 
                                 ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
                                 xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
@@ -2706,8 +2712,8 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, eqn_idx%cont%end
                                     flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                      & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) + xi_P*qR_prim_rs${XYZ}$_vf(j &
-                                                      & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, &
+                                                      & k, l, i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end do
 
                                 if (bubbles_euler .and. (num_fluids > 1)) then
@@ -2758,17 +2764,17 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                     flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                      & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) + xi_P*qR_prim_rs${XYZ}$_vf(j &
-                                                      & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, &
+                                                      & k, l, i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end do
 
                                 ! Advection velocity source: interface velocity for volume fraction transport
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_src_rs${XYZ}$_vf(j, k, l, &
-                                                         & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*s_M*(xi_L &
-                                                         & - 1._wp)) + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*s_P*(xi_R &
-                                                         & - 1._wp))
+                                                         & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) &
+                                                         & *s_M*xi_L_m1) + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) &
+                                                         & *s_P*xi_R_m1)
 
                                     ! IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0._wp
                                 end do
@@ -2779,21 +2785,20 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%bub%beg, eqn_idx%bub%end
                                     flux_rs${XYZ}$_vf(j, k, l, i) = xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                                      & i)*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                      & + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
-                                                      & i)*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf(j &
+                                                      & + 1, k, l, i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end do
 
                                 if (qbmm) then
                                     flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%bub%beg) = xi_M*nbub_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                      & + xi_P*nbub_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & eqn_idx%bub%beg) = xi_M*nbub_L*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                      & + xi_P*nbub_R*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end if
 
                                 if (adv_n) then
                                     flux_rs${XYZ}$_vf(j, k, l, &
-                                                      & eqn_idx%n) = xi_M*nbub_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                      & + xi_P*nbub_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                      & eqn_idx%n) = xi_M*nbub_L*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                      & + xi_P*nbub_R*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
