@@ -825,6 +825,8 @@ contains
             sys_size = eqn_idx%species%end
         end if
 
+        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
                                            & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 

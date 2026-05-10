@@ -703,7 +703,7 @@ contains
                         case (1)
                             mtn_dposdt(k, l, stage) = f_interpolate_velocity(myPos(l), cell, l, q_prim_vf)
                             mtn_dveldt(k, l, stage) = 0._wp
-                            mtn_vel(k, l, stage) = mtn_dposdt(k, l, stage)
+                            mtn_vel(k, l, 1) = mtn_dposdt(k, l, stage)
                         case (2)
                             mtn_dposdt(k, l, stage) = myVel(l)
                             f_b = f_get_bubble_force(myPos(l), myR, myV, myVel(l), myMass_n, myMass_v, Re(1), myRho, cell, l, &
