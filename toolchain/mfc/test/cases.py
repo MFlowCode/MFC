@@ -65,6 +65,18 @@ _CONVERGENCE_TEMPORAL_SCHEMES = [
     ("RK3", ["--order", "5", "--time-stepper", "3"], 3, 0.3, [0.50, 0.25]),
 ]
 
+# 2D diagonal advection (smooth density wave; no covariance floor): exercises
+# WENO7 / TENO7 in 2D. CFL=0.005 keeps RK3 temporal error below O(h^7).
+# With 4 ranks (2x2 decomp) the per-rank stencil constraint n+1 >= 5*weno_order=35
+# sets min_N=70 (rounded up to 80). N capped at 96 to keep CI cost reasonable:
+# 7th-order error scaling between N=80 and N=96 is ~3.6x, well above the
+# machine-precision floor and clean for rate measurement.
+_RES_2D_ADV_DEFAULT = [80, 96]
+_CONVERGENCE_2D_ADV_SCHEMES = [
+    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, 80, 96),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, 80, 96),
+]
+
 
 def add_convergence_cases(cases):
     num_ranks = 4
@@ -146,6 +158,30 @@ def add_convergence_cases(cases):
                     "cfls": cfls,
                     "N": 512,
                     "cons_vars": _CONS_VARS_1D,
+                    "primary_idx": 1,
+                    "num_ranks": num_ranks,
+                },
+                ppn=num_ranks,
+            )
+        )
+
+    # 2D diagonal advection — same 4-rank decomposition as the rest of the suite.
+    for label, extra_args, expected, tol, min_N, max_N in _CONVERGENCE_2D_ADV_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> 2D Adv -> {label}",
+                spec={
+                    "runner": "2d_vortex",
+                    "case_path": "examples/2D_advection_convergence/case.py",
+                    "extra_args": extra_args,
+                    "expected_order": expected,
+                    "tol": tol,
+                    "resolutions": _RES_2D_ADV_DEFAULT,
+                    "min_N": min_N,
+                    "max_N": max_N,
+                    "ndim": 2,
+                    "domain_len": 1.0,
+                    "cons_vars": _CONS_VARS_2D,
                     "primary_idx": 1,
                     "num_ranks": num_ranks,
                 },
@@ -1731,6 +1767,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_euler_convergence",
                 "1D_advection_convergence",
                 "1D_sod_convergence",
+                "2D_advection_convergence",
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",
