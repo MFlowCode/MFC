@@ -41,6 +41,13 @@ p-gpu python/3.12.5 nvhpc/24.5 hpcx/2.19-cuda cuda/12.1.1
 p-gpu MFC_CUDA_CC=70,75,80,89,90 NVHPC_CUDA_HOME=$CUDA_HOME CC=nvc CXX=nvc++ FC=nvfortran
 p-gpu-unload xalt
 
+pifx     GT Phoenix (IFX)
+pifx-all
+pifx-cpu intel-oneapi-compilers/2024.2.1 intel-oneapi-mpi/2021.9.0 intel-oneapi-mkl/2023.1.0
+pifx-cpu CC=icx CXX=icpx FC=ifx
+pifx-cpu MPICC=mpiicc MPICXX=mpiicpc MPIFC=mpiifort
+pifx-cpu I_MPI_CC=icx I_MPI_CXX=icpx I_MPI_F90=ifx I_MPI_F77=ifx
+
 f     OLCF Frontier
 f-all cpe/25.03 rocm/6.3.1
 f-all cray-fftw cray-hdf5 python cmake
