@@ -108,9 +108,19 @@ def _get_source_context(fname: str, lineno: int, context: int = 2) -> str:
     return "\n".join(rows)
 
 
+def _merge(*dicts):
+    """Merge dicts left-to-right; later entries override earlier ones."""
+    result = {}
+    for d in dicts:
+        result.update(d)
+    return result
+
+
+# Shared EOS parameters for common fluid types.
 _AIR_EOS = {"fluid_pp(1)%gamma": 1.0 / 0.4, "fluid_pp(1)%pi_inf": 0.0}
 _WATER_EOS = {"fluid_pp(1)%gamma": 0.1953125, "fluid_pp(1)%pi_inf": 4046.31}
 
+# Parameters shared by every pre_process run.
 _BASE_PRE = {
     "x_domain%beg": 0.0,
     "x_domain%end": 1.0,
@@ -134,6 +144,7 @@ _BASE_PRE = {
     "patch_icpp(2)%vel(1)": 0.0,
 }
 
+# Parameters shared by every simulation run.
 _BASE_SIM = {
     "run_time_info": "F",
     "x_domain%beg": 0.0,
@@ -159,179 +170,14 @@ _BASE_SIM = {
     "parallel_io": "F",
 }
 
-_CASE_PARAMS = {
-    "sod_standard": {
-        "pre": {
-            **_BASE_PRE,
-            "m": 24,
-            "num_fluids": 1,
-            "mpp_lim": "F",
-            "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%alpha_rho(1)": 1.0,
-            "patch_icpp(1)%alpha(1)": 1.0,
-            "patch_icpp(2)%pres": 0.1,
-            "patch_icpp(2)%alpha_rho(1)": 0.125,
-            "patch_icpp(2)%alpha(1)": 1.0,
-            **_AIR_EOS,
-        },
-        "sim": {**_BASE_SIM, "m": 24, "num_fluids": 1, "dt": 0.001, **_AIR_EOS},
-    },
-    "sod_strong": {
-        "pre": {
-            **_BASE_PRE,
-            "m": 49,
-            "num_fluids": 1,
-            "mpp_lim": "F",
-            "patch_icpp(1)%pres": 1000.0,
-            "patch_icpp(1)%alpha_rho(1)": 10.0,
-            "patch_icpp(1)%alpha(1)": 1.0,
-            "patch_icpp(2)%pres": 0.01,
-            "patch_icpp(2)%alpha_rho(1)": 0.01,
-            "patch_icpp(2)%alpha(1)": 1.0,
-            **_AIR_EOS,
-        },
-        "sim": {**_BASE_SIM, "m": 49, "num_fluids": 1, "dt": 5e-5, "prim_vars_wrt": "T", **_AIR_EOS},
-    },
-    "water_stiffened": {
-        "pre": {
-            **_BASE_PRE,
-            "m": 49,
-            "num_fluids": 1,
-            "mpp_lim": "F",
-            "patch_icpp(1)%pres": 100.0,
-            "patch_icpp(1)%alpha_rho(1)": 1.0,
-            "patch_icpp(1)%alpha(1)": 1.0,
-            "patch_icpp(2)%pres": 0.1,
-            "patch_icpp(2)%alpha_rho(1)": 1.0,
-            "patch_icpp(2)%alpha(1)": 1.0,
-            **_WATER_EOS,
-        },
-        "sim": {**_BASE_SIM, "m": 49, "num_fluids": 1, "dt": 2.5e-5, "mixture_err": "T", "prim_vars_wrt": "T", **_WATER_EOS},
-    },
-    "air_water_interface": {
-        "pre": {
-            **_BASE_PRE,
-            "m": 24,
-            "num_fluids": 2,
-            "mpp_lim": "T",
-            "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%alpha_rho(1)": 1.0,
-            "patch_icpp(1)%alpha_rho(2)": 0.0,
-            "patch_icpp(1)%alpha(1)": 1.0,
-            "patch_icpp(1)%alpha(2)": 0.0,
-            "patch_icpp(2)%pres": 1.0,
-            "patch_icpp(2)%alpha_rho(1)": 0.0,
-            "patch_icpp(2)%alpha_rho(2)": 1.0,
-            "patch_icpp(2)%alpha(1)": 0.0,
-            "patch_icpp(2)%alpha(2)": 1.0,
-            **_AIR_EOS,
-            "fluid_pp(2)%gamma": 0.1953125,
-            "fluid_pp(2)%pi_inf": 4046.31,
-        },
-        "sim": {
-            **_BASE_SIM,
-            "m": 24,
-            "num_fluids": 2,
-            "mpp_lim": "T",
-            "dt": 5e-5,
-            "mixture_err": "T",
-            **_AIR_EOS,
-            "fluid_pp(2)%gamma": 0.1953125,
-            "fluid_pp(2)%pi_inf": 4046.31,
-        },
-    },
-    "bubble_rp": {
-        "pre": {
-            **_BASE_PRE,
-            "m": 49,
-            "num_fluids": 1,
-            "mpp_lim": "F",
-            "bubbles_euler": "T",
-            "nb": 1,
-            "polytropic": "T",
-            "polydisperse": "F",
-            "thermal": 3,
-            "pref": 101325.0,
-            "rhoref": 1000.0,
-            "patch_icpp(1)%pres": 2.0,
-            "patch_icpp(1)%alpha_rho(1)": 0.96,
-            "patch_icpp(1)%alpha(1)": 0.04,
-            "patch_icpp(1)%r0": 1.0,
-            "patch_icpp(1)%v0": 0.0,
-            "patch_icpp(2)%pres": 1.0,
-            "patch_icpp(2)%alpha_rho(1)": 0.96,
-            "patch_icpp(2)%alpha(1)": 0.04,
-            "patch_icpp(2)%r0": 1.0,
-            "patch_icpp(2)%v0": 0.0,
-            "fluid_pp(1)%gamma": 0.16,
-            "fluid_pp(1)%pi_inf": 3515.0,
-            "bub_pp%R0ref": 1.0,
-            "bub_pp%p0ref": 1.0,
-            "bub_pp%rho0ref": 1.0,
-            "bub_pp%ss": 0.07179866765358993,
-            "bub_pp%pv": 0.02308216136195411,
-            "bub_pp%mu_l": 0.009954269975623244,
-            "bub_pp%gam_g": 1.4,
-        },
-        "sim": {
-            **_BASE_SIM,
-            "m": 49,
-            "num_fluids": 1,
-            "dt": 2.5e-5,
-            "mixture_err": "T",
-            "prim_vars_wrt": "T",
-            "bubbles_euler": "T",
-            "nb": 1,
-            "bubble_model": 3,
-            "polytropic": "T",
-            "polydisperse": "F",
-            "thermal": 3,
-            "pref": 101325.0,
-            "rhoref": 1000.0,
-            "fluid_pp(1)%gamma": 0.16,
-            "fluid_pp(1)%pi_inf": 3515.0,
-            "bub_pp%R0ref": 1.0,
-            "bub_pp%p0ref": 1.0,
-            "bub_pp%rho0ref": 1.0,
-            "bub_pp%ss": 0.07179866765358993,
-            "bub_pp%pv": 0.02308216136195411,
-            "bub_pp%mu_l": 0.009954269975623244,
-            "bub_pp%gam_g": 1.4,
-        },
-    },
-    "low_mach": {
-        "pre": {
-            **_BASE_PRE,
-            "m": 49,
-            "num_fluids": 1,
-            "mpp_lim": "F",
-            "patch_icpp(1)%pres": 100.0,
-            "patch_icpp(1)%alpha_rho(1)": 1.0,
-            "patch_icpp(1)%alpha(1)": 1.0,
-            "patch_icpp(2)%pres": 0.1,
-            "patch_icpp(2)%alpha_rho(1)": 1.0,
-            "patch_icpp(2)%alpha(1)": 1.0,
-            **_WATER_EOS,
-        },
-        "sim": {
-            **_BASE_SIM,
-            "m": 49,
-            "num_fluids": 1,
-            "dt": 2.5e-5,
-            "mixture_err": "T",
-            "prim_vars_wrt": "T",
-            "low_Mach": 1,
-            **_WATER_EOS,
-        },
-    },
-}
-
-# Each case:
-#   name         - unique identifier (key in _CASE_PARAMS)
-#   description  - human-readable purpose
-#   compare      - list of D/ filenames to compare
-#   threshold    - max L∞ deviation allowed (conserved-variable units)
-#   ill_cond     - known ill-conditioning (empty string = none expected)
+# Each entry is one test case. Fields:
+#   name      - unique identifier used in log paths and console output
+#   description - human-readable summary
+#   compare   - D/ output files compared between reference and perturbed runs
+#   threshold - max L∞ deviation allowed before the case is declared FAIL
+#   ill_cond  - known source of cancellation (empty string = none expected)
+#   pre       - parameters for pre_process (generates initial conditions)
+#   sim       - parameters for simulation
 CASES = [
     {
         "name": "sod_standard",
@@ -339,6 +185,22 @@ CASES = [
         "compare": ["cons.1.00.000050.dat", "cons.3.00.000050.dat"],
         "threshold": 1e-13,
         "ill_cond": "",
+        "pre": _merge(
+            _BASE_PRE,
+            _AIR_EOS,
+            {
+                "m": 24,
+                "num_fluids": 1,
+                "mpp_lim": "F",
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%pres": 0.1,
+                "patch_icpp(2)%alpha_rho(1)": 0.125,
+                "patch_icpp(2)%alpha(1)": 1.0,
+            },
+        ),
+        "sim": _merge(_BASE_SIM, _AIR_EOS, {"m": 24, "num_fluids": 1, "dt": 0.001}),
     },
     {
         "name": "sod_strong",
@@ -346,6 +208,22 @@ CASES = [
         "compare": ["cons.1.00.000050.dat", "cons.3.00.000050.dat"],
         "threshold": 1e-10,
         "ill_cond": "HLLC xi factor: (s_L - vel_L)/(s_L - s_S) cancels near sonic contact",
+        "pre": _merge(
+            _BASE_PRE,
+            _AIR_EOS,
+            {
+                "m": 49,
+                "num_fluids": 1,
+                "mpp_lim": "F",
+                "patch_icpp(1)%pres": 1000.0,
+                "patch_icpp(1)%alpha_rho(1)": 10.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%pres": 0.01,
+                "patch_icpp(2)%alpha_rho(1)": 0.01,
+                "patch_icpp(2)%alpha(1)": 1.0,
+            },
+        ),
+        "sim": _merge(_BASE_SIM, _AIR_EOS, {"m": 49, "num_fluids": 1, "dt": 5e-5, "prim_vars_wrt": "T"}),
     },
     {
         "name": "water_stiffened",
@@ -353,6 +231,22 @@ CASES = [
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
         "threshold": 1e-8,
         "ill_cond": "Pressure recovery: p=(E-pi_inf)/gamma loses ~4 digits (pi_inf/p_right~40,000) [threshold loosened until reduced-energy (Etilde) scheme is merged]",
+        "pre": _merge(
+            _BASE_PRE,
+            _WATER_EOS,
+            {
+                "m": 49,
+                "num_fluids": 1,
+                "mpp_lim": "F",
+                "patch_icpp(1)%pres": 100.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%pres": 0.1,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+            },
+        ),
+        "sim": _merge(_BASE_SIM, _WATER_EOS, {"m": 49, "num_fluids": 1, "dt": 2.5e-5, "mixture_err": "T", "prim_vars_wrt": "T"}),
     },
     {
         "name": "air_water_interface",
@@ -360,6 +254,40 @@ CASES = [
         "compare": ["cons.1.00.000050.dat", "cons.4.00.000050.dat", "cons.5.00.000050.dat"],
         "threshold": 1e-10,
         "ill_cond": "Mixed-cell pressure recovery: E-alpha_w*gamma_w*pi_inf cancels when alpha_w<<1",
+        "pre": _merge(
+            _BASE_PRE,
+            _AIR_EOS,
+            {
+                "m": 24,
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha_rho(2)": 0.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(1)%alpha(2)": 0.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 0.0,
+                "patch_icpp(2)%alpha_rho(2)": 1.0,
+                "patch_icpp(2)%alpha(1)": 0.0,
+                "patch_icpp(2)%alpha(2)": 1.0,
+                "fluid_pp(2)%gamma": 0.1953125,
+                "fluid_pp(2)%pi_inf": 4046.31,
+            },
+        ),
+        "sim": _merge(
+            _BASE_SIM,
+            _AIR_EOS,
+            {
+                "m": 24,
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "dt": 5e-5,
+                "mixture_err": "T",
+                "fluid_pp(2)%gamma": 0.1953125,
+                "fluid_pp(2)%pi_inf": 4046.31,
+            },
+        ),
     },
     {
         "name": "bubble_rp",
@@ -367,6 +295,67 @@ CASES = [
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
         "threshold": 1e-8,
         "ill_cond": "RP ODE: (p_bub - p_ext) cancels near bubble equilibrium",
+        "pre": _merge(
+            _BASE_PRE,
+            {
+                "m": 49,
+                "num_fluids": 1,
+                "mpp_lim": "F",
+                "bubbles_euler": "T",
+                "nb": 1,
+                "polytropic": "T",
+                "polydisperse": "F",
+                "thermal": 3,
+                "pref": 101325.0,
+                "rhoref": 1000.0,
+                "patch_icpp(1)%pres": 2.0,
+                "patch_icpp(1)%alpha_rho(1)": 0.96,
+                "patch_icpp(1)%alpha(1)": 0.04,
+                "patch_icpp(1)%r0": 1.0,
+                "patch_icpp(1)%v0": 0.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 0.96,
+                "patch_icpp(2)%alpha(1)": 0.04,
+                "patch_icpp(2)%r0": 1.0,
+                "patch_icpp(2)%v0": 0.0,
+                "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%pi_inf": 3515.0,
+                "bub_pp%R0ref": 1.0,
+                "bub_pp%p0ref": 1.0,
+                "bub_pp%rho0ref": 1.0,
+                "bub_pp%ss": 0.07179866765358993,
+                "bub_pp%pv": 0.02308216136195411,
+                "bub_pp%mu_l": 0.009954269975623244,
+                "bub_pp%gam_g": 1.4,
+            },
+        ),
+        "sim": _merge(
+            _BASE_SIM,
+            {
+                "m": 49,
+                "num_fluids": 1,
+                "dt": 2.5e-5,
+                "mixture_err": "T",
+                "prim_vars_wrt": "T",
+                "bubbles_euler": "T",
+                "nb": 1,
+                "bubble_model": 3,
+                "polytropic": "T",
+                "polydisperse": "F",
+                "thermal": 3,
+                "pref": 101325.0,
+                "rhoref": 1000.0,
+                "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%pi_inf": 3515.0,
+                "bub_pp%R0ref": 1.0,
+                "bub_pp%p0ref": 1.0,
+                "bub_pp%rho0ref": 1.0,
+                "bub_pp%ss": 0.07179866765358993,
+                "bub_pp%pv": 0.02308216136195411,
+                "bub_pp%mu_l": 0.009954269975623244,
+                "bub_pp%gam_g": 1.4,
+            },
+        ),
     },
     {
         "name": "low_mach",
@@ -374,6 +363,22 @@ CASES = [
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
         "threshold": 2e-7,
         "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M≈0 (threshold loosened to 2e-7 to absorb MCA sampling variance)",
+        "pre": _merge(
+            _BASE_PRE,
+            _WATER_EOS,
+            {
+                "m": 49,
+                "num_fluids": 1,
+                "mpp_lim": "F",
+                "patch_icpp(1)%pres": 100.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%pres": 0.1,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+            },
+        ),
+        "sim": _merge(_BASE_SIM, _WATER_EOS, {"m": 49, "num_fluids": 1, "dt": 2.5e-5, "mixture_err": "T", "prim_vars_wrt": "T", "low_Mach": 1}),
     },
 ]
 
@@ -880,9 +885,8 @@ def _run_case(
     }
     try:
         cons.print("  [dim]running pre_process...[/dim]")
-        params = _CASE_PARAMS[name]
-        _write_inp(params["sim"], "simulation", work_dir)
-        _run_preprocess(pp_bin, params["pre"], work_dir)
+        _write_inp(case["sim"], "simulation", work_dir)
+        _run_preprocess(pp_bin, case["pre"], work_dir)
 
         ref_dir = os.path.join(work_dir, "ref")
         os.makedirs(ref_dir)
