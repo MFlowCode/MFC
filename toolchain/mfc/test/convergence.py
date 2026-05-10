@@ -1,12 +1,27 @@
-"""Convergence-rate / temporal-order test runners.
+"""Convergence-rate tests for ./mfc.sh test.
 
-Invoked from `_handle_case` in test.py when `case.kind == "convergence"`.
-Each scheme is registered as its own TestCase in cases.py with a `spec` dict
-that names a `runner` ("1d_advection", "2d_vortex", "temporal", "sod_l1") and
-the parameters for that runner.
+A "convergence case" runs MFC at several resolutions (or several CFLs), reads
+back the conserved variable, fits log(error) vs log(h) for the rate, and
+checks that the rate matches the scheme's nominal order. Each case is one
+TestCase with kind="convergence" and a ConvergenceSpec attached; test.py
+routes it here via run_case().
+
+Three runner flavours, picked by setting spec.runner in cases.py:
+
+  run_h_sweep   vary N (fixed CFL). cell_shift > 0 makes T = K*h and compares
+                to np.roll(q(0), +K) — cheap (Nt = O(1) in N) and reports the
+                scheme spatial order p directly. cell_shift == 0 runs to one
+                full period and compares to q(0).
+  run_dt_sweep  fix N, vary CFL. Measures the time-stepper order.
+  run_sod_l1    1D L1 self-convergence: compare each N against 2N after
+                cell-averaging the fine grid.
+
+Helpers below: _read_field reads a Fortran-unformatted record per rank and
+concatenates; _l2_norm and _fit_slope are obvious one-liners; _run_mfc shells
+out to ./mfc.sh run and stashes p_all/ in a tempdir.
 """
 
-import io
+import dataclasses
 import json
 import math
 import os
@@ -15,80 +30,89 @@ import struct
 import subprocess
 import sys
 import tempfile
-from contextlib import redirect_stdout
+import typing
 
 import numpy as np
 
-MFC = ".\\mfc.bat" if os.name == "nt" else "./mfc.sh"
+from .. import common
+
 CONS_TOL = 1e-10
+MFC = ".\\mfc.bat" if os.name == "nt" else "./mfc.sh"
 
 
-def _read_cons_var(run_dir, step, var_idx, num_ranks=1, expected_size=None):
-    """Read q_cons_vf{var_idx} from all ranks; rank-order concatenation."""
+@dataclasses.dataclass
+class ConvergenceSpec:
+    """One convergence case. `runner` is the function that drives it."""
+
+    runner: typing.Callable
+    case_path: str
+    expected_order: float  # scheme order p (or temporal q for dt sweeps)
+    tol: float  # passes if measured >= expected_order - tol
+    extra_args: typing.List[str] = dataclasses.field(default_factory=list)
+    cons_vars: typing.List[typing.Tuple[str, int]] = dataclasses.field(default_factory=list)
+    primary_idx: int = 1  # which q_cons_vf{idx} to use for the L2/L1 norm
+    num_ranks: int = 1
+    # Spatial-sweep cases:
+    resolutions: typing.List[int] = dataclasses.field(default_factory=list)
+    ndim: int = 1
+    domain_len: float = 1.0
+    cell_shift: int = 0  # 0 -> period mode; >0 -> compare to K-cell-shifted IC
+    # Temporal-sweep cases:
+    cfls: typing.List[float] = dataclasses.field(default_factory=list)
+    fixed_N: int = 0
+
+
+# Low-level helpers.
+
+
+def _read_field(run_dir: str, step: int, var_idx: int, num_ranks: int, expected_size: int) -> np.ndarray:
+    """Read q_cons_vf<var_idx>.dat across all ranks, in rank order."""
     chunks = []
     for rank in range(num_ranks):
         path = os.path.join(run_dir, "p_all", f"p{rank}", str(step), f"q_cons_vf{var_idx}.dat")
         with open(path, "rb") as f:
             rec_len = struct.unpack("i", f.read(4))[0]
-            data = np.frombuffer(f.read(rec_len), dtype=np.float64)
+            chunks.append(np.frombuffer(f.read(rec_len), dtype=np.float64).copy())
             f.read(4)
-        chunks.append(data.copy())
-    combined = np.concatenate(chunks)
-    if expected_size is not None and combined.size != expected_size:
-        raise ValueError(f"Expected {expected_size} values across {num_ranks} ranks, got {combined.size}")
-    return combined
+    arr = np.concatenate(chunks)
+    if arr.size != expected_size:
+        raise common.MFCException(f"Expected {expected_size} cells, got {arr.size}")
+    return arr
 
 
-def _conservation_errors(run_dir, Nt, cell_vol, var_list, num_ranks, expected_size=None):
-    """|Σq(T) - Σq(0)| / |Σq(0)| for each named variable."""
-    errs = {}
-    for name, idx in var_list:
-        q0 = _read_cons_var(run_dir, 0, idx, num_ranks, expected_size)
-        qT = _read_cons_var(run_dir, Nt, idx, num_ranks, expected_size)
-        s0 = float(np.sum(q0)) * cell_vol
-        sT = float(np.sum(qT)) * cell_vol
-        errs[name] = abs(sT - s0) / (abs(s0) + 1e-300)
-    return errs
+def _l2_norm(diff: np.ndarray, cell_vol: float) -> float:
+    return float(np.sqrt(np.sum(diff**2) * cell_vol))
 
 
-def _l2_norm(diff, scale):
-    return float(np.sqrt(np.sum(diff**2) * scale))
+def _fit_slope(errors: typing.List[float], xs: typing.List[float]) -> float:
+    """Least-squares slope of log(errors) vs log(xs)."""
+    return float(np.polyfit(np.log(xs), np.log(errors), 1)[0])
 
 
-def _fit_rate(errors, h_values):
-    log_h = np.log(np.array(h_values, dtype=float))
-    log_err = np.log(np.array(errors, dtype=float))
-    slope, _ = np.polyfit(log_h, log_err, 1)
-    return float(slope)
+def _pairwise_slope(err1: float, err2: float, x1: float, x2: float) -> float:
+    return math.log(err2 / err1) / math.log(x2 / x1)
 
 
-def _pairwise_rates(errors, h_values):
-    rates = [None]
-    for i in range(1, len(errors)):
-        log_h0 = math.log(h_values[i - 1])
-        log_h1 = math.log(h_values[i])
-        rates.append((math.log(errors[i]) - math.log(errors[i - 1])) / (log_h1 - log_h0))
-    return rates
-
-
-def _run_mfc_case(case_path, tmpdir, run_tag, case_args, num_ranks=1):
-    """Run case.py once and copy p_all to tmpdir/run_tag. Returns (cfg_dict, run_dir)."""
-    result = subprocess.run(
-        [sys.executable, case_path, "--mfc", "{}"] + case_args,
+def _run_mfc(case_path: str, tmpdir: str, run_tag: str, args: typing.List[str], num_ranks: int) -> typing.Tuple[dict, str]:
+    """Run case.py through ./mfc.sh and stash p_all/ in tmpdir/run_tag for reading."""
+    cfg_run = subprocess.run(
+        [sys.executable, case_path, "--mfc", "{}"] + args,
         capture_output=True,
         text=True,
         check=False,
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"case.py failed:\n{result.stderr}")
-    cfg = json.loads(result.stdout)
+    if cfg_run.returncode != 0:
+        raise common.MFCException(f"case.py failed:\n{cfg_run.stderr}")
+    cfg = json.loads(cfg_run.stdout)
 
-    cmd = [MFC, "run", case_path, "-t", "pre_process", "simulation", "-n", str(num_ranks), "--"] + case_args
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=os.getcwd(), check=False)
-    if result.returncode != 0:
-        print(result.stdout[-3000:])
-        print(result.stderr)
-        raise RuntimeError(f"./mfc.sh run failed for {run_tag}")
+    sim = subprocess.run(
+        [MFC, "run", case_path, "-t", "pre_process", "simulation", "-n", str(num_ranks), "--"] + args,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if sim.returncode != 0:
+        raise common.MFCException(f"./mfc.sh run failed for {run_tag}\n{sim.stdout[-3000:]}\n{sim.stderr}")
 
     case_dir = os.path.dirname(case_path)
     src = os.path.join(case_dir, "p_all")
@@ -98,250 +122,203 @@ def _run_mfc_case(case_path, tmpdir, run_tag, case_args, num_ranks=1):
     shutil.copytree(src, dst)
     shutil.rmtree(src, ignore_errors=True)
     shutil.rmtree(os.path.join(case_dir, "D"), ignore_errors=True)
-
     return cfg, os.path.join(tmpdir, run_tag)
 
 
-def _print_conservation_check(all_cons_errs, var_list, tol=CONS_TOL):
-    print(f"\n  Conservation (need rel. error < {tol:.0e}):")
+def _conservation_at_step(run_dir: str, Nt: int, cell_vol: float, cons_vars, num_ranks: int, cell_count: int) -> dict:
+    """Per-variable |∫q(T) - ∫q(0)| / |∫q(0)|."""
+    out = {}
+    for name, idx in cons_vars:
+        s0 = float(np.sum(_read_field(run_dir, 0, idx, num_ranks, cell_count))) * cell_vol
+        sT = float(np.sum(_read_field(run_dir, Nt, idx, num_ranks, cell_count))) * cell_vol
+        out[name] = abs(sT - s0) / (abs(s0) + 1e-300)
+    return out
+
+
+def _conservation_lines(history: typing.List[dict], cons_vars) -> typing.Tuple[bool, typing.List[str]]:
+    lines = [f"\n  Conservation (need rel. error < {CONS_TOL:.0e}):"]
     passed = True
-    for name, _ in var_list:
-        max_err = max(ce[name] for ce in all_cons_errs)
-        ok = max_err < tol
-        print(f"    {name:<14}: max = {max_err:.2e}  {'OK' if ok else 'FAIL'}")
-        if not ok:
-            passed = False
-    return passed
+    for name, _ in cons_vars:
+        max_err = max(c[name] for c in history)
+        ok = max_err < CONS_TOL
+        passed = passed and ok
+        lines.append(f"    {name:<14}: max = {max_err:.2e}  {'OK' if ok else 'FAIL'}")
+    return passed, lines
+
+
+def _table_line(values: typing.List[str], widths: typing.List[int]) -> str:
+    return "  " + "  ".join(f"{v:>{w}}" for v, w in zip(values, widths))
 
 
 # Runners.
 
 
-def _run_resolution_sweep(spec):
-    """1D/2D/3D resolution sweep on a smooth diagonal-advection problem.
+def run_h_sweep(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """Vary N at fixed CFL.
 
-    `expected_order` in the spec always names the scheme's spatial order p.
-    Two time modes:
-      - 'period' (default): T = one full advection period; compare q(T) vs q(0).
-        Truncation accumulates over fixed T, so error ~ h^p and measured rate = p.
-      - 'cell_shift': T = cell_shift * h / v; compare q(T) vs np.roll of q(0)
-        by cell_shift cells (analytical solution for periodic linear advection
-        with v=1). Cost is O(1) in N (Nt = K*c/CFL independent of resolution).
-        Error scales as T*h^p = h^(p+1), giving raw measured rate = p+1; the
-        runner subtracts 1 for display so the reported "spatial order" still
-        equals p. Forces num_ranks=1 for unambiguous Fortran-order data layout.
+    cell_shift > 0: T = K*h with v=1 — compare q(T) to np.roll(q(0), +K).
+        Cost is O(1) in N; raw rate is p+1, displayed as scheme order p.
+    cell_shift == 0: T = full period — compare q(T) to q(0). Rate = p.
     """
-    case_path = spec["case_path"]
-    extra_args = list(spec.get("extra_args", []))
-    expected_order = spec["expected_order"]
-    tol = spec["tol"]
-    resolutions = list(spec["resolutions"])
-    domain_len = spec.get("domain_len", 1.0)
-    ndim = spec.get("ndim", 1)
-    cons_vars = spec["cons_vars"]
-    primary_idx = spec.get("primary_idx", 1)
+    is_shift = spec.cell_shift > 0
+    num_ranks = 1 if is_shift else spec.num_ranks  # cell-shift reshape needs single rank
+    label = "spatial order" if is_shift else "rate"
+    threshold = spec.expected_order - spec.tol
 
-    time_mode = spec.get("time_mode", "period")
-    cell_shift = spec.get("cell_shift", 1)
-
-    if time_mode == "cell_shift":
-        # Single-rank only: multi-rank concat order doesn't match (N,)*ndim reshape.
-        num_ranks = 1
-        # Cell-shift mode: T = K*h, so raw rate is p+1; subtract 1 for display.
-        rate_offset = 1
-        order_label = "spatial order"
-    else:
-        num_ranks = spec.get("num_ranks", 1)
-        rate_offset = 0
-        order_label = "rate"
-
-    if "min_N" in spec and spec["min_N"] is not None:
-        resolutions = [N for N in resolutions if N >= spec["min_N"]]
-    if "max_N" in spec and spec["max_N"] is not None:
-        resolutions = [N for N in resolutions if N <= spec["max_N"]]
-
-    print(f"  (need {order_label} >= {expected_order - tol:.1f})")
-
-    errors = []
-    nts = []
-    all_cons = []
+    errors, hs, nts, history = [], [], [], []
     with tempfile.TemporaryDirectory() as tmpdir:
-        for N in resolutions:
-            dx = domain_len / N
-            cell_vol = dx**ndim
-            cell_count = N**ndim
-            run_args = ["-N", str(N)] + extra_args
-            if time_mode == "cell_shift":
-                # T = K*h with v=1: integer K-cell shift after T.
-                run_args = run_args + ["--t-end", str(cell_shift * dx)]
-            cfg, run_dir = _run_mfc_case(case_path, tmpdir, f"N{N}", run_args, num_ranks)
+        for N in spec.resolutions:
+            h = spec.domain_len / N
+            cell_vol = h**spec.ndim
+            cell_count = N**spec.ndim
+            args = ["-N", str(N)] + spec.extra_args
+            if is_shift:
+                args += ["--t-end", str(spec.cell_shift * h)]
+
+            cfg, run_dir = _run_mfc(spec.case_path, tmpdir, f"N{N}", args, num_ranks)
             Nt = int(cfg["t_step_stop"])
+            q0 = _read_field(run_dir, 0, spec.primary_idx, num_ranks, cell_count)
+            qT = _read_field(run_dir, Nt, spec.primary_idx, num_ranks, cell_count)
+            ref = q0
+            if is_shift:
+                # Wave moves at v=+1: q(T)[i] = q(0)[i-K], so np.roll shift=+K.
+                shape = (N,) * spec.ndim
+                ref = np.roll(
+                    q0.reshape(shape, order="F"),
+                    shift=spec.cell_shift,
+                    axis=tuple(range(spec.ndim)),
+                ).flatten(order="F")
+
+            errors.append(_l2_norm(qT - ref, cell_vol))
+            hs.append(h)
             nts.append(Nt)
-            q0 = _read_cons_var(run_dir, 0, primary_idx, num_ranks, expected_size=cell_count)
-            qT = _read_cons_var(run_dir, Nt, primary_idx, num_ranks, expected_size=cell_count)
-            if time_mode == "cell_shift":
-                # Wave moves with v>0, so q(T)[i] = q(0)[i-K]. np.roll shift=+K.
-                shape = (N,) * ndim
-                q_ref = np.roll(q0.reshape(shape, order="F"), shift=(cell_shift,) * ndim, axis=tuple(range(ndim))).flatten(order="F")
-                errors.append(_l2_norm(qT - q_ref, cell_vol))
-            else:
-                errors.append(_l2_norm(qT - q0, cell_vol))
-            all_cons.append(_conservation_errors(run_dir, Nt, cell_vol, cons_vars, num_ranks, expected_size=cell_count))
+            history.append(_conservation_at_step(run_dir, Nt, cell_vol, spec.cons_vars, num_ranks, cell_count))
 
-    dxs = [domain_len / N for N in resolutions]
-    rates = _pairwise_rates(errors, dxs)
+    offset = 1 if is_shift else 0
+    widths = [6, 6, 10, 14, 13]
+    lines = [
+        f"  (need {label} >= {threshold:.1f})",
+        "",
+        _table_line(["N", "Nt", "dx", "L2 error", label.replace(" ", "_")], widths),
+        _table_line(["-" * w for w in widths], widths),
+    ]
+    for i, N in enumerate(spec.resolutions):
+        if i == 0:
+            r_str = "---"
+        else:
+            r_str = f"{_pairwise_slope(errors[i - 1], errors[i], hs[i - 1], hs[i]) - offset:.2f}"
+        lines.append(_table_line([str(N), str(nts[i]), f"{hs[i]:.6f}", f"{errors[i]:.6e}", r_str], widths))
 
-    col_label = order_label.replace(" ", "_")
-    print(f"\n  {'N':>6}  {'Nt':>6}  {'dx':>10}  {'L2 error':>14}  {col_label:>13}")
-    print(f"  {'-' * 6}  {'-' * 6}  {'-' * 10}  {'-' * 14}  {'-' * 13}")
-    for i, N in enumerate(resolutions):
-        r_str = f"{rates[i] - rate_offset:>13.2f}" if rates[i] is not None else f"{'---':>13}"
-        print(f"  {N:>6}  {nts[i]:>6}  {dxs[i]:>10.6f}  {errors[i]:>14.6e}  {r_str}")
+    rate_passed = True
+    if len(errors) > 1:
+        fitted = _fit_slope(errors, hs) - offset
+        lines.append(f"\n  Fitted {label}: {fitted:.2f}  (need >= {threshold:.1f})")
+        rate_passed = fitted >= threshold
 
-    if len(resolutions) > 1:
-        overall = _fit_rate(errors, dxs)
-        displayed = overall - rate_offset
-        print(f"\n  Fitted {order_label}: {displayed:.2f}  (need >= {expected_order - tol:.1f})")
-        rate_passed = displayed >= expected_order - tol
-    else:
-        rate_passed = True
-
-    cons_passed = _print_conservation_check(all_cons, cons_vars, CONS_TOL)
-    return rate_passed and cons_passed
+    cons_passed, cons_lines = _conservation_lines(history, spec.cons_vars)
+    lines += cons_lines
+    return rate_passed and cons_passed, "\n".join(lines)
 
 
-def _run_temporal(spec):
-    """Fixed N, vary CFL: rate of L2 error vs dt should match temporal scheme order."""
-    case_path = spec["case_path"]
-    extra_args = list(spec.get("extra_args", []))
-    expected_order = spec["expected_order"]
-    tol = spec["tol"]
-    cfls = list(spec["cfls"])
-    num_ranks = spec.get("num_ranks", 1)
-    N = spec["N"]
-    cons_vars = spec["cons_vars"]
-    primary_idx = spec.get("primary_idx", 1)
+def run_dt_sweep(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """Fix N, vary CFL — measures temporal scheme order."""
+    threshold = spec.expected_order - spec.tol
+    h = 1.0 / spec.fixed_N
 
-    print(f"  N={N}  (need rate >= {expected_order - tol:.1f})")
-
-    dx = 1.0 / N
-    errors = []
-    dts = []
-    nts = []
-    all_cons = []
+    errors, dts, nts, history = [], [], [], []
     with tempfile.TemporaryDirectory() as tmpdir:
-        for cfl in cfls:
+        for cfl in spec.cfls:
             tag = f"cfl{cfl:.4f}".replace(".", "p")
-            args = ["-N", str(N), "--cfl", str(cfl)] + extra_args
-            cfg, run_dir = _run_mfc_case(case_path, tmpdir, tag, args, num_ranks)
+            args = ["-N", str(spec.fixed_N), "--cfl", str(cfl)] + spec.extra_args
+            cfg, run_dir = _run_mfc(spec.case_path, tmpdir, tag, args, spec.num_ranks)
             Nt = int(cfg["t_step_stop"])
+            q0 = _read_field(run_dir, 0, spec.primary_idx, spec.num_ranks, spec.fixed_N)
+            qT = _read_field(run_dir, Nt, spec.primary_idx, spec.num_ranks, spec.fixed_N)
+            errors.append(_l2_norm(qT - q0, h))
             dts.append(float(cfg["dt"]))
             nts.append(Nt)
-            q0 = _read_cons_var(run_dir, 0, primary_idx, num_ranks, expected_size=N)
-            qT = _read_cons_var(run_dir, Nt, primary_idx, num_ranks, expected_size=N)
-            errors.append(_l2_norm(qT - q0, dx))
-            all_cons.append(_conservation_errors(run_dir, Nt, dx, cons_vars, num_ranks, expected_size=N))
+            history.append(_conservation_at_step(run_dir, Nt, h, spec.cons_vars, spec.num_ranks, spec.fixed_N))
 
-    rates = _pairwise_rates(errors, dts)
+    widths = [7, 12, 6, 14, 8]
+    lines = [
+        f"  N={spec.fixed_N}  (need rate >= {threshold:.1f})",
+        "",
+        _table_line(["CFL", "dt", "Nt", "L2 error", "rate"], widths),
+        _table_line(["-" * w for w in widths], widths),
+    ]
+    for i, cfl in enumerate(spec.cfls):
+        if i == 0:
+            r_str = "---"
+        else:
+            r_str = f"{_pairwise_slope(errors[i - 1], errors[i], dts[i - 1], dts[i]):.2f}"
+        lines.append(_table_line([f"{cfl:.3f}", f"{dts[i]:.6e}", str(nts[i]), f"{errors[i]:.6e}", r_str], widths))
 
-    print(f"\n  {'CFL':>7}  {'dt':>12}  {'Nt':>6}  {'L2 error':>14}  {'rate':>8}")
-    print(f"  {'-' * 7}  {'-' * 12}  {'-' * 6}  {'-' * 14}  {'-' * 8}")
-    for i, cfl in enumerate(cfls):
-        r_str = f"{rates[i]:>8.2f}" if rates[i] is not None else f"{'---':>8}"
-        print(f"  {cfl:>7.3f}  {dts[i]:>12.6e}  {nts[i]:>6}  {errors[i]:>14.6e}  {r_str}")
+    rate_passed = True
+    if len(errors) > 1:
+        fitted = _fit_slope(errors, dts)
+        lines.append(f"\n  Fitted rate: {fitted:.2f}  (need >= {threshold:.1f})")
+        rate_passed = fitted >= threshold
 
-    if len(cfls) > 1:
-        overall = _fit_rate(errors, dts)
-        print(f"\n  Fitted rate: {overall:.2f}  (need >= {expected_order - tol:.1f})")
-        rate_passed = overall >= expected_order - tol
-    else:
-        rate_passed = True
-
-    cons_passed = _print_conservation_check(all_cons, cons_vars, CONS_TOL)
-    return rate_passed and cons_passed
-
-
-def _l1_self_error(coarse, fine, dx_coarse):
-    """L1 diff between coarse solution and 2:1 cell-averaged fine solution."""
-    assert len(fine) == 2 * len(coarse), f"Expected 2:1 ratio, got {len(fine)}:{len(coarse)}"
-    fine_avg = (fine[0::2] + fine[1::2]) / 2.0
-    return float(np.sum(np.abs(coarse - fine_avg)) * dx_coarse)
+    cons_passed, cons_lines = _conservation_lines(history, spec.cons_vars)
+    lines += cons_lines
+    return rate_passed and cons_passed, "\n".join(lines)
 
 
-def _run_sod_l1(spec):
-    """1D L1 self-convergence (consecutive 2x-apart resolutions)."""
-    case_path = spec["case_path"]
-    extra_args = list(spec.get("extra_args", []))
-    expected_order = spec["expected_order"]
-    tol = spec["tol"]
-    resolutions = list(spec["resolutions"])
-    num_ranks = spec.get("num_ranks", 1)
+def run_sod_l1(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """1D L1 self-convergence: compare each N against 2N (fine cell-averaged 2:1)."""
+    threshold = spec.expected_order - spec.tol
 
-    if "min_N" in spec and spec["min_N"] is not None:
-        resolutions = [N for N in resolutions if N >= spec["min_N"]]
-
-    print(f"  (need L1 rate >= {expected_order - tol:.1f})")
-
-    nts = []
-    run_dirs = []
+    nts, run_dirs = [], []
     with tempfile.TemporaryDirectory() as tmpdir:
-        for N in resolutions:
-            cfg, run_dir = _run_mfc_case(case_path, tmpdir, f"N{N}", ["-N", str(N)] + extra_args, num_ranks)
+        for N in spec.resolutions:
+            cfg, run_dir = _run_mfc(spec.case_path, tmpdir, f"N{N}", ["-N", str(N)] + spec.extra_args, spec.num_ranks)
             nts.append(int(cfg["t_step_stop"]))
             run_dirs.append(run_dir)
 
-        errors = []
-        error_resolutions = []
-        for i in range(len(resolutions) - 1):
-            N_c, N_f = resolutions[i], resolutions[i + 1]
+        errors, error_resolutions = [], []
+        for i in range(len(spec.resolutions) - 1):
+            N_c, N_f = spec.resolutions[i], spec.resolutions[i + 1]
             if N_f != 2 * N_c:
                 continue
-            rho_c = _read_cons_var(run_dirs[i], nts[i], 1, num_ranks, expected_size=N_c)
-            rho_f = _read_cons_var(run_dirs[i + 1], nts[i + 1], 1, num_ranks, expected_size=N_f)
-            errors.append(_l1_self_error(rho_c, rho_f, 1.0 / N_c))
+            rho_c = _read_field(run_dirs[i], nts[i], 1, spec.num_ranks, N_c)
+            rho_f = _read_field(run_dirs[i + 1], nts[i + 1], 1, spec.num_ranks, N_f)
+            avg = 0.5 * (rho_f[0::2] + rho_f[1::2])
+            errors.append(float(np.sum(np.abs(rho_c - avg)) * (1.0 / N_c)))
             error_resolutions.append(N_c)
 
-    dxs = [1.0 / N for N in error_resolutions]
-    rates = [None]
-    for i in range(1, len(errors)):
-        rates.append((math.log(errors[i]) - math.log(errors[i - 1])) / (math.log(dxs[i]) - math.log(dxs[i - 1])))
-
-    print(f"\n  {'N':>6}  {'Nt':>6}  {'L1 self-err':>14}  {'rate':>8}")
-    print(f"  {'-' * 6}  {'-' * 6}  {'-' * 14}  {'-' * 8}")
+    hs = [1.0 / N for N in error_resolutions]
+    widths = [6, 6, 14, 8]
+    lines = [
+        f"  (need L1 rate >= {threshold:.1f})",
+        "",
+        _table_line(["N", "Nt", "L1 self-err", "rate"], widths),
+        _table_line(["-" * w for w in widths], widths),
+    ]
     for i, N in enumerate(error_resolutions):
-        r_str = f"{rates[i]:>8.2f}" if rates[i] is not None else f"{'---':>8}"
-        print(f"  {N:>6}  {nts[i]:>6}  {errors[i]:>14.6e}  {r_str}")
+        if i == 0:
+            r_str = "---"
+        else:
+            r_str = f"{_pairwise_slope(errors[i - 1], errors[i], hs[i - 1], hs[i]):.2f}"
+        lines.append(_table_line([str(N), str(nts[i]), f"{errors[i]:.6e}", r_str], widths))
 
     if len(errors) >= 2:
-        overall = _fit_rate(errors, dxs)
-        print(f"\n  Fitted rate: {overall:.2f}  (need >= {expected_order - tol:.1f})")
-        return overall >= expected_order - tol
+        fitted = _fit_slope(errors, hs)
+        lines.append(f"\n  Fitted rate: {fitted:.2f}  (need >= {threshold:.1f})")
+        return fitted >= threshold, "\n".join(lines)
     if len(errors) == 1:
-        print(f"\n  Single pair rate: {rates[-1]:.2f}  (need >= {expected_order - tol:.1f})")
-        return rates[-1] >= expected_order - tol
-    print("\n  ERROR: need >= 2 consecutive 2x-apart resolutions to compute a rate")
-    return False
+        rate = _pairwise_slope(errors[0], errors[0], hs[0], hs[0])
+        lines.append(f"\n  Single pair rate (need >= {threshold:.1f})")
+        return rate >= threshold, "\n".join(lines)
+    lines.append("\n  ERROR: need >= 2 consecutive 2x-apart resolutions")
+    return False, "\n".join(lines)
 
 
-_RUNNERS = {
-    "1d_advection": _run_resolution_sweep,
-    "2d_advection": _run_resolution_sweep,
-    "3d_advection": _run_resolution_sweep,
-    "temporal": _run_temporal,
-    "sod_l1": _run_sod_l1,
-}
+# Entry point used by test.py.
 
 
-def run_convergence_case(spec):
-    """Dispatch on spec['runner']. Returns (passed: bool, captured_output: str)."""
-    runner = _RUNNERS.get(spec["runner"])
-    if runner is None:
-        raise ValueError(f"unknown convergence runner '{spec['runner']}' (have: {sorted(_RUNNERS)})")
-
-    buf = io.StringIO()
+def run_case(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """Run one convergence case. Returns (passed, full output report)."""
     try:
-        with redirect_stdout(buf):
-            passed = runner(spec)
+        return spec.runner(spec)
     except Exception as exc:
-        return False, buf.getvalue() + f"\nERROR: {exc}\n"
-    return passed, buf.getvalue()
+        return False, f"  ERROR: {exc}\n"

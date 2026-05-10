@@ -449,14 +449,14 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
 
 def _handle_convergence_case(case: TestCase, start_time: float):
     """Dispatch convergence/order-of-accuracy cases through convergence.py."""
-    from .convergence import run_convergence_case
+    from .convergence import run_case
 
     if ARG("dry_run"):
         trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
         cons.print(f"  (dry-run)     {trace_display:50s}   SKIP    [magenta]{case.get_uuid()}[/magenta]")
         return
 
-    passed, output = run_convergence_case(case.convergence_spec)
+    passed, output = run_case(case.convergence_spec)
 
     log_dir = os.path.join(common.MFC_TEST_DIR, case.get_uuid())
     common.create_directory(log_dir)

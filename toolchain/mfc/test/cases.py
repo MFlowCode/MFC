@@ -6,6 +6,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .convergence import ConvergenceSpec, run_dt_sweep, run_h_sweep, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -92,81 +93,51 @@ _CONVERGENCE_TEMPORAL_SCHEMES = [
 def add_convergence_cases(cases):
     num_ranks = 4
 
-    def _adv_spec(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, time_mode):
-        # cell_shift forces num_ranks=1 inside the runner; period mode keeps the suite default.
-        return {
-            "runner": f"{ndim}d_advection",
-            "case_path": case_path,
-            "extra_args": extra_args,
-            "expected_order": expected,
-            "tol": tol,
-            "resolutions": resolutions,
-            "ndim": ndim,
-            "domain_len": 1.0,
-            "cons_vars": cons_vars,
-            "primary_idx": 1,
-            "num_ranks": num_ranks,
-            "time_mode": time_mode,
-            "cell_shift": 1,
-        }
-
-    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_1D_SCHEMES:
-        cases.append(
-            define_convergence_case(
-                f"Convergence -> 1D -> {label}",
-                spec=_adv_spec("examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, extra_args, expected, tol, resolutions, "cell_shift"),
-                ppn=1,
-            )
-        )
-    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_1D_PERIOD_SCHEMES:
-        cases.append(
-            define_convergence_case(
-                f"Convergence -> 1D -> {label}",
-                spec=_adv_spec("examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, extra_args, expected, tol, resolutions, "period"),
-                ppn=num_ranks,
-            )
+    def _h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift):
+        return ConvergenceSpec(
+            runner=run_h_sweep,
+            case_path=case_path,
+            extra_args=extra_args,
+            expected_order=expected,
+            tol=tol,
+            cons_vars=cons_vars,
+            resolutions=resolutions,
+            ndim=ndim,
+            cell_shift=cell_shift,
+            num_ranks=num_ranks,  # ignored by run_h_sweep when cell_shift > 0
         )
 
-    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_2D_SCHEMES:
-        cases.append(
-            define_convergence_case(
-                f"Convergence -> 2D -> {label}",
-                spec=_adv_spec("examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, extra_args, expected, tol, resolutions, "cell_shift"),
-                ppn=1,
+    advection_groups = [
+        (_CONVERGENCE_1D_SCHEMES, "1D", "examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, 1, 1),
+        (_CONVERGENCE_1D_PERIOD_SCHEMES, "1D", "examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, 0, num_ranks),
+        (_CONVERGENCE_2D_SCHEMES, "2D", "examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, 1, 1),
+        (_CONVERGENCE_2D_PERIOD_SCHEMES, "2D", "examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, 0, num_ranks),
+        (_CONVERGENCE_3D_SCHEMES, "3D", "examples/3D_advection_convergence/case.py", 3, _CONS_VARS_3D, 1, 1),
+    ]
+    for schemes, dim_label, case_path, ndim, cons_vars, cell_shift, ppn in advection_groups:
+        for label, extra_args, expected, tol, resolutions in schemes:
+            cases.append(
+                define_convergence_case(
+                    f"Convergence -> {dim_label} -> {label}",
+                    spec=_h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift),
+                    ppn=ppn,
+                )
             )
-        )
-    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_2D_PERIOD_SCHEMES:
-        cases.append(
-            define_convergence_case(
-                f"Convergence -> 2D -> {label}",
-                spec=_adv_spec("examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, extra_args, expected, tol, resolutions, "period"),
-                ppn=num_ranks,
-            )
-        )
-
-    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_3D_SCHEMES:
-        cases.append(
-            define_convergence_case(
-                f"Convergence -> 3D -> {label}",
-                spec=_adv_spec("examples/3D_advection_convergence/case.py", 3, _CONS_VARS_3D, extra_args, expected, tol, resolutions, "cell_shift"),
-                ppn=1,
-            )
-        )
 
     for label, extra_args, expected, tol, min_N in _CONVERGENCE_SOD_SCHEMES:
+        resolutions = [N for N in _RES_SOD_DEFAULT if min_N is None or N >= min_N]
         cases.append(
             define_convergence_case(
                 f"Convergence -> Sod -> {label}",
-                spec={
-                    "runner": "sod_l1",
-                    "case_path": "examples/1D_sod_convergence/case.py",
-                    "extra_args": extra_args,
-                    "expected_order": expected,
-                    "tol": tol,
-                    "resolutions": _RES_SOD_DEFAULT,
-                    "min_N": min_N,
-                    "num_ranks": num_ranks,
-                },
+                spec=ConvergenceSpec(
+                    runner=run_sod_l1,
+                    case_path="examples/1D_sod_convergence/case.py",
+                    extra_args=extra_args,
+                    expected_order=expected,
+                    tol=tol,
+                    resolutions=resolutions,
+                    num_ranks=num_ranks,
+                ),
                 ppn=num_ranks,
             )
         )
@@ -175,18 +146,17 @@ def add_convergence_cases(cases):
         cases.append(
             define_convergence_case(
                 f"Convergence -> Temporal -> {label}",
-                spec={
-                    "runner": "temporal",
-                    "case_path": "examples/1D_euler_convergence/case.py",
-                    "extra_args": extra_args,
-                    "expected_order": expected,
-                    "tol": tol,
-                    "cfls": cfls,
-                    "N": 512,
-                    "cons_vars": _CONS_VARS_1D,
-                    "primary_idx": 1,
-                    "num_ranks": num_ranks,
-                },
+                spec=ConvergenceSpec(
+                    runner=run_dt_sweep,
+                    case_path="examples/1D_euler_convergence/case.py",
+                    extra_args=extra_args,
+                    expected_order=expected,
+                    tol=tol,
+                    cons_vars=_CONS_VARS_1D,
+                    cfls=cfls,
+                    fixed_N=512,
+                    num_ranks=num_ranks,
+                ),
                 ppn=num_ranks,
             )
         )
