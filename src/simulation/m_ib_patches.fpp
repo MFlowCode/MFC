@@ -21,12 +21,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models, &
-        & s_decode_patch_periodicity
-
-    real(wp) :: cart_y, cart_z
-    $:GPU_DECLARE(create='[cart_y, cart_z]')
-    ! Variables to be used to hold cell locations in Cartesian coordinates if 3D simulation is using cylindrical coordinates
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity
 
 contains
 
@@ -542,18 +537,12 @@ contains
 
         ! Checking whether the sphere covers a particular cell in the domain and verifying whether the current patch has permission
         ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, cart_y, cart_z]', copyin='[encoded_patch_id, center, radius]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k]', copyin='[encoded_patch_id, center, radius]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
-                    if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                    else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
-                    end if
                     ! Updating the patch identities bookkeeping variable
-                    if (((x_cc(i) - center(1))**2 + (cart_y - center(2))**2 + (cart_z - center(3))**2 <= radius**2)) then
+                    if (((x_cc(i) - center(1))**2 + (y_cc(j) - center(2))**2 + (z_cc(k) - center(3))**2 <= radius**2)) then
                         ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do
@@ -603,19 +592,12 @@ contains
         ! Checking whether the cuboid covers a particular cell in the domain and verifying whether the current patch has permission
         ! to write to to that cell. If both queries check out, the primitive variables of the current patch are assigned to this
         ! cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, cart_y, cart_z]', copyin='[encoded_patch_id, center, length, &
-                            & inverse_rotation]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center, length, inverse_rotation]', &
+                            & collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
-                    if (grid_geometry == 3) then
-                        ! TODO :: This does not work and is not covered by any tests. This should be fixed
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                    else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
-                    end if
-                    xyz_local = [x_cc(i), cart_y, cart_z] - center  ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
                     if (-0.5*length(1) <= xyz_local(1) .and. 0.5*length(1) >= xyz_local(1) .and. -0.5*length(2) <= xyz_local(2) &
@@ -672,18 +654,12 @@ contains
         ! Checking whether the cylinder covers a particular cell in the domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
         ! this cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, cart_y, cart_z]', copyin='[encoded_patch_id, center, length, radius, &
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center, length, radius, &
                             & inverse_rotation]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
-                    if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                    else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
-                    end if
-                    xyz_local = [x_cc(i), cart_y, cart_z] - center  ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
                     if (((.not. f_is_default(length(1)) .and. xyz_local(2)**2 + xyz_local(3)**2 <= radius**2 .and. &
@@ -962,30 +938,6 @@ contains
         end if
 
     end subroutine s_update_ib_rotation_matrix
-
-    !> Convert cylindrical (r, theta) coordinates to Cartesian (y, z)
-    subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in) :: cyl_y, cyl_z
-
-        cart_y = cyl_y*sin(cyl_z)
-        cart_z = cyl_y*cos(cyl_z)
-
-    end subroutine s_convert_cylindrical_to_cartesian_coord
-
-    !> Convert a 3D cylindrical coordinate vector (x, r, theta) to Cartesian (x, y, z)
-    pure function f_convert_cyl_to_cart(cyl) result(cart)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), dimension(1:3), intent(in) :: cyl
-        real(wp), dimension(1:3)             :: cart
-
-        cart = (/cyl(1), cyl(2)*sin(cyl(3)), cyl(2)*cos(cyl(3))/)
-
-    end function f_convert_cyl_to_cart
 
     subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
 

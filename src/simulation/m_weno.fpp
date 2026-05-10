@@ -73,6 +73,9 @@ module m_weno
     integer :: v_size  !< Number of WENO-reconstructed cell-average variables
     $:GPU_DECLARE(create='[v_size]')
 
+    logical :: uniform_grid(3)  !< True if grid spacing is uniform in each direction
+    $:GPU_DECLARE(create='[uniform_grid]')
+
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
@@ -183,6 +186,7 @@ contains
         integer                           :: i               !< Generic loop iterator
         real(wp)                          :: w(1:8)          !< Intermediate var for ideal weights: s_cb across overall stencil
         real(wp)                          :: y(1:4)          !< Intermediate var for poly & beta: diff(s_cb) across sub-stencil
+        real(wp)                          :: h0              !< Reference spacing for uniform-grid detection
 
         ! Determine cell count, boundary locations, and BCs for selected WENO direction
 
@@ -843,12 +847,24 @@ contains
             end if
         #:endfor
 
+        ! Detect whether grid spacing is uniform (enables cancellation-free sum-of-squares beta). Tolerance uses sqrt(epsilon) so it
+        ! works in both double and single precision: ~1.5e-8 relative in double, ~3.5e-4 in single - above FP noise, below real
+        ! stretching.
+        uniform_grid(weno_dir) = .true.
+        h0 = (s_cb(s) - s_cb(0))/real(s, wp)
+        do i = 0, s - 1
+            if (abs((s_cb(i + 1) - s_cb(i)) - h0) > sqrt(epsilon(h0))*abs(h0)) then
+                uniform_grid(weno_dir) = .false.
+                exit
+            end if
+        end do
+
         if (weno_dir == 1) then
-            $:GPU_UPDATE(device='[poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x]')
+            $:GPU_UPDATE(device='[poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x, uniform_grid]')
         else if (weno_dir == 2) then
-            $:GPU_UPDATE(device='[poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y]')
+            $:GPU_UPDATE(device='[poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y, uniform_grid]')
         else
-            $:GPU_UPDATE(device='[poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z]')
+            $:GPU_UPDATE(device='[poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z, uniform_grid]')
         end if
 
         ! Nullifying WENO coefficients and cell-boundary locations pointers
@@ -1053,12 +1069,22 @@ contains
                                         poly(2) = v_rs_ws_${XYZ}$ (j, k, l, i) + poly_coef_cbL_${XYZ}$ (j, 2, &
                                              & 0)*dvd(-1) + poly_coef_cbL_${XYZ}$ (j, 2, 1)*dvd(-2)
 
-                                        beta(0) = beta_coef_${XYZ}$ (j, 0, 0)*dvd(1)*dvd(1) + beta_coef_${XYZ}$ (j, 0, &
-                                             & 1)*dvd(1)*dvd(0) + beta_coef_${XYZ}$ (j, 0, 2)*dvd(0)*dvd(0) + weno_eps
-                                        beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(0)*dvd(0) + beta_coef_${XYZ}$ (j, 1, &
-                                             & 1)*dvd(0)*dvd(-1) + beta_coef_${XYZ}$ (j, 1, 2)*dvd(-1)*dvd(-1) + weno_eps
-                                        beta(2) = beta_coef_${XYZ}$ (j, 2, 0)*dvd(-1)*dvd(-1) + beta_coef_${XYZ}$ (j, 2, &
-                                             & 1)*dvd(-1)*dvd(-2) + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) + weno_eps
+                                        ! Jiang & Shu (1996) sum-of-squares form on uniform grids: all terms non-negative, no
+                                        ! cancellation. On non-uniform grids, fall back to precomputed coefficients.
+                                        if (uniform_grid(${WENO_DIR}$)) then
+                                            beta(0) = 13._wp/12._wp*(dvd(1) - dvd(0))**2 + 0.25_wp*(dvd(1) - 3._wp*dvd(0))**2 &
+                                                 & + weno_eps
+                                            beta(1) = 13._wp/12._wp*(dvd(0) - dvd(-1))**2 + 0.25_wp*(dvd(0) + dvd(-1))**2 + weno_eps
+                                            beta(2) = 13._wp/12._wp*(dvd(-1) - dvd(-2))**2 + 0.25_wp*(3._wp*dvd(-1) - dvd(-2))**2 &
+                                                 & + weno_eps
+                                        else
+                                            beta(0) = beta_coef_${XYZ}$ (j, 0, 0)*dvd(1)*dvd(1) + beta_coef_${XYZ}$ (j, 0, &
+                                                 & 1)*dvd(1)*dvd(0) + beta_coef_${XYZ}$ (j, 0, 2)*dvd(0)*dvd(0) + weno_eps
+                                            beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(0)*dvd(0) + beta_coef_${XYZ}$ (j, 1, &
+                                                 & 1)*dvd(0)*dvd(-1) + beta_coef_${XYZ}$ (j, 1, 2)*dvd(-1)*dvd(-1) + weno_eps
+                                            beta(2) = beta_coef_${XYZ}$ (j, 2, 0)*dvd(-1)*dvd(-1) + beta_coef_${XYZ}$ (j, 2, &
+                                                 & 1)*dvd(-1)*dvd(-2) + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) + weno_eps
+                                        end if
 
                                         if (wenojs) then
                                             do q = 0, weno_num_stencils

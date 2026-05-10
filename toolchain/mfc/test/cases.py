@@ -368,6 +368,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
         if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
             cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
+            stack.push(
+                "surface_tension=T",
+                {
+                    "surface_tension": "T",
+                    "sigma": 1,
+                    "patch_icpp(1)%cf_val": 1,
+                    "patch_icpp(2)%cf_val": 0,
+                    "patch_icpp(3)%cf_val": 1,
+                },
+            )
+            cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+            stack.pop()
         stack.pop()
 
         stack.push("muscl_order=2", {"muscl_order": 2, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
@@ -2064,6 +2076,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         three directions. Stretching interacts with WENO reconstruction
         and gradient calculations in direction-specific ways. Not covered
         by any dynamic test (only via examples at reduced resolution).
+
+        MTHINC on stretched 2D grid: a circular bubble creates diagonal
+        interface normals that have components in both x and y. With a
+        non-uniform x grid, the reference-space normal weighting
+        (Δx_j / (x_cc(j+1)-x_cc(j-1))) differs from 0.5, exercising the
+        grid-spacing correction in s_compute_mthinc_normals.
         """
         base_3d = {
             "m": 24,
@@ -2143,6 +2161,70 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Extend last z-patch to cover stretched z range
                 "patch_icpp(3)%z_centroid": 1.15,
                 "patch_icpp(3)%length_z": 0.7,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # 2D MTHINC on a stretched (non-uniform) x-grid.
+        # A circular bubble creates diagonal interface normals (components in both
+        # x and y), so the reference-space weighting Δx_j/(x_cc(j+1)-x_cc(j-1))
+        # differs from 0.5 and changes the normalized normal on non-uniform grids.
+        # Axis-aligned interfaces would not catch this because the unit normal is
+        # the same regardless of the gradient scaling.
+        eps = 1e-6
+        stack.push(
+            "Kernel -> 2D -> MTHINC -> Grid Stretching",
+            {
+                "m": 24,
+                "n": 24,
+                "p": 0,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "num_patches": 2,
+                "num_fluids": 2,
+                "fluid_pp(2)%gamma": 2.5,
+                "fluid_pp(2)%pi_inf": 0.0,
+                # Patch 1: fluid 1 background rectangle; length covers stretched extent (~1.39).
+                # vel(1)=0.5 provides advection so MTHINC reconstruction affects the solution.
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.75,
+                "patch_icpp(1)%length_x": 1.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps,
+                "patch_icpp(1)%alpha_rho(2)": eps,
+                "patch_icpp(1)%alpha(2)": eps,
+                # Patch 2: fluid 2 circular bubble centered in the stretched region;
+                # alter_patch(1)=T needed so patch 2 can overwrite patch 1 cells
+                "patch_icpp(2)%geometry": 2,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%radius": 0.2,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%alpha_rho(1)": eps,
+                "patch_icpp(2)%alpha(1)": eps,
+                "patch_icpp(2)%alpha_rho(2)": 1.0 - eps,
+                "patch_icpp(2)%alpha(2)": 1.0 - eps,
+                # MTHINC
+                "int_comp": 2,
+                # x-stretching creates non-uniform cells at the bubble interface
+                "stretch_x": "T",
+                "a_x": 2.0,
+                "x_a": 0.3,
+                "x_b": 0.7,
+                "loops_x": 1,
             },
         )
         cases.append(define_case_d(stack, "", {}))
