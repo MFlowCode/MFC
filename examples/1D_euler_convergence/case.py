@@ -26,6 +26,7 @@ parser.add_argument("--cfl", type=float, default=0.4, help="CFL number (default:
 parser.add_argument("--no-mapped", action="store_true", help="Disable mapped WENO")
 parser.add_argument("--muscl-lim", type=int, default=0, help="MUSCL limiter: 0=unlimited 1=minmod ... (default: 0)")
 parser.add_argument("--time-stepper", type=int, default=3, help="Time stepper: 1=Euler 2=RK2 3=RK3 (default: 3)")
+parser.add_argument("--t-end", type=float, default=None, help="Override total simulation time (default: 1.0 = one period)")
 args = parser.parse_args()
 
 gamma = 1.4
@@ -37,8 +38,8 @@ dx = L / N
 # c_sound = sqrt(gamma * p / rho) = sqrt(gamma) for p=1, rho=1
 c_max = math.sqrt(gamma) + 1.0  # acoustic + convective
 dt = args.cfl * dx / c_max
-T_end = 1.0
-Nt = max(4, math.ceil(T_end / dt))
+T_end = args.t_end if args.t_end is not None else 1.0
+Nt = max(1, math.ceil(T_end / dt))
 dt = T_end / Nt
 
 if args.muscl:

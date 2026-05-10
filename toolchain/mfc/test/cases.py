@@ -12,39 +12,54 @@ from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define
 # the filter handle (`./mfc.sh test --only Convergence`); convergence cases
 # are skipped by default.
 
-# 1D Euler advection (rho = 1 + 0.2*sin(2*pi*x), u=1, p=1, T=1):
-# WENO5/TENO5 use CFL=0.02 so RK3 temporal floor is below O(h^5) at N>=128.
-# WENO7/TENO7 cap at N=128 and use CFL=0.005 (machine-precision floor near N=512).
-# WENO3-JS degrades to 2nd order at smooth extrema (Henrick et al. 2005).
-# MUSCL2 uses unlimited slope (limiters clip to 1st order at smooth extrema).
+# Advection convergence cases use cell-shift mode by default: T = K*h per
+# resolution, compare q(T) to np.roll(q(0), -K) per dim. Spatial error scales
+# as T*h^p = h^(p+1), so measured rate = p+1 (p = scheme order). Wins ~10-100x
+# vs running a full period since Nt = K*c/CFL is independent of N.
+# WENO7/TENO7 stay in period mode: at typical N their cell-shift error hits
+# machine precision (h^8 < 1e-15 at N=64) before any rate signal develops.
 _CONS_VARS_1D = [("density", 1), ("x-momentum", 2), ("energy", 3)]
-_RES_1D_DEFAULT = [64, 128, 256, 512, 1024]
+_CONS_VARS_2D = [("density", 1), ("energy", 4)]
+_CONS_VARS_3D = [("density", 1), ("energy", 5)]
+
+# (label, extra_args, expected_order, tol, resolutions)
+# expected_order = scheme order p + 1 in cell-shift mode (T scales with h).
+# WENO3-JS reduces to 2 at smooth extrema → cell-shift expected = 3.
+# MUSCL2 unlimited central → effective order 2 → cell-shift expected = 3.
 _CONVERGENCE_1D_SCHEMES = [
-    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.2, 128, 512),
-    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2, 0.2, 256, None),
-    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.05, 128, None),
-    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.1, 128, None),
-    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.2, 128, 512),
-    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, 64, 128),
-    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, 64, 128),
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 6, 0.3, [32, 64, 128]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2.5, 0.3, [64, 128, 256]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 2, 0.2, [64, 128, 256]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 3, 0.3, [64, 128, 256]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 6, 0.3, [32, 64, 128]),
+]
+# WENO7/TENO7 in 1D: period mode (full period T=1.0, see 1D case.py).
+_CONVERGENCE_1D_PERIOD_SCHEMES = [
+    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [64, 128]),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [64, 128]),
 ]
 
-# 2D diagonal advection (rho = 1 + 0.2 sin(2pi(x+y)), v=(1,1), period T=0.5):
-# linear primitives mean no covariance floor — clean asymptotic rates for all
-# WENO/MUSCL/TENO orders. WENO3 reduces to 2nd at smooth extrema (Henrick 2005).
-# 4 ranks (2x2 decomp): per-rank stencil constraint n+1 >= 5*weno_order/2.
-# WENO5/TENO5 use [64, 96, 128] (33>=25 at N=64). WENO7/TENO7 use [80, 96]
-# (41>=35 at N=80) and CFL=0.005 to push RK3 temporal error below O(h^7).
-# (label, extra_args, expected_order, tol, resolutions)
-_CONS_VARS_2D = [("density", 1), ("energy", 4)]
 _CONVERGENCE_2D_SCHEMES = [
-    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [64, 96, 128]),
-    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2, 0.3, [32, 64, 128]),
-    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64, 128]),
-    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.1, [32, 64, 128]),
-    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [64, 96, 128]),
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 6, 0.3, [32, 64, 96]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2.5, 0.3, [32, 64, 128]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 2, 0.2, [32, 64, 128]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 3, 0.3, [32, 64, 128]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 6, 0.3, [32, 64, 96]),
+]
+_CONVERGENCE_2D_PERIOD_SCHEMES = [
     ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [80, 96]),
     ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [80, 96]),
+]
+
+# 3D diagonal advection: only cell-shift mode (period T=1/3 with N^3 cells
+# would dominate CI even at N=64). WENO7/TENO7 skipped — at N=64 with K=1
+# the spatial error signal is below machine precision.
+_CONVERGENCE_3D_SCHEMES = [
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 6, 0.3, [32, 64]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2.5, 0.3, [32, 64]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 2, 0.2, [32, 64]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 3, 0.3, [32, 64]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 6, 0.3, [32, 64]),
 ]
 
 # Sod L1 self-convergence: any conservative monotone scheme converges at L1
@@ -71,41 +86,41 @@ _CONVERGENCE_TEMPORAL_SCHEMES = [
     ("RK3", ["--order", "5", "--time-stepper", "3"], 3, 0.3, [0.50, 0.25]),
 ]
 
-# 2D diagonal advection (smooth density wave; no covariance floor): exercises
-# WENO7 / TENO7 in 2D. CFL=0.005 keeps RK3 temporal error below O(h^7).
-# With 4 ranks (2x2 decomp) the per-rank stencil constraint n+1 >= 5*weno_order=35
-# sets min_N=70 (rounded up to 80). N capped at 96 to keep CI cost reasonable:
-# 7th-order error scaling between N=80 and N=96 is ~3.6x, well above the
-# machine-precision floor and clean for rate measurement.
-_RES_2D_ADV_DEFAULT = [80, 96]
-_CONVERGENCE_2D_ADV_SCHEMES = [
-    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, 80, 96),
-    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, 80, 96),
-]
-
 
 def add_convergence_cases(cases):
     num_ranks = 4
 
-    for label, extra_args, expected, tol, min_N, max_N in _CONVERGENCE_1D_SCHEMES:
+    def _adv_spec(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, time_mode):
+        # cell_shift forces num_ranks=1 inside the runner; period mode keeps the suite default.
+        return {
+            "runner": f"{ndim}d_advection",
+            "case_path": case_path,
+            "extra_args": extra_args,
+            "expected_order": expected,
+            "tol": tol,
+            "resolutions": resolutions,
+            "ndim": ndim,
+            "domain_len": 1.0,
+            "cons_vars": cons_vars,
+            "primary_idx": 1,
+            "num_ranks": num_ranks,
+            "time_mode": time_mode,
+            "cell_shift": 1,
+        }
+
+    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_1D_SCHEMES:
         cases.append(
             define_convergence_case(
                 f"Convergence -> 1D -> {label}",
-                spec={
-                    "runner": "1d_advection",
-                    "case_path": "examples/1D_euler_convergence/case.py",
-                    "extra_args": extra_args,
-                    "expected_order": expected,
-                    "tol": tol,
-                    "resolutions": _RES_1D_DEFAULT,
-                    "min_N": min_N,
-                    "max_N": max_N,
-                    "ndim": 1,
-                    "domain_len": 1.0,
-                    "cons_vars": _CONS_VARS_1D,
-                    "primary_idx": 1,
-                    "num_ranks": num_ranks,
-                },
+                spec=_adv_spec("examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, extra_args, expected, tol, resolutions, "cell_shift"),
+                ppn=1,
+            )
+        )
+    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_1D_PERIOD_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> 1D -> {label}",
+                spec=_adv_spec("examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, extra_args, expected, tol, resolutions, "period"),
                 ppn=num_ranks,
             )
         )
@@ -114,20 +129,25 @@ def add_convergence_cases(cases):
         cases.append(
             define_convergence_case(
                 f"Convergence -> 2D -> {label}",
-                spec={
-                    "runner": "2d_advection",
-                    "case_path": "examples/2D_advection_convergence/case.py",
-                    "extra_args": extra_args,
-                    "expected_order": expected,
-                    "tol": tol,
-                    "resolutions": resolutions,
-                    "ndim": 2,
-                    "domain_len": 1.0,
-                    "cons_vars": _CONS_VARS_2D,
-                    "primary_idx": 1,
-                    "num_ranks": num_ranks,
-                },
+                spec=_adv_spec("examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, extra_args, expected, tol, resolutions, "cell_shift"),
+                ppn=1,
+            )
+        )
+    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_2D_PERIOD_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> 2D -> {label}",
+                spec=_adv_spec("examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, extra_args, expected, tol, resolutions, "period"),
                 ppn=num_ranks,
+            )
+        )
+
+    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_3D_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> 3D -> {label}",
+                spec=_adv_spec("examples/3D_advection_convergence/case.py", 3, _CONS_VARS_3D, extra_args, expected, tol, resolutions, "cell_shift"),
+                ppn=1,
             )
         )
 
@@ -1747,6 +1767,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_advection_convergence",
                 "1D_sod_convergence",
                 "2D_advection_convergence",
+                "3D_advection_convergence",
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",

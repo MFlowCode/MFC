@@ -118,17 +118,36 @@ def _print_conservation_check(all_cons_errs, var_list, tol=CONS_TOL):
 
 
 def _run_resolution_sweep(spec):
-    """1D/2D resolution sweep: L2(q(T) - q(0)) vs h, expect rate >= expected_order - tol."""
+    """1D/2D/3D resolution sweep on a smooth diagonal-advection problem.
+
+    Two time modes:
+      - 'period' (default): T = one full advection period; compare q(T) vs q(0).
+        Spatial truncation accumulates over a full period, so error ~ h^p and
+        the measured rate equals the scheme order p.
+      - 'cell_shift':       T = cell_shift * h / v; compare q(T) vs np.roll of q(0)
+        by cell_shift cells (analytical solution for periodic linear advection
+        with v=1 in unit domain). Cost is O(1) in N (Nt = c/CFL independent
+        of resolution). Error scales as T*h^p = h^(p+1) so the measured rate
+        is p+1. Forces num_ranks=1 for unambiguous Fortran-order data layout.
+    """
     case_path = spec["case_path"]
     extra_args = list(spec.get("extra_args", []))
     expected_order = spec["expected_order"]
     tol = spec["tol"]
     resolutions = list(spec["resolutions"])
-    num_ranks = spec.get("num_ranks", 1)
     domain_len = spec.get("domain_len", 1.0)
     ndim = spec.get("ndim", 1)
     cons_vars = spec["cons_vars"]
     primary_idx = spec.get("primary_idx", 1)
+
+    time_mode = spec.get("time_mode", "period")
+    cell_shift = spec.get("cell_shift", 1)
+
+    if time_mode == "cell_shift":
+        # Single-rank only: multi-rank concat order doesn't match (N,)*ndim reshape.
+        num_ranks = 1
+    else:
+        num_ranks = spec.get("num_ranks", 1)
 
     if "min_N" in spec and spec["min_N"] is not None:
         resolutions = [N for N in resolutions if N >= spec["min_N"]]
@@ -145,12 +164,22 @@ def _run_resolution_sweep(spec):
             dx = domain_len / N
             cell_vol = dx**ndim
             cell_count = N**ndim
-            cfg, run_dir = _run_mfc_case(case_path, tmpdir, f"N{N}", ["-N", str(N)] + extra_args, num_ranks)
+            run_args = ["-N", str(N)] + extra_args
+            if time_mode == "cell_shift":
+                # T = K*h with v=1: integer K-cell shift after T.
+                run_args = run_args + ["--t-end", str(cell_shift * dx)]
+            cfg, run_dir = _run_mfc_case(case_path, tmpdir, f"N{N}", run_args, num_ranks)
             Nt = int(cfg["t_step_stop"])
             nts.append(Nt)
             q0 = _read_cons_var(run_dir, 0, primary_idx, num_ranks, expected_size=cell_count)
             qT = _read_cons_var(run_dir, Nt, primary_idx, num_ranks, expected_size=cell_count)
-            errors.append(_l2_norm(qT - q0, cell_vol))
+            if time_mode == "cell_shift":
+                # Wave moves with v>0, so q(T)[i] = q(0)[i-K]. np.roll shift=+K.
+                shape = (N,) * ndim
+                q_ref = np.roll(q0.reshape(shape, order="F"), shift=(cell_shift,) * ndim, axis=tuple(range(ndim))).flatten(order="F")
+                errors.append(_l2_norm(qT - q_ref, cell_vol))
+            else:
+                errors.append(_l2_norm(qT - q0, cell_vol))
             all_cons.append(_conservation_errors(run_dir, Nt, cell_vol, cons_vars, num_ranks, expected_size=cell_count))
 
     dxs = [domain_len / N for N in resolutions]
@@ -289,6 +318,7 @@ def _run_sod_l1(spec):
 _RUNNERS = {
     "1d_advection": _run_resolution_sweep,
     "2d_advection": _run_resolution_sweep,
+    "3d_advection": _run_resolution_sweep,
     "temporal": _run_temporal,
     "sod_l1": _run_sod_l1,
 }
