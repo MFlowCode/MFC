@@ -10,10 +10,10 @@ env:
   OMPI_MCA_rmaps_base_oversubscribe: 1
 
 jobs:
-  convergence-1d:
-    name: "1D Advection Convergence"
+  convergence:
+    name: "Convergence"
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 240
 
     steps:
       - uses: actions/checkout@v4
@@ -29,98 +29,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Initialize MFC
-        run: ./mfc.sh init
+      - name: Build MFC
+        run: ./mfc.sh build -j 4
 
-      - name: Run 1D convergence tests
-        run: |
-          source build/venv/bin/activate
-          python toolchain/mfc/test/run_convergence_1d.py \
-            --resolutions 64 128 256 512 1024 \
-            --num-ranks 4
-
-  convergence-2d:
-    name: "2D Isentropic Vortex Convergence"
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Ubuntu
-        run: |
-          sudo apt update -y
-          sudo apt install -y cmake gcc g++ python3 python3-dev \
-                   openmpi-bin libopenmpi-dev
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Initialize MFC
-        run: ./mfc.sh init
-
-      - name: Run 2D convergence tests
-        run: |
-          source build/venv/bin/activate
-          python toolchain/mfc/test/run_convergence.py \
-            --resolutions 32 64 128 \
-            --num-ranks 4
-
-  convergence-sod:
-    name: "1D Sod Shock Tube L1 Convergence"
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Ubuntu
-        run: |
-          sudo apt update -y
-          sudo apt install -y cmake gcc g++ python3 python3-dev \
-                   openmpi-bin libopenmpi-dev
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Initialize MFC
-        run: ./mfc.sh init
-
-      - name: Run Sod shock tube L1 convergence tests
-        run: |
-          source build/venv/bin/activate
-          python toolchain/mfc/test/run_sod.py \
-            --resolutions 64 128 256 512 \
-            --num-ranks 4
-
-  convergence-temporal:
-    name: "RK3 Temporal Order"
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Ubuntu
-        run: |
-          sudo apt update -y
-          sudo apt install -y cmake gcc g++ python3 python3-dev \
-                   openmpi-bin libopenmpi-dev
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Initialize MFC
-        run: ./mfc.sh init
-
-      - name: Run temporal order tests
-        run: |
-          source build/venv/bin/activate
-          python toolchain/mfc/test/run_temporal_order.py \
-            --num-ranks 4
+      - name: Run convergence tests
+        run: ./mfc.sh test --only Convergence --no-build -j 1

@@ -5,7 +5,153 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f
+from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+
+# Convergence test specs.
+# One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
+# the filter handle (`./mfc.sh test --only Convergence`); convergence cases
+# are skipped by default.
+
+# 1D Euler advection (rho = 1 + 0.2*sin(2*pi*x), u=1, p=1, T=1):
+# WENO5/TENO5 use CFL=0.02 so RK3 temporal floor is below O(h^5) at N>=128.
+# WENO7/TENO7 cap at N=128 and use CFL=0.005 (machine-precision floor near N=512).
+# WENO3-JS degrades to 2nd order at smooth extrema (Henrick et al. 2005).
+# MUSCL2 uses unlimited slope (limiters clip to 1st order at smooth extrema).
+_CONS_VARS_1D = [("density", 1), ("x-momentum", 2), ("energy", 3)]
+_RES_1D_DEFAULT = [64, 128, 256, 512, 1024]
+_CONVERGENCE_1D_SCHEMES = [
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.2, 128, 512),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2, 0.2, 256, None),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.05, 128, None),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.1, 128, None),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.2, 128, 512),
+    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, 64, 128),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, 64, 128),
+]
+
+# 2D isentropic vortex (eps=0.01, hcid=283 Gauss-Legendre IC). WENO7/TENO7
+# excluded — covariance floor O(eps^3 h^2) dominates at N=32..128.
+_CONS_VARS_2D = [("density", 1), ("energy", 4)]
+_RES_2D_DEFAULT = [32, 64, 128]
+_CONVERGENCE_2D_SCHEMES = [
+    ("WENO5", ["--order", "5"], 5, 1.0, 64, None),
+    ("WENO3", ["--order", "3"], 3, 1.2, 32, None),
+    ("WENO1", ["--order", "1"], 1, 0.4, 32, None),
+    ("MUSCL2", ["--muscl"], 2, 0.5, 32, None),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6"], 5, 1.0, 64, None),
+]
+
+# Sod L1 self-convergence: any conservative monotone scheme converges at L1
+# rate ~1 (Godunov). SUPERBEE is over-compressive; min_N=128 skips its
+# pre-asymptotic point.
+_RES_SOD_DEFAULT = [128, 256, 512, 1024]
+_CONVERGENCE_SOD_SCHEMES = [
+    ("WENO1", ["--order", "1"], 1, 0.5, None),
+    ("WENO3", ["--order", "3"], 1, 0.3, None),
+    ("WENO5", ["--order", "5"], 1, 0.3, None),
+    ("WENO7", ["--order", "7"], 1, 0.3, None),
+    ("MUSCL-minmod", ["--muscl", "--muscl-lim", "1"], 1, 0.3, None),
+    ("MUSCL-MC", ["--muscl", "--muscl-lim", "2"], 1, 0.3, None),
+    ("MUSCL-VanLeer", ["--muscl", "--muscl-lim", "4"], 1, 0.3, None),
+    ("MUSCL-SUPERBEE", ["--muscl", "--muscl-lim", "5"], 1, 0.5, 128),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6"], 1, 0.3, None),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9"], 1, 0.3, None),
+]
+
+# Temporal order: fixed N=512 / WENO5; vary CFL.
+_CONVERGENCE_TEMPORAL_SCHEMES = [
+    ("RK1", ["--order", "5", "--time-stepper", "1"], 1, 0.1, [0.10, 0.05]),
+    ("RK2", ["--order", "5", "--time-stepper", "2"], 2, 0.2, [0.50, 0.25]),
+    ("RK3", ["--order", "5", "--time-stepper", "3"], 3, 0.3, [0.50, 0.25]),
+]
+
+
+def add_convergence_cases(cases):
+    num_ranks = 4
+
+    for label, extra_args, expected, tol, min_N, max_N in _CONVERGENCE_1D_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> 1D -> {label}",
+                spec={
+                    "runner": "1d_advection",
+                    "case_path": "examples/1D_euler_convergence/case.py",
+                    "extra_args": extra_args,
+                    "expected_order": expected,
+                    "tol": tol,
+                    "resolutions": _RES_1D_DEFAULT,
+                    "min_N": min_N,
+                    "max_N": max_N,
+                    "ndim": 1,
+                    "domain_len": 1.0,
+                    "cons_vars": _CONS_VARS_1D,
+                    "primary_idx": 1,
+                    "num_ranks": num_ranks,
+                },
+                ppn=num_ranks,
+            )
+        )
+
+    for label, extra_args, expected, tol, min_N, max_N in _CONVERGENCE_2D_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> 2D -> {label}",
+                spec={
+                    "runner": "2d_vortex",
+                    "case_path": "examples/2D_isentropicvortex_convergence/case.py",
+                    "extra_args": extra_args,
+                    "expected_order": expected,
+                    "tol": tol,
+                    "resolutions": _RES_2D_DEFAULT,
+                    "min_N": min_N,
+                    "max_N": max_N,
+                    "ndim": 2,
+                    "domain_len": 10.0,
+                    "cons_vars": _CONS_VARS_2D,
+                    "primary_idx": 1,
+                    "num_ranks": num_ranks,
+                },
+                ppn=num_ranks,
+            )
+        )
+
+    for label, extra_args, expected, tol, min_N in _CONVERGENCE_SOD_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> Sod -> {label}",
+                spec={
+                    "runner": "sod_l1",
+                    "case_path": "examples/1D_sod_convergence/case.py",
+                    "extra_args": extra_args,
+                    "expected_order": expected,
+                    "tol": tol,
+                    "resolutions": _RES_SOD_DEFAULT,
+                    "min_N": min_N,
+                    "num_ranks": num_ranks,
+                },
+                ppn=num_ranks,
+            )
+        )
+
+    for label, extra_args, expected, tol, cfls in _CONVERGENCE_TEMPORAL_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> Temporal -> {label}",
+                spec={
+                    "runner": "temporal",
+                    "case_path": "examples/1D_euler_convergence/case.py",
+                    "extra_args": extra_args,
+                    "expected_order": expected,
+                    "tol": tol,
+                    "cfls": cfls,
+                    "N": 512,
+                    "cons_vars": _CONS_VARS_1D,
+                    "primary_idx": 1,
+                    "num_ranks": num_ranks,
+                },
+                ppn=num_ranks,
+            )
+        )
 
 
 def get_bc_mods(bc: int, dimInfo):
@@ -2235,6 +2381,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     kernel_golden_tests()
+
+    add_convergence_cases(cases)
 
     # Sanity Check 1
     if stack.size() != 0:
