@@ -29,16 +29,22 @@ _CONVERGENCE_1D_SCHEMES = [
     ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, 64, 128),
 ]
 
-# 2D isentropic vortex (eps=0.01, hcid=283 Gauss-Legendre IC). WENO7/TENO7
-# excluded — covariance floor O(eps^3 h^2) dominates at N=32..128.
+# 2D diagonal advection (rho = 1 + 0.2 sin(2pi(x+y)), v=(1,1), period T=0.5):
+# linear primitives mean no covariance floor — clean asymptotic rates for all
+# WENO/MUSCL/TENO orders. WENO3 reduces to 2nd at smooth extrema (Henrick 2005).
+# 4 ranks (2x2 decomp): per-rank stencil constraint n+1 >= 5*weno_order/2.
+# WENO5/TENO5 use [64, 96, 128] (33>=25 at N=64). WENO7/TENO7 use [80, 96]
+# (41>=35 at N=80) and CFL=0.005 to push RK3 temporal error below O(h^7).
+# (label, extra_args, expected_order, tol, resolutions)
 _CONS_VARS_2D = [("density", 1), ("energy", 4)]
-_RES_2D_DEFAULT = [32, 64, 128]
 _CONVERGENCE_2D_SCHEMES = [
-    ("WENO5", ["--order", "5"], 5, 1.0, 64, None),
-    ("WENO3", ["--order", "3"], 3, 1.2, 32, None),
-    ("WENO1", ["--order", "1"], 1, 0.4, 32, None),
-    ("MUSCL2", ["--muscl"], 2, 0.5, 32, None),
-    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6"], 5, 1.0, 64, None),
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [64, 96, 128]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2, 0.3, [32, 64, 128]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64, 128]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.1, [32, 64, 128]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [64, 96, 128]),
+    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [80, 96]),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [80, 96]),
 ]
 
 # Sod L1 self-convergence: any conservative monotone scheme converges at L1
@@ -104,21 +110,19 @@ def add_convergence_cases(cases):
             )
         )
 
-    for label, extra_args, expected, tol, min_N, max_N in _CONVERGENCE_2D_SCHEMES:
+    for label, extra_args, expected, tol, resolutions in _CONVERGENCE_2D_SCHEMES:
         cases.append(
             define_convergence_case(
                 f"Convergence -> 2D -> {label}",
                 spec={
-                    "runner": "2d_vortex",
-                    "case_path": "examples/2D_isentropicvortex_convergence/case.py",
+                    "runner": "2d_advection",
+                    "case_path": "examples/2D_advection_convergence/case.py",
                     "extra_args": extra_args,
                     "expected_order": expected,
                     "tol": tol,
-                    "resolutions": _RES_2D_DEFAULT,
-                    "min_N": min_N,
-                    "max_N": max_N,
+                    "resolutions": resolutions,
                     "ndim": 2,
-                    "domain_len": 10.0,
+                    "domain_len": 1.0,
                     "cons_vars": _CONS_VARS_2D,
                     "primary_idx": 1,
                     "num_ranks": num_ranks,
@@ -158,30 +162,6 @@ def add_convergence_cases(cases):
                     "cfls": cfls,
                     "N": 512,
                     "cons_vars": _CONS_VARS_1D,
-                    "primary_idx": 1,
-                    "num_ranks": num_ranks,
-                },
-                ppn=num_ranks,
-            )
-        )
-
-    # 2D diagonal advection — same 4-rank decomposition as the rest of the suite.
-    for label, extra_args, expected, tol, min_N, max_N in _CONVERGENCE_2D_ADV_SCHEMES:
-        cases.append(
-            define_convergence_case(
-                f"Convergence -> 2D Adv -> {label}",
-                spec={
-                    "runner": "2d_vortex",
-                    "case_path": "examples/2D_advection_convergence/case.py",
-                    "extra_args": extra_args,
-                    "expected_order": expected,
-                    "tol": tol,
-                    "resolutions": _RES_2D_ADV_DEFAULT,
-                    "min_N": min_N,
-                    "max_N": max_N,
-                    "ndim": 2,
-                    "domain_len": 1.0,
-                    "cons_vars": _CONS_VARS_2D,
                     "primary_idx": 1,
                     "num_ranks": num_ranks,
                 },
@@ -1763,7 +1743,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_titarevtorro_analytical",
                 "2D_acoustic_pulse_analytical",
                 "2D_isentropicvortex_analytical",
-                "2D_isentropicvortex_convergence",
                 "1D_euler_convergence",
                 "1D_advection_convergence",
                 "1D_sod_convergence",

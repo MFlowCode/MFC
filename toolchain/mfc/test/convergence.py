@@ -288,7 +288,7 @@ def _run_sod_l1(spec):
 
 _RUNNERS = {
     "1d_advection": _run_resolution_sweep,
-    "2d_vortex": _run_resolution_sweep,
+    "2d_advection": _run_resolution_sweep,
     "temporal": _run_temporal,
     "sod_l1": _run_sod_l1,
 }
