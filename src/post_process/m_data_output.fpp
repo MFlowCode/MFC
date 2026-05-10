@@ -901,86 +901,102 @@ contains
 
         call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
-        gsizes(1) = file_tot_part
-        gsizes(2) = lag_io_vars
-        lsizes(1) = file_tot_part
-        lsizes(2) = lag_io_vars
-        start_idx_part(1) = 0
-        start_idx_part(2) = 0
+        if (file_tot_part > 0) then
+            gsizes(1) = file_tot_part
+            gsizes(2) = lag_io_vars
+            lsizes(1) = file_tot_part
+            lsizes(2) = lag_io_vars
+            start_idx_part(1) = 0
+            start_idx_part(2) = 0
 
-        call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
-        call MPI_TYPE_COMMIT(view, ierr)
+            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
 
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-        disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
-                   & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
-        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_null, ierr)
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
+                       & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_null, ierr)
 
-        allocate (MPI_IO_DATA_lg_bubbles(file_tot_part,1:lag_io_vars))
+            allocate (MPI_IO_DATA_lg_bubbles(file_tot_part,1:lag_io_vars))
 
-        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, lag_io_vars*file_tot_part, mpi_p, status, ierr)
+            call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, lag_io_vars*file_tot_part, mpi_p, status, ierr)
 
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_post_process_', t_step, '.dat'
-        file_loc = trim(case_dir) // '/lag_bubbles_post_process/' // trim(file_loc)
+            write (file_loc, '(A,I0,A)') 'lag_bubbles_post_process_', t_step, '.dat'
+            file_loc = trim(case_dir) // '/lag_bubbles_post_process/' // trim(file_loc)
 
-        if (proc_rank == 0) then
-            open (unit=29, file=file_loc, form='formatted', position='rewind')
+            if (proc_rank == 0) then
+                open (unit=29, file=file_loc, form='formatted', position='rewind')
 
-            if (lag_header) then
-                write (29, '(A)', advance='no')
-                if (lag_id_wrt) write (29, '(A8)', advance='no') 'id, '
-                if (lag_pos_wrt) write (29, '(3(A17))', advance='no') 'px, ', 'py, ', 'pz, '
-                if (lag_pos_prev_wrt) write (29, '(3(A17))', advance='no') 'pvx, ', 'pvy, ', 'pvz, '
-                if (lag_vel_wrt) write (29, '(3(A17))', advance='no') 'vx, ', 'vy, ', 'vz, '
-                if (lag_rad_wrt) write (29, '(A17)', advance='no') 'radius, '
-                if (lag_rvel_wrt) write (29, '(A17)', advance='no') 'rvel, '
-                if (lag_r0_wrt) write (29, '(A17)', advance='no') 'r0, '
-                if (lag_rmax_wrt) write (29, '(A17)', advance='no') 'rmax, '
-                if (lag_rmin_wrt) write (29, '(A17)', advance='no') 'rmin, '
-                if (lag_dphidt_wrt) write (29, '(A17)', advance='no') 'dphidt, '
-                if (lag_pres_wrt) write (29, '(A17)', advance='no') 'pressure, '
-                if (lag_mv_wrt) write (29, '(A17)', advance='no') 'mv, '
-                if (lag_mg_wrt) write (29, '(A17)', advance='no') 'mg, '
-                if (lag_betaT_wrt) write (29, '(A17)', advance='no') 'betaT, '
-                if (lag_betaC_wrt) write (29, '(A17)', advance='no') 'betaC, '
-                write (29, '(A15)') 'time'
+                if (lag_header) then
+                    write (29, '(A)', advance='no')
+                    if (lag_id_wrt) write (29, '(A8)', advance='no') 'id, '
+                    if (lag_pos_wrt) write (29, '(3(A17))', advance='no') 'px, ', 'py, ', 'pz, '
+                    if (lag_pos_prev_wrt) write (29, '(3(A17))', advance='no') 'pvx, ', 'pvy, ', 'pvz, '
+                    if (lag_vel_wrt) write (29, '(3(A17))', advance='no') 'vx, ', 'vy, ', 'vz, '
+                    if (lag_rad_wrt) write (29, '(A17)', advance='no') 'radius, '
+                    if (lag_rvel_wrt) write (29, '(A17)', advance='no') 'rvel, '
+                    if (lag_r0_wrt) write (29, '(A17)', advance='no') 'r0, '
+                    if (lag_rmax_wrt) write (29, '(A17)', advance='no') 'rmax, '
+                    if (lag_rmin_wrt) write (29, '(A17)', advance='no') 'rmin, '
+                    if (lag_dphidt_wrt) write (29, '(A17)', advance='no') 'dphidt, '
+                    if (lag_pres_wrt) write (29, '(A17)', advance='no') 'pressure, '
+                    if (lag_mv_wrt) write (29, '(A17)', advance='no') 'mv, '
+                    if (lag_mg_wrt) write (29, '(A17)', advance='no') 'mg, '
+                    if (lag_betaT_wrt) write (29, '(A17)', advance='no') 'betaT, '
+                    if (lag_betaC_wrt) write (29, '(A17)', advance='no') 'betaC, '
+                    write (29, '(A15)') 'time'
+                end if
+
+                do i = 1, file_tot_part
+                    id = int(MPI_IO_DATA_lg_bubbles(i, 1))
+                    inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i,2:21)
+                    if (id > 0) then
+                        write (29, '(100(A))', advance='no') ''
+                        if (lag_id_wrt) write (29, '(I6, A)', advance='no') id, ', '
+                        if (lag_pos_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(1), ', ', inputvals(2), ', ', &
+                            & inputvals(3), ', '
+                        if (lag_pos_prev_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(4), ', ', inputvals(5), ', ', &
+                            & inputvals(6), ', '
+                        if (lag_vel_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(7), ', ', inputvals(8), ', ', &
+                            & inputvals(9), ', '
+                        if (lag_rad_wrt) write (29, '(E15.7, A)', advance='no') inputvals(10), ', '
+                        if (lag_rvel_wrt) write (29, '(E15.7, A)', advance='no') inputvals(11), ', '
+                        if (lag_r0_wrt) write (29, '(E15.7, A)', advance='no') inputvals(12), ', '
+                        if (lag_rmax_wrt) write (29, '(E15.7, A)', advance='no') inputvals(13), ', '
+                        if (lag_rmin_wrt) write (29, '(E15.7, A)', advance='no') inputvals(14), ', '
+                        if (lag_dphidt_wrt) write (29, '(E15.7, A)', advance='no') inputvals(15), ', '
+                        if (lag_pres_wrt) write (29, '(E15.7, A)', advance='no') inputvals(16), ', '
+                        if (lag_mv_wrt) write (29, '(E15.7, A)', advance='no') inputvals(17), ', '
+                        if (lag_mg_wrt) write (29, '(E15.7, A)', advance='no') inputvals(18), ', '
+                        if (lag_betaT_wrt) write (29, '(E15.7, A)', advance='no') inputvals(19), ', '
+                        if (lag_betaC_wrt) write (29, '(E15.7, A)', advance='no') inputvals(20), ', '
+                        write (29, '(E15.7)') time_real
+                    end if
+                end do
+                close (29)
             end if
 
-            do i = 1, file_tot_part
-                id = int(MPI_IO_DATA_lg_bubbles(i, 1))
-                inputvals(1:20) = MPI_IO_DATA_lg_bubbles(i,2:21)
-                if (id > 0) then
-                    write (29, '(100(A))', advance='no') ''
-                    if (lag_id_wrt) write (29, '(I6, A)', advance='no') id, ', '
-                    if (lag_pos_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(1), ', ', inputvals(2), ', ', &
-                        & inputvals(3), ', '
-                    if (lag_pos_prev_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(4), ', ', inputvals(5), ', ', &
-                        & inputvals(6), ', '
-                    if (lag_vel_wrt) write (29, '(3(E15.7, A))', advance='no') inputvals(7), ', ', inputvals(8), ', ', &
-                        & inputvals(9), ', '
-                    if (lag_rad_wrt) write (29, '(E15.7, A)', advance='no') inputvals(10), ', '
-                    if (lag_rvel_wrt) write (29, '(E15.7, A)', advance='no') inputvals(11), ', '
-                    if (lag_r0_wrt) write (29, '(E15.7, A)', advance='no') inputvals(12), ', '
-                    if (lag_rmax_wrt) write (29, '(E15.7, A)', advance='no') inputvals(13), ', '
-                    if (lag_rmin_wrt) write (29, '(E15.7, A)', advance='no') inputvals(14), ', '
-                    if (lag_dphidt_wrt) write (29, '(E15.7, A)', advance='no') inputvals(15), ', '
-                    if (lag_pres_wrt) write (29, '(E15.7, A)', advance='no') inputvals(16), ', '
-                    if (lag_mv_wrt) write (29, '(E15.7, A)', advance='no') inputvals(17), ', '
-                    if (lag_mg_wrt) write (29, '(E15.7, A)', advance='no') inputvals(18), ', '
-                    if (lag_betaT_wrt) write (29, '(E15.7, A)', advance='no') inputvals(19), ', '
-                    if (lag_betaC_wrt) write (29, '(E15.7, A)', advance='no') inputvals(20), ', '
-                    write (29, '(E15.7)') time_real
-                end if
-            end do
-            close (29)
+            deallocate (MPI_IO_DATA_lg_bubbles)
+
+            call s_mpi_barrier()
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        else
+            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
+            call MPI_TYPE_COMMIT(view, ierr)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
+                       & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
+            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_null, ierr)
+
+            call MPI_FILE_READ_ALL(ifile, lag_io_null, 0, mpi_p, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+            call MPI_TYPE_FREE(view, ierr)
         end if
-
-        deallocate (MPI_IO_DATA_lg_bubbles)
-
-        call s_mpi_barrier()
-
-        call MPI_FILE_CLOSE(ifile, ierr)
 #endif
 
     end subroutine s_write_lag_bubbles_results_to_text
@@ -1083,7 +1099,6 @@ contains
                 allocate (${VAR}$ (nBub))
             #:endfor
             allocate (MPI_IO_DATA_lg_bubbles(nBub,1:lag_io_vars))
-
             call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
             call MPI_TYPE_COMMIT(view, ierr)
 

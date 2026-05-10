@@ -1902,7 +1902,7 @@ contains
         real(wp), dimension(1:1,1:lag_io_vars) :: dummy
         dummy = 0._wp
 
-        bub_id = 0._wp
+        bub_id = 0
         if (n_el_bubs_loc /= 0) then
             do k = 1, n_el_bubs_loc
                 if (particle_in_domain_physical(mtn_pos(k,1:3,1))) then
