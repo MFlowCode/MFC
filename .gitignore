@@ -37,7 +37,6 @@ docs/documentation/parameters.md
 /tests/*/**
 !/tests/*/golden.txt
 !/tests/*/golden-metadata.txt
-!/tests/fp_stability/**
 
 # NVIDIA Nsight Compute
 *.nsys-rep

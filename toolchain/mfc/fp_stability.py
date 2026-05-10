@@ -66,8 +66,6 @@ from .common import MFC_ROOT_DIR, MFCException
 from .printer import cons
 from .state import ARG
 
-CASES_DIR = os.path.join(MFC_ROOT_DIR, "tests", "fp_stability", "cases")
-
 # Mantissa-bit levels for the VPREC sweep (C).
 # 52 = full double, 23 = single, 16 = half-ish, 10 = ultra-low.
 VPREC_MANTISSA_BITS = [52, 23, 16, 10]
@@ -110,8 +108,226 @@ def _get_source_context(fname: str, lineno: int, context: int = 2) -> str:
     return "\n".join(rows)
 
 
+_AIR_EOS = {"fluid_pp(1)%gamma": 1.0 / 0.4, "fluid_pp(1)%pi_inf": 0.0}
+_WATER_EOS = {"fluid_pp(1)%gamma": 0.1953125, "fluid_pp(1)%pi_inf": 4046.31}
+
+_BASE_PRE = {
+    "x_domain%beg": 0.0,
+    "x_domain%end": 1.0,
+    "n": 0,
+    "p": 0,
+    "t_step_start": 0,
+    "num_patches": 2,
+    "model_eqns": 2,
+    "weno_order": 5,
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    "precision": 2,
+    "parallel_io": "F",
+    "patch_icpp(1)%geometry": 1,
+    "patch_icpp(1)%x_centroid": 0.25,
+    "patch_icpp(1)%length_x": 0.5,
+    "patch_icpp(1)%vel(1)": 0.0,
+    "patch_icpp(2)%geometry": 1,
+    "patch_icpp(2)%x_centroid": 0.75,
+    "patch_icpp(2)%length_x": 0.5,
+    "patch_icpp(2)%vel(1)": 0.0,
+}
+
+_BASE_SIM = {
+    "run_time_info": "F",
+    "x_domain%beg": 0.0,
+    "x_domain%end": 1.0,
+    "n": 0,
+    "p": 0,
+    "t_step_start": 0,
+    "t_step_stop": 50,
+    "t_step_save": 50,
+    "model_eqns": 2,
+    "mpp_lim": "F",
+    "mixture_err": "F",
+    "time_stepper": 3,
+    "weno_order": 5,
+    "weno_eps": 1e-16,
+    "riemann_solver": 2,
+    "wave_speeds": 1,
+    "avg_state": 2,
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    "precision": 2,
+    "prim_vars_wrt": "F",
+    "parallel_io": "F",
+}
+
+_CASE_PARAMS = {
+    "sod_standard": {
+        "pre": {
+            **_BASE_PRE,
+            "m": 24,
+            "num_fluids": 1,
+            "mpp_lim": "F",
+            "patch_icpp(1)%pres": 1.0,
+            "patch_icpp(1)%alpha_rho(1)": 1.0,
+            "patch_icpp(1)%alpha(1)": 1.0,
+            "patch_icpp(2)%pres": 0.1,
+            "patch_icpp(2)%alpha_rho(1)": 0.125,
+            "patch_icpp(2)%alpha(1)": 1.0,
+            **_AIR_EOS,
+        },
+        "sim": {**_BASE_SIM, "m": 24, "num_fluids": 1, "dt": 0.001, **_AIR_EOS},
+    },
+    "sod_strong": {
+        "pre": {
+            **_BASE_PRE,
+            "m": 49,
+            "num_fluids": 1,
+            "mpp_lim": "F",
+            "patch_icpp(1)%pres": 1000.0,
+            "patch_icpp(1)%alpha_rho(1)": 10.0,
+            "patch_icpp(1)%alpha(1)": 1.0,
+            "patch_icpp(2)%pres": 0.01,
+            "patch_icpp(2)%alpha_rho(1)": 0.01,
+            "patch_icpp(2)%alpha(1)": 1.0,
+            **_AIR_EOS,
+        },
+        "sim": {**_BASE_SIM, "m": 49, "num_fluids": 1, "dt": 5e-5, "prim_vars_wrt": "T", **_AIR_EOS},
+    },
+    "water_stiffened": {
+        "pre": {
+            **_BASE_PRE,
+            "m": 49,
+            "num_fluids": 1,
+            "mpp_lim": "F",
+            "patch_icpp(1)%pres": 100.0,
+            "patch_icpp(1)%alpha_rho(1)": 1.0,
+            "patch_icpp(1)%alpha(1)": 1.0,
+            "patch_icpp(2)%pres": 0.1,
+            "patch_icpp(2)%alpha_rho(1)": 1.0,
+            "patch_icpp(2)%alpha(1)": 1.0,
+            **_WATER_EOS,
+        },
+        "sim": {**_BASE_SIM, "m": 49, "num_fluids": 1, "dt": 2.5e-5, "mixture_err": "T", "prim_vars_wrt": "T", **_WATER_EOS},
+    },
+    "air_water_interface": {
+        "pre": {
+            **_BASE_PRE,
+            "m": 24,
+            "num_fluids": 2,
+            "mpp_lim": "T",
+            "patch_icpp(1)%pres": 1.0,
+            "patch_icpp(1)%alpha_rho(1)": 1.0,
+            "patch_icpp(1)%alpha_rho(2)": 0.0,
+            "patch_icpp(1)%alpha(1)": 1.0,
+            "patch_icpp(1)%alpha(2)": 0.0,
+            "patch_icpp(2)%pres": 1.0,
+            "patch_icpp(2)%alpha_rho(1)": 0.0,
+            "patch_icpp(2)%alpha_rho(2)": 1.0,
+            "patch_icpp(2)%alpha(1)": 0.0,
+            "patch_icpp(2)%alpha(2)": 1.0,
+            **_AIR_EOS,
+            "fluid_pp(2)%gamma": 0.1953125,
+            "fluid_pp(2)%pi_inf": 4046.31,
+        },
+        "sim": {
+            **_BASE_SIM,
+            "m": 24,
+            "num_fluids": 2,
+            "mpp_lim": "T",
+            "dt": 5e-5,
+            "mixture_err": "T",
+            **_AIR_EOS,
+            "fluid_pp(2)%gamma": 0.1953125,
+            "fluid_pp(2)%pi_inf": 4046.31,
+        },
+    },
+    "bubble_rp": {
+        "pre": {
+            **_BASE_PRE,
+            "m": 49,
+            "num_fluids": 1,
+            "mpp_lim": "F",
+            "bubbles_euler": "T",
+            "nb": 1,
+            "polytropic": "T",
+            "polydisperse": "F",
+            "thermal": 3,
+            "pref": 101325.0,
+            "rhoref": 1000.0,
+            "patch_icpp(1)%pres": 2.0,
+            "patch_icpp(1)%alpha_rho(1)": 0.96,
+            "patch_icpp(1)%alpha(1)": 0.04,
+            "patch_icpp(1)%r0": 1.0,
+            "patch_icpp(1)%v0": 0.0,
+            "patch_icpp(2)%pres": 1.0,
+            "patch_icpp(2)%alpha_rho(1)": 0.96,
+            "patch_icpp(2)%alpha(1)": 0.04,
+            "patch_icpp(2)%r0": 1.0,
+            "patch_icpp(2)%v0": 0.0,
+            "fluid_pp(1)%gamma": 0.16,
+            "fluid_pp(1)%pi_inf": 3515.0,
+            "bub_pp%R0ref": 1.0,
+            "bub_pp%p0ref": 1.0,
+            "bub_pp%rho0ref": 1.0,
+            "bub_pp%ss": 0.07179866765358993,
+            "bub_pp%pv": 0.02308216136195411,
+            "bub_pp%mu_l": 0.009954269975623244,
+            "bub_pp%gam_g": 1.4,
+        },
+        "sim": {
+            **_BASE_SIM,
+            "m": 49,
+            "num_fluids": 1,
+            "dt": 2.5e-5,
+            "mixture_err": "T",
+            "prim_vars_wrt": "T",
+            "bubbles_euler": "T",
+            "nb": 1,
+            "bubble_model": 3,
+            "polytropic": "T",
+            "polydisperse": "F",
+            "thermal": 3,
+            "pref": 101325.0,
+            "rhoref": 1000.0,
+            "fluid_pp(1)%gamma": 0.16,
+            "fluid_pp(1)%pi_inf": 3515.0,
+            "bub_pp%R0ref": 1.0,
+            "bub_pp%p0ref": 1.0,
+            "bub_pp%rho0ref": 1.0,
+            "bub_pp%ss": 0.07179866765358993,
+            "bub_pp%pv": 0.02308216136195411,
+            "bub_pp%mu_l": 0.009954269975623244,
+            "bub_pp%gam_g": 1.4,
+        },
+    },
+    "low_mach": {
+        "pre": {
+            **_BASE_PRE,
+            "m": 49,
+            "num_fluids": 1,
+            "mpp_lim": "F",
+            "patch_icpp(1)%pres": 100.0,
+            "patch_icpp(1)%alpha_rho(1)": 1.0,
+            "patch_icpp(1)%alpha(1)": 1.0,
+            "patch_icpp(2)%pres": 0.1,
+            "patch_icpp(2)%alpha_rho(1)": 1.0,
+            "patch_icpp(2)%alpha(1)": 1.0,
+            **_WATER_EOS,
+        },
+        "sim": {
+            **_BASE_SIM,
+            "m": 49,
+            "num_fluids": 1,
+            "dt": 2.5e-5,
+            "mixture_err": "T",
+            "prim_vars_wrt": "T",
+            "low_Mach": 1,
+            **_WATER_EOS,
+        },
+    },
+}
+
 # Each case:
-#   name         - subdirectory under CASES_DIR
+#   name         - unique identifier (key in _CASE_PARAMS)
 #   description  - human-readable purpose
 #   compare      - list of D/ filenames to compare
 #   threshold    - max L∞ deviation allowed (conserved-variable units)
@@ -193,8 +409,18 @@ def _verrou_pythonpath(verrou_bin: str) -> str:
     return matches[0] if matches else ""
 
 
-def _run_preprocess(pp_bin: str, case_dir: str, work_dir: str):
-    shutil.copy2(os.path.join(case_dir, "pre_process.inp"), work_dir)
+def _write_inp(params: dict, target_name: str, work_dir: str) -> None:
+    """Write a Fortran namelist .inp file from a Python params dict."""
+    from .run import case_dicts
+
+    master_keys = case_dicts.get_input_dict_keys(target_name)
+    lines = [f"{k} = {v}" for k, v in params.items() if k in master_keys]
+    with open(os.path.join(work_dir, f"{target_name}.inp"), "w") as fh:
+        fh.write("&user_inputs\n" + "\n".join(lines) + "\n&end/\n")
+
+
+def _run_preprocess(pp_bin: str, pre_params: dict, work_dir: str):
+    _write_inp(pre_params, "pre_process", work_dir)
     with open(os.path.join(work_dir, "pre.log"), "w") as f:
         result = subprocess.run([pp_bin], cwd=work_dir, stdout=f, stderr=subprocess.STDOUT, check=False)
     if result.returncode != 0:
@@ -630,7 +856,6 @@ def _run_case(
     name = case["name"]
     threshold = case["threshold"]
     compare = case["compare"]
-    case_dir = os.path.join(CASES_DIR, name)
 
     cons.print(f"[bold]{name}[/bold]: {case['description']}")
     cons.indent()
@@ -655,8 +880,9 @@ def _run_case(
     }
     try:
         cons.print("  [dim]running pre_process...[/dim]")
-        shutil.copy2(os.path.join(case_dir, "simulation.inp"), work_dir)
-        _run_preprocess(pp_bin, case_dir, work_dir)
+        params = _CASE_PARAMS[name]
+        _write_inp(params["sim"], "simulation", work_dir)
+        _run_preprocess(pp_bin, params["pre"], work_dir)
 
         ref_dir = os.path.join(work_dir, "ref")
         os.makedirs(ref_dir)
