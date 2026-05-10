@@ -678,16 +678,16 @@ class CaseValidator:
         cyl_coord = self.get("cyl_coord", "F") == "T"
         viscous = self.get("viscous", "F") == "T"
 
+        self.prohibit(riemann_solver is None, "riemann_solver must be specified (1=HLL, 2=HLLC, 4=HLLD, 5=Lax-Friedrichs)")
         if riemann_solver is None:
             return
 
-        self.prohibit(riemann_solver < 1 or riemann_solver > 5, "riemann_solver must be 1, 2, 3, 4 or 5")
+        self.prohibit(riemann_solver not in [1, 2, 4, 5], "riemann_solver must be 1 (HLL), 2 (HLLC), 4 (HLLD), or 5 (Lax-Friedrichs)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
-        self.prohibit(riemann_solver == 3 and wave_speeds is not None, "Exact Riemann (riemann_solver = 3) does not support wave_speeds")
         self.prohibit(avg_state is not None and avg_state not in [1, 2], "avg_state must be 1 or 2")
-        self.prohibit(riemann_solver not in [3, 5] and wave_speeds is None, "wave_speeds must be set if riemann_solver != 3,5")
-        self.prohibit(riemann_solver not in [3, 5] and avg_state is None, "avg_state must be set if riemann_solver != 3,5")
+        self.prohibit(riemann_solver != 5 and wave_speeds is None, "wave_speeds must be set for riemann_solver 1, 2, or 4")
+        self.prohibit(riemann_solver != 5 and avg_state is None, "avg_state must be set for riemann_solver 1, 2, or 4")
         self.prohibit(low_Mach not in [0, 1, 2], "low_Mach must be 0, 1, or 2")
         self.prohibit(riemann_solver != 2 and low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
         self.prohibit(low_Mach != 0 and model_eqns not in [2, 3], "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
