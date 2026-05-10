@@ -120,15 +120,16 @@ def _print_conservation_check(all_cons_errs, var_list, tol=CONS_TOL):
 def _run_resolution_sweep(spec):
     """1D/2D/3D resolution sweep on a smooth diagonal-advection problem.
 
+    `expected_order` in the spec always names the scheme's spatial order p.
     Two time modes:
       - 'period' (default): T = one full advection period; compare q(T) vs q(0).
-        Spatial truncation accumulates over a full period, so error ~ h^p and
-        the measured rate equals the scheme order p.
-      - 'cell_shift':       T = cell_shift * h / v; compare q(T) vs np.roll of q(0)
+        Truncation accumulates over fixed T, so error ~ h^p and measured rate = p.
+      - 'cell_shift': T = cell_shift * h / v; compare q(T) vs np.roll of q(0)
         by cell_shift cells (analytical solution for periodic linear advection
-        with v=1 in unit domain). Cost is O(1) in N (Nt = c/CFL independent
-        of resolution). Error scales as T*h^p = h^(p+1) so the measured rate
-        is p+1. Forces num_ranks=1 for unambiguous Fortran-order data layout.
+        with v=1). Cost is O(1) in N (Nt = K*c/CFL independent of resolution).
+        Error scales as T*h^p = h^(p+1), giving raw measured rate = p+1; the
+        runner subtracts 1 for display so the reported "spatial order" still
+        equals p. Forces num_ranks=1 for unambiguous Fortran-order data layout.
     """
     case_path = spec["case_path"]
     extra_args = list(spec.get("extra_args", []))
@@ -146,15 +147,20 @@ def _run_resolution_sweep(spec):
     if time_mode == "cell_shift":
         # Single-rank only: multi-rank concat order doesn't match (N,)*ndim reshape.
         num_ranks = 1
+        # Cell-shift mode: T = K*h, so raw rate is p+1; subtract 1 for display.
+        rate_offset = 1
+        order_label = "spatial order"
     else:
         num_ranks = spec.get("num_ranks", 1)
+        rate_offset = 0
+        order_label = "rate"
 
     if "min_N" in spec and spec["min_N"] is not None:
         resolutions = [N for N in resolutions if N >= spec["min_N"]]
     if "max_N" in spec and spec["max_N"] is not None:
         resolutions = [N for N in resolutions if N <= spec["max_N"]]
 
-    print(f"  (need rate >= {expected_order - tol:.1f})")
+    print(f"  (need {order_label} >= {expected_order - tol:.1f})")
 
     errors = []
     nts = []
@@ -185,16 +191,18 @@ def _run_resolution_sweep(spec):
     dxs = [domain_len / N for N in resolutions]
     rates = _pairwise_rates(errors, dxs)
 
-    print(f"\n  {'N':>6}  {'Nt':>6}  {'dx':>10}  {'L2 error':>14}  {'rate':>8}")
-    print(f"  {'-' * 6}  {'-' * 6}  {'-' * 10}  {'-' * 14}  {'-' * 8}")
+    col_label = order_label.replace(" ", "_")
+    print(f"\n  {'N':>6}  {'Nt':>6}  {'dx':>10}  {'L2 error':>14}  {col_label:>13}")
+    print(f"  {'-' * 6}  {'-' * 6}  {'-' * 10}  {'-' * 14}  {'-' * 13}")
     for i, N in enumerate(resolutions):
-        r_str = f"{rates[i]:>8.2f}" if rates[i] is not None else f"{'---':>8}"
+        r_str = f"{rates[i] - rate_offset:>13.2f}" if rates[i] is not None else f"{'---':>13}"
         print(f"  {N:>6}  {nts[i]:>6}  {dxs[i]:>10.6f}  {errors[i]:>14.6e}  {r_str}")
 
     if len(resolutions) > 1:
         overall = _fit_rate(errors, dxs)
-        print(f"\n  Fitted rate: {overall:.2f}  (need >= {expected_order - tol:.1f})")
-        rate_passed = overall >= expected_order - tol
+        displayed = overall - rate_offset
+        print(f"\n  Fitted {order_label}: {displayed:.2f}  (need >= {expected_order - tol:.1f})")
+        rate_passed = displayed >= expected_order - tol
     else:
         rate_passed = True
 

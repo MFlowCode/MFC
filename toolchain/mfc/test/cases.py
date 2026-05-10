@@ -12,26 +12,28 @@ from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define
 # the filter handle (`./mfc.sh test --only Convergence`); convergence cases
 # are skipped by default.
 
-# Advection convergence cases use cell-shift mode by default: T = K*h per
-# resolution, compare q(T) to np.roll(q(0), -K) per dim. Spatial error scales
-# as T*h^p = h^(p+1), so measured rate = p+1 (p = scheme order). Wins ~10-100x
-# vs running a full period since Nt = K*c/CFL is independent of N.
-# WENO7/TENO7 stay in period mode: at typical N their cell-shift error hits
-# machine precision (h^8 < 1e-15 at N=64) before any rate signal develops.
+# Advection convergence cases. Cell-shift mode: T = K*h per resolution, compare
+# q(T) to np.roll(q(0), +K) per dim. Cost is O(1) in N (Nt = K*c/CFL independent
+# of resolution) — wins ~10-100x vs period mode (full advection period).
+# WENO7/TENO7 stay in period mode: at typical N their cell-shift signal sinks
+# below machine precision (h^8 < 1e-15 at N=64) before any rate develops.
+#
+# expected_order is always the scheme's spatial order p. The runner subtracts
+# 1 from the displayed rate in cell-shift mode (where raw rate = p+1) so the
+# reported "spatial order" matches expected_order in both modes.
 _CONS_VARS_1D = [("density", 1), ("x-momentum", 2), ("energy", 3)]
 _CONS_VARS_2D = [("density", 1), ("energy", 4)]
 _CONS_VARS_3D = [("density", 1), ("energy", 5)]
 
 # (label, extra_args, expected_order, tol, resolutions)
-# expected_order = scheme order p + 1 in cell-shift mode (T scales with h).
-# WENO3-JS reduces to 2 at smooth extrema → cell-shift expected = 3.
-# MUSCL2 unlimited central → effective order 2 → cell-shift expected = 3.
+# WENO3-JS at smooth extrema empirically achieves ~1.5 in MFC (Henrick mapping
+# enabled). MUSCL2 unlimited central → effective spatial order 2.
 _CONVERGENCE_1D_SCHEMES = [
-    ("WENO5", ["--order", "5", "--cfl", "0.02"], 6, 0.3, [32, 64, 128]),
-    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2.5, 0.3, [64, 128, 256]),
-    ("WENO1", ["--order", "1", "--cfl", "0.02"], 2, 0.2, [64, 128, 256]),
-    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 3, 0.3, [64, 128, 256]),
-    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 6, 0.3, [32, 64, 128]),
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [32, 64, 128]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 1.5, 0.3, [64, 128, 256]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [64, 128, 256]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [64, 128, 256]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64, 128]),
 ]
 # WENO7/TENO7 in 1D: period mode (full period T=1.0, see 1D case.py).
 _CONVERGENCE_1D_PERIOD_SCHEMES = [
@@ -40,11 +42,11 @@ _CONVERGENCE_1D_PERIOD_SCHEMES = [
 ]
 
 _CONVERGENCE_2D_SCHEMES = [
-    ("WENO5", ["--order", "5", "--cfl", "0.02"], 6, 0.3, [32, 64, 96]),
-    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2.5, 0.3, [32, 64, 128]),
-    ("WENO1", ["--order", "1", "--cfl", "0.02"], 2, 0.2, [32, 64, 128]),
-    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 3, 0.3, [32, 64, 128]),
-    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 6, 0.3, [32, 64, 96]),
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [32, 64, 96]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 1.5, 0.3, [32, 64, 128]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64, 128]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [32, 64, 128]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64, 96]),
 ]
 _CONVERGENCE_2D_PERIOD_SCHEMES = [
     ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [80, 96]),
@@ -55,11 +57,11 @@ _CONVERGENCE_2D_PERIOD_SCHEMES = [
 # would dominate CI even at N=64). WENO7/TENO7 skipped — at N=64 with K=1
 # the spatial error signal is below machine precision.
 _CONVERGENCE_3D_SCHEMES = [
-    ("WENO5", ["--order", "5", "--cfl", "0.02"], 6, 0.3, [32, 64]),
-    ("WENO3", ["--order", "3", "--cfl", "0.02"], 2.5, 0.3, [32, 64]),
-    ("WENO1", ["--order", "1", "--cfl", "0.02"], 2, 0.2, [32, 64]),
-    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 3, 0.3, [32, 64]),
-    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 6, 0.3, [32, 64]),
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [32, 64]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 1.5, 0.3, [32, 64]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [32, 64]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64]),
 ]
 
 # Sod L1 self-convergence: any conservative monotone scheme converges at L1
