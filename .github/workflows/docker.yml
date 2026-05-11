@@ -135,6 +135,9 @@ jobs:
   manifests:
     runs-on: ubuntu-latest
     needs: Container
+    environment:
+      name: containers
+      url: https://hub.docker.com/r/mflowcode/mfc
     steps:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
