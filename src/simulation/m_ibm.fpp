@@ -87,8 +87,6 @@ contains
         if (p /= 0) then
             $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
         end if
-        ib_gbl_idx_lookup = -1
-        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
         call s_update_ib_lookup()
 
         ! recompute the new ib_patch locations and broadcast them.
@@ -1263,8 +1261,8 @@ contains
 
         buf_size = storage_size(0)/8 + (storage_size(0)/8 + 6*storage_size(0._wp)/8)*size(patch_ib)
         allocate (send_buf(buf_size), recv_buf(buf_size), recv_forces_snap(num_ibs, 3), recv_torques_snap(num_ibs, 3))
-        @:ALLOCATE(send_ids(num_ibs), send_ft(num_ibs, 6))
-        allocate (recv_ids(size(patch_ib)), recv_ft(size(patch_ib), 6))
+        @:ALLOCATE(send_ids(num_ibs), send_ft(6, num_ibs))
+        allocate (recv_ids(size(patch_ib)), recv_ft(6, size(patch_ib)))
 
         ! Accumulation phase: propagate contributions toward the high-index corner.
         #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
@@ -1282,8 +1280,8 @@ contains
                     $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
-                        send_ft(i,1:3) = forces(i,:)
-                        send_ft(i,4:6) = torques(i,:)
+                        send_ft(1:3,i) = forces(i,:)
+                        send_ft(4:6,i) = torques(i,:)
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                     $:GPU_UPDATE(host='[send_ids, send_ft]')
@@ -1298,19 +1296,19 @@ contains
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        ! $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques,
-                        ! recv_forces_snap, recv_torques_snap]')
+                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
+                                            & recv_forces_snap, recv_torques_snap]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
                                 ! add forces and subtract recv_snap prevent double-counting
-                                forces(j,:) = forces(j,:) + recv_ft(i,1:3) - recv_forces_snap(j,:)
-                                torques(j,:) = torques(j,:) + recv_ft(i,4:6) - recv_torques_snap(j,:)
-                                recv_forces_snap(j,:) = recv_ft(i,1:3)
-                                recv_torques_snap(j,:) = recv_ft(i,4:6)
+                                forces(j,:) = forces(j,:) + recv_ft(1:3,i) - recv_forces_snap(j,:)
+                                torques(j,:) = torques(j,:) + recv_ft(4:6,i) - recv_torques_snap(j,:)
+                                recv_forces_snap(j,:) = recv_ft(1:3,i)
+                                recv_torques_snap(j,:) = recv_ft(4:6,i)
                             end if
                         end do
-                        ! $:END_GPU_PARALLEL_LOOP()
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                     tag = tag + 2
                 end do
@@ -1325,13 +1323,14 @@ contains
 
                 do k = 1, 2*ib_neighborhood_radius
                     pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i]', copy='[send_ids, send_ft]', copyin='[forces, torques]')
+                    $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
-                        send_ft(i,1:3) = forces(i,:)
-                        send_ft(i,4:6) = torques(i,:)
+                        send_ft(1:3,i) = forces(i,:)
+                        send_ft(4:6,i) = torques(i,:)
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                    $:GPU_UPDATE(host='[send_ids, send_ft]')
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ft, 6*num_ibs, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
@@ -1342,15 +1341,15 @@ contains
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        ! $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
+                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
-                                forces(j,:) = recv_ft(i,1:3)
-                                torques(j,:) = recv_ft(i,4:6)
+                                forces(j,:) = recv_ft(1:3,i)
+                                torques(j,:) = recv_ft(4:6,i)
                             end if
                         end do
-                        ! $:END_GPU_PARALLEL_LOOP()
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                     tag = tag + 2
                 end do
@@ -1400,7 +1399,9 @@ contains
                 ! delete if not in neighborhood
                 if (f_neighborhood_ranks_own_location(centroid)) then
                     output_idx = output_idx + 1
-                    if (i /= output_idx) patch_ib(output_idx) = patch_ib(i)
+                    if (i /= output_idx) then
+                        patch_ib(output_idx) = patch_ib(i)
+                    end if
 
                     ! check if in local domain
                     if (f_local_rank_owns_location(centroid)) then
@@ -1411,6 +1412,8 @@ contains
             end do
             num_ibs = output_idx
             num_local_ibs = local_output_idx
+            $:GPU_UPDATE(device='[patch_ib]')
+            call s_update_ib_lookup()
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
             patch_bytes = storage_size(tmp_patch)/8
@@ -1497,6 +1500,7 @@ contains
             end do
 
             deallocate (send_buf, recv_bufs)
+            $:GPU_UPDATE(device='[patch_ib]')
             call s_update_ib_lookup()
         end if
 #endif
@@ -1519,11 +1523,15 @@ contains
 
         integer :: i
 
+        ib_gbl_idx_lookup = -1
+        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
+
         $:GPU_PARALLEL_LOOP(private='[i]')
         do i = 1, num_ibs
             ib_gbl_idx_lookup(patch_ib(i)%gbl_patch_id) = i
         end do
         $:END_GPU_PARALLEL_LOOP()
+
         $:GPU_UPDATE(host='[ib_gbl_idx_lookup]')
 
     end subroutine s_update_ib_lookup
