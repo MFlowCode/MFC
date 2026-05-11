@@ -44,6 +44,11 @@ module m_ibm
 #endif
     logical :: moving_immersed_boundary_flag
 
+    ! IB MPI buffers
+    integer, allocatable  :: send_ids(:), recv_ids(:)
+    real(wp), allocatable :: send_ft(:,:), recv_ft(:,:)
+    real(wp), allocatable :: recv_forces_snap(:,:), recv_torques_snap(:,:)
+
 contains
 
     !> Allocates memory for the variables in the IBM module
@@ -82,6 +87,15 @@ contains
         end do
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
+        ! allocate some arrays for MPI communication, if required by this simulation
+#ifdef MFC_MPI
+        if (num_procs > 1) then
+            @:ALLOCATE(send_ids(size(patch_ib)), send_ft(6, size(patch_ib)))
+            allocate (recv_forces_snap(size(patch_ib), 3), recv_torques_snap(size(patch_ib), 3), recv_ids(size(patch_ib)), &
+                      & recv_ft(6, size(patch_ib)))
+        end if
+#endif
+
         ! GPU routines require updated cell centers
         $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
         if (p /= 0) then
@@ -89,7 +103,7 @@ contains
         end if
         call s_update_ib_lookup()
 
-        ! recompute the new ib_patch locations and broadcast them.
+        ! recompute the new ib_patch locations
         ib_markers%sf = 0._wp
         $:GPU_UPDATE(device='[ib_markers%sf]')
         call s_apply_ib_patches(ib_markers)
@@ -1048,20 +1062,6 @@ contains
 
     end subroutine s_compute_ib_forces
 
-    !> Finalize the IBM module
-    impure subroutine s_finalize_ibm_module()
-
-        @:DEALLOCATE(ib_markers%sf)
-        @:DEALLOCATE(ib_gbl_idx_lookup)
-        if (allocated(airfoil_grid_u)) then
-            @:DEALLOCATE(airfoil_grid_u)
-            @:DEALLOCATE(airfoil_grid_l)
-        end if
-
-        if (collision_model > 0) call s_finalize_collisions_module()
-
-    end subroutine s_finalize_ibm_module
-
     !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
     !> These patches include things like NACA airfoils and STL models
     subroutine s_compute_centroid_offset(ib_marker)
@@ -1252,17 +1252,12 @@ contains
 #ifdef MFC_MPI
         integer                       :: i, j, k, pack_pos, unpack_pos, buf_size, ierr
         integer                       :: send_neighbor, recv_neighbor, recv_count, tag
-        real(wp), allocatable         :: recv_forces_snap(:,:), recv_torques_snap(:,:)
-        character(len=1), allocatable :: send_buf(:), recv_buf(:)
-        integer, allocatable          :: send_ids(:), recv_ids(:)
-        real(wp), allocatable         :: send_ft(:,:), recv_ft(:,:)
+        character(len=1), allocatable :: ib_force_send_buf(:), ib_force_recv_buf(:)
 
         if (num_procs == 1) return
 
         buf_size = storage_size(0)/8 + (storage_size(0)/8 + 6*storage_size(0._wp)/8)*size(patch_ib)
-        allocate (send_buf(buf_size), recv_buf(buf_size), recv_forces_snap(num_ibs, 3), recv_torques_snap(num_ibs, 3))
-        @:ALLOCATE(send_ids(num_ibs), send_ft(6, num_ibs))
-        allocate (recv_ids(size(patch_ib)), recv_ft(6, size(patch_ib)))
+        allocate (ib_force_send_buf(buf_size), ib_force_recv_buf(buf_size))
 
         ! Accumulation phase: propagate contributions toward the high-index corner.
         #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
@@ -1285,17 +1280,18 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                     $:GPU_UPDATE(host='[send_ids, send_ft]')
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, recv_buf, buf_size, MPI_PACKED, &
-                                      & recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
+                                      & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
                     if (recv_neighbor /= MPI_PROC_NULL) then
                         unpack_pos = 0
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
+                                        & MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
                         $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
                                             & recv_forces_snap, recv_torques_snap]')
                         do i = 1, recv_count
@@ -1331,16 +1327,17 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                     $:GPU_UPDATE(host='[send_ids, send_ft]')
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_SENDRECV(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, recv_buf, buf_size, MPI_PACKED, &
-                                      & recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
+                                      & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     if (recv_neighbor /= MPI_PROC_NULL) then
                         unpack_pos = 0
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
+                                        & MPI_COMM_WORLD, ierr)
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
                         $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
@@ -1355,9 +1352,6 @@ contains
                 end do
             end if
         #:endfor
-
-        @:DEALLOCATE(send_ids, send_ft)
-        deallocate (send_buf, recv_buf, recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
 #endif
 
     end subroutine s_communicate_ib_forces
@@ -1535,5 +1529,26 @@ contains
         $:GPU_UPDATE(host='[ib_gbl_idx_lookup]')
 
     end subroutine s_update_ib_lookup
+
+    !> Finalize the IBM module
+    impure subroutine s_finalize_ibm_module()
+
+        @:DEALLOCATE(ib_markers%sf)
+        @:DEALLOCATE(ib_gbl_idx_lookup)
+        if (allocated(airfoil_grid_u)) then
+            @:DEALLOCATE(airfoil_grid_u)
+            @:DEALLOCATE(airfoil_grid_l)
+        end if
+
+        if (collision_model > 0) call s_finalize_collisions_module()
+
+#ifdef MFC_MPI
+        if (num_procs > 1) then
+            @:DEALLOCATE(send_ids, send_ft)
+            deallocate (recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
+        end if
+#endif
+
+    end subroutine s_finalize_ibm_module
 
 end module m_ibm
