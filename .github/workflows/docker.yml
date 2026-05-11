@@ -71,6 +71,8 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "TAG=$TAG" >> $GITHUB_ENV
+          OWNER="${{ github.repository_owner }}"
+          echo "GH_REGISTRY=ghcr.io/${OWNER,,}/mfc" >> $GITHUB_ENV
           git clone --branch "$BRANCH" --depth 1 ${{ github.server_url }}/${{ github.repository }}.git mfc
 
       - name: Stage
@@ -107,7 +109,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner }}
-            ghcr.io/${{ github.repository_owner }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner }}
+            ${{ env.GH_REGISTRY }}:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner }}
           push: true
 
       - name: Build and push image (gpu)
@@ -129,7 +131,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner }}
-            ghcr.io/${{ github.repository_owner }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner }}
+            ${{ env.GH_REGISTRY }}:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner }}
           push: true
 
   manifests:
@@ -155,12 +157,17 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set GHCR registry (lowercase)
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          echo "GH_REGISTRY=ghcr.io/${OWNER,,}/mfc" >> $GITHUB_ENV
+
       - name: Create and Push Manifest Lists
         env:
           TAG: ${{ needs.Container.outputs.tag }}
           DH: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
-          GH: ghcr.io/${{ github.repository_owner }}/mfc
         run: |
+          GH="${{ env.GH_REGISTRY }}"
           for R in "$DH" "$GH"; do
             docker buildx imagetools create -t $R:$TAG-cpu $R:$TAG-cpu-ubuntu-22.04 $R:$TAG-cpu-ubuntu-22.04-arm
             docker buildx imagetools create -t $R:$TAG-gpu $R:$TAG-gpu-ubuntu-22.04 $R:$TAG-gpu-ubuntu-22.04-arm
@@ -171,8 +178,8 @@ jobs:
         env:
           TAG: ${{ needs.Container.outputs.tag }}
           DH: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
-          GH: ghcr.io/${{ github.repository_owner }}/mfc
         run: |
+          GH="${{ env.GH_REGISTRY }}"
           for R in "$DH" "$GH"; do
             docker buildx imagetools create -t $R:latest-cpu $R:$TAG-cpu-ubuntu-22.04 $R:$TAG-cpu-ubuntu-22.04-arm
             docker buildx imagetools create -t $R:latest-gpu $R:$TAG-gpu-ubuntu-22.04 $R:$TAG-gpu-ubuntu-22.04-arm
