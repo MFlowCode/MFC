@@ -13,7 +13,9 @@ module m_weno
     ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
-    use m_muscl
+    use m_thinc, only: s_thinc_compression
+    use m_nvtx
+
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they are stored in v_vf. However, they are
@@ -70,6 +72,9 @@ module m_weno
 
     integer :: v_size  !< Number of WENO-reconstructed cell-average variables
     $:GPU_DECLARE(create='[v_size]')
+
+    logical :: uniform_grid(3)  !< True if grid spacing is uniform in each direction
+    $:GPU_DECLARE(create='[uniform_grid]')
 
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
@@ -173,7 +178,6 @@ contains
     subroutine s_compute_weno_coefficients(weno_dir, is)
 
         ! Compute WENO coefficients for a given coordinate direction. Shu (1997)
-
         integer, intent(in)               :: weno_dir
         type(int_bounds_info), intent(in) :: is
         integer                           :: s
@@ -182,6 +186,7 @@ contains
         integer                           :: i               !< Generic loop iterator
         real(wp)                          :: w(1:8)          !< Intermediate var for ideal weights: s_cb across overall stencil
         real(wp)                          :: y(1:4)          !< Intermediate var for poly & beta: diff(s_cb) across sub-stencil
+        real(wp)                          :: h0              !< Reference spacing for uniform-grid detection
 
         ! Determine cell count, boundary locations, and BCs for selected WENO direction
 
@@ -362,7 +367,7 @@ contains
                             d_cbL_${XYZ}$ (0:1,s) = 0._wp; d_cbL_${XYZ}$ (2, s) = 1._wp
                         end if
                     end if
-                else  ! WENO7
+                else
                     if (.not. teno) then
                         do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
                             ! Reference: Shu (1997) "Essentially Non-Oscillatory and Weighted Essentially Non-Oscillatory Schemes
@@ -824,7 +829,7 @@ contains
                                                & + 5*y(3)**2*y(4)**2))/(5*(y(1) + y(2))**2*(y(1) + y(2) + y(3))**2*(y(1) + y(2) &
                                                & + y(3) + y(4))**2)
                         end do
-                    else  ! TENO (only supports uniform grid)
+                    else
                         ! (Fu, et al., 2016) Table 2 (for right flux)
                         d_cbL_${XYZ}$ (0,:) = 18._wp/35._wp
                         d_cbL_${XYZ}$ (1,:) = 3._wp/35._wp
@@ -842,12 +847,24 @@ contains
             end if
         #:endfor
 
+        ! Detect whether grid spacing is uniform (enables cancellation-free sum-of-squares beta). Tolerance uses sqrt(epsilon) so it
+        ! works in both double and single precision: ~1.5e-8 relative in double, ~3.5e-4 in single - above FP noise, below real
+        ! stretching.
+        uniform_grid(weno_dir) = .true.
+        h0 = (s_cb(s) - s_cb(0))/real(s, wp)
+        do i = 0, s - 1
+            if (abs((s_cb(i + 1) - s_cb(i)) - h0) > sqrt(epsilon(h0))*abs(h0)) then
+                uniform_grid(weno_dir) = .false.
+                exit
+            end if
+        end do
+
         if (weno_dir == 1) then
-            $:GPU_UPDATE(device='[poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x]')
+            $:GPU_UPDATE(device='[poly_coef_cbL_x, poly_coef_cbR_x, d_cbL_x, d_cbR_x, beta_coef_x, uniform_grid]')
         else if (weno_dir == 2) then
-            $:GPU_UPDATE(device='[poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y]')
+            $:GPU_UPDATE(device='[poly_coef_cbL_y, poly_coef_cbR_y, d_cbL_y, d_cbR_y, beta_coef_y, uniform_grid]')
         else
-            $:GPU_UPDATE(device='[poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z]')
+            $:GPU_UPDATE(device='[poly_coef_cbL_z, poly_coef_cbR_z, d_cbL_z, d_cbR_z, beta_coef_z, uniform_grid]')
         end if
 
         ! Nullifying WENO coefficients and cell-boundary locations pointers
@@ -1052,12 +1069,22 @@ contains
                                         poly(2) = v_rs_ws_${XYZ}$ (j, k, l, i) + poly_coef_cbL_${XYZ}$ (j, 2, &
                                              & 0)*dvd(-1) + poly_coef_cbL_${XYZ}$ (j, 2, 1)*dvd(-2)
 
-                                        beta(0) = beta_coef_${XYZ}$ (j, 0, 0)*dvd(1)*dvd(1) + beta_coef_${XYZ}$ (j, 0, &
-                                             & 1)*dvd(1)*dvd(0) + beta_coef_${XYZ}$ (j, 0, 2)*dvd(0)*dvd(0) + weno_eps
-                                        beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(0)*dvd(0) + beta_coef_${XYZ}$ (j, 1, &
-                                             & 1)*dvd(0)*dvd(-1) + beta_coef_${XYZ}$ (j, 1, 2)*dvd(-1)*dvd(-1) + weno_eps
-                                        beta(2) = beta_coef_${XYZ}$ (j, 2, 0)*dvd(-1)*dvd(-1) + beta_coef_${XYZ}$ (j, 2, &
-                                             & 1)*dvd(-1)*dvd(-2) + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) + weno_eps
+                                        ! Jiang & Shu (1996) sum-of-squares form on uniform grids: all terms non-negative, no
+                                        ! cancellation. On non-uniform grids, fall back to precomputed coefficients.
+                                        if (uniform_grid(${WENO_DIR}$)) then
+                                            beta(0) = 13._wp/12._wp*(dvd(1) - dvd(0))**2 + 0.25_wp*(dvd(1) - 3._wp*dvd(0))**2 &
+                                                 & + weno_eps
+                                            beta(1) = 13._wp/12._wp*(dvd(0) - dvd(-1))**2 + 0.25_wp*(dvd(0) + dvd(-1))**2 + weno_eps
+                                            beta(2) = 13._wp/12._wp*(dvd(-1) - dvd(-2))**2 + 0.25_wp*(3._wp*dvd(-1) - dvd(-2))**2 &
+                                                 & + weno_eps
+                                        else
+                                            beta(0) = beta_coef_${XYZ}$ (j, 0, 0)*dvd(1)*dvd(1) + beta_coef_${XYZ}$ (j, 0, &
+                                                 & 1)*dvd(1)*dvd(0) + beta_coef_${XYZ}$ (j, 0, 2)*dvd(0)*dvd(0) + weno_eps
+                                            beta(1) = beta_coef_${XYZ}$ (j, 1, 0)*dvd(0)*dvd(0) + beta_coef_${XYZ}$ (j, 1, &
+                                                 & 1)*dvd(0)*dvd(-1) + beta_coef_${XYZ}$ (j, 1, 2)*dvd(-1)*dvd(-1) + weno_eps
+                                            beta(2) = beta_coef_${XYZ}$ (j, 2, 0)*dvd(-1)*dvd(-1) + beta_coef_${XYZ}$ (j, 2, &
+                                                 & 1)*dvd(-1)*dvd(-2) + beta_coef_${XYZ}$ (j, 2, 2)*dvd(-2)*dvd(-2) + weno_eps
+                                        end if
 
                                         if (wenojs) then
                                             do q = 0, weno_num_stencils
@@ -1075,23 +1102,22 @@ contains
                                             end do
                                         else if (wenoz) then
                                             ! Borges, et al. (2008)
-
                                             tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 0, weno_num_stencils
+                                            do q = 0, weno_num_stencils  ! Equation 28 (note: weno_eps was already added to beta)
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q)))
-                                                ! Equation 28 (note: weno_eps was already added to beta)
                                             end do
                                         else if (teno) then
                                             ! Fu, et al. (2016) Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
-                                            tau = abs(beta(2) - beta(0))
+                                            tau = abs(beta(2) - beta(0))  ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = 1._wp + tau/beta(q)  ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
-                                                alpha(q) = (alpha(q)**3._wp) &
-                                                      & **2._wp  ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                                ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                                alpha(q) = 1._wp + tau/beta(q)
+                                                ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
+                                                alpha(q) = (alpha(q)**3._wp)**2._wp
                                             end do
-                                            omega = alpha/sum(alpha)  ! Equation 25 (reuse omega as xi)
+                                            omega = alpha/sum(alpha)
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
@@ -1239,7 +1265,7 @@ contains
                                                  & 2)*dvd(-1)*dvd(-3) + beta_coef_${XYZ}$ (j, 3, &
                                                  & 3)*dvd(-2)*dvd(-2) + beta_coef_${XYZ}$ (j, 3, &
                                                  & 4)*dvd(-2)*dvd(-3) + beta_coef_${XYZ}$ (j, 3, 5)*dvd(-3)*dvd(-3) + weno_eps
-                                        else  ! TENO
+                                        else
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
                                                 ! High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu
                                                 ! & Tang, 2019) Section 3.2
@@ -1384,9 +1410,15 @@ contains
             #:endif
         end if
 
-        if (int_comp) then
-            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, weno_dir, &
-                                         & is1_weno_d, is2_weno_d, is3_weno_d)
+        if (int_comp > 0 .and. v_size >= eqn_idx%adv%end) then
+            call nvtxStartRange("WENO-INTCOMP")
+            #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (weno_dir == ${WENO_DIR}$) then
+                    call s_thinc_compression(v_rs_ws_${XYZ}$, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, &
+                                             & vR_rs_vf_z, weno_dir, is1_weno, is2_weno, is3_weno)
+                end if
+            #:endfor
+            call nvtxEndRange()
         end if
 
     end subroutine s_weno
@@ -1463,12 +1495,11 @@ contains
         real(wp) :: d_MD, d_LC          !< Median (md) curvature and large curvature (LC) measures
         ! The left and right upper bounds (UL), medians, large curvatures, minima, and maxima of the WENO-reconstructed values of
         ! the cell- average variables.
-        real(wp) :: vL_UL, vR_UL
-        real(wp) :: vL_MD, vR_MD
-        real(wp) :: vL_LC, vR_LC
-        real(wp) :: vL_min, vR_min
-        real(wp) :: vL_max, vR_max
-        ! Monotonicity-preserving bounds, Suresh & Huynh JCP (1997)
+        real(wp)            :: vL_UL, vR_UL
+        real(wp)            :: vL_MD, vR_MD
+        real(wp)            :: vL_LC, vR_LC
+        real(wp)            :: vL_min, vR_min
+        real(wp)            :: vL_max, vR_max
         real(wp), parameter :: alpha = 2._wp       !< Max CFL stability parameter (CFL < 1/(1+alpha))
         real(wp), parameter :: beta = 4._wp/3._wp  !< Local curvature freedom parameter
         real(wp), parameter :: alpha_mp = 2._wp

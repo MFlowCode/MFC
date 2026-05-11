@@ -1,0 +1,36 @@
+name: Convergence
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  OMPI_MCA_rmaps_base_oversubscribe: 1
+
+jobs:
+  convergence:
+    name: "Convergence"
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Ubuntu
+        run: |
+          sudo apt update -y
+          sudo apt install -y cmake gcc g++ python3 python3-dev \
+                   openmpi-bin libopenmpi-dev
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build MFC
+        run: ./mfc.sh build -j 4
+
+      - name: Run convergence tests
+        run: ./mfc.sh test --only Convergence --no-build -j 1

@@ -51,7 +51,7 @@ case "$cluster" in
         compiler_flag="f"
         account="CFD154"
         job_prefix="MFC"
-        qos="develop"
+        qos="hackathon"
         extra_sbatch=""
         test_time="01:59:00"
         bench_time="01:59:00"
@@ -61,7 +61,7 @@ case "$cluster" in
         compiler_flag="famd"
         account="CFD154"
         job_prefix="MFC"
-        qos="develop"
+        qos="hackathon"
         extra_sbatch=""
         test_time="01:59:00"
         bench_time="01:59:00"
@@ -92,7 +92,7 @@ if [ "$device" = "cpu" ]; then
         frontier|frontier_amd)
             sbatch_device_opts="\
 #SBATCH -n 32
-#SBATCH -p service"
+#SBATCH -p batch"
             ;;
     esac
 elif [ "$device" = "gpu" ]; then
@@ -120,7 +120,7 @@ elif [ "$device" = "gpu" ]; then
         frontier|frontier_amd)
             sbatch_device_opts="\
 #SBATCH -n 8
-#SBATCH -p service"
+#SBATCH -p batch"
             ;;
     esac
 else

@@ -172,7 +172,7 @@ jobs:
 
         include:
           - os:    ubuntu
-            mpi:   no-mpi
+            mpi:   mpi
             precision: single
             debug: no-debug
             intel: false
@@ -386,11 +386,12 @@ jobs:
       - name: Test
         if:   '!matrix.nvhpc'
         run:  |
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $ONLY_CHANGES $TEST_ALL $TEST_PCT
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $ONLY_CHANGES $TEST_ALL $TEST_PCT $PRECISION
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
           ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
+          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       # ── NVHPC build + test (via docker exec into long-lived container) ──
       - name: Build (NVHPC)

@@ -13,22 +13,28 @@ from .registry import REGISTRY, IndexedFamily
 from .schema import ParamDef, ParamType
 
 # Index limits — sourced from Fortran compile-time constants (m_constants.fpp).
-# These must stay in sync with Fortran; we error if the source can't be parsed.
+# Falls back to the inline default when src/ is unavailable (e.g. Homebrew).
+# Default must match src/common/m_constants.fpp — enforced by co-location.
 _FC = get_fortran_constants()
 
 
-def _fc(name: str) -> int:
-    """Get a required Fortran constant, raising if unavailable."""
-    if name not in _FC:
-        raise RuntimeError(f"Fortran constant '{name}' not found in m_constants.fpp. Toolchain is out of sync with Fortran source.")
-    return _FC[name]
+def _fc(name: str, default: int) -> int:
+    """Get a Fortran constant, using the inline default when m_constants.fpp is unavailable."""
+    if _FC:
+        if name not in _FC:
+            raise RuntimeError(
+                f"Fortran constant '{name}' not found in m_constants.fpp. "
+                f"Toolchain is out of sync with Fortran source."
+            )
+        return _FC[name]
+    return default
 
 
-NF = _fc("num_fluids_max")  # fluid_pp
-NPR = _fc("num_probes_max")  # probe, acoustic, integral
-NB = _fc("num_bc_patches_max")  # patch_bc
-NUM_PATCHES_MAX = _fc("num_patches_max")  # patch_icpp (Fortran array bound)
-NIB = _fc("num_ib_patches_max")  # patch_ib (Fortran array bound)
+NF = _fc("num_fluids_max", 10)        # fluid_pp
+NPR = _fc("num_probes_max", 10)       # probe, acoustic, integral
+NB = _fc("num_bc_patches_max", 10)    # patch_bc
+NUM_PATCHES_MAX = _fc("num_patches_max", 10)   # patch_icpp (Fortran array bound)
+NIB = _fc("num_ib_patches_max", 50000)         # patch_ib (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -257,6 +263,7 @@ _SIMPLE_DESCS = {
     "recon_type": "Reconstruction type",
     "muscl_order": "MUSCL reconstruction order",
     "muscl_lim": "MUSCL limiter type",
+    "muscl_eps": "MUSCL limiter slope-product threshold",
     "low_Mach": "Low Mach number correction",
     "bubble_model": "Bubble dynamics model",
     "Ca": "Cavitation number",
@@ -609,8 +616,12 @@ CONSTRAINTS = {
         "value_labels": {1: "1st order", 2: "2nd order"},
     },
     "muscl_lim": {
-        "choices": [1, 2, 3, 4, 5],
-        "value_labels": {1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
+        "choices": [0, 1, 2, 3, 4, 5],
+        "value_labels": {0: "unlimited", 1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
+    },
+    "int_comp": {
+        "choices": [0, 1, 2],
+        "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
     },
     # Time stepping
     "time_stepper": {
@@ -619,8 +630,8 @@ CONSTRAINTS = {
     },
     # Riemann solver
     "riemann_solver": {
-        "choices": [1, 2, 3, 4, 5],
-        "value_labels": {1: "HLL", 2: "HLLC", 3: "Exact", 4: "HLLD", 5: "Lax-Friedrichs"},
+        "choices": [1, 2, 4, 5],
+        "value_labels": {1: "HLL", 2: "HLLC", 4: "HLLD", 5: "Lax-Friedrichs"},
     },
     "wave_speeds": {
         "choices": [1, 2],
@@ -658,6 +669,8 @@ CONSTRAINTS = {
     "cfl_target": {"min": 0},
     # WENO
     "weno_eps": {"min": 0},
+    # MUSCL
+    "muscl_eps": {"min": 0},
     # Physics (must be non-negative)
     "R0ref": {"min": 0},
     "sigma": {"min": 0},
@@ -868,6 +881,7 @@ def _load():
     _r("recon_type", INT)
     _r("muscl_order", INT)
     _r("muscl_lim", INT)
+    _r("muscl_eps", REAL)
     _r("weno_eps", REAL, {"weno"}, math=r"\f$\varepsilon\f$")
     _r("teno_CT", REAL, {"weno"}, math=r"\f$C_T\f$")
     _r("wenoz_q", REAL, {"weno"})
@@ -1059,11 +1073,11 @@ def _load():
         "mixture_err",
         "rdma_mpi",
         "igr_pres_lim",
-        "int_comp",
         "nv_uvm_out_of_core",
         "nv_uvm_pref_gpu",
     ]:
         _r(n, LOG)
+    _r("int_comp", INT)
     _r("case_dir", STR)
 
     # Body force
