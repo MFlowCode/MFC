@@ -22,19 +22,16 @@ def _fc(name: str, default: int) -> int:
     """Get a Fortran constant, using the inline default when m_constants.fpp is unavailable."""
     if _FC:
         if name not in _FC:
-            raise RuntimeError(
-                f"Fortran constant '{name}' not found in m_constants.fpp. "
-                f"Toolchain is out of sync with Fortran source."
-            )
+            raise RuntimeError(f"Fortran constant '{name}' not found in m_constants.fpp. Toolchain is out of sync with Fortran source.")
         return _FC[name]
     return default
 
 
-NF = _fc("num_fluids_max", 10)        # fluid_pp
-NPR = _fc("num_probes_max", 10)       # probe, acoustic, integral
-NB = _fc("num_bc_patches_max", 10)    # patch_bc
-NUM_PATCHES_MAX = _fc("num_patches_max", 10)   # patch_icpp (Fortran array bound)
-NIB = _fc("num_ib_patches_max", 50000)         # patch_ib (Fortran array bound)
+NF = _fc("num_fluids_max", 10)  # fluid_pp
+NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
+NB = _fc("num_bc_patches_max", 10)  # patch_bc
+NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
+NIB = _fc("num_ib_patches_max", 50000)  # patch_ib (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
