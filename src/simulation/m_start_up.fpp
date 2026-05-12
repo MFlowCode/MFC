@@ -1212,7 +1212,7 @@ contains
 
         type(ib_patch_parameters), allocatable :: patch_ib_gbl(:)
         real(wp), dimension(3)                 :: centroid
-        integer                                :: i, j, n_copy
+        integer                                :: i, j
         integer                                :: num_aware_ibs
         logical                                :: is_in_neighborhood, is_local
 
@@ -1231,25 +1231,23 @@ contains
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
         call s_compute_ib_neighbor_ranks()  ! build lookup of all neighbor MPI ranks
 
-        deallocate (patch_ib)
-        num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
-        allocate (patch_ib(num_aware_ibs))
-
-        ! assign defaults to all values
         num_gbl_ibs = num_ibs
         num_local_ibs = num_ibs
         do i = 1, num_local_ibs_max
             local_ib_patch_ids(i) = i
         end do
 
+        deallocate (patch_ib)
+
 #ifdef MFC_MPI
-        ! fallback for 1-rank case: patch_ib has num_aware_ibs slots; clamp copy to avoid out-of-bounds
-        ! when num_gbl_ibs > num_aware_ibs (large particle beds on a single rank)
         if (num_procs == 1) then
-            n_copy = min(num_gbl_ibs, num_aware_ibs)
-            patch_ib(1:n_copy) = patch_ib_gbl(1:n_copy)
+            ! single-rank: every patch is local - transfer ownership directly to avoid truncation
+            call move_alloc(patch_ib_gbl, patch_ib)
         else
-            ! determine the set of patches owned by local rank
+            ! multi-rank: carve out the local neighbourhood subset
+            num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
+            allocate (patch_ib(num_aware_ibs))
+
             num_local_ibs = 0
             num_ibs = 0
             do i = 1, num_gbl_ibs
@@ -1269,14 +1267,13 @@ contains
                     end if
                 end if
             end do
+
+            deallocate (patch_ib_gbl)
         end if
 #else
-        ! reduce the size of the array for local simulation in no-MPI case
-        n_copy = min(num_gbl_ibs, num_aware_ibs)
-        patch_ib(1:n_copy) = patch_ib_gbl(1:n_copy)
+        ! no-MPI: every patch is local - transfer ownership directly to avoid truncation
+        call move_alloc(patch_ib_gbl, patch_ib)
 #endif
-
-        deallocate (patch_ib_gbl)
 
         @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
 
