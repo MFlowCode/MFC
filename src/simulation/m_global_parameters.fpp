@@ -353,6 +353,20 @@ module m_global_parameters
     logical :: ib_state_wrt
     type(ib_patch_parameters), allocatable, dimension(:) :: patch_ib  !< Immersed boundary patch parameters
     integer, dimension(num_local_ibs_max) :: local_ib_patch_ids       !< lookup table of IBs in the local compute domain
+
+    type particle_bed_parameters
+        real(wp) :: x_centroid, y_centroid, z_centroid  !< Center of the particle bed region
+        real(wp) :: length_x, length_y, length_z        !< Dimensions of the particle bed region
+        integer  :: num_particles                        !< Number of particles to generate
+        real(wp) :: radius                               !< Particle radius
+        real(wp) :: mass                                 !< Particle mass
+        real(wp) :: min_spacing                          !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
+        integer  :: moving_ibm                           !< Motion flag: 0=static, 1=moving (forces), 2=forced path
+        integer  :: seed                                 !< Random seed for reproducible placement
+    end type particle_bed_parameters
+
+    integer :: num_particle_beds                                                      !< Number of particle bed specifications
+    type(particle_bed_parameters), dimension(num_particle_beds_max) :: particle_bed  !< Particle bed specifications
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks       !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     integer :: Np
@@ -798,6 +812,22 @@ contains
             mhd = .false.
             relativity = .false.
         #:endif
+
+        num_particle_beds = 0
+        do i = 1, num_particle_beds_max
+            particle_bed(i)%x_centroid = 0._wp
+            particle_bed(i)%y_centroid = 0._wp
+            particle_bed(i)%z_centroid = 0._wp
+            particle_bed(i)%length_x = dflt_real
+            particle_bed(i)%length_y = dflt_real
+            particle_bed(i)%length_z = dflt_real
+            particle_bed(i)%num_particles = 0
+            particle_bed(i)%radius = dflt_real
+            particle_bed(i)%mass = dflt_real
+            particle_bed(i)%min_spacing = 0._wp
+            particle_bed(i)%moving_ibm = 0
+            particle_bed(i)%seed = 0
+        end do
 
         allocate (patch_ib(num_ib_patches_max))
         do i = 1, num_ib_patches_max

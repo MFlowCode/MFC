@@ -591,11 +591,19 @@ class CaseValidator:
         ib = self.get("ib", "F") == "T"
         n = self.get("n", 0)
         num_ibs = self.get("num_ibs", 0)
+        num_particle_beds = self.get("num_particle_beds", 0) or 0
 
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
 
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
-        self.prohibit(ib and num_ibs <= 0, "num_ibs must be >= 1 when ib is enabled")
+        has_particle_beds = num_particle_beds > 0 and any(
+            (self.get(f"particle_bed({i})%num_particles", 0) or 0) > 0
+            for i in range(1, num_particle_beds + 1)
+        )
+        self.prohibit(
+            ib and num_ibs <= 0 and not has_particle_beds,
+            "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_bed with num_particles > 0)",
+        )
         num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max", 100000)
         self.prohibit(
             ib and num_ibs > num_ib_patches_max,

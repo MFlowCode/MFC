@@ -31,7 +31,8 @@ NF = _fc("num_fluids_max", 10)  # fluid_pp
 NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
-NIB = _fc("num_ib_patches_max", 50000)  # patch_ib (Fortran array bound)
+NIB = _fc("num_ib_patches_max", 50000)   # patch_ib (Fortran array bound)
+NPB = _fc("num_particle_beds_max", 10)  # particle_bed (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -928,6 +929,7 @@ def _load():
 
     # Immersed boundary
     _r("num_ibs", INT, {"ib"})
+    _r("num_particle_beds", INT, {"ib"})
     _r("ib_neighborhood_radius", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
@@ -1210,6 +1212,27 @@ def _load():
             attrs=_ib_attrs,
             tags=_ib_tags,
             max_index=NIB,
+        )
+    )
+
+    # particle_bed — compact bed specification that expands into individual patch_ib spheres/circles at startup
+    _pb_tags = {"ib"}
+    _pb_attrs: Dict[str, tuple] = {}
+    for _d in ["x", "y", "z"]:
+        _pb_attrs[f"{_d}_centroid"] = (REAL, _pb_tags)
+        _pb_attrs[f"length_{_d}"] = (REAL, _pb_tags)
+    _pb_attrs["num_particles"] = (INT, _pb_tags)
+    _pb_attrs["radius"] = (REAL, _pb_tags)
+    _pb_attrs["mass"] = (REAL, _pb_tags)
+    _pb_attrs["min_spacing"] = (REAL, _pb_tags)
+    _pb_attrs["moving_ibm"] = (INT, _pb_tags)
+    _pb_attrs["seed"] = (INT, _pb_tags)
+    REGISTRY.register_family(
+        IndexedFamily(
+            base_name="particle_bed",
+            attrs=_pb_attrs,
+            tags=_pb_tags,
+            max_index=NPB,
         )
     )
 

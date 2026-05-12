@@ -41,6 +41,7 @@ module m_start_up
     use m_nvtx
     use m_ibm
     use m_model
+    use m_particle_bed
     use m_collisions
     use m_compile_specific
     use m_checker_common
@@ -94,6 +95,7 @@ contains
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, ib_neighborhood_radius, patch_ib, &
+            num_particle_beds, particle_bed, &
             collision_model, coefficient_of_restitution, collision_time, &
             ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
@@ -1003,8 +1005,9 @@ contains
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
             call s_check_input_file()
+            call s_generate_particle_beds()
 
-            print '(" Simulating a ", A, " ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s) ", A, ".")', &
+            print '(" Simulating a ", A, " ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s) ", A, ".")',&
             #:if not MFC_CASE_OPTIMIZATION
                 "regular", &
             #:else
