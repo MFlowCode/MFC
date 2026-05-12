@@ -1300,15 +1300,15 @@ class CaseValidator:
                 continue
 
             a = self.get(f"a_{direction}")
-            coord_a = self.get(f"{direction}_a")
-            coord_b = self.get(f"{direction}_b")
+            coord_a = self.get(f"{direction}_stretch%beg")
+            coord_b = self.get(f"{direction}_stretch%end")
 
             self.prohibit(old_grid, f"old_grid and stretch_{direction} are incompatible")
             self.prohibit(a is None, f"a_{direction} must be set with stretch_{direction} enabled")
-            self.prohibit(coord_a is None, f"{direction}_a must be set with stretch_{direction} enabled")
-            self.prohibit(coord_b is None, f"{direction}_b must be set with stretch_{direction} enabled")
+            self.prohibit(coord_a is None, f"{direction}_stretch%%beg must be set with stretch_{direction} enabled")
+            self.prohibit(coord_b is None, f"{direction}_stretch%%end must be set with stretch_{direction} enabled")
             if coord_a is not None and coord_b is not None:
-                self.prohibit(coord_a >= coord_b, f"{direction}_a must be less than {direction}_b with stretch_{direction} enabled")
+                self.prohibit(coord_a >= coord_b, f"{direction}_stretch%%beg must be less than {direction}_stretch%%end with stretch_{direction} enabled")
 
     def check_perturb_density(self):
         """Checks initial partial density perturbation constraints (pre-process)"""

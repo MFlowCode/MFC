@@ -161,27 +161,20 @@ module m_global_parameters
     real(wp) :: ic_eps           !< THINC Epsilon to compress on surface cells
     real(wp) :: ic_beta          !< THINC Sharpness Parameter
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
-    integer            :: hyper_model                  !< hyperelasticity solver algorithm
-    logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
-    logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
-    logical            :: shear_stress                 !< Shear stresses
-    logical            :: bulk_stress                  !< Bulk stresses
-    logical            :: cont_damage                  !< Continuum damage modeling
-    logical            :: hyper_cleaning               !< Hyperbolic cleaning for MHD for divB=0
-    integer            :: num_igr_iters                !< number of iterations for elliptic solve
-    integer            :: num_igr_warm_start_iters     !< number of warm start iterations for elliptic solve
-    real(wp)           :: alf_factor                   !< alpha factor for IGR
-    logical            :: bodyForces
-    logical            :: bf_x, bf_y, bf_z             !< body force toggle in three directions
-    !> amplitude, frequency, and phase shift sinusoid in each direction
-    #:for dir in {'x', 'y', 'z'}
-        #:for param in {'k','w','p','g'}
-            real(wp) :: ${param}$_${dir}$
-        #:endfor
-    #:endfor
+    integer                :: hyper_model                  !< hyperelasticity solver algorithm
+    logical                :: elasticity                   !< elasticity modeling, true for hyper or hypo
+    logical, parameter     :: chemistry = .${chemistry}$.  !< Chemistry modeling
+    logical                :: shear_stress                 !< Shear stresses
+    logical                :: bulk_stress                  !< Bulk stresses
+    logical                :: cont_damage                  !< Continuum damage modeling
+    logical                :: hyper_cleaning               !< Hyperbolic cleaning for MHD for divB=0
+    integer                :: num_igr_iters                !< number of iterations for elliptic solve
+    integer                :: num_igr_warm_start_iters     !< number of warm start iterations for elliptic solve
+    real(wp)               :: alf_factor                   !< alpha factor for IGR
+    logical                :: bodyForces
+    type(body_force_axis)  :: bf_x, bf_y, bf_z             !< body force parameters per direction
     real(wp), dimension(3) :: accel_bf
     $:GPU_DECLARE(create='[accel_bf]')
-    ! $:GPU_DECLARE(create='[k_x,w_x,p_x,g_x,k_y,w_y,p_y,g_y,k_z,w_z,p_z,g_z]')
 
     integer :: cpu_start, cpu_end, cpu_rate
 
@@ -227,12 +220,11 @@ module m_global_parameters
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
-    real(wp) :: x_a, y_a, z_a
-    real(wp) :: x_b, y_b, z_b
-    logical  :: parallel_io       !< Format of the data files
-    logical  :: file_per_process  !< shared file or not when using parallel io
-    integer  :: precision         !< Precision of output files
-    logical  :: down_sample       !< down sample the output files
+    type(bounds_info) :: x_stretch, y_stretch, z_stretch
+    logical           :: parallel_io       !< Format of the data files
+    logical           :: file_per_process  !< shared file or not when using parallel io
+    integer           :: precision         !< Precision of output files
+    logical           :: down_sample       !< down sample the output files
     $:GPU_DECLARE(create='[down_sample]')
 
     integer, allocatable, dimension(:)            :: proc_coords  !< Processor coordinates in MPI_CART_COMM
@@ -680,13 +672,10 @@ contains
         surface_tension = .false.
 
         bodyForces = .false.
-        bf_x = .false.; bf_y = .false.; bf_z = .false.
-        !> amplitude, frequency, and phase shift sinusoid in each direction
-        #:for dir in {'x', 'y', 'z'}
-            #:for param in {'k','w','p','g'}
-                ${param}$_${dir}$ = dflt_real
-            #:endfor
-        #:endfor
+        bf_x%enabled = .false.; bf_y%enabled = .false.; bf_z%enabled = .false.
+        bf_x%k = 0._wp; bf_x%w = 0._wp; bf_x%p = 0._wp; bf_x%g = 0._wp
+        bf_y%k = 0._wp; bf_y%w = 0._wp; bf_y%p = 0._wp; bf_y%g = 0._wp
+        bf_z%k = 0._wp; bf_z%w = 0._wp; bf_z%p = 0._wp; bf_z%g = 0._wp
 
         fft_wrt = .false.
         dummy = .false.

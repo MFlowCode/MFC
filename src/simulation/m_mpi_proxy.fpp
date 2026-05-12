@@ -63,8 +63,9 @@ contains
 
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
-        #:for VAR in ['k_x', 'k_y', 'k_z', 'w_x', 'w_y', 'w_z', 'p_x', 'p_y', &
-            & 'p_z', 'g_x', 'g_y', 'g_z']
+        #:for VAR in ['bf_x%k', 'bf_x%w', 'bf_x%p', 'bf_x%g', &
+            & 'bf_y%k', 'bf_y%w', 'bf_y%p', 'bf_y%g', &
+            & 'bf_z%k', 'bf_z%w', 'bf_z%p', 'bf_z%g']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -86,7 +87,7 @@ contains
             & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',          &
-            & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x', 'bf_y', 'bf_z',    &
+            & 'adv_n', 'adap_dt', 'ib', 'bodyForces', 'bf_x%enabled', 'bf_y%enabled', 'bf_z%enabled',    &
             & 'bc_x%grcbc_in', 'bc_x%grcbc_out', 'bc_x%grcbc_vel_out',          &
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',          &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
@@ -130,11 +131,12 @@ contains
             & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
-            & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',    &
-            & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
-            & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in', 'bc_y%Twall_out',  &
+            & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',              &
+            & 'z_domain%beg', 'z_domain%end', 'x_stretch%beg', 'x_stretch%end',           &
+            & 'y_stretch%beg', 'y_stretch%end', 'z_stretch%beg', 'z_stretch%end',         &
+            & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in', 'bc_y%Twall_out',      &
             & 'bc_z%Twall_in', 'bc_z%Twall_out', &
-            & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
+            & 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
             & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
             & 'ic_eps', 'ic_beta', 'hyper_cleaning_speed', &
             & 'hyper_cleaning_tau', 'coefficient_of_restitution', 'collision_time', &

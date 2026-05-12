@@ -46,11 +46,10 @@ module m_global_parameters
     real(wp)          :: dx, dy, dz  !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     logical           :: stretch_x, stretch_y, stretch_z  !< Grid stretching flags for the x-, y- and z-coordinate directions
-    ! Grid stretching: a_x/a_y/a_z = rate, x_a/y_a/z_a = location
-    real(wp) :: a_x, a_y, a_z
-    integer  :: loops_x, loops_y, loops_z
-    real(wp) :: x_a, y_a, z_a
-    real(wp) :: x_b, y_b, z_b
+    ! Grid stretching: a_x/a_y/a_z = rate, x_stretch%beg/end = locations
+    real(wp)          :: a_x, a_y, a_z
+    integer           :: loops_x, loops_y, loops_z
+    type(bounds_info) :: x_stretch, y_stretch, z_stretch
 
     ! Simulation Algorithm Parameters
     integer            :: model_eqns                   !< Multicomponent flow model
@@ -230,12 +229,12 @@ contains
         loops_x = 1
         loops_y = 1
         loops_z = 1
-        x_a = dflt_real
-        x_b = dflt_real
-        y_a = dflt_real
-        y_b = dflt_real
-        z_a = dflt_real
-        z_b = dflt_real
+        x_stretch%beg = dflt_real
+        x_stretch%end = dflt_real
+        y_stretch%beg = dflt_real
+        y_stretch%end = dflt_real
+        z_stretch%beg = dflt_real
+        z_stretch%end = dflt_real
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int

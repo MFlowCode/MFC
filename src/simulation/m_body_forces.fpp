@@ -45,8 +45,8 @@ contains
         real(wp), intent(in) :: t
 
         #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (bf_${XYZ}$) then
-                accel_bf(${DIR}$) = g_${XYZ}$ + k_${XYZ}$*sin(w_${XYZ}$*t - p_${XYZ}$)
+            if (bf_${XYZ}$%enabled) then
+                accel_bf(${DIR}$) = bf_${XYZ}$%g + bf_${XYZ}$%k*sin(bf_${XYZ}$%w*t - bf_${XYZ}$%p)
             end if
         #:endfor
 
@@ -98,7 +98,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (bf_x) then  ! x-direction body forces
+        if (bf_x%enabled) then  ! x-direction body forces
 
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
@@ -113,7 +113,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bf_y) then  ! y-direction body forces
+        if (bf_y%enabled) then  ! y-direction body forces
 
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
@@ -129,7 +129,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bf_z) then  ! z-direction body forces
+        if (bf_z%enabled) then  ! z-direction body forces
 
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
