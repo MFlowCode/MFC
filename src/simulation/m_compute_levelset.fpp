@@ -88,8 +88,8 @@ contains
 
         radius = patch_ib(ib_patch_id)%radius
 
-        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        dist_vec(1) = x%cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        dist_vec(2) = y%cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
@@ -125,7 +125,7 @@ contains
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
-        xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
+        xy_local = [x%cc(i) - center(1), y%cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
         xy_local = matmul(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinate
         xy_local = xy_local - offset  ! airfoils are a patch that require a centroid offset
 
@@ -210,7 +210,7 @@ contains
         z_max = lz/2
         z_min = -lz/2
 
-        xyz_local = [x_cc(i), y_cc(j), z_cc(l)] - center
+        xyz_local = [x%cc(i), y%cc(j), z%cc(l)] - center
         xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
         xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
@@ -311,7 +311,7 @@ contains
         bottom_left(2) = -length_y/2
 
         ! convert grid to local coordinates
-        xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+        xy_local = [x%cc(i) - center(1), y%cc(j) - center(2), 0._wp]
         xy_local = matmul(inverse_rotation, xy_local)
 
         side_dists(1) = bottom_left(1) - xy_local(1)
@@ -374,7 +374,7 @@ contains
         ellipse_coeffs(1) = 0.5_wp*length_x
         ellipse_coeffs(2) = 0.5_wp*length_y
 
-        xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+        xy_local = [x%cc(i) - center(1), y%cc(j) - center(2), 0._wp]
         xy_local = matmul(inverse_rotation, xy_local)
 
         normal_vector = xy_local
@@ -433,7 +433,7 @@ contains
         Front = length_z/2
         Back = -length_z/2
 
-        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+        xyz_local = [x%cc(i), y%cc(j), z%cc(k)] - center  ! get coordinate frame centered on IB
         xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinate
 
         dist_left = Left - xyz_local(1)
@@ -505,9 +505,9 @@ contains
         center(3) = patch_ib(ib_patch_id)%z_centroid
         center = center + periodicity
 
-        dist_vec(1) = x_cc(i) - center(1)
-        dist_vec(2) = y_cc(j) - center(2)
-        dist_vec(3) = z_cc(k) - center(3)
+        dist_vec(1) = x%cc(i) - center(1)
+        dist_vec(2) = y%cc(j) - center(2)
+        dist_vec(3) = z%cc(k) - center(3)
         dist = sqrt(sum(dist_vec**2))
         gp%levelset = dist - radius
         if (f_approx_equal(dist, 0._wp)) then
@@ -566,7 +566,7 @@ contains
             dist_surface_vec = (/1, 1, 0/)
         end if
 
-        xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+        xyz_local = [x%cc(i), y%cc(j), z%cc(k)] - center  ! get coordinate frame centered on IB
         xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
         ! get distance to flat edge of cylinder
@@ -626,9 +626,9 @@ contains
         rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
 
         ! determine where we are located in space
-        xyz_local = (/x_cc(i) - center(1), y_cc(j) - center(2), 0._wp/)
+        xyz_local = (/x%cc(i) - center(1), y%cc(j) - center(2), 0._wp/)
         if (p > 0) then
-            xyz_local(3) = z_cc(k) - center(3)
+            xyz_local(3) = z%cc(k) - center(3)
         end if
         xyz_local = matmul(inverse_rotation, xyz_local)
 

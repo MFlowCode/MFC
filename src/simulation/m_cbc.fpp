@@ -312,8 +312,8 @@ contains
                         vel_out(${CBC_DIR}$, 3) = bc_${XYZ}$%vel_out(3)
                     end if
                 end if
-                Del_in(${CBC_DIR}$) = maxval(d${XYZ}$)
-                Del_out(${CBC_DIR}$) = maxval(d${XYZ}$)
+                Del_in(${CBC_DIR}$) = maxval(${XYZ}$%spacing)
+                Del_out(${CBC_DIR}$) = maxval(${XYZ}$%spacing)
                 pres_in(${CBC_DIR}$) = bc_${XYZ}$%pres_in
                 pres_out(${CBC_DIR}$) = bc_${XYZ}$%pres_out
                 do i = 1, num_fluids
@@ -422,11 +422,11 @@ contains
 
             if (cbc_loc_in == -1) then
                 do i = 0, buff_size
-                    ds(i) = dx(i)
+                    ds(i) = x%spacing(i)
                 end do
             else
                 do i = 0, buff_size
-                    ds(i) = dx(m - i)
+                    ds(i) = x%spacing(m - i)
                 end do
             end if
 
@@ -436,11 +436,11 @@ contains
 
             if (cbc_loc_in == -1) then
                 do i = 0, buff_size
-                    ds(i) = dy(i)
+                    ds(i) = y%spacing(i)
                 end do
             else
                 do i = 0, buff_size
-                    ds(i) = dy(n - i)
+                    ds(i) = y%spacing(n - i)
                 end do
             end if
 
@@ -450,11 +450,11 @@ contains
 
             if (cbc_loc_in == -1) then
                 do i = 0, buff_size
-                    ds(i) = dz(i)
+                    ds(i) = z%spacing(i)
                 end do
             else
                 do i = 0, buff_size
-                    ds(i) = dz(p - i)
+                    ds(i) = z%spacing(p - i)
                 end do
             end if
         end if
@@ -792,7 +792,7 @@ contains
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1)) + rho*c*c*vel(dir_idx(1))/y_cc(n)
+                            dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1)) + rho*c*c*vel(dir_idx(1))/y%cc(n)
                         else
                             dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1))
                         end if
@@ -825,7 +825,7 @@ contains
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%adv%end - eqn_idx%E
-                                dadv_dt(i) = -L(eqn_idx%mom%end + i)  ! + adv_local(i) * vel(dir_idx(1))/y_cc(n)
+                                dadv_dt(i) = -L(eqn_idx%mom%end + i)  ! + adv_local(i) * vel(dir_idx(1))/y%cc(n)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')

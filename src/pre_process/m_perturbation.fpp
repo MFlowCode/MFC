@@ -172,12 +172,12 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            xl = freq*(x_cc(j) + ofs(i, 1))
-                            yl = freq*(y_cc(k) + ofs(i, 2))
+                            xl = freq*(x%cc(j) + ofs(i, 1))
+                            yl = freq*(y%cc(k) + ofs(i, 2))
                             if (num_dims == 2) then
                                 mag = f_simplex2d(xl, yl)
                             else if (num_dims == 3) then
-                                zl = freq*(z_cc(l) + ofs(i, 3))
+                                zl = freq*(z%cc(l) + ofs(i, 3))
                                 mag = f_simplex3d(xl, yl, zl)
                             end if
 
@@ -210,12 +210,12 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            xl = freq*(x_cc(j) + ofs(i, 1))
-                            yl = freq*(y_cc(k) + ofs(i, 2))
+                            xl = freq*(x%cc(j) + ofs(i, 1))
+                            yl = freq*(y%cc(k) + ofs(i, 2))
                             if (num_dims == 2) then
                                 mag = f_simplex2d(xl, yl)
                             else if (num_dims == 3) then
-                                zl = freq*(z_cc(l) + ofs(i, 3))
+                                zl = freq*(z%cc(l) + ofs(i, 3))
                                 mag = f_simplex3d(xl, yl, zl)
                             end if
                             q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l) = q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, &
@@ -255,7 +255,7 @@ contains
         do r = 0, n
             ! Compute prescribed Reynolds stress tensor with about half magnitude of its self-similar value
             Rij(:,:) = 0._wp
-            uu0 = patch_icpp(1)%vel(1)**2._wp*(1._wp - tanh(y_cc(r)*mixlayer_vel_coef)**2._wp)
+            uu0 = patch_icpp(1)%vel(1)**2._wp*(1._wp - tanh(y%cc(r)*mixlayer_vel_coef)**2._wp)
             Rij(1, 1) = 0.05_wp*uu0
             Rij(2, 2) = 0.03_wp*uu0
             Rij(3, 3) = 0.03_wp*uu0
@@ -277,7 +277,7 @@ contains
             do i = 1, mixlayer_perturb_nk
                 ! Generate random numbers for unit wavevector khat, random unit vector xi, and random mode phase phi
                 if (proc_rank == 0) then
-                    call s_generate_random_perturbation(khat, xi, phi, i, y_cc(r))
+                    call s_generate_random_perturbation(khat, xi, phi, i, y%cc(r))
                 end if
 
 #ifdef MFC_MPI
@@ -295,7 +295,7 @@ contains
                 do l = 0, p
                     do j = 0, m
                         q = sqrt(Ek(i)/Eksum)
-                        alpha = k(i)*(khat(1)*x_cc(j) + khat(2)*y_cc(r) + khat(3)*z_cc(l)) + 2._wp*pi*phi
+                        alpha = k(i)*(khat(1)*x%cc(j) + khat(2)*y%cc(r) + khat(3)*z%cc(l)) + 2._wp*pi*phi
                         velfluc = 2._wp*q*sig*cos(alpha)
                         velfluc = matmul(Lmat, velfluc)
                         q_prim_vf(eqn_idx%mom%beg)%sf(j, r, l) = q_prim_vf(eqn_idx%mom%beg)%sf(j, r, l) + velfluc(1)

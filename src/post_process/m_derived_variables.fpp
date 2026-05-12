@@ -218,8 +218,8 @@ contains
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
-                                q_sf(j, k, l) = q_sf(j, k, l) + 1._wp/y_cc(k)*(fd_coeff_y(r, &
-                                     & k)*y_cc(r + k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, l) - fd_coeff_z(r, &
+                                q_sf(j, k, l) = q_sf(j, k, l) + 1._wp/y%cc(k)*(fd_coeff_y(r, &
+                                     & k)*y%cc(r + k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, l) - fd_coeff_z(r, &
                                      & l)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l))
                             else
                                 q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, &
@@ -237,7 +237,7 @@ contains
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
-                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)/y_cc(k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)/y%cc(k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
                                      & r + l) - fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
                             else
                                 q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
@@ -284,13 +284,13 @@ contains
 
                     do r = -fd_number, fd_number
                         do jj = 1, 3
-                            ! d()/dx
+                            ! d()/x%spacing
                             q_jacobian_sf(jj, 1) = q_jacobian_sf(jj, 1) + fd_coeff_x(r, &
                                           & j)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(r + j, k, l)
-                            ! d()/dy
+                            ! d()/y%spacing
                             q_jacobian_sf(jj, 2) = q_jacobian_sf(jj, 2) + fd_coeff_y(r, &
                                           & k)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, r + k, l)
-                            ! d()/dz
+                            ! d()/z%spacing
                             q_jacobian_sf(jj, 3) = q_jacobian_sf(jj, 3) + fd_coeff_z(r, &
                                           & l)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, k, r + l)
                         end do
@@ -362,11 +362,11 @@ contains
 
                     do r = -fd_number, fd_number
                         do i = 1, 3
-                            ! d()/dx
+                            ! d()/x%spacing
                             vgt(i, 1) = vgt(i, 1) + fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(r + j, k, l)
-                            ! d()/dy
+                            ! d()/y%spacing
                             vgt(i, 2) = vgt(i, 2) + fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, r + k, l)
-                            ! d()/dz
+                            ! d()/z%spacing
                             vgt(i, 3) = vgt(i, 3) + fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, r + l)
                         end do
                     end do
@@ -464,7 +464,7 @@ contains
 
                         do i = -fd_number, fd_number
                             if (grid_geometry == 3) then
-                                drho_dz = drho_dz + fd_coeff_z(i, l)/y_cc(k)*rho_sf(j, k, i + l)
+                                drho_dz = drho_dz + fd_coeff_z(i, l)/y%cc(k)*rho_sf(j, k, i + l)
                             else
                                 drho_dz = drho_dz + fd_coeff_z(i, l)*rho_sf(j, k, i + l)
                             end if

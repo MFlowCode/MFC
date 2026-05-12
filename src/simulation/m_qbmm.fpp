@@ -446,7 +446,7 @@ contains
                                     nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j - 1, k, &
                                                         & l) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                           & i) - 3._wp*gam/(dx(j)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                           & i) - 3._wp*gam/(x%spacing(j)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (2)
                                     nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k - 1, &
                                                        & l) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
@@ -455,7 +455,7 @@ contains
                                     nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k - 1, &
                                                         & l) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                           & i) - 3._wp*gam/(dy(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                           & i) - 3._wp*gam/(y%spacing(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (3)
                                     if (is_axisym) then
                                         nb_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
@@ -468,8 +468,8 @@ contains
                                                             & l)*(flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, &
                                                             & l - 1) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, &
-                                               & q, i))
+                                               & i) - 3._wp*gam/(z%spacing(l)*y%cc(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot) &
+                                               & *(pb(j, k, l, q, i))
                                     else
                                         nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, &
                                                            & l - 1) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
@@ -478,39 +478,40 @@ contains
                                         nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, &
                                                             & l - 1) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) - 3._wp*gam/(dz(l)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                               & i) - 3._wp*gam/(z%spacing(l)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, &
+                                               & q, i))
                                     end if
                                 end select
                                 if (q <= 2) then
                                     select case (idir)
                                     case (1)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q - nR2*nb_dot) &
-                                               & *(pb(j, k, l, q, i))
+                                               & i) + 3._wp*gam/(x%spacing(j)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
+                                               & - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q)*(nR_dot*nb_q &
-                                               & - nR*nb_dot))*(pb(j, k, l, q, i))
+                                               & i) + 3._wp*gam/(x%spacing(j)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
+                                               & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (2)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q - nR2*nb_dot) &
-                                               & *(pb(j, k, l, q, i))
+                                               & i) + 3._wp*gam/(y%spacing(k)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
+                                               & - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q)*(nR_dot*nb_q &
-                                               & - nR*nb_dot))*(pb(j, k, l, q, i))
+                                               & i) + 3._wp*gam/(y%spacing(k)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
+                                               & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (3)
                                         if (is_axisym) then
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
-                                                   & - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                   & i) + 3._wp*gam/(z%spacing(l)*y%cc(k)*AX*nb_q**2*sqrt(var)*2._wp) &
+                                                   & *(nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
-                                                   & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                   & i) + 3._wp*gam/(z%spacing(l)*y%cc(k)*AX*nb_q**2*sqrt(var)*2._wp) &
+                                                   & *(-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         else
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q - nR2*nb_dot) &
-                                                   & *(pb(j, k, l, q, i))
+                                                   & i) + 3._wp*gam/(z%spacing(l)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
+                                                   & - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
+                                                   & i) + 3._wp*gam/(z%spacing(l)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
                                                    & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         end if
                                     end select
@@ -518,32 +519,32 @@ contains
                                     select case (idir)
                                     case (1)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q - nR2*nb_dot) &
-                                               & *(pb(j, k, l, q, i))
+                                               & i) - 3._wp*gam/(x%spacing(j)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
+                                               & - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q)*(nR_dot*nb_q &
-                                               & - nR*nb_dot))*(pb(j, k, l, q, i))
+                                               & i) - 3._wp*gam/(x%spacing(j)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
+                                               & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (2)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q - nR2*nb_dot) &
-                                               & *(pb(j, k, l, q, i))
+                                               & i) - 3._wp*gam/(y%spacing(k)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
+                                               & - nR2*nb_dot)*(pb(j, k, l, q, i))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                               & i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q)*(nR_dot*nb_q &
-                                               & - nR*nb_dot))*(pb(j, k, l, q, i))
+                                               & i) - 3._wp*gam/(y%spacing(k)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
+                                               & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                     case (3)
                                         if (is_axisym) then
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
-                                                   & - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                   & i) - 3._wp*gam/(z%spacing(l)*y%cc(k)*AX*nb_q**2*sqrt(var)*2._wp) &
+                                                   & *(nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
-                                                   & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                                   & i) - 3._wp*gam/(z%spacing(l)*y%cc(k)*AX*nb_q**2*sqrt(var)*2._wp) &
+                                                   & *(-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         else
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q - nR2*nb_dot) &
-                                                   & *(pb(j, k, l, q, i))
+                                                   & i) - 3._wp*gam/(z%spacing(l)*AX*nb_q**2*sqrt(var)*2._wp)*(nR2_dot*nb_q &
+                                                   & - nR2*nb_dot)*(pb(j, k, l, q, i))
                                             rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
-                                                   & i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
+                                                   & i) - 3._wp*gam/(z%spacing(l)*AX*nb_q**2*sqrt(var)*2._wp)*(-2._wp*(nR/nb_q) &
                                                    & *(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
                                         end if
                                     end select

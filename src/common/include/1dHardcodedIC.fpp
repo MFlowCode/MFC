@@ -7,12 +7,12 @@
     select case (patch_icpp(patch_id)%hcid)
     case (150)  ! 1D Smooth Alfven Case for MHD
         ! velocity
-        q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
-        q_prim_vf(eqn_idx%mom%beg + 2)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
+        q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x%cc(i))
+        q_prim_vf(eqn_idx%mom%beg + 2)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x%cc(i))
 
         ! magnetic field
-        q_prim_vf(eqn_idx%B%end - 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
-        q_prim_vf(eqn_idx%B%end)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
+        q_prim_vf(eqn_idx%B%end - 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x%cc(i))
+        q_prim_vf(eqn_idx%B%end)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x%cc(i))
     case (170)  ! 1D profile from external data (e.g. Cantera, SDtoolbox)
         ! This hardcoded case can be used to start a simulation with initial conditions given from a known 1D profile (e.g. Cantera,
         ! SDtoolbox)
@@ -21,17 +21,17 @@
         ! This is patch is hard-coded for test suite optimization used in the 1D_shuoser cases: "patch_icpp(2)%alpha_rho(1)": "1 +
         ! 0.2*sin(5*x)"
         if (patch_id == 2) then
-            q_prim_vf(eqn_idx%cont%beg + 0)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
+            q_prim_vf(eqn_idx%cont%beg + 0)%sf(i, 0, 0) = 1 + 0.2*sin(5*x%cc(i))
         end if
     case (181)  ! Titarev-Torro problem
         ! This is patch is hard-coded for test suite optimization used in the 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)":
         ! "1 + 0.1*sin(20*x*pi)"
-        q_prim_vf(eqn_idx%cont%beg + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*pi)
+        q_prim_vf(eqn_idx%cont%beg + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x%cc(i)*pi)
     case (182)  ! Multi-component diffusion
         ! This patch is a hard-coded for test suite optimization (multiple component diffusion)
         x_mid_diffu = 0.05_wp/2.0_wp
         width_sq = (2.5_wp*10.0_wp**(-3.0_wp))**2
-        profile_shape = 1.0_wp - 0.5_wp*exp(-(x_cc(i) - x_mid_diffu)**2/width_sq)
+        profile_shape = 1.0_wp - 0.5_wp*exp(-(x%cc(i) - x_mid_diffu)**2/width_sq)
         q_prim_vf(eqn_idx%mom%beg)%sf(i, 0, 0) = 0.0_wp
         q_prim_vf(eqn_idx%E)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5
         q_prim_vf(eqn_idx%adv%beg)%sf(i, 0, 0) = 1.0_wp
@@ -58,10 +58,10 @@
         q_prim_vf(eqn_idx%mom%beg)%sf(i, 0, 0) = 0.0_wp
         q_prim_vf(eqn_idx%species%beg)%sf(i, 0, 0) = 1.0_wp
 
-        if (x_cc(i) <= 0.025_wp) then
-            temp = 700.0_wp + ((1000.0_wp - 700.0_wp)/0.025_wp)*x_cc(i)
+        if (x%cc(i) <= 0.025_wp) then
+            temp = 700.0_wp + ((1000.0_wp - 700.0_wp)/0.025_wp)*x%cc(i)
         else
-            temp = 1200.0_wp + ((900.0_wp - 1000.0_wp)/0.025_wp)*(x_cc(i) - 0.025_wp)
+            temp = 1200.0_wp + ((900.0_wp - 1000.0_wp)/0.025_wp)*(x%cc(i) - 0.025_wp)
         end if
 
         molar_mass_inv = 1.0_wp/2.01588_wp

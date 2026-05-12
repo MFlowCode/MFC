@@ -56,27 +56,27 @@ contains
         type(scalar_field), intent(inout)                   :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(int_bounds_info), dimension(1:3), intent(in)   :: bounds
-        integer                                             :: x, y, z, eqn
+        integer                                             :: cx, cy, cz, eqn
         real(wp)                                            :: energy, T_in
         real(wp), dimension(num_species)                    :: Ys
 
-        do z = bounds(3)%beg, bounds(3)%end
-            do y = bounds(2)%beg, bounds(2)%end
-                do x = bounds(1)%beg, bounds(1)%end
+        do cz = bounds(3)%beg, bounds(3)%end
+            do cy = bounds(2)%beg, bounds(2)%end
+                do cx = bounds(1)%beg, bounds(1)%end
                     do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                        Ys(eqn - eqn_idx%species%beg + 1) = q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)
+                        Ys(eqn - eqn_idx%species%beg + 1) = q_cons_vf(eqn)%sf(cx, cy, cz)/q_cons_vf(eqn_idx%cont%beg)%sf(cx, cy, cz)
                     end do
 
                     ! e = E - 1/2*|u|^2 cons. eqn_idx%E = \rho E cons. eqn_idx%cont%beg = \rho (1-fluid model) cons. eqn_idx%mom%beg
                     ! + i = \rho u_i
-                    energy = q_cons_vf(eqn_idx%E)%sf(x, y, z)/q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)
+                    energy = q_cons_vf(eqn_idx%E)%sf(cx, cy, cz)/q_cons_vf(eqn_idx%cont%beg)%sf(cx, cy, cz)
                     do eqn = eqn_idx%mom%beg, eqn_idx%mom%end
-                        energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z))**2._wp
+                        energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(cx, cy, cz)/q_cons_vf(eqn_idx%cont%beg)%sf(cx, cy, cz))**2._wp
                     end do
 
-                    T_in = real(q_T_sf%sf(x, y, z), kind=wp)
+                    T_in = real(q_T_sf%sf(cx, cy, cz), kind=wp)
                     call get_temperature(energy, dflt_T_guess, Ys, .true., T_in)
-                    q_T_sf%sf(x, y, z) = T_in
+                    q_T_sf%sf(cx, cy, cz) = T_in
                 end do
             end do
         end do
@@ -89,19 +89,20 @@ contains
         type(scalar_field), intent(inout)                   :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)   :: bounds
-        integer                                             :: x, y, z, i
+        integer                                             :: cx, cy, cz, i
         real(wp), dimension(num_species)                    :: Ys
         real(wp)                                            :: mix_mol_weight
 
-        do z = bounds(3)%beg, bounds(3)%end
-            do y = bounds(2)%beg, bounds(2)%end
-                do x = bounds(1)%beg, bounds(1)%end
+        do cz = bounds(3)%beg, bounds(3)%end
+            do cy = bounds(2)%beg, bounds(2)%end
+                do cx = bounds(1)%beg, bounds(1)%end
                     do i = eqn_idx%species%beg, eqn_idx%species%end
-                        Ys(i - eqn_idx%species%beg + 1) = q_prim_vf(i)%sf(x, y, z)
+                        Ys(i - eqn_idx%species%beg + 1) = q_prim_vf(i)%sf(cx, cy, cz)
                     end do
 
                     call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                    q_T_sf%sf(x, y, z) = q_prim_vf(eqn_idx%E)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
+                    q_T_sf%sf(cx, cy, cz) = q_prim_vf(eqn_idx%E)%sf(cx, cy, cz)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(cx, &
+                              & cy, cz))
                 end do
             end do
         end do
@@ -115,7 +116,7 @@ contains
         type(scalar_field), intent(inout)                      :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_qp, q_prim_qp
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
-        integer                                                :: x, y, z
+        integer                                                :: cx, cy, cz
         integer                                                :: eqn
         real(wp)                                               :: T
         real(wp)                                               :: rho, omega_m
@@ -129,16 +130,16 @@ contains
         #:endif
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
-        do z = bounds(3)%beg, bounds(3)%end
-            do y = bounds(2)%beg, bounds(2)%end
-                do x = bounds(1)%beg, bounds(1)%end
+        do cz = bounds(3)%beg, bounds(3)%end
+            do cy = bounds(2)%beg, bounds(2)%end
+                do cx = bounds(1)%beg, bounds(1)%end
                     $:GPU_LOOP(parallelism='[seq]')
                     do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                        Ys(eqn - eqn_idx%species%beg + 1) = q_prim_qp(eqn)%sf(x, y, z)
+                        Ys(eqn - eqn_idx%species%beg + 1) = q_prim_qp(eqn)%sf(cx, cy, cz)
                     end do
 
-                    rho = q_cons_qp(eqn_idx%cont%end)%sf(x, y, z)
-                    T = q_T_sf%sf(x, y, z)
+                    rho = q_cons_qp(eqn_idx%cont%end)%sf(cx, cy, cz)
+                    T = q_T_sf%sf(cx, cy, cz)
 
                     call get_net_production_rates(rho, T, Ys, omega)
 
@@ -150,7 +151,7 @@ contains
                         #:else
                             omega_m = molecular_weights(eqn - eqn_idx%species%beg + 1)*omega(eqn - eqn_idx%species%beg + 1)
                         #:endif
-                        rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
+                        rhs_vf(eqn)%sf(cx, cy, cz) = rhs_vf(eqn)%sf(cx, cy, cz) + omega_m
                     end do
                 end do
             end do
@@ -186,7 +187,7 @@ contains
         real(wp)              :: Cp_L, Cp_R
         real(wp)              :: diffusivity_L, diffusivity_R, diffusivity_cell
         real(wp)              :: hmix_L, hmix_R, dh_dxi
-        integer               :: x, y, z, i, n, eqn
+        integer               :: cx, cy, cz, i, n, eqn
         integer, dimension(3) :: offsets
 
         isc1 = irx; isc2 = iry; isc3 = irz
@@ -200,29 +201,30 @@ contains
             ! Model 1: Mixture-Average Transport
             if (chem_params%transport_model == 1) then
                 ! Note: Added 'i' and 'eqn' to private list.
-                $:GPU_PARALLEL_LOOP(collapse=3,  private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, &
+                $:GPU_PARALLEL_LOOP(collapse=3,  private='[cx, cy, cz, i, eqn, Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, &
                                     & mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, &
                                     & h_l, h_r, Xs_cell, h_k, dXk_dxi, Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, &
                                     & T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, &
                                     & dT_dxi, grid_spacing]', copyin='[offsets]')
-                do z = isc3%beg, isc3%end
-                    do y = isc2%beg, isc2%end
-                        do x = isc1%beg, isc1%end
+                do cz = isc3%beg, isc3%end
+                    do cy = isc2%beg, isc2%end
+                        do cx = isc1%beg, isc1%end
                             ! Calculate grid spacing using direction-based indexing
                             select case (idir)
                             case (1)
-                                grid_spacing = x_cc(x + 1) - x_cc(x)
+                                grid_spacing = x%cc(cx + 1) - x%cc(cx)
                             case (2)
-                                grid_spacing = y_cc(y + 1) - y_cc(y)
+                                grid_spacing = y%cc(cy + 1) - y%cc(cy)
                             case (3)
-                                grid_spacing = z_cc(z + 1) - z_cc(z)
+                                grid_spacing = z%cc(cz + 1) - z%cc(cz)
                             end select
 
                             ! Extract species mass fractions
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%species%beg, eqn_idx%species%end
-                                Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x, y, z)
-                                Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(cx, cy, cz)
+                                Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(cx + offsets(1), cy + offsets(2), &
+                                     & cz + offsets(3))
                                 Ys_cell(i - eqn_idx%species%beg + 1) = 0.5_wp*(Ys_L(i - eqn_idx%species%beg + 1) + Ys_R(i &
                                         & - eqn_idx%species%beg + 1))
                             end do
@@ -235,14 +237,14 @@ contains
                             call get_mole_fractions(MW_L, Ys_L, Xs_L)
                             call get_mole_fractions(MW_R, Ys_R, Xs_R)
 
-                            P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
-                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            P_L = q_prim_qp(eqn_idx%E)%sf(cx, cy, cz)
+                            P_R = q_prim_qp(eqn_idx%E)%sf(cx + offsets(1), cy + offsets(2), cz + offsets(3))
 
-                            rho_L = q_prim_qp(1)%sf(x, y, z)
-                            rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            rho_L = q_prim_qp(1)%sf(cx, cy, cz)
+                            rho_R = q_prim_qp(1)%sf(cx + offsets(1), cy + offsets(2), cz + offsets(3))
 
-                            T_L = q_T_sf%sf(x, y, z)
-                            T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            T_L = q_T_sf%sf(cx, cy, cz)
+                            T_R = q_T_sf%sf(cx + offsets(1), cy + offsets(2), cz + offsets(3))
 
                             rho_cell = 0.5_wp*(rho_L + rho_R)
                             dT_dxi = (T_R - T_L)/grid_spacing
@@ -322,12 +324,12 @@ contains
                             Mass_Diffu_Energy = lambda_Cell*dT_dxi + Mass_Diffu_Energy
 
                             ! Update flux arrays
-                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_vf(eqn_idx%E)%sf(cx, cy, cz) = flux_src_vf(eqn_idx%E)%sf(cx, cy, cz) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, &
-                                            & z) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
+                                flux_src_vf(eqn)%sf(cx, cy, cz) = flux_src_vf(eqn)%sf(cx, cy, &
+                                            & cz) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                             end do
                         end do
                     end do
@@ -337,28 +339,29 @@ contains
                 ! Model 2: Unity Lewis Number
             else if (chem_params%transport_model == 2) then
                 ! Note: Added ALL scalars and 'i'/'eqn' to private list to prevent race conditions.
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, dYk_dxi, Mass_Diffu_Flux, &
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[cx, cy, cz, i, eqn, Ys_L, Ys_R, Ys_cell, dYk_dxi, Mass_Diffu_Flux, &
                                     & grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, Cp_R, &
                                     & hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, diffusivity_R, &
                                     & diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
-                do z = isc3%beg, isc3%end
-                    do y = isc2%beg, isc2%end
-                        do x = isc1%beg, isc1%end
+                do cz = isc3%beg, isc3%end
+                    do cy = isc2%beg, isc2%end
+                        do cx = isc1%beg, isc1%end
                             ! Calculate grid spacing using direction-based indexing
                             select case (idir)
                             case (1)
-                                grid_spacing = x_cc(x + 1) - x_cc(x)
+                                grid_spacing = x%cc(cx + 1) - x%cc(cx)
                             case (2)
-                                grid_spacing = y_cc(y + 1) - y_cc(y)
+                                grid_spacing = y%cc(cy + 1) - y%cc(cy)
                             case (3)
-                                grid_spacing = z_cc(z + 1) - z_cc(z)
+                                grid_spacing = z%cc(cz + 1) - z%cc(cz)
                             end select
 
                             ! Extract species mass fractions
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%species%beg, eqn_idx%species%end
-                                Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x, y, z)
-                                Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(cx, cy, cz)
+                                Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(cx + offsets(1), cy + offsets(2), &
+                                     & cz + offsets(3))
                                 Ys_cell(i - eqn_idx%species%beg + 1) = 0.5_wp*(Ys_L(i - eqn_idx%species%beg + 1) + Ys_R(i &
                                         & - eqn_idx%species%beg + 1))
                             end do
@@ -368,14 +371,14 @@ contains
                             call get_mixture_molecular_weight(Ys_R, MW_R)
                             MW_cell = 0.5_wp*(MW_L + MW_R)
 
-                            P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
-                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            P_L = q_prim_qp(eqn_idx%E)%sf(cx, cy, cz)
+                            P_R = q_prim_qp(eqn_idx%E)%sf(cx + offsets(1), cy + offsets(2), cz + offsets(3))
 
-                            rho_L = q_prim_qp(1)%sf(x, y, z)
-                            rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            rho_L = q_prim_qp(1)%sf(cx, cy, cz)
+                            rho_R = q_prim_qp(1)%sf(cx + offsets(1), cy + offsets(2), cz + offsets(3))
 
-                            T_L = q_T_sf%sf(x, y, z)
-                            T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            T_L = q_T_sf%sf(cx, cy, cz)
+                            T_R = q_T_sf%sf(cx + offsets(1), cy + offsets(2), cz + offsets(3))
 
                             rho_cell = 0.5_wp*(rho_L + rho_R)
 
@@ -414,12 +417,12 @@ contains
                             Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
 
                             ! Update flux arrays
-                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_vf(eqn_idx%E)%sf(cx, cy, cz) = flux_src_vf(eqn_idx%E)%sf(cx, cy, cz) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, &
-                                            & z) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
+                                flux_src_vf(eqn)%sf(cx, cy, cz) = flux_src_vf(eqn)%sf(cx, cy, &
+                                            & cz) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                             end do
                         end do
                     end do

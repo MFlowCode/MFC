@@ -43,7 +43,7 @@ contains
             #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do j = 0, n
-                        if (y_cc(j) > y_boundary%beg .and. y_cc(j) < y_boundary%end) then
+                        if (y%cc(j) > y_boundary%beg .and. y%cc(j) < y_boundary%end) then
                             bc_type(1, ${IDX}$)%sf(0, j, 0) = patch_bc(patch_id)%type
                         end if
                     end do
@@ -63,7 +63,7 @@ contains
             #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do j = 0, m
-                        if (x_cc(j) > x_boundary%beg .and. x_cc(j) < x_boundary%end) then
+                        if (x%cc(j) > x_boundary%beg .and. x%cc(j) < x_boundary%end) then
                             bc_type(2, ${IDX}$)%sf(j, 0, 0) = patch_bc(patch_id)%type
                         end if
                     end do
@@ -89,7 +89,7 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, n
-                            if ((z_cc(k) - z_centroid)**2._wp + (y_cc(j) - y_centroid)**2._wp <= radius**2._wp) then
+                            if ((z%cc(k) - z_centroid)**2._wp + (y%cc(j) - y_centroid)**2._wp <= radius**2._wp) then
                                 bc_type(1, ${IDX}$)%sf(0, j, k) = patch_bc(patch_id)%type
                             end if
                         end do
@@ -106,7 +106,7 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, m
-                            if ((z_cc(k) - z_centroid)**2._wp + (x_cc(j) - x_centroid)**2._wp <= radius**2._wp) then
+                            if ((z%cc(k) - z_centroid)**2._wp + (x%cc(j) - x_centroid)**2._wp <= radius**2._wp) then
                                 bc_type(2, ${IDX}$)%sf(j, 0, k) = patch_bc(patch_id)%type
                             end if
                         end do
@@ -122,7 +122,7 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                     do k = 0, n
                         do j = 0, m
-                            if ((y_cc(k) - y_centroid)**2._wp + (x_cc(j) - x_centroid)**2._wp <= radius**2._wp) then
+                            if ((y%cc(k) - y_centroid)**2._wp + (x%cc(j) - x_centroid)**2._wp <= radius**2._wp) then
                                 bc_type(3, ${IDX}$)%sf(j, k, 0) = patch_bc(patch_id)%type
                             end if
                         end do
@@ -156,8 +156,8 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, n
-                            if (y_boundary%beg <= y_cc(j) .and. y_boundary%end >= y_cc(j) .and. z_boundary%beg <= z_cc(k) &
-                                & .and. z_boundary%end >= z_cc(k)) then
+                            if (y_boundary%beg <= y%cc(j) .and. y_boundary%end >= y%cc(j) .and. z_boundary%beg <= z%cc(k) &
+                                & .and. z_boundary%end >= z%cc(k)) then
                                 bc_type(1, ${IDX}$)%sf(0, j, k) = patch_bc(patch_id)%type
                             end if
                         end do
@@ -181,8 +181,8 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, m
-                            if (x_boundary%beg <= x_cc(j) .and. x_boundary%end >= x_cc(j) .and. z_boundary%beg <= z_cc(k) &
-                                & .and. z_boundary%end >= z_cc(k)) then
+                            if (x_boundary%beg <= x%cc(j) .and. x_boundary%end >= x%cc(j) .and. z_boundary%beg <= z%cc(k) &
+                                & .and. z_boundary%end >= z%cc(k)) then
                                 bc_type(2, ${IDX}$)%sf(j, 0, k) = patch_bc(patch_id)%type
                             end if
                         end do
@@ -205,8 +205,8 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                     do k = 0, n
                         do j = 0, m
-                            if (x_boundary%beg <= x_cc(j) .and. x_boundary%end >= x_cc(j) .and. y_boundary%beg <= y_cc(k) &
-                                & .and. y_boundary%end >= y_cc(k)) then
+                            if (x_boundary%beg <= x%cc(j) .and. x_boundary%end >= x%cc(j) .and. y_boundary%beg <= y%cc(k) &
+                                & .and. y_boundary%end >= y%cc(k)) then
                                 bc_type(3, ${IDX}$)%sf(j, k, 0) = patch_bc(patch_id)%type
                             end if
                         end do

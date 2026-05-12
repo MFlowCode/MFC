@@ -326,21 +326,21 @@ contains
             upper_bound = ${M}$ + offset_${X}$%end
 
             do i = lower_bound, upper_bound
-                if (${X}$_cc(i) > ${X}$_output%beg) then
+                if (${X}$%cc(i) > ${X}$_output%beg) then
                     ${X}$_output_idx%beg = i + offset_${X}$%beg
                     exit
                 end if
             end do
 
             do i = upper_bound, lower_bound, -1
-                if (${X}$_cc(i) < ${X}$_output%end) then
+                if (${X}$%cc(i) < ${X}$_output%end) then
                     ${X}$_output_idx%end = i + offset_${X}$%beg
                     exit
                 end if
             end do
 
             ! If no grid points are within the output region
-            if ((${X}$_cc(lower_bound) > ${X}$_output%end) .or. (${X}$_cc(upper_bound) < ${X}$_output%beg)) then
+            if ((${X}$%cc(lower_bound) > ${X}$_output%end) .or. (${X}$%cc(upper_bound) < ${X}$_output%beg)) then
                 ${X}$_output_idx%beg = 0
                 ${X}$_output_idx%end = 0
             end if
@@ -455,14 +455,14 @@ contains
                 call s_mpi_gather_spatial_extents(spatial_extents)
             else if (p > 0) then
                 if (grid_geometry == 3) then
-                    spatial_extents(:,0) = (/minval(y_cb), minval(z_cb), minval(x_cb), maxval(y_cb), maxval(z_cb), maxval(x_cb)/)
+                    spatial_extents(:,0) = (/minval(y%cb), minval(z%cb), minval(x%cb), maxval(y%cb), maxval(z%cb), maxval(x%cb)/)
                 else
-                    spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), minval(z_cb), maxval(x_cb), maxval(y_cb), maxval(z_cb)/)
+                    spatial_extents(:,0) = (/minval(x%cb), minval(y%cb), minval(z%cb), maxval(x%cb), maxval(y%cb), maxval(z%cb)/)
                 end if
             else if (n > 0) then
-                spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), maxval(x_cb), maxval(y_cb)/)
+                spatial_extents(:,0) = (/minval(x%cb), minval(y%cb), maxval(x%cb), maxval(y%cb)/)
             else
-                spatial_extents(:,0) = (/minval(x_cb), maxval(x_cb)/)
+                spatial_extents(:,0) = (/minval(x%cb), maxval(x%cb)/)
             end if
 
             ! Next, the root processor proceeds to record all of the spatial extents in the formatted database master file. In
@@ -492,10 +492,10 @@ contains
                 err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, size(lo_offset), lo_offset)
                 err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, size(hi_offset), hi_offset)
                 if (grid_geometry == 3) then
-                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, dims, 3, DB_DOUBLE, &
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y%cb, z%cb, x%cb, dims, 3, DB_DOUBLE, &
                                   & DB_COLLINEAR, optlist, ierr)
                 else
-                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, dims, 3, DB_DOUBLE, &
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x%cb, y%cb, z%cb, dims, 3, DB_DOUBLE, &
                                   & DB_COLLINEAR, optlist, ierr)
                 end if
                 err = DBFREEOPTLIST(optlist)
@@ -503,14 +503,14 @@ contains
                 err = DBMKOPTLIST(2, optlist)
                 err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, size(lo_offset), lo_offset)
                 err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, size(hi_offset), hi_offset)
-                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, DB_F77NULL, dims, 2, DB_DOUBLE, &
+                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x%cb, y%cb, DB_F77NULL, dims, 2, DB_DOUBLE, &
                               & DB_COLLINEAR, optlist, ierr)
                 err = DBFREEOPTLIST(optlist)
             else
                 err = DBMKOPTLIST(2, optlist)
                 err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, size(lo_offset), lo_offset)
                 err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, size(hi_offset), hi_offset)
-                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, DB_F77NULL, DB_F77NULL, dims, 1, &
+                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x%cb, DB_F77NULL, DB_F77NULL, dims, 1, &
                               & DB_DOUBLE, DB_COLLINEAR, optlist, ierr)
                 err = DBFREEOPTLIST(optlist)
             end if
@@ -519,23 +519,23 @@ contains
             ! maintained in multidimensions.
             if (p > 0) then
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, sp), real(y_cb, sp), real(z_cb, sp)
+                    write (dbfile) real(x%cb, sp), real(y%cb, sp), real(z%cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), y_cb(y_output_idx%beg - 1:y_output_idx%end), &
-                               & z_cb(z_output_idx%beg - 1:z_output_idx%end)
+                        write (dbfile) x%cb(x_output_idx%beg - 1:x_output_idx%end), y%cb(y_output_idx%beg - 1:y_output_idx%end), &
+                               & z%cb(z_output_idx%beg - 1:z_output_idx%end)
                     else
-                        write (dbfile) x_cb, y_cb, z_cb
+                        write (dbfile) x%cb, y%cb, z%cb
                     end if
                 end if
             else if (n > 0) then
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, sp), real(y_cb, sp)
+                    write (dbfile) real(x%cb, sp), real(y%cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), y_cb(y_output_idx%beg - 1:y_output_idx%end)
+                        write (dbfile) x%cb(x_output_idx%beg - 1:x_output_idx%end), y%cb(y_output_idx%beg - 1:y_output_idx%end)
                     else
-                        write (dbfile) x_cb, y_cb
+                        write (dbfile) x%cb, y%cb
                     end if
                 end if
 
@@ -543,19 +543,19 @@ contains
                 ! is put together by the root process and written to the master file.
             else
                 if (precision == 1) then
-                    write (dbfile) real(x_cb, sp)
+                    write (dbfile) real(x%cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end)
+                        write (dbfile) x%cb(x_output_idx%beg - 1:x_output_idx%end)
                     else
-                        write (dbfile) x_cb
+                        write (dbfile) x%cb
                     end if
                 end if
 
                 if (num_procs > 1) then
                     call s_mpi_defragment_1d_grid_variable()
                 else
-                    x_root_cb(:) = x_cb(:)
+                    x_root_cb(:) = x%cb(:)
                 end if
 
                 if (proc_rank == 0) then
@@ -1189,7 +1189,7 @@ contains
         call s_mpi_allreduce_max(maxalph_loc, maxalph_glb)
         if (p > 0) then
             do l = 0, p
-                if (z_cc(l) < dz(l) .and. z_cc(l) > 0) then
+                if (z%cc(l) < z%spacing(l) .and. z%cc(l) > 0) then
                     cent = l
                 end if
             end do
@@ -1208,18 +1208,18 @@ contains
                     & .or. (ayp < thres .and. aym > thres)) then
                     if (counter == 0) then
                         counter = counter + 1
-                        x_d1(counter) = x_cc(j)
-                        y_d1(counter) = y_cc(k)
+                        x_d1(counter) = x%cc(j)
+                        y_d1(counter) = y%cc(k)
                     else
-                        tgp = sqrt(dx(j)**2 + dy(k)**2)
+                        tgp = sqrt(x%spacing(j)**2 + y%spacing(k)**2)
                         do i = 1, counter
-                            euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
+                            euc_d = sqrt((x%cc(j) - x_d1(i))**2 + (y%cc(k) - y_d1(i))**2)
                             if (euc_d < tgp) then
                                 exit
                             else if (i == counter) then
                                 counter = counter + 1
-                                x_d1(counter) = x_cc(j)
-                                y_d1(counter) = y_cc(k)
+                                x_d1(counter) = x%cc(j)
+                                y_d1(counter) = y%cc(k)
                             end if
                         end do
                     end if
@@ -1278,7 +1278,7 @@ contains
             do j = 0, n
                 do i = 0, m
                     pres = 0._wp
-                    dV = dx(i)*dy(j)*dz(k)
+                    dV = x%spacing(i)*y%spacing(j)*z%spacing(k)
                     rho = 0._wp
                     gamma = 0._wp
                     pi_inf = 0._wp

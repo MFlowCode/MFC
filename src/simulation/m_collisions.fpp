@@ -426,10 +426,10 @@ contains
                 #:endfor
 
                 ! the object that contains the collision location owns the collisions
-                owns_collision = x_cb(-1) <= projected_location(1) .and. projected_location(1) < x_cb(m)
-                owns_collision = owns_collision .and. y_cb(-1) <= projected_location(2) .and. projected_location(2) < y_cb(n)
-                if (num_dims == 3) owns_collision = owns_collision .and. z_cb(-1) <= projected_location(3) &
-                    & .and. projected_location(3) < z_cb(p)
+                owns_collision = x%cb(-1) <= projected_location(1) .and. projected_location(1) < x%cb(m)
+                owns_collision = owns_collision .and. y%cb(-1) <= projected_location(2) .and. projected_location(2) < y%cb(n)
+                if (num_dims == 3) owns_collision = owns_collision .and. z%cb(-1) <= projected_location(3) &
+                    & .and. projected_location(3) < z%cb(p)
             end if
         #:else
             owns_collision = .true.

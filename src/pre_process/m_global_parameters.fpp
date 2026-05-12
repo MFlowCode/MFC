@@ -41,13 +41,11 @@ module m_global_parameters
     integer               :: num_vels             !< Number of velocity components (different from num_dims for mhd)
     logical               :: cyl_coord
     integer               :: grid_geometry        !< Cylindrical coordinates (either axisymmetric or full 3D)
-    !> Locations of cell-centers (cc) in x-, y- and z-directions, respectively
-    real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
-    !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
-    real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
+    !> Cell-boundary (cb) and cell-center (cc) arrays per direction
+    type(grid_axis)   :: x, y, z
+    real(wp)          :: dx, dy, dz  !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
-    logical :: stretch_x, stretch_y, stretch_z         !< Grid stretching flags for the x-, y- and z-coordinate directions
+    logical           :: stretch_x, stretch_y, stretch_z  !< Grid stretching flags for the x-, y- and z-coordinate directions
     ! Grid stretching: a_x/a_y/a_z = rate, x_a/y_a/z_a = location
     real(wp) :: a_x, a_y, a_z
     integer  :: loops_x, loops_y, loops_z
@@ -810,12 +808,12 @@ contains
 #endif
 
         ! Allocating grid variables for the x-direction
-        allocate (x_cc(0:m), x_cb(-1:m))
+        allocate (x%cc(0:m), x%cb(-1:m))
         ! Allocating grid variables for the y- and z-directions
         if (n > 0) then
-            allocate (y_cc(0:n), y_cb(-1:n))
+            allocate (y%cc(0:n), y%cb(-1:n))
             if (p > 0) then
-                allocate (z_cc(0:p), z_cb(-1:p))
+                allocate (z%cc(0:p), z%cb(-1:p))
             end if
         end if
 
@@ -879,12 +877,12 @@ contains
 
         ! Deallocating grid variables for the x-direction
 
-        deallocate (x_cc, x_cb)
+        deallocate (x%cc, x%cb)
         ! Deallocating grid variables for the y- and z-directions
         if (n > 0) then
-            deallocate (y_cc, y_cb)
+            deallocate (y%cc, y%cb)
             if (p > 0) then
-                deallocate (z_cc, z_cb)
+                deallocate (z%cc, z%cb)
             end if
         end if
 
