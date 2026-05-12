@@ -142,8 +142,8 @@ contains
             end do
 
             if (n_placed < particle_bed(b)%num_particles) then
-                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', &
-                    b, n_placed, particle_bed(b)%num_particles, n_attempts
+                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', b, n_placed, &
+                    & particle_bed(b)%num_particles, n_attempts
             end if
 
             deallocate (placed, hash_head, chain_next)
