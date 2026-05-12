@@ -563,10 +563,11 @@ exit 0
             find_package(MPI COMPONENTS Fortran REQUIRED)
 	    
             target_compile_definitions(${a_target} PRIVATE MFC_MPI)
-            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND
+               DEFINED ENV{CRAY_MPICH_INC} AND NOT "$ENV{CRAY_MPICH_INC}" STREQUAL "")
                 target_compile_options(${a_target} PRIVATE "$ENV{CRAY_MPICH_INC}")
                 target_link_libraries(${a_target} PRIVATE $ENV{CRAY_MPICH_LIB})
-            else() 
+            else()
                 target_link_libraries(${a_target} PRIVATE MPI::MPI_Fortran)
             endif()
         endif()
@@ -587,10 +588,16 @@ exit 0
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
-                else() 
+                    if(DEFINED ENV{CRAY_HIPFORT_LIB} AND NOT "$ENV{CRAY_HIPFORT_LIB}" STREQUAL "")
+                        target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
+                    else()
+                        find_library(HIPFFT_LIB hipfft
+                            HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                        target_link_libraries(${a_target} PRIVATE ${HIPFFT_LIB})
+                    endif()
+                else()
                     find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
-                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)                    
+                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)
                 endif()
             else()
                 find_package(FFTW REQUIRED)
@@ -703,8 +710,14 @@ exit 0
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-                find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
-                target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
+                find_library(HIP_LIB amdhip64
+                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
+                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                target_include_directories(${a_target} PRIVATE
+                    "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn")
+                target_link_libraries(${a_target} PRIVATE
+                    ${HIP_LIB} ${HIPFORT_AMDGCN_LIB} flang_rt.hostdevice)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")

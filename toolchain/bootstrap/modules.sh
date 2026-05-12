@@ -105,7 +105,6 @@ fi
 
 ELEMENTS="$(__extract "$u_c-all") $(__extract "$u_c-$cg")"
 MODULES=`echo "$ELEMENTS" | tr ' ' '\n' | grep -v = | xargs`
-VARIABLES=`echo "$ELEMENTS" | tr ' ' '\n' | grep = | xargs`
 
 log " $ module load $MODULES"
 if ! module load $MODULES; then
@@ -114,10 +113,17 @@ if ! module load $MODULES; then
     return
 fi
 
-if [ $(echo "$VARIABLES" | grep = | wc -c) -gt 0 ]; then
-    log " $ export $(eval "echo $VARIABLES")"
-    export $(eval "echo $VARIABLES") > /dev/null
-fi
+# Export variables one line at a time so each can reference previously exported vars
+# (e.g. PATH="${OLCF_AFAR_ROOT}/..." requires OLCF_AFAR_ROOT to already be set)
+for _suffix in "all" "$cg"; do
+    while IFS= read -r _entry; do
+        if echo "$_entry" | grep -q '='; then
+            log " $ export $(eval "echo \"$_entry\"")"
+            eval "export $_entry"
+        fi
+    done < <(grep -E "^$u_c-$_suffix\s+" toolchain/modules | sed "s/^$u_c-$_suffix\s\+//")
+done
+unset _suffix _entry
 
 UNLOAD_MODULES="$(__extract "$u_c-all-unload") $(__extract "$u_c-$cg-unload")"
 UNLOAD_MODULES=$(echo "$UNLOAD_MODULES" | xargs)
