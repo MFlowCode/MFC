@@ -75,7 +75,7 @@ contains
         character(len=1000)     :: line
 
         namelist /user_inputs/ case_dir, old_grid, old_ic, t_step_old, t_step_start, m, n, p, x_domain, y_domain, z_domain, &
-            & stretch_x, stretch_y, stretch_z, a_x, a_y, a_z, x_a, y_a, z_a, x_b, y_b, z_b, model_eqns, num_fluids, mpp_lim, &
+            & stretch_x, stretch_y, stretch_z, a_x, a_y, a_z, x_stretch, y_stretch, z_stretch, model_eqns, num_fluids, mpp_lim, &
             & weno_order, bc_x, bc_y, bc_z, num_patches, hypoelasticity, mhd, patch_icpp, fluid_pp, bub_pp, precision, &
             & parallel_io, mixlayer_vel_profile, mixlayer_vel_coef, mixlayer_perturb, mixlayer_perturb_nk, mixlayer_perturb_k0, &
             & pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, perturb_sph, perturb_sph_fluid, fluid_rho, cyl_coord, &

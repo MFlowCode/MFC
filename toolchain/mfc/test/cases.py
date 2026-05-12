@@ -1186,13 +1186,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_body_forces(dimInfo):
         ndims = len(dimInfo[0])
 
-        stack.push("Bodyforces", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10})
+        stack.push("Bodyforces", {"bf_x%enabled": "T", "bf_x%k": 1, "bf_x%w": 1, "bf_x%p": 1, "bf_x%g": 10})
 
         if ndims >= 2:
-            stack.push("", {"bf_y": "T", "k_y": 1, "w_y": 1, "p_y": 1, "g_y": 10})
+            stack.push("", {"bf_y%enabled": "T", "bf_y%k": 1, "bf_y%w": 1, "bf_y%p": 1, "bf_y%g": 10})
 
         if ndims == 3:
-            stack.push("", {"bf_z": "T", "k_z": 1, "w_z": 1, "p_z": 1, "g_z": 10})
+            stack.push("", {"bf_z%enabled": "T", "bf_z%k": 1, "bf_z%w": 1, "bf_z%p": 1, "bf_z%g": 10})
 
         cases.append(define_case_d(stack, "", {}))
 
@@ -2291,18 +2291,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 **base_3d,
                 "stretch_x": "T",
                 "a_x": 2.0,
-                "x_a": 0.3,
-                "x_b": 0.7,
+                "x_stretch%beg": 0.3,
+                "x_stretch%end": 0.7,
                 "loops_x": 1,
                 "stretch_y": "T",
                 "a_y": 2.0,
-                "y_a": 0.3,
-                "y_b": 0.7,
+                "y_stretch%beg": 0.3,
+                "y_stretch%end": 0.7,
                 "loops_y": 1,
                 "stretch_z": "T",
                 "a_z": 2.0,
-                "z_a": 0.3,
-                "z_b": 0.7,
+                "z_stretch%beg": 0.3,
+                "z_stretch%end": 0.7,
                 "loops_z": 1,
                 # Enlarge x/y coverage for all patches (stretched domain reaches ~1.39)
                 "patch_icpp(1)%x_centroid": 0.75,
@@ -2381,8 +2381,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # x-stretching creates non-uniform cells at the bubble interface
                 "stretch_x": "T",
                 "a_x": 2.0,
-                "x_a": 0.3,
-                "x_b": 0.7,
+                "x_stretch%beg": 0.3,
+                "x_stretch%end": 0.7,
                 "loops_x": 1,
             },
         )

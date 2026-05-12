@@ -146,13 +146,13 @@ When the simulation is 2D/axi-symmetric or 1D, it requires that $p=0$ or $p=n=0$
 - `stretch_[x,y,z]` activates grid stretching in the $[x,y,z]$ directions.
 The grid is gradually stretched such that the domain boundaries are pushed away from the origin along a specified axis.
 
-- `a_[x,y,z]`, `[x,y,z]_a`, and `[x,y,z]_b` are parameters that define the grid stretching function. When grid stretching along the $x$ axis is considered, the stretching function is given as:
+- `a_[x,y,z]`, `[x,y,z]_stretch%%beg`, and `[x,y,z]_stretch%%end` (where `beg` is the negative-direction anchor and `end` the positive-direction anchor) are parameters that define the grid stretching function. When grid stretching along the $x$ axis is considered, the stretching function is given as:
 
-\f[ x_{cb,stretch} = x_{cb} + \frac{x_{cb}}{a_x} \Bigg[ \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_a)}{L} \right) \right] + \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_b)}{L} \right) \right] -2 \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_b-x_a)}{2L} \right) \right]  \Bigg] \f]
+\f[ x_{cb,stretch} = x_{cb} + \frac{x_{cb}}{a_x} \Bigg[ \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_{stretch,beg})}{L} \right) \right] + \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_{stretch,end})}{L} \right) \right] -2 \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{stretch,end}-x_{stretch,beg})}{2L} \right) \right]  \Bigg] \f]
 
 where `x_cb` and `x_[cb,stretch]` are the coordinates of a cell boundary at the original and stretched domains, respectively.
 `L` is the domain length along the `x` axis: `L`=`x_domain%%end`-`x_domain%%beg`.
-Crudely speaking, `x_a` and `x_b` define the coordinates at which the grid begins to get stretched in the negative and positive directions along the $x$ axis, respectively.
+Crudely speaking, `x_stretch%%beg` and `x_stretch%%end` define the coordinates at which the grid begins to get stretched in the negative and positive directions along the $x$ axis, respectively.
 $a_x$ defines the smoothness of the stretching.
 Stretching along the $y$ and $z$ axes follows the same logistics.
 Optimal choice of the parameters for grid stretching is case-dependent and left to the user.
@@ -987,15 +987,15 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models whe
 
 | Parameter         | Type    | Description                                |
 | ---:              | :---:   | :---                                       |
-| `bf_x[y,z]`       | Logical | Enable body forces in the x[y,z] direction |
-| `k_x[y,y]`        | Real    | Magnitude of oscillating acceleration      |
-| `w_x[y,z]`        | Real    | Frequency of oscillating acceleration      |
-| `p_x[y,z]`        | Real    | Phase shift of oscillating acceleration    |
-| `g_x[y,z]`        | Real    | Magnitude of background acceleration       |
+| `bf_[x,y,z]%%enabled` | Logical | Enable body forces in the [x,y,z] direction |
+| `bf_[x,y,z]%%k`      | Real    | Magnitude of oscillating acceleration       |
+| `bf_[x,y,z]%%w`      | Real    | Frequency of oscillating acceleration       |
+| `bf_[x,y,z]%%p`      | Real    | Phase shift of oscillating acceleration     |
+| `bf_[x,y,z]%%g`      | Real    | Magnitude of background acceleration        |
 
-`k_x[y,z]`, `w_x[y,z]`, `p_x[y,z]`, and `g_x[y,z]` define an oscillating acceleration in the `x[y,z]` direction with the form
+`bf_[x,y,z]%%k`, `bf_[x,y,z]%%w`, `bf_[x,y,z]%%p`, and `bf_[x,y,z]%%g` define an oscillating acceleration in the `[x,y,z]` direction with the form
 
-\f[ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). \f]
+\f[ a_{[x,y,z]} = bf_{[x,y,z]}\%g + bf_{[x,y,z]}\%k\sin\left(bf_{[x,y,z]}\%w \cdot t + bf_{[x,y,z]}\%p\right). \f]
 
 By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
 

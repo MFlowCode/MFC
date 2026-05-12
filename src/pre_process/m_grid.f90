@@ -51,13 +51,13 @@ contains
         if (stretch_x) then
             length = abs(x%cb(m) - x%cb(-1))
             x%cb = x%cb/length
-            x_a = x_a/length
-            x_b = x_b/length
+            x_stretch%beg = x_stretch%beg/length
+            x_stretch%end = x_stretch%end/length
 
             do j = 1, loops_x
                 do i = -1, m
-                    x%cb(i) = x%cb(i)/a_x*(a_x + log(cosh(a_x*(x%cb(i) - x_a))) + log(cosh(a_x*(x%cb(i) - x_b))) &
-                         & - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
+                    x%cb(i) = x%cb(i)/a_x*(a_x + log(cosh(a_x*(x%cb(i) - x_stretch%beg))) + log(cosh(a_x*(x%cb(i) - x_stretch%end) &
+                         & )) - 2._wp*log(cosh(a_x*(x_stretch%end - x_stretch%beg)/2._wp)))
                 end do
             end do
             x%cb = x%cb*length
@@ -98,13 +98,13 @@ contains
         if (stretch_y) then
             length = abs(y%cb(n) - y%cb(-1))
             y%cb = y%cb/length
-            y_a = y_a/length
-            y_b = y_b/length
+            y_stretch%beg = y_stretch%beg/length
+            y_stretch%end = y_stretch%end/length
 
             do j = 1, loops_y
                 do i = -1, n
-                    y%cb(i) = y%cb(i)/a_y*(a_y + log(cosh(a_y*(y%cb(i) - y_a))) + log(cosh(a_y*(y%cb(i) - y_b))) &
-                         & - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
+                    y%cb(i) = y%cb(i)/a_y*(a_y + log(cosh(a_y*(y%cb(i) - y_stretch%beg))) + log(cosh(a_y*(y%cb(i) - y_stretch%end) &
+                         & )) - 2._wp*log(cosh(a_y*(y_stretch%end - y_stretch%beg)/2._wp)))
                 end do
             end do
 
@@ -132,13 +132,13 @@ contains
         if (stretch_z) then
             length = abs(z%cb(p) - z%cb(-1))
             z%cb = z%cb/length
-            z_a = z_a/length
-            z_b = z_b/length
+            z_stretch%beg = z_stretch%beg/length
+            z_stretch%end = z_stretch%end/length
 
             do j = 1, loops_z
                 do i = -1, p
-                    z%cb(i) = z%cb(i)/a_z*(a_z + log(cosh(a_z*(z%cb(i) - z_a))) + log(cosh(a_z*(z%cb(i) - z_b))) &
-                         & - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
+                    z%cb(i) = z%cb(i)/a_z*(a_z + log(cosh(a_z*(z%cb(i) - z_stretch%beg))) + log(cosh(a_z*(z%cb(i) - z_stretch%end) &
+                         & )) - 2._wp*log(cosh(a_z*(z_stretch%end - z_stretch%beg)/2._wp)))
                 end do
             end do
 
@@ -180,13 +180,13 @@ contains
 
             x_cb_glb = x_cb_glb/length
 
-            x_a = x_a/length
-            x_b = x_b/length
+            x_stretch%beg = x_stretch%beg/length
+            x_stretch%end = x_stretch%end/length
 
             do j = 1, loops_x
                 do i = -1, m_glb
-                    x_cb_glb(i) = x_cb_glb(i)/a_x*(a_x + log(cosh(a_x*(x_cb_glb(i) - x_a))) + log(cosh(a_x*(x_cb_glb(i) - x_b))) &
-                             & - 2._wp*log(cosh(a_x*(x_b - x_a)/2._wp)))
+                    x_cb_glb(i) = x_cb_glb(i)/a_x*(a_x + log(cosh(a_x*(x_cb_glb(i) - x_stretch%beg))) + log(cosh(a_x*(x_cb_glb(i) &
+                             & - x_stretch%end))) - 2._wp*log(cosh(a_x*(x_stretch%end - x_stretch%beg)/2._wp)))
                 end do
             end do
 
@@ -214,13 +214,14 @@ contains
 
                 y_cb_glb = y_cb_glb/length
 
-                y_a = y_a/length
-                y_b = y_b/length
+                y_stretch%beg = y_stretch%beg/length
+                y_stretch%end = y_stretch%end/length
 
                 do j = 1, loops_y
                     do i = -1, n_glb
-                        y_cb_glb(i) = y_cb_glb(i)/a_y*(a_y + log(cosh(a_y*(y_cb_glb(i) - y_a))) + log(cosh(a_y*(y_cb_glb(i) - y_b) &
-                                 & )) - 2._wp*log(cosh(a_y*(y_b - y_a)/2._wp)))
+                        y_cb_glb(i) = y_cb_glb(i)/a_y*(a_y + log(cosh(a_y*(y_cb_glb(i) - y_stretch%beg))) &
+                                 & + log(cosh(a_y*(y_cb_glb(i) - y_stretch%end))) - 2._wp*log(cosh(a_y*(y_stretch%end &
+                                 & - y_stretch%beg)/2._wp)))
                     end do
                 end do
 
@@ -238,13 +239,14 @@ contains
                     length = abs(z_cb_glb(p_glb) - z_cb_glb(-1))
 
                     z_cb_glb = z_cb_glb/length
-                    z_a = z_a/length
-                    z_b = z_b/length
+                    z_stretch%beg = z_stretch%beg/length
+                    z_stretch%end = z_stretch%end/length
 
                     do j = 1, loops_z
                         do i = -1, p_glb
-                            z_cb_glb(i) = z_cb_glb(i)/a_z*(a_z + log(cosh(a_z*(z_cb_glb(i) - z_a))) + log(cosh(a_z*(z_cb_glb(i) &
-                                     & - z_b))) - 2._wp*log(cosh(a_z*(z_b - z_a)/2._wp)))
+                            z_cb_glb(i) = z_cb_glb(i)/a_z*(a_z + log(cosh(a_z*(z_cb_glb(i) - z_stretch%beg))) &
+                                     & + log(cosh(a_z*(z_cb_glb(i) - z_stretch%end))) - 2._wp*log(cosh(a_z*(z_stretch%end &
+                                     & - z_stretch%beg)/2._wp)))
                         end do
                     end do
 

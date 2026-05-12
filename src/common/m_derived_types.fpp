@@ -175,6 +175,12 @@ module m_derived_types
         real(wp) :: end
     end type bounds_info
 
+    !> Derived type grouping body force parameters for one coordinate direction
+    type body_force_axis
+        real(wp) :: k, w, p, g
+        logical  :: enabled
+    end type body_force_axis
+
     !> Defines parameters for a Model Patch
     type ic_model_parameters
         character(LEN=pathlen_max) :: filepath   !< Path the STL file relative to case_dir.

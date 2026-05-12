@@ -171,12 +171,12 @@ _SIMPLE_DESCS = {
     "a_x": "Grid stretching rate in x",
     "a_y": "Grid stretching rate in y",
     "a_z": "Grid stretching rate in z",
-    "x_a": "Stretching start (negative x)",
-    "x_b": "Stretching start (positive x)",
-    "y_a": "Stretching start (negative y)",
-    "y_b": "Stretching start (positive y)",
-    "z_a": "Stretching start (negative z)",
-    "z_b": "Stretching start (positive z)",
+    "x_stretch%beg": "Stretching start (negative x)",
+    "x_stretch%end": "Stretching start (positive x)",
+    "y_stretch%beg": "Stretching start (negative y)",
+    "y_stretch%end": "Stretching start (positive y)",
+    "z_stretch%beg": "Stretching start (negative z)",
+    "z_stretch%end": "Stretching start (positive z)",
     "loops_x": "Stretching iterations in x",
     "loops_y": "Stretching iterations in y",
     "loops_z": "Stretching iterations in z",
@@ -268,21 +268,21 @@ _SIMPLE_DESCS = {
     "format": "Output format",
     "precision": "Output precision",
     # Body forces
-    "bf_x": "Enable body force in x",
-    "bf_y": "Enable body force in y",
-    "bf_z": "Enable body force in z",
-    "k_x": "Body force wavenumber in x",
-    "k_y": "Body force wavenumber in y",
-    "k_z": "Body force wavenumber in z",
-    "w_x": "Body force frequency in x",
-    "w_y": "Body force frequency in y",
-    "w_z": "Body force frequency in z",
-    "p_x": "Body force phase in x",
-    "p_y": "Body force phase in y",
-    "p_z": "Body force phase in z",
-    "g_x": "Gravitational acceleration in x",
-    "g_y": "Gravitational acceleration in y",
-    "g_z": "Gravitational acceleration in z",
+    "bf_x%enabled": "Enable body force in x",
+    "bf_y%enabled": "Enable body force in y",
+    "bf_z%enabled": "Enable body force in z",
+    "bf_x%k": "Body force wavenumber in x",
+    "bf_y%k": "Body force wavenumber in y",
+    "bf_z%k": "Body force wavenumber in z",
+    "bf_x%w": "Body force frequency in x",
+    "bf_y%w": "Body force frequency in y",
+    "bf_z%w": "Body force frequency in z",
+    "bf_x%p": "Body force phase in x",
+    "bf_y%p": "Body force phase in y",
+    "bf_z%p": "Body force phase in z",
+    "bf_x%g": "Gravitational acceleration in x",
+    "bf_y%g": "Gravitational acceleration in y",
+    "bf_z%g": "Gravitational acceleration in z",
     # More output
     "E_wrt": "Write energy field",
     "c_wrt": "Write sound speed field",
@@ -744,32 +744,32 @@ DEPENDENCIES = {
     },
     "stretch_x": {
         "when_true": {
-            "requires": ["a_x", "x_a", "x_b"],
+            "requires": ["a_x", "x_stretch%beg", "x_stretch%end"],
         }
     },
     "stretch_y": {
         "when_true": {
-            "requires": ["a_y", "y_a", "y_b"],
+            "requires": ["a_y", "y_stretch%beg", "y_stretch%end"],
         }
     },
     "stretch_z": {
         "when_true": {
-            "requires": ["a_z", "z_a", "z_b"],
+            "requires": ["a_z", "z_stretch%beg", "z_stretch%end"],
         }
     },
-    "bf_x": {
+    "bf_x%enabled": {
         "when_true": {
-            "requires": ["k_x", "w_x", "p_x", "g_x"],
+            "requires": ["bf_x%k", "bf_x%w", "bf_x%p", "bf_x%g"],
         }
     },
-    "bf_y": {
+    "bf_y%enabled": {
         "when_true": {
-            "requires": ["k_y", "w_y", "p_y", "g_y"],
+            "requires": ["bf_y%k", "bf_y%w", "bf_y%p", "bf_y%g"],
         }
     },
-    "bf_z": {
+    "bf_z%enabled": {
         "when_true": {
-            "requires": ["k_z", "w_z", "p_z", "g_z"],
+            "requires": ["bf_z%k", "bf_z%w", "bf_z%p", "bf_z%g"],
         }
     },
     "teno": {
@@ -854,8 +854,8 @@ def _load():
     for n in ["stretch_x", "stretch_y", "stretch_z"]:
         _r(n, LOG, {"grid"})
     for d in ["x", "y", "z"]:
-        _r(f"{d}_a", REAL, {"grid"})
-        _r(f"{d}_b", REAL, {"grid"})
+        _r(f"{d}_stretch%beg", REAL, {"grid"})
+        _r(f"{d}_stretch%end", REAL, {"grid"})
         _r(f"a_{d}", REAL, {"grid"})
         _r(f"loops_{d}", INT, {"grid"})
         _r(f"{d}_domain%beg", REAL, {"grid"})
@@ -1076,11 +1076,11 @@ def _load():
 
     # Body force
     for d in ["x", "y", "z"]:
-        _r(f"g_{d}", REAL, math=r"\f$g_" + d + r"\f$")
-        _r(f"k_{d}", REAL, math=r"\f$k_" + d + r"\f$")
-        _r(f"w_{d}", REAL, math=r"\f$\omega_" + d + r"\f$")
-        _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
-        _r(f"bf_{d}", LOG)
+        _r(f"bf_{d}%g", REAL, math=r"\f$g_" + d + r"\f$")
+        _r(f"bf_{d}%k", REAL, math=r"\f$k_" + d + r"\f$")
+        _r(f"bf_{d}%w", REAL, math=r"\f$\omega_" + d + r"\f$")
+        _r(f"bf_{d}%p", REAL, math=r"\f$\phi_" + d + r"\f$")
+        _r(f"bf_{d}%enabled", LOG)
 
     # INDEXED PARAMETERS
 

@@ -52,9 +52,10 @@ contains
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
-        #:for VAR in [ 'x_domain%beg', 'x_domain%end', 'y_domain%beg',         &
-            & 'y_domain%end', 'z_domain%beg', 'z_domain%end', 'a_x', 'a_y',    &
-            & 'a_z', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', 'z_b', 'bc_x%beg',     &
+        #:for VAR in [ 'x_domain%beg', 'x_domain%end', 'y_domain%beg',                         &
+            & 'y_domain%end', 'z_domain%beg', 'z_domain%end', 'a_x', 'a_y',                   &
+            & 'a_z', 'x_stretch%beg', 'x_stretch%end', 'y_stretch%beg', 'y_stretch%end',      &
+            & 'z_stretch%beg', 'z_stretch%end', 'bc_x%beg',     &
             & 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',      &
             & 'perturb_flow_mag', 'pref', 'rhoref', 'poly_sigma', 'R0ref',     &
             & 'Web', 'Ca', 'Re_inv', 'sigR', 'sigV', 'rhoRV', 'palpha_eps',    &
