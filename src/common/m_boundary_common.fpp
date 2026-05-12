@@ -2562,7 +2562,7 @@ contains
 #ifndef MFC_PRE_PROCESS
         ! Populating cell-width distribution buffer at bc%x%beg
         if (bc%x%beg >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(1, -1)
+            if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(1, -1)
         else if (bc%x%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dx(-i) = dx(0)
@@ -2577,18 +2577,21 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc%x%beg
-        do i = 1, offset_x%beg
-            x_cb(-1 - i) = x_cb(-i) - dx(-i)
-        end do
+        ! Computing the cell-boundary and center locations buffer at bc%x%beg. Skip when parallel_io has already filled the ghost
+        ! x_cb / x_cc bitwise from the global grid file via s_apply_grid_from_global_dim
+        if (.not. (bc%x%beg >= 0 .and. parallel_io)) then
+            do i = 1, offset_x%beg
+                x_cb(-1 - i) = x_cb(-i) - dx(-i)
+            end do
 
-        do i = 1, buff_size
-            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
-        end do
+            do i = 1, buff_size
+                x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
+            end do
+        end if
 
         ! Populating the cell-width distribution buffer at bc%x%end
         if (bc%x%end >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(1, 1)
+            if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(1, 1)
         else if (bc%x%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dx(m + i) = dx(m)
@@ -2603,20 +2606,22 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc%x%end
-        do i = 1, offset_x%end
-            x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-        end do
+        ! Populating the cell-boundary and center locations buffer at bc%x%end. Skip when parallel_io has already filled the ghost.
+        if (.not. (bc%x%end >= 0 .and. parallel_io)) then
+            do i = 1, offset_x%end
+                x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
+            end do
 
-        do i = 1, buff_size
-            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-        end do
+            do i = 1, buff_size
+                x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
+            end do
+        end if
 
         ! Populating cell-width distribution buffer at bc%y%beg
         if (n == 0) then
             return
         else if (bc%y%beg >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(2, -1)
+            if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(2, -1)
         else if (bc%y%beg <= BC_GHOST_EXTRAP .and. bc%y%beg /= BC_AXIS) then
             do i = 1, buff_size
                 dy(-i) = dy(0)
@@ -2631,18 +2636,20 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc%y%beg
-        do i = 1, offset_y%beg
-            y_cb(-1 - i) = y_cb(-i) - dy(-i)
-        end do
+        ! Computing the cell-boundary and center locations buffer at bc%y%beg. Skip when parallel_io has already filled the ghost.
+        if (.not. (bc%y%beg >= 0 .and. parallel_io)) then
+            do i = 1, offset_y%beg
+                y_cb(-1 - i) = y_cb(-i) - dy(-i)
+            end do
 
-        do i = 1, buff_size
-            y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-        end do
+            do i = 1, buff_size
+                y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
+            end do
+        end if
 
         ! Populating the cell-width distribution buffer at bc%y%end
         if (bc%y%end >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(2, 1)
+            if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(2, 1)
         else if (bc%y%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dy(n + i) = dy(n)
@@ -2657,20 +2664,22 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc%y%end
-        do i = 1, offset_y%end
-            y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-        end do
+        ! Populating the cell-boundary and center locations buffer at bc%y%end. Skip when parallel_io has already filled the ghost.
+        if (.not. (bc%y%end >= 0 .and. parallel_io)) then
+            do i = 1, offset_y%end
+                y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
+            end do
 
-        do i = 1, buff_size
-            y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
-        end do
+            do i = 1, buff_size
+                y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
+            end do
+        end if
 
         ! Populating cell-width distribution buffer at bc%z%beg
         if (p == 0) then
             return
         else if (bc%z%beg >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(3, -1)
+            if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(3, -1)
         else if (bc%z%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dz(-i) = dz(0)
@@ -2685,18 +2694,20 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc%z%beg
-        do i = 1, offset_z%beg
-            z_cb(-1 - i) = z_cb(-i) - dz(-i)
-        end do
+        ! Computing the cell-boundary and center locations buffer at bc%z%beg. Skip when parallel_io has already filled the ghost.
+        if (.not. (bc%z%beg >= 0 .and. parallel_io)) then
+            do i = 1, offset_z%beg
+                z_cb(-1 - i) = z_cb(-i) - dz(-i)
+            end do
 
-        do i = 1, buff_size
-            z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-        end do
+            do i = 1, buff_size
+                z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
+            end do
+        end if
 
         ! Populating the cell-width distribution buffer at bc%z%end
         if (bc%z%end >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(3, 1)
+            if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(3, 1)
         else if (bc%z%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
                 dz(p + i) = dz(p)
@@ -2711,14 +2722,16 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc%z%end
-        do i = 1, offset_z%end
-            z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-        end do
+        ! Populating the cell-boundary and center locations buffer at bc%z%end. Skip when parallel_io has already filled the ghost.
+        if (.not. (bc%z%end >= 0 .and. parallel_io)) then
+            do i = 1, offset_z%end
+                z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
+            end do
 
-        do i = 1, buff_size
-            z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
-        end do
+            do i = 1, buff_size
+                z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
+            end do
+        end if
 #endif
 
     end subroutine s_populate_grid_variables_buffers

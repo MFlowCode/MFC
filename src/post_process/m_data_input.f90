@@ -334,12 +334,9 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
-        ! Assigning local cell boundary locations
-        x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        ! Computing the cell width distribution
-        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        ! Computing the cell center location
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
+        ! Bitwise-consistent grid distribution from the global file
+        call s_apply_grid_from_global_dim(x_cb_glb, m_glb, m, start_idx(1), bc_x%beg, bc_x%end, offset_x%beg, offset_x%end, &
+                                          & buff_size, buff_size, x_cb, x_cc, dx)
 
         if (n > 0) then
             ! Read in cell boundary locations in y-direction
@@ -362,12 +359,8 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
-            ! Assigning local cell boundary locations
-            y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            ! Computing the cell width distribution
-            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            ! Computing the cell center location
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
+            call s_apply_grid_from_global_dim(y_cb_glb, n_glb, n, start_idx(2), bc_y%beg, bc_y%end, offset_y%beg, offset_y%end, &
+                                              & buff_size, buff_size, y_cb, y_cc, dy)
 
             if (p > 0) then
                 ! Read in cell boundary locations in z-direction
@@ -390,12 +383,8 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
                 end if
 
-                ! Assigning local cell boundary locations
-                z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                ! Computing the cell width distribution
-                dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                ! Computing the cell center location
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
+                call s_apply_grid_from_global_dim(z_cb_glb, p_glb, p, start_idx(3), bc_z%beg, bc_z%end, offset_z%beg, &
+                                                  & offset_z%end, buff_size, buff_size, z_cb, z_cc, dz)
             end if
         end if
 

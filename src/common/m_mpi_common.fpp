@@ -1932,6 +1932,99 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_grid_variables_buffers
+
+    !> Populate the local cell-boundary, cell-center, and cell-width arrays in one direction directly from the global cell-boundary
+    !! array. This guarantees that every rank sees bitwise-identical values at any shared physical cell or boundary
+    !!
+    !! Ghost-cell extents may be asymmetric between x_cb_loc and dx_loc/x_cc_loc (post_process uses offset_x%beg/end for x_cb but
+    !! buff_size for dx/x_cc), so the buffer widths are supplied explicitly per side and per array.
+    !! @param x_cb_glb     Global cell-boundary array indexed -1:m_dim_glb
+    !! @param m_dim_glb    Global cell count in this direction
+    !! @param m_dim        Local cell count in this direction
+    !! @param sidx         Start index of this rank's interior in the global array (x_cb_loc(0) == x_cb_glb(sidx))
+    !! @param bc_beg       bc_x/y/z%beg value after MPI cart setup (>=0 means an MPI neighbor exists)
+    !! @param bc_end       bc_x/y/z%end value after MPI cart setup
+    !! @param cb_lo,cb_hi  Available ghost cells on each side of x_cb_loc (x_cb_loc(-1-cb_lo:m_dim+cb_hi))
+    !! @param cw_lo,cw_hi  Available ghost cells on each side of dx_loc/x_cc_loc (dx_loc(-cw_lo:m_dim+cw_hi))
+    !! @param x_cb_loc     Local cell-boundary array, fully sized including ghost cells
+    !! @param x_cc_loc     Local cell-center array, fully sized including ghost cells
+    !! @param dx_loc       Local cell-width array, fully sized including ghost cells
+    subroutine s_apply_grid_from_global_dim(x_cb_glb, m_dim_glb, m_dim, sidx, bc_beg, bc_end, cb_lo, cb_hi, cw_lo, cw_hi, &
+                                            & x_cb_loc, x_cc_loc, dx_loc)
+
+        integer, intent(in)     :: m_dim_glb, m_dim, sidx, bc_beg, bc_end
+        integer, intent(in)     :: cb_lo, cb_hi, cw_lo, cw_hi
+        real(wp), intent(in)    :: x_cb_glb(-1:m_dim_glb)
+        real(wp), intent(inout) :: x_cb_loc(-1 - cb_lo:m_dim + cb_hi)
+        real(wp), intent(inout) :: x_cc_loc(-cw_lo:m_dim + cw_hi)
+        real(wp), intent(inout) :: dx_loc(-cw_lo:m_dim + cw_hi)
+        real(wp)                :: domain_len
+        integer                 :: i, gidx, lo, hi
+
+        domain_len = x_cb_glb(m_dim_glb) - x_cb_glb(-1)
+
+        ! Interior cell boundaries sliced directly from the global list
+        do i = -1, m_dim
+            x_cb_loc(i) = x_cb_glb(sidx + i)
+        end do
+
+        ! Left ghost cell boundaries
+        if (bc_beg >= 0) then
+            if (sidx == 0) then
+                ! Leftmost rank with a neighbor -> periodic+multirank, so wrap from the global right end
+                do i = 1, cb_lo
+                    x_cb_loc(-1 - i) = x_cb_glb(m_dim_glb - i) - domain_len
+                end do
+            else
+                do i = 1, cb_lo
+                    gidx = sidx - 1 - i
+                    if (gidx >= -1) then
+                        x_cb_loc(-1 - i) = x_cb_glb(gidx)
+                    else
+                        x_cb_loc(-1 - i) = x_cb_glb(m_dim_glb + 1 + gidx) - domain_len
+                    end if
+                end do
+            end if
+        end if
+
+        ! Right ghost cell boundaries
+        if (bc_end >= 0) then
+            if (sidx + m_dim == m_dim_glb) then
+                ! Rightmost rank with a neighbor -> periodic+multirank, wrap from the global left end
+                do i = 1, cb_hi
+                    x_cb_loc(m_dim + i) = x_cb_glb(i - 1) + domain_len
+                end do
+            else
+                do i = 1, cb_hi
+                    gidx = sidx + m_dim + i
+                    if (gidx <= m_dim_glb) then
+                        x_cb_loc(m_dim + i) = x_cb_glb(gidx)
+                    else
+                        x_cb_loc(m_dim + i) = x_cb_glb(gidx - m_dim_glb - 1) + domain_len
+                    end if
+                end do
+            end if
+        end if
+
+        ! Recompute dx and x_cc over the range where x_cb is now valid using one formula so values are bitwise-identical
+        if (bc_beg >= 0) then
+            lo = -min(cw_lo, cb_lo)
+        else
+            lo = 0
+        end if
+
+        if (bc_end >= 0) then
+            hi = m_dim + min(cw_hi, cb_hi)
+        else
+            hi = m_dim
+        end if
+
+        do i = lo, hi
+            dx_loc(i) = x_cb_loc(i) - x_cb_loc(i - 1)
+            x_cc_loc(i) = (x_cb_loc(i) + x_cb_loc(i - 1))/2._wp
+        end do
+
+    end subroutine s_apply_grid_from_global_dim
 #endif
 
     !> Module deallocation and/or disassociation procedures
