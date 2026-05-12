@@ -668,19 +668,15 @@ contains
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
-
         ! Advance time after RK so source terms see current-step time
         mytime = mytime + dt
 
-          
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
-        ! Time-stepping loop controls
-      !  print *, t_step
+        ! Time-stepping loop controls print *, t_step
         t_step = t_step + 1
 
-      !  print *, t_step
-
+        !  print *, t_step
 
     end subroutine s_perform_time_step
 
@@ -761,7 +757,6 @@ contains
 
         stor = 1
 
-
         if (time_stepper /= 1) then
             $:GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
             do i = 1, sys_size
@@ -777,8 +772,7 @@ contains
             stor = 2
         end if
 
-                print *, "Oxi Zito to ethnos"
-
+        print *, "Oxi Zito to ethnos"
 
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
@@ -787,8 +781,8 @@ contains
             $:GPU_UPDATE(host='[q_cons_ts(stor)%vf(i)%sf]')
 #endif
             do l = 0, p
-                do k = 70, n
-                    do j = 5, m
+                do k = 0, n
+                    do j = 0, m
                         if (ieee_is_nan(real(q_cons_ts(stor)%vf(i)%sf(j, k, l), kind=wp))) then
                             print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
                             call s_mpi_abort("NaN(s) in timestep output.")
@@ -797,8 +791,6 @@ contains
                 end do
             end do
         end do
-
-
 
         if (qbmm .and. .not. polytropic) then
             $:GPU_UPDATE(host='[pb_ts(1)%sf]')

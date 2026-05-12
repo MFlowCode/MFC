@@ -44,12 +44,12 @@ module m_variables_conversion
 #endif
 
 #ifndef MFC_SIMULATION
-  type(integer_field), public :: ghost_points_index
-  type(scalar_field),  public :: pressure_ghost_point
-  $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
+    type(integer_field), public :: ghost_points_index
+    type(scalar_field), public  :: pressure_ghost_point
+    $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
 #else
     type(integer_field), public :: ghost_points_index
-    type(scalar_field),  public :: pressure_ghost_point
+    type(scalar_field), public  :: pressure_ghost_point
     $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
 #endif
 
@@ -370,19 +370,19 @@ contains
             $:GPU_UPDATE(device='[Res_vc, Re_idx, Re_size]')
         end if
 
-    if (p > 0) then
-        @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:p))
-        @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:p))
-    else
-        @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:0))
-        @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:0))
-    end if
+        if (p > 0) then
+            @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:p))
+            @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:p))
+        else
+            @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:0))
+            @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:0))
+        end if
 
-    ghost_points_index%sf = 0
-    pressure_ghost_point%sf = 0.0_wp
+        ghost_points_index%sf = 0
+        pressure_ghost_point%sf = 0.0_wp
 
-    @:ACC_SETUP_SFs(ghost_points_index)
-    @:ACC_SETUP_SFs(pressure_ghost_point)
+        @:ACC_SETUP_SFs(ghost_points_index)
+        @:ACC_SETUP_SFs(pressure_ghost_point)
 #endif
 
         if (bubbles_euler) then
@@ -496,7 +496,7 @@ contains
         type(scalar_field), intent(inout)                      :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: ibounds
-        integer, optional, intent(in) :: t_step, stage
+        integer, optional, intent(in)                          :: t_step, stage
 
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
@@ -696,17 +696,18 @@ contains
                     end if
 
                     call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_pres_K, &
-                                       & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+                                            & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
 
-#ifdef MFC_SIMULATION
-                   !         if (.not. (t_step == 0 .and. stage == 1)) then
-                   !             if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0 .and. l <= p) then
-                   !                 if (ghost_points_index%sf(j, k, l) == 1) then
-                   !                     pres = pressure_ghost_point%sf(j, k, l)
-                   !                 end if
-                   !             end if
-                   !         end if
-#endif
+!#ifdef MFC_SIMULATION
+                     if (.not. (t_step == 0 .and. stage == 1)) then 
+                         if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0  .and. l <= p)   then 
+                            if (ghost_points_index%sf(j, k, l) == 1)  then 
+                                pres = pressure_ghost_point%sf(j, k, l) 
+                            !    print *, pres
+                              end if
+                   end if
+                    end if
+!#endif
 
                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
 

@@ -469,7 +469,6 @@ contains
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, time_avg, s)
 
-
             if (s == 1) then
                 if (run_time_info) then
                     if (igr .or. dummy) then
@@ -539,7 +538,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
             if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
@@ -556,8 +554,6 @@ contains
                     call s_propagate_immersed_boundaries(s)
                     ! compute ib forces for fixed immersed boundaries if requested for output
                 end if
-
-
 
                 ! update the ghost fluid properties point values based on IB state
                 if (qbmm .and. .not. polytropic) then
@@ -590,8 +586,7 @@ contains
             wall_time_avg = 0._wp
         end if
 
-                                    print *, "yoohoo"
-
+        print *, "yoohoo"
 
     end subroutine s_tvd_rk
 

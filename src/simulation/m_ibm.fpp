@@ -20,9 +20,7 @@ module m_ibm
     use m_viscous
     use m_model
     use m_collisions
-
-    use m_thermochem, only: &
-        num_species, molecular_weights, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass
+    use m_thermochem, only: num_species, molecular_weights, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass
 
     implicit none
 
@@ -144,7 +142,7 @@ contains
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
         real(wp) :: T_IP
-        real(wp) :: T_GP,MW_GP,E_GP
+        real(wp) :: T_GP, MW_GP, E_GP
         real(wp), dimension(num_species) :: Ys_IP
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -198,17 +196,17 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (p > 0) then
-            ! Parallel loop or simple assignment if compiler supports it
-            ! Typically simpler to just do:
+            ! Parallel loop or simple assignment if compiler supports it Typically simpler to just do:
             ghost_points_index%sf = 0
         else
-            ghost_points_index%sf(0:m, 0:n, 0:0) = 0
+            ghost_points_index%sf(0:m,0:n,0:0) = 0
         end if
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
-                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP,T_IP,T_GP,MW_GP,E_GP, pressure_ghost_point, ghost_points_index]')
+                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
+                                & Ys_IP, T_IP, T_GP, MW_GP, E_GP, pressure_ghost_point, ghost_points_index]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -234,7 +232,8 @@ contains
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
                                                    & pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
                 else
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, T_IP=T_IP, Ys_IP=Ys_IP)
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, T_IP=T_IP, &
+                                                   & Ys_IP=Ys_IP)
                 end if
 
                 dyn_pres = 0._wp
@@ -248,14 +247,13 @@ contains
 
                 $:GPU_LOOP(parallelism='[seq]')
                 if (chemistry) then
-                do q = eqn_idx%species%beg, eqn_idx%species%end
-                    q_prim_vf(q)%sf(j,k,l) = Ys_IP(q-eqn_idx%species%beg+1)
-                end do
+                    do q = eqn_idx%species%beg, eqn_idx%species%end
+                        q_prim_vf(q)%sf(j, k, l) = Ys_IP(q - eqn_idx%species%beg + 1)
+                    end do
                 end if
 
                 T_GP = 2.0_wp*600.0_wp - T_IP
                 call get_mixture_energy_mass(T_GP, Ys_IP, E_GP)
-
 
                 if (surface_tension) then
                     q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP
@@ -344,16 +342,16 @@ contains
                 if (bubbles_euler) then
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
                 else if (chemistry) then
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) =    alpha_rho_IP(eqn_idx%cont%beg)*E_GP+ dyn_pres
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = alpha_rho_IP(eqn_idx%cont%beg)*E_GP + dyn_pres
                 else
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
                 end if
 
-               $:GPU_LOOP(parallelism='[seq]')
+                $:GPU_LOOP(parallelism='[seq]')
                 if (chemistry) then
-                  do q = eqn_idx%species%beg, eqn_idx%species%end
-                     q_cons_vf(q)%sf(j,k,l) = alpha_rho_IP(eqn_idx%cont%beg)*Ys_IP(q-eqn_idx%species%beg+1)
-                  end do
+                    do q = eqn_idx%species%beg, eqn_idx%species%end
+                        q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(eqn_idx%cont%beg)*Ys_IP(q - eqn_idx%species%beg + 1)
+                    end do
                 end if
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
@@ -755,7 +753,7 @@ contains
     !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
 
-        & nmom_IP, pb_in, mv_in, presb_IP, massv_IP, T_IP,Ys_IP)
+        & nmom_IP, pb_in, mv_in, presb_IP, massv_IP, T_IP, Ys_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Primitive Variables
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_in, mv_in
@@ -768,16 +766,16 @@ contains
         #:else
             real(wp), dimension(num_fluids), intent(inout) :: alpha_IP, alpha_rho_IP
         #:endif
-        real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
-        real(wp), optional, dimension(:), intent(inout) :: nmom_IP
-        real(wp), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
-        integer                                         :: i, j, k, l, q           !< Iterator variables
-        integer                                         :: i1, i2, j1, j2, k1, k2  !< Iterator variables
-        real(wp)                                        :: coeff
-        real(wp), optional, dimension(num_species), intent(INOUT) :: Ys_IP
-        real(wp), optional, intent(INOUT) :: T_IP
-        real(wp), dimension(num_species) :: Ys_S
-        real(wp) :: MW_S,T_S, R_gas_S,MW_IPS
+        real(wp), optional, dimension(:), intent(inout)           :: r_IP, v_IP, pb_IP, mv_IP
+        real(wp), optional, dimension(:), intent(inout)           :: nmom_IP
+        real(wp), optional, dimension(:), intent(inout)           :: presb_IP, massv_IP
+        integer                                                   :: i, j, k, l, q           !< Iterator variables
+        integer                                                   :: i1, i2, j1, j2, k1, k2  !< Iterator variables
+        real(wp)                                                  :: coeff
+        real(wp), optional, dimension(num_species), intent(inout) :: Ys_IP
+        real(wp), optional, intent(inout)                         :: T_IP
+        real(wp), dimension(num_species)                          :: Ys_S
+        real(wp)                                                  :: MW_S, T_S, R_gas_S, MW_IPS
 
         i1 = gp%ip_grid(1); i2 = i1 + 1
         j1 = gp%ip_grid(2); j2 = j1 + 1
@@ -792,7 +790,7 @@ contains
         alpha_IP = 0._wp
         pres_IP = 0._wp
         vel_IP = 0._wp
-                Ys_IP = 0.0_wp
+        Ys_IP = 0.0_wp
         T_IP = 0.0_wp
         T_S = 0.0_wp
         MW_IPS = 0.0_wp
@@ -823,24 +821,24 @@ contains
                 $:GPU_LOOP(parallelism='[seq]')
                 do k = k1, k2
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
-                          
-                           if (chemistry) then
-                           do l = eqn_idx%species%beg, eqn_idx%species%end
-                               Ys_S(l-eqn_idx%species%beg+1) = q_prim_vf(l)%sf(i,j,k)
-                          
-                           end do 
-                                        R_gas_S = gas_constant/MW_S
-                            T_S =q_prim_vf(eqn_idx%E)%sf(i,j,k) / q_prim_vf(eqn_idx%cont%beg)%sf(i,j,k) / R_gas_S
-                                                T_IP = T_IP + coeff*T_S
+
+                    if (chemistry) then
+                        do l = eqn_idx%species%beg, eqn_idx%species%end
+                            Ys_S(l - eqn_idx%species%beg + 1) = q_prim_vf(l)%sf(i, j, k)
+                        end do
+                        call get_mixture_molecular_weight(Ys_S,MW_S)
+                        R_gas_S = gas_constant/MW_S
+                        T_S = q_prim_vf(eqn_idx%E)%sf(i, j, k)/q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k)/R_gas_S
+                        T_IP = T_IP + coeff*T_S
+                        print *, R_gas_S, "yoyo"
                     end if
-                  
-                  if (chemistry) then
-                    pres_IP = pres_IP+coeff*q_prim_vf(eqn_idx%cont%beg)%sf(i,j,k)*T_S*R_gas_S
-                  else 
-                  pres_IP = pres_IP + coeff* &
-                             q_prim_vf(eqn_idx%E)%sf(i, j, k)
-                  end if
-                       
+
+                    if (chemistry) then
+                        pres_IP = pres_IP + coeff*q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k)*T_S*R_gas_S
+                    else
+                        pres_IP = pres_IP + coeff*q_prim_vf(eqn_idx%E)%sf(i, j, k)
+                    end if
+
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%mom%beg, eqn_idx%mom%end
                         vel_IP(q + 1 - eqn_idx%mom%beg) = vel_IP(q + 1 - eqn_idx%mom%beg) + coeff*q_prim_vf(q)%sf(i, j, k)
@@ -852,12 +850,11 @@ contains
                         alpha_IP(l) = alpha_IP(l) + coeff*q_prim_vf(eqn_idx%adv%beg + l - 1)%sf(i, j, k)
                     end do
 
-                    if (chemistry) then 
-                      do l = eqn_idx%species%beg, eqn_idx%species%end
-                      Ys_IP(l-eqn_idx%species%beg+1) = Ys_IP(l-eqn_idx%species%beg+1)+coeff*q_prim_vf(l)%sf(i,j,k)
-                      end do
+                    if (chemistry) then
+                        do l = eqn_idx%species%beg, eqn_idx%species%end
+                            Ys_IP(l - eqn_idx%species%beg + 1) = Ys_IP(l - eqn_idx%species%beg + 1) + coeff*q_prim_vf(l)%sf(i, j, k)
+                        end do
                     end if
-
 
                     if (surface_tension) then
                         c_IP = c_IP + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
@@ -897,11 +894,10 @@ contains
             end do
         end do
 
-               if (chemistry) then
-                       call get_mixture_molecular_weight(Ys_IP,MW_IPS)
-                    alpha_rho_IP(eqn_idx%cont%beg) = pres_IP*MW_IPS/gas_constant/T_IP
-                end if
-
+        if (chemistry) then
+            call get_mixture_molecular_weight(Ys_IP, MW_IPS)
+            alpha_rho_IP(eqn_idx%cont%beg) = pres_IP*MW_IPS/gas_constant/T_IP
+        end if
 
     end subroutine s_interpolate_image_point
 
