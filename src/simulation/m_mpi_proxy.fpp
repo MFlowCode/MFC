@@ -192,6 +192,19 @@ contains
             #:endfor
         end do
 
+        ! Non-rank-0 processes may have patch_ib sized to num_ib_patches_max_namelist while rank 0 grew it
+        ! for particle beds. Grow here before receiving the broadcast entries.
+        if (proc_rank /= 0 .and. num_ibs > size(patch_ib)) then
+            block
+                type(ib_patch_parameters), allocatable :: tmp(:)
+                integer                                :: n
+                n = size(patch_ib)
+                call move_alloc(patch_ib, tmp)
+                allocate (patch_ib(num_ib_patches_max))
+                patch_ib(1:n) = tmp
+            end block
+        end if
+
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
                 & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip', 'mass', &
