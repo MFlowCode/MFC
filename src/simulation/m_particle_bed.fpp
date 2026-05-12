@@ -40,6 +40,18 @@ contains
 
         if (num_particle_beds == 0) return
 
+        ! Grow patch_ib from the namelist-sized allocation to the full capacity needed for particle beds
+        if (size(patch_ib) < num_ib_patches_max) then
+            block
+                type(ib_patch_parameters), allocatable :: tmp(:)
+                integer                                :: n
+                n = size(patch_ib)
+                call move_alloc(patch_ib, tmp)
+                allocate (patch_ib(num_ib_patches_max))
+                patch_ib(1:n) = tmp
+            end block
+        end if
+
         do b = 1, num_particle_beds
             xmin = particle_bed(b)%x_centroid - 0.5_wp*particle_bed(b)%length_x
             xmax = particle_bed(b)%x_centroid + 0.5_wp*particle_bed(b)%length_x

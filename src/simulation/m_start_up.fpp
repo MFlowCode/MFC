@@ -1022,7 +1022,7 @@ contains
             "on CPUs"
 #endif
         else
-            allocate (patch_ib(num_ib_patches_max))
+            allocate (patch_ib(num_ib_patches_max_namelist))
         end if
 
         call s_mpi_bcast_user_inputs()
@@ -1210,11 +1210,11 @@ contains
     !! the local computational domain.
     subroutine s_reduce_ib_patch_array()
 
-        type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib_gbl
-        real(wp), dimension(3)                                   :: centroid
-        integer                                                  :: i, j
-        integer                                                  :: num_aware_ibs
-        logical                                                  :: is_in_neighborhood, is_local
+        type(ib_patch_parameters), allocatable :: patch_ib_gbl(:)
+        real(wp), dimension(3)                 :: centroid
+        integer                                :: i, j
+        integer                                :: num_aware_ibs
+        logical                                :: is_in_neighborhood, is_local
 
         ! do all set up for moving immersed boundaries
 
@@ -1226,6 +1226,7 @@ contains
             end if
         end do
 
+        allocate (patch_ib_gbl(num_ibs))
         patch_ib_gbl(1:num_ibs) = patch_ib(1:num_ibs)
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
         call s_compute_ib_neighbor_ranks()  ! build lookup of all neighbor MPI ranks
@@ -1244,7 +1245,7 @@ contains
 #ifdef MFC_MPI
         ! fallback for 1-rank case
         if (num_procs == 1) then
-            patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
+            patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
         else
             ! determine the set of patches owned by local rank
             num_local_ibs = 0
@@ -1269,8 +1270,10 @@ contains
         end if
 #else
         ! reduce the size of the array for local simulation in no-MPI case
-        patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
+        patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
 #endif
+
+        deallocate (patch_ib_gbl)
 
         @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
 
