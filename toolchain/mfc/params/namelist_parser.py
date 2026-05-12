@@ -492,27 +492,16 @@ def get_fortran_constants() -> Dict[str, int]:
     """
     Get Fortran compile-time constants from m_constants.fpp.
 
-    Cached after first call. Falls back to built-in defaults when the Fortran
-    source is unavailable (e.g. Homebrew installs where src/ is not shipped).
+    Cached after first call. Returns an empty dict when the Fortran source is
+    unavailable (e.g. Homebrew installs where src/ is not shipped); callers
+    supply their own inline defaults via _fc(name, default) in definitions.py.
     """
     global _FORTRAN_CONSTANTS_CACHE  # noqa: PLW0603
     if _FORTRAN_CONSTANTS_CACHE is None:
         root = get_mfc_root()
         path = root / "src" / "common" / "m_constants.fpp"
         _FORTRAN_CONSTANTS_CACHE = parse_fortran_constants(path)
-        if not _FORTRAN_CONSTANTS_CACHE:
-            _FORTRAN_CONSTANTS_CACHE = _FALLBACK_CONSTANTS.copy()
     return _FORTRAN_CONSTANTS_CACHE
-
-
-# Fallback values for when m_constants.fpp is not available at runtime.
-# Keep in sync with src/common/m_constants.fpp.
-_FALLBACK_CONSTANTS: Dict[str, int] = {
-    "num_fluids_max": 10,
-    "num_probes_max": 10,
-    "num_patches_max": 1000,
-    "num_bc_patches_max": 10,
-}
 
 
 def get_mfc_root() -> Path:

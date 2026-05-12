@@ -133,7 +133,7 @@ PHYSICS_DOCS = {
     "check_muscl": {
         "title": "MUSCL Reconstruction",
         "category": "Numerical Schemes",
-        "explanation": "muscl_order must be 1 or 2. Second order requires muscl_lim in {1,2,3,4,5}.",
+        "explanation": "muscl_order must be 1 or 2. Second order requires muscl_lim in {0,1,2,3,4,5}.",
     },
     "check_time_stepping": {
         "title": "Time Stepping",
@@ -808,7 +808,7 @@ class CaseValidator:
             return
 
         self.prohibit(muscl_order == 2 and muscl_lim is None, "muscl_lim must be defined if using muscl_order = 2")
-        self.prohibit(muscl_lim is not None and (muscl_lim < 1 or muscl_lim > 5), "muscl_lim must be 1, 2, 3, 4, or 5")
+        self.prohibit(muscl_lim is not None and (muscl_lim < 0 or muscl_lim > 5), "muscl_lim must be 0 (unlimited), 1, 2, 3, 4, or 5")
         if muscl_eps is not None:
             self.prohibit(muscl_eps < 0, "muscl_eps must be >= 0 (use 0 for textbook limiter behavior)")
 

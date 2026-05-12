@@ -170,7 +170,9 @@ contains
                                     slopeR = v_rs_ws_${XYZ}$_muscl(j, k, l, i) - v_rs_ws_${XYZ}$_muscl(j - 1, k, l, i)
                                     slope = 0._wp
 
-                                    if (muscl_lim == 1) then  ! minmod
+                                    if (muscl_lim == 0) then  ! unlimited (central difference)
+                                        slope = 5e-1_wp*(slopeL + slopeR)
+                                    else if (muscl_lim == 1) then  ! minmod
                                         if (slopeL*slopeR > muscl_eps) then
                                             slope = min(abs(slopeL), abs(slopeR))
                                         end if

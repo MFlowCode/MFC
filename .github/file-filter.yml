@@ -30,6 +30,8 @@ yml: &yml
   - '.github/workflows/bench.yml'
   - '.github/workflows/test.yml'
   - '.github/workflows/formatting.yml'
+  - '.github/workflows/fp-stability.yml'
+  - '.github/workflows/convergence.yml'
 
 checkall: &checkall
   - *fortran_src
