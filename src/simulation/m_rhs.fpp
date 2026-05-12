@@ -517,9 +517,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout)                                     :: rhs_vf
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in
 
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), &
-             & intent(inout) &
-             & :: rhs_pb  ! TODO :: I think these other two variables need to be stp as well, but it doesn't compile like that right now
+        ! TODO :: I think these other two variables need to be stp as well, but it doesn't compile like that right now
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_pb
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: mv_in
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_mv
         integer, intent(in) :: t_step
@@ -530,6 +529,7 @@ contains
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
+
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
