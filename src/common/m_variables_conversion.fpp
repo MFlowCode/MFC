@@ -698,7 +698,7 @@ contains
                     call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_pres_K, &
                                             & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
 
-!#ifdef MFC_SIMULATION
+#ifdef MFC_SIMULATION
                      if (.not. (t_step == 0 .and. stage == 1)) then 
                          if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0  .and. l <= p)   then 
                             if (ghost_points_index%sf(j, k, l) == 1)  then 
@@ -707,7 +707,7 @@ contains
                               end if
                    end if
                     end if
-!#endif
+#endif
 
                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
 

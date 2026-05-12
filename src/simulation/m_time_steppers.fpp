@@ -586,7 +586,6 @@ contains
             wall_time_avg = 0._wp
         end if
 
-        print *, "yoohoo"
 
     end subroutine s_tvd_rk
 
@@ -656,7 +655,6 @@ contains
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
-
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
                 end do
             end do

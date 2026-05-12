@@ -673,10 +673,8 @@ contains
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
-        ! Time-stepping loop controls print *, t_step
+        ! Time-stepping loop controls 
         t_step = t_step + 1
-
-        !  print *, t_step
 
     end subroutine s_perform_time_step
 
@@ -771,8 +769,6 @@ contains
             $:END_GPU_PARALLEL_LOOP()
             stor = 2
         end if
-
-        print *, "Oxi Zito to ethnos"
 
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")

@@ -214,6 +214,8 @@ contains
                 l = gp%loc(3)
                 patch_id = ghost_points(i)%ib_patch_id
 
+                ghost_points_index%sf(j, k, l) = 1
+
                 ! Calculate physical location of GP
                 if (p > 0) then
                     physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
@@ -830,7 +832,6 @@ contains
                         R_gas_S = gas_constant/MW_S
                         T_S = q_prim_vf(eqn_idx%E)%sf(i, j, k)/q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k)/R_gas_S
                         T_IP = T_IP + coeff*T_S
-                        print *, R_gas_S, "yoyo"
                     end if
 
                     if (chemistry) then
