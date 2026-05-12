@@ -202,7 +202,7 @@ contains
         Rmin_glb = max(dflt_real, -dflt_real)
         $:GPU_UPDATE(device='[Rmax_glb, Rmin_glb]')
 
-        $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
+        $:GPU_UPDATE(device='[x%spacing, y%spacing, z%spacing, x%cb, x%cc, y%cb, y%cc, z%cb, z%cc]')
 
         ! Populate temporal variables
         call s_transfer_data_to_tmp()
@@ -793,48 +793,48 @@ contains
             !> Getting p_cell in terms of only the current cell by interpolation
             !> Getting the cell volulme as Omega
             if (p > 0) then
-                vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+                vol = x%spacing(cell(1))*y%spacing(cell(2))*z%spacing(cell(3))
             else
                 if (cyl_coord) then
-                    vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+                    vol = x%spacing(cell(1))*y%spacing(cell(2))*y%cc(cell(2))*2._wp*pi
                 else
-                    vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                    vol = x%spacing(cell(1))*y%spacing(cell(2))*lag_params%charwidth
                 end if
             end if
 
             !> Obtain bilinear interpolation coefficients, based on the current location of the bubble.
-            psi(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
+            psi(1) = (scoord(1) - real(cell(1)))*x%spacing(cell(1)) + x%cb(cell(1) - 1)
             if (cell(1) == (m + buff_size)) then
                 cell(1) = cell(1) - 1
                 psi(1) = 1._wp
             else if (cell(1) == (-buff_size)) then
                 psi(1) = 0._wp
             else
-                if (psi(1) < x_cc(cell(1))) cell(1) = cell(1) - 1
-                psi(1) = abs((psi(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
+                if (psi(1) < x%cc(cell(1))) cell(1) = cell(1) - 1
+                psi(1) = abs((psi(1) - x%cc(cell(1)))/(x%cc(cell(1) + 1) - x%cc(cell(1))))
             end if
 
-            psi(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
+            psi(2) = (scoord(2) - real(cell(2)))*y%spacing(cell(2)) + y%cb(cell(2) - 1)
             if (cell(2) == (n + buff_size)) then
                 cell(2) = cell(2) - 1
                 psi(2) = 1._wp
             else if (cell(2) == (-buff_size)) then
                 psi(2) = 0._wp
             else
-                if (psi(2) < y_cc(cell(2))) cell(2) = cell(2) - 1
-                psi(2) = abs((psi(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
+                if (psi(2) < y%cc(cell(2))) cell(2) = cell(2) - 1
+                psi(2) = abs((psi(2) - y%cc(cell(2)))/(y%cc(cell(2) + 1) - y%cc(cell(2))))
             end if
 
             if (p > 0) then
-                psi(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
+                psi(3) = (scoord(3) - real(cell(3)))*z%spacing(cell(3)) + z%cb(cell(3) - 1)
                 if (cell(3) == (p + buff_size)) then
                     cell(3) = cell(3) - 1
                     psi(3) = 1._wp
                 else if (cell(3) == (-buff_size)) then
                     psi(3) = 0._wp
                 else
-                    if (psi(3) < z_cc(cell(3))) cell(3) = cell(3) - 1
-                    psi(3) = abs((psi(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
+                    if (psi(3) < z%cc(cell(3))) cell(3) = cell(3) - 1
+                    psi(3) = abs((psi(3) - z%cc(cell(3)))/(z%cc(cell(3) + 1) - z%cc(cell(3))))
                 end if
             else
                 psi(3) = 0._wp
@@ -890,7 +890,7 @@ contains
                             if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
                                 celloutside = .true.
                             end if
-                            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
+                            if (cyl_coord .and. y%cc(cellaux(2)) < 0._wp) then
                                 celloutside = .true.
                             end if
                             if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
@@ -907,7 +907,7 @@ contains
                             end if
                         end if
                         if (.not. celloutside) then
-                            if (cyl_coord .and. (p == 0) .and. (y_cc(cellaux(2)) < 0._wp)) then
+                            if (cyl_coord .and. (p == 0) .and. (y%cc(cellaux(2)) < 0._wp)) then
                                 celloutside = .true.
                             end if
                         end if
@@ -915,12 +915,12 @@ contains
                         if (.not. celloutside) then
                             !> Obtaining the cell volulme
                             if (p > 0) then
-                                vol = dx(cellaux(1))*dy(cellaux(2))*dz(cellaux(3))
+                                vol = x%spacing(cellaux(1))*y%spacing(cellaux(2))*z%spacing(cellaux(3))
                             else
                                 if (cyl_coord) then
-                                    vol = dx(cellaux(1))*dy(cellaux(2))*y_cc(cellaux(2))*2._wp*pi
+                                    vol = x%spacing(cellaux(1))*y%spacing(cellaux(2))*y%cc(cellaux(2))*2._wp*pi
                                 else
-                                    vol = dx(cellaux(1))*dy(cellaux(2))*lag_params%charwidth
+                                    vol = x%spacing(cellaux(1))*y%spacing(cellaux(2))*lag_params%charwidth
                                 end if
                             end if
                             !> Update values
@@ -1088,40 +1088,40 @@ contains
         integer, dimension(3), intent(inout) :: cell
         integer                              :: i
 
-        do while (pos(1) < x_cb(cell(1) - 1))
+        do while (pos(1) < x%cb(cell(1) - 1))
             cell(1) = cell(1) - 1
         end do
 
-        do while (pos(1) > x_cb(cell(1)))
+        do while (pos(1) > x%cb(cell(1)))
             cell(1) = cell(1) + 1
         end do
 
-        do while (pos(2) < y_cb(cell(2) - 1))
+        do while (pos(2) < y%cb(cell(2) - 1))
             cell(2) = cell(2) - 1
         end do
 
-        do while (pos(2) > y_cb(cell(2)))
+        do while (pos(2) > y%cb(cell(2)))
             cell(2) = cell(2) + 1
         end do
 
         if (p > 0) then
-            do while (pos(3) < z_cb(cell(3) - 1))
+            do while (pos(3) < z%cb(cell(3) - 1))
                 cell(3) = cell(3) - 1
             end do
-            do while (pos(3) > z_cb(cell(3)))
+            do while (pos(3) > z%cb(cell(3)))
                 cell(3) = cell(3) + 1
             end do
         end if
 
         ! The numbering of the cell of which left boundary is the domain boundary is 0. if comp.coord of the pos is s, the real
         ! coordinate of s is (the coordinate of the left boundary of the Floor(s)-th cell) + (s-(int(s))*(cell-width). In other
-        ! words, the coordinate of the center of the cell is x_cc(cell).
+        ! words, the coordinate of the center of the cell is x%cc(cell).
 
         ! coordinates in computational space
-        scoord(1) = cell(1) + (pos(1) - x_cb(cell(1) - 1))/dx(cell(1))
-        scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
+        scoord(1) = cell(1) + (pos(1) - x%cb(cell(1) - 1))/x%spacing(cell(1))
+        scoord(2) = cell(2) + (pos(2) - y%cb(cell(2) - 1))/y%spacing(cell(2))
         scoord(3) = 0._wp
-        if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
+        if (p > 0) scoord(3) = cell(3) + (pos(3) - z%cb(cell(3) - 1))/z%spacing(cell(3))
         cell(:) = int(scoord(:))
         do i = 1, num_dims
             if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
@@ -1159,43 +1159,43 @@ contains
 
         if (p == 0 .and. cyl_coord .neqv. .true.) then
             ! Defining a virtual z-axis that has the same dimensions as y-axis defined in the input file
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) &
-                                  & .and. (pos_part(2) < y_cb(n + buff_size)) .and. (pos_part(2) >= y_cb(-buff_size - 1)) &
+            particle_in_domain = ((pos_part(1) < x%cb(m + buff_size)) .and. (pos_part(1) >= x%cb(-buff_size - 1)) &
+                                  & .and. (pos_part(2) < y%cb(n + buff_size)) .and. (pos_part(2) >= y%cb(-buff_size - 1)) &
                                   & .and. (pos_part(3) < lag_params%charwidth/2._wp) .and. (pos_part(3) >= &
                                   & -lag_params%charwidth/2._wp))
         else
             ! cyl_coord
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) &
-                                  & .and. (abs(pos_part(2)) < y_cb(n + buff_size)) .and. (abs(pos_part(2)) >= max(y_cb(-buff_size &
+            particle_in_domain = ((pos_part(1) < x%cb(m + buff_size)) .and. (pos_part(1) >= x%cb(-buff_size - 1)) &
+                                  & .and. (abs(pos_part(2)) < y%cb(n + buff_size)) .and. (abs(pos_part(2)) >= max(y%cb(-buff_size &
                                   & - 1), 0._wp)))
         end if
 
         ! 3D
         if (p > 0) then
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) &
-                                  & .and. (pos_part(2) < y_cb(n + buff_size)) .and. (pos_part(2) >= y_cb(-buff_size - 1)) &
-                                  & .and. (pos_part(3) < z_cb(p + buff_size)) .and. (pos_part(3) >= z_cb(-buff_size - 1)))
+            particle_in_domain = ((pos_part(1) < x%cb(m + buff_size)) .and. (pos_part(1) >= x%cb(-buff_size - 1)) &
+                                  & .and. (pos_part(2) < y%cb(n + buff_size)) .and. (pos_part(2) >= y%cb(-buff_size - 1)) &
+                                  & .and. (pos_part(3) < z%cb(p + buff_size)) .and. (pos_part(3) >= z%cb(-buff_size - 1)))
         end if
 
         ! For symmetric and wall boundary condition
         if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(1) >= x_cb(-1)))
+            particle_in_domain = (particle_in_domain .and. (pos_part(1) >= x%cb(-1)))
         end if
         if (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(1) < x_cb(m)))
+            particle_in_domain = (particle_in_domain .and. (pos_part(1) < x%cb(m)))
         end if
         if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(2) >= y_cb(-1)))
+            particle_in_domain = (particle_in_domain .and. (pos_part(2) >= y%cb(-1)))
         end if
         if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(2) < y_cb(n)))
+            particle_in_domain = (particle_in_domain .and. (pos_part(2) < y%cb(n)))
         end if
         if (p > 0) then
             if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-                particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z_cb(-1)))
+                particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z%cb(-1)))
             end if
             if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-                particle_in_domain = (particle_in_domain .and. (pos_part(3) < z_cb(p)))
+                particle_in_domain = (particle_in_domain .and. (pos_part(3) < z%cb(p)))
             end if
         end if
 
@@ -1207,12 +1207,12 @@ contains
         logical                            :: particle_in_domain_physical
         real(wp), dimension(3), intent(in) :: pos_part
 
-        particle_in_domain_physical = ((pos_part(1) < x_cb(m)) .and. (pos_part(1) >= x_cb(-1)) .and. (pos_part(2) < y_cb(n)) &
-                                       & .and. (pos_part(2) >= y_cb(-1)))
+        particle_in_domain_physical = ((pos_part(1) < x%cb(m)) .and. (pos_part(1) >= x%cb(-1)) .and. (pos_part(2) < y%cb(n)) &
+                                       & .and. (pos_part(2) >= y%cb(-1)))
 
         if (p > 0) then
-            particle_in_domain_physical = (particle_in_domain_physical .and. (pos_part(3) < z_cb(p)) .and. (pos_part(3) &
-                                           & >= z_cb(-1)))
+            particle_in_domain_physical = (particle_in_domain_physical .and. (pos_part(3) < z%cb(p)) .and. (pos_part(3) &
+                                           & >= z%cb(-1)))
         end if
 
     end function particle_in_domain_physical
@@ -1230,9 +1230,9 @@ contains
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) + q(i + 1, j, k)*(dx(i) + dx(i - 1)) - q(i - 1, j, &
-                           & k)*(dx(i) + dx(i + 1))
-                        dq(i, j, k) = dq(i, j, k)/((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
+                        dq(i, j, k) = q(i, j, k)*(x%spacing(i + 1) - x%spacing(i - 1)) + q(i + 1, j, &
+                           & k)*(x%spacing(i) + x%spacing(i - 1)) - q(i - 1, j, k)*(x%spacing(i) + x%spacing(i + 1))
+                        dq(i, j, k) = dq(i, j, k)/((x%spacing(i) + x%spacing(i - 1))*(x%spacing(i) + x%spacing(i + 1)))
                     end do
                 end do
             end do
@@ -1243,9 +1243,9 @@ contains
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) + q(i, j + 1, k)*(dy(j) + dy(j - 1)) - q(i, j - 1, &
-                           & k)*(dy(j) + dy(j + 1))
-                        dq(i, j, k) = dq(i, j, k)/((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
+                        dq(i, j, k) = q(i, j, k)*(y%spacing(j + 1) - y%spacing(j - 1)) + q(i, j + 1, &
+                           & k)*(y%spacing(j) + y%spacing(j - 1)) - q(i, j - 1, k)*(y%spacing(j) + y%spacing(j + 1))
+                        dq(i, j, k) = dq(i, j, k)/((y%spacing(j) + y%spacing(j - 1))*(y%spacing(j) + y%spacing(j + 1)))
                     end do
                 end do
             end do
@@ -1256,9 +1256,9 @@ contains
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) + q(i, j, k + 1)*(dz(k) + dz(k - 1)) - q(i, j, &
-                           & k - 1)*(dz(k) + dz(k + 1))
-                        dq(i, j, k) = dq(i, j, k)/((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
+                        dq(i, j, k) = q(i, j, k)*(z%spacing(k + 1) - z%spacing(k - 1)) + q(i, j, &
+                           & k + 1)*(z%spacing(k) + z%spacing(k - 1)) - q(i, j, k - 1)*(z%spacing(k) + z%spacing(k + 1))
+                        dq(i, j, k) = dq(i, j, k)/((z%spacing(k) + z%spacing(k - 1))*(z%spacing(k) + z%spacing(k + 1)))
                     end do
                 end do
             end do

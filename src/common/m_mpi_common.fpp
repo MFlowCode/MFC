@@ -1443,57 +1443,57 @@ contains
             if (pbc_loc == -1) then  ! PBC at the beginning
 
                 if (bc_x%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
-                                      & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(x%spacing(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, x%spacing(-buff_size), &
+                                      & buff_size, mpi_p, bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(x%spacing(0), buff_size, mpi_p, bc_x%beg, 1, x%spacing(-buff_size), buff_size, mpi_p, &
+                                      & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else  ! PBC at the end
                 if (bc_x%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(x%spacing(0), buff_size, mpi_p, bc_x%beg, 1, x%spacing(m + 1), buff_size, mpi_p, bc_x%end, &
+                                      & 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else  ! PBC at the end only
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
-                                      & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(x%spacing(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, x%spacing(m + 1), buff_size, &
+                                      & mpi_p, bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
         else if (mpi_dir == 2) then
             if (pbc_loc == -1) then  ! PBC at the beginning
 
                 if (bc_y%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
-                                      & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(y%spacing(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, y%spacing(-buff_size), &
+                                      & buff_size, mpi_p, bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(y%spacing(0), buff_size, mpi_p, bc_y%beg, 1, y%spacing(-buff_size), buff_size, mpi_p, &
+                                      & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else  ! PBC at the end
                 if (bc_y%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(y%spacing(0), buff_size, mpi_p, bc_y%beg, 1, y%spacing(n + 1), buff_size, mpi_p, bc_y%end, &
+                                      & 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else  ! PBC at the end only
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
-                                      & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(y%spacing(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, y%spacing(n + 1), buff_size, &
+                                      & mpi_p, bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
         else
             if (pbc_loc == -1) then  ! PBC at the beginning
 
                 if (bc_z%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
-                                      & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(z%spacing(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, z%spacing(-buff_size), &
+                                      & buff_size, mpi_p, bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(z%spacing(0), buff_size, mpi_p, bc_z%beg, 1, z%spacing(-buff_size), buff_size, mpi_p, &
+                                      & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             else  ! PBC at the end
                 if (bc_z%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(z%spacing(0), buff_size, mpi_p, bc_z%beg, 1, z%spacing(p + 1), buff_size, mpi_p, bc_z%end, &
+                                      & 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 else  ! PBC at the end only
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
-                                      & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    call MPI_SENDRECV(z%spacing(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, z%spacing(p + 1), buff_size, &
+                                      & mpi_p, bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
             end if
         end if

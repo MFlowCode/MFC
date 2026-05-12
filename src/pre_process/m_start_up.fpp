@@ -173,19 +173,19 @@ contains
 
         if (file_check) then
             open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
-            read (1) x_cb(-1:m)
+            read (1) x%cb(-1:m)
             close (1)
         else
             call s_mpi_abort('File x_cb.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
         end if
 
-        x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
+        x%cc(0:m) = (x%cb(0:m) + x%cb(-1:(m - 1)))/2._wp
 
-        dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
+        dx = minval(x%cb(0:m) - x%cb(-1:m - 1))
         if (num_procs > 1) call s_mpi_reduce_min(dx)
 
-        x_domain%beg = x_cb(-1)
-        x_domain%end = x_cb(m)
+        x_domain%beg = x%cb(-1)
+        x_domain%end = x%cb(m)
 
         if (n > 0) then
             file_loc = trim(t_step_dir) // '/y_cb.dat'
@@ -193,19 +193,19 @@ contains
 
             if (file_check) then
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
-                read (1) y_cb(-1:n)
+                read (1) y%cb(-1:n)
                 close (1)
             else
                 call s_mpi_abort('File y_cb.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
             end if
 
-            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
+            y%cc(0:n) = (y%cb(0:n) + y%cb(-1:(n - 1)))/2._wp
 
-            dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
+            dy = minval(y%cb(0:n) - y%cb(-1:n - 1))
             if (num_procs > 1) call s_mpi_reduce_min(dy)
 
-            y_domain%beg = y_cb(-1)
-            y_domain%end = y_cb(n)
+            y_domain%beg = y%cb(-1)
+            y_domain%end = y%cb(n)
 
             if (p > 0) then
                 file_loc = trim(t_step_dir) // '/z_cb.dat'
@@ -213,19 +213,19 @@ contains
 
                 if (file_check) then
                     open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
-                    read (1) z_cb(-1:p)
+                    read (1) z%cb(-1:p)
                     close (1)
                 else
                     call s_mpi_abort('File z_cb.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
                 end if
 
-                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
+                z%cc(0:p) = (z%cb(0:p) + z%cb(-1:(p - 1)))/2._wp
 
-                dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
+                dz = minval(z%cb(0:p) - z%cb(-1:p - 1))
                 if (num_procs > 1) call s_mpi_reduce_min(dz)
 
-                z_domain%beg = z_cb(-1)
-                z_domain%end = z_cb(p)
+                z_domain%beg = z%cb(-1)
+                z_domain%end = z%cb(p)
             end if
         end if
 
@@ -241,17 +241,17 @@ contains
     !! coordinate directions and making sure that all of the cell-widths are positively valued
     impure subroutine s_check_grid_data_files
 
-        if (any(x_cb(0:m) - x_cb(-1:m - 1) <= 0._wp)) then
+        if (any(x%cb(0:m) - x%cb(-1:m - 1) <= 0._wp)) then
             call s_mpi_abort('x_cb.dat in ' // trim(t_step_dir) // ' contains non-positive cell-spacings. Exiting.')
         end if
 
         if (n > 0) then
-            if (any(y_cb(0:n) - y_cb(-1:n - 1) <= 0._wp)) then
+            if (any(y%cb(0:n) - y%cb(-1:n - 1) <= 0._wp)) then
                 call s_mpi_abort('y_cb.dat in ' // trim(t_step_dir) // ' contains non-positive cell-spacings. ' // 'Exiting.')
             end if
 
             if (p > 0) then
-                if (any(z_cb(0:p) - z_cb(-1:p - 1) <= 0._wp)) then
+                if (any(z%cb(0:p) - z%cb(-1:p - 1) <= 0._wp)) then
                     call s_mpi_abort('z_cb.dat in ' // trim(t_step_dir) // ' contains non-positive cell-spacings' // ' .Exiting.')
                 end if
             end if
@@ -352,12 +352,12 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting. ')
         end if
 
-        x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
-        dx = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
+        x%cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
+        x%cc(0:m) = (x%cb(0:m) + x%cb(-1:(m - 1)))/2._wp
+        dx = minval(x%cb(0:m) - x%cb(-1:(m - 1)))
         if (num_procs > 1) call s_mpi_reduce_min(dx)
-        x_domain%beg = x_cb(-1)
-        x_domain%end = x_cb(m)
+        x_domain%beg = x%cb(-1)
+        x_domain%end = x%cb(m)
 
         if (n > 0) then
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
@@ -372,12 +372,12 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting. ')
             end if
 
-            y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
-            dy = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
+            y%cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
+            y%cc(0:n) = (y%cb(0:n) + y%cb(-1:(n - 1)))/2._wp
+            dy = minval(y%cb(0:n) - y%cb(-1:(n - 1)))
             if (num_procs > 1) call s_mpi_reduce_min(dy)
-            y_domain%beg = y_cb(-1)
-            y_domain%end = y_cb(n)
+            y_domain%beg = y%cb(-1)
+            y_domain%end = y%cb(n)
 
             if (p > 0) then
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
@@ -392,12 +392,12 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting. ')
                 end if
 
-                z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
-                dz = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
+                z%cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
+                z%cc(0:p) = (z%cb(0:p) + z%cb(-1:(p - 1)))/2._wp
+                dz = minval(z%cb(0:p) - z%cb(-1:(p - 1)))
                 if (num_procs > 1) call s_mpi_reduce_min(dz)
-                z_domain%beg = z_cb(-1)
-                z_domain%end = z_cb(p)
+                z_domain%beg = z%cb(-1)
+                z_domain%end = z%cb(p)
             end if
         end if
 
@@ -551,9 +551,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        r2 = x_cc(j)**2
-                        if (n > 0) r2 = r2 + y_cc(k)**2
-                        if (p > 0) r2 = r2 + z_cc(l)**2
+                        r2 = x%cc(j)**2
+                        if (n > 0) r2 = r2 + y%cc(k)**2
+                        if (p > 0) r2 = r2 + z%cc(l)**2
                         q_cons_vf(eqn_idx%psi)%sf(j, k, l) = 1.0e-2_wp*exp(-r2/(2.0_wp*0.05_wp**2))
                         q_prim_vf(eqn_idx%psi)%sf(j, k, l) = q_cons_vf(eqn_idx%psi)%sf(j, k, l)
                     end do

@@ -301,19 +301,19 @@ contains
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
         open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
-        write (2) x_cb(-1:m); close (2)
+        write (2) x%cb(-1:m); close (2)
 
         if (n > 0) then
             file_path = trim(t_step_dir) // '/y_cb.dat'
 
             open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
-            write (2) y_cb(-1:n); close (2)
+            write (2) y%cb(-1:n); close (2)
 
             if (p > 0) then
                 file_path = trim(t_step_dir) // '/z_cb.dat'
 
                 open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
-                write (2) z_cb(-1:p); close (2)
+                write (2) z%cb(-1:p); close (2)
             end if
         end if
 
@@ -401,9 +401,9 @@ contains
                     do j = 0, m
                         ! todo: revisit change here
                         if (((i >= eqn_idx%adv%beg) .and. (i <= eqn_idx%adv%end))) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else
-                            write (2, FMT) x_cb(j), q_prim_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x%cb(j), q_prim_vf(i)%sf(j, 0, 0)
                         end if
                     end do
                     close (2)
@@ -415,7 +415,7 @@ contains
 
                 open (2, FILE=trim(file_path))
                 do j = 0, m
-                    write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                    write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)
                 end do
                 close (2)
             end do
@@ -428,7 +428,7 @@ contains
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), pb_ts(1)%sf(j, 0, 0, r, i)
+                            write (2, FMT) x%cb(j), pb_ts(1)%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -440,7 +440,7 @@ contains
 
                         open (2, FILE=trim(file_path))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), mv_ts(1)%sf(j, 0, 0, r, i)
+                            write (2, FMT) x%cb(j), mv_ts(1)%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -460,7 +460,7 @@ contains
                 open (2, FILE=trim(file_path))
                 do j = 0, m
                     do k = 0, n
-                        write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                        write (2, FMT) x%cb(j), y%cb(k), q_cons_vf(i)%sf(j, k, 0)
                     end do
                     write (2, *)
                 end do
@@ -472,7 +472,7 @@ contains
                 open (2, FILE=trim(file_path))
                 do j = 0, m
                     do k = 0, n
-                        write (2, FMT) x_cb(j), y_cb(k), beta%sf(j, k, 0)
+                        write (2, FMT) x%cb(j), y%cb(k), beta%sf(j, k, 0)
                     end do
                     write (2, *)
                 end do
@@ -488,7 +488,7 @@ contains
                         open (2, FILE=trim(file_path))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), pb_ts(1)%sf(j, k, 0, r, i)
+                                write (2, FMT) x%cb(j), y%cb(k), pb_ts(1)%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -502,7 +502,7 @@ contains
                         open (2, FILE=trim(file_path))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), mv_ts(1)%sf(j, k, 0, r, i)
+                                write (2, FMT) x%cb(j), y%cb(k), mv_ts(1)%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -520,9 +520,9 @@ contains
                         do k = 0, n
                             if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
                                 & .and. (i <= eqn_idx%adv%end))) then
-                                write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                                write (2, FMT) x%cb(j), y%cb(k), q_cons_vf(i)%sf(j, k, 0)
                             else
-                                write (2, FMT) x_cb(j), y_cb(k), q_prim_vf(i)%sf(j, k, 0)
+                                write (2, FMT) x%cb(j), y%cb(k), q_prim_vf(i)%sf(j, k, 0)
                             end if
                         end do
                         write (2, *)
@@ -545,7 +545,7 @@ contains
                 do j = 0, m
                     do k = 0, n
                         do l = 0, p
-                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                            write (2, FMT) x%cb(j), y%cb(k), z%cb(l), q_cons_vf(i)%sf(j, k, l)
                         end do
                         write (2, *)
                     end do
@@ -560,7 +560,7 @@ contains
                 do j = 0, m
                     do k = 0, n
                         do l = 0, p
-                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), beta%sf(j, k, l)
+                            write (2, FMT) x%cb(j), y%cb(k), z%cb(l), beta%sf(j, k, l)
                         end do
                         write (2, *)
                     end do
@@ -579,7 +579,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), pb_ts(1)%sf(j, k, l, r, i)
+                                    write (2, FMT) x%cb(j), y%cb(k), z%cb(l), pb_ts(1)%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do
@@ -595,7 +595,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), mv_ts(1)%sf(j, k, l, r, i)
+                                    write (2, FMT) x%cb(j), y%cb(k), z%cb(l), mv_ts(1)%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do
@@ -616,9 +616,9 @@ contains
                                 if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
                                     & .and. (i <= eqn_idx%adv%end)) .or. ((i >= eqn_idx%species%beg) &
                                     & .and. (i <= eqn_idx%species%end))) then
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                                    write (2, FMT) x%cb(j), y%cb(k), z%cb(l), q_cons_vf(i)%sf(j, k, l)
                                 else
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)
+                                    write (2, FMT) x%cb(j), y%cb(k), z%cb(l), q_prim_vf(i)%sf(j, k, l)
                                 end if
                             end do
                             write (2, *)
@@ -1136,9 +1136,9 @@ contains
             damage_state = 0._wp
 
             if (n == 0) then
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
+                if ((probe(i)%x >= x%cb(-1)) .and. (probe(i)%x <= x%cb(m))) then
                     do s = -1, m
-                        distx(s) = x_cb(s) - probe(i)%x
+                        distx(s) = x%cb(s) - probe(i)%x
                         if (distx(s) < 0._wp) distx(s) = 1000._wp
                     end do
                     j = minloc(distx, 1)
@@ -1244,14 +1244,14 @@ contains
                     end do
                 end if
 
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
+                if ((probe(i)%x >= x%cb(-1)) .and. (probe(i)%x <= x%cb(m))) then
+                    if ((probe(i)%y >= y%cb(-1)) .and. (probe(i)%y <= y%cb(n))) then
                         do s = -1, m
-                            distx(s) = x_cb(s) - probe(i)%x
+                            distx(s) = x%cb(s) - probe(i)%x
                             if (distx(s) < 0._wp) distx(s) = 1000._wp
                         end do
                         do s = -1, n
-                            disty(s) = y_cb(s) - probe(i)%y
+                            disty(s) = y%cb(s) - probe(i)%y
                             if (disty(s) < 0._wp) disty(s) = 1000._wp
                         end do
                         j = minloc(distx, 1)
@@ -1319,19 +1319,19 @@ contains
                     end if
                 end if
             else
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
-                        if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
+                if ((probe(i)%x >= x%cb(-1)) .and. (probe(i)%x <= x%cb(m))) then
+                    if ((probe(i)%y >= y%cb(-1)) .and. (probe(i)%y <= y%cb(n))) then
+                        if ((probe(i)%z >= z%cb(-1)) .and. (probe(i)%z <= z%cb(p))) then
                             do s = -1, m
-                                distx(s) = x_cb(s) - probe(i)%x
+                                distx(s) = x%cb(s) - probe(i)%x
                                 if (distx(s) < 0._wp) distx(s) = 1000._wp
                             end do
                             do s = -1, n
-                                disty(s) = y_cb(s) - probe(i)%y
+                                disty(s) = y%cb(s) - probe(i)%y
                                 if (disty(s) < 0._wp) disty(s) = 1000._wp
                             end do
                             do s = -1, p
-                                distz(s) = z_cb(s) - probe(i)%z
+                                distz(s) = z%cb(s) - probe(i)%z
                                 if (distz(s) < 0._wp) distz(s) = 1000._wp
                             end do
                             j = minloc(distx, 1)
@@ -1485,7 +1485,7 @@ contains
                         pi_inf = 0._wp
                         qv = 0._wp
 
-                        if ((integral(i)%xmin <= x_cb(j)) .and. (integral(i)%xmax >= x_cb(j))) then
+                        if ((integral(i)%xmin <= x%cb(j)) .and. (integral(i)%xmax >= x%cb(j))) then
                             npts = npts + 1
                             call s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
                             do s = 1, num_vels
@@ -1528,14 +1528,14 @@ contains
                             trigger = .false.
                             if (i == 1) then
                                 ! inner portion
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad - 0.5_wp*thickness)) trigger = .true.
+                                if (sqrt(x%cb(j)**2._wp + y%cb(k)**2._wp) < (rad - 0.5_wp*thickness)) trigger = .true.
                             else if (i == 2) then
                                 ! net region
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad - 0.5_wp*thickness) .and. sqrt(x_cb(j)**2._wp &
-                                    & + y_cb(k)**2._wp) < (rad + 0.5_wp*thickness)) trigger = .true.
+                                if (sqrt(x%cb(j)**2._wp + y%cb(k)**2._wp) > (rad - 0.5_wp*thickness) .and. sqrt(x%cb(j)**2._wp &
+                                    & + y%cb(k)**2._wp) < (rad + 0.5_wp*thickness)) trigger = .true.
                             else if (i == 3) then
                                 ! everything else
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad + 0.5_wp*thickness)) trigger = .true.
+                                if (sqrt(x%cb(j)**2._wp + y%cb(k)**2._wp) > (rad + 0.5_wp*thickness)) trigger = .true.
                             end if
 
                             pres = 0._wp

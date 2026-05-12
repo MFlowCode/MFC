@@ -55,7 +55,7 @@
             do l = 0, n
                 rcut = 0._wp
                 do s = 0, NJet - 1
-                    r = sqrt((y_cc(l) - y_th_arr(s))**2._wp + (z_cc(q) - z_th_arr(s))**2._wp)
+                    r = sqrt((y%cc(l) - y_th_arr(s))**2._wp + (z%cc(q) - z_th_arr(s))**2._wp)
                     rcut = rcut + f_cut_on(r - r_th_arr(s), eps_smooth)
                 end do
                 rcut_arr(l, q) = rcut
@@ -76,33 +76,33 @@
         wl = 2._wp*pi/lam
         amp = 0.025_wp/wl
 
-        intH = amp*(sin(2._wp*pi*x_cc(i)/lam - pi/2._wp) + sin(2._wp*pi*z_cc(k)/lam - pi/2._wp)) + h
+        intH = amp*(sin(2._wp*pi*x%cc(i)/lam - pi/2._wp) + sin(2._wp*pi*z%cc(k)/lam - pi/2._wp)) + h
 
-        alph = 5.e-1_wp*(1._wp + tanh((y_cc(j) - intH)/2.5e-3_wp))
+        alph = 5.e-1_wp*(1._wp + tanh((y%cc(j) - intH)/2.5e-3_wp))
 
         if (alph < eps) alph = eps
         if (alph > 1._wp - eps) alph = 1._wp - eps
 
-        if (y_cc(j) > intH) then
+        if (y%cc(j) > intH) then
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = alph
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = (1._wp - alph)*rhoL
-            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y%cc(j))
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = alph
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = (1._wp - alph)*rhoL
             pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
-            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y%cc(j))
         end if
     case (301)  ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
         h = 0.0_wp
         lam = 1.0_wp
         amp = patch_icpp(patch_id)%a(2)
-        intH = amp*abs((sin(2*pi*y_cc(j)/lam - pi/2) + sin(2*pi*z_cc(k)/lam - pi/2)) + h)
-        if (x_cc(i) > intH) then
+        intH = amp*abs((sin(2*pi*y%cc(j)/lam - pi/2) + sin(2*pi*z%cc(k)/lam - pi/2)) + h)
+        if (x%cc(i) > intH) then
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = patch_icpp(1)%alpha_rho(2)
             q_prim_vf(eqn_idx%E)%sf(i, j, k) = patch_icpp(1)%pres
@@ -122,9 +122,9 @@
         eps_smooth = 1._wp
         eps = 1e-6
 
-        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
+        r = sqrt((y%cc(j) - y_th)**2._wp + (z%cc(k) - z_th)**2._wp)
         rcut = f_cut_on(r - r_th, eps_smooth)
-        xcut = f_cut_on(x_cc(i), eps_smooth)
+        xcut = f_cut_on(x%cc(i), eps_smooth)
 
         q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k) = ux_th*rcut*xcut + ux_am
         q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = 0._wp
@@ -150,7 +150,7 @@
         eps = 1e-6
 
         rcut = rcut_arr(j, k)
-        xcut = f_cut_on(x_cc(i), eps_smooth)
+        xcut = f_cut_on(x%cc(i), eps_smooth)
 
         q_prim_vf(eqn_idx%mom%beg)%sf(i, j, k) = ux_th*rcut*xcut + ux_am
         q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = 0._wp
@@ -174,9 +174,9 @@
         Mach = 0.1
         if (patch_id == 1) then
             q_prim_vf(eqn_idx%E)%sf(i, j, &
-                      & k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)
-            q_prim_vf(eqn_idx%mom%beg + 0)%sf(i, j, k) = Mach*376.636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
-            q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
+                      & k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x%cc(i)/1) + cos(2*y%cc(j)/1))*(cos(2*z%cc(k)/1) + 2)
+            q_prim_vf(eqn_idx%mom%beg + 0)%sf(i, j, k) = Mach*376.636429464809*sin(x%cc(i)/1)*cos(y%cc(j)/1)*sin(z%cc(k)/1)
+            q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x%cc(i)/1)*sin(y%cc(j)/1)*sin(z%cc(k)/1)
         end if
     case default
         call s_int_to_str(patch_id, iStr)

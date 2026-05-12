@@ -156,77 +156,77 @@ contains
         if (p > 0) then
             if (grid_geometry == 3) then
                 ! Minimum spatial extent in the r-direction
-                call MPI_GATHERV(minval(y_cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(minval(y%cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Minimum spatial extent in the theta-direction
-                call MPI_GATHERV(minval(z_cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(minval(z%cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Minimum spatial extent in the z-direction
-                call MPI_GATHERV(minval(x_cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(minval(x%cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Maximum spatial extent in the r-direction
-                call MPI_GATHERV(maxval(y_cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(maxval(y%cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Maximum spatial extent in the theta-direction
-                call MPI_GATHERV(maxval(z_cb), 1, mpi_p, spatial_extents(5, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(maxval(z%cb), 1, mpi_p, spatial_extents(5, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Maximum spatial extent in the z-direction
-                call MPI_GATHERV(maxval(x_cb), 1, mpi_p, spatial_extents(6, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(maxval(x%cb), 1, mpi_p, spatial_extents(6, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
             else
                 ! Minimum spatial extent in the x-direction
-                call MPI_GATHERV(minval(x_cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(minval(x%cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Minimum spatial extent in the y-direction
-                call MPI_GATHERV(minval(y_cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(minval(y%cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Minimum spatial extent in the z-direction
-                call MPI_GATHERV(minval(z_cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(minval(z%cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Maximum spatial extent in the x-direction
-                call MPI_GATHERV(maxval(x_cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(maxval(x%cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Maximum spatial extent in the y-direction
-                call MPI_GATHERV(maxval(y_cb), 1, mpi_p, spatial_extents(5, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(maxval(y%cb), 1, mpi_p, spatial_extents(5, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
 
                 ! Maximum spatial extent in the z-direction
-                call MPI_GATHERV(maxval(z_cb), 1, mpi_p, spatial_extents(6, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
+                call MPI_GATHERV(maxval(z%cb), 1, mpi_p, spatial_extents(6, 0), recvcounts, 6*displs, mpi_p, 0, MPI_COMM_WORLD, &
                                  & ierr)
             end if
             ! Simulation is 2D
         else if (n > 0) then
             ! Minimum spatial extent in the x-direction
-            call MPI_GATHERV(minval(x_cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHERV(minval(x%cb), 1, mpi_p, spatial_extents(1, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             ! Minimum spatial extent in the y-direction
-            call MPI_GATHERV(minval(y_cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHERV(minval(y%cb), 1, mpi_p, spatial_extents(2, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             ! Maximum spatial extent in the x-direction
-            call MPI_GATHERV(maxval(x_cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHERV(maxval(x%cb), 1, mpi_p, spatial_extents(3, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             ! Maximum spatial extent in the y-direction
-            call MPI_GATHERV(maxval(y_cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHERV(maxval(y%cb), 1, mpi_p, spatial_extents(4, 0), recvcounts, 4*displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
             ! Simulation is 1D
         else
             ! For 1D, recvcounts/displs are sized for grid defragmentation (m+1 per rank), not for scalar gathers. Use MPI_GATHER
             ! instead.
 
             ! Minimum spatial extent in the x-direction
-            call MPI_GATHER(minval(x_cb), 1, mpi_p, ext_temp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHER(minval(x%cb), 1, mpi_p, ext_temp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             if (proc_rank == 0) spatial_extents(1,:) = ext_temp
 
             ! Maximum spatial extent in the x-direction
-            call MPI_GATHER(maxval(x_cb), 1, mpi_p, ext_temp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHER(maxval(x%cb), 1, mpi_p, ext_temp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             if (proc_rank == 0) spatial_extents(2,:) = ext_temp
         end if
 #endif
@@ -242,13 +242,13 @@ contains
         ! Silo-HDF5 database format
 
         if (format == 1) then
-            call MPI_GATHERV(x_cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHERV(x%cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             ! Binary database format
         else
-            call MPI_GATHERV(x_cb(0), m + 1, mpi_p, x_root_cb(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHERV(x%cb(0), m + 1, mpi_p, x_root_cb(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
-            if (proc_rank == 0) x_root_cb(-1) = x_cb(-1)
+            if (proc_rank == 0) x_root_cb(-1) = x%cb(-1)
         end if
 #endif
 

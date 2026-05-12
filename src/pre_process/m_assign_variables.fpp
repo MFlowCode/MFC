@@ -97,15 +97,15 @@ contains
 
         do i = 1, eqn_idx%E - eqn_idx%mom%beg
             q_prim_vf(i + 1)%sf(j, k, l) = 1._wp/q_prim_vf(1)%sf(j, k, &
-                      & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta) &
-                      & *patch_icpp(smooth_patch_id)%rho*patch_icpp(smooth_patch_id)%vel(i))
+                      & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*patch_icpp(smooth_patch_id) &
+                      & %rho*patch_icpp(smooth_patch_id)%vel(i))
         end do
 
         q_prim_vf(eqn_idx%gamma)%sf(j, k, l) = eta*patch_icpp(patch_id)%gamma + (1._wp - eta)*patch_icpp(smooth_patch_id)%gamma
 
         q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp/q_prim_vf(eqn_idx%gamma)%sf(j, k, &
-                  & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta) &
-                  & *patch_icpp(smooth_patch_id)%gamma*patch_icpp(smooth_patch_id)%pres)
+                  & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta)*patch_icpp(smooth_patch_id) &
+                  & %gamma*patch_icpp(smooth_patch_id)%pres)
 
         q_prim_vf(eqn_idx%pi_inf)%sf(j, k, l) = eta*patch_icpp(patch_id)%pi_inf + (1._wp - eta)*patch_icpp(smooth_patch_id)%pi_inf
 
@@ -384,18 +384,18 @@ contains
 
         if (hyperelasticity) then
             if (pre_stress) then  ! pre stressed initial condition in spatial domain
-                rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
-                theta = atan2(y_cc(k), x_cc(j))
-                phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
+                rcoord = sqrt((x%cc(j)**2 + y%cc(k)**2 + z%cc(l)**2))
+                theta = atan2(y%cc(k), x%cc(j))
+                phi = atan2(sqrt(x%cc(j)**2 + y%cc(k)**2), z%cc(l))
                 ! spherical coord, assuming Rmax=1
                 xi_sph = (rcoord**3 - R0ref**3 + 1._wp)**(1._wp/3._wp)
                 xi_cart(1) = xi_sph*sin(phi)*cos(theta)
                 xi_cart(2) = xi_sph*sin(phi)*sin(theta)
                 xi_cart(3) = xi_sph*cos(phi)
             else
-                xi_cart(1) = x_cc(j)
-                xi_cart(2) = y_cc(k)
-                xi_cart(3) = z_cc(l)
+                xi_cart(1) = x%cc(j)
+                xi_cart(2) = y%cc(k)
+                xi_cart(3) = z%cc(l)
             end if
 
             ! assigning the reference map to the q_prim vector field
@@ -464,7 +464,7 @@ contains
         ! Set streamwise velocity to hyperbolic tangent function of y
         if (mixlayer_vel_profile) then
             q_prim_vf(1 + eqn_idx%cont%end)%sf(j, k, &
-                      & l) = (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)*mixlayer_vel_coef) + (1._wp - eta)*orig_prim_vf(1 &
+                      & l) = (eta*patch_icpp(patch_id)%vel(1)*tanh(y%cc(k)*mixlayer_vel_coef) + (1._wp - eta)*orig_prim_vf(1 &
                       & + eqn_idx%cont%end))
         end if
 

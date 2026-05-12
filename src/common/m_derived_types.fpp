@@ -13,6 +13,11 @@ module m_derived_types
 
     implicit none
 
+    !> Derived type for a single spatial grid axis: cell-boundary, cell-center, and per-cell spacing arrays
+    type grid_axis
+        real(wp), allocatable, dimension(:) :: cb, cc, spacing
+    end type grid_axis
+
     !> Derived type adding the field position (fp) as an attribute
     type field_position
         real(stp), allocatable, dimension(:,:,:) :: fp  !< Field position

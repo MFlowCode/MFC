@@ -82,9 +82,9 @@ contains
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
+        $:GPU_UPDATE(device='[num_ibs, x%cc, y%cc, x%spacing, y%spacing, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
+            $:GPU_UPDATE(device='[z%cc, z%spacing, z_domain, ib_bc_z%beg]')
         end if
 
         ! allocate STL models
@@ -204,9 +204,9 @@ contains
 
                 ! Calculate physical location of GP
                 if (p > 0) then
-                    physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
+                    physical_loc = [x%cc(j), y%cc(k), z%cc(l)]
                 else
-                    physical_loc = [x_cc(j), y_cc(k), 0._wp]
+                    physical_loc = [x%cc(j), y%cc(k), 0._wp]
                 end if
 
                 ! Interpolate primitive variables at image point associated w/ GP
@@ -404,9 +404,9 @@ contains
 
             ! Calculate physical location of ghost point
             if (p > 0) then
-                physical_loc = [x_cc(i), y_cc(j), z_cc(k)]
+                physical_loc = [x%cc(i), y%cc(j), z%cc(k)]
             else
-                physical_loc = [x_cc(i), y_cc(j), 0._wp]
+                physical_loc = [x%cc(i), y%cc(j), 0._wp]
             end if
 
             ! Calculate and store the precise location of the image point
@@ -419,13 +419,13 @@ contains
             do dim = 1, num_dims
                 ! s_cc points to the dim array we need
                 if (dim == 1) then
-                    s_cc => x_cc
+                    s_cc => x%cc
                     bound = m + buff_size - 1
                 else if (dim == 2) then
-                    s_cc => y_cc
+                    s_cc => y%cc
                     bound = n + buff_size - 1
                 else
-                    s_cc => z_cc
+                    s_cc => z%cc
                     bound = p + buff_size - 1
                 end if
 
@@ -448,15 +448,15 @@ contains
                             print *, "A required image point is not located in this computational domain."
                             print *, "Ghost Point is located at :"
                             if (p == 0) then
-                                print *, [x_cc(i), y_cc(j)]
+                                print *, [x%cc(i), y%cc(j)]
                             else
-                                print *, [x_cc(i), y_cc(j), z_cc(k)]
+                                print *, [x%cc(i), y%cc(j), z%cc(k)]
                             end if
                             print *, "We are searching in dimension ", dim, " for image point at ", ghost_points_in(q)%ip_loc(:)
-                            print *, "Domain size: ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
-                            print *, "x: ", x_cc(-buff_size), " to: ", x_cc(m + buff_size - 1)
-                            print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
-                            if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
+                            print *, "Domain size: ", [x%cc(-buff_size), y%cc(-buff_size), z%cc(-buff_size)]
+                            print *, "x: ", x%cc(-buff_size), " to: ", x%cc(m + buff_size - 1)
+                            print *, "y: ", y%cc(-buff_size), " to: ", y%cc(n + buff_size - 1)
+                            if (p /= 0) print *, "z: ", z%cc(-buff_size), " to: ", z%cc(p + buff_size - 1)
                             print *, "Image point is located approximately ", &
                                 & (ghost_points_in(q)%loc(dim) - ghost_points_in(q) %ip_loc(dim))/(s_cc(1) - s_cc(0)), &
                                 & " grid cells away"
@@ -544,7 +544,8 @@ contains
         if (p == 0) gp_layers_z = 0
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, xp, yp, zp]', &
-                            & copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, gp_layers_z]', collapse=3)
+                            & copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, gp_layers_z]', &
+                                & collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -577,26 +578,26 @@ contains
                             ghost_points_in(local_idx)%z_periodicity = zp
                             ghost_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
-                            if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                            if ((x%cc(i) - x%spacing(i)) < x_domain%beg) then
                                 ghost_points_in(local_idx)%DB(1) = -1
-                            else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                            else if ((x%cc(i) + x%spacing(i)) > x_domain%end) then
                                 ghost_points_in(local_idx)%DB(1) = 1
                             else
                                 ghost_points_in(local_idx)%DB(1) = 0
                             end if
 
-                            if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                            if ((y%cc(j) - y%spacing(j)) < y_domain%beg) then
                                 ghost_points_in(local_idx)%DB(2) = -1
-                            else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                            else if ((y%cc(j) + y%spacing(j)) > y_domain%end) then
                                 ghost_points_in(local_idx)%DB(2) = 1
                             else
                                 ghost_points_in(local_idx)%DB(2) = 0
                             end if
 
                             if (p /= 0) then
-                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                if ((z%cc(k) - z%spacing(k)) < z_domain%beg) then
                                     ghost_points_in(local_idx)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                else if ((z%cc(k) + z%spacing(k)) > z_domain%end) then
                                     ghost_points_in(local_idx)%DB(3) = 1
                                 else
                                     ghost_points_in(local_idx)%DB(3) = 0
@@ -643,11 +644,11 @@ contains
             do ii = 0, 1
                 do jj = 0, 1
                     if (p == 0) then
-                        dist(1 + ii, 1 + jj, 1) = sqrt((x_cc(i + ii) - gp%ip_loc(1))**2 + (y_cc(j + jj) - gp%ip_loc(2))**2)
+                        dist(1 + ii, 1 + jj, 1) = sqrt((x%cc(i + ii) - gp%ip_loc(1))**2 + (y%cc(j + jj) - gp%ip_loc(2))**2)
                     else
                         do kk = 0, 1
                             dist(1 + ii, 1 + jj, &
-                                 & 1 + kk) = sqrt((x_cc(i + ii) - gp%ip_loc(1))**2 + (y_cc(j + jj) - gp%ip_loc(2))**2 + (z_cc(k &
+                                 & 1 + kk) = sqrt((x%cc(i + ii) - gp%ip_loc(1))**2 + (y%cc(j + jj) - gp%ip_loc(2))**2 + (z%cc(k &
                                  & + kk) - gp%ip_loc(3))**2)
                         end do
                     end if
@@ -890,7 +891,7 @@ contains
         ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3,1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2
         real(wp), dimension(1:3)     :: local_force_contribution, radial_vector, local_torque_contribution
-        real(wp)                     :: cell_volume, dx, dy, dz, dynamic_viscosity
+        real(wp)                     :: cell_volume, dx_loc, dy_loc, dz_loc, dynamic_viscosity
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: dynamic_viscosities
@@ -915,7 +916,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[ib_idx, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
                             & local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, &
-                            & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[patch_ib, &
+                            & viscous_stress_div_2, dx_loc, dy_loc, dz_loc]', copy='[forces, torques]', copyin='[patch_ib, &
                             & dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -926,31 +927,32 @@ contains
 
                         ! get the vector pointing to the grid cell from the IB centroid
                         if (num_dims == 3) then
-                            radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, &
+                            radial_vector = [x%cc(i), y%cc(j), z%cc(k)] - [patch_ib(ib_idx)%x_centroid, &
                                                   & patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid]
                         else
-                            radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, &
+                            radial_vector = [x%cc(i), y%cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, &
                                                   & patch_ib(ib_idx)%y_centroid, 0._wp]
                         end if
-                        dx = x_cc(i + 1) - x_cc(i)
-                        dy = y_cc(j + 1) - y_cc(j)
+                        dx_loc = x%cc(i + 1) - x%cc(i)
+                        dy_loc = y%cc(j + 1) - y%cc(j)
 
                         local_force_contribution(:) = 0._wp
                         do fluid_idx = 0, num_fluids - 1
                             ! Get the pressure contribution to force via a finite difference to compute the 2D components of the
                             ! gradient of the pressure and cell volume
                             local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i &
-                                                     & + 1, j, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i - 1, j, k))/(2._wp*dx)  ! force is the negative pressure gradient
+                                                     & + 1, j, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i - 1, j, &
+                                                     & k))/(2._wp*dx_loc)  ! force is the negative pressure gradient
                             local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, &
-                                                     & j + 1, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
-                            cell_volume = abs(dx*dy)
+                                                     & j + 1, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy_loc)
+                            cell_volume = abs(dx_loc*dy_loc)
                             ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
                             if (num_dims == 3) then
-                                dz = z_cc(k + 1) - z_cc(k)
-                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(eqn_idx%E &
-                                                         & + fluid_idx)%sf(i, j, k + 1) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, &
-                                                         & j, k - 1))/(2._wp*dz)
-                                cell_volume = abs(cell_volume*dz)
+                                dz_loc = z%cc(k + 1) - z%cc(k)
+                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(eqn_idx%E + fluid_idx) &
+                                                         & %sf(i, j, k + 1) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j, &
+                                                         & k - 1))/(2._wp*dz_loc)
+                                cell_volume = abs(cell_volume*dz_loc)
                             end if
                         end do
 
@@ -968,14 +970,14 @@ contains
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i - 1, j, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i + 1, j, k)
                             ! get x derivative of the first-row of viscous stress tensor
-                            viscous_stress_div(1,1:3) = (viscous_stress_div_2(1,1:3) - viscous_stress_div_1(1,1:3))/(2._wp*dx)
+                            viscous_stress_div(1,1:3) = (viscous_stress_div_2(1,1:3) - viscous_stress_div_1(1,1:3))/(2._wp*dx_loc)
                             ! add the x components of the divergence to the force
                             local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1,1:3)
 
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j - 1, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j + 1, k)
                             ! get y derivative of the second-row of viscous stress tensor
-                            viscous_stress_div(2,1:3) = (viscous_stress_div_2(2,1:3) - viscous_stress_div_1(2,1:3))/(2._wp*dy)
+                            viscous_stress_div(2,1:3) = (viscous_stress_div_2(2,1:3) - viscous_stress_div_1(2,1:3))/(2._wp*dy_loc)
                             ! add the y components of the divergence to the force
                             local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2,1:3)
 
@@ -985,7 +987,8 @@ contains
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j, &
                                                                      & k + 1)
                                 ! get z derivative of the third-row of viscous stress tensor
-                                viscous_stress_div(3,1:3) = (viscous_stress_div_2(3,1:3) - viscous_stress_div_1(3,1:3))/(2._wp*dz)
+                                viscous_stress_div(3,1:3) = (viscous_stress_div_2(3,1:3) - viscous_stress_div_1(3, &
+                                                   & 1:3))/(2._wp*dz_loc)
                                 ! add the z components of the divergence to the force
                                 local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3,1:3)
                             end if
@@ -1058,8 +1061,8 @@ contains
 
         ! Offset only needs to be computes for specific geometries
 
-        if (patch_ib(ib_marker)%geometry == 4 .or. patch_ib(ib_marker)%geometry == 5 .or. patch_ib(ib_marker)%geometry == 11 &
-            & .or. patch_ib(ib_marker)%geometry == 12) then
+        if (patch_ib(ib_marker)%geometry == 4 .or. patch_ib(ib_marker)%geometry == 5 .or. patch_ib(ib_marker) &
+            & %geometry == 11 .or. patch_ib(ib_marker)%geometry == 12) then
             center_of_mass_local = [0._wp, 0._wp, 0._wp]
             num_cells_local = 0
 
@@ -1069,8 +1072,8 @@ contains
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) == ib_marker) then
                             num_cells_local = num_cells_local + 1
-                            center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
-                            if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z_cc(k)
+                            center_of_mass_local = center_of_mass_local + [x%cc(i), y%cc(j), 0._wp]
+                            if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z%cc(k)
                         end if
                     end do
                 end do
@@ -1128,20 +1131,20 @@ contains
         if (patch_ib(ib_marker)%geometry == 2) then  ! circle
             patch_ib(ib_marker)%moment = 0.5_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
         else if (patch_ib(ib_marker)%geometry == 3) then  ! rectangle
-            patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 &
-                     & + patch_ib(ib_marker)%length_y**2)/6._wp
+            patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
+                     & %length_y**2)/6._wp
         else if (patch_ib(ib_marker)%geometry == 6) then  ! ellipse
-            patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 &
-                     & + patch_ib(ib_marker)%length_y**2)
+            patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
+                     & %length_y**2)
         else if (patch_ib(ib_marker)%geometry == 8) then  ! sphere
             patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
             moment = 0._wp
-            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
+            cell_volume = (x%cc(1) - x%cc(0))*(y%cc(1) - y%cc(0))
             ! computed without grid stretching. Update in the loop to perform with stretching
             if (p /= 0) then
-                cell_volume = cell_volume*(z_cc(1) - z_cc(0))
+                cell_volume = cell_volume*(z%cc(1) - z%cc(0))
             end if
 
             $:GPU_PARALLEL_LOOP(private='[position, closest_point_along_axis, vector_to_axis, distance_to_axis]', copy='[moment, &
@@ -1155,10 +1158,10 @@ contains
 
                             ! get the position in local coordinates so that the axis passes through 0, 0, 0
                             if (p == 0) then
-                                position = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_marker)%x_centroid, &
+                                position = [x%cc(i), y%cc(j), 0._wp] - [patch_ib(ib_marker)%x_centroid, &
                                                  & patch_ib(ib_marker)%y_centroid, 0._wp]
                             else
-                                position = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_marker)%x_centroid, &
+                                position = [x%cc(i), y%cc(j), z%cc(k)] - [patch_ib(ib_marker)%x_centroid, &
                                                  & patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid]
                             end if
 

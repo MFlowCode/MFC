@@ -158,9 +158,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (p == 0) then
-            alf_igr = alf_factor*max(dx(1), dy(1))**2._wp
+            alf_igr = alf_factor*max(x%spacing(1), y%spacing(1))**2._wp
         else
-            alf_igr = alf_factor*max(dx(1), dy(1), dz(1))**2._wp
+            alf_igr = alf_factor*max(x%spacing(1), y%spacing(1), z%spacing(1))**2._wp
         end if
         $:GPU_UPDATE(device='[alf_igr]')
 
@@ -261,37 +261,37 @@ contains
                             fd_coeff = fd_coeff + q_cons_vf(i)%sf(j, k, l)
                         end do
 
-                        fd_coeff = 1._wp/fd_coeff + alf_igr*((1._wp/dx(j)**2._wp)*(1._wp/rho_lx + 1._wp/rho_rx) + (1._wp/dy(k) &
-                                                             & **2._wp)*(1._wp/rho_ly + 1._wp/rho_ry))
+                        fd_coeff = 1._wp/fd_coeff + alf_igr*((1._wp/x%spacing(j)**2._wp)*(1._wp/rho_lx + 1._wp/rho_rx) &
+                                                             & + (1._wp/y%spacing(k)**2._wp)*(1._wp/rho_ly + 1._wp/rho_ry))
 
                         if (num_dims == 3) then
-                            fd_coeff = fd_coeff + alf_igr*(1._wp/dz(l)**2._wp)*(1._wp/rho_lz + 1._wp/rho_rz)
+                            fd_coeff = fd_coeff + alf_igr*(1._wp/z%spacing(l)**2._wp)*(1._wp/rho_lz + 1._wp/rho_rz)
                         end if
 
                         if (igr_iter_solver == 1) then  ! Jacobi iteration
                             if (num_dims == 3) then
-                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/dx(j)**2._wp)*(jac_old(j - 1, k, &
-                                    & l)/rho_lx + jac_old(j + 1, k, l)/rho_rx) + (1._wp/dy(k)**2._wp)*(jac_old(j, k - 1, &
-                                    & l)/rho_ly + jac_old(j, k + 1, l)/rho_ry) + (1._wp/dz(l)**2._wp)*(jac_old(j, k, &
+                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/x%spacing(j)**2._wp)*(jac_old(j - 1, k, &
+                                    & l)/rho_lx + jac_old(j + 1, k, l)/rho_rx) + (1._wp/y%spacing(k)**2._wp)*(jac_old(j, k - 1, &
+                                    & l)/rho_ly + jac_old(j, k + 1, l)/rho_ry) + (1._wp/z%spacing(l)**2._wp)*(jac_old(j, k, &
                                     & l - 1)/rho_lz + jac_old(j, k, l + 1)/rho_rz)) + real(jac_rhs(j, k, l), kind=wp)/fd_coeff, &
                                     & kind=stp)
                             else
-                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/dx(j)**2._wp)*(real(jac_old(j - 1, k, l), &
+                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/x%spacing(j)**2._wp)*(real(jac_old(j - 1, k, l), &
                                     & kind=wp)/rho_lx + real(jac_old(j + 1, k, l), &
-                                    & kind=wp)/rho_rx) + (1._wp/dy(k)**2._wp)*(real(jac_old(j, k - 1, l), &
+                                    & kind=wp)/rho_rx) + (1._wp/y%spacing(k)**2._wp)*(real(jac_old(j, k - 1, l), &
                                     & kind=wp)/rho_ly + real(jac_old(j, k + 1, l), kind=wp)/rho_ry)) + real(jac_rhs(j, k, l), &
                                     & kind=wp)/fd_coeff, kind=stp)
                             end if
                         else  ! Gauss Seidel iteration
                             if (num_dims == 3) then
-                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/dx(j)**2._wp)*(jac(j - 1, k, &
-                                    & l)/rho_lx + jac(j + 1, k, l)/rho_rx) + (1._wp/dy(k)**2._wp)*(jac(j, k - 1, &
-                                    & l)/rho_ly + jac(j, k + 1, l)/rho_ry) + (1._wp/dz(l)**2._wp)*(jac(j, k, &
+                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/x%spacing(j)**2._wp)*(jac(j - 1, k, &
+                                    & l)/rho_lx + jac(j + 1, k, l)/rho_rx) + (1._wp/y%spacing(k)**2._wp)*(jac(j, k - 1, &
+                                    & l)/rho_ly + jac(j, k + 1, l)/rho_ry) + (1._wp/z%spacing(l)**2._wp)*(jac(j, k, &
                                     & l - 1)/rho_lz + jac(j, k, l + 1)/rho_rz)) + real(jac_rhs(j, k, l), kind=wp)/fd_coeff, &
                                     & kind=stp)
                             else
-                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/dx(j)**2._wp)*(jac(j - 1, k, &
-                                    & l)/rho_lx + jac(j + 1, k, l)/rho_rx) + (1._wp/dy(k)**2._wp)*(jac(j, k - 1, &
+                                jac(j, k, l) = real((alf_igr/fd_coeff)*((1._wp/x%spacing(j)**2._wp)*(jac(j - 1, k, &
+                                    & l)/rho_lx + jac(j + 1, k, l)/rho_rx) + (1._wp/y%spacing(k)**2._wp)*(jac(j, k - 1, &
                                     & l)/rho_ly + jac(j, k + 1, l)/rho_ry)) + real(jac_rhs(j, k, l), kind=wp)/fd_coeff, kind=stp)
                             end if
                         end if
@@ -380,16 +380,16 @@ contains
                     #:for LR in ['L', 'R']
                         $:GPU_ATOMIC(atomic='update')
                         rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                               & l) + real(0.5_wp*dt*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
+                               & l) + real(0.5_wp*dt*F_${LR}$*(1._wp/x%spacing(j + 1)), kind=stp)
                         $:GPU_ATOMIC(atomic='update')
                         rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                               & l) + real(0.5_wp*dt*vel_${LR}$*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
+                               & l) + real(0.5_wp*dt*vel_${LR}$*F_${LR}$*(1._wp/x%spacing(j + 1)), kind=stp)
                         $:GPU_ATOMIC(atomic='update')
-                        rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, l) - real(0.5_wp*dt*F_${LR}$*(1._wp/dx(j)), &
-                               & kind=stp)
+                        rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
+                               & l) - real(0.5_wp*dt*F_${LR}$*(1._wp/x%spacing(j)), kind=stp)
                         $:GPU_ATOMIC(atomic='update')
                         rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                               & l) - real(0.5_wp*dt*vel_${LR}$*F_${LR}$*(1._wp/dx(j)), kind=stp)
+                               & l) - real(0.5_wp*dt*vel_${LR}$*F_${LR}$*(1._wp/x%spacing(j)), kind=stp)
                     #:endfor
                 end do
             end do
@@ -456,10 +456,10 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(2._wp*dx(j)))*(1._wp*q_cons_vf(igr_momxb)%sf(j + 1 + q, k, &
+                                    dvel_small(1) = (1/(2._wp*x%spacing(j)))*(1._wp*q_cons_vf(igr_momxb)%sf(j + 1 + q, k, &
                                                & l)/rho_sf_small(1) - 1._wp*q_cons_vf(igr_momxb)%sf(j - 1 + q, k, &
                                                & l)/rho_sf_small(-1))
-                                    dvel_small(2) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1 + q, k, &
+                                    dvel_small(2) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1 + q, k, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j - 1 + q, k, l)/rho_sf_small(-1))
 
                                     if (q == 0) then
@@ -489,9 +489,9 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb)%sf(j + q, k + 1, &
+                                    dvel_small(1) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb)%sf(j + q, k + 1, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j + q, k - 1, l)/rho_sf_small(-1))
-                                    dvel_small(2) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 1)%sf(j + q, k + 1, &
+                                    dvel_small(2) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 1)%sf(j + q, k + 1, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j + q, k - 1, l)/rho_sf_small(-1))
 
                                     if (q == 0) then
@@ -615,59 +615,59 @@ contains
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/x%spacing(j)), kind=stp)
                                 end if
 
                                 E_L = 0._wp; E_R = 0._wp
@@ -688,13 +688,13 @@ contains
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, &
-                                           & l) + real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/dx(j + 1)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dx(j + 1))), kind=stp)
+                                           & l) + real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/x%spacing(j + 1)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/dx(j)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dx(j))), kind=stp)
+                                           & l) - real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/x%spacing(j)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/x%spacing(j))), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -702,67 +702,67 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l) + real((0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/dx(j + 1)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dx(j + 1))), kind=stp)
+                                               & l) + real((0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/x%spacing(j + 1)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
                                                & l) - real((0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l)*vel_L(1)*(1._wp/dx(j + 1))), kind=stp)
+                                               & l)*vel_L(1)*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real((0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/dx(j)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dx(j))), kind=stp)
+                                               & l) - real((0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/x%spacing(j)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/x%spacing(j))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real((0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_L(1)*(1._wp/dx(j))), kind=stp)
+                                               & l)*vel_L(1)*(1._wp/x%spacing(j))), kind=stp)
                                     end do
                                 end if
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/dx(j + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/x%spacing(j + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/x%spacing(j + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/dx(j + 1)) - 0.5_wp*dt*cfl*(E_L) &
-                                       & *(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/x%spacing(j + 1)) &
+                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/dx(j)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/x%spacing(j)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/x%spacing(j)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/dx(j)) - 0.5_wp*dt*cfl*(E_L) &
-                                       & *(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/x%spacing(j)) - 0.5_wp*dt*cfl*(E_L) &
+                                       & *(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, &
-                                           & l) + real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/dx(j + 1)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dx(j + 1))), kind=stp)
+                                           & l) + real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/x%spacing(j + 1)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/dx(j)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dx(j))), kind=stp)
+                                           & l) - real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/x%spacing(j)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/x%spacing(j))), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -770,55 +770,55 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l) + real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/dx(j + 1)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dx(j + 1))), kind=stp)
+                                               & l) + real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/x%spacing(j + 1)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
                                                & l) - real((0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l)*vel_R(1)*(1._wp/dx(j + 1))), kind=stp)
+                                               & l)*vel_R(1)*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/dx(j)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dx(j))), kind=stp)
+                                               & l) - real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/x%spacing(j)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/x%spacing(j))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real((0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_R(1)*(1._wp/dx(j))), kind=stp)
+                                               & l)*vel_R(1)*(1._wp/x%spacing(j))), kind=stp)
                                     end do
                                 end if
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/dx(j + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/x%spacing(j + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/x%spacing(j + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/dx(j + 1)) + 0.5_wp*dt*cfl*(E_R) &
-                                       & *(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/x%spacing(j + 1)) &
+                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/dx(j)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/x%spacing(j)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/x%spacing(j)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/dx(j)) + 0.5_wp*dt*cfl*(E_R) &
-                                       & *(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/x%spacing(j)) + 0.5_wp*dt*cfl*(E_R) &
+                                       & *(1._wp/x%spacing(j))), kind=stp)
                             end do
                         end do
                     end do
@@ -855,11 +855,11 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb)%sf(j + 1 + q, k, &
+                                    dvel_small(1) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb)%sf(j + 1 + q, k, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j - 1 + q, k, l)/rho_sf_small(-1))
-                                    dvel_small(2) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1 + q, k, &
+                                    dvel_small(2) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1 + q, k, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j - 1 + q, k, l)/rho_sf_small(-1))
-                                    dvel_small(3) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb + 2)%sf(j + 1 + q, k, &
+                                    dvel_small(3) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb + 2)%sf(j + 1 + q, k, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j - 1 + q, k, l)/rho_sf_small(-1))
 
                                     if (q == 0) then
@@ -891,12 +891,12 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb)%sf(j + q, k + 1, &
+                                    dvel_small(1) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb)%sf(j + q, k + 1, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j + q, k - 1, l)/rho_sf_small(-1))
-                                    dvel_small(2) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 1)%sf(j + q, k + 1, &
+                                    dvel_small(2) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 1)%sf(j + q, k + 1, &
                                                & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j + q, k - 1, l)/rho_sf_small(-1))
-                                    if (q == 0) dvel_small(3) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 2)%sf(j + q, k + 1, &
-                                        & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j + q, k - 1, l)/rho_sf_small(-1))
+                                    if (q == 0) dvel_small(3) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 2)%sf(j + q, &
+                                        & k + 1, l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j + q, k - 1, l)/rho_sf_small(-1))
                                     if (q == 0) then
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, num_dims
@@ -924,11 +924,11 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb)%sf(j + q, k, &
+                                    dvel_small(1) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb)%sf(j + q, k, &
                                                & l + 1)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j + q, k, l - 1)/rho_sf_small(-1))
-                                    if (q == 0) dvel_small(2) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb + 1)%sf(j + q, k, &
+                                    if (q == 0) dvel_small(2) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb + 1)%sf(j + q, k, &
                                         & l + 1)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j + q, k, l - 1)/rho_sf_small(-1))
-                                    dvel_small(3) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb + 2)%sf(j + q, k, &
+                                    dvel_small(3) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb + 2)%sf(j + q, k, &
                                                & l + 1)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j + q, k, &
                                                & l - 1)/rho_sf_small(-1))
                                     if (q == 0) then
@@ -1054,87 +1054,87 @@ contains
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(2)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(2)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 2)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 2)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(1)*(1._wp/x%spacing(j)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/x%spacing(j + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/x%spacing(j)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/dx(j)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(1)*(1._wp/x%spacing(j)), kind=stp)
                                 end if
 
                                 E_L = 0._wp; E_R = 0._wp
@@ -1156,13 +1156,13 @@ contains
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, &
-                                           & l) + real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/dx(j + 1)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dx(j + 1))), kind=stp)
+                                           & l) + real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/x%spacing(j + 1)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/dx(j)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dx(j))), kind=stp)
+                                           & l) - real((0.5_wp*dt*(alpha_rho_L(i)*vel_L(1))*(1._wp/x%spacing(j)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/x%spacing(j))), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -1170,77 +1170,77 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l) + real((0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/dx(j + 1)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dx(j + 1))), kind=stp)
+                                               & l) + real((0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/x%spacing(j + 1)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
                                                & l) - real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l)*vel_L(1)*(1._wp/dx(j + 1)), kind=stp)
+                                               & l)*vel_L(1)*(1._wp/x%spacing(j + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/dx(j)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dx(j)), kind=stp)
+                                               & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(1))*(1._wp/x%spacing(j)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/x%spacing(j)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_L(1)*(1._wp/dx(j)), kind=stp)
+                                               & l)*vel_L(1)*(1._wp/x%spacing(j)), kind=stp)
                                     end do
                                 end if
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/dx(j + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/x%spacing(j + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/x%spacing(j + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 2)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/dx(j + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/x%spacing(j + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/dx(j + 1)) - 0.5_wp*dt*cfl*(E_L) &
-                                       & *(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/x%spacing(j + 1)) &
+                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/dx(j)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(rho_L*(vel_L(1))**2.0 + pres_L)*(1._wp/x%spacing(j)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dx(j)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/x%spacing(j)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/dx(j)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/x%spacing(j)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/dx(j)) - 0.5_wp*dt*cfl*(E_L) &
-                                       & *(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(vel_L(1)*(E_L + pres_L))*(1._wp/x%spacing(j)) - 0.5_wp*dt*cfl*(E_L) &
+                                       & *(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j + 1, k, l) = rhs_vf(i)%sf(j + 1, k, &
-                                           & l) + real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/dx(j + 1)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dx(j + 1))), kind=stp)
+                                           & l) + real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/x%spacing(j + 1)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/dx(j)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dx(j))), kind=stp)
+                                           & l) - real((0.5_wp*dt*(alpha_rho_R(i)*vel_R(1))*(1._wp/x%spacing(j)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/x%spacing(j))), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -1248,65 +1248,65 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l) + real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/dx(j + 1)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dx(j + 1))), kind=stp)
+                                               & l) + real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/x%spacing(j + 1)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j + 1, k, &
                                                & l) - real((0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j + 1, k, &
-                                               & l)*vel_R(1)*(1._wp/dx(j + 1))), kind=stp)
+                                               & l)*vel_R(1)*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/dx(j)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dx(j))), kind=stp)
+                                               & l) - real((0.5_wp*dt*(alpha_R(i)*vel_R(1))*(1._wp/x%spacing(j)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/x%spacing(j))), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real((0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_R(1)*(1._wp/dx(j))), kind=stp)
+                                               & l)*vel_R(1)*(1._wp/x%spacing(j))), kind=stp)
                                     end do
                                 end if
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/dx(j + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/x%spacing(j + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 1)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/x%spacing(j + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j + 1, k, l) = rhs_vf(igr_momxb + 2)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/dx(j + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/x%spacing(j + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                       & l) + real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/dx(j + 1)) + 0.5_wp*dt*cfl*(E_R) &
-                                       & *(1._wp/dx(j + 1))), kind=stp)
+                                       & l) + real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/x%spacing(j + 1)) &
+                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/x%spacing(j + 1))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/dx(j)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(rho_R*(vel_R(1))**2.0 + pres_R)*(1._wp/x%spacing(j)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/dx(j)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(2)*(1._wp/x%spacing(j)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/dx(j)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/x%spacing(j)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/x%spacing(j))), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/dx(j)) + 0.5_wp*dt*cfl*(E_R) &
-                                       & *(1._wp/dx(j))), kind=stp)
+                                       & l) - real((0.5_wp*dt*(vel_R(1)*(E_R + pres_R))*(1._wp/x%spacing(j)) + 0.5_wp*dt*cfl*(E_R) &
+                                       & *(1._wp/x%spacing(j))), kind=stp)
                             end do
                         end do
                     end do
@@ -1346,9 +1346,9 @@ contains
                                             rho_sf_small(i) = rho_L
                                         end do
 
-                                        dvel_small(1) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb)%sf(j + 1, k + q, &
+                                        dvel_small(1) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb)%sf(j + 1, k + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j - 1, k + q, l)/rho_sf_small(-1))
-                                        dvel_small(2) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1, k + q, &
+                                        dvel_small(2) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1, k + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j - 1, k + q, &
                                                    & l)/rho_sf_small(-1))
 
@@ -1372,9 +1372,9 @@ contains
                                             rho_sf_small(i) = rho_L
                                         end do
 
-                                        dvel_small(1) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb)%sf(j, k + 1 + q, &
+                                        dvel_small(1) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb)%sf(j, k + 1 + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j, k - 1 + q, l)/rho_sf_small(-1))
-                                        dvel_small(2) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + 1 + q, &
+                                        dvel_small(2) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + 1 + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j, k - 1 + q, &
                                                    & l)/rho_sf_small(-1))
 
@@ -1489,59 +1489,59 @@ contains
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/y%spacing(k)), kind=stp)
                                 end if
 
                                 E_L = 0._wp; E_R = 0._wp
@@ -1566,13 +1566,13 @@ contains
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, &
-                                           & l) + real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/dy(k + 1)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) + real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/y%spacing(k + 1)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/dy(k)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dy(k)), kind=stp)
+                                           & l) - real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/y%spacing(k)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/y%spacing(k)), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -1580,66 +1580,66 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l) + real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/dy(k + 1)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dy(k + 1)), kind=stp)
+                                               & l) + real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/y%spacing(k + 1)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
                                                & l) - real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l)*vel_L(2)*(1._wp/dy(k + 1)), kind=stp)
+                                               & l)*vel_L(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/dy(k)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dy(k)), kind=stp)
+                                               & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/y%spacing(k)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/y%spacing(k)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_L(2)*(1._wp/dy(k)), kind=stp)
+                                               & l)*vel_L(2)*(1._wp/y%spacing(k)), kind=stp)
                                     end do
                                 end if
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/dy(k + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/y%spacing(k + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/y%spacing(k + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/dy(k + 1)) &
-                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/y%spacing(k + 1)) &
+                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/dy(k)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/y%spacing(k)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k)) - 0.5_wp*dt*cfl*(rho_L*vel_L(1) &
-                                       & )*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/y%spacing(k)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/dy(k)) - 0.5_wp*dt*cfl*(E_L) &
-                                       & *(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/y%spacing(k)) &
+                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, &
-                                           & l) + real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/dy(k + 1)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) + real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/y%spacing(k + 1)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/dy(k)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dy(k)), kind=stp)
+                                           & l) - real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/y%spacing(k)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/y%spacing(k)), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -1647,49 +1647,49 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l) + real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/dy(k + 1)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dy(k + 1)), kind=stp)
+                                               & l) + real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/y%spacing(k + 1)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
                                                & l) - real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l)*vel_R(2)*(1._wp/dy(k + 1)), kind=stp)
+                                               & l)*vel_R(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/dy(k)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dy(k)), kind=stp)
+                                               & l) - real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/y%spacing(k)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/y%spacing(k)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_R(2)*(1._wp/dy(k)), kind=stp)
+                                               & l)*vel_R(2)*(1._wp/y%spacing(k)), kind=stp)
                                     end do
                                 end if
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/dy(k + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/y%spacing(k + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/y%spacing(k + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/y%spacing(k + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/y%spacing(k + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/dy(k + 1)) &
-                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/y%spacing(k + 1)) &
+                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/y%spacing(k + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/dy(k)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/y%spacing(k)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/y%spacing(k)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k)) + 0.5_wp*dt*cfl*(rho_R*vel_R(1) &
-                                       & )*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/y%spacing(k)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/y%spacing(k)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/dy(k)) + 0.5_wp*dt*cfl*(E_R) &
-                                       & *(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/y%spacing(k)) &
+                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/y%spacing(k)), kind=stp)
                             end do
                         end do
                     end do
@@ -1727,9 +1727,9 @@ contains
                                             rho_sf_small(i) = rho_L
                                         end do
 
-                                        dvel_small(1) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb)%sf(j + 1, k + q, &
+                                        dvel_small(1) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb)%sf(j + 1, k + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j - 1, k + q, l)/rho_sf_small(-1))
-                                        dvel_small(2) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1, k + q, &
+                                        dvel_small(2) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb + 1)%sf(j + 1, k + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j - 1, k + q, &
                                                    & l)/rho_sf_small(-1))
 
@@ -1753,12 +1753,12 @@ contains
                                             rho_sf_small(i) = rho_L
                                         end do
 
-                                        dvel_small(1) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb)%sf(j, k + 1 + q, &
+                                        dvel_small(1) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb)%sf(j, k + 1 + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j, k - 1 + q, l)/rho_sf_small(-1))
-                                        dvel_small(2) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + 1 + q, &
+                                        dvel_small(2) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + 1 + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j, k - 1 + q, &
                                                    & l)/rho_sf_small(-1))
-                                        dvel_small(3) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 2)%sf(j, k + 1 + q, &
+                                        dvel_small(3) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 2)%sf(j, k + 1 + q, &
                                                    & l)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j, k - 1 + q, &
                                                    & l)/rho_sf_small(-1))
 
@@ -1784,10 +1784,10 @@ contains
                                             rho_sf_small(i) = rho_L
                                         end do
 
-                                        dvel_small(2) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + q, &
+                                        dvel_small(2) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + q, &
                                                    & l + 1)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j, k + q, &
                                                    & l - 1)/rho_sf_small(-1))
-                                        dvel_small(3) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb + 2)%sf(j, k + q, &
+                                        dvel_small(3) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb + 2)%sf(j, k + q, &
                                                    & l + 1)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j, k + q, &
                                                    & l - 1)/rho_sf_small(-1))
                                         if (q > vidxb) then
@@ -1901,87 +1901,87 @@ contains
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 2)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(3)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 2)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(3)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(2)*(1._wp/y%spacing(k)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/y%spacing(k + 1)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/y%spacing(k)), kind=stp)
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/dy(k)), kind=stp)
+                                           & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(2)*(1._wp/y%spacing(k)), kind=stp)
                                 end if
 
                                 E_L = 0._wp; E_R = 0._wp
@@ -2006,13 +2006,13 @@ contains
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, &
-                                           & l) + real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/dy(k + 1)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) + real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/y%spacing(k + 1)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/dy(k)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dy(k)), kind=stp)
+                                           & l) - real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(2))*(1._wp/y%spacing(k)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/y%spacing(k)), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -2020,77 +2020,77 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l) + real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/dy(k + 1)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dy(k + 1)), kind=stp)
+                                               & l) + real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/y%spacing(k + 1)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
                                                & l) - real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l)*vel_L(2)*(1._wp/dy(k + 1)), kind=stp)
+                                               & l)*vel_L(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/dy(k)) &
-                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dy(k)), kind=stp)
+                                               & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(2))*(1._wp/y%spacing(k)) &
+                                               & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/y%spacing(k)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_L(2)*(1._wp/dy(k)), kind=stp)
+                                               & l)*vel_L(2)*(1._wp/y%spacing(k)), kind=stp)
                                     end do
                                 end if
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/dy(k + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/y%spacing(k + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/y%spacing(k + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 2)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*rho_L*vel_L(3)*vel_L(2)*(1._wp/dy(k + 1)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*rho_L*vel_L(3)*vel_L(2)*(1._wp/y%spacing(k + 1)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/dy(k + 1)) &
-                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/y%spacing(k + 1)) &
+                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/dy(k)) &
-                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(rho_L*(vel_L(2))**2.0 + pres_L + F_L)*(1._wp/y%spacing(k)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/dy(k)) - 0.5_wp*dt*cfl*(rho_L*vel_L(1) &
-                                       & )*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(2)*(1._wp/y%spacing(k)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*rho_L*vel_L(3)*vel_L(2)*(1._wp/dy(k)) - 0.5_wp*dt*cfl*(rho_L*vel_L(3) &
-                                       & )*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*rho_L*vel_L(3)*vel_L(2)*(1._wp/y%spacing(k)) &
+                                       & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/dy(k)) - 0.5_wp*dt*cfl*(E_L) &
-                                       & *(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(vel_L(2)*(E_L + pres_L + F_L))*(1._wp/y%spacing(k)) &
+                                       & - 0.5_wp*dt*cfl*(E_L)*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k + 1, l) = rhs_vf(i)%sf(j, k + 1, &
-                                           & l) + real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/dy(k + 1)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dy(k + 1)), kind=stp)
+                                           & l) + real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/y%spacing(k + 1)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                           & l) - real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/dy(k)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dy(k)), kind=stp)
+                                           & l) - real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(2))*(1._wp/y%spacing(k)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/y%spacing(k)), kind=stp)
                                 end do
 
                                 if (num_fluids > 1) then
@@ -2098,65 +2098,65 @@ contains
                                     do i = 1, num_fluids - 1
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l) + real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/dy(k + 1)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dy(k + 1)), kind=stp)
+                                               & l) + real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/y%spacing(k + 1)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k + 1, &
                                                & l) - real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k + 1, &
-                                               & l)*vel_R(2)*(1._wp/dy(k + 1)), kind=stp)
+                                               & l)*vel_R(2)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l) - real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/dy(k)) &
-                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dy(k)), kind=stp)
+                                               & l) - real(0.5_wp*dt*(alpha_R(i)*vel_R(2))*(1._wp/y%spacing(k)) &
+                                               & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/y%spacing(k)), kind=stp)
 
                                         $:GPU_ATOMIC(atomic='update')
                                         rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                                & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                               & l)*vel_R(2)*(1._wp/dy(k)), kind=stp)
+                                               & l)*vel_R(2)*(1._wp/y%spacing(k)), kind=stp)
                                     end do
                                 end if
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/dy(k + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/y%spacing(k + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k + 1, l) = rhs_vf(igr_momxb)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/y%spacing(k + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 2)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/dy(k + 1)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/y%spacing(k + 1)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                       & l) + real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/dy(k + 1)) &
-                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/dy(k + 1)), kind=stp)
+                                       & l) + real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/y%spacing(k + 1)) &
+                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/y%spacing(k + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/dy(k)) &
-                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(rho_R*(vel_R(2))**2.0 + pres_R + F_R)*(1._wp/y%spacing(k)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/dy(k)) + 0.5_wp*dt*cfl*(rho_R*vel_R(1) &
-                                       & )*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(1)*(1._wp/y%spacing(k)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/dy(k)) + 0.5_wp*dt*cfl*(rho_R*vel_R(3) &
-                                       & )*(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/y%spacing(k)) &
+                                       & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/y%spacing(k)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/dy(k)) + 0.5_wp*dt*cfl*(E_R) &
-                                       & *(1._wp/dy(k)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(vel_R(2)*(E_R + pres_R + F_R))*(1._wp/y%spacing(k)) &
+                                       & + 0.5_wp*dt*cfl*(E_R)*(1._wp/y%spacing(k)), kind=stp)
                             end do
                         end do
                     end do
@@ -2195,9 +2195,9 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb)%sf(j + 1, k, &
+                                    dvel_small(1) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb)%sf(j + 1, k, &
                                                & l + q)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j - 1, k, l + q)/rho_sf_small(-1))
-                                    dvel_small(3) = (1/(2._wp*dx(j)))*(q_cons_vf(igr_momxb + 2)%sf(j + 1, k, &
+                                    dvel_small(3) = (1/(2._wp*x%spacing(j)))*(q_cons_vf(igr_momxb + 2)%sf(j + 1, k, &
                                                & l + q)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j - 1, k, &
                                                & l + q)/rho_sf_small(-1))
 
@@ -2221,10 +2221,10 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(2) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + 1, &
+                                    dvel_small(2) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 1)%sf(j, k + 1, &
                                                & l + q)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j, k - 1, &
                                                & l + q)/rho_sf_small(-1))
-                                    dvel_small(3) = (1/(2._wp*dy(k)))*(q_cons_vf(igr_momxb + 2)%sf(j, k + 1, &
+                                    dvel_small(3) = (1/(2._wp*y%spacing(k)))*(q_cons_vf(igr_momxb + 2)%sf(j, k + 1, &
                                                & l + q)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j, k - 1, &
                                                & l + q)/rho_sf_small(-1))
 
@@ -2247,13 +2247,13 @@ contains
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
-                                    dvel_small(1) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb)%sf(j, k, &
+                                    dvel_small(1) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb)%sf(j, k, &
                                                & l + 1 + q)/rho_sf_small(1) - q_cons_vf(igr_momxb)%sf(j, k, &
                                                & l - 1 + q)/rho_sf_small(-1))
-                                    dvel_small(2) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb + 1)%sf(j, k, &
+                                    dvel_small(2) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb + 1)%sf(j, k, &
                                                & l + 1 + q)/rho_sf_small(1) - q_cons_vf(igr_momxb + 1)%sf(j, k, &
                                                & l - 1 + q)/rho_sf_small(-1))
-                                    dvel_small(3) = (1/(2._wp*dz(l)))*(q_cons_vf(igr_momxb + 2)%sf(j, k, &
+                                    dvel_small(3) = (1/(2._wp*z%spacing(l)))*(q_cons_vf(igr_momxb + 2)%sf(j, k, &
                                                & l + 1 + q)/rho_sf_small(1) - q_cons_vf(igr_momxb + 2)%sf(j, k, &
                                                & l - 1 + q)/rho_sf_small(-1))
                                     if (q > vidxb) then
@@ -2370,87 +2370,87 @@ contains
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l + 1) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/z%spacing(l + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*(1._wp/z%spacing(l)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(1)*vel_L(1)*(1._wp/z%spacing(l)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l + 1) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/z%spacing(l + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*(1._wp/z%spacing(l)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(1)*vel_R(1)*(1._wp/z%spacing(l)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/z%spacing(l + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*(1._wp/z%spacing(l)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(2)*vel_L(2)*(1._wp/z%spacing(l)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/z%spacing(l + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*(1._wp/z%spacing(l)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(2)*vel_R(2)*(1._wp/z%spacing(l)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/z%spacing(l + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*(1._wp/z%spacing(l)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_L*vflux_L_arr(3)*vel_L(3)*(1._wp/z%spacing(l)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/z%spacing(l + 1)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) - real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*(1._wp/z%spacing(l)), kind=stp)
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/dz(l)), kind=stp)
+                                       & l) + real(0.5_wp*dt*mu_R*vflux_R_arr(3)*vel_R(3)*(1._wp/z%spacing(l)), kind=stp)
                             end if
 
                             E_L = 0._wp; E_R = 0._wp
@@ -2475,13 +2475,13 @@ contains
                             do i = 1, num_fluids
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l + 1) = rhs_vf(i)%sf(j, k, &
-                                       & l + 1) + real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(3))*(1._wp/dz(l + 1)) &
-                                       & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) + real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(3))*(1._wp/z%spacing(l + 1)) &
+                                       & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(3))*(1._wp/dz(l)) &
-                                       & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/dz(l)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(alpha_rho_L(i)*vel_L(3))*(1._wp/z%spacing(l)) &
+                                       & - 0.5_wp*dt*cfl*(alpha_rho_L(i))*(1._wp/z%spacing(l)), kind=stp)
                             end do
 
                             if (num_fluids > 1) then
@@ -2489,77 +2489,77 @@ contains
                                 do i = 1, num_fluids - 1
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l + 1) + real(0.5_wp*dt*(alpha_L(i)*vel_L(3))*(1._wp/dz(l + 1)) &
-                                           & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/dz(l + 1)), kind=stp)
+                                           & l + 1) + real(0.5_wp*dt*(alpha_L(i)*vel_L(3))*(1._wp/z%spacing(l + 1)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                            & l + 1) - real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l + 1)*vel_L(3)*(1._wp/dz(l + 1)), kind=stp)
+                                           & l + 1)*vel_L(3)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(3))*(1._wp/dz(l)) - 0.5_wp*dt*cfl*(alpha_L(i)) &
-                                           & *(1._wp/dz(l)), kind=stp)
+                                           & l) - real(0.5_wp*dt*(alpha_L(i)*vel_L(3))*(1._wp/z%spacing(l)) &
+                                           & - 0.5_wp*dt*cfl*(alpha_L(i))*(1._wp/z%spacing(l)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, l)*vel_L(3)*(1._wp/dz(l)), &
-                                           & kind=stp)
+                                           & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
+                                           & l)*vel_L(3)*(1._wp/z%spacing(l)), kind=stp)
                                 end do
                             end if
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 2)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*(rho_L*(vel_L(3))**2.0 + pres_L + F_L)*(1._wp/dz(l + 1)) &
-                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*(rho_L*(vel_L(3))**2.0 + pres_L + F_L)*(1._wp/z%spacing(l + 1)) &
+                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb)%sf(j, k, l + 1) = rhs_vf(igr_momxb)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/dz(l + 1)) &
-                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/z%spacing(l + 1)) &
+                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 1)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*rho_L*vel_L(2)*vel_L(3)*(1._wp/dz(l + 1)) &
-                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*rho_L*vel_L(2)*vel_L(3)*(1._wp/z%spacing(l + 1)) &
+                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*(vel_L(3)*(E_L + pres_L + F_L))*(1._wp/dz(l + 1)) &
-                                   & - 0.5_wp*dt*cfl*(E_L)*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*(vel_L(3)*(E_L + pres_L + F_L))*(1._wp/z%spacing(l + 1)) &
+                                   & - 0.5_wp*dt*cfl*(E_L)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*(rho_L*(vel_L(3))**2.0 + pres_L + F_L)*(1._wp/dz(l)) &
-                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*(rho_L*(vel_L(3))**2.0 + pres_L + F_L)*(1._wp/z%spacing(l)) &
+                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(3))*(1._wp/z%spacing(l)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/dz(l)) - 0.5_wp*dt*cfl*(rho_L*vel_L(1)) &
-                                   & *(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*rho_L*vel_L(1)*vel_L(3)*(1._wp/z%spacing(l)) &
+                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(1))*(1._wp/z%spacing(l)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*rho_L*vel_L(2)*vel_L(3)*(1._wp/dz(l)) - 0.5_wp*dt*cfl*(rho_L*vel_L(2)) &
-                                   & *(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*rho_L*vel_L(2)*vel_L(3)*(1._wp/z%spacing(l)) &
+                                   & - 0.5_wp*dt*cfl*(rho_L*vel_L(2))*(1._wp/z%spacing(l)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*(vel_L(3)*(E_L + pres_L + F_L))*(1._wp/dz(l)) - 0.5_wp*dt*cfl*(E_L) &
-                                   & *(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*(vel_L(3)*(E_L + pres_L + F_L))*(1._wp/z%spacing(l)) &
+                                   & - 0.5_wp*dt*cfl*(E_L)*(1._wp/z%spacing(l)), kind=stp)
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l + 1) = rhs_vf(i)%sf(j, k, &
-                                       & l + 1) + real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(3))*(1._wp/dz(l + 1)) &
-                                       & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dz(l + 1)), kind=stp)
+                                       & l + 1) + real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(3))*(1._wp/z%spacing(l + 1)) &
+                                       & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                 $:GPU_ATOMIC(atomic='update')
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                       & l) - real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(3))*(1._wp/dz(l)) &
-                                       & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/dz(l)), kind=stp)
+                                       & l) - real(0.5_wp*dt*(alpha_rho_R(i)*vel_R(3))*(1._wp/z%spacing(l)) &
+                                       & + 0.5_wp*dt*cfl*(alpha_rho_R(i))*(1._wp/z%spacing(l)), kind=stp)
                             end do
 
                             if (num_fluids > 1) then
@@ -2567,65 +2567,65 @@ contains
                                 do i = 1, num_fluids - 1
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l + 1) + real(0.5_wp*dt*(alpha_R(i)*vel_R(3))*(1._wp/dz(l + 1)) &
-                                           & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/dz(l + 1)), kind=stp)
+                                           & l + 1) + real(0.5_wp*dt*(alpha_R(i)*vel_R(3))*(1._wp/z%spacing(l + 1)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l + 1) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
                                            & l + 1) - real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l + 1)*vel_R(3)*(1._wp/dz(l + 1)), kind=stp)
+                                           & l + 1)*vel_R(3)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l) - real(0.5_wp*dt*(alpha_R(i)*vel_R(3))*(1._wp/dz(l)) + 0.5_wp*dt*cfl*(alpha_R(i)) &
-                                           & *(1._wp/dz(l)), kind=stp)
+                                           & l) - real(0.5_wp*dt*(alpha_R(i)*vel_R(3))*(1._wp/z%spacing(l)) &
+                                           & + 0.5_wp*dt*cfl*(alpha_R(i))*(1._wp/z%spacing(l)), kind=stp)
 
                                     $:GPU_ATOMIC(atomic='update')
                                     rhs_vf(igr_advxb + i - 1)%sf(j, k, l) = rhs_vf(igr_advxb + i - 1)%sf(j, k, &
-                                           & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, l)*vel_R(3)*(1._wp/dz(l)), &
-                                           & kind=stp)
+                                           & l) + real(0.5_wp*dt*q_cons_vf(igr_advxb + i - 1)%sf(j, k, &
+                                           & l)*vel_R(3)*(1._wp/z%spacing(l)), kind=stp)
                                 end do
                             end if
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 2)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*(rho_R*(vel_R(3))**2.0 + pres_R + F_R)*(1._wp/dz(l + 1)) &
-                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*(rho_R*(vel_R(3))**2.0 + pres_R + F_R)*(1._wp/z%spacing(l + 1)) &
+                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb)%sf(j, k, l + 1) = rhs_vf(igr_momxb)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/dz(l + 1)) &
-                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/z%spacing(l + 1)) &
+                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 1)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/dz(l + 1)) &
-                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/z%spacing(l + 1)) &
+                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*dt*(vel_R(3)*(E_R + pres_R + F_R))*(1._wp/dz(l + 1)) &
-                                   & + 0.5_wp*dt*cfl*(E_R)*(1._wp/dz(l + 1)), kind=stp)
+                                   & l + 1) + real(0.5_wp*dt*(vel_R(3)*(E_R + pres_R + F_R))*(1._wp/z%spacing(l + 1)) &
+                                   & + 0.5_wp*dt*cfl*(E_R)*(1._wp/z%spacing(l + 1)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*(rho_R*(vel_R(3))**2.0 + pres_R + F_R)*(1._wp/dz(l)) &
-                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*(rho_R*(vel_R(3))**2.0 + pres_R + F_R)*(1._wp/z%spacing(l)) &
+                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(3))*(1._wp/z%spacing(l)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/dz(l)) + 0.5_wp*dt*cfl*(rho_R*vel_R(1)) &
-                                   & *(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*rho_R*vel_R(1)*vel_R(3)*(1._wp/z%spacing(l)) &
+                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(1))*(1._wp/z%spacing(l)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/dz(l)) + 0.5_wp*dt*cfl*(rho_R*vel_R(2)) &
-                                   & *(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*rho_R*vel_R(2)*vel_R(3)*(1._wp/z%spacing(l)) &
+                                   & + 0.5_wp*dt*cfl*(rho_R*vel_R(2))*(1._wp/z%spacing(l)), kind=stp)
 
                             $:GPU_ATOMIC(atomic='update')
                             rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l) - real(0.5_wp*dt*(vel_R(3)*(E_R + pres_R + F_R))*(1._wp/dz(l)) + 0.5_wp*dt*cfl*(E_R) &
-                                   & *(1._wp/dz(l)), kind=stp)
+                                   & l) - real(0.5_wp*dt*(vel_R(3)*(E_R + pres_R + F_R))*(1._wp/z%spacing(l)) &
+                                   & + 0.5_wp*dt*cfl*(E_R)*(1._wp/z%spacing(l)), kind=stp)
                         end do
                     end do
                 end do
@@ -2691,7 +2691,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = 1._wp/dx(j)*(flux_vf(i)%sf(j - 1, k, l) - flux_vf(i)%sf(j, k, l))
+                            rhs_vf(i)%sf(j, k, l) = 1._wp/x%spacing(j)*(flux_vf(i)%sf(j - 1, k, l) - flux_vf(i)%sf(j, k, l))
                         end do
                     end do
                 end do
@@ -2703,7 +2703,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_vf(i)%sf(j, k - 1, &
+                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/y%spacing(k)*(flux_vf(i)%sf(j, k - 1, &
                                    & l) - flux_vf(i)%sf(j, k, l))
                         end do
                     end do
@@ -2716,7 +2716,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)*(flux_vf(i)%sf(j, k, &
+                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/z%spacing(l)*(flux_vf(i)%sf(j, k, &
                                    & l - 1) - flux_vf(i)%sf(j, k, l))
                         end do
                     end do

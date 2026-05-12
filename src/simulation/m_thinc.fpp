@@ -242,18 +242,18 @@ contains
 
                     if (ac >= ic_eps .and. ac <= 1._wp - ic_eps) then
                         nr_x = (v_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - v_vf(eqn_idx%adv%beg)%sf(j - 1, k, &
-                                & l))*(x_cb(j) - x_cb(j - 1))/(x_cc(j + 1) - x_cc(j - 1))
+                                & l))*(x%cb(j) - x%cb(j - 1))/(x%cc(j + 1) - x%cc(j - 1))
 
                         nr_y = 0._wp
                         if (n > 0) then
                             nr_y = (v_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - v_vf(eqn_idx%adv%beg)%sf(j, k - 1, &
-                                    & l))*(y_cb(k) - y_cb(k - 1))/(y_cc(k + 1) - y_cc(k - 1))
+                                    & l))*(y%cb(k) - y%cb(k - 1))/(y%cc(k + 1) - y%cc(k - 1))
                         end if
 
                         nr_z = 0._wp
                         if (p > 0) then
                             nr_z = (v_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - v_vf(eqn_idx%adv%beg)%sf(j, k, &
-                                    & l - 1))*(z_cb(l) - z_cb(l - 1))/(z_cc(l + 1) - z_cc(l - 1))
+                                    & l - 1))*(z%cb(l) - z%cb(l - 1))/(z%cc(l + 1) - z%cc(l - 1))
                         end if
 
                         nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
@@ -305,7 +305,7 @@ contains
         real(wp)                          :: nh1, nh2, nh3, d_local, rho1, rho2
         real(wp)                          :: rho_b, rho_e
 
-        #:for REC_DIR, XYZ, CC_PRI in [(1, 'x', 'x_cc'), (2, 'y', 'y_cc'), (3, 'z', 'z_cc')]
+        #:for REC_DIR, XYZ, CC_PRI in [(1, 'x', 'x%cc'), (2, 'y', 'y%cc'), (3, 'z', 'z%cc')]
             if (recon_dir == ${REC_DIR}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, ix, iy, iz, aCL, aC, aCR, aTHINC, moncon, sgn, qmin, qmax, A, &
                                     & B, C, beta_eff, nh1, nh2, nh3, d_local, rho1, rho2, rho_b, rho_e]')

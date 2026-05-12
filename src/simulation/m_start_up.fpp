@@ -203,19 +203,19 @@ contains
 
         if (file_exist) then
             open (2, FILE=trim(file_path), form='unformatted', ACTION='read', STATUS='old')
-            read (2) x_cb(-1:m); close (2)
+            read (2) x%cb(-1:m); close (2)
         else
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
 
-        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
+        x%spacing(0:m) = x%cb(0:m) - x%cb(-1:m - 1)
+        x%cc(0:m) = x%cb(-1:m - 1) + x%spacing(0:m)/2._wp
 
         if (ib) then
             do i = 1, num_ibs
                 if (patch_ib(i)%c > 0) then
-                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/x%spacing(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c) &
+                             & /x%spacing(0))*20) + 1
                 end if
             end do
         end if
@@ -227,13 +227,13 @@ contains
 
             if (file_exist) then
                 open (2, FILE=trim(file_path), form='unformatted', ACTION='read', STATUS='old')
-                read (2) y_cb(-1:n); close (2)
+                read (2) y%cb(-1:n); close (2)
             else
                 call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
             end if
 
-            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
+            y%spacing(0:n) = y%cb(0:n) - y%cb(-1:n - 1)
+            y%cc(0:n) = y%cb(-1:n - 1) + y%spacing(0:n)/2._wp
         end if
 
         if (p > 0) then
@@ -243,13 +243,13 @@ contains
 
             if (file_exist) then
                 open (2, FILE=trim(file_path), form='unformatted', ACTION='read', STATUS='old')
-                read (2) z_cb(-1:p); close (2)
+                read (2) z%cb(-1:p); close (2)
             else
                 call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
             end if
 
-            dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-            z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
+            z%spacing(0:p) = z%cb(0:p) - z%cb(-1:p - 1)
+            z%cc(0:p) = z%cb(-1:p - 1) + z%spacing(0:p)/2._wp
         end if
 
         do i = 1, sys_size
@@ -344,15 +344,15 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
-        x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
+        x%cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
+        x%spacing(0:m) = x%cb(0:m) - x%cb(-1:m - 1)
+        x%cc(0:m) = x%cb(-1:m - 1) + x%spacing(0:m)/2._wp
 
         if (ib) then
             do i = 1, num_ibs
                 if (patch_ib(i)%c > 0) then
-                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
+                    Np = int((patch_ib(i)%p*patch_ib(i)%c/x%spacing(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c) &
+                             & /x%spacing(0))*20) + 1
                     allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
                 end if
             end do
@@ -371,9 +371,9 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
-            y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
+            y%cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
+            y%spacing(0:n) = y%cb(0:n) - y%cb(-1:n - 1)
+            y%cc(0:n) = y%cb(-1:n - 1) + y%spacing(0:n)/2._wp
 
             if (p > 0) then
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
@@ -388,9 +388,9 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // 'is missing. Exiting.')
                 end if
 
-                z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
+                z%cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
+                z%spacing(0:p) = z%cb(0:p) - z%cb(-1:p - 1)
+                z%cc(0:p) = z%cb(-1:p - 1) + z%spacing(0:p)/2._wp
             end if
         end if
 
@@ -1068,7 +1068,7 @@ contains
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
-        $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
+        $:GPU_UPDATE(device='[x%spacing, y%spacing, z%spacing, x%cb, x%cc, y%cb, y%cc, z%cb, z%cc]')
         $:GPU_UPDATE(device='[bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]')
         $:GPU_UPDATE(device='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')

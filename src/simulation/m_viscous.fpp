@@ -43,7 +43,7 @@ contains
 
     end subroutine s_initialize_viscous_module
 
-    !> Compute viscous stress tensor near cylindrical axis, avoiding 1/r singularity at y_cb(-1)=0
+    !> Compute viscous stress tensor near cylindrical axis, avoiding 1/r singularity at y%cb(-1)=0
     subroutine s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, tau_Re_vf, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -166,7 +166,7 @@ contains
                             tau_Re(2, 1) = (grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l))/Re_visc(1)
 
                             tau_Re(2, 2) = (4._wp*grad_y_vf(2)%sf(j, k, l) - 2._wp*grad_x_vf(1)%sf(j, k, &
-                                   & l) - 2._wp*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y_cc(k))/(3._wp*Re_visc(1))
+                                   & l) - 2._wp*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y%cc(k))/(3._wp*Re_visc(1))
                             ! Viscous flux contribution to momentum and energy equations
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, 2
@@ -266,7 +266,7 @@ contains
                             end if
 
                             tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, &
-                                   & l) + q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y_cc(k))/Re_visc(2)
+                                   & l) + q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y%cc(k))/Re_visc(2)
 
                             tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - tau_Re(2, 2)
 
@@ -362,10 +362,10 @@ contains
                                 end if
                             end if
 
-                            tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(1)
+                            tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y%cc(k)/Re_visc(1)
 
                             tau_Re(2, 3) = ((grad_z_vf(2)%sf(j, k, l) - q_prim_vf(eqn_idx%mom%end)%sf(j, k, &
-                                   & l))/y_cc(k) + grad_y_vf(3)%sf(j, k, l))/Re_visc(1)
+                                   & l))/y%cc(k) + grad_y_vf(3)%sf(j, k, l))/Re_visc(1)
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 2, 3
@@ -462,7 +462,7 @@ contains
                                 end if
                             end if
 
-                            tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(2)
+                            tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y%cc(k)/Re_visc(2)
 
                             tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - tau_Re(2, 2)
 
@@ -510,15 +510,15 @@ contains
             do i = 1, num_dims
                 if (i == 1) then
                     call s_apply_scalar_divergence_theorem(qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
-                                                           & dq_prim_dx_qp(1)%vf(iv%beg:iv%end), i, ix, iy, iz, iv, dx, m, &
+                                                           & dq_prim_dx_qp(1)%vf(iv%beg:iv%end), i, ix, iy, iz, iv, x%spacing, m, &
                                                            & buff_size)
                 else if (i == 2) then
                     call s_apply_scalar_divergence_theorem(qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
-                                                           & dq_prim_dy_qp(1)%vf(iv%beg:iv%end), i, ix, iy, iz, iv, dy, n, &
+                                                           & dq_prim_dy_qp(1)%vf(iv%beg:iv%end), i, ix, iy, iz, iv, y%spacing, n, &
                                                            & buff_size)
                 else
                     call s_apply_scalar_divergence_theorem(qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
-                                                           & dq_prim_dz_qp(1)%vf(iv%beg:iv%end), i, ix, iy, iz, iv, dz, p, &
+                                                           & dq_prim_dz_qp(1)%vf(iv%beg:iv%end), i, ix, iy, iz, iv, z%spacing, p, &
                                                            & buff_size)
                 end if
             end do
@@ -537,7 +537,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
                             dqL_prim_dx_n(1)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j, k, l) - q_prim_qp%vf(i)%sf(j - 1, k, &
-                                          & l))/(x_cc(j) - x_cc(j - 1))
+                                          & l))/(x%cc(j) - x%cc(j - 1))
                         end do
                     end do
                 end do
@@ -551,7 +551,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
                             dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) = (q_prim_qp%vf(i)%sf(j + 1, k, l) - q_prim_qp%vf(i)%sf(j, k, &
-                                          & l))/(x_cc(j + 1) - x_cc(j))
+                                          & l))/(x%cc(j + 1) - x%cc(j))
                         end do
                     end do
                 end do
@@ -567,7 +567,7 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = iv%beg, iv%end
                                     dqL_prim_dy_n(2)%vf(i)%sf(k, j, l) = (q_prim_qp%vf(i)%sf(k, j, l) - q_prim_qp%vf(i)%sf(k, &
-                                                  & j - 1, l))/(y_cc(j) - y_cc(j - 1))
+                                                  & j - 1, l))/(y%cc(j) - y%cc(j - 1))
                                 end do
                             end do
                         end do
@@ -581,7 +581,7 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = iv%beg, iv%end
                                     dqR_prim_dy_n(2)%vf(i)%sf(k, j, l) = (q_prim_qp%vf(i)%sf(k, j + 1, l) - q_prim_qp%vf(i)%sf(k, &
-                                                  & j, l))/(y_cc(j + 1) - y_cc(j))
+                                                  & j, l))/(y%cc(j + 1) - y%cc(j))
                                 end do
                             end do
                         end do
@@ -666,7 +666,7 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = iv%beg, iv%end
                                         dqL_prim_dz_n(3)%vf(i)%sf(k, l, j) = (q_prim_qp%vf(i)%sf(k, l, j) - q_prim_qp%vf(i)%sf(k, &
-                                                      & l, j - 1))/(z_cc(j) - z_cc(j - 1))
+                                                      & l, j - 1))/(z%cc(j) - z%cc(j - 1))
                                     end do
                                 end do
                             end do
@@ -680,7 +680,7 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = iv%beg, iv%end
                                         dqR_prim_dz_n(3)%vf(i)%sf(k, l, j) = (q_prim_qp%vf(i)%sf(k, l, &
-                                                      & j + 1) - q_prim_qp%vf(i)%sf(k, l, j))/(z_cc(j + 1) - z_cc(j))
+                                                      & j + 1) - q_prim_qp%vf(i)%sf(k, l, j))/(z%cc(j + 1) - z%cc(j))
                                     end do
                                 end do
                             end do
@@ -1158,7 +1158,7 @@ contains
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
-                    grad_x%sf(j, k, l) = (var%sf(j + 1, k, l) - var%sf(j - 1, k, l))/(x_cc(j + 1) - x_cc(j - 1))
+                    grad_x%sf(j, k, l) = (var%sf(j + 1, k, l) - var%sf(j - 1, k, l))/(x%cc(j + 1) - x%cc(j - 1))
                 end do
             end do
         end do
@@ -1169,7 +1169,7 @@ contains
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
-                        grad_y%sf(j, k, l) = (var%sf(j, k + 1, l) - var%sf(j, k - 1, l))/(y_cc(k + 1) - y_cc(k - 1))
+                        grad_y%sf(j, k, l) = (var%sf(j, k + 1, l) - var%sf(j, k - 1, l))/(y%cc(k + 1) - y%cc(k - 1))
                     end do
                 end do
             end do
@@ -1181,7 +1181,7 @@ contains
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
-                        grad_z%sf(j, k, l) = (var%sf(j, k, l + 1) - var%sf(j, k, l - 1))/(z_cc(l + 1) - z_cc(l - 1))
+                        grad_z%sf(j, k, l) = (var%sf(j, k, l + 1) - var%sf(j, k, l - 1))/(z%cc(l + 1) - z%cc(l - 1))
                     end do
                 end do
             end do
@@ -1192,9 +1192,9 @@ contains
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 grad_x%sf(idwbuff(1)%beg, k, l) = (-3._wp*var%sf(idwbuff(1)%beg, k, l) + 4._wp*var%sf(idwbuff(1)%beg + 1, k, &
-                          & l) - var%sf(idwbuff(1)%beg + 2, k, l))/(x_cc(idwbuff(1)%beg + 2) - x_cc(idwbuff(1)%beg))
+                          & l) - var%sf(idwbuff(1)%beg + 2, k, l))/(x%cc(idwbuff(1)%beg + 2) - x%cc(idwbuff(1)%beg))
                 grad_x%sf(idwbuff(1)%end, k, l) = (+3._wp*var%sf(idwbuff(1)%end, k, l) - 4._wp*var%sf(idwbuff(1)%end - 1, k, &
-                          & l) + var%sf(idwbuff(1)%end - 2, k, l))/(x_cc(idwbuff(1)%end) - x_cc(idwbuff(1)%end - 2))
+                          & l) + var%sf(idwbuff(1)%end - 2, k, l))/(x%cc(idwbuff(1)%end) - x%cc(idwbuff(1)%end - 2))
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -1203,9 +1203,9 @@ contains
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     grad_y%sf(j, idwbuff(2)%beg, l) = (-3._wp*var%sf(j, idwbuff(2)%beg, l) + 4._wp*var%sf(j, idwbuff(2)%beg + 1, &
-                              & l) - var%sf(j, idwbuff(2)%beg + 2, l))/(y_cc(idwbuff(2)%beg + 2) - y_cc(idwbuff(2)%beg))
+                              & l) - var%sf(j, idwbuff(2)%beg + 2, l))/(y%cc(idwbuff(2)%beg + 2) - y%cc(idwbuff(2)%beg))
                     grad_y%sf(j, idwbuff(2)%end, l) = (+3._wp*var%sf(j, idwbuff(2)%end, l) - 4._wp*var%sf(j, idwbuff(2)%end - 1, &
-                              & l) + var%sf(j, idwbuff(2)%end - 2, l))/(y_cc(idwbuff(2)%end) - y_cc(idwbuff(2)%end - 2))
+                              & l) + var%sf(j, idwbuff(2)%end - 2, l))/(y%cc(idwbuff(2)%end) - y%cc(idwbuff(2)%end - 2))
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -1215,10 +1215,10 @@ contains
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = (-3._wp*var%sf(j, k, idwbuff(3)%beg) + 4._wp*var%sf(j, k, &
                                   & idwbuff(3)%beg + 1) - var%sf(j, k, &
-                                  & idwbuff(3)%beg + 2))/(z_cc(idwbuff(3)%beg + 2) - z_cc(is3_viscous%beg))
+                                  & idwbuff(3)%beg + 2))/(z%cc(idwbuff(3)%beg + 2) - z%cc(is3_viscous%beg))
                         grad_z%sf(j, k, idwbuff(3)%end) = (+3._wp*var%sf(j, k, idwbuff(3)%end) - 4._wp*var%sf(j, k, &
                                   & idwbuff(3)%end - 1) + var%sf(j, k, &
-                                  & idwbuff(3)%end - 2))/(z_cc(idwbuff(3)%end) - z_cc(idwbuff(3)%end - 2))
+                                  & idwbuff(3)%end - 2))/(z%cc(idwbuff(3)%end) - z%cc(idwbuff(3)%end - 2))
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
@@ -1229,7 +1229,7 @@ contains
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
-                    grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/(x_cc(2) - x_cc(0))
+                    grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/(x%cc(2) - x%cc(0))
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -1239,7 +1239,7 @@ contains
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(m, k, l) = (3._wp*var%sf(m, k, l) - 4._wp*var%sf(m - 1, k, l) + var%sf(m - 2, k, &
-                              & l))/(x_cc(m) - x_cc(m - 2))
+                              & l))/(x%cc(m) - x%cc(m - 2))
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -1249,7 +1249,7 @@ contains
                 $:GPU_PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/(y_cc(2) - y_cc(0))
+                        grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/(y%cc(2) - y%cc(0))
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
@@ -1259,7 +1259,7 @@ contains
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, n, l) = (3._wp*var%sf(j, n, l) - 4._wp*var%sf(j, n - 1, l) + var%sf(j, n - 2, &
-                                  & l))/(y_cc(n) - y_cc(n - 2))
+                                  & l))/(y%cc(n) - y%cc(n - 2))
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
@@ -1270,7 +1270,7 @@ contains
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, 0) = (-3._wp*var%sf(j, k, 0) + 4._wp*var%sf(j, k, 1) - var%sf(j, k, &
-                                      & 2))/(z_cc(2) - z_cc(0))
+                                      & 2))/(z%cc(2) - z%cc(0))
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
@@ -1280,7 +1280,7 @@ contains
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, p) = (3._wp*var%sf(j, k, p) - 4._wp*var%sf(j, k, p - 1) + var%sf(j, k, &
-                                      & p - 2))/(z_cc(p) - z_cc(p - 2))
+                                      & p - 2))/(z%cc(p) - z%cc(p - 2))
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
@@ -1300,31 +1300,31 @@ contains
         real(wp), intent(in)                                  :: dynamic_viscosity
         integer, intent(in)                                   :: i, j, k
         real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
-        real(wp), dimension(1:3)                              :: dx
+        real(wp), dimension(1:3)                              :: ds
         real(wp)                                              :: divergence
         integer                                               :: l, q  !< iterators
 
         ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
         viscous_stress_tensor = 0._wp
         velocity_gradient_tensor = 0._wp
-        dx = 0._wp
+        ds = 0._wp
 
         ! get the change in x used in the finite difference equation
-        dx(1) = 0.5_wp*(x_cc(i + 1) - x_cc(i - 1))
-        dx(2) = 0.5_wp*(y_cc(j + 1) - y_cc(j - 1))
+        ds(1) = 0.5_wp*(x%cc(i + 1) - x%cc(i - 1))
+        ds(2) = 0.5_wp*(y%cc(j + 1) - y%cc(j - 1))
         if (num_dims == 3) then
-            dx(3) = 0.5_wp*(z_cc(k + 1) - z_cc(k - 1))
+            ds(3) = 0.5_wp*(z%cc(k + 1) - z%cc(k - 1))
         end if
 
         ! compute the velocity gradient tensor
         do l = 1, num_dims
             velocity_gradient_tensor(l, 1) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + 1, j, &
-                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i - 1, j, k))/(2._wp*dx(1))
+                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i - 1, j, k))/(2._wp*ds(1))
             velocity_gradient_tensor(l, 2) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + 1, &
-                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j - 1, k))/(2._wp*dx(2))
+                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j - 1, k))/(2._wp*ds(2))
             if (num_dims == 3) then
                 velocity_gradient_tensor(l, 3) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
-                                         & k + 1) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k - 1))/(2._wp*dx(3))
+                                         & k + 1) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k - 1))/(2._wp*ds(3))
             end if
         end do
 

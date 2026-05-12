@@ -94,19 +94,19 @@ contains
 
         file_loc = trim(t_step_dir) // '/x_cb.dat'
         open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
-        write (1) x_cb(-1:m)
+        write (1) x%cb(-1:m)
         close (1)
 
         if (n > 0) then
             file_loc = trim(t_step_dir) // '/y_cb.dat'
             open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
-            write (1) y_cb(-1:n)
+            write (1) y%cb(-1:n)
             close (1)
 
             if (p > 0) then
                 file_loc = trim(t_step_dir) // '/z_cb.dat'
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
-                write (1) z_cb(-1:p)
+                write (1) z%cb(-1:p)
                 close (1)
             end if
         end if
@@ -179,15 +179,15 @@ contains
                         lit_gamma = 1._wp/gamma + 1._wp
 
                         if ((i >= eqn_idx%species%beg) .and. (i <= eqn_idx%species%end)) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
+                            write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
                         else if (((i >= eqn_idx%cont%beg) .and. (i <= eqn_idx%cont%end)) .or. ((i >= eqn_idx%adv%beg) &
                                  & .and. (i <= eqn_idx%adv%end)) .or. ((i >= eqn_idx%species%beg) .and. (i <= eqn_idx%species%end) &
                                  & )) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == eqn_idx%mom%beg) then  ! u
-                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)/rho
+                            write (2, FMT) x%cb(j), q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)/rho
                         else if (i == eqn_idx%stress%beg) then  ! tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%stress%beg)%sf(j, 0, 0)/rho
+                            write (2, FMT) x%cb(j), q_cons_vf(eqn_idx%stress%beg)%sf(j, 0, 0)/rho
                         else if (i == eqn_idx%E) then  ! p
                             if (mhd) then
                                 pres_mag = 0.5_wp*(Bx0**2 + q_cons_vf(eqn_idx%B%beg)%sf(j, 0, &
@@ -197,16 +197,16 @@ contains
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
                                                     & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, &
                                                     & rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
-                            write (2, FMT) x_cb(j), pres
+                            write (2, FMT) x%cb(j), pres
                         else if (mhd) then
                             if (i == eqn_idx%mom%beg + 1) then  ! v
-                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, 0, 0)/rho
+                                write (2, FMT) x%cb(j), q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, 0, 0)/rho
                             else if (i == eqn_idx%mom%beg + 2) then  ! w
-                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, 0, 0)/rho
+                                write (2, FMT) x%cb(j), q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, 0, 0)/rho
                             else if (i == eqn_idx%B%beg) then  ! By
-                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg)%sf(j, 0, 0)/rho
+                                write (2, FMT) x%cb(j), q_cons_vf(eqn_idx%B%beg)%sf(j, 0, 0)/rho
                             else if (i == eqn_idx%B%beg + 1) then  ! Bz
-                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)/rho
+                                write (2, FMT) x%cb(j), q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)/rho
                             end if
                         else if ((i >= eqn_idx%bub%beg) .and. (i <= eqn_idx%bub%end) .and. bubbles_euler) then
                             if (qbmm) then
@@ -222,11 +222,11 @@ contains
                                     call s_comp_n_from_cons(real(q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), kind=wp), nRtmp, nbub, weight)
                                 end if
                             end if
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
+                            write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         else if (i == eqn_idx%n .and. adv_n .and. bubbles_euler) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == eqn_idx%damage) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do
                     close (2)
@@ -238,7 +238,7 @@ contains
 
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
-                    write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                    write (2, FMT) x%cb(j), q_cons_vf(i)%sf(j, 0, 0)
                 end do
                 close (2)
             end do
@@ -251,7 +251,7 @@ contains
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), pb%sf(j, 0, 0, r, i)
+                            write (2, FMT) x%cb(j), pb%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -263,7 +263,7 @@ contains
 
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
-                            write (2, FMT) x_cb(j), mv%sf(j, 0, 0, r, i)
+                            write (2, FMT) x%cb(j), mv%sf(j, 0, 0, r, i)
                         end do
                         close (2)
                     end do
@@ -283,7 +283,7 @@ contains
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
                     do k = 0, n
-                        write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                        write (2, FMT) x%cb(j), y%cb(k), q_cons_vf(i)%sf(j, k, 0)
                     end do
                     write (2, *)
                 end do
@@ -299,7 +299,7 @@ contains
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), pb%sf(j, k, 0, r, i)
+                                write (2, FMT) x%cb(j), y%cb(k), pb%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -313,7 +313,7 @@ contains
                         open (2, FILE=trim(file_loc))
                         do j = 0, m
                             do k = 0, n
-                                write (2, FMT) x_cb(j), y_cb(k), mv%sf(j, k, 0, r, i)
+                                write (2, FMT) x%cb(j), y%cb(k), mv%sf(j, k, 0, r, i)
                             end do
                         end do
                         close (2)
@@ -335,7 +335,7 @@ contains
                 do j = 0, m
                     do k = 0, n
                         do l = 0, p
-                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                            write (2, FMT) x%cb(j), y%cb(k), z%cb(l), q_cons_vf(i)%sf(j, k, l)
                         end do
                         write (2, *)
                     end do
@@ -354,7 +354,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), pb%sf(j, k, l, r, i)
+                                    write (2, FMT) x%cb(j), y%cb(k), z%cb(l), pb%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do
@@ -370,7 +370,7 @@ contains
                         do j = 0, m
                             do k = 0, n
                                 do l = 0, p
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), mv%sf(j, k, l, r, i)
+                                    write (2, FMT) x%cb(j), y%cb(k), z%cb(l), mv%sf(j, k, l, r, i)
                                 end do
                             end do
                         end do

@@ -54,10 +54,10 @@ contains
             strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
             if (num_dims == 2) then
-                Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+                Vol = x%spacing(cell(1))*y%spacing(cell(2))*lag_params%charwidth
+                if (cyl_coord) Vol = x%spacing(cell(1))*y%spacing(cell(2))*y%cc(cell(2))*2._wp*pi
             else
-                Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+                Vol = x%spacing(cell(1))*y%spacing(cell(2))*z%spacing(cell(3))
             end if
 
             ! Update void fraction field
@@ -133,9 +133,9 @@ contains
                         call s_check_celloutside(cellaux, celloutside)
 
                         if (.not. celloutside) then
-                            nodecoord(1) = x_cc(cellaux(1))
-                            nodecoord(2) = y_cc(cellaux(2))
-                            if (p > 0) nodecoord(3) = z_cc(cellaux(3))
+                            nodecoord(1) = x%cc(cellaux(1))
+                            nodecoord(2) = y%cc(cellaux(2))
+                            if (p > 0) nodecoord(3) = z%cc(cellaux(3))
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
                             if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
@@ -204,7 +204,7 @@ contains
                 !> 2D cylindrical function:
                 ! We smear particles in the azimuthal direction for given r
                 theta = 0._wp
-                Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
+                Nr = ceiling(2._wp*pi*nodecoord(2)/(y%cb(cellaux(2)) - y%cb(cellaux(2) - 1)))
                 dtheta = 2._wp*pi/Nr
                 L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
                 distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
@@ -225,9 +225,9 @@ contains
                 !> 2D cartesian function:
                 ! We smear particles considering a virtual depth (lag_params%charwidth)
                 theta = 0._wp
-                Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
+                Nr = ceiling(lag_params%charwidth/(y%cb(cellaux(2)) - y%cb(cellaux(2) - 1)))
                 Nr_count = 1._wp - mapCells*1._wp
-                dzp = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
+                dzp = y%cb(cellaux(2) + 1) - y%cb(cellaux(2))
                 Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
                 distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                 func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
@@ -257,7 +257,7 @@ contains
             if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
                 celloutside = .true.
             end if
-            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
+            if (cyl_coord .and. y%cc(cellaux(2)) < 0._wp) then
                 celloutside = .true.
             end if
             if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
@@ -323,17 +323,17 @@ contains
         real(wp)                          :: rad
 
         !> Compute characteristic distance
-        chardist = sqrt(dx(cell(1))*dy(cell(2)))
-        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
+        chardist = sqrt(x%spacing(cell(1))*y%spacing(cell(2)))
+        if (p > 0) chardist = (x%spacing(cell(1))*y%spacing(cell(2))*z%spacing(cell(3)))**(1._wp/3._wp)
 
         !> Compute characteristic volume
         if (p > 0) then
-            charvol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+            charvol = x%spacing(cell(1))*y%spacing(cell(2))*z%spacing(cell(3))
         else
             if (cyl_coord) then
-                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+                charvol = x%spacing(cell(1))*y%spacing(cell(2))*y%cc(cell(2))*2._wp*pi
             else
-                charvol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                charvol = x%spacing(cell(1))*y%spacing(cell(2))*lag_params%charwidth
             end if
         end if
 
@@ -356,12 +356,12 @@ contains
         real(wp), intent(out) :: Charvol
 
         if (p > 0) then
-            Charvol = dx(cellx)*dy(celly)*dz(cellz)
+            Charvol = x%spacing(cellx)*y%spacing(celly)*z%spacing(cellz)
         else
             if (cyl_coord) then
-                Charvol = dx(cellx)*dy(celly)*y_cc(celly)*2._wp*pi
+                Charvol = x%spacing(cellx)*y%spacing(celly)*y%cc(celly)*2._wp*pi
             else
-                Charvol = dx(cellx)*dy(celly)*lag_params%charwidth
+                Charvol = x%spacing(cellx)*y%spacing(celly)*lag_params%charwidth
             end if
         end if
 

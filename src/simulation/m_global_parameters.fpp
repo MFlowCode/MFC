@@ -48,23 +48,17 @@ module m_global_parameters
     !> @}
     $:GPU_DECLARE(create='[cyl_coord, grid_geometry]')
 
-    !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
+    !> @name Cell-boundary (cb), cell-center (cc), and spacing arrays per direction
     !> @{
-    real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    !> @}
-
-    !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
-    !> @{
-    real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
-    !> @}
-    ! type(bounds_info) :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
-    !> @name Cell-width distributions in the x-, y- and z-directions, respectively
-    !> @{
-    real(wp), target, allocatable, dimension(:) :: dx, dy, dz
+    type(grid_axis), target :: x, y, z
     !> @}
 
     real(wp) :: dt  !< Size of the time-step
-    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p]')
+#if defined(MFC_OpenACC)
+    $:GPU_DECLARE(create='[x%cb, y%cb, z%cb, x%cc, y%cc, z%cc, x%spacing, y%spacing, z%spacing, dt, m, n, p]')
+#elif defined(MFC_OpenMP)
+    $:GPU_DECLARE(create='[x, y, z, dt, m, n, p]')
+#endif
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number of time-step iterations between successive
     !! solution backups, respectively
@@ -1239,28 +1233,28 @@ contains
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')
 
         ! Allocating grid variables for the x-, y- and z-directions
-        @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
-        @:ALLOCATE(x_cc(-buff_size:m + buff_size))
-        @:ALLOCATE(dx(-buff_size:m + buff_size))
-        @:PREFER_GPU(x_cb)
-        @:PREFER_GPU(x_cc)
-        @:PREFER_GPU(dx)
+        @:ALLOCATE(x%cb(-1 - buff_size:m + buff_size))
+        @:ALLOCATE(x%cc(-buff_size:m + buff_size))
+        @:ALLOCATE(x%spacing(-buff_size:m + buff_size))
+        @:PREFER_GPU(x%cb)
+        @:PREFER_GPU(x%cc)
+        @:PREFER_GPU(x%spacing)
 
         if (n == 0) return
-        @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
-        @:ALLOCATE(y_cc(-buff_size:n + buff_size))
-        @:ALLOCATE(dy(-buff_size:n + buff_size))
-        @:PREFER_GPU(y_cb)
-        @:PREFER_GPU(y_cc)
-        @:PREFER_GPU(dy)
+        @:ALLOCATE(y%cb(-1 - buff_size:n + buff_size))
+        @:ALLOCATE(y%cc(-buff_size:n + buff_size))
+        @:ALLOCATE(y%spacing(-buff_size:n + buff_size))
+        @:PREFER_GPU(y%cb)
+        @:PREFER_GPU(y%cc)
+        @:PREFER_GPU(y%spacing)
 
         if (p == 0) return
-        @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
-        @:ALLOCATE(z_cc(-buff_size:p + buff_size))
-        @:ALLOCATE(dz(-buff_size:p + buff_size))
-        @:PREFER_GPU(z_cb)
-        @:PREFER_GPU(z_cc)
-        @:PREFER_GPU(dz)
+        @:ALLOCATE(z%cb(-1 - buff_size:p + buff_size))
+        @:ALLOCATE(z%cc(-buff_size:p + buff_size))
+        @:ALLOCATE(z%spacing(-buff_size:p + buff_size))
+        @:PREFER_GPU(z%cb)
+        @:PREFER_GPU(z%cc)
+        @:PREFER_GPU(z%spacing)
 
     end subroutine s_initialize_global_parameters_module
 
@@ -1341,13 +1335,13 @@ contains
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 
         ! Deallocating grid variables for the x-, y- and z-directions
-        @:DEALLOCATE(x_cb, x_cc, dx)
+        @:DEALLOCATE(x%cb, x%cc, x%spacing)
 
         if (n == 0) return
-        @:DEALLOCATE(y_cb, y_cc, dy)
+        @:DEALLOCATE(y%cb, y%cc, y%spacing)
 
         if (p == 0) return
-        @:DEALLOCATE(z_cb, z_cc, dz)
+        @:DEALLOCATE(z%cb, z%cc, z%spacing)
 
     end subroutine s_finalize_global_parameters_module
 

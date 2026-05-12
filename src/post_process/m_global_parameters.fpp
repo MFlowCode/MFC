@@ -50,20 +50,11 @@ module m_global_parameters
 
     integer :: num_dims  !< Number of spatial dimensions
     integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
-    !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
+    !> @name Cell-boundary (cb), cell-center (cc), and spacing arrays per direction
     !> @{
-    real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
-    !> @}
-
-    !> @name Cell-center locations in the x-, y- and z-coordinate directions
-    !> @{
-    real(wp), allocatable, dimension(:) :: x_cc, x_root_cc, y_cc, z_cc
+    type(grid_axis)                     :: x, y, z
+    real(wp), allocatable, dimension(:) :: x_root_cb, x_root_cc
     real(sp), allocatable, dimension(:) :: x_root_cc_s, x_cc_s
-    !> @}
-
-    !> Cell-width distributions in the x-, y- and z-coordinate directions
-    !> @{
-    real(wp), allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
     integer :: buff_size     !< Number of ghost cells for boundary condition storage
@@ -819,20 +810,20 @@ contains
         allocate (x_cc_s(-buff_size:m + buff_size))
 
         ! Allocating the grid variables in the x-coordinate direction
-        allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
-        allocate (x_cc(-buff_size:m + buff_size))
-        allocate (dx(-buff_size:m + buff_size))
+        allocate (x%cb(-1 - offset_x%beg:m + offset_x%end))
+        allocate (x%cc(-buff_size:m + buff_size))
+        allocate (x%spacing(-buff_size:m + buff_size))
 
         ! Allocating grid variables in the y- and z-coordinate directions
         if (n > 0) then
-            allocate (y_cb(-1 - offset_y%beg:n + offset_y%end))
-            allocate (y_cc(-buff_size:n + buff_size))
-            allocate (dy(-buff_size:n + buff_size))
+            allocate (y%cb(-1 - offset_y%beg:n + offset_y%end))
+            allocate (y%cc(-buff_size:n + buff_size))
+            allocate (y%spacing(-buff_size:n + buff_size))
 
             if (p > 0) then
-                allocate (z_cb(-1 - offset_z%beg:p + offset_z%end))
-                allocate (z_cc(-buff_size:p + buff_size))
-                allocate (dz(-buff_size:p + buff_size))
+                allocate (z%cb(-1 - offset_z%beg:p + offset_z%end))
+                allocate (z%cc(-buff_size:p + buff_size))
+                allocate (z%spacing(-buff_size:p + buff_size))
             end if
 
             ! Allocating the grid variables, only used for the 1D simulations, and containing the defragmented computational domain
@@ -904,13 +895,13 @@ contains
 
         ! Deallocating the grid variables for the x-coordinate direction
 
-        deallocate (x_cc, x_cb, dx)
+        deallocate (x%cc, x%cb, x%spacing)
 
         ! Deallocating grid variables for the y- and z-coordinate directions
         if (n > 0) then
-            deallocate (y_cc, y_cb, dy)
+            deallocate (y%cc, y%cb, y%spacing)
             if (p > 0) then
-                deallocate (z_cc, z_cb, dz)
+                deallocate (z%cc, z%cb, z%spacing)
             end if
         else
             ! Deallocating the grid variables, only used for the 1D simulations, and containing the defragmented computational

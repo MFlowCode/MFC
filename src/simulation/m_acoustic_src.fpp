@@ -69,7 +69,8 @@ contains
                    & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), &
                    & aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), &
                    & element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), &
-                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
+                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), &
+                                  & bb_lowest_freq(1:num_source))
 
         do i = 1, num_source
             do j = 1, 3
@@ -486,18 +487,18 @@ contains
         ! Calculate sig spatial support width
 
         if (n == 0) then
-            sig = dx(j)
+            sig = x%spacing(j)
         else if (p == 0) then
-            sig = maxval((/dx(j), dy(k)/))
+            sig = maxval((/x%spacing(j), y%spacing(k)/))
         else
-            sig = maxval((/dx(j), dy(k), dz(l)/))
+            sig = maxval((/x%spacing(j), y%spacing(k), z%spacing(l)/))
         end if
         sig = sig*acoustic_spatial_support_width
 
         ! Calculate displacement from acoustic source location
-        r(1) = x_cc(j) - loc(1)
-        if (n /= 0) r(2) = y_cc(k) - loc(2)
-        if (p /= 0) r(3) = z_cc(l) - loc(3)
+        r(1) = x%cc(j) - loc(1)
+        if (n /= 0) r(2) = y%cc(k) - loc(2)
+        if (p /= 0) r(3) = z%cc(l) - loc(3)
 
         if (any(support(ai) == (/1, 2, 3, 4/))) then
             call s_source_spatial_planar(ai, sig, r, source)

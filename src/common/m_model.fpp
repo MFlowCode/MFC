@@ -980,8 +980,8 @@ contains
         real(wp)                                :: grid_mm(1:3,1:2)
         real(wp), dimension(1:4,1:4)            :: transform, transform_n
 
-        dx_local = minval(dx); dy_local = minval(dy)
-        if (p /= 0) dz_local = minval(dz)
+        dx_local = minval(x%spacing); dy_local = minval(y%spacing)
+        if (p /= 0) dz_local = minval(z%spacing)
 
         allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
 
@@ -1036,11 +1036,11 @@ contains
                     write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
                     write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
 
-                    grid_mm(1,:) = (/minval(x_cc(0:m)) - 0.5_wp*dx_local, maxval(x_cc(0:m)) + 0.5_wp*dx_local/)
-                    grid_mm(2,:) = (/minval(y_cc(0:n)) - 0.5_wp*dy_local, maxval(y_cc(0:n)) + 0.5_wp*dy_local/)
+                    grid_mm(1,:) = (/minval(x%cc(0:m)) - 0.5_wp*dx_local, maxval(x%cc(0:m)) + 0.5_wp*dx_local/)
+                    grid_mm(2,:) = (/minval(y%cc(0:n)) - 0.5_wp*dy_local, maxval(y%cc(0:n)) + 0.5_wp*dy_local/)
 
                     if (p > 0) then
-                        grid_mm(3,:) = (/minval(z_cc(0:p)) - 0.5_wp*dz_local, maxval(z_cc(0:p)) + 0.5_wp*dz_local/)
+                        grid_mm(3,:) = (/minval(z%cc(0:p)) - 0.5_wp*dz_local, maxval(z%cc(0:p)) + 0.5_wp*dz_local/)
                     else
                         grid_mm(3,:) = (/0._wp, 0._wp/)
                     end if

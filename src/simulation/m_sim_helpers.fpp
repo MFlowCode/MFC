@@ -28,12 +28,12 @@ contains
 
         if (grid_geometry == 3) then
             if (k == 0) then
-                fltr_dtheta = 2._wp*pi*y_cb(0)/3._wp
+                fltr_dtheta = 2._wp*pi*y%cb(0)/3._wp
             else if (k <= fourier_rings) then
                 Nfq = min(floor(2._wp*real(k, wp)*pi), (p + 1)/2 + 1)
-                fltr_dtheta = 2._wp*pi*y_cb(k - 1)/real(Nfq, wp)
+                fltr_dtheta = 2._wp*pi*y%cb(k - 1)/real(Nfq, wp)
             else
-                fltr_dtheta = y_cb(k - 1)*dz(l)
+                fltr_dtheta = y%cb(k - 1)*z%spacing(l)
             end if
         else
             fltr_dtheta = 0._wp
@@ -57,14 +57,14 @@ contains
             ! 3D
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 if (grid_geometry == 3) then
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
+                    cfl_terms = min(x%spacing(j)/(abs(vel(1)) + c), y%spacing(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
                 else
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
+                    cfl_terms = min(x%spacing(j)/(abs(vel(1)) + c), y%spacing(k)/(abs(vel(2)) + c), z%spacing(l)/(abs(vel(3)) + c))
                 end if
             #:endif
         else
             ! 2D
-            cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
+            cfl_terms = min(x%spacing(j)/(abs(vel(1)) + c), y%spacing(k)/(abs(vel(2)) + c))
         end if
 
     end function f_compute_multidim_cfl_terms
@@ -155,7 +155,7 @@ contains
             icfl_sf(j, k, l) = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
         else
             ! 1D
-            icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
+            icfl_sf(j, k, l) = (dt/x%spacing(j))*(abs(vel(1)) + c)
         end if
 
         ! Viscous calculations
@@ -165,23 +165,23 @@ contains
                     ! 3D
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), fltr_dtheta)**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(x%spacing(j), y%spacing(k), fltr_dtheta)**2._wp
+                        Rc_sf(j, k, l) = min(x%spacing(j)*(abs(vel(1)) + c), y%spacing(k)*(abs(vel(2)) + c), &
                               & fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     else
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k), dz(l))**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), &
-                              & dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(x%spacing(j), y%spacing(k), z%spacing(l))**2._wp
+                        Rc_sf(j, k, l) = min(x%spacing(j)*(abs(vel(1)) + c), y%spacing(k)*(abs(vel(2)) + c), &
+                              & z%spacing(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     end if
                 #:endif
             else if (n > 0) then
                 ! 2D
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
-                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c))/maxval(1._wp/Re_l)
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(x%spacing(j), y%spacing(k))**2._wp
+                Rc_sf(j, k, l) = min(x%spacing(j)*(abs(vel(1)) + c), y%spacing(k)*(abs(vel(2)) + c))/maxval(1._wp/Re_l)
             else
                 ! 1D
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
-                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/x%spacing(j)**2._wp
+                Rc_sf(j, k, l) = x%spacing(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
 
@@ -205,7 +205,7 @@ contains
             icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
         else
             ! 1D case
-            icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
+            icfl_dt = cfl_target*(x%spacing(j)/(abs(vel(1)) + c))
         end if
 
         ! Viscous calculations
@@ -214,16 +214,16 @@ contains
                 ! 3D
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
+                    vcfl_dt = cfl_target*(min(x%spacing(j), y%spacing(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
                 else
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)/maxval(1/(rho*Re_l))
+                    vcfl_dt = cfl_target*(min(x%spacing(j), y%spacing(k), z%spacing(l))**2._wp)/maxval(1/(rho*Re_l))
                 end if
             else if (n > 0) then
                 ! 2D
-                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
+                vcfl_dt = cfl_target*(min(x%spacing(j), y%spacing(k))**2._wp)/maxval((1/Re_l)/rho)
             else
                 ! 1D
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
+                vcfl_dt = cfl_target*(x%spacing(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
         end if
 

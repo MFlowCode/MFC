@@ -65,14 +65,14 @@ contains
         end if
 
         ! Computing centered finite difference coefficients
-        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_hypo, buff_size, fd_number, fd_order)
+        call s_compute_finite_difference_coefficients(m, x%cc, fd_coeff_x_hypo, buff_size, fd_number, fd_order)
         $:GPU_UPDATE(device='[fd_coeff_x_hypo]')
         if (n > 0) then
-            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_hypo, buff_size, fd_number, fd_order)
+            call s_compute_finite_difference_coefficients(n, y%cc, fd_coeff_y_hypo, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_y_hypo]')
         end if
         if (p > 0) then
-            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_hypo, buff_size, fd_number, fd_order)
+            call s_compute_finite_difference_coefficients(p, z%cc, fd_coeff_z_hypo, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_z_hypo]')
         end if
 
@@ -301,25 +301,27 @@ contains
                     do k = 0, m
                         ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
                         rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) - rho_K_field(k, l, &
-                               & q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y_cc(l)*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, &
+                               & q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y%cc(l)*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, &
                                & q) + (2._wp/3._wp)*G_K_field(k, l, q))  ! tau_xx + 2/3*G
 
                         ! S_xr -= rho * v/r * tau_xr
                         rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) - rho_K_field(k, &
-                               & l, q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y_cc(l)*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, &
+                               & l, q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y%cc(l)*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, &
                                & l, q)  ! tau_xx
 
                         ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
                         rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) - rho_K_field(k, &
                                & l, q)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, &
-                               & q)/y_cc(l)*(q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))  ! tau_rr + 2/3*G
+                               & q)/y%cc(l)*(q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, &
+                               & q))  ! tau_rr + 2/3*G
 
-                        ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
+                        ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/x%spacing + dv/dr + v/r) + 2*(tau_thetatheta +
+                        ! G)*v/r )
                         rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + rho_K_field(k, &
                                & l, q)*(-(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, &
                                & q))*(du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q) + q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, &
-                               & q)/y_cc(l)) + 2._wp*(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + G_K_field(k, l, &
-                               & q))*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y_cc(l))
+                               & q)/y%cc(l)) + 2._wp*(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + G_K_field(k, l, &
+                               & q))*q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y%cc(l))
                     end do
                 end do
             end do

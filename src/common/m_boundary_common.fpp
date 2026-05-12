@@ -784,7 +784,7 @@ contains
         integer                                                                                              :: j, q, i
 
         do j = 1, buff_size
-            if (z_cc(l) < pi) then
+            if (z%cc(l) < pi) then
                 do i = 1, eqn_idx%mom%beg
                     q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
                 end do
@@ -815,7 +815,7 @@ contains
             do i = 1, nb
                 do q = 1, nnode
                     do j = 1, buff_size
-                        if (z_cc(l) < pi) then
+                        if (z%cc(l) < pi) then
                             pb_in(k, -j, l, q, i) = pb_in(k, j - 1, l + ((p + 1)/2), q, i)
                             mv_in(k, -j, l, q, i) = mv_in(k, j - 1, l + ((p + 1)/2), q, i)
                         else
@@ -2166,25 +2166,25 @@ contains
             call s_mpi_sendrecv_grid_variables_buffers(1, -1)
         else if (bc_x%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
-                dx(-i) = dx(0)
+                x%spacing(-i) = x%spacing(0)
             end do
         else if (bc_x%beg == BC_REFLECTIVE) then
             do i = 1, buff_size
-                dx(-i) = dx(i - 1)
+                x%spacing(-i) = x%spacing(i - 1)
             end do
         else if (bc_x%beg == BC_PERIODIC) then
             do i = 1, buff_size
-                dx(-i) = dx(m - (i - 1))
+                x%spacing(-i) = x%spacing(m - (i - 1))
             end do
         end if
 
         ! Computing the cell-boundary and center locations buffer at bc_x%beg
         do i = 1, offset_x%beg
-            x_cb(-1 - i) = x_cb(-i) - dx(-i)
+            x%cb(-1 - i) = x%cb(-i) - x%spacing(-i)
         end do
 
         do i = 1, buff_size
-            x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
+            x%cc(-i) = x%cc(1 - i) - (x%spacing(1 - i) + x%spacing(-i))/2._wp
         end do
 
         ! Populating the cell-width distribution buffer at bc_x%end
@@ -2192,25 +2192,25 @@ contains
             call s_mpi_sendrecv_grid_variables_buffers(1, 1)
         else if (bc_x%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
-                dx(m + i) = dx(m)
+                x%spacing(m + i) = x%spacing(m)
             end do
         else if (bc_x%end == BC_REFLECTIVE) then
             do i = 1, buff_size
-                dx(m + i) = dx(m - (i - 1))
+                x%spacing(m + i) = x%spacing(m - (i - 1))
             end do
         else if (bc_x%end == BC_PERIODIC) then
             do i = 1, buff_size
-                dx(m + i) = dx(i - 1)
+                x%spacing(m + i) = x%spacing(i - 1)
             end do
         end if
 
         ! Populating the cell-boundary and center locations buffer at bc_x%end
         do i = 1, offset_x%end
-            x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
+            x%cb(m + i) = x%cb(m + (i - 1)) + x%spacing(m + i)
         end do
 
         do i = 1, buff_size
-            x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
+            x%cc(m + i) = x%cc(m + (i - 1)) + (x%spacing(m + (i - 1)) + x%spacing(m + i))/2._wp
         end do
 
         ! Population of Buffers in y-direction
@@ -2222,25 +2222,25 @@ contains
             call s_mpi_sendrecv_grid_variables_buffers(2, -1)
         else if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_AXIS) then
             do i = 1, buff_size
-                dy(-i) = dy(0)
+                y%spacing(-i) = y%spacing(0)
             end do
         else if (bc_y%beg == BC_REFLECTIVE .or. bc_y%beg == BC_AXIS) then
             do i = 1, buff_size
-                dy(-i) = dy(i - 1)
+                y%spacing(-i) = y%spacing(i - 1)
             end do
         else if (bc_y%beg == BC_PERIODIC) then
             do i = 1, buff_size
-                dy(-i) = dy(n - (i - 1))
+                y%spacing(-i) = y%spacing(n - (i - 1))
             end do
         end if
 
         ! Computing the cell-boundary and center locations buffer at bc_y%beg
         do i = 1, offset_y%beg
-            y_cb(-1 - i) = y_cb(-i) - dy(-i)
+            y%cb(-1 - i) = y%cb(-i) - y%spacing(-i)
         end do
 
         do i = 1, buff_size
-            y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
+            y%cc(-i) = y%cc(1 - i) - (y%spacing(1 - i) + y%spacing(-i))/2._wp
         end do
 
         ! Populating the cell-width distribution buffer at bc_y%end
@@ -2248,25 +2248,25 @@ contains
             call s_mpi_sendrecv_grid_variables_buffers(2, 1)
         else if (bc_y%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
-                dy(n + i) = dy(n)
+                y%spacing(n + i) = y%spacing(n)
             end do
         else if (bc_y%end == BC_REFLECTIVE) then
             do i = 1, buff_size
-                dy(n + i) = dy(n - (i - 1))
+                y%spacing(n + i) = y%spacing(n - (i - 1))
             end do
         else if (bc_y%end == BC_PERIODIC) then
             do i = 1, buff_size
-                dy(n + i) = dy(i - 1)
+                y%spacing(n + i) = y%spacing(i - 1)
             end do
         end if
 
         ! Populating the cell-boundary and center locations buffer at bc_y%end
         do i = 1, offset_y%end
-            y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
+            y%cb(n + i) = y%cb(n + (i - 1)) + y%spacing(n + i)
         end do
 
         do i = 1, buff_size
-            y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
+            y%cc(n + i) = y%cc(n + (i - 1)) + (y%spacing(n + (i - 1)) + y%spacing(n + i))/2._wp
         end do
 
         ! Population of Buffers in z-direction
@@ -2278,25 +2278,25 @@ contains
             call s_mpi_sendrecv_grid_variables_buffers(3, -1)
         else if (bc_z%beg <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
-                dz(-i) = dz(0)
+                z%spacing(-i) = z%spacing(0)
             end do
         else if (bc_z%beg == BC_REFLECTIVE) then
             do i = 1, buff_size
-                dz(-i) = dz(i - 1)
+                z%spacing(-i) = z%spacing(i - 1)
             end do
         else if (bc_z%beg == BC_PERIODIC) then
             do i = 1, buff_size
-                dz(-i) = dz(p - (i - 1))
+                z%spacing(-i) = z%spacing(p - (i - 1))
             end do
         end if
 
         ! Computing the cell-boundary and center locations buffer at bc_z%beg
         do i = 1, offset_z%beg
-            z_cb(-1 - i) = z_cb(-i) - dz(-i)
+            z%cb(-1 - i) = z%cb(-i) - z%spacing(-i)
         end do
 
         do i = 1, buff_size
-            z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
+            z%cc(-i) = z%cc(1 - i) - (z%spacing(1 - i) + z%spacing(-i))/2._wp
         end do
 
         ! Populating the cell-width distribution buffer at bc_z%end
@@ -2304,25 +2304,25 @@ contains
             call s_mpi_sendrecv_grid_variables_buffers(3, 1)
         else if (bc_z%end <= BC_GHOST_EXTRAP) then
             do i = 1, buff_size
-                dz(p + i) = dz(p)
+                z%spacing(p + i) = z%spacing(p)
             end do
         else if (bc_z%end == BC_REFLECTIVE) then
             do i = 1, buff_size
-                dz(p + i) = dz(p - (i - 1))
+                z%spacing(p + i) = z%spacing(p - (i - 1))
             end do
         else if (bc_z%end == BC_PERIODIC) then
             do i = 1, buff_size
-                dz(p + i) = dz(i - 1)
+                z%spacing(p + i) = z%spacing(i - 1)
             end do
         end if
 
         ! Populating the cell-boundary and center locations buffer at bc_z%end
         do i = 1, offset_z%end
-            z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
+            z%cb(p + i) = z%cb(p + (i - 1)) + z%spacing(p + i)
         end do
 
         do i = 1, buff_size
-            z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
+            z%cc(p + i) = z%cc(p + (i - 1)) + (z%spacing(p + (i - 1)) + z%spacing(p + i))/2._wp
         end do
 #endif
 

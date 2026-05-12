@@ -237,7 +237,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))*(q_prim_vf(eqn_idx%c)%sf(j + 1, k, &
+                    c_divs(1)%sf(j, k, l) = 1._wp/(x%cc(j + 1) - x%cc(j - 1))*(q_prim_vf(eqn_idx%c)%sf(j + 1, k, &
                            & l) - q_prim_vf(eqn_idx%c)%sf(j - 1, k, l))
                 end do
             end do
@@ -248,7 +248,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k + 1, &
+                    c_divs(2)%sf(j, k, l) = 1._wp/(y%cc(k + 1) - y%cc(k - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k + 1, &
                            & l) - q_prim_vf(eqn_idx%c)%sf(j, k - 1, l))
                 end do
             end do
@@ -260,7 +260,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k, &
+                        c_divs(3)%sf(j, k, l) = 1._wp/(z%cc(l + 1) - z%cc(l - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k, &
                                & l + 1) - q_prim_vf(eqn_idx%c)%sf(j, k, l - 1))
                     end do
                 end do
