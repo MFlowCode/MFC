@@ -423,11 +423,11 @@ contains
                                     pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                                 #:endif
                                 E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R &
-                                    & + pres_mag%R  ! includes magnetic energy
+                                ! includes magnetic energy
+                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R
                                 H_L = (E_L + pres_L - pres_mag%L)/rho_L
-                                H_R = (E_R + pres_R - pres_mag%R) &
-                                       & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                H_R = (E_R + pres_R - pres_mag%R)/rho_R
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
@@ -754,9 +754,8 @@ contains
                                                           & eqn_idx%psi) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
                                                           & eqn_idx%psi)))/(s_M - s_P)
                                     else
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%B%beg + norm_dir - 1) &
-                                                          & = 0._wp  ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
+                                        ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
+                                        flux_rs${XYZ}$_vf(j, k, l, eqn_idx%B%beg + norm_dir - 1) = 0._wp
                                     end if
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, eqn_idx%adv%beg) = 0._wp
@@ -1113,11 +1112,11 @@ contains
                                 pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
                                 pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                                 E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R &
-                                    & + pres_mag%R  ! includes magnetic energy
+                                ! includes magnetic energy
+                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R
                                 H_L = (E_L + pres_L - pres_mag%L)/rho_L
-                                H_R = (E_R + pres_R - pres_mag%R) &
-                                       & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                H_R = (E_R + pres_R - pres_mag%R)/rho_R
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
@@ -3474,8 +3473,8 @@ contains
                             E%L = gamma%L*pres%L + pi_inf%L + 0.5_wp*rho%L*vel_rms%L + qv%L + pres_mag%L
                             E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R  ! includes magnetic energy
                             H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
-                            H_no_mag%R = (E%R + pres%R - pres_mag%R) &
-                                          & /rho%R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                            ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                            H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R
 
                             ! (2) Compute fast wave speeds
                             call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, &
