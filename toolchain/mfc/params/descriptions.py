@@ -133,6 +133,7 @@ DESCRIPTIONS = {
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "num_ibs": "Number of immersed boundary patches",
+    "num_particle_beds": "Number of particle bed specifications to generate immersed boundary patches from",
     "ib_neighborhood_radius": "Neighborhood radius in ranks for IB awareness",
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",

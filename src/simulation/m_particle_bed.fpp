@@ -3,6 +3,8 @@
 !! @brief Generates particle beds: converts particle_bed specifications into
 !!        individual sphere/circle patch_ib entries before MPI broadcast.
 
+!> @brief Generates particle beds by converting particle_bed patch specifications into individual immersed boundary patches before
+!! MPI broadcast.
 module m_particle_bed
 
     use m_global_parameters
