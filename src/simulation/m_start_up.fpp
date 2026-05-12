@@ -1212,7 +1212,7 @@ contains
 
         type(ib_patch_parameters), allocatable :: patch_ib_gbl(:)
         real(wp), dimension(3)                 :: centroid
-        integer                                :: i, j
+        integer                                :: i, j, n_copy
         integer                                :: num_aware_ibs
         logical                                :: is_in_neighborhood, is_local
 
@@ -1243,9 +1243,11 @@ contains
         end do
 
 #ifdef MFC_MPI
-        ! fallback for 1-rank case
+        ! fallback for 1-rank case: patch_ib has num_aware_ibs slots; clamp copy to avoid out-of-bounds
+        ! when num_gbl_ibs > num_aware_ibs (large particle beds on a single rank)
         if (num_procs == 1) then
-            patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
+            n_copy = min(num_gbl_ibs, num_aware_ibs)
+            patch_ib(1:n_copy) = patch_ib_gbl(1:n_copy)
         else
             ! determine the set of patches owned by local rank
             num_local_ibs = 0
@@ -1270,7 +1272,8 @@ contains
         end if
 #else
         ! reduce the size of the array for local simulation in no-MPI case
-        patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
+        n_copy = min(num_gbl_ibs, num_aware_ibs)
+        patch_ib(1:n_copy) = patch_ib_gbl(1:n_copy)
 #endif
 
         deallocate (patch_ib_gbl)
