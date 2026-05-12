@@ -601,10 +601,10 @@ class CaseValidator:
             ib and num_ibs <= 0 and not has_particle_beds,
             "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_bed with num_particles > 0)",
         )
-        num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max", 100000)
+        num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max_namelist", 50000)
         self.prohibit(
             ib and num_ibs > num_ib_patches_max,
-            f"num_ibs must be <= {num_ib_patches_max} (num_ib_patches_max in m_constants.fpp)",
+            f"num_ibs must be <= {num_ib_patches_max} (num_ib_patches_max_namelist in m_constants.fpp)",
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
