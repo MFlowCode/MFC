@@ -544,8 +544,7 @@ contains
         if (p == 0) gp_layers_z = 0
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, xp, yp, zp]', &
-                            & copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, gp_layers_z]', &
-                                & collapse=3)
+                            & copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -941,17 +940,16 @@ contains
                             ! Get the pressure contribution to force via a finite difference to compute the 2D components of the
                             ! gradient of the pressure and cell volume
                             local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i &
-                                                     & + 1, j, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i - 1, j, &
-                                                     & k))/(2._wp*dx_loc)  ! force is the negative pressure gradient
+                                                     & + 1, j, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i - 1, j, k))/(2._wp*dx_loc)  ! force is the negative pressure gradient
                             local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, &
                                                      & j + 1, k) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy_loc)
                             cell_volume = abs(dx_loc*dy_loc)
                             ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 dz_loc = z%cc(k + 1) - z%cc(k)
-                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(eqn_idx%E + fluid_idx) &
-                                                         & %sf(i, j, k + 1) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j, &
-                                                         & k - 1))/(2._wp*dz_loc)
+                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(eqn_idx%E &
+                                                         & + fluid_idx)%sf(i, j, k + 1) - q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, &
+                                                         & j, k - 1))/(2._wp*dz_loc)
                                 cell_volume = abs(cell_volume*dz_loc)
                             end if
                         end do
@@ -1061,8 +1059,8 @@ contains
 
         ! Offset only needs to be computes for specific geometries
 
-        if (patch_ib(ib_marker)%geometry == 4 .or. patch_ib(ib_marker)%geometry == 5 .or. patch_ib(ib_marker) &
-            & %geometry == 11 .or. patch_ib(ib_marker)%geometry == 12) then
+        if (patch_ib(ib_marker)%geometry == 4 .or. patch_ib(ib_marker)%geometry == 5 .or. patch_ib(ib_marker)%geometry == 11 &
+            & .or. patch_ib(ib_marker)%geometry == 12) then
             center_of_mass_local = [0._wp, 0._wp, 0._wp]
             num_cells_local = 0
 
@@ -1131,11 +1129,11 @@ contains
         if (patch_ib(ib_marker)%geometry == 2) then  ! circle
             patch_ib(ib_marker)%moment = 0.5_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
         else if (patch_ib(ib_marker)%geometry == 3) then  ! rectangle
-            patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
-                     & %length_y**2)/6._wp
+            patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 &
+                     & + patch_ib(ib_marker)%length_y**2)/6._wp
         else if (patch_ib(ib_marker)%geometry == 6) then  ! ellipse
-            patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker) &
-                     & %length_y**2)
+            patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 &
+                     & + patch_ib(ib_marker)%length_y**2)
         else if (patch_ib(ib_marker)%geometry == 8) then  ! sphere
             patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum

@@ -69,8 +69,7 @@ contains
                    & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), &
                    & aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), &
                    & element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), &
-                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), &
-                                  & bb_lowest_freq(1:num_source))
+                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
 
         do i = 1, num_source
             do j = 1, 3

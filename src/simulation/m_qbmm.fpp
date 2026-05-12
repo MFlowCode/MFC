@@ -841,8 +841,8 @@ contains
                                                                             & momrhs(:,i1, i2, j, q))
                                                 end if
                                             case (2)
-                                                if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) &
-                                                    & .or. (j >= 10 .and. j <= 11) .or. (j == 26)) then
+                                                if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) .or. (j >= 10 &
+                                                    & .and. j <= 11) .or. (j == 26)) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
                                                                             & q))*f_quad2D(abscX(:,q), abscY(:,q), wght_pb(:,q), &
                                                                             & momrhs(:,i1, i2, j, q))
