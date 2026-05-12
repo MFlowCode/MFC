@@ -22,7 +22,8 @@ contains
     impure subroutine s_generate_particle_beds()
 
         integer               :: b, ib_idx, geom
-        integer               :: n_placed, n_attempts, max_attempts
+        integer               :: n_placed
+        integer(8)            :: n_attempts, max_attempts
         real(wp)              :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
         real(wp)              :: rx, ry, rz, dist
         integer               :: seed
@@ -57,7 +58,7 @@ contains
                 dz_hi = 1
             end if
 
-            max_attempts = particle_bed(b)%num_particles*10000
+            max_attempts = int(particle_bed(b)%num_particles, 8)*10000_8
             n_placed = 0
             n_attempts = 0
             seed = particle_bed(b)%seed
@@ -141,8 +142,8 @@ contains
             end do
 
             if (n_placed < particle_bed(b)%num_particles) then
-                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', b, n_placed, &
-                    & particle_bed(b)%num_particles, n_attempts
+                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', &
+                    b, n_placed, particle_bed(b)%num_particles, n_attempts
             end if
 
             deallocate (placed, hash_head, chain_next)
