@@ -189,9 +189,9 @@ class Case:
             # values from the case file
             def rhs_replace(match):
                 return {
-                    "x": "x_cc(i)",
-                    "y": "y_cc(j)",
-                    "z": "z_cc(k)",
+                    "x": "x%cc(i)",
+                    "y": "y%cc(j)",
+                    "z": "z%cc(k)",
                     "xc": f"patch_icpp({pid})%x_centroid",
                     "yc": f"patch_icpp({pid})%y_centroid",
                     "zc": f"patch_icpp({pid})%z_centroid",
@@ -271,9 +271,9 @@ class Case:
             # values from the case file
             def rhs_replace(match):
                 return {
-                    "x": "x_cc(i)",
-                    "y": "y_cc(j)",
-                    "z": "z_cc(k)",
+                    "x": "x%cc(i)",
+                    "y": "y%cc(j)",
+                    "z": "z%cc(k)",
                     "t": "mytime",
                     "r": f"patch_ib({pid})%radius",
                     "e": f"{math.e}",
