@@ -206,7 +206,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, T_GP, MW_GP, E_GP, pressure_ghost_point, ghost_points_index]')
+                                & Ys_IP, T_IP, T_GP, MW_GP, E_GP]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -247,8 +247,8 @@ contains
                     q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
                 end do
 
-                $:GPU_LOOP(parallelism='[seq]')
                 if (chemistry) then
+                $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%species%beg, eqn_idx%species%end
                         q_prim_vf(q)%sf(j, k, l) = Ys_IP(q - eqn_idx%species%beg + 1)
                     end do
@@ -349,9 +349,10 @@ contains
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
                 end if
 
-                $:GPU_LOOP(parallelism='[seq]')
                 if (chemistry) then
-                    do q = eqn_idx%species%beg, eqn_idx%species%end
+                 
+                $:GPU_LOOP(parallelism='[seq]')
+                      do q = eqn_idx%species%beg, eqn_idx%species%end
                         q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(eqn_idx%cont%beg)*Ys_IP(q - eqn_idx%species%beg + 1)
                     end do
                 end if
