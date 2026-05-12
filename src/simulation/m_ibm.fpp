@@ -496,7 +496,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (bounds_error) error stop "Ghost Point and Image Point on Different Processors. Exiting"
+        @:PROHIBIT(bounds_error, "Ghost Point and Image Point on Different Processors. Exiting")
 
     end subroutine s_compute_image_points
 
@@ -1430,7 +1430,6 @@ contains
                     end if
                 end do
                 if (is_new) then
-                    print *, proc_rank, " New Owner ", patch_ib(k)%gbl_patch_id  ! TODO :: REMOVE THIS DEBUG PRINT
                     call MPI_PACK(patch_ib(k), patch_bytes, MPI_BYTE, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     new_count = new_count + 1
                 end if
@@ -1538,6 +1537,10 @@ contains
         if (allocated(airfoil_grid_u)) then
             @:DEALLOCATE(airfoil_grid_u)
             @:DEALLOCATE(airfoil_grid_l)
+        end if
+
+        if (allocated(models)) then
+            @:DEALLOCATE(models)
         end if
 
         if (collision_model > 0) call s_finalize_collisions_module()
