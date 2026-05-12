@@ -354,6 +354,8 @@ contains
 
                     collision_lookup(current_collisions, 1) = pid1
                     collision_lookup(current_collisions, 2) = pid2
+                    collision_lookup(current_collisions, 3) = pid1
+                    collision_lookup(current_collisions, 4) = pid2
                 end if
             end do
         end do

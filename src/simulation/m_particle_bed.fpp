@@ -16,24 +16,23 @@ module m_particle_bed
 
 contains
 
-    !> Generate all particle beds and append the resulting particles to patch_ib.
-    !! Called on rank 0 only, before s_mpi_bcast_user_inputs.
-    !! Uses a spatial hash grid (cell size = min_dist) so each candidate requires
-    !! only 3^dim distance checks on average instead of O(n).
+    !> Generate all particle beds and append the resulting particles to patch_ib. Called on rank 0 only, before
+    !! s_mpi_bcast_user_inputs. Uses a spatial hash grid (cell size = min_dist) so each candidate requires only 3^dim distance
+    !! checks on average instead of O(n).
     impure subroutine s_generate_particle_beds()
 
-        integer :: b, ib_idx, geom
-        integer :: n_placed, n_attempts, max_attempts
-        real(wp) :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp) :: rx, ry, rz, dist
-        integer :: seed
-        logical :: overlaps
-        real(wp), allocatable :: placed(:, :)
+        integer               :: b, ib_idx, geom
+        integer               :: n_placed, n_attempts, max_attempts
+        real(wp)              :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
+        real(wp)              :: rx, ry, rz, dist
+        integer               :: seed
+        logical               :: overlaps
+        real(wp), allocatable :: placed(:,:)
 
         ! Spatial hash grid
-        integer :: hash_size, slot
-        integer :: bx, by, bz, nbx, nby, nbz
-        integer :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        integer              :: hash_size, slot
+        integer              :: bx, by, bz, nbx, nby, nbz
+        integer              :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
         integer, allocatable :: hash_head(:), chain_next(:)
 
         if (num_particle_beds == 0) return
@@ -66,8 +65,8 @@ contains
 
             allocate (placed(3, particle_bed(b)%num_particles))
 
-            ! Hash table: 4x overprovisioned for ~25% load factor, minimum 16 buckets.
-            ! chain_next(i) links placed particle i to the previous occupant of its bucket.
+            ! Hash table: 4x overprovisioned for ~25% load factor, minimum 16 buckets. chain_next(i) links placed particle i to the
+            ! previous occupant of its bucket.
             hash_size = max(16, 4*particle_bed(b)%num_particles)
             allocate (hash_head(hash_size))
             allocate (chain_next(particle_bed(b)%num_particles))
@@ -90,7 +89,7 @@ contains
                 bz = 0
                 if (p /= 0) bz = int(floor(rz/min_dist))
 
-                ! Check 3x3(x3) neighboring bins — O(1) average via hash lookup
+                ! Check 3x3(x3) neighboring bins - O(1) average via hash lookup
                 overlaps = .false.
                 outer: do dx_b = -1, 1
                     do dy_b = -1, 1
@@ -104,8 +103,7 @@ contains
                                 if (p == 0) then
                                     dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2)
                                 else
-                                    dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 &
-                                               + (rz - placed(3, j))**2)
+                                    dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 + (rz - placed(3, j))**2)
                                 end if
                                 if (dist < min_dist) then
                                     overlaps = .true.
@@ -143,8 +141,8 @@ contains
             end do
 
             if (n_placed < particle_bed(b)%num_particles) then
-                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', &
-                    b, n_placed, particle_bed(b)%num_particles, n_attempts
+                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', b, n_placed, &
+                    & particle_bed(b)%num_particles, n_attempts
             end if
 
             deallocate (placed, hash_head, chain_next)
@@ -156,7 +154,7 @@ contains
     function f_xorshift(seed) result(rval)
 
         integer, intent(inout) :: seed
-        real(wp) :: rval
+        real(wp)               :: rval
 
         seed = ieor(seed, ishft(seed, 13))
         seed = ieor(seed, ishft(seed, -17))
@@ -166,14 +164,13 @@ contains
 
     end function f_xorshift
 
-    !> Hash bin coordinates to a 1-indexed slot in [1, hash_size].
-    !! Uses large prime multipliers to spread bins across buckets.
-    !! Hash collisions are benign: the distance check catches false neighbours.
+    !> Hash bin coordinates to a 1-indexed slot in [1, hash_size]. Uses large prime multipliers to spread bins across buckets. Hash
+    !! collisions are benign: the distance check catches false neighbours.
     function f_bin_hash(bx, by, bz, hash_size) result(slot)
 
         integer, intent(in) :: bx, by, bz, hash_size
-        integer :: slot
-        integer(8) :: key
+        integer             :: slot
+        integer(8)          :: key
 
         key = ieor(ieor(int(bx, 8)*73856093_8, int(by, 8)*19349663_8), int(bz, 8)*83492791_8)
         slot = int(mod(abs(key), int(hash_size, 8))) + 1

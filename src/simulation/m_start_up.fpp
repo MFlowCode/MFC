@@ -1007,7 +1007,7 @@ contains
             call s_check_input_file()
             call s_generate_particle_beds()
 
-            print '(" Simulating a ", A, " ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s) ", A, ".")',&
+            print '(" Simulating a ", A, " ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s) ", A, ".")', &
             #:if not MFC_CASE_OPTIMIZATION
                 "regular", &
             #:else

@@ -356,18 +356,18 @@ module m_global_parameters
 
     type particle_bed_parameters
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Center of the particle bed region
-        real(wp) :: length_x, length_y, length_z        !< Dimensions of the particle bed region
-        integer  :: num_particles                        !< Number of particles to generate
-        real(wp) :: radius                               !< Particle radius
-        real(wp) :: mass                                 !< Particle mass
-        real(wp) :: min_spacing                          !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
-        integer  :: moving_ibm                           !< Motion flag: 0=static, 1=moving (forces), 2=forced path
-        integer  :: seed                                 !< Random seed for reproducible placement
+        real(wp) :: length_x, length_y, length_z  !< Dimensions of the particle bed region
+        integer  :: num_particles  !< Number of particles to generate
+        real(wp) :: radius  !< Particle radius
+        real(wp) :: mass  !< Particle mass
+        real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
+        integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
+        integer  :: seed  !< Random seed for reproducible placement
     end type particle_bed_parameters
 
-    integer :: num_particle_beds                                                      !< Number of particle bed specifications
+    integer :: num_particle_beds  !< Number of particle bed specifications
     type(particle_bed_parameters), dimension(num_particle_beds_max) :: particle_bed  !< Particle bed specifications
-    integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks       !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
+    integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
     integer :: Np
 

@@ -27,13 +27,13 @@ steps_to_save = int(num_time_steps / num_saves)
 collision_time = 20.0 * dt
 
 # Particle bed parameters
-bed_x = -0.5
+bed_x = 0.5
 bed_y = 0.0
-bed_lx = 1.
+bed_lx = 2.0
 bed_ly = 3.5
 particle_radius = 0.15
 particle_mass = 0.25
-particle_min_spacing = 0.02
+particle_min_spacing = 0.05
 
 print(
     json.dumps(
@@ -46,8 +46,8 @@ print(
             "y_domain%beg": -domain_size * 0.5,
             "y_domain%end": domain_size * 0.5,
             "cyl_coord": "F",
-            "m": 512,
-            "n": 512,
+            "m": 256,
+            "n": 256,
             "p": 0,
             "dt": dt,
             "t_step_start": 0,
