@@ -334,7 +334,11 @@
         u_mean = u_max*bottom_blend_u
         T_loc = T_wall + (T_inf - T_wall)*bottom_blend_T
         q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = P_atm/(R_mix*T_loc)
+        if (y_cc(j) .ge. 0.0_wp) then
         q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = u_mean
+        else
+         q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) =0.0_wp
+         end if
         q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
         q_prim_vf(eqn_idx%E)%sf(i, j, 0) = P_atm
         q_prim_vf(eqn_idx%species%beg)%sf(i, j, 0) = Y_O2

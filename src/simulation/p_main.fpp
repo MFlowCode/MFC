@@ -80,7 +80,8 @@ program p_main
             end if
         end if
 
-        call s_perform_time_step(t_step, time_avg)
+
+        call s_perform_time_step(t_step, time_avg) 
 
         if (cfl_dt) then
             if (abs(mod(mytime, t_save)) < dt .or. mytime >= t_stop) then
@@ -90,6 +91,7 @@ program p_main
             if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
                 call s_save_data(t_step, start, finish, io_time_avg, nt)
             end if
+
         end if
 
         call system_clock(cpu_end)

@@ -39,7 +39,10 @@ program p_main
 
         call cpu_time(start)
 
+
         call s_perform_time_step(t_step)
+
+                print *, t_step, "lele"
 
         call s_save_data(t_step, varname, pres, c, H)
 

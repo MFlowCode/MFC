@@ -7,7 +7,7 @@ import cantera as ct
 Lx = 0.05
 Ly = 0.05
 
-ctfile = "h2o2.yaml"
+ctfile = "o2.yaml"
 sol_L = ct.Solution(ctfile)
 sol_L.TPY = 1125, ct.one_atm, "O2:0.21,N2:0.79"
 # Configuring case dictionary
@@ -30,14 +30,14 @@ case = {
     "num_fluids": 1,
     "mpp_lim": "F",
     "mixture_err": "T",
-    "time_stepper": 3,
+    "time_stepper": 1,
     "mp_weno": "F",
     "weno_order": 5,
     "weno_eps": 1e-16,
     "riemann_solver": 2,
     "wave_speeds": 1,
     "avg_state": 2,
-    "bc_x%beg": -7,
+    "bc_x%beg": -3,
     "bc_x%end": -3,
     "bc_y%beg": -16,
     "bc_y%end": -3,
@@ -57,18 +57,18 @@ case = {
     "patch_icpp(1)%x_centroid": Lx / 2,
     "patch_icpp(1)%y_centroid": Ly / 2,
     "patch_icpp(1)%length_x": Lx,
-    "patch_icpp(1)%length_y": 2*Ly,
+    "patch_icpp(1)%length_y": 10*Ly,
     "patch_icpp(1)%vel(1)": 0,
     "patch_icpp(1)%vel(2)": 0,
     "patch_icpp(1)%pres": 101325,
     "patch_icpp(1)%alpha_rho(1)": 1.00,
     "patch_icpp(1)%alpha(1)": 1,
-   "patch_ib(1)%geometry": 3,
+    "patch_ib(1)%geometry": 3,
     "patch_ib(1)%x_centroid": Lx/2,
-            "patch_ib(1)%y_centroid": -Ly/20,
-            "patch_ib(1)%length_x": 2*Lx,
-            "patch_ib(1)%length_y": Ly/2,
-            "patch_ib(1)%slip": "F",
+    "patch_ib(1)%y_centroid": -Ly/20,
+    "patch_ib(1)%length_x": Lx,
+    "patch_ib(1)%length_y": Ly/10,
+    "patch_ib(1)%slip": "F",
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
     "viscous": "T",
