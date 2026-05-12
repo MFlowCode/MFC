@@ -46,7 +46,9 @@ contains
                 type(ib_patch_parameters), allocatable :: tmp(:)
                 integer                                :: n
                 n = size(patch_ib)
-                call move_alloc(patch_ib, tmp)
+                allocate (tmp(n))
+                tmp(1:n) = patch_ib(1:n)
+                deallocate (patch_ib)
                 allocate (patch_ib(num_ib_patches_max))
                 patch_ib(1:n) = tmp
             end block

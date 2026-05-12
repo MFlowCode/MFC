@@ -1241,8 +1241,10 @@ contains
 
 #ifdef MFC_MPI
         if (num_procs == 1) then
-            ! single-rank: every patch is local - transfer ownership directly to avoid truncation
-            call move_alloc(patch_ib_gbl, patch_ib)
+            ! single-rank: every patch is local; allocate to exact size and copy
+            allocate (patch_ib(num_gbl_ibs))
+            patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
+            deallocate (patch_ib_gbl)
         else
             ! multi-rank: carve out the local neighbourhood subset
             num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
@@ -1271,8 +1273,10 @@ contains
             deallocate (patch_ib_gbl)
         end if
 #else
-        ! no-MPI: every patch is local - transfer ownership directly to avoid truncation
-        call move_alloc(patch_ib_gbl, patch_ib)
+        ! no-MPI: every patch is local; allocate to exact size and copy
+        allocate (patch_ib(num_gbl_ibs))
+        patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
+        deallocate (patch_ib_gbl)
 #endif
 
         @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
