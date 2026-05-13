@@ -173,13 +173,8 @@ contains
             end do
 
             if (n_placed < particle_bed(b)%num_particles) then
-<<<<<<< HEAD
               print *, "Error :: Failed to place all IBs ib particle bed"
               stop
-=======
-                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', b, n_placed, &
-                    & particle_bed(b)%num_particles, n_attempts
->>>>>>> 2c3099e1155411381d72e866957b6fcf2d89f9fc
             end if
 
             n_total_placed = n_total_placed + n_placed
