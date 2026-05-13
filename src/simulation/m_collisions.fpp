@@ -39,8 +39,8 @@ contains
         spring_stiffness = (pi**2 + log(e)**2)/(collision_time**2)
         $:GPU_UPDATE(device='[damping_parameter, spring_stiffness]')
 
-        @:ALLOCATE(collision_lookup(num_ibs * 8, 4))
-        @:ALLOCATE(wall_overlap_distances(num_ibs, 6))
+        @:ALLOCATE(collision_lookup(num_local_ibs_max * 27 * 8, 4))
+        @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
 
         wall_overlap_distances = 0
         $:GPU_UPDATE(device='[wall_overlap_distances]')

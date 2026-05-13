@@ -983,7 +983,7 @@ contains
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
-        num_gbl_ibs = num_ibs
+        @:ALLOCATE(models(num_ibs))
         allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
 
         do patch_id = 1, num_ibs

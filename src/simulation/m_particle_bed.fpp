@@ -22,10 +22,11 @@ contains
     impure subroutine s_generate_particle_beds()
 
         integer               :: b, ib_idx, geom
-        integer               :: n_placed
+        integer               :: n_placed, n_total_placed
         integer(8)            :: n_attempts, max_attempts
         real(wp)              :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
         real(wp)              :: rx, ry, rz, dist
+        real(wp)              :: t_start, t_end
         integer               :: seed
         logical               :: overlaps
         real(wp), allocatable :: placed(:,:)
@@ -37,6 +38,9 @@ contains
         integer, allocatable :: hash_head(:), chain_next(:)
 
         if (num_particle_beds == 0) return
+
+        call cpu_time(t_start)
+        n_total_placed = 0
 
         do b = 1, num_particle_beds
             xmin = particle_bed(b)%x_centroid - 0.5_wp*particle_bed(b)%length_x
@@ -58,7 +62,7 @@ contains
                 dz_hi = 1
             end if
 
-            max_attempts = int(particle_bed(b)%num_particles, 8)*10000_8
+            max_attempts = int(particle_bed(b)%num_particles, 8)*1000_8
             n_placed = 0
             n_attempts = 0
             seed = particle_bed(b)%seed
@@ -135,6 +139,15 @@ contains
                     patch_ib(ib_idx)%x_centroid = rx
                     patch_ib(ib_idx)%y_centroid = ry
                     patch_ib(ib_idx)%z_centroid = rz
+                    patch_ib(ib_idx)%angles(1) = 0._wp
+                    patch_ib(ib_idx)%angles(2) = 0._wp
+                    patch_ib(ib_idx)%angles(3) = 0._wp
+                    patch_ib(ib_idx)%vel(1) = 0._wp
+                    patch_ib(ib_idx)%vel(2) = 0._wp
+                    patch_ib(ib_idx)%vel(3) = 0._wp
+                    patch_ib(ib_idx)%angular_vel(1) = 0._wp
+                    patch_ib(ib_idx)%angular_vel(2) = 0._wp
+                    patch_ib(ib_idx)%angular_vel(3) = 0._wp
                     patch_ib(ib_idx)%radius = particle_bed(b)%radius
                     patch_ib(ib_idx)%mass = particle_bed(b)%mass
                     patch_ib(ib_idx)%moving_ibm = particle_bed(b)%moving_ibm
@@ -142,12 +155,16 @@ contains
             end do
 
             if (n_placed < particle_bed(b)%num_particles) then
-                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', &
-                    b, n_placed, particle_bed(b)%num_particles, n_attempts
+              print *, "Error :: Failed to place all IBs ib particle bed"
+              stop
             end if
 
+            n_total_placed = n_total_placed + n_placed
             deallocate (placed, hash_head, chain_next)
         end do
+
+        call cpu_time(t_end)
+        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', n_total_placed, ' particles in ', t_end - t_start, ' seconds.'
 
     end subroutine s_generate_particle_beds
 

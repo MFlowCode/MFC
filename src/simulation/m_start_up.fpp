@@ -922,6 +922,9 @@ contains
                 call s_read_ib_restart_data(n_start)
             else if (t_step_start > 0) then
                 call s_read_ib_restart_data(t_step_start)
+            else
+                ! particle bed generated on first tiem step
+                call s_generate_particle_beds()
             end if
             call s_instantiate_STL_models()
             call s_reduce_ib_patch_array()
@@ -1005,7 +1008,6 @@ contains
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
             call s_check_input_file()
-            call s_generate_particle_beds()
 
             print '(" Simulating a ", A, " ", I0, "x", I0, "x", I0, " case on ", I0, " rank(s) ", A, ".")', &
             #:if not MFC_CASE_OPTIMIZATION
@@ -1217,7 +1219,6 @@ contains
         logical                                                  :: is_in_neighborhood, is_local
 
         ! do all set up for moving immersed boundaries
-
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
@@ -1288,6 +1289,8 @@ contains
         integer               :: ierr
         integer, dimension(4) :: buf4, rbuf4
         integer, dimension(2) :: buf2, rbuf2
+
+        if (proc_rank == 0) print *, "Entering compute_ib_neighbor_ranks"
 
         ax = ib_neighborhood_radius
 
@@ -1431,6 +1434,8 @@ contains
             deallocate (send_table, recv_tables)
         end if
 #endif
+
+        if (proc_rank == 0) print *, "Exiting compute_ib_neighbor_ranks"
 
     end subroutine s_compute_ib_neighbor_ranks
 

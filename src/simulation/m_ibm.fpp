@@ -60,8 +60,6 @@ contains
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
         end if
 
-        @:ALLOCATE(models(num_ibs))
-
         @:ACC_SETUP_SFs(ib_markers)
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
@@ -1034,6 +1032,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        if (proc_rank == 0) print *, "s_apply_collision_forces"
         call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
 
         ! reduce the forces across local neighborhood ranks
