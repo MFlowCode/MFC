@@ -208,8 +208,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, di, dj, dk, lb, bub_idx, center, nodecoord, s_coord, cell, cellijk, &
                             & stddsv, volpart, strength_vel, strength_vol, func, func2, y_kahan, t_kahan, di_beg, di_end, dj_beg, &
-                            & dj_end, dk_beg, dk_end]', copyin='[smear_x_beg, smear_x_end, smear_y_beg, smear_y_end, smear_z_beg, &
-                                & smear_z_end]')
+                            & dj_end, dk_beg, dk_end]', copyin='[smear_x_beg, smear_x_end, smear_y_beg, smear_y_end, smear_z_beg, smear_z_end]')
         do k = smear_z_beg, smear_z_end
             do j = smear_y_beg, smear_y_end
                 do i = smear_x_beg, smear_x_end

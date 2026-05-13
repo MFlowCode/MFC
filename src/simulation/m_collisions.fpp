@@ -373,8 +373,8 @@ contains
                     edge_location = patch_ib(patch_id)%${X}$_centroid - patch_ib(patch_id)%radius
                     ! check if that edge actually extends out of the comutational domain
                     if (edge_location < glb_bounds(${DIR}$)%beg) then
-                        overlap_distance = glb_bounds(${DIR}$)%beg &
-                                                      & - edge_location  ! the distance that the IB extends out of the domain
+                        ! the distance that the IB extends out of the domain
+                        overlap_distance = glb_bounds(${DIR}$)%beg - edge_location
                     else
                         overlap_distance = 0._wp
                     end if
