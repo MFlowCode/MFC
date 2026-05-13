@@ -923,7 +923,7 @@ contains
             else if (t_step_start > 0) then
                 call s_read_ib_restart_data(t_step_start)
             else
-                ! particle bed generated on first tiem step
+                ! particle bed generated on first time step
                 call s_generate_particle_beds()
             end if
             call s_instantiate_STL_models()
@@ -1219,6 +1219,7 @@ contains
         logical                                :: is_in_neighborhood, is_local
 
         ! do all set up for moving immersed boundaries
+
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then

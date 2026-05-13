@@ -157,8 +157,8 @@ contains
             end do
 
             if (n_placed < particle_bed(b)%num_particles) then
-              print *, "Error :: Failed to place all IBs ib particle bed"
-              stop
+                print *, "Error :: Failed to place all IBs ib particle bed"
+                stop
             end if
 
             n_total_placed = n_total_placed + n_placed
@@ -166,7 +166,8 @@ contains
         end do
 
         call cpu_time(t_end)
-        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', n_total_placed, ' particles in ', t_end - t_start, ' seconds.'
+        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', n_total_placed, ' particles in ', t_end - t_start, &
+            & ' seconds.'
 
     end subroutine s_generate_particle_beds
 
