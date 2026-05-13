@@ -402,12 +402,11 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)                                        :: flux_n_vf
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb
 
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), &
-             & intent(inout) :: rhs_pb  ! TODO :: I think that this should be stp as well.
-
-        integer  :: i, j, k, l, q
+        ! TODO :: I think that this should be stp as well.
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_pb
+        integer :: i, j, k, l, q
         real(wp) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
-        logical  :: is_axisym
+        logical :: is_axisym
 
         select case (idir)
         case (1)
@@ -841,8 +840,8 @@ contains
                                                                             & momrhs(:,i1, i2, j, q))
                                                 end if
                                             case (2)
-                                                if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) &
-                                                    & .or. (j >= 10 .and. j <= 11) .or. (j == 26)) then
+                                                if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) .or. (j >= 10 &
+                                                    & .and. j <= 11) .or. (j == 26)) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
                                                                             & q))*f_quad2D(abscX(:,q), abscY(:,q), wght_pb(:,q), &
                                                                             & momrhs(:,i1, i2, j, q))
