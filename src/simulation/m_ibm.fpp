@@ -1032,7 +1032,6 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (proc_rank == 0) print *, "s_apply_collision_forces"
         call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
 
         ! reduce the forces across local neighborhood ranks

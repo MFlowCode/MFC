@@ -927,9 +927,12 @@ contains
                 call s_generate_particle_beds()
             end if
             call s_instantiate_STL_models()
+            if (proc_rank == 0) print *, "s_reduce_ib_patch_array"
             call s_reduce_ib_patch_array()
+            if (proc_rank == 0) print *, "s_ibm_setup"
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
+                if (proc_rank == 0) print *, "s_write_ib_data_file"
                 call s_write_ib_data_file(0)
                 call s_write_ib_state_file(0)
             end if
@@ -1290,8 +1293,6 @@ contains
         integer, dimension(4) :: buf4, rbuf4
         integer, dimension(2) :: buf2, rbuf2
 
-        if (proc_rank == 0) print *, "Entering compute_ib_neighbor_ranks"
-
         ax = ib_neighborhood_radius
 
         if (allocated(ib_neighbor_ranks)) deallocate (ib_neighbor_ranks)
@@ -1434,8 +1435,6 @@ contains
             deallocate (send_table, recv_tables)
         end if
 #endif
-
-        if (proc_rank == 0) print *, "Exiting compute_ib_neighbor_ranks"
 
     end subroutine s_compute_ib_neighbor_ranks
 
