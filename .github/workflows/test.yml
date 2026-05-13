@@ -659,12 +659,16 @@ jobs:
         if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh cpu ${{ matrix.interface }} ${{ matrix.cluster }}
 
+      - name: Pre-Build (SLURM)
+        if:   matrix.cluster == 'frontier_amd'
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }}
+
       - name: Build & Run Case-Optimization Tests
-        if:   matrix.cluster != 'phoenix'
+        if:   matrix.cluster != 'phoenix' && matrix.cluster != 'frontier_amd'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Run Case-Optimization Tests
-        if:   matrix.cluster == 'phoenix'
+        if:   matrix.cluster == 'phoenix' || matrix.cluster == 'frontier_amd'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Cancel SLURM Jobs
