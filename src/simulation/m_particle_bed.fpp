@@ -3,6 +3,8 @@
 !! @brief Generates particle beds: converts particle_bed specifications into
 !!        individual sphere/circle patch_ib entries before MPI broadcast.
 
+!> @brief Generates particle beds by converting particle_bed patch specifications into individual immersed boundary patches before
+!! MPI broadcast.
 module m_particle_bed
 
     use m_global_parameters
@@ -39,8 +41,24 @@ contains
 
         if (num_particle_beds == 0) return
 
+<<<<<<< HEAD
         call cpu_time(t_start)
         n_total_placed = 0
+=======
+        ! Grow patch_ib from the namelist-sized allocation to the full capacity needed for particle beds
+        if (size(patch_ib) < num_ib_patches_max) then
+            block
+                type(ib_patch_parameters), allocatable :: tmp(:)
+                integer                                :: n
+                n = size(patch_ib)
+                allocate (tmp(n))
+                tmp(1:n) = patch_ib(1:n)
+                deallocate (patch_ib)
+                allocate (patch_ib(num_ib_patches_max))
+                patch_ib(1:n) = tmp
+            end block
+        end if
+>>>>>>> 2c3099e1155411381d72e866957b6fcf2d89f9fc
 
         do b = 1, num_particle_beds
             xmin = particle_bed(b)%x_centroid - 0.5_wp*particle_bed(b)%length_x
@@ -155,8 +173,13 @@ contains
             end do
 
             if (n_placed < particle_bed(b)%num_particles) then
+<<<<<<< HEAD
               print *, "Error :: Failed to place all IBs ib particle bed"
               stop
+=======
+                print '("WARNING: particle_bed(",I0,"): placed ",I0," of ",I0," particles after ",I0," attempts")', b, n_placed, &
+                    & particle_bed(b)%num_particles, n_attempts
+>>>>>>> 2c3099e1155411381d72e866957b6fcf2d89f9fc
             end if
 
             n_total_placed = n_total_placed + n_placed

@@ -97,15 +97,15 @@ contains
 
         do i = 1, eqn_idx%E - eqn_idx%mom%beg
             q_prim_vf(i + 1)%sf(j, k, l) = 1._wp/q_prim_vf(1)%sf(j, k, &
-                      & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*patch_icpp(smooth_patch_id) &
-                      & %rho*patch_icpp(smooth_patch_id)%vel(i))
+                      & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta) &
+                      & *patch_icpp(smooth_patch_id)%rho*patch_icpp(smooth_patch_id)%vel(i))
         end do
 
         q_prim_vf(eqn_idx%gamma)%sf(j, k, l) = eta*patch_icpp(patch_id)%gamma + (1._wp - eta)*patch_icpp(smooth_patch_id)%gamma
 
         q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp/q_prim_vf(eqn_idx%gamma)%sf(j, k, &
-                  & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta)*patch_icpp(smooth_patch_id) &
-                  & %gamma*patch_icpp(smooth_patch_id)%pres)
+                  & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta) &
+                  & *patch_icpp(smooth_patch_id)%gamma*patch_icpp(smooth_patch_id)%pres)
 
         q_prim_vf(eqn_idx%pi_inf)%sf(j, k, l) = eta*patch_icpp(patch_id)%pi_inf + (1._wp - eta)*patch_icpp(smooth_patch_id)%pi_inf
 

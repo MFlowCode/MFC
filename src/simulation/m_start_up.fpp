@@ -1027,7 +1027,7 @@ contains
             "on CPUs"
 #endif
         else
-            allocate (patch_ib(num_ib_patches_max))
+            allocate (patch_ib(num_ib_patches_max_namelist))
         end if
 
         call s_mpi_bcast_user_inputs()
@@ -1215,11 +1215,11 @@ contains
     !! the local computational domain.
     subroutine s_reduce_ib_patch_array()
 
-        type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib_gbl
-        real(wp), dimension(3)                                   :: centroid
-        integer                                                  :: i, j
-        integer                                                  :: num_aware_ibs
-        logical                                                  :: is_in_neighborhood, is_local
+        type(ib_patch_parameters), allocatable :: patch_ib_gbl(:)
+        real(wp), dimension(3)                 :: centroid
+        integer                                :: i, j
+        integer                                :: num_aware_ibs
+        logical                                :: is_in_neighborhood, is_local
 
         ! do all set up for moving immersed boundaries
         moving_immersed_boundary_flag = .false.
@@ -1230,27 +1230,30 @@ contains
             end if
         end do
 
+        allocate (patch_ib_gbl(num_ibs))
         patch_ib_gbl(1:num_ibs) = patch_ib(1:num_ibs)
         call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
         call s_compute_ib_neighbor_ranks()  ! build lookup of all neighbor MPI ranks
 
-        deallocate (patch_ib)
-        num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
-        allocate (patch_ib(num_aware_ibs))
-
-        ! assign defaults to all values
         num_gbl_ibs = num_ibs
         num_local_ibs = num_ibs
         do i = 1, num_local_ibs_max
             local_ib_patch_ids(i) = i
         end do
 
+        deallocate (patch_ib)
+
 #ifdef MFC_MPI
-        ! fallback for 1-rank case
         if (num_procs == 1) then
-            patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
+            ! single-rank: every patch is local; allocate to exact size and copy
+            allocate (patch_ib(num_gbl_ibs))
+            patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
+            deallocate (patch_ib_gbl)
         else
-            ! determine the set of patches owned by local rank
+            ! multi-rank: carve out the local neighbourhood subset
+            num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
+            allocate (patch_ib(num_aware_ibs))
+
             num_local_ibs = 0
             num_ibs = 0
             do i = 1, num_gbl_ibs
@@ -1270,10 +1273,14 @@ contains
                     end if
                 end if
             end do
+
+            deallocate (patch_ib_gbl)
         end if
 #else
-        ! reduce the size of the array for local simulation in no-MPI case
-        patch_ib(:) = patch_ib_gbl(1:num_aware_ibs)
+        ! no-MPI: every patch is local; allocate to exact size and copy
+        allocate (patch_ib(num_gbl_ibs))
+        patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
+        deallocate (patch_ib_gbl)
 #endif
 
         @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))

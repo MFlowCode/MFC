@@ -104,10 +104,10 @@ contains
 
         ! Constraints on smoothing initial condition patch parameters
         do i = 1, num_patches
-            if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 3 .or. patch_icpp(i) &
-                & %geometry == 4 .or. patch_icpp(i)%geometry == 5 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i) &
-                & %geometry == 9 .or. patch_icpp(i)%geometry == 10 .or. patch_icpp(i)%geometry == 11 .or. patch_icpp(i) &
-                & %geometry == 12 .or. patch_icpp(i)%geometry == 13 .or. patch_icpp(i)%geometry == 14)) then
+            if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 3 .or. patch_icpp(i)%geometry == 4 &
+                & .or. patch_icpp(i)%geometry == 5 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i)%geometry == 9 &
+                & .or. patch_icpp(i)%geometry == 10 .or. patch_icpp(i)%geometry == 11 .or. patch_icpp(i)%geometry == 12 &
+                & .or. patch_icpp(i)%geometry == 13 .or. patch_icpp(i)%geometry == 14)) then
                 call s_check_supported_patch_smoothing(i)
             else
                 call s_check_unsupported_patch_smoothing(i)
@@ -462,11 +462,13 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%vel(1)), "Patch "//trim(iStr)//": vel(1) must be set")
-        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) .and. (.not. f_approx_equal(patch_icpp(patch_id) &
-                   & %vel(2), 0._wp)) .and. (.not. mhd), "Patch " // trim(iStr) // ": vel(2) must not be set when n = 0")
+        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) &
+                   & .and. (.not. f_approx_equal(patch_icpp(patch_id)%vel(2), 0._wp)) .and. (.not. mhd), &
+                   & "Patch " // trim(iStr) // ": vel(2) must not be set when n = 0")
         @:PROHIBIT(n > 0 .and. f_is_default(patch_icpp(patch_id)%vel(2)), "Patch "//trim(iStr)//": vel(2) must be set when n > 0")
-        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) .and. (.not. f_approx_equal(patch_icpp(patch_id) &
-                   & %vel(3), 0._wp)) .and. (.not. mhd), "Patch " // trim(iStr) // ": vel(3) must not be set when p = 0")
+        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) &
+                   & .and. (.not. f_approx_equal(patch_icpp(patch_id)%vel(3), 0._wp)) .and. (.not. mhd), &
+                   & "Patch " // trim(iStr) // ": vel(3) must not be set when p = 0")
         @:PROHIBIT(p > 0 .and. f_is_default(patch_icpp(patch_id)%vel(3)), "Patch "//trim(iStr)//": vel(3) must be set when p > 0")
         @:PROHIBIT(mhd .and. (f_is_default(patch_icpp(patch_id)%vel(2)) .or. f_is_default(patch_icpp(patch_id)%vel(3))), &
                    & "Patch " // trim(iStr) // ": All velocities (vel(1:3)) must be set when mhd = true")

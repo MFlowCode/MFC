@@ -390,8 +390,8 @@ contains
         do l = ll, lr
             do j = jl, jr
                 do i = il, ir
-                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), &
-                                      & z_cc(l) - center(3)]  ! get coordinate frame centered on IB
+                    ! get coordinate frame centered on IB
+                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)]
                     xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
                     xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 

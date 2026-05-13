@@ -31,7 +31,7 @@ NF = _fc("num_fluids_max", 10)  # fluid_pp
 NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
-NIB = _fc("num_ib_patches_max", 50000)   # patch_ib (Fortran array bound)
+NIB = _fc("num_ib_patches_max_namelist", 50000)  # patch_ib namelist limit (patch_ib grows beyond this for particle beds)
 NPB = _fc("num_particle_beds_max", 10)  # particle_bed (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
@@ -1184,9 +1184,8 @@ def _load():
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
-    # max_index is None so the parameter registry stays compact (no enumeration).
-    # The Fortran-side upper bound (num_ib_patches_max in m_constants.fpp) is parsed
-    # and enforced by the case_validator, not by max_index here.
+    # max_index=NIB enforces the namelist limit (num_ib_patches_max_namelist); particle beds can
+    # grow patch_ib beyond this at runtime, but those entries are never in the namelist.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm"]:
