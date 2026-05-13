@@ -791,6 +791,12 @@ if (MFC_POST_PROCESS)
 
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)
+
+    # flang-23/LLD defaults to PIE; SILO and LAPACK static libs on Frontier are
+    # non-PIC, producing R_X86_64_32 relocations that LLD rejects in PIE mode.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+        target_link_options(post_process PRIVATE -no-pie)
+    endif()
 endif()
 
 if (MFC_SYSCHECK)
