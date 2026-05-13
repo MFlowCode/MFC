@@ -481,36 +481,13 @@ contains
     end subroutine s_compute_viscous_stress_cylindrical_boundary
 
     !> Computes viscous terms
-    !! @param qL_prim_rsx_vf Left reconstructed primitive variables in x
-    !! @param qL_prim_rsy_vf Left reconstructed primitive variables in y
-    !! @param qL_prim_rsz_vf Left reconstructed primitive variables in z
-    !! @param dqL_prim_dx_n Left primitive x-derivative
-    !! @param dqL_prim_dy_n Left primitive y-derivative
-    !! @param dqL_prim_dz_n Left primitive z-derivative
-    !! @param qL_prim Left cell-boundary primitive variables
-    !! @param qR_prim_rsx_vf Right reconstructed primitive variables in x
-    !! @param qR_prim_rsy_vf Right reconstructed primitive variables in y
-    !! @param qR_prim_rsz_vf Right reconstructed primitive variables in z
-    !! @param dqR_prim_dx_n Right primitive x-derivative
-    !! @param dqR_prim_dy_n Right primitive y-derivative
-    !! @param dqR_prim_dz_n Right primitive z-derivative
-    !! @param qR_prim Right cell-boundary primitive variables
-    !! @param q_prim_qp Cell-averaged primitive variables
-    !! @param dq_prim_dx_qp Cell-averaged primitive x-derivative
-    !! @param dq_prim_dy_qp Cell-averaged primitive y-derivative
-    !! @param dq_prim_dz_qp Cell-averaged primitive z-derivative
-    !! @param ix Index bounds in the x-direction
-    !! @param iy Index bounds in the y-direction
-    !! @param iz Index bounds in the z-direction
-    subroutine s_get_viscous(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                             & qL_prim, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_n, dqR_prim_dy_n, &
-                             & dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, iy, iz)
+    subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, &
+                             & dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, &
+                             & iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
-             & qL_prim_rsy_vf, qR_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsz_vf
-
-        type(vector_field), dimension(num_dims), intent(inout)   :: qL_prim, qR_prim
-        type(vector_field), intent(in)                           :: q_prim_qp
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
+        type(vector_field), dimension(num_dims), intent(inout) :: qL_prim, qR_prim
+        type(vector_field), intent(in) :: q_prim_qp
         type(vector_field), dimension(1:num_dims), intent(inout) :: dqL_prim_dx_n, dqR_prim_dx_n, dqL_prim_dy_n, dqR_prim_dy_n, &
              & dqL_prim_dz_n, dqR_prim_dz_n
 
@@ -518,18 +495,16 @@ contains
         type(int_bounds_info), intent(in)               :: ix, iy, iz
         integer                                         :: i, j, k, l
 
-        do i = 1, num_dims
-            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
-
-            $:GPU_UPDATE(device='[iv]')
-
-            call s_reconstruct_cell_boundary_values_visc(q_prim_qp%vf(iv%beg:iv%end), qL_prim_rsx_vf, qL_prim_rsy_vf, &
-                & qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, i, qL_prim(i)%vf(iv%beg:iv%end), &
-                & qR_prim(i)%vf(iv%beg:iv%end), ix, iy, iz)
-        end do
+        iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
+        $:GPU_UPDATE(device='[iv]')
 
         if (weno_Re_flux) then
-            ! Compute velocity gradient at cell centers using scalar divergence theorem
+            do i = 1, num_dims
+                call s_reconstruct_cell_boundary_values_visc(q_prim_qp%vf(iv%beg:iv%end), qL_prim_rsx_vf, qR_prim_rsx_vf, i, &
+                    & qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), ix, iy, iz)
+            end do
+
+            ! Compute velocity gradients via divergence theorem on cell-boundary reconstructed values
             do i = 1, num_dims
                 if (i == 1) then
                     call s_apply_scalar_divergence_theorem(qL_prim(i)%vf(iv%beg:iv%end), qR_prim(i)%vf(iv%beg:iv%end), &
@@ -870,20 +845,21 @@ contains
 
     end subroutine s_get_viscous
 
-    !> @brief Reconstructs left and right cell-boundary values of viscous primitive variables using WENO or MUSCL.
-    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir, vL_prim_vf, &
+    !> Reconstruct left and right cell-boundary values of viscous primitive variables
+    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, &
+
         & vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_x, vR_x
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
         integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
-            if (recon_type == ${TYPE}$ .or. dummy) then
+            if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
 
                 if (norm_dir == 1) then
@@ -901,25 +877,13 @@ contains
                 end if
 
                 $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
-                if (n > 0) then
-                    if (p > 0) then
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
-                                           & iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:, &
-                                           & iv%beg:iv%end), recon_dir, is1_viscous, is2_viscous, is3_viscous)
-                    else
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
-                                           & :), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:,:), recon_dir, &
-                                           & is1_viscous, is2_viscous, is3_viscous)
-                    end if
-                else
-                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
-                                       & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1_viscous, is2_viscous, &
-                                       & is3_viscous)
-                end if
+
+                call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), recon_dir, &
+                                   & is1_viscous, is2_viscous, is3_viscous)
             end if
         #:endfor
 
-        if (viscous .or. dummy) then
+        if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
                     $:GPU_PARALLEL_LOOP(collapse=4)
@@ -927,8 +891,8 @@ contains
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
                                 do k = is2_viscous%beg, is2_viscous%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                    vL_prim_vf(i)%sf(k, j, l) = vL_x(k, j, l, i)
+                                    vR_prim_vf(i)%sf(k, j, l) = vR_x(k, j, l, i)
                                 end do
                             end do
                         end do
@@ -940,8 +904,8 @@ contains
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
                                 do l = is3_viscous%beg, is3_viscous%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                    vL_prim_vf(i)%sf(l, k, j) = vL_x(l, k, j, i)
+                                    vR_prim_vf(i)%sf(l, k, j) = vR_x(l, k, j, i)
                                 end do
                             end do
                         end do
@@ -966,17 +930,17 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_visc
 
-    !> @brief Reconstructs left and right cell-boundary values of viscous primitive variable derivatives using WENO or MUSCL.
-    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, norm_dir, vL_prim_vf, &
+    !> Reconstruct left and right cell-boundary values of viscous primitive variable derivatives
+    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, &
+
         & vR_prim_vf, ix, iy, iz)
-        type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                    :: v_vf
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, &
-             & vR_y, vR_z
+        type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(inout) :: vL_x, vR_x
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
-        type(int_bounds_info), intent(in)                           :: ix, iy, iz
-        integer, intent(in)                                         :: norm_dir
-        integer                                                     :: recon_dir  !< Coordinate direction of the WENO reconstruction
-        integer                                                     :: i, j, k, l
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+        integer, intent(in) :: norm_dir
+        integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
+        integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
             if (recon_type == ${TYPE}$) then
@@ -996,25 +960,13 @@ contains
                     is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
                 end if
                 $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
-                if (n > 0) then
-                    if (p > 0) then
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
-                                           & iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:, &
-                                           & iv%beg:iv%end), recon_dir, is1_viscous, is2_viscous, is3_viscous)
-                    else
-                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,iv%beg:iv%end), vL_z(:,:,:, &
-                                           & :), vR_x(:,:,:,iv%beg:iv%end), vR_y(:,:,:,iv%beg:iv%end), vR_z(:,:,:,:), recon_dir, &
-                                           & is1_viscous, is2_viscous, is3_viscous)
-                    end if
-                else
-                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vL_y(:,:,:,:), vL_z(:,:,:,:), vR_x(:,:,:, &
-                                       & iv%beg:iv%end), vR_y(:,:,:,:), vR_z(:,:,:,:), recon_dir, is1_viscous, is2_viscous, &
-                                       & is3_viscous)
-                end if
+
+                call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), recon_dir, &
+                                   & is1_viscous, is2_viscous, is3_viscous)
             end if
         #:endfor
 
-        if (viscous .or. dummy) then
+        if (viscous) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
                     $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1022,8 +974,8 @@ contains
                         do l = is3_viscous%beg, is3_viscous%end
                             do j = is1_viscous%beg, is1_viscous%end
                                 do k = is2_viscous%beg, is2_viscous%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                    vL_prim_vf(i)%sf(k, j, l) = vL_x(k, j, l, i)
+                                    vR_prim_vf(i)%sf(k, j, l) = vR_x(k, j, l, i)
                                 end do
                             end do
                         end do
@@ -1035,8 +987,8 @@ contains
                         do j = is1_viscous%beg, is1_viscous%end
                             do k = is2_viscous%beg, is2_viscous%end
                                 do l = is3_viscous%beg, is3_viscous%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                    vL_prim_vf(i)%sf(l, k, j) = vL_x(l, k, j, i)
+                                    vR_prim_vf(i)%sf(l, k, j) = vR_x(l, k, j, i)
                                 end do
                             end do
                         end do

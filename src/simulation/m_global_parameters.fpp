@@ -490,7 +490,6 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
-    logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
     !> @name Continuum damage model parameters
     !> @{!
@@ -722,7 +721,6 @@ contains
         #:endfor
 
         fft_wrt = .false.
-        dummy = .false.
 
         do j = 1, num_probes_max
             acoustic(j)%pulse = dflt_int

@@ -133,10 +133,10 @@ contains
 
         if (bubbles_lagrange) then
             block
-                real(stp), allocatable :: beta_ones(:,:,:)
+                real(stp), allocatable                         :: beta_ones(:,:,:)
                 character(LEN=len_trim(t_step_dir) + name_len) :: beta_file_loc
-                integer :: jj, kk, ll
-                allocate (beta_ones(0:m, 0:n, 0:p))
+                integer                                        :: jj, kk, ll
+                allocate (beta_ones(0:m,0:n,0:p))
                 do ll = 0, p
                     do kk = 0, n
                         do jj = 0, m
@@ -553,8 +553,8 @@ contains
             if (bubbles_lagrange) then
                 block
                     real(stp), allocatable :: beta_ones(:,:,:)
-                    integer :: jj, kk, ll
-                    allocate (beta_ones(0:m, 0:n, 0:p))
+                    integer                :: jj, kk, ll
+                    allocate (beta_ones(0:m,0:n,0:p))
                     do ll = 0, p
                         do kk = 0, n
                             do jj = 0, m
@@ -635,8 +635,8 @@ contains
             if (bubbles_lagrange) then
                 block
                     real(stp), allocatable :: beta_ones(:,:,:)
-                    integer :: jj, kk, ll
-                    allocate (beta_ones(0:m, 0:n, 0:p))
+                    integer                :: jj, kk, ll
+                    allocate (beta_ones(0:m,0:n,0:p))
                     do ll = 0, p
                         do kk = 0, n
                             do jj = 0, m

@@ -554,7 +554,7 @@ contains
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
-                if (weno_order == 3 .or. dummy) then
+                if (weno_order == 3) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
                         & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
@@ -582,7 +582,7 @@ contains
                 end if
 
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                if (weno_order == 5 .or. dummy) then
+                if (weno_order == 5) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
                         & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 

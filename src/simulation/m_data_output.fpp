@@ -215,7 +215,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         ! end: Computing Stability Criteria at Current Time-step
 
-        ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, n_el_bubs_loc, icfl_max_glb, &
                 & vcfl_max_glb, Rc_min_glb, n_el_bubs_glb)

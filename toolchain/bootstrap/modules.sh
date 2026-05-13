@@ -139,14 +139,15 @@ if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' '
 fi
 
 if [ "$u_c" '==' 'famd' ]; then 
-    export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/rocm-afar-8873-drop-22.2.0"
+    export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/therock-23.1.0-gfx90a-7.12.0-bb5005b6"
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
     export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD_LIBRARY_PATH}
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm-7.0.2/lib/llvm/lib:/opt/rocm-7.0.2/lib/
 
     export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich3.4a2"
     export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/include/hipfort/amdgcn"
-    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -lhipfft"
+    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
     export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
