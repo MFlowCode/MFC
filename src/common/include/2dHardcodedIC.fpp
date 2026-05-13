@@ -8,6 +8,12 @@
     real(wp) :: sinA, cosA
     real(wp) :: r_sq
 
+    ! # 283 - Gauss-averaged isentropic vortex (conserved-variable cell averages)
+    real(wp) :: gauss_xi(3), gauss_w(3), xq, yq, r2q, T_facq, wq
+    real(wp) :: rho_avg, rhou_avg, rhov_avg, E_avg
+    real(wp) :: rhoq, pq, uq, vq, Eq, vortex_eps
+    integer  :: igq, jgq
+
     ! # 291 - Shear/Thermal Layer Case
     real(wp) :: delta_shear, u_max, u_mean
     real(wp) :: T_wall, T_inf, P_atm, T_loc
@@ -285,11 +291,11 @@
                       & 0) = 1.0*(1.0 - (1.0/1.0)*(5.0/(2.0*pi))*(5.0/(8.0*1.0*(1.4 + 1.0)*pi))*exp(2.0*1.0*(1.0 - (x_cc(i) &
                       & - patch_icpp(1)%x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0)))**1.4
             q_prim_vf(eqn_idx%mom%beg + 0)%sf(i, j, &
-                      & 0) = 0.0 + (y_cc(j) - patch_icpp(1)%y_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1) &
-                      & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+                      & 0) = patch_icpp(1)%vel(1) + (y_cc(j) - patch_icpp(1)%y_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) &
+                      & - patch_icpp(1) %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
             q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, &
-                      & 0) = 0.0 - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) - patch_icpp(1) &
-                      & %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
+                      & 0) = patch_icpp(1)%vel(2) - (x_cc(i) - patch_icpp(1)%x_centroid)*(5.0/(2.0*pi))*exp(1.0*(1.0 - (x_cc(i) &
+                      & - patch_icpp(1) %x_centroid)**2.0 - (y_cc(j) - patch_icpp(1)%y_centroid)**2.0))
         end if
     case (281)  ! Acoustic pulse
         ! This is patch is hard-coded for test suite optimization used in the 2D_acoustic_pulse case: This analytic patch uses
@@ -312,6 +318,46 @@
                       & 0) = 112.99092883944267*(1 - (0.1/0.3))*y_cc(j)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
             q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, &
                       & 0) = 112.99092883944267*((0.1/0.3))*x_cc(i)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
+        end if
+    case (283)  ! Isentropic vortex: conserved-variable GL cell averages (3-pt tensor product)
+        ! GL averages of conserved variables (rho, rho*u, rho*v, E) eliminate the O(h^2) error that primitive-variable averaging
+        ! introduces through the nonlinear prim->cons conversion: cell_avg(rho*u) != cell_avg(rho)*cell_avg(u) by O(h^2). We back
+        ! out primitive values that reproduce the conserved averages exactly. Vortex strength eps is read from
+        ! patch_icpp(patch_id)%epsilon; defaults to 5.
+        if (patch_id == 1) then
+            vortex_eps = merge(patch_icpp(patch_id)%epsilon, 5._wp, patch_icpp(patch_id)%epsilon > 0._wp)
+            gauss_xi = [-sqrt(3._wp/5._wp), 0._wp, sqrt(3._wp/5._wp)]
+            gauss_w = [5._wp/9._wp, 8._wp/9._wp, 5._wp/9._wp]
+            rho_avg = 0._wp; rhou_avg = 0._wp; rhov_avg = 0._wp; E_avg = 0._wp
+            do igq = 1, 3
+                do jgq = 1, 3
+                    xq = x_cc(i) + gauss_xi(igq)*(x_cb(i) - x_cb(i - 1))*0.5_wp
+                    yq = y_cc(j) + gauss_xi(jgq)*(y_cb(j) - y_cb(j - 1))*0.5_wp
+                    r2q = (xq - patch_icpp(patch_id)%x_centroid)**2._wp + (yq - patch_icpp(patch_id)%y_centroid)**2._wp
+                    T_facq = 1._wp - (vortex_eps/(2._wp*pi))*(vortex_eps/(8._wp*(1.4_wp + 1._wp)*pi))*exp(2._wp*(1._wp - r2q))
+                    wq = gauss_w(igq)*gauss_w(jgq)
+                    rhoq = T_facq**1.4_wp
+                    pq = T_facq**2.4_wp
+                    uq = patch_icpp(patch_id)%vel(1) + (yq - patch_icpp(patch_id)%y_centroid)*(vortex_eps/(2._wp*pi))*exp(1._wp &
+                                    & - r2q)
+                    vq = patch_icpp(patch_id)%vel(2) - (xq - patch_icpp(patch_id)%x_centroid)*(vortex_eps/(2._wp*pi))*exp(1._wp &
+                                    & - r2q)
+                    Eq = pq/0.4_wp + 0.5_wp*rhoq*(uq**2 + vq**2)
+                    rho_avg = rho_avg + wq*rhoq
+                    rhou_avg = rhou_avg + wq*(rhoq*uq)
+                    rhov_avg = rhov_avg + wq*(rhoq*vq)
+                    E_avg = E_avg + wq*Eq
+                end do
+            end do
+            rho_avg = rho_avg*0.25_wp
+            rhou_avg = rhou_avg*0.25_wp
+            rhov_avg = rhov_avg*0.25_wp
+            E_avg = E_avg*0.25_wp
+            ! Back out primitive vars so prim->cons conversion recovers the conserved averages
+            q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = rho_avg
+            q_prim_vf(eqn_idx%mom%beg + 0)%sf(i, j, 0) = rhou_avg/rho_avg
+            q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, 0) = rhov_avg/rho_avg
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = (E_avg - 0.5_wp*(rhou_avg**2 + rhov_avg**2)/rho_avg)*0.4_wp
         end if
     case (291)  ! Isothermal Flat Plate
         T_inf = 1125.0_wp

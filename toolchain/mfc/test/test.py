@@ -111,6 +111,18 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--only filter matched zero test cases. Specified: {ARG('only')}. Check that UUIDs/names are valid.")
 
+    # Convergence cases are slow (multiple resolutions × MPI ranks). Skip
+    # by default unless the user explicitly opted in via --only "Convergence"
+    # or a convergence UUID. _filter_only above has already narrowed cases
+    # to the user's selection, so any convergence case still present here
+    # was selected on purpose. Listing (`-l`) shows all cases regardless.
+    if not ARG("only") and not ARG("list"):
+        convergence_cases = [c for c in cases if getattr(c, "kind", "golden") == "convergence"]
+        if convergence_cases:
+            for c in convergence_cases:
+                cases.remove(c)
+                skipped_cases.append(c)
+
     # --only-changes: filter based on file-level gcov coverage
     if ARG("only_changes"):
         from .coverage import (
@@ -435,9 +447,39 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
         raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
 
+def _handle_convergence_case(case: TestCase, start_time: float):
+    """Dispatch convergence/order-of-accuracy cases through convergence.py."""
+    from .convergence import run_case
+
+    if ARG("dry_run"):
+        trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
+        cons.print(f"  (dry-run)     {trace_display:50s}   SKIP    [magenta]{case.get_uuid()}[/magenta]")
+        return
+
+    passed, output = run_case(case.convergence_spec)
+
+    log_dir = os.path.join(common.MFC_TEST_DIR, case.get_uuid())
+    common.create_directory(log_dir)
+    common.file_write(os.path.join(log_dir, "convergence.log"), output)
+
+    duration = time.time() - start_time
+    global current_test_number  # noqa: PLW0603
+    current_test_number += 1
+    progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
+    trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
+    cons.print(f"  {progress_str}    {trace_display:50s}  {duration:6.2f}    [magenta]{case.get_uuid()}[/magenta]")
+
+    if not passed:
+        raise MFCException(f"Test {case}: convergence rate check failed (see {log_dir}/convergence.log)")
+
+
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     global current_test_number  # noqa: PLW0603
     start_time = time.time()
+
+    if getattr(case, "kind", "golden") == "convergence":
+        _handle_convergence_case(case, start_time)
+        return
 
     # Set timeout using threading.Timer (works in worker threads)
     # Note: we intentionally do not use signal.alarm() here because signals

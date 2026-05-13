@@ -54,6 +54,7 @@ print(
             "model_eqns": 2,
             "num_fluids": 1,
             "time_stepper": 3,
+            "riemann_solver": 5,
             "bc_x%beg": -1,
             "bc_x%end": -1,
             "bc_y%beg": -1,
