@@ -1,0 +1,25 @@
+--- a/fypp.py
++++ b/fypp.py
+@@ -1842,11 +1842,16 @@ class _Renderer:
+             if self._linenums:
+                 # Last line was folded, but no linenums were generated for
+                 # the continuation lines -> current line position is not
+                 # in sync with the one calculated from the last line number
+                 unsync = (
+                     len(foldedlines) and len(foldedlines[-1]) > 1
+                     and not self._contlinenums)
+                 # Eval directive in source consists of more than one line
+                 multiline = span[1] - span[0] > 1
+-                if unsync or multiline:
++                # Always emit a resync marker after a $: call. Without this,
++                # single-line $: calls that expand to multi-line #if/#endif
++                # blocks (e.g. GPU_PARALLEL_LOOP) cause the compiler to
++                # attribute the next Fortran statement to the call-site line
++                # rather than the following source line, producing off-by-1
++                # errors in backtraces and debugger line info.
++                if unsync or multiline or True:
+                     # For inline eval directives span[0] == span[1]
+                     # -> next line is span[0] + 1 and not span[1] as for
+                     # line eval directives
+                     nextline = max(span[1], span[0] + 1)
+                     trailing += self._linenumdir(nextline, fname)
