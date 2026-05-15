@@ -32,8 +32,8 @@ module m_riemann_solvers
         & s_hlld_riemann_solver, s_lf_riemann_solver, s_finalize_riemann_solvers_module
 
     !> The cell-boundary values of the fluxes (src - source) that are computed through the chosen Riemann problem solver, and the
-    !! direct evaluation of source terms, by using the left and right states given in qK_prim_rs_vf, dqK_prim_ds_vf where ds =
-    !! x%spacing, y%spacing or z%spacing.
+    !! direct evaluation of source terms, by using the left and right states given in qK_prim_rs_vf, dqK_prim_ds_vf where ds = dx,
+    !! dy or dz.
     !> @{
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf, flux_src_rsx_vf
     $:GPU_DECLARE(create='[flux_rsx_vf, flux_src_rsx_vf]')
@@ -688,7 +688,7 @@ contains
 
                             ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
-                                if (n == 0) then  ! 1D: d/x%spacing flux only & Bx = Bx0 = const.
+                                if (n == 0) then  ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 1
@@ -1296,7 +1296,7 @@ contains
 
                             ! MHD: magnetic flux and Maxwell stress contributions
                             if (mhd) then
-                                if (n == 0) then  ! 1D: d/x%spacing flux only & Bx = Bx0 = const.
+                                if (n == 0) then  ! 1D: d/dx flux only & Bx = Bx0 = const.
                                     ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 1
@@ -4105,17 +4105,17 @@ contains
                         Re_s = Re_avg_rsx_vf(j, k, l, 1)
                         Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
-                        r_eff = y%cc(k)
+                        r_eff = y_cc(k)
                     case (2)  ! y-face (radial face in r_cyl direction)
                         Re_s = Re_avg_rsx_vf(j, k, l, 1)
                         Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
-                        r_eff = y%cb(k)
+                        r_eff = y_cb(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         Re_s = Re_avg_rsx_vf(j, k, l, 1)
                         Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
-                        r_eff = y%cc(k)
+                        r_eff = y_cc(k)
                     end select
 
                     ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)

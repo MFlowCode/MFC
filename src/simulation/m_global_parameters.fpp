@@ -53,6 +53,14 @@ module m_global_parameters
     type(grid_axis), target :: x, y, z
     !> @}
 
+    !> @name Flat GPU-accessible aliases for grid arrays (used in GPU kernels)
+    !> @{
+    real(wp), allocatable, target :: dx(:), dy(:), dz(:)
+    real(wp), allocatable, target :: x_cc(:), y_cc(:), z_cc(:)
+    real(wp), allocatable, target :: x_cb(:), y_cb(:), z_cb(:)
+    !> @}
+    $:GPU_DECLARE(create='[dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb]')
+
     real(wp) :: dt  !< Size of the time-step
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[x%cb, y%cb, z%cb, x%cc, y%cc, z%cc, x%spacing, y%spacing, z%spacing, dt, m, n, p]')
@@ -1222,6 +1230,9 @@ contains
         @:PREFER_GPU(x%cb)
         @:PREFER_GPU(x%cc)
         @:PREFER_GPU(x%spacing)
+        @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
+        @:ALLOCATE(x_cc(-buff_size:m + buff_size))
+        @:ALLOCATE(dx(-buff_size:m + buff_size))
 
         if (n == 0) return
         @:ALLOCATE(y%cb(-1 - buff_size:n + buff_size))
@@ -1230,6 +1241,9 @@ contains
         @:PREFER_GPU(y%cb)
         @:PREFER_GPU(y%cc)
         @:PREFER_GPU(y%spacing)
+        @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
+        @:ALLOCATE(y_cc(-buff_size:n + buff_size))
+        @:ALLOCATE(dy(-buff_size:n + buff_size))
 
         if (p == 0) return
         @:ALLOCATE(z%cb(-1 - buff_size:p + buff_size))
@@ -1238,6 +1252,9 @@ contains
         @:PREFER_GPU(z%cb)
         @:PREFER_GPU(z%cc)
         @:PREFER_GPU(z%spacing)
+        @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
+        @:ALLOCATE(z_cc(-buff_size:p + buff_size))
+        @:ALLOCATE(dz(-buff_size:p + buff_size))
 
     end subroutine s_initialize_global_parameters_module
 
@@ -1319,12 +1336,15 @@ contains
 
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x%cb, x%cc, x%spacing)
+        @:DEALLOCATE(x_cb, x_cc, dx)
 
         if (n == 0) return
         @:DEALLOCATE(y%cb, y%cc, y%spacing)
+        @:DEALLOCATE(y_cb, y_cc, dy)
 
         if (p == 0) return
         @:DEALLOCATE(z%cb, z%cc, z%spacing)
+        @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module
 

@@ -924,6 +924,15 @@ contains
 
         call s_populate_grid_variables_buffers()
 
+        ! Sync flat grid aliases from struct members before module inits that use them (e.g. WENO coeff setup)
+        x_cb = x%cb; x_cc = x%cc; dx = x%spacing
+        if (n > 0) then
+            y_cb = y%cb; y_cc = y%cc; dy = y%spacing
+        end if
+        if (p > 0) then
+            z_cb = z%cb; z_cc = z%cc; dz = z%spacing
+        end if
+
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             if (cfl_dt .and. n_start > 0) then
@@ -1081,6 +1090,22 @@ contains
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
         $:GPU_UPDATE(device='[x%spacing, y%spacing, z%spacing, x%cb, x%cc, y%cb, y%cc, z%cb, z%cc]')
+
+        ! Sync flat GPU aliases from struct members
+        dx = x%spacing; x_cc = x%cc; x_cb = x%cb
+        if (n > 0) then
+            dy = y%spacing; y_cc = y%cc; y_cb = y%cb
+        end if
+        if (p > 0) then
+            dz = z%spacing; z_cc = z%cc; z_cb = z%cb
+        end if
+        $:GPU_UPDATE(device='[dx, x_cc, x_cb]')
+        if (n > 0) then
+            $:GPU_UPDATE(device='[dy, y_cc, y_cb]')
+        end if
+        if (p > 0) then
+            $:GPU_UPDATE(device='[dz, z_cc, z_cb]')
+        end if
         $:GPU_UPDATE(device='[bc%x%beg, bc%x%end, bc%y%beg, bc%y%end, bc%z%beg, bc%z%end]')
         $:GPU_UPDATE(device='[bc%x%beg_side%vel_wall, bc%x%end_side%vel_wall]')
         $:GPU_UPDATE(device='[bc%y%beg_side%vel_wall, bc%y%end_side%vel_wall]')

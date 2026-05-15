@@ -758,7 +758,7 @@ contains
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1)) + rho*c*c*vel(dir_idx(1))/y%cc(n)
+                            dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1)) + rho*c*c*vel(dir_idx(1))/y_cc(n)
                         else
                             dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1))
                         end if
@@ -791,7 +791,7 @@ contains
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%adv%end - eqn_idx%E
-                                dadv_dt(i) = -L(eqn_idx%mom%end + i)  ! + adv_local(i) * vel(dir_idx(1))/y%cc(n)
+                                dadv_dt(i) = -L(eqn_idx%mom%end + i)  ! + adv_local(i) * vel(dir_idx(1))/y_cc(n)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')

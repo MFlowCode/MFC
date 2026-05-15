@@ -488,18 +488,18 @@ contains
         ! Calculate sig spatial support width
 
         if (n == 0) then
-            sig = x%spacing(j)
+            sig = dx(j)
         else if (p == 0) then
-            sig = maxval((/x%spacing(j), y%spacing(k)/))
+            sig = maxval((/dx(j), dy(k)/))
         else
-            sig = maxval((/x%spacing(j), y%spacing(k), z%spacing(l)/))
+            sig = maxval((/dx(j), dy(k), dz(l)/))
         end if
         sig = sig*acoustic_spatial_support_width
 
         ! Calculate displacement from acoustic source location
-        r(1) = x%cc(j) - loc(1)
-        if (n /= 0) r(2) = y%cc(k) - loc(2)
-        if (p /= 0) r(3) = z%cc(l) - loc(3)
+        r(1) = x_cc(j) - loc(1)
+        if (n /= 0) r(2) = y_cc(k) - loc(2)
+        if (p /= 0) r(3) = z_cc(l) - loc(3)
 
         if (any(support(ai) == (/1, 2, 3, 4/))) then
             call s_source_spatial_planar(ai, sig, r, source)
