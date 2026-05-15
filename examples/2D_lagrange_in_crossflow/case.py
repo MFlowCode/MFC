@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import math
+import os
 
 # Bubble screen
 # Description: A planar acoustic wave interacts with a bubble cloud
@@ -53,6 +54,27 @@ z_virtual = 5.0e-3  # Virtual depth (z direction)
 
 Nx = 240  # number of elements into x direction
 Ny = 50  # number of elements into y direction
+
+# Lagrangian bubble initial conditions
+# Columns: x, y, z, u, v, w, R, pad (all nondimensional; lengths in units of x0)
+lag_bubbles = [
+    (-10.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.1000, 0.0),
+    (-10.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.1500, 0.0),
+    (-10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1500, 0.0),
+    (-10.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.1500, 0.0),
+    (-10.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.1009, 0.0),
+]
+
+
+def write_lag_bubbles_file():
+    input_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "input")
+    os.makedirs(input_dir, exist_ok=True)
+    with open(os.path.join(input_dir, "lag_bubbles.dat"), "w") as f:
+        for row in lag_bubbles:
+            f.write("".join(f"{v:15.6E}" for v in row) + "\n")
+
+
+write_lag_bubbles_file()
 
 # Configuring case dictionary
 print(
@@ -117,7 +139,7 @@ print(
             "thermal": 3,
             "polytropic": "F",
             "fd_order": 2,
-            "lag_params%nBubs_glb": 5,
+            "lag_params%nBubs_glb": len(lag_bubbles),
             "lag_params%vel_model": 2,
             "lag_params%drag_model": 3,
             "lag_params%solver_approach": 1,

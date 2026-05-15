@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import math
+import os
 
 # Bubble screen
 # Description: A planar acoustic wave interacts with a bubble cloud
@@ -52,6 +53,22 @@ z_virtual = 5.0e-3  # Virtual depth (z direction)
 
 Nx = 50  # number of elements into x direction
 Ny = 50  # number of elements into y direction
+
+# Lagrangian bubble seeding: 5 bubbles along y=-2 with varying radii
+lag_bubbles = [
+    # x,   y,    z,   u, v, w,   R,     interface velocity
+    (-2.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.100, 0.0),
+    (-1.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.125, 0.0),
+    (0.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.150, 0.0),
+    (1.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.125, 0.0),
+    (2.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.075, 0.0),
+]
+
+input_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "input")
+os.makedirs(input_dir, exist_ok=True)
+with open(os.path.join(input_dir, "lag_bubbles.dat"), "w") as f:
+    for row in lag_bubbles:
+        f.write("\t".join(f"{v: .6E}" for v in row) + "\n")
 
 # Configuring case dictionary
 print(

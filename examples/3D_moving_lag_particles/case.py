@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+import os
 
 import numpy as np
 
@@ -193,5 +194,51 @@ data = {
 }
 
 mods = {}
+
+
+def write_lag_bubbles_file():
+    nBubs = 5000
+    r_inner = 0.25 / L0
+    r_outer = 0.50 / L0
+    R_min, R_max = 0.5, 1.0
+    max_attempts = 10000
+
+    rng = np.random.default_rng(seed=42)
+    x_pos = np.zeros(nBubs)
+    y_pos = np.zeros(nBubs)
+    z_pos = np.zeros(nBubs)
+    R_bub = np.zeros(nBubs)
+
+    for n in range(nBubs):
+        for _ in range(max_attempts):
+            u = rng.uniform(0.0, 1.0)
+            r = (r_inner**3 + u * (r_outer**3 - r_inner**3)) ** (1.0 / 3.0)
+            cos_th = rng.uniform(-1.0, 1.0)
+            sin_th = math.sqrt(max(0.0, 1.0 - cos_th * cos_th))
+            phi = rng.uniform(0.0, 2.0 * math.pi)
+            xi = r * sin_th * math.cos(phi)
+            yi = r * sin_th * math.sin(phi)
+            zi = r * cos_th
+            Ri = rng.uniform(R_min, R_max)
+            if n == 0:
+                break
+            dx = x_pos[:n] - xi
+            dy = y_pos[:n] - yi
+            dz = z_pos[:n] - zi
+            dist = np.sqrt(dx * dx + dy * dy + dz * dz)
+            if np.all(dist >= 2 * (R_bub[:n] + Ri)):
+                break
+        else:
+            raise RuntimeError(f"Could not place bubble {n} without overlap after {max_attempts} attempts")
+        x_pos[n], y_pos[n], z_pos[n], R_bub[n] = xi, yi, zi, Ri
+
+    input_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "input")
+    os.makedirs(input_dir, exist_ok=True)
+    with open(os.path.join(input_dir, "lag_bubbles.dat"), "w") as f:
+        for i in range(nBubs):
+            f.write(f"{x_pos[i]:12.6f}\t{y_pos[i]:12.6f}\t{z_pos[i]:12.6f}\t{0.0:12.6f}\t{0.0:12.6f}\t{0.0:12.6f}\t{R_bub[i]:12.6f}\t{0.0:12.6f}\n")
+
+
+write_lag_bubbles_file()
 
 print(json.dumps({**data, **mods}, indent=4))
