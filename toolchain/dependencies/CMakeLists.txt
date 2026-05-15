@@ -109,6 +109,7 @@ if (MFC_SILO)
                            "-DCMAKE_FIND_PACKAGE_REDIRECTS_DIR=${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}"
                            "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
                            "-DCMAKE_C_FLAGS=${_silo_c_flags}"
+                           "$<$<STREQUAL:${CMAKE_Fortran_COMPILER_ID},Cray>:-DCMAKE_MODULE_PATH=${CMAKE_SOURCE_DIR}/../cmake/cce>"
         )
     endif()
 endif()
