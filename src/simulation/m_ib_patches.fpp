@@ -111,15 +111,15 @@ contains
         jl = -gp_layers - 1
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
-        call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
-        call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
+        call get_bounding_indices(center(1) - radius, center(1) + radius, x%cc, il, ir)
+        call get_bounding_indices(center(2) - radius, center(2) + radius, y%cc, jl, jr)
 
         ! Assign primitive variables if circle covers cell and patch has write permission
 
         $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[encoded_patch_id, center, radius]', collapse=2)
         do j = jl, jr
             do i = il, ir
-                if ((x_cc(i) - center(1))**2 + (y_cc(j) - center(2))**2 <= radius**2) then
+                if ((x%cc(i) - center(1))**2 + (y%cc(j) - center(2))**2 <= radius**2) then
                     ib_markers%sf(i, j, 0) = encoded_patch_id
                 end if
             end do
@@ -152,8 +152,8 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        Np1 = int((pa*ca_in/dx(0))*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
+        Np1 = int((pa*ca_in/x%spacing(0))*20)
+        Np2 = int(((ca_in - pa*ca_in)/x%spacing(0))*20)
         Np = Np1 + Np2 + 1
         $:GPU_UPDATE(device='[Np]')
 
@@ -224,14 +224,14 @@ contains
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         ! maximum distance any marker can be from the center is the length of the airfoil
-        call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
-        call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
+        call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x%cc, il, ir)
+        call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y%cc, jl, jr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, ma, &
                             & ca_in, airfoil_grid_u, airfoil_grid_l]', collapse=2)
         do j = jl, jr
             do i = il, ir
-                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
+                xy_local = [x%cc(i) - center(1), y%cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinates
                 xy_local = xy_local - offset  ! airfoils are a patch that require a centroid offset
 
@@ -310,8 +310,8 @@ contains
         z_max = lz/2
         z_min = -lz/2
 
-        Np1 = int((pa*ca_in/dx(0))*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
+        Np1 = int((pa*ca_in/x%spacing(0))*20)
+        Np2 = int(((ca_in - pa*ca_in)/x%spacing(0))*20)
         Np = Np1 + Np2 + 1
         $:GPU_UPDATE(device='[Np]')
 
@@ -381,9 +381,9 @@ contains
         jr = n + gp_layers + 1
         lr = p + gp_layers + 1
         ! maximum distance any marker can be from the center is the length of the airfoil
-        call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
-        call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
-        call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
+        call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x%cc, il, ir)
+        call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y%cc, jl, jr)
+        call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z%cc, ll, lr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, &
                             & ma, ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
@@ -391,7 +391,7 @@ contains
             do j = jl, jr
                 do i = il, ir
                     ! get coordinate frame centered on IB
-                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)]
+                    xyz_local = [x%cc(i) - center(1), y%cc(j) - center(2), z%cc(l) - center(3)]
                     xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
                     xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
@@ -469,16 +469,16 @@ contains
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         corner_distance = sqrt(dot_product(length, length))/2._wp  ! maximum distance any marker can be from the center
-        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
-        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
+        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x%cc, il, ir)
+        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y%cc, jl, jr)
 
         ! Assign primitive variables if rectangle covers cell and patch has write permission
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, &
-                            & y_cc]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, length, inverse_rotation, x%cc, &
+                            & y%cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
-                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+                xy_local = [x%cc(i) - center(1), y%cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
 
                 if (-0.5_wp*length(1) <= xy_local(1) .and. 0.5_wp*length(1) >= xy_local(1) .and. -0.5_wp*length(2) <= xy_local(2) &
@@ -515,9 +515,9 @@ contains
         radius = patch_ib(patch_id)%radius
 
         ! completely skip particles no in the domain
-        if (center(1) - radius > x_cc(m + gp_layers + 1) .or. center(1) + radius < x_cc(-gp_layers - 1) .or. center(2) &
-            & - radius > y_cc(n + gp_layers + 1) .or. center(2) + radius < y_cc(-gp_layers - 1) .or. center(3) - radius > z_cc(p &
-            & + gp_layers + 1) .or. center(3) + radius < z_cc(-gp_layers - 1)) then
+        if (center(1) - radius > x%cc(m + gp_layers + 1) .or. center(1) + radius < x%cc(-gp_layers - 1) .or. center(2) &
+            & - radius > y%cc(n + gp_layers + 1) .or. center(2) + radius < y%cc(-gp_layers - 1) .or. center(3) - radius > z%cc(p &
+            & + gp_layers + 1) .or. center(3) + radius < z%cc(-gp_layers - 1)) then
             return
         end if
 
@@ -531,9 +531,9 @@ contains
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
-        call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
-        call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
-        call get_bounding_indices(center(3) - radius, center(3) + radius, z_cc, kl, kr)
+        call get_bounding_indices(center(1) - radius, center(1) + radius, x%cc, il, ir)
+        call get_bounding_indices(center(2) - radius, center(2) + radius, y%cc, jl, jr)
+        call get_bounding_indices(center(3) - radius, center(3) + radius, z%cc, kl, kr)
 
         ! Checking whether the sphere covers a particular cell in the domain and verifying whether the current patch has permission
         ! to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to this cell.
@@ -542,7 +542,7 @@ contains
             do j = jl, jr
                 do i = il, ir
                     ! Updating the patch identities bookkeeping variable
-                    if (((x_cc(i) - center(1))**2 + (y_cc(j) - center(2))**2 + (z_cc(k) - center(3))**2 <= radius**2)) then
+                    if (((x%cc(i) - center(1))**2 + (y%cc(j) - center(2))**2 + (z%cc(k) - center(3))**2 <= radius**2)) then
                         ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do
@@ -585,9 +585,9 @@ contains
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
         corner_distance = sqrt(dot_product(length, length))/2._wp  ! maximum distance any marker can be from the center
-        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
-        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
-        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
+        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x%cc, il, ir)
+        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y%cc, jl, jr)
+        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z%cc, kl, kr)
 
         ! Checking whether the cuboid covers a particular cell in the domain and verifying whether the current patch has permission
         ! to write to to that cell. If both queries check out, the primitive variables of the current patch are assigned to this
@@ -597,7 +597,7 @@ contains
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
-                    xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+                    xyz_local = [x%cc(i), y%cc(j), z%cc(k)] - center  ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
                     if (-0.5*length(1) <= xyz_local(1) .and. 0.5*length(1) >= xyz_local(1) .and. -0.5*length(2) <= xyz_local(2) &
@@ -647,9 +647,9 @@ contains
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
         corner_distance = sqrt(radius**2 + maxval(length)**2)  ! distance to rim of cylinder
-        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
-        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
-        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
+        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x%cc, il, ir)
+        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y%cc, jl, jr)
+        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z%cc, kl, kr)
 
         ! Checking whether the cylinder covers a particular cell in the domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
@@ -659,7 +659,7 @@ contains
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
-                    xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
+                    xyz_local = [x%cc(i), y%cc(j), z%cc(k)] - center  ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
                     if (((.not. f_is_default(length(1)) .and. xyz_local(2)**2 + xyz_local(3)**2 <= radius**2 .and. &
@@ -707,16 +707,16 @@ contains
         jl = -gp_layers - 1
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
-        call get_bounding_indices(center(1) - maxval(ellipse_coeffs)*2._wp, center(1) + maxval(ellipse_coeffs)*2._wp, x_cc, il, ir)
-        call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y_cc, jl, jr)
+        call get_bounding_indices(center(1) - maxval(ellipse_coeffs)*2._wp, center(1) + maxval(ellipse_coeffs)*2._wp, x%cc, il, ir)
+        call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y%cc, jl, jr)
 
         ! Checking whether the ellipse covers a particular cell in the domain
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, ellipse_coeffs, inverse_rotation, &
-                            & x_cc, y_cc]', collapse=2)
+                            & x%cc, y%cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
-                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+                xy_local = [x%cc(i) - center(1), y%cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
 
                 ! Ellipse condition (x/a)^2 + (y/b)^2 <= 1
@@ -784,14 +784,14 @@ contains
             end do
         end do
 
-        call get_bounding_indices(bbox_min(1), bbox_max(1), x_cc, il, ir)
-        call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
+        call get_bounding_indices(bbox_min(1), bbox_max(1), x%cc, il, ir)
+        call get_bounding_indices(bbox_min(2), bbox_max(2), y%cc, jl, jr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', copyin='[patch_id, encoded_patch_id, center, inverse_rotation, &
                             & offset, spc, threshold]', collapse=2)
         do i = il, ir
             do j = jl, jr
-                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+                xy_local = [x%cc(i) - center(1), y%cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
                 xy_local = xy_local - offset
 
@@ -869,16 +869,16 @@ contains
             end do
         end do
 
-        call get_bounding_indices(bbox_min(1), bbox_max(1), x_cc, il, ir)
-        call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
-        call get_bounding_indices(bbox_min(3), bbox_max(3), z_cc, kl, kr)
+        call get_bounding_indices(bbox_min(1), bbox_max(1), x%cc, il, ir)
+        call get_bounding_indices(bbox_min(2), bbox_max(2), y%cc, jl, jr)
+        call get_bounding_indices(bbox_min(3), bbox_max(3), z%cc, kl, kr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, eta]', copyin='[patch_id, encoded_patch_id, center, inverse_rotation, &
                             & offset, spc, threshold]', collapse=3)
         do i = il, ir
             do j = jl, jr
                 do k = kl, kr
-                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(k) - center(3)]
+                    xyz_local = [x%cc(i) - center(1), y%cc(j) - center(2), z%cc(k) - center(3)]
                     xyz_local = matmul(inverse_rotation, xyz_local)
                     xyz_local = xyz_local - offset
 

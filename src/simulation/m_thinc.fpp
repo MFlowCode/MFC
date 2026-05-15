@@ -242,18 +242,18 @@ contains
 
                     if (ac >= ic_eps .and. ac <= 1._wp - ic_eps) then
                         nr_x = (v_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - v_vf(eqn_idx%adv%beg)%sf(j - 1, k, &
-                                & l))*(x_cb(j) - x_cb(j - 1))/(x_cc(j + 1) - x_cc(j - 1))
+                                & l))*(x%cb(j) - x%cb(j - 1))/(x%cc(j + 1) - x%cc(j - 1))
 
                         nr_y = 0._wp
                         if (n > 0) then
                             nr_y = (v_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - v_vf(eqn_idx%adv%beg)%sf(j, k - 1, &
-                                    & l))*(y_cb(k) - y_cb(k - 1))/(y_cc(k + 1) - y_cc(k - 1))
+                                    & l))*(y%cb(k) - y%cb(k - 1))/(y%cc(k + 1) - y%cc(k - 1))
                         end if
 
                         nr_z = 0._wp
                         if (p > 0) then
                             nr_z = (v_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - v_vf(eqn_idx%adv%beg)%sf(j, k, &
-                                    & l - 1))*(z_cb(l) - z_cb(l - 1))/(z_cc(l + 1) - z_cc(l - 1))
+                                    & l - 1))*(z%cb(l) - z%cb(l - 1))/(z%cc(l + 1) - z%cc(l - 1))
                         end if
 
                         nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
@@ -304,9 +304,9 @@ contains
         real(wp) :: rho_b, rho_e
 
         #:for REC_DIR, XYZ, CC_PRI,  STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
-                    [(1, 'x', 'x_cc', 'j', '{STENCIL_IDX}, k, l', 'is1_d', 'is2_d', 'is3_d'), &
-                     (2, 'y', 'y_cc', 'k', 'j, {STENCIL_IDX}, l', 'is2_d', 'is1_d', 'is3_d'), &
-                     (3, 'z', 'z_cc', 'l', 'j, k, {STENCIL_IDX}', 'is3_d', 'is2_d', 'is1_d')]
+                    [(1, 'x', 'x%cc', 'j', '{STENCIL_IDX}, k, l', 'is1_d', 'is2_d', 'is3_d'), &
+                     (2, 'y', 'y%cc', 'k', 'j, {STENCIL_IDX}, l', 'is2_d', 'is1_d', 'is3_d'), &
+                     (3, 'z', 'z%cc', 'l', 'j, k, {STENCIL_IDX}', 'is3_d', 'is2_d', 'is1_d')]
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (recon_dir == ${REC_DIR}$) then

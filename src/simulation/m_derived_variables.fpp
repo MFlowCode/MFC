@@ -81,15 +81,15 @@ contains
                 call s_open_com_files()
             end if
             ! Computing centered finite difference coefficients
-            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, fd_number, fd_order)
+            call s_compute_finite_difference_coefficients(m, x%cc, fd_coeff_x, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_x]')
 
             if (n > 0) then
-                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, fd_number, fd_order)
+                call s_compute_finite_difference_coefficients(n, y%cc, fd_coeff_y, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_y]')
             end if
             if (p > 0) then
-                call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, fd_number, fd_order)
+                call s_compute_finite_difference_coefficients(p, z%cc, fd_coeff_z, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_z]')
             end if
         end if
@@ -205,7 +205,7 @@ contains
                                          & j)*q_prim_vf0(eqn_idx%mom%beg)%sf(r + j, k, l) + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, &
                                          & k, l)*fd_coeff_y(r, k)*q_prim_vf0(eqn_idx%mom%beg)%sf(j, r + k, &
                                          & l) + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, &
-                                         & l)*q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, r + l)/y_cc(k)
+                                         & l)*q_prim_vf0(eqn_idx%mom%beg)%sf(j, k, r + l)/y%cc(k)
                                 end do
                             end do
                         end do
@@ -270,7 +270,7 @@ contains
                                          & l) + q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l)*fd_coeff_y(r, &
                                          & k)*q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, r + k, l) + q_prim_vf0(eqn_idx%mom%end)%sf(j, &
                                          & k, l)*fd_coeff_z(r, l)*q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                         & r + l)/y_cc(k) - (q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)**2._wp)/y_cc(k)
+                                         & r + l)/y%cc(k) - (q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)**2._wp)/y%cc(k)
                                 end do
                             end do
                         end do
@@ -319,8 +319,8 @@ contains
                                      & l)*fd_coeff_y(r, k)*q_prim_vf0(eqn_idx%mom%end)%sf(j, r + k, &
                                      & l) + q_prim_vf0(eqn_idx%mom%end)%sf(j, k, l)*fd_coeff_z(r, &
                                      & l)*q_prim_vf0(eqn_idx%mom%end)%sf(j, k, &
-                                     & r + l)/y_cc(k) + (q_prim_vf0(eqn_idx%mom%end)%sf(j, k, &
-                                     & l)*q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l))/y_cc(k)
+                                     & r + l)/y%cc(k) + (q_prim_vf0(eqn_idx%mom%end)%sf(j, k, &
+                                     & l)*q_prim_vf0(eqn_idx%mom%beg + 1)%sf(j, k, l))/y%cc(k)
                             end do
                         end do
                     end do
@@ -367,13 +367,13 @@ contains
                     do j = 0, m
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids  ! Loop over individual fluids
-                            dV = dx(j)
+                            dV = x%spacing(j)
                             ! Mass
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
                             ! x-location weighted
                             $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x%cc(j)
                             ! Volume fraction
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
@@ -389,16 +389,16 @@ contains
                     do j = 0, m
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids  ! Loop over individual fluids
-                            dV = dx(j)*dy(k)
+                            dV = x%spacing(j)*y%spacing(k)
                             ! Mass
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
                             ! x-location weighted
                             $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x%cc(j)
                             ! y-location weighted
                             $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y%cc(k)
                             ! Volume fraction
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
@@ -414,19 +414,19 @@ contains
                     do j = 0, m
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids  ! Loop over individual fluids
-                            dV = dx(j)*dy(k)*dz(l)
+                            dV = x%spacing(j)*y%spacing(k)*z%spacing(l)
                             ! Mass
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
                             ! x-location weighted
                             $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
+                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x%cc(j)
                             ! y-location weighted
                             $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
+                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y%cc(k)
                             ! z-location weighted
                             $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z_cc(l)
+                            c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z%cc(l)
                             ! Volume fraction
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV

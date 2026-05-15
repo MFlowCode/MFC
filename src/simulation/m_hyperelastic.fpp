@@ -58,14 +58,14 @@ contains
         end if
 
         ! Computing centered finite difference coefficients
-        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_hyper, buff_size, fd_number, fd_order)
+        call s_compute_finite_difference_coefficients(m, x%cc, fd_coeff_x_hyper, buff_size, fd_number, fd_order)
         $:GPU_UPDATE(device='[fd_coeff_x_hyper]')
         if (n > 0) then
-            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_hyper, buff_size, fd_number, fd_order)
+            call s_compute_finite_difference_coefficients(n, y%cc, fd_coeff_y_hyper, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_y_hyper]')
         end if
         if (p > 0) then
-            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_hyper, buff_size, fd_number, fd_order)
+            call s_compute_finite_difference_coefficients(p, z%cc, fd_coeff_z_hyper, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_z_hyper]')
         end if
 

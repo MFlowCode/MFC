@@ -104,7 +104,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             divu_in%sf(j, k, l) = 0._wp
-                            divu_in%sf(j, k, l) = 5.e-1_wp/dx(j)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j + 1, k, &
+                            divu_in%sf(j, k, l) = 5.e-1_wp/x%spacing(j)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j + 1, k, &
                                        & l) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j - 1, k, l))
                         end do
                     end do
@@ -116,8 +116,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dy(k)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, &
-                                   & k + 1, l) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k - 1, l))
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, &
+                                   & l) + 5.e-1_wp/y%spacing(k)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k + 1, &
+                                   & l) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k - 1, l))
                     end do
                 end do
             end do
@@ -127,7 +128,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu_in%sf(j, k, l) = divu_in%sf(j, k, l) + 5.e-1_wp/dz(l)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
+                        divu_in%sf(j, k, l) = divu_in%sf(j, k, &
+                                   & l) + 5.e-1_wp/z%spacing(l)*(q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
                                    & l + 1) - q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, l - 1))
                     end do
                 end do
