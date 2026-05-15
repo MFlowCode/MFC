@@ -90,7 +90,7 @@ contains
             bc_x, bc_y, bc_z, &
             x_a, y_a, z_a, x_b, y_b, z_b, &
             x_domain, y_domain, z_domain, &
-            hypoelasticity, hypo_hll_interface_rhs, hll_u_interface, &
+            hypoelasticity, hypo_hll_interface_rhs, hypo_energy_guard, hll_u_interface, &
             ib, num_ibs, patch_ib, &
             collision_model, coefficient_of_restitution, collision_time, &
             ib_coefficient_of_friction, ib_state_wrt, &

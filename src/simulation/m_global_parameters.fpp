@@ -159,6 +159,7 @@ module m_global_parameters
     real(wp) :: ADC_kappa
     logical  :: hll_u_interface         !< T = HLL Method 2 (u-interface), F = HLL Method 1 (alpha-interface)
     logical  :: hypo_hll_interface_rhs  !< When T, HLL hypo uses interface-consistent RHS instead of legacy FD
+    logical  :: hypo_energy_guard       !< Guard elastic energy E_e when mixture G near zero
     logical  :: hypo_nc_finite_diff
     logical  :: hypo_nc_interface
     logical  :: hypo_nc_dual_pass
@@ -215,7 +216,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress, cont_damage, hyper_cleaning]')
-    $:GPU_DECLARE(create='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_nc_interface]')
+    $:GPU_DECLARE(create='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard, hypo_nc_interface]')
 
     logical  :: relax         !< activate phase change
     integer  :: relax_model   !< Relaxation model
@@ -548,6 +549,7 @@ contains
         ADC_kappa = 1.0_wp
         hll_u_interface = .false.
         hypo_hll_interface_rhs = .false.
+        hypo_energy_guard = .true.
         hypo_nc_finite_diff = .false.
         hypo_nc_interface = .false.
         hypo_nc_dual_pass = .false.
@@ -1276,7 +1278,7 @@ contains
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
                      & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
                      & hyperelasticity, hyper_model, elasticity, low_Mach]')
-        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_nc_interface]')
+        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard, hypo_nc_interface]')
 
         $:GPU_UPDATE(device='[Bx0]')
 

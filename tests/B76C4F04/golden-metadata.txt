@@ -1,12 +1,12 @@
-This file was created on 2026-03-29 02:40:30.130538.
+This file was created on 2026-05-14 23:23:53.916065.
 
 mfc.sh:
 
-    Invocation: test --generate -o Hypoelasticity Interface RHS --no-build -j 16
-    Lock:       mpi=Yes & gpu=No & debug=Yes & gcov=No & unified=No & single=No
-    Git:        71754c925fdc2c96558581c82ffd243a2f9c45da on hypo_hlld_pre_merge (dirty)
+    Invocation: test --generate -o B76C4F04 -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        bc69bbaa9e2f9c67146f7cff9469e7c0e45c7de0 on hypo_hlld (dirty)
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -15,26 +15,27 @@ syscheck:
         C       : GNU v13.3.0 (/usr/bin/cc)
         Fortran : GNU v13.3.0 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
         Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -57,22 +58,23 @@ simulation:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
         Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -81,26 +83,61 @@ pre_process:
         C       : GNU v13.3.0 (/usr/bin/cc)
         Fortran : GNU v13.3.0 (/usr/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on 9950X3D
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
         Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,43 +146,46 @@ CPU:
 
     CPU Info:
     From lscpu
-    Architecture:                         x86_64
-    CPU op-mode(s):                       32-bit, 64-bit
-    Address sizes:                        48 bits physical, 48 bits virtual
-    Byte Order:                           Little Endian
-    CPU(s):                               32
-    On-line CPU(s) list:                  0-31
-    Vendor ID:                            AuthenticAMD
-    Model name:                           AMD Ryzen 9 9950X3D 16-Core Processor
-    CPU family:                           26
-    Model:                                68
-    Thread(s) per core:                   2
-    Core(s) per socket:                   16
-    Socket(s):                            1
-    Stepping:                             0
-    BogoMIPS:                             8599.84
-    Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect
-    Virtualization:                       AMD-V
-    Hypervisor vendor:                    Microsoft
-    Virtualization type:                  full
-    L1d cache:                            768 KiB (16 instances)
-    L1i cache:                            512 KiB (16 instances)
-    L2 cache:                             16 MiB (16 instances)
-    L3 cache:                             96 MiB (1 instance)
-    NUMA node(s):                         1
-    NUMA node0 CPU(s):                    0-31
-    Vulnerability Gather data sampling:   Not affected
-    Vulnerability Itlb multihit:          Not affected
-    Vulnerability L1tf:                   Not affected
-    Vulnerability Mds:                    Not affected
-    Vulnerability Meltdown:               Not affected
-    Vulnerability Mmio stale data:        Not affected
-    Vulnerability Reg file data sampling: Not affected
-    Vulnerability Retbleed:               Not affected
-    Vulnerability Spec rstack overflow:   Not affected
-    Vulnerability Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl
-    Vulnerability Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization
-    Vulnerability Spectre v2:             Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
-    Vulnerability Srbds:                  Not affected
-    Vulnerability Tsx async abort:        Not affected
+    Architecture:                            x86_64
+    CPU op-mode(s):                          32-bit, 64-bit
+    Address sizes:                           48 bits physical, 48 bits virtual
+    Byte Order:                              Little Endian
+    CPU(s):                                  32
+    On-line CPU(s) list:                     0-31
+    Vendor ID:                               AuthenticAMD
+    Model name:                              AMD Ryzen 9 9950X3D 16-Core Processor
+    CPU family:                              26
+    Model:                                   68
+    Thread(s) per core:                      2
+    Core(s) per socket:                      16
+    Socket(s):                               1
+    Stepping:                                0
+    BogoMIPS:                                8599.84
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect
+    Virtualization:                          AMD-V
+    Hypervisor vendor:                       Microsoft
+    Virtualization type:                     full
+    L1d cache:                               768 KiB (16 instances)
+    L1i cache:                               512 KiB (16 instances)
+    L2 cache:                                16 MiB (16 instances)
+    L3 cache:                                96 MiB (1 instance)
+    NUMA node(s):                            1
+    NUMA node0 CPU(s):                       0-31
+    Vulnerability Gather data sampling:      Not affected
+    Vulnerability Indirect target selection: Not affected
+    Vulnerability Itlb multihit:             Not affected
+    Vulnerability L1tf:                      Not affected
+    Vulnerability Mds:                       Not affected
+    Vulnerability Meltdown:                  Not affected
+    Vulnerability Mmio stale data:           Not affected
+    Vulnerability Reg file data sampling:    Not affected
+    Vulnerability Retbleed:                  Not affected
+    Vulnerability Spec rstack overflow:      Not affected
+    Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+    Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+    Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+    Vulnerability Srbds:                     Not affected
+    Vulnerability Tsa:                       Not affected
+    Vulnerability Tsx async abort:           Not affected
+    Vulnerability Vmscape:                   Not affected
 

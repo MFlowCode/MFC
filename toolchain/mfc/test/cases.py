@@ -1556,6 +1556,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "rho_wrt": "T",
             "parallel_io": "T",
             "hypoelasticity": "T",
+            "hypo_energy_guard": "F",
             "fd_order": 4,
             **_fluids,
         }

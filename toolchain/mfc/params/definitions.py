@@ -212,6 +212,7 @@ _SIMPLE_DESCS = {
     "riemann_hypo_ADC": "Enable hypo anti-diffusion correction for HLLC/HLLD",
     "ADC_kappa": "ADC sensor scaling parameter",
     "hypo_hll_interface_rhs": "HLL uses interface-consistent hypo RHS",
+    "hypo_energy_guard": "Guard elastic energy when shear modulus near zero",
     "hll_u_interface": "HLL Method 2 (u-interface) selector",
     # Physics toggles
     "viscous": "Enable viscous effects",
@@ -938,6 +939,7 @@ def _load():
     _r("riemann_hypo_ADC", LOG, {"elasticity"})
     _r("ADC_kappa", REAL, {"elasticity"})
     _r("hypo_hll_interface_rhs", LOG, {"elasticity"})
+    _r("hypo_energy_guard", LOG, {"elasticity"})
     _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension

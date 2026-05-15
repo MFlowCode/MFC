@@ -69,6 +69,7 @@ module m_global_parameters
     integer            :: weno_order                   !< Order of accuracy for the WENO reconstruction
     integer            :: muscl_order                  !< Order of accuracy for the MUSCL reconstruction
     logical            :: hypoelasticity               !< activate hypoelasticity
+    logical            :: hypo_energy_guard            !< guard elastic energy when G near zero
     logical            :: hyperelasticity              !< activate hyperelasticity
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
     logical            :: mhd                          !< Magnetohydrodynamics
@@ -253,6 +254,7 @@ contains
         muscl_order = dflt_int
 
         hypoelasticity = .false.
+        hypo_energy_guard = .true.
         hyperelasticity = .false.
         elasticity = .false.
         pre_stress = .false.

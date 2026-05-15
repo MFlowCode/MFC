@@ -98,6 +98,7 @@ module m_global_parameters
     logical            :: mhd                          !< Magnetohydrodynamics
     logical            :: relativity                   !< Relativity for RMHD
     logical            :: hypoelasticity               !< Turn hypoelasticity on
+    logical            :: hypo_energy_guard            !< guard elastic energy when G near zero
     logical            :: hyperelasticity              !< Turn hyperelasticity on
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
     integer            :: b_size                       !< Number of components in the b tensor
@@ -315,6 +316,7 @@ contains
         relativity = .false.
 
         hypoelasticity = .false.
+        hypo_energy_guard = .true.
         hyperelasticity = .false.
         elasticity = .false.
         b_size = dflt_int

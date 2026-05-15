@@ -96,7 +96,7 @@ contains
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
             & 'hyperelasticity', 'down_sample', 'fft_wrt', &
             & 'hyper_cleaning', 'ib_state_wrt', &
-            & 'riemann_hypo_ADC', 'hll_u_interface', 'hypo_hll_interface_rhs' ]
+            & 'riemann_hypo_ADC', 'hll_u_interface', 'hypo_hll_interface_rhs', 'hypo_energy_guard' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
