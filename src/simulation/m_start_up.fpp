@@ -111,7 +111,9 @@ contains
             & g_y, g_z, n_start, t_save, t_stop, cfl_adap_dt, cfl_const_dt, cfl_target, surface_tension, bubbles_lagrange, &
             & lag_params, hyperelasticity, R0ref, num_bc_patches, Bx0, cont_damage, tau_star, cont_damage_s, alpha_bar, &
             & hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, alf_factor, num_igr_iters, num_igr_warm_start_iters, &
-            & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
+            & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, &
+            & synthetic_turbulence, synth_seed, synth_n_shells, num_turbulent_sources, synth_U_inf, synth_n_waves_per_shell, &
+            & synth_k_shell, synth_amp_shell, turb_pos, synth_L
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
 
@@ -921,7 +923,7 @@ contains
                 call s_write_ib_state_file(0)
             end if
         end if
-        if (bodyForces) call s_initialize_body_forces_module()
+        if (bodyForces .or. synthetic_turbulence) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
 
         ! Initialize the Temperature cache.
@@ -1134,7 +1136,7 @@ contains
         call s_finalize_mpi_proxy_module()
 
         if (surface_tension) call s_finalize_surface_tension_module()
-        if (bodyForces) call s_finalize_body_forces_module()
+        if (bodyForces .or. synthetic_turbulence) call s_finalize_body_forces_module()
         if (ib) call s_finalize_ibm_module()
 
         call s_mpi_finalize()

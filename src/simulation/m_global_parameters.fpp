@@ -187,6 +187,17 @@ module m_global_parameters
     $:GPU_DECLARE(create='[accel_bf]')
     ! $:GPU_DECLARE(create='[k_x,w_x,p_x,g_x,k_y,w_y,p_y,g_y,k_z,w_z,p_z,g_z]')
 
+    ! Synthetic turbulence
+    logical                                      :: synthetic_turbulence
+    integer                                      :: synth_seed, synth_n_shells, num_turbulent_sources
+    real(wp)                                     :: synth_U_inf
+    integer, dimension(num_synth_shells_max)     :: synth_n_waves_per_shell
+    real(wp), dimension(num_synth_shells_max)    :: synth_k_shell, synth_amp_shell
+    real(wp), dimension(num_turb_sources_max, 3) :: turb_pos, synth_L
+    $:GPU_DECLARE(create='[synthetic_turbulence, num_turbulent_sources]')
+    $:GPU_DECLARE(create='[synth_U_inf, synth_n_waves_per_shell, synth_k_shell, synth_amp_shell]')
+    $:GPU_DECLARE(create='[turb_pos, synth_L]')
+
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
@@ -689,6 +700,17 @@ contains
                 ${param}$_${dir}$ = dflt_real
             #:endfor
         #:endfor
+
+        synthetic_turbulence = .false.
+        synth_seed = 1234
+        synth_n_shells = dflt_int
+        num_turbulent_sources = 0
+        synth_U_inf = dflt_real
+        synth_n_waves_per_shell = 0
+        synth_k_shell = dflt_real
+        synth_amp_shell = dflt_real
+        turb_pos = dflt_real
+        synth_L = dflt_real
 
         fft_wrt = .false.
         dummy = .false.
@@ -1223,6 +1245,12 @@ contains
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau]')
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')
+
+        if (synthetic_turbulence) then
+            $:GPU_UPDATE(device='[synthetic_turbulence, num_turbulent_sources]')
+            $:GPU_UPDATE(device='[synth_U_inf, synth_n_waves_per_shell, synth_k_shell, synth_amp_shell]')
+            $:GPU_UPDATE(device='[turb_pos, synth_L]')
+        end if
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))

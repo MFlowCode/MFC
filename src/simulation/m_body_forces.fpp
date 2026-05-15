@@ -10,6 +10,7 @@ module m_body_forces
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_mpi_proxy
     use m_nvtx
 
     ! $:USE_GPU_MODULE()
@@ -23,10 +24,24 @@ module m_body_forces
     real(wp), allocatable, dimension(:,:,:) :: rhoM
     $:GPU_DECLARE(create='[rhoM]')
 
+    integer :: num_synthetic_wave_numbers
+    $:GPU_DECLARE(create='[num_synthetic_wave_numbers]')
+
+    real(wp), allocatable, dimension(:) :: synthetic_k_x, synthetic_k_y, synthetic_k_z
+    real(wp), allocatable, dimension(:) :: synthetic_phase, synthetic_amp
+    $:GPU_DECLARE(create='[synthetic_k_x, synthetic_k_y, synthetic_k_z, synthetic_phase, synthetic_amp]')
+
 contains
 
-    !> Initialize the body forces module
+    !> Initialize the body forces module. When synthetic_turbulence is enabled,
+    !> generates random wave vectors for each energy shell on rank 0, then
+    !> broadcasts to all MPI ranks and copies to GPU.
     impure subroutine s_initialize_body_forces_module
+
+        integer              :: s, m_wave, m_global
+        integer              :: n_seed
+        integer, allocatable :: seed_arr(:)
+        real(wp)             :: rn1, rn2, kz, r_xy, k_mag
 
         if (n > 0) then
             if (p > 0) then
@@ -36,6 +51,91 @@ contains
             end if
         else
             @:ALLOCATE(rhoM(-buff_size:buff_size + m, 0:0, 0:0))
+        end if
+
+        if (.not. synthetic_turbulence) return
+        if (synth_n_shells <= 0) return
+
+        num_synthetic_wave_numbers = sum(synth_n_waves_per_shell(1:synth_n_shells))
+
+        if (num_synthetic_wave_numbers == 0) return
+
+        @:ALLOCATE(synthetic_k_x(1:num_synthetic_wave_numbers))
+        @:ALLOCATE(synthetic_phase(1:num_synthetic_wave_numbers))
+        @:ALLOCATE(synthetic_amp(1:num_synthetic_wave_numbers))
+
+        if (num_dims > 1) then
+            @:ALLOCATE(synthetic_k_y(1:num_synthetic_wave_numbers))
+        end if
+
+        if (num_dims == 3) then
+            @:ALLOCATE(synthetic_k_z(1:num_synthetic_wave_numbers))
+        end if
+
+        ! Generate random wave vectors and phases on rank 0, then broadcast
+        if (proc_rank == 0) then
+            call random_seed(size=n_seed)
+            allocate (seed_arr(n_seed))
+            seed_arr = synth_seed
+            call random_seed(put=seed_arr)
+            deallocate (seed_arr)
+
+            m_global = 0
+            do s = 1, synth_n_shells
+                k_mag = synth_k_shell(s)
+                do m_wave = 1, synth_n_waves_per_shell(s)
+                    m_global = m_global + 1
+
+                    if (num_dims == 1) then
+                        synthetic_k_x(m_global) = k_mag
+                    else if (num_dims == 2) then
+                        ! Random azimuthal angle -> uniform on circle
+                        call random_number(rn1)
+                        rn1 = rn1*2._wp*pi
+                        synthetic_k_x(m_global) = k_mag*cos(rn1)
+                        synthetic_k_y(m_global) = k_mag*sin(rn1)
+                    else
+                        ! Uniform on sphere: azimuthal angle + cos(polar) uniform in [-1,1]
+                        call random_number(rn1)
+                        call random_number(rn2)
+                        rn1 = rn1*2._wp*pi
+                        kz = 2._wp*rn2 - 1._wp
+                        r_xy = sqrt(max(0._wp, 1._wp - kz*kz))
+                        synthetic_k_x(m_global) = k_mag*r_xy*cos(rn1)
+                        synthetic_k_y(m_global) = k_mag*r_xy*sin(rn1)
+                        synthetic_k_z(m_global) = k_mag*kz
+                    end if
+
+                    call random_number(rn1)
+                    synthetic_phase(m_global) = rn1*2._wp*pi
+
+                    synthetic_amp(m_global) = synth_amp_shell(s)
+                end do
+            end do
+        end if
+
+        ! Broadcast from rank 0 to all ranks
+        call s_mpi_send_random_number(synthetic_k_x, num_synthetic_wave_numbers)
+        call s_mpi_send_random_number(synthetic_phase, num_synthetic_wave_numbers)
+        call s_mpi_send_random_number(synthetic_amp, num_synthetic_wave_numbers)
+
+        if (num_dims > 1) then
+            call s_mpi_send_random_number(synthetic_k_y, num_synthetic_wave_numbers)
+        end if
+
+        if (num_dims == 3) then
+            call s_mpi_send_random_number(synthetic_k_z, num_synthetic_wave_numbers)
+        end if
+
+        ! Push wave data to GPU
+        $:GPU_UPDATE(device='[num_synthetic_wave_numbers, synthetic_k_x, synthetic_phase, synthetic_amp]')
+
+        if (num_dims > 1) then
+            $:GPU_UPDATE(device='[synthetic_k_y]')
+        end if
+
+        if (num_dims == 3) then
+            $:GPU_UPDATE(device='[synthetic_k_z]')
         end if
 
     end subroutine s_initialize_body_forces_module
@@ -59,7 +159,7 @@ contains
     subroutine s_compute_mixture_density(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer                                             :: i, j, k, l  !< standard iterators
+        integer                                             :: i, j, k, l
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
         do l = 0, p
@@ -82,7 +182,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: i, j, k, l  !< Loop variables
+        integer                                                :: i, j, k, l
 
         call s_compute_acceleration(mytime)
         call s_compute_mixture_density(q_cons_vf)
@@ -99,8 +199,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (bf_x) then  ! x-direction body forces
-
+        if (bf_x) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
@@ -114,8 +213,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bf_y) then  ! y-direction body forces
-
+        if (bf_y) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
@@ -130,8 +228,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bf_z) then  ! z-direction body forces
-
+        if (bf_z) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
@@ -147,76 +244,94 @@ contains
 
     end subroutine s_compute_body_forces_rhs
 
-    subroutine s_compute_turbulent_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
+    !> Compute the synthetic turbulence RHS contribution.
+    !>
+    !> For each Gaussian forcing zone (turb_idx), superimposes random Fourier
+    !> modes onto the x-momentum RHS and the energy RHS. The wave field advects
+    !> in the +x direction at speed synth_U_inf. Only cells inside the Gaussian
+    !> window contribute; outside cells leave rhs_vf unchanged.
+    subroutine s_compute_synthetic_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: i, j, k, l, q, n_mode
-        real(wp)                                               :: gauss_x, two_over_Lx
-        real(wp)                                               :: u_prime, rho_local
-        real(wp), dimension(num_dims)                          :: u_local, force, pos
-        real(wp)                                               :: phase_arg
+        integer                                                :: i, j, k, l, n_mode, turb_idx
+        real(wp)                                               :: pos_x, pos_y, pos_z
+        real(wp)                                               :: gauss_env, G_norm
+        real(wp)                                               :: u_prime, rho_local, u_local_x
+        real(wp)                                               :: phase_arg, force_x
+        real(wp)                                               :: adv_offset
+        logical                                                :: in_box
 
-        ! G_bar for the 1D Gaussian exp(-pi/2 * (2x/Lx)^2) on [-Lx/2, Lx/2] Analytical: G_bar = erf(sqrt(pi/2)) / sqrt(pi/2) \approx
-        ! 0.7602
+        ! G_bar = integral of exp(-pi/2 * (2x/L)^2) / L over [-L/2, L/2] Analytically: erf(sqrt(pi/2)) / sqrt(pi/2) ~ 0.7602
         real(wp), parameter :: G_BAR = 0.760173_wp
 
-        do turb_idx = 1, num_turbulent_sources
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, q, n_mode, x_pos, y_pos, z_pos, gauss_x, u_prime, force, rho_local, &
-                                & u_local, phase_arg]', collapse=3)
+        ! Zero momentum and energy RHS for the synthetic turbulence pass
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
+        do i = eqn_idx%mom%beg, eqn_idx%E
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        ! position relative to forcing-zone center
-                        #:for 'X', 'ID', 'IND' in [('x', 1, 'j'), ('y', 2, 'k'), ('z', 3, 'l')]
-                            if (${ID}$ <= num_dims) pos(${ID}$) = ${X}$_cc(${IND}$) - turb_pos(turb_idx, ${ID}$)
-                        #:endfor
+                        rhs_vf(i)%sf(j, k, l) = 0._wp
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-                        ! Skip cells outside the forcing box
-                        if (abs(pos(1)) > 0.5_wp*synth_L(turb_idx, 1) .or. abs(pos(2)) > 0.5_wp*synth_L(turb_idx, &
-                            & 2) .or. abs(pos(3)) > 0.5_wp*synth_L(turb_idx, 3)) then
-                            do i = eqn_idx%mom%beg, eqn_idx%mom%beg + num_dims - 1
-                                rhs_vf(i)%sf(j, k, l) = 0._wp
+        ! Pre-compute advection offset (mytime is CPU-only, captured as firstprivate)
+        adv_offset = synth_U_inf*mytime
+
+        do turb_idx = 1, num_turbulent_sources
+            $:GPU_PARALLEL_LOOP(private='[j, k, l, n_mode, pos_x, pos_y, pos_z, gauss_env, G_norm, u_prime, rho_local, u_local_x, &
+                                & phase_arg, force_x, in_box]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        ! Position relative to the forcing-zone center
+                        pos_x = x_cc(j) - turb_pos(turb_idx, 1)
+                        pos_y = 0._wp
+                        pos_z = 0._wp
+                        if (num_dims > 1) pos_y = y_cc(k) - turb_pos(turb_idx, 2)
+                        if (num_dims == 3) pos_z = z_cc(l) - turb_pos(turb_idx, 3)
+
+                        ! Skip cells outside the bounding box of the Gaussian window
+                        in_box = abs(pos_x) <= 0.5_wp*synth_L(turb_idx, 1)
+                        if (num_dims > 1) in_box = in_box .and. abs(pos_y) <= 0.5_wp*synth_L(turb_idx, 2)
+                        if (num_dims == 3) in_box = in_box .and. abs(pos_z) <= 0.5_wp*synth_L(turb_idx, 3)
+
+                        if (in_box) then
+                            ! Gaussian envelope G(x) = exp(-pi/2 * (2*pos/L)^2)
+                            gauss_env = exp(-0.5_wp*pi*(2._wp*pos_x/synth_L(turb_idx, 1))**2)
+                            if (num_dims > 1) then
+                                gauss_env = gauss_env*exp(-0.5_wp*pi*(2._wp*pos_y/synth_L(turb_idx, 2))**2)
+                            end if
+                            if (num_dims == 3) then
+                                gauss_env = gauss_env*exp(-0.5_wp*pi*(2._wp*pos_z/synth_L(turb_idx, 3))**2)
+                            end if
+                            G_norm = gauss_env/G_BAR**num_dims
+
+                            ! Synthetic fluctuation u' = sum_m A_m * cos(k . (x - U_inf*t*xhat) + phi_m)
+                            ! The x-advection Taylor-freezes the field: k_x * (x - U_inf * t)
+                            u_prime = 0._wp
+                            do n_mode = 1, num_synthetic_wave_numbers
+                                phase_arg = synthetic_k_x(n_mode)*(x_cc(j) - adv_offset) + synthetic_phase(n_mode)
+                                if (num_dims > 1) phase_arg = phase_arg + synthetic_k_y(n_mode)*y_cc(k)
+                                if (num_dims == 3) phase_arg = phase_arg + synthetic_k_z(n_mode)*z_cc(l)
+                                u_prime = u_prime + synthetic_amp(n_mode)*cos(phase_arg)
                             end do
-                            cycle
+
+                            ! Local primitive state
+                            rho_local = q_prim_vf(eqn_idx%cont%beg)%sf(j, k, l)
+                            u_local_x = q_prim_vf(eqn_idx%mom%beg)%sf(j, k, l)
+
+                            ! Tangermann-Klein x-force: F_x = rho * u' * (U_inf / L_x) * G_norm
+                            force_x = rho_local*u_prime*(synth_U_inf/synth_L(turb_idx, 1))*G_norm
+
+                            rhs_vf(eqn_idx%mom%beg)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg)%sf(j, k, l) + force_x
+                            rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + force_x*u_local_x
                         end if
-
-                        ! Gaussian envelope
-                        gauss_scaler = 1._wp
-                        do q = 1, num_dims
-                            gauss_scaler = gauss_scaler*exp(-0.5_wp*pi*(2._wp*pos/(synth_L(turb_idx, q)))**2)
-                        end do
-
-                        ! Synthetic fluctuation
-                        u_prime = 0._wp
-                        do n_mode = 1, synth_n_modes
-                            phase_arg = synth_k(n_mode)*(x_cc(j) - synth_U_inf*t_step) + synth_phase(n_mode)
-                            u_prime = u_prime + synth_amp(n_mode)*cos(phase_arg)
-                        end do
-
-                        ! Local density and x-velocity from primitive vars
-                        rho_local = q_prim_vf(eqn_idx%cont%beg)%sf(j, k, l)
-                        do q = 1, num_dims
-                            u_local(q) = q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l)
-                        end do
-
-                        ! Volume force per Tangermann & Klein Eq. (2) F_syn = rho * u' / T * G / G_bar (x-component only) T = Lx /
-                        ! U_inf
-                        do q = 1, num_dims
-                            force(i) = rho_local*u_prime*(synth_U_inf/synth_Lx)*gauss_scaler/(G_BAR**num_dims)
-                        end do
-
-                        ! Apply to momentum (x) and energy equations
-                        rhs_vf(eqn_idx%mom%beg)%sf(j, k, l) = force_x
-
-                        ! Energy source: power injected = F . u  (only x-component nonzero)
-                        rhs_vf(eqn_idx%E)%sf(j, k, l) = force_x*u_local
-
-                        ! Continuity and y/z momentum get zero
-                        rhs_vf(eqn_idx%cont%beg)%sf(j, k, l) = 0._wp
-                        if (n > 0) rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = 0._wp
-                        if (p > 0) rhs_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
@@ -229,6 +344,18 @@ contains
     impure subroutine s_finalize_body_forces_module
 
         @:DEALLOCATE(rhoM)
+
+        if (num_synthetic_wave_numbers > 0) then
+            @:DEALLOCATE(synthetic_k_x)
+            @:DEALLOCATE(synthetic_phase)
+            @:DEALLOCATE(synthetic_amp)
+            if (num_dims > 1) then
+                @:DEALLOCATE(synthetic_k_y)
+            end if
+            if (num_dims == 3) then
+                @:DEALLOCATE(synthetic_k_z)
+            end if
+        end if
 
     end subroutine s_finalize_body_forces_module
 

@@ -108,4 +108,8 @@ module m_constants
     integer, parameter :: BC_SLIP_WALL = -15
     integer, parameter :: BC_NO_SLIP_WALL = -16
     integer, parameter :: BC_DIRICHLET = -17
+
+    ! Synthetic turbulence array size limits
+    integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
+    integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
 end module m_constants
