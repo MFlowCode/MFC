@@ -78,6 +78,11 @@ module m_derived_types
         type(scalar_field), allocatable, dimension(:) :: vf  !< Vector field
     end type vector_field
 
+    !> Primitive variable gradient triplet: x/y/z spatial derivatives for each sweep direction
+    type dq_prim_dir_t
+        type(vector_field), allocatable, dimension(:) :: x, y, z
+    end type dq_prim_dir_t
+
     !> Generic 3-component vector (e.g., spatial coordinates or field components) Named _dt (derived types: x,y,z) to differentiate
     !! from t_vec3 (3-component vector)
     type vec3_dt  ! dt for derived types

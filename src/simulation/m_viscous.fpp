@@ -478,17 +478,15 @@ contains
     end subroutine s_compute_viscous_stress_cylindrical_boundary
 
     !> Computes viscous terms
-    subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-
-        & qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, &
-            & dq_prim_dz_qp, ix, iy, iz)
+    subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, &
+                             & dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, &
+                             & iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(vector_field), dimension(num_dims), intent(inout) :: qL_prim, qR_prim
         type(vector_field), intent(in) :: q_prim_qp
         type(vector_field), dimension(1:num_dims), intent(inout) :: dqL_prim_dx_n, dqR_prim_dx_n, dqL_prim_dy_n, dqR_prim_dy_n, &
              & dqL_prim_dz_n, dqR_prim_dz_n
-
         type(vector_field), dimension(1), intent(inout) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
         type(int_bounds_info), intent(in)               :: ix, iy, iz
         integer                                         :: i, j, k, l

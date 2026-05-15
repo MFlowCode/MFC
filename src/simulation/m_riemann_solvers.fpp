@@ -75,17 +75,15 @@ contains
 
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
     !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_lf_riemann_solver 4) s_hlld_riemann_solver
-    subroutine s_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
-
-        & qL_prim_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
-            & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+    subroutine s_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
+                                & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, &
+                                & flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
-
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
@@ -125,10 +123,9 @@ contains
     end subroutine s_compute_viscous_source_flux
 
     !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, &
-            & flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
+                                    & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                    & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -794,10 +791,9 @@ contains
     end subroutine s_hll_riemann_solver
 
     !> Lax-Friedrichs (Rusanov) approximate Riemann solver
-    subroutine s_lf_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, &
-            & flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+    subroutine s_lf_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
+                                   & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, &
+                                   & flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -1651,10 +1647,9 @@ contains
     end subroutine s_lf_riemann_solver
 
     !> HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
-    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, &
-            & flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+    subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
+                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                     & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -3256,15 +3251,13 @@ contains
     end subroutine s_hllc_riemann_solver
 
     !> HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
-    subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, &
-            & flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+    subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
+                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                     & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
-
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)          :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout)       :: flux_vf, flux_src_vf, flux_gsrc_vf
@@ -3555,14 +3548,12 @@ contains
     end subroutine s_initialize_riemann_solvers_module
 
     !> Populate the left and right Riemann state variable buffers based on boundary conditions
-    subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, &
-
-        & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
+    subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
+        & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
-
         integer, intent(in)               :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
         integer                           :: i, j, k, l  !< Generic loop iterator

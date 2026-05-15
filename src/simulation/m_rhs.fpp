@@ -57,11 +57,10 @@ module m_rhs
     !! primitive variables. The cell-average of the first-order spatial derivatives may be found in the variables dq_prim_ds_qp,
     !! where s = x, y or z.
     !> @{
-    type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
-    type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
+    type(dq_prim_dir_t) :: dqL_prim_n, dqR_prim_n
 #if defined(MFC_OpenACC)
-    $:GPU_DECLARE(create='[dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n]')
-    $:GPU_DECLARE(create='[dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n]')
+    $:GPU_DECLARE(create='[dqL_prim_n%x, dqL_prim_n%y, dqL_prim_n%z]')
+    $:GPU_DECLARE(create='[dqR_prim_n%x, dqR_prim_n%y, dqR_prim_n%z]')
 #endif
     !> @}
 
@@ -264,12 +263,12 @@ contains
             @:ALLOCATE(qL_prim(1:num_dims))
             @:ALLOCATE(qR_prim(1:num_dims))
 
-            @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
-            @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
-            @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
-            @:ALLOCATE(dqR_prim_dx_n(1:num_dims))
-            @:ALLOCATE(dqR_prim_dy_n(1:num_dims))
-            @:ALLOCATE(dqR_prim_dz_n(1:num_dims))
+            @:ALLOCATE(dqL_prim_n%x(1:num_dims))
+            @:ALLOCATE(dqL_prim_n%y(1:num_dims))
+            @:ALLOCATE(dqL_prim_n%z(1:num_dims))
+            @:ALLOCATE(dqR_prim_n%x(1:num_dims))
+            @:ALLOCATE(dqR_prim_n%y(1:num_dims))
+            @:ALLOCATE(dqR_prim_n%z(1:num_dims))
 
             do i = 1, num_dims
                 @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
@@ -290,23 +289,23 @@ contains
 
             if (.not. viscous) then
                 do i = 1, num_dims
-                    @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqL_prim_dz_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_n%x(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_n%y(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_n%z(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_n%x(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_n%y(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_n%z(i)%vf(1:sys_size))
 
                     do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                        @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
-                        @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
-                        @:ALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
-                        @:ALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
-                        @:ALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
-                        @:ALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqL_prim_n%x(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqL_prim_n%y(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqL_prim_n%z(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqR_prim_n%x(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqR_prim_n%y(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqR_prim_n%z(i)%vf(l)%sf(1:1, 1:1, 1:1))
                     end do
-                    @:ACC_SETUP_VFs(dqL_prim_dx_n(i), dqL_prim_dy_n(i), dqL_prim_dz_n(i))
-                    @:ACC_SETUP_VFs(dqR_prim_dx_n(i), dqR_prim_dy_n(i), dqR_prim_dz_n(i))
+                    @:ACC_SETUP_VFs(dqL_prim_n%x(i), dqL_prim_n%y(i), dqL_prim_n%z(i))
+                    @:ACC_SETUP_VFs(dqR_prim_n%x(i), dqR_prim_n%y(i), dqR_prim_n%z(i))
                 end do
             end if
 
@@ -350,42 +349,42 @@ contains
                 end if
 
                 do i = 1, num_dims
-                    @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqL_prim_dz_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
-                    @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_n%x(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_n%y(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_n%z(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_n%x(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_n%y(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_n%z(i)%vf(1:sys_size))
                 end do
 
                 do i = 1, num_dims
                     do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                        @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                        @:ALLOCATE(dqL_prim_n%x(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                    & idwbuff(3)%beg:idwbuff(3)%end))
-                        @:ALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                        @:ALLOCATE(dqR_prim_n%x(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                    & idwbuff(3)%beg:idwbuff(3)%end))
                     end do
 
                     if (n > 0) then
                         do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                            @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                            @:ALLOCATE(dqL_prim_n%y(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
-                            @:ALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                            @:ALLOCATE(dqR_prim_n%y(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
                         end do
                     end if
 
                     if (p > 0) then
                         do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                            @:ALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                            @:ALLOCATE(dqL_prim_n%z(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
-                            @:ALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                            @:ALLOCATE(dqR_prim_n%z(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
                         end do
                     end if
 
-                    @:ACC_SETUP_VFs(dqL_prim_dx_n(i), dqL_prim_dy_n(i), dqL_prim_dz_n(i))
-                    @:ACC_SETUP_VFs(dqR_prim_dx_n(i), dqR_prim_dy_n(i), dqR_prim_dz_n(i))
+                    @:ACC_SETUP_VFs(dqL_prim_n%x(i), dqL_prim_n%y(i), dqL_prim_n%z(i))
+                    @:ACC_SETUP_VFs(dqR_prim_n%x(i), dqR_prim_n%y(i), dqR_prim_n%z(i))
                 end do
 
                 if (weno_Re_flux) then
@@ -557,8 +556,8 @@ contains
 
         if ((viscous .and. .not. igr)) then
             call nvtxStartRange("RHS-VISCOUS")
-            call s_get_viscous(qL_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, dqR_prim_dx_n, &
-                               & dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+            call s_get_viscous(qL_rsx_vf, dqL_prim_n%x, dqL_prim_n%y, dqL_prim_n%z, qL_prim, qR_rsx_vf, dqR_prim_n%x, &
+                               & dqR_prim_n%y, dqR_prim_n%z, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                                & idwbuff(1), idwbuff(2), idwbuff(3))
             call nvtxEndRange
         end if
@@ -687,15 +686,15 @@ contains
                 if (weno_Re_flux) then
                     iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
                     call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dx_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                        & dqR_rsx_vf, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), idwbuff(1), &
+                        & dqR_rsx_vf, id, dqL_prim_n%x(id)%vf(iv%beg:iv%end), dqR_prim_n%x(id)%vf(iv%beg:iv%end), idwbuff(1), &
                         & idwbuff(2), idwbuff(3))
                     if (n > 0) then
                         call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dy_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                            & dqR_rsx_vf, id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
-                            & idwbuff(1), idwbuff(2), idwbuff(3))
+                            & dqR_rsx_vf, id, dqL_prim_n%y(id)%vf(iv%beg:iv%end), dqR_prim_n%y(id)%vf(iv%beg:iv%end), idwbuff(1), &
+                            & idwbuff(2), idwbuff(3))
                         if (p > 0) then
                             call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dz_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                                & dqR_rsx_vf, id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
+                                & dqR_rsx_vf, id, dqL_prim_n%z(id)%vf(iv%beg:iv%end), dqR_prim_n%z(id)%vf(iv%beg:iv%end), &
                                 & idwbuff(1), idwbuff(2), idwbuff(3))
                         end if
                     end if
@@ -715,10 +714,9 @@ contains
 
                 ! Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
-                call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
-                                      & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
-                                      & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
-                                      & flux_gsrc_n(id)%vf, id, irx, iry, irz)
+                call s_riemann_solver(qR_rsx_vf, dqR_prim_n%x(id)%vf, dqR_prim_n%y(id)%vf, dqR_prim_n%z(id)%vf, qR_prim(id)%vf, &
+                                      & qL_rsx_vf, dqL_prim_n%x(id)%vf, dqL_prim_n%y(id)%vf, dqL_prim_n%z(id)%vf, qL_prim(id)%vf, &
+                                      & q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, flux_gsrc_n(id)%vf, id, irx, iry, irz)
                 call nvtxEndRange
 
                 ! Additional physics and source terms RHS addition for advection source
@@ -1762,30 +1760,30 @@ contains
 
                 do i = num_dims, 1, -1
                     do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                        @:DEALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf)
-                        @:DEALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf)
+                        @:DEALLOCATE(dqL_prim_n%x(i)%vf(l)%sf)
+                        @:DEALLOCATE(dqR_prim_n%x(i)%vf(l)%sf)
                     end do
 
                     if (n > 0) then
                         do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                            @:DEALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf)
-                            @:DEALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf)
+                            @:DEALLOCATE(dqL_prim_n%y(i)%vf(l)%sf)
+                            @:DEALLOCATE(dqR_prim_n%y(i)%vf(l)%sf)
                         end do
                     end if
 
                     if (p > 0) then
                         do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                            @:DEALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf)
-                            @:DEALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf)
+                            @:DEALLOCATE(dqL_prim_n%z(i)%vf(l)%sf)
+                            @:DEALLOCATE(dqR_prim_n%z(i)%vf(l)%sf)
                         end do
                     end if
 
-                    @:DEALLOCATE(dqL_prim_dx_n(i)%vf)
-                    @:DEALLOCATE(dqL_prim_dy_n(i)%vf)
-                    @:DEALLOCATE(dqL_prim_dz_n(i)%vf)
-                    @:DEALLOCATE(dqR_prim_dx_n(i)%vf)
-                    @:DEALLOCATE(dqR_prim_dy_n(i)%vf)
-                    @:DEALLOCATE(dqR_prim_dz_n(i)%vf)
+                    @:DEALLOCATE(dqL_prim_n%x(i)%vf)
+                    @:DEALLOCATE(dqL_prim_n%y(i)%vf)
+                    @:DEALLOCATE(dqL_prim_n%z(i)%vf)
+                    @:DEALLOCATE(dqR_prim_n%x(i)%vf)
+                    @:DEALLOCATE(dqR_prim_n%y(i)%vf)
+                    @:DEALLOCATE(dqR_prim_n%z(i)%vf)
                 end do
 
                 if (weno_Re_flux) then
@@ -1798,8 +1796,8 @@ contains
                 @:DEALLOCATE(tau_Re_vf(eqn_idx%E)%sf)
                 @:DEALLOCATE(tau_Re_vf)
             end if
-            @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-            @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
+            @:DEALLOCATE(dqL_prim_n%x, dqL_prim_n%y, dqL_prim_n%z)
+            @:DEALLOCATE(dqR_prim_n%x, dqR_prim_n%y, dqR_prim_n%z)
         end if
 
         if (mpp_lim .and. bubbles_euler) then
