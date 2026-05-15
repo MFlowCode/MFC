@@ -871,8 +871,8 @@ contains
                                     & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, &
                                     & B2, b4, cm, pcorr, zcoef, vel_grad_L, vel_grad_R, idx_right_phys, vel_rms, vel_avg_rms, &
                                     & vel_tmp, Ms, pres_S, alpha_L_sum, alpha_R_sum, c_avg, pres, rho, gamma, pi_inf, qv, c, E, &
-                                    & H, ptilde, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp, Cv, R_gas, &
-                                    & MW, T, Y, flux_tau]')
+                                    & H, ptilde, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp, Cv, Gamm, &
+                                    & R_gas, MW, T, Y, flux_tau]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
