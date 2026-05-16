@@ -8,17 +8,20 @@ ARG FC_COMPILER
 ARG COMPILER_PATH
 ARG COMPILER_LD_LIBRARY_PATH
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
 RUN apt-get update -y && \
-    apt-get install -y software-properties-common ca-certificates gnupg && \
+    apt-get install -y software-properties-common ca-certificates gnupg wget && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update -y && \
-    if [ "$TARGET" != "gpu" ]; then \
+    if [ "$TARGET" = "cpu" ]; then \
         apt-get install -y \
             build-essential git make cmake gcc g++ gfortran bc \
             python3.12 python3.12-venv python3-pip \
             openmpi-bin libopenmpi-dev libfftw3-dev \
             mpich libmpich-dev; \
-    else \
+    elif [ "$TARGET" = "gpu" ]; then \
         apt-get install -y \
             build-essential git make cmake bc \
             python3.12 python3.12-venv python3-pip \
@@ -30,6 +33,7 @@ RUN apt-get update -y && \
 
 ENV OMPI_ALLOW_RUN_AS_ROOT=1
 ENV OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+ENV HYDRA_LAUNCHER=fork
 ENV PATH="/opt/MFC:$PATH"
 
 COPY ../ /opt/MFC
@@ -37,8 +41,8 @@ COPY ../ /opt/MFC
 ENV CC=${CC_COMPILER}
 ENV CXX=${CXX_COMPILER}
 ENV FC=${FC_COMPILER}
-ENV PATH="${COMPILER_PATH}:$PATH"
-ENV LD_LIBRARY_PATH="${COMPILER_LD_LIBRARY_PATH}:${LD_LIBRARY_PATH:-}"
+ENV PATH="${COMPILER_PATH}:/opt/mpich/bin:$PATH"
+ENV LD_LIBRARY_PATH="${COMPILER_LD_LIBRARY_PATH}:/opt/mpich/lib:${LD_LIBRARY_PATH:-}"
 
 # Pre-install numpy into the venv before mfc.sh runs, as it's required at
 # build time by several dependencies (pandas, cantera, matplotlib, etc.) that
@@ -50,14 +54,14 @@ RUN python3.12 -m venv /opt/MFC/build/venv && \
 RUN echo "TARGET=$TARGET CC=$CC_COMPILER FC=$FC_COMPILER" && \
     cd /opt/MFC && \
     if [ "$TARGET" = "gpu" ]; then \
-      ./mfc.sh build --gpu -j $(nproc); \
+      ./mfc.sh build --gpu acc -j $(nproc); \
     else \
       ./mfc.sh build -j $(nproc); \
     fi
 
 RUN cd /opt/MFC && \
     if [ "$TARGET" = "gpu" ]; then \
-      ./mfc.sh test -a --dry-run --gpu -j $(nproc); \
+      ./mfc.sh test -a --dry-run --gpu acc -j $(nproc); \
     else \
       ./mfc.sh test -a --dry-run -j $(nproc); \
     fi

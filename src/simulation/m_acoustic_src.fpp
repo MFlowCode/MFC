@@ -69,8 +69,7 @@ contains
                    & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), &
                    & aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), &
                    & element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), &
-                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), &
-                                  & bb_lowest_freq(1:num_source))
+                   & num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
 
         do i = 1, num_source
             do j = 1, 3
@@ -455,14 +454,16 @@ contains
                 call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
-            $:GPU_UPDATE(device='[source_spatials(ai)%coord]')
-            $:GPU_UPDATE(device='[source_spatials(ai)%val]')
-            if (support(ai) >= 5) then
-                if (dim == 2) then
-                    $:GPU_UPDATE(device='[source_spatials(ai)%angle]')
-                end if
-                if (dim == 3) then
-                    $:GPU_UPDATE(device='[source_spatials(ai)%xyz_to_r_ratios]')
+            if (count > 0) then
+                $:GPU_UPDATE(device='[source_spatials(ai)%coord]')
+                $:GPU_UPDATE(device='[source_spatials(ai)%val]')
+                if (support(ai) >= 5) then
+                    if (dim == 2) then
+                        $:GPU_UPDATE(device='[source_spatials(ai)%angle]')
+                    end if
+                    if (dim == 3) then
+                        $:GPU_UPDATE(device='[source_spatials(ai)%xyz_to_r_ratios]')
+                    end if
                 end if
             end if
         end do
@@ -526,8 +527,8 @@ contains
         else if (support(ai) == 2 .or. support(ai) == 3) then  ! 2D or 3D
             ! If we let unit vector e = (cos(dir), sin(dir)),
             dist = r(1)*cos(dir(ai)) + r(2)*sin(dir(ai))  ! dot(r,e)
-            if ((r(1) - dist*cos(dir(ai)))**2._wp + (r(2) - dist*sin(dir(ai)))**2._wp < 0.25_wp*length(ai)**2._wp) &
-                & then  ! |r - dist*e| < length/2
+            ! |r - dist*e| < length/2
+            if ((r(1) - dist*cos(dir(ai)))**2._wp + (r(2) - dist*sin(dir(ai)))**2._wp < 0.25_wp*length(ai)**2._wp) then
                 if (support(ai) /= 3 .or. abs(r(3)) < 0.25_wp*height(ai)) then  ! additional height constraint for 3D
                     source = 1._wp/(sqrt(2._wp*pi)*sig/2._wp)*exp(-0.5_wp*(dist/(sig/2._wp))**2._wp)
                 end if

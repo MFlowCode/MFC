@@ -529,7 +529,7 @@ contains
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
-                if (weno_order == 3 .or. dummy) then
+                if (weno_order == 3) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
                         & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
@@ -557,7 +557,7 @@ contains
                 end if
 
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                if (weno_order == 5 .or. dummy) then
+                if (weno_order == 5) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
                         & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
@@ -725,15 +725,15 @@ contains
 
                         Ma = vel(dir_idx(1))/c
 
-                        if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SLIP_WALL) &
-                            & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_SLIP_WALL)) then
+                        if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SLIP_WALL) .or. (cbc_loc == 1 &
+                            & .and. bc_${XYZ}$%end == BC_CHAR_SLIP_WALL)) then
                             call s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_BUFFER) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_BUFFER)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_BUFFER) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_BUFFER)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
                                 & dvel_ds, dadv_ds, dYs_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_INFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_INFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_INFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_INFLOW)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
@@ -759,8 +759,8 @@ contains
                                   & dir_idx(1))*sign(1, &
                                   & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
                                 & dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
@@ -773,19 +773,19 @@ contains
                                       & + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_FF_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_FF_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_FF_SUB_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, &
                                 & dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_CP_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_CP_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_CP_SUB_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
                                 & dvel_ds, dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_INFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_SUP_INFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_INFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_SUP_INFLOW)) then
                             call s_compute_supersonic_inflow_L(L)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_SUP_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_SUP_OUTFLOW)) then
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, &
                                                                 & dYs_ds)
                         end if

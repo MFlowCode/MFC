@@ -900,6 +900,133 @@ COUNT_DIFF_COMMAND = Command(
     include_common=["targets", "mfc_config", "jobs", "verbose", "debug_log"],
 )
 
+FP_STABILITY_COMMAND = Command(
+    name="fp-stability",
+    help="Run floating-point stability tests using Verrou.",
+    description=(
+        "Runs each registered test case N times under Verrou's random IEEE-754 "
+        "rounding mode and compares against a nearest-rounding reference run. "
+        "Reports the max L∞ deviation and PASS/FAIL against per-case thresholds.\n\n"
+        "Requires a Verrou-enabled Valgrind at $VERROU_HOME/bin/valgrind "
+        "(defaults to $HOME/.local/verrou). The simulation and pre_process "
+        "binaries must be serial (no-MPI, no-GPU) debug builds.\n\n"
+        "Test cases:\n"
+        "  sod_standard      1-D standard Sod, p_L/p_R=10 (well-conditioned baseline)\n"
+        "  sod_strong        1-D Sod, p_L/p_R=100,000 — HLLC xi-factor cancellation\n"
+        "  water_stiffened   1-D water shock (pi_inf=4046) — pressure-recovery cancellation\n"
+        "  air_water_interface  1-D air/water contact (two-fluid) — mixed-cell cancellation\n\n"
+        "Additional features (skip with --no-* flags):\n"
+        "  float proxy    One run with --rounding-mode=float (single-precision sensitivity)\n"
+        "  vprec sweep    Runs at mantissa bits [52, 23, 16, 10] (precision floor curve)\n"
+        "  dd_sym         verrou_dd_sym bisection to responsible functions (on failure)\n"
+        "  dd_line        verrou_dd_line bisection to responsible source lines (on failure)\n"
+        "  cancellation   --check-cancellation detection of catastrophic cancellation sites\n"
+        "  mca-sigbits    Monte Carlo Arithmetic (mcaquad) significant-bits lower bound\n"
+        "  float-max      --check-max-float detection of double→float overflow sites\n"
+    ),
+    include_common=["mfc_config", "verbose", "debug_log"],
+    arguments=[
+        Argument(
+            name="sim-binary",
+            help="Path to a serial simulation binary (debug, no-MPI). Auto-discovered from build/install/ if omitted.",
+            default=None,
+            metavar="PATH",
+        ),
+        Argument(
+            name="pre-binary",
+            help="Path to a serial pre_process binary (no-MPI). Auto-discovered from build/install/ if omitted.",
+            default=None,
+            metavar="PATH",
+        ),
+        Argument(
+            name="verrou-binary",
+            help="Path to a Verrou-enabled valgrind binary. Defaults to $VERROU_HOME/bin/valgrind or $HOME/.local/verrou/bin/valgrind.",
+            default=None,
+            metavar="PATH",
+        ),
+        Argument(
+            name="samples",
+            short="N",
+            help="Number of random-rounding simulation runs per test case.",
+            type=int,
+            default=5,
+            metavar="N",
+        ),
+        Argument(
+            name="no-float-proxy",
+            help="Skip the --rounding-mode=float single-precision sensitivity run.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_float_proxy",
+        ),
+        Argument(
+            name="no-vprec",
+            help="Skip the VPREC mantissa-bit precision sweep.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_vprec",
+        ),
+        Argument(
+            name="no-dd-sym",
+            help="Skip verrou_dd_sym function-level delta-debug on failure.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_dd_sym",
+        ),
+        Argument(
+            name="no-dd-line",
+            help="Skip verrou_dd_line source-line delta-debug on failure.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_dd_line",
+        ),
+        Argument(
+            name="no-cancellation",
+            help="Skip --check-cancellation catastrophic-cancellation detection.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_cancellation",
+        ),
+        Argument(
+            name="no-mca",
+            help="Skip Monte Carlo Arithmetic (mcaquad) significant-bits estimate.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_mca",
+        ),
+        Argument(
+            name="no-float-max",
+            help="Skip --check-max-float float32 overflow detection.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_float_max",
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh fp-stability", "Auto-discover binaries and run all cases"),
+        Example(
+            "./mfc.sh fp-stability --sim-binary build/install/abc123/bin/simulation",
+            "Specify simulation binary explicitly",
+        ),
+        Example("./mfc.sh fp-stability -N 10", "Run 10 random-rounding samples per case"),
+        Example("./mfc.sh fp-stability --no-vprec --no-dd-line", "Skip VPREC sweep and line debug"),
+        Example("./mfc.sh fp-stability --no-cancellation --no-mca --no-float-max", "Skip new analysis passes"),
+    ],
+    key_options=[
+        ("--sim-binary PATH", "Serial simulation binary (debug, no-MPI)"),
+        ("--pre-binary PATH", "Serial pre_process binary"),
+        ("--verrou-binary PATH", "Verrou-enabled valgrind"),
+        ("-N, --samples N", "Random-rounding samples per case (default: 5)"),
+        ("--no-float-proxy", "Skip float-rounding proxy run"),
+        ("--no-vprec", "Skip VPREC mantissa-bit sweep"),
+        ("--no-dd-sym", "Skip verrou_dd_sym on failure"),
+        ("--no-dd-line", "Skip verrou_dd_line on failure"),
+        ("--no-cancellation", "Skip cancellation detection"),
+        ("--no-mca", "Skip MCA significant-bits estimate"),
+        ("--no-float-max", "Skip float32 overflow detection"),
+    ],
+)
+
 VIZ_COMMAND = Command(
     name="viz",
     help="Visualize post-processed MFC output.",
@@ -1372,6 +1499,7 @@ started, run `./mfc.sh build -h`.""",
         BENCH_DIFF_COMMAND,
         COUNT_COMMAND,
         COUNT_DIFF_COMMAND,
+        FP_STABILITY_COMMAND,
     ],
     common_sets=[
         COMMON_TARGETS,

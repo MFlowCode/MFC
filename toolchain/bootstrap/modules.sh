@@ -105,7 +105,6 @@ fi
 
 ELEMENTS="$(__extract "$u_c-all") $(__extract "$u_c-$cg")"
 MODULES=`echo "$ELEMENTS" | tr ' ' '\n' | grep -v = | xargs`
-VARIABLES=`echo "$ELEMENTS" | tr ' ' '\n' | grep = | xargs`
 
 log " $ module load $MODULES"
 if ! module load $MODULES; then
@@ -114,10 +113,17 @@ if ! module load $MODULES; then
     return
 fi
 
-if [ $(echo "$VARIABLES" | grep = | wc -c) -gt 0 ]; then
-    log " $ export $(eval "echo $VARIABLES")"
-    export $(eval "echo $VARIABLES") > /dev/null
-fi
+# Export variables one line at a time so each can reference previously exported vars
+# (e.g. PATH="${OLCF_AFAR_ROOT}/..." requires OLCF_AFAR_ROOT to already be set)
+for _suffix in "all" "$cg"; do
+    while IFS= read -r _entry; do
+        if echo "$_entry" | grep -q '='; then
+            log " $ export $(eval "echo \"$_entry\"")"
+            eval "export $_entry"
+        fi
+    done < <(grep -E "^$u_c-$_suffix\s+" toolchain/modules | sed "s/^$u_c-$_suffix\s\+//")
+done
+unset _suffix _entry
 
 UNLOAD_MODULES="$(__extract "$u_c-all-unload") $(__extract "$u_c-$cg-unload")"
 UNLOAD_MODULES=$(echo "$UNLOAD_MODULES" | xargs)
@@ -133,19 +139,20 @@ if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' '
 fi
 
 if [ "$u_c" '==' 'famd' ]; then 
-    export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/rocm-afar-8873-drop-22.2.0"
+    export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/therock-23.1.0-gfx90a-7.12.0-bb5005b6"
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
     export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD_LIBRARY_PATH}
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm-7.0.2/lib/llvm/lib:/opt/rocm-7.0.2/lib/
 
     export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich3.4a2"
     export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/include/hipfort/amdgcn"
-    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -lhipfft"
+    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
     export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
                         -lmpifort_amd -lmpi_amd -lmpi -lpmi -lpmi2"
-    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CRAY_LD_LIBRARY_PATH}" 
+    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CRAY_LD_LIBRARY_PATH}"
     export CMAKE_PREFIX_PATH="${OLCF_AFAR_ROOT}:${CMAKE_PREFIX_PATH}"
     export FC="${OLCF_AFAR_ROOT}/bin/amdflang"
 
