@@ -1,0 +1,157 @@
+This file was created on 2026-04-26 03:20:07.365557.
+
+mfc.sh:
+
+    Invocation: test --generate --only F4E54FC0 F207F0FE B46CEFF3 28D9A304 71258175 D68EDC50 5EC347F2 42848784 374C9B16 347964C3 4F79391A 77292B06 9BD657CB 30035426 01DC0251 -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        be1e6654c61a88ef82ca9fc539f2cb33f20af480 on MUSCL_fix (dirty)
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on 9950X3D
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/chris/source/MFC_MUSCL_fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on 9950X3D
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/chris/source/MFC_MUSCL_fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on 9950X3D
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/chris/source/MFC_MUSCL_fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From lscpu
+    Architecture:                            x86_64
+    CPU op-mode(s):                          32-bit, 64-bit
+    Address sizes:                           48 bits physical, 48 bits virtual
+    Byte Order:                              Little Endian
+    CPU(s):                                  32
+    On-line CPU(s) list:                     0-31
+    Vendor ID:                               AuthenticAMD
+    Model name:                              AMD Ryzen 9 9950X3D 16-Core Processor
+    CPU family:                              26
+    Model:                                   68
+    Thread(s) per core:                      2
+    Core(s) per socket:                      16
+    Socket(s):                               1
+    Stepping:                                0
+    BogoMIPS:                                8599.85
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect
+    Virtualization:                          AMD-V
+    Hypervisor vendor:                       Microsoft
+    Virtualization type:                     full
+    L1d cache:                               768 KiB (16 instances)
+    L1i cache:                               512 KiB (16 instances)
+    L2 cache:                                16 MiB (16 instances)
+    L3 cache:                                96 MiB (1 instance)
+    NUMA node(s):                            1
+    NUMA node0 CPU(s):                       0-31
+    Vulnerability Gather data sampling:      Not affected
+    Vulnerability Indirect target selection: Not affected
+    Vulnerability Itlb multihit:             Not affected
+    Vulnerability L1tf:                      Not affected
+    Vulnerability Mds:                       Not affected
+    Vulnerability Meltdown:                  Not affected
+    Vulnerability Mmio stale data:           Not affected
+    Vulnerability Reg file data sampling:    Not affected
+    Vulnerability Retbleed:                  Not affected
+    Vulnerability Spec rstack overflow:      Not affected
+    Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+    Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+    Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+    Vulnerability Srbds:                     Not affected
+    Vulnerability Tsa:                       Not affected
+    Vulnerability Tsx async abort:           Not affected
+    Vulnerability Vmscape:                   Not affected
+

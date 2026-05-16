@@ -73,6 +73,7 @@ DESCRIPTIONS = {
     "recon_type": "Reconstruction type",
     "muscl_order": "Order of MUSCL reconstruction",
     "muscl_lim": "MUSCL limiter type",
+    "muscl_eps": "MUSCL limiter slope-product threshold",
     # Riemann solver
     "riemann_solver": "Riemann solver",
     "wave_speeds": "Wave speed estimates",
