@@ -253,6 +253,41 @@ To run a case anyway (testing code correctness on CPU fallback), invoke
 `pre_process` and `simulation` directly from their install paths, bypassing
 the `./mfc.sh run` wrapper that calls `syscheck` first.
 
+### Multi-node MPI with Intel MPI 2021.x
+
+Intel MPI 2021.x expects a bundled `ssh` binary at `$I_MPI_ROOT/bin/ssh` that
+understands an `--external-launcher` flag used by hydra bootstrap. This binary
+is missing from some oneAPI installations, causing SSH bootstrap to fail with
+`unknown option -- -`.
+
+Workaround: create a wrapper that strips the Intel-specific flag:
+
+```bash
+mkdir -p ~/bin
+cat > ~/bin/ssh << 'EOF'
+#!/bin/bash
+args=(-q -o StrictHostKeyChecking=yes -o BatchMode=yes)
+for arg in "$@"; do
+    [[ "$arg" == "--external-launcher" ]] && continue
+    [[ "$arg" == "--" ]] && break
+    args+=("$arg")
+done
+exec /usr/bin/ssh "${args[@]}"
+EOF
+chmod +x ~/bin/ssh
+```
+
+Then run with:
+```bash
+PATH=$HOME/bin:$PATH \
+I_MPI_HYDRA_BOOTSTRAP=rsh \
+I_MPI_HYDRA_BOOTSTRAP_EXEC=$HOME/bin/ssh \
+mpirun -n <ranks> -hosts <node1>,<node2> ./simulation
+```
+
+Nodes must have passwordless SSH from the launch node and no `pam_slurm_adopt`
+blocking. Suppress the SSH login banner on remote nodes with `touch ~/.hushlogin`.
+
 ### `libumf.so.1` not found at runtime
 The 2026.0 Level Zero and OpenCL UR adapters link against `libumf.so.1`.
 If not in `LD_LIBRARY_PATH`, all adapters fail silently and sycl-ls reports
