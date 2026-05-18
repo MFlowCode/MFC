@@ -587,7 +587,7 @@ contains
         $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-        #:if USING_AMD
+        #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(32,0:2,0:2), intent(out) :: coeffs
         #:else
             real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeffs
@@ -666,7 +666,7 @@ contains
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-        #:if USING_AMD
+        #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(32,0:2,0:2), intent(out) :: coeffs
         #:else
             real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeffs
@@ -748,7 +748,7 @@ contains
             real(wp), dimension(nmom)      :: moms, msum
             real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
         #:endif
-        #:if USING_AMD
+        #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(32,0:2,0:2) :: coeff
         #:else
             real(wp), dimension(nterms,0:2,0:2) :: coeff
@@ -930,7 +930,7 @@ contains
 
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', cray_inline=True)
             real(wp), intent(in) :: pres, rho, c
-            #:if USING_AMD
+            #:if (USING_AMD or USING_INTEL)
                 real(wp), dimension(32,0:2,0:2), intent(out) :: coeff
             #:else
                 real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeff
