@@ -288,6 +288,27 @@ mpirun -n <ranks> -hosts <node1>,<node2> ./simulation
 Nodes must have passwordless SSH from the launch node and no `pam_slurm_adopt`
 blocking. Suppress the SSH login banner on remote nodes with `touch ~/.hushlogin`.
 
+**OFI provider path**: Intel MPI 2021.x ships its own libfabric providers in
+`$I_MPI_ROOT/libfabric/lib/prov/`. The system libfabric may not include the tcp
+or shm providers. Always set:
+
+```bash
+export FI_PROVIDER_PATH=$I_MPI_ROOT/libfabric/lib/prov
+```
+
+Without this, `PMPI_Init` aborts with `OFI fi_getinfo() failed: No data available`.
+This is handled automatically by `source ./mfc.sh load -c crnch -m gpu`.
+
+**SLURM GPU access**: on SLURM-managed Intel GPU nodes, processes outside a SLURM
+allocation cannot open `/dev/dri/renderD128`. Always request the GPU resource:
+
+```bash
+#SBATCH --gres=gpu:max_1100:1   # Intel GPU Max 1100
+```
+
+Without `--gres`, `omp_get_num_devices()` returns 0 and the process aborts with
+integer divide-by-zero in `s_initialize_mpi_domain` (rank % num_devices with 0 devices).
+
 ### `libumf.so.1` not found at runtime
 The 2026.0 Level Zero and OpenCL UR adapters link against `libumf.so.1`.
 If not in `LD_LIBRARY_PATH`, all adapters fail silently and sycl-ls reports
