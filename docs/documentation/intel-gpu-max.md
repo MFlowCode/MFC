@@ -309,6 +309,74 @@ allocation cannot open `/dev/dri/renderD128`. Always request the GPU resource:
 Without `--gres`, `omp_get_num_devices()` returns 0 and the process aborts with
 integer divide-by-zero in `s_initialize_mpi_domain` (rank % num_devices with 0 devices).
 
+**Per-node renderD128 permissions on CRNCH**: `dash4` has `renderD128` as
+`crwxrwxrwx` (world-accessible), but `dash3` has `crw-rw----` (render group only).
+`--gres=gpu:max_1100:1` does NOT grant cgroup access on dash3 with the current
+SLURM configuration; `omp_get_num_devices()` returns 0 on dash3 even within a
+SLURM GPU allocation. Contact the CRNCH admin to either fix the device permissions
+on dash3 or configure SLURM device cgroups to grant renderD128 access for GPU jobs.
+Until fixed, 2-node GPU simulation is not possible using dash3+dash4.
+
+**Inter-node MPI: FI_TCP_IFACE must be set dynamically**: The CRNCH dash nodes
+have multiple network interfaces (high-speed 10GbE at `10.10.10.x`, public 1GbE
+at `143.215.138.x/25`). Intel MPI's OFI tcp provider selects the highest-speed
+interface by default. On dash3, this picks `enp200s0f1np1` (10.10.10.32), which
+has no corresponding active interface on dash4. This causes the inter-node MPI
+broadcast to hang silently after `MPI_Init` succeeds.
+
+Fix: set `FI_TCP_IFACE` to the name of the interface with the public IP (which
+is accessible from all nodes). The interface name differs per node, so set it
+dynamically in each rank's startup script:
+
+```bash
+IFACE=$(ip -o addr show | awk '/143\.215\.138\.[0-9]+\// {print $2; exit}')
+export FI_TCP_IFACE="${IFACE}"
+```
+
+This selects `enp3s0f0` on dash3 and `enp3s0f0np0` on dash4. Combined with
+`srun --mpi=pmi2` for SLURM-native MPI bootstrap (avoiding Intel MPI hydra/SSH),
+this enables successful inter-node MPI communication.
+
+**Recommended 2-node run script pattern** (for when dash3's GPU access is fixed):
+
+```bash
+#!/bin/bash
+#SBATCH -N 2
+#SBATCH --ntasks-per-node=1
+#SBATCH -p rg-nextgen-hpc
+#SBATCH -w dash3,dash4
+#SBATCH --gres=gpu:max_1100:1
+#SBATCH --time=01:00:00
+
+INTEL=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1
+export PATH=${INTEL}/compiler/2025.0/bin:${INTEL}/mpi/2021.14/bin:${PATH}
+export LD_LIBRARY_PATH=${INTEL}/mkl/2025.0/lib:${INTEL}/compiler/2025.0/lib:${INTEL}/2025.0/lib:${INTEL}/mpi/2021.14/lib:${INTEL}/mpi/2021.14/libfabric/lib:${LD_LIBRARY_PATH}
+export FI_PROVIDER_PATH=${INTEL}/mpi/2021.14/libfabric/lib/prov
+export I_MPI_FABRICS="shm:ofi"
+export FI_PROVIDER=tcp
+
+cd /path/to/case
+
+# Step 1: pre-process
+WRAP_SCRIPT=$(mktemp)
+cat > "$WRAP_SCRIPT" << 'EOF'
+IFACE=$(ip -o addr show | awk '/143\.215\.138\.[0-9]+\// {print $2; exit}')
+export FI_TCP_IFACE="$IFACE"
+exec /path/to/build/install/<hash>/bin/pre_process
+EOF
+chmod +x "$WRAP_SCRIPT"
+srun --mpi=pmi2 -n 2 --ntasks-per-node=1 "$WRAP_SCRIPT"
+
+# Step 2: simulation
+cat > "$WRAP_SCRIPT" << 'EOF'
+IFACE=$(ip -o addr show | awk '/143\.215\.138\.[0-9]+\// {print $2; exit}')
+export FI_TCP_IFACE="$IFACE"
+exec /path/to/build/install/<hash>/bin/simulation
+EOF
+srun --mpi=pmi2 -n 2 --ntasks-per-node=1 "$WRAP_SCRIPT"
+rm "$WRAP_SCRIPT"
+```
+
 ### `libumf.so.1` not found at runtime
 The 2026.0 Level Zero and OpenCL UR adapters link against `libumf.so.1`.
 If not in `LD_LIBRARY_PATH`, all adapters fail silently and sycl-ls reports
