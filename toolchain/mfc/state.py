@@ -21,6 +21,7 @@ class MFCConfig:
     single: bool = False
     mixed: bool = False
     fastmath: bool = False
+    intel_aot: bool = False
 
     def __hash__(self):
         return hash(tuple(getattr(self, f.name) for f in dataclasses.fields(self)))
@@ -32,7 +33,8 @@ class MFCConfig:
         r = MFCConfig()
 
         for field in dataclasses.fields(MFCConfig):
-            setattr(r, field.name, d[field.name])
+            if field.name in d:
+                setattr(r, field.name, d[field.name])
 
         return r
 

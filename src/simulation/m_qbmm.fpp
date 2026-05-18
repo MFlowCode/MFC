@@ -741,7 +741,7 @@ contains
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout)  :: rhs_mv
         type(int_bounds_info), intent(in)                                                          :: ix, iy, iz
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(6)    :: moms, msum
             real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
         #:else
@@ -1027,7 +1027,7 @@ contains
         function f_quad(abscX, abscY, wght_in, q, r, s)
 
             $:GPU_ROUTINE(parallelism='[seq]')
-            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
                 real(wp), dimension(4, 3), intent(in) :: abscX, abscY, wght_in
             #:else
                 real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
@@ -1053,7 +1053,7 @@ contains
         function f_quad2D(abscX, abscY, wght_in, pow)
 
             $:GPU_ROUTINE(parallelism='[seq]')
-            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
                 real(wp), dimension(4), intent(in) :: abscX, abscY, wght_in
             #:else
                 real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in

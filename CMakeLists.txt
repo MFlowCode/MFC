@@ -31,6 +31,8 @@ option(MFC_DOCUMENTATION "Build documentation"                               OFF
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
 option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
+option(MFC_Intel_AOT       "Build Intel GPU with AOT compilation (no JIT)"  OFF)
+set(MFC_Intel_AOT_DEVICE "pvc" CACHE STRING "Intel GPU AOT target device (e.g. pvc, dg2)")
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -249,6 +251,42 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
         add_compile_options(-g -Og -traceback -check bounds)
     endif()
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
+    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>
+                        $<$<COMPILE_LANGUAGE:Fortran>:-fpp>)
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(-g -Og -traceback -debug -check all)
+    elseif (CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+        add_compile_options(-g -Og -traceback -check bounds)
+    endif()
+
+    # mpiifx calls 'ifx' via eval. If ifx is not in PATH, cmake's compiler
+    # capability tests (OpenMP detection, IPO check) fail with "ifx: not found".
+    # Locate ifx relative to mpiifx's oneapi tree so cmake tests work without
+    # the user having to load modules before every build.
+    get_filename_component(_fc_name "${CMAKE_Fortran_COMPILER}" NAME)
+    if (_fc_name MATCHES "^mpi")
+        get_filename_component(_mpi_bin  "${CMAKE_Fortran_COMPILER}" DIRECTORY)
+        get_filename_component(_mpi_ver  "${_mpi_bin}"               DIRECTORY)
+        get_filename_component(_mpi_root "${_mpi_ver}"               DIRECTORY)
+        get_filename_component(_oneapi   "${_mpi_root}"              DIRECTORY)
+        file(GLOB _ifx_bins "${_oneapi}/compiler/*/bin/ifx")
+        if (_ifx_bins)
+            list(GET _ifx_bins 0 _ifx_bin)
+            get_filename_component(_ifx_dir "${_ifx_bin}" DIRECTORY)
+            set(ENV{PATH} "${_ifx_dir}:$ENV{PATH}")
+            message(STATUS "MFC: mpiifx detected — added ifx to PATH: ${_ifx_dir}")
+        endif()
+        unset(_mpi_bin)
+        unset(_mpi_ver)
+        unset(_mpi_root)
+        unset(_oneapi)
+        unset(_ifx_bins)
+        unset(_ifx_bin)
+        unset(_ifx_dir)
+    endif()
+    unset(_fc_name)
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
@@ -560,8 +598,18 @@ exit 0
         )
 
         if (MFC_MPI AND ARGS_MPI)
-            find_package(MPI COMPONENTS Fortran REQUIRED)
-	    
+            # When the Fortran compiler is an MPI wrapper (e.g. mpiifx), skip MPI
+            # auto-detection: cmake's FindMPI probes with -showme:compile which hangs
+            # on Intel MPI. The wrapper already injects all MPI includes and link flags.
+            get_filename_component(_fc_basename "${CMAKE_Fortran_COMPILER}" NAME)
+            if (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM" AND _fc_basename MATCHES "^mpi")
+                if (NOT TARGET MPI::MPI_Fortran)
+                    add_library(MPI::MPI_Fortran INTERFACE IMPORTED)
+                endif()
+            else()
+                find_package(MPI COMPONENTS Fortran REQUIRED)
+            endif()
+
             target_compile_definitions(${a_target} PRIVATE MFC_MPI)
             if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND
                DEFINED ENV{CRAY_MPICH_INC} AND NOT "$ENV{CRAY_MPICH_INC}" STREQUAL "")
@@ -595,6 +643,71 @@ exit 0
                             HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
                         target_link_libraries(${a_target} PRIVATE ${HIPFFT_LIB})
                     endif()
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
+                    # Intel GPU: oneMKL DFTI with !$omp dispatch for GPU FFT.
+                    # Requires MKLROOT to be set (via oneAPI module or env).
+                    if (NOT DEFINED ENV{MKLROOT})
+                        message(FATAL_ERROR "MKLROOT is not set. Load oneAPI MKL module before building.")
+                    endif()
+                    # Compile mkl_dfti_omp_offload.f90 in isolation with minimal flags.
+                    # The file uses !$omp declare variant with need_device_addr (OpenMP 5.2)
+                    # which requires the global -free -fpp flags to be absent so the
+                    # compiler parses it in standard fixed/free detection mode only.
+                    set(_mkl_omp_src "$ENV{MKLROOT}/include/mkl_dfti_omp_offload.f90")
+                    if (NOT EXISTS "${_mkl_omp_src}")
+                        message(FATAL_ERROR "mkl_dfti_omp_offload.f90 not found in $ENV{MKLROOT}/include")
+                    endif()
+                    set(_mkl_omp_mod_dir "${CMAKE_CURRENT_BINARY_DIR}/mkl_omp_mods")
+                    set(_mkl_omp_obj "${_mkl_omp_mod_dir}/mkl_dfti_omp_offload.o")
+                    set(_mkl_omp_obj_host "${_mkl_omp_mod_dir}/mkl_dfti_omp_offload_host.o")
+                    file(MAKE_DIRECTORY "${_mkl_omp_mod_dir}")
+                    # Find clang-offload-bundler (in ifx's bin/compiler/ subdir).
+                    # CMAKE_Fortran_COMPILER may be an MPI wrapper (mpiifx); resolve the
+                    # underlying ifx from PATH so the HINTS point to the right directory.
+                    find_program(_IFX_REAL ifx REQUIRED)
+                    cmake_path(GET _IFX_REAL PARENT_PATH _ifx_bin)
+                    find_program(CLANG_OFFLOAD_BUNDLER
+                        NAMES clang-offload-bundler
+                        HINTS "${_ifx_bin}/compiler" "${_ifx_bin}"
+                        REQUIRED)
+                    add_custom_command(
+                        OUTPUT  "${_mkl_omp_obj}"
+                                "${_mkl_omp_mod_dir}/mkl_dfti_omp_offload.mod"
+                        COMMAND "${CMAKE_Fortran_COMPILER}"
+                                -fiopenmp -fopenmp-targets=spir64
+                                -c -I"$ENV{MKLROOT}/include"
+                                "${_mkl_omp_src}"
+                                -o "${_mkl_omp_obj}"
+                        WORKING_DIRECTORY "${_mkl_omp_mod_dir}"
+                        DEPENDS "${_mkl_omp_src}"
+                        COMMENT "Compiling MKL OMP offload Fortran module (mkl_dfti_omp_offload)"
+                    )
+                    # Strip the SPIR-V device bundle so the linked object has only host code.
+                    # The SPIR-V contains Import declarations for MKL SYCL DFT functions that
+                    # the OpenMP Level Zero plugin cannot resolve, causing zeModuleDynamicLink
+                    # failure. With host-only code, !$omp dispatch falls back to CPU for DFT.
+                    add_custom_command(
+                        OUTPUT  "${_mkl_omp_obj_host}"
+                        COMMAND "${CLANG_OFFLOAD_BUNDLER}"
+                                --unbundle --type=o
+                                --targets=host-x86_64-unknown-linux-gnu
+                                --input="${_mkl_omp_obj}"
+                                --output="${_mkl_omp_obj_host}"
+                        DEPENDS "${_mkl_omp_obj}"
+                        COMMENT "Stripping SPIR-V from MKL DFT object (host-only, fixes Level Zero link)"
+                    )
+                    add_custom_target(mkl_omp_offload_mod_${a_target}
+                        DEPENDS "${_mkl_omp_obj_host}")
+                    add_dependencies(${a_target} mkl_omp_offload_mod_${a_target})
+                    target_include_directories(${a_target} PRIVATE
+                        "$ENV{MKLROOT}/include" "${_mkl_omp_mod_dir}")
+                    target_link_libraries(${a_target} PRIVATE "${_mkl_omp_obj_host}")
+                    # Link MKL threading + core + SYCL DFT backend
+                    target_link_options(${a_target} PRIVATE -qmkl=parallel)
+                    find_library(MKL_SYCL_DFT mkl_sycl_dft HINTS "$ENV{MKLROOT}/lib" REQUIRED)
+                    find_library(SYCL_LIB sycl HINTS ENV LIBRARY_PATH "${_ifx_bin}/../lib" REQUIRED)
+                    find_library(OPENCL_LIB OpenCL HINTS ENV LIBRARY_PATH "${_ifx_bin}/../lib" REQUIRED)
+                    target_link_libraries(${a_target} PRIVATE ${MKL_SYCL_DFT} ${SYCL_LIB} ${OPENCL_LIB})
                 else()
                     find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
                     target_link_libraries(${a_target} PRIVATE hipfort::hipfft)
@@ -636,9 +749,23 @@ exit 0
                     target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
                     target_link_options(${a_target} PRIVATE "-mp=gpu")
                     set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
-                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
-                    target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
-                    target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
+                    # Intel GPU: OpenMP target offload to SPIR64 (Xe-HPC / Ponte Vecchio).
+                    # GPU FFT uses oneMKL DFTI via the OpenMP dispatch construct.
+                    # MFC_Intel_AOT=ON: compile native GPU ISA at build time (no runtime JIT).
+                    if(MFC_Intel_AOT)
+                        # AOT: compile native GPU ISA at build time with ocloc via -Xopenmp-target-backend.
+                        # ocloc uses single-dash flags (-device pvc, not --device pvc).
+                        # -Xopenmp-target-backend goes only on link because ocloc runs at link time;
+                        # putting it on compile options too causes ocloc to see -device twice.
+                        target_compile_options(${a_target} PRIVATE
+                            -fiopenmp -fopenmp-targets=spir64_gen -fp-model=precise)
+                        target_link_options(${a_target} PRIVATE
+                            "SHELL:-fiopenmp -fopenmp-targets=spir64_gen -Xopenmp-target-backend \"-device ${MFC_Intel_AOT_DEVICE}\"")
+                    else()
+                        target_compile_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64 -fp-model=precise)
+                        target_link_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64)
+                    endif()
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
                     target_compile_options(${a_target} PRIVATE -fopenmp)
                     target_link_options(${a_target} PRIVATE -fopenmp)
@@ -753,6 +880,13 @@ if (MFC_PRE_PROCESS)
         # via cross-file inlining. Safe to disable IPA for the whole target
         # (CPU-only, no GPU device-call requirements). See PR #1286.
         target_compile_options(pre_process PRIVATE -Oipa0)
+    elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
+        # ifx stack-allocates compiler-generated temporaries by default; large
+        # ones (e.g. 8 MB MPI I/O contiguous copies) overflow the stack when the
+        # Level Zero / OpenMP offload runtime has already consumed stack space.
+        # Note: -heap-arrays triggers an ICE in ifx's SPIR-V backend for simulation
+        # (GPU device code), so it is applied only to CPU-only targets here.
+        target_compile_options(pre_process PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-heap-arrays>)
     endif()
 endif()
 
@@ -781,6 +915,17 @@ if (MFC_SIMULATION)
         else()
             target_compile_options(simulation PRIVATE -Oipa0)
         endif()
+    endif()
+    # ifx SPIR64 ICE: the LLVM inliner pulls !$omp declare target (seq) geometry
+    # routines into target teams loop kernels and generates SPIR-V IR that crashes
+    # llvm-spirv at O1+. -fno-inline keeps them as proper device-side calls.
+    # Each GPU loop calls exactly one geometry routine (split-loop pattern in
+    # m_compute_levelset.fpp), so device-call overhead is small. See PR intel-gpu.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM" AND MFC_OpenMP)
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_compute_levelset.fpp.f90"
+            PROPERTIES COMPILE_OPTIONS "-fno-inline"
+        )
     endif()
 endif()
 

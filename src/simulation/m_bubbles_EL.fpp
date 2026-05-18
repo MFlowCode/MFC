@@ -492,7 +492,7 @@ contains
         real(wp)                                               :: myPinf, aux1, aux2, myCson, myRho
         real(wp)                                               :: gamma, pi_inf, qv
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: myalpha_rho, myalpha
         #:else
             real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
@@ -704,10 +704,10 @@ contains
         integer, dimension(3), intent(in)                   :: cell
         real(wp), intent(out)                               :: cson
         real(wp)                                            :: E, H
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: vel
         #:else
-            real(wp), dimension(num_dims) :: vel
+            real(wp), dimension(3) :: vel
         #:endif
         integer :: i
 

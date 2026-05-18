@@ -129,7 +129,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive variables
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: myalpha, myalpha_rho
         #:else
             real(wp), dimension(num_fluids) :: myalpha, myalpha_rho

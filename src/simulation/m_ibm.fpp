@@ -141,7 +141,7 @@ contains
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3)  :: Gs
             real(wp), dimension(3)  :: alpha_rho_IP, alpha_IP
             real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
@@ -727,10 +727,10 @@ contains
         real(wp), intent(inout) :: pres_IP
         real(wp), dimension(3), intent(inout) :: vel_IP
         real(wp), intent(inout) :: c_IP
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(inout) :: alpha_IP, alpha_rho_IP
         #:else
-            real(wp), dimension(num_fluids), intent(inout) :: alpha_IP, alpha_rho_IP
+            real(wp), dimension(num_fluids_max), intent(inout) :: alpha_IP, alpha_rho_IP
         #:endif
         real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(inout) :: nmom_IP
@@ -892,7 +892,7 @@ contains
         real(wp), dimension(1:3)     :: local_force_contribution, radial_vector, local_torque_contribution
         real(wp)                     :: cell_volume, dx, dy, dz, dynamic_viscosity
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: dynamic_viscosities
         #:else
             real(wp), dimension(num_fluids) :: dynamic_viscosities

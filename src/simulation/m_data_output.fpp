@@ -166,12 +166,12 @@ contains
         integer, intent(in)                                 :: t_step
         real(wp)                                            :: rho  !< Cell-avg. density
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: alpha  !< Cell-avg. volume fraction
             real(wp), dimension(3) :: vel    !< Cell-avg. velocity
         #:else
-            real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
-            real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
+            real(wp), dimension(num_fluids_max) :: alpha  !< Cell-avg. volume fraction
+            real(wp), dimension(3)              :: vel    !< Cell-avg. velocity
         #:endif
         real(wp)               :: vel_sum  !< Cell-avg. velocity sum
         real(wp)               :: pres     !< Cell-avg. pressure

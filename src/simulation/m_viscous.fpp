@@ -53,7 +53,7 @@ contains
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(wp), dimension(2) :: Re_visc
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
             real(wp), dimension(3, 3) :: tau_Re
         #:else
@@ -1266,14 +1266,14 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(1:3,1:3), intent(inout)           :: viscous_stress_tensor
-        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(in)                                  :: dynamic_viscosity
-        integer, intent(in)                                   :: i, j, k
-        real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
-        real(wp), dimension(1:3)                              :: dx
-        real(wp)                                              :: divergence
-        integer                                               :: l, q  !< iterators
+        real(wp), dimension(1:3,1:3), intent(inout)  :: viscous_stress_tensor
+        type(scalar_field), dimension(:), intent(in) :: q_prim_vf
+        real(wp), intent(in)                         :: dynamic_viscosity
+        integer, intent(in)                          :: i, j, k
+        real(wp), dimension(1:3,1:3)                 :: velocity_gradient_tensor
+        real(wp), dimension(1:3)                     :: dx
+        real(wp)                                     :: divergence
+        integer                                      :: l, q  !< iterators
 
         ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
         viscous_stress_tensor = 0._wp

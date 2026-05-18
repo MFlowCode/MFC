@@ -120,7 +120,7 @@ contains
         real(wp)                                               :: T
         real(wp)                                               :: rho, omega_m
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(10) :: Ys
             real(wp), dimension(10) :: omega
         #:else
@@ -168,7 +168,7 @@ contains
         integer, intent(in)                                    :: idir
         type(scalar_field), intent(in)                         :: q_T_sf
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
             real(wp), dimension(10) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
             real(wp), dimension(10) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k

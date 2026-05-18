@@ -303,4 +303,12 @@
 
 #:set USING_NVHPC = (MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID)
 #:set USING_CCE = (MFC_COMPILER == CCE_COMPILER_ID)
+
+! Dispatch to oneMKL GPU FFT via OpenMP dispatch construct (Intel GPU only)
+#:def GPU_MKL_DISPATCH()
+    #:set omp_code = OMP_MKL_DISPATCH()
+#if defined(MFC_OpenMP)
+    $:omp_code
+#endif
+#:enddef
 ! New line at end of file is required for FYPP

@@ -32,16 +32,16 @@ if (MFC_FFTW)
         message(STATUS "FFTW found.")
         add_custom_target(fftw)
     else()
-        if (NOT CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+            message(WARNING "The Fortran compiler vendor is Cray so FFTW3 will not be built. We will use cray-fftw instead.")
+            add_custom_target(fftw)
+        else()
             ExternalProject_Add(fftw
                 URL        "http://www.fftw.org/fftw-3.3.10.tar.gz"
                 CMAKE_ARGS -DBUILD_TESTS=OFF
                            -DBUILD_SHARED_LIBS=OFF
                            "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
             )
-        else()
-            message(WARNING "The Fortran compiler vendor is Cray so FFTW3 will not be built. We will use cray-fftw instead.")
-            add_custom_target(fftw)
         endif()
     endif()
 endif()
@@ -135,6 +135,9 @@ endif()
                             -DCBLAS=OFF
                             -DLAPACKE=OFF
                             -DBUILD_DEPRECATED=OFF
+                            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+                            "-DCMAKE_EXE_LINKER_FLAGS=-no-pie"
+                            "-DCMAKE_Fortran_COMPILER=${CMAKE_Fortran_COMPILER}"
                             "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
                             "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
          )

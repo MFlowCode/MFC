@@ -477,12 +477,12 @@ contains
         real(wp)                                               :: dqv_dt
         real(wp)                                               :: dpres_ds
 
-        #:if USING_AMD
+        #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20) :: L
         #:else
             real(wp), dimension(sys_size) :: L
         #:endif
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3)  :: alpha_rho, dalpha_rho_ds, mf
             real(wp), dimension(3)  :: vel, dvel_ds
             real(wp), dimension(3)  :: adv_local, dadv_ds

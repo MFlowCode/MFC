@@ -148,7 +148,7 @@ contains
         real(wp)                                               :: pb_local, mv_local, vflux, pbdot
         real(wp)                                               :: n_tait, B_tait
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: Rtmp, Vtmp
             real(wp), dimension(3) :: myalpha, myalpha_rho
         #:else

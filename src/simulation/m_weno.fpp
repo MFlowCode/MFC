@@ -895,7 +895,7 @@ contains
         integer, intent(in)                                                                    :: weno_dir
         type(int_bounds_info), intent(in)                                                      :: is1_weno_d, is2_weno_d, is3_weno_d
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(-3:2) :: dvd
             real(wp), dimension(0:4)  :: poly
             real(wp), dimension(0:4)  :: alpha

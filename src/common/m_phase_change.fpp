@@ -76,7 +76,7 @@ contains
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
         #:else
             real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
@@ -259,7 +259,7 @@ contains
         ! initializing variables
         integer, intent(in)                                 :: j, k, l, MFL
         real(wp), intent(out)                               :: pS
-        real(wp), dimension(1:), intent(out)                :: p_infpT
+        real(wp), dimension(num_fluids), intent(out)        :: p_infpT
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in)                                :: rhoe
         real(wp), intent(out)                               :: TS
@@ -283,7 +283,7 @@ contains
             mQ = mQ + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
         end do
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             if (num_fluids < 3) then
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = num_fluids + 1, 3
@@ -353,14 +353,14 @@ contains
 
         integer, intent(in)                                    :: j, k, l
         real(wp), intent(inout)                                :: pS
-        real(wp), dimension(1:), intent(in)                    :: p_infpT
-        real(wp), intent(in)                                   :: rhoe
+        real(wp), dimension(num_fluids), intent(in)            :: p_infpT
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(wp), intent(in)                                   :: rhoe
         real(wp), intent(inout)                                :: TS
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: p_infpTg  !< stiffness for the participating fluids for pTg-equilibrium
         #:else
-            real(wp), dimension(num_fluids) :: p_infpTg  !< stiffness for the participating fluids for pTg-equilibrium
+            real(wp), dimension(num_fluids_max) :: p_infpTg  !< stiffness for the participating fluids for pTg-equilibrium
         #:endif
         real(wp), dimension(2, 2) :: Jac, InvJac, TJac                  !< matrices for the Newton Solver
         real(wp), dimension(2)    :: R2D, DeltamP                       !< residual and correction array

@@ -2,7 +2,7 @@
 
 #:set NVIDIA_COMPILER_ID="NVHPC"
 #:set PGI_COMPILER_ID="PGI"
-#:set INTEL_COMPILER_ID="Intel"
+#:set INTEL_COMPILER_ID="IntelLLVM"
 #:set CCE_COMPILER_ID="Cray"
 #:set AMD_COMPILER_ID="LLVMFlang"
 
@@ -182,6 +182,20 @@
         #:set omp_start_directive = '!$omp target teams distribute parallel do simd defaultmap(firstprivate:scalar) '
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams distribute parallel do '
+    #:elif MFC_COMPILER == INTEL_COMPILER_ID
+        #! Intel OMP 5.2: bind(a,b) is invalid. Drop explicit firstprivate list:
+        #! ifx rejects firstprivate for declare-target module variables (#7655).
+        #! OMP 5.0 rule: unclaused scalars in target constructs are firstprivate
+        #! by default, so scalar locals (e.g. gp_layers_z) are covered implicitly.
+        #! declare-target vars (e.g. gp_layers) are device-resident -- no mapping
+        #! needed. defaultmap(firstprivate:scalar) also unsupported by ifx (#9061).
+        #:set omp_start_directive = '!$omp target teams loop '
+        #:set clause_val = collapse_val.strip('\n') + &
+            & default_val.strip('\n') + GEN_PRIVATE_STR(private, False).strip('\n') + &
+            & reduction_val.strip('\n') + copy_val.strip('\n') + copyin_val.strip('\n') + &
+            & copyout_val.strip('\n') + create_val.strip('\n') + &
+            & no_create_val.strip('\n') + present_val.strip('\n') + &
+            & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #:else
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
     #:endif
@@ -197,6 +211,8 @@
         #:set omp_end_directive = '!$omp end target teams distribute parallel do simd'
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_end_directive = '!$omp end target teams distribute parallel do'
+    #:elif MFC_COMPILER == INTEL_COMPILER_ID
+        #:set omp_end_directive = '!$omp end target teams loop'
     #:else
         #:set omp_end_directive = '!$omp end target teams loop'
     #:endif
@@ -218,7 +234,9 @@
         #:set function_name_val = ''
     #:endif
 
-    #:if MFC_COMPILER == AMD_COMPILER_ID
+    #:if MFC_COMPILER == AMD_COMPILER_ID or MFC_COMPILER == INTEL_COMPILER_ID
+        #! AMD: device_type unsupported. Intel: OpenMP 5.2 requires an enter/to/link/local
+        #! clause alongside device_type; omit device_type entirely for both.
         #:set clause_val = ''
     #:else
         #:set clause_val = nohost_val.strip('\n')
@@ -372,6 +390,12 @@
 #:def UNDEF_NVIDIA(code)
     #:if MFC_COMPILER != NVIDIA_COMPILER_ID and MFC_COMPILER != PGI_COMPILER_ID
         $:code
+    #:endif
+#:enddef
+
+#:def OMP_MKL_DISPATCH()
+    #:if MFC_COMPILER == INTEL_COMPILER_ID
+        !$omp dispatch
     #:endif
 #:enddef
 ! New line at end of file is required for FYPP

@@ -65,7 +65,7 @@ contains
         integer, intent(in)                                    :: id
         type(int_bounds_info), intent(in)                      :: isx, isy, isz
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3, 3) :: Omega
         #:else
             real(wp), dimension(num_dims, num_dims) :: Omega

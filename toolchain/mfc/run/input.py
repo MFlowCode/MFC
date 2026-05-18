@@ -99,6 +99,16 @@ class MFCInputFile(Case):
 
         thermochem_code = pyro.FortranCodeGenerator().generate("m_thermochem", sol, pyro.CodeGenerationOptions(scalar_type=real_type, directive_offload=directive_str))
 
+        if directive_str == "mp":
+            # ifx -fpp strips !$omp directives produced by C-macro expansion because the
+            # Intel Fortran preprocessor treats '!' as a Fortran comment after expansion.
+            # Rewrite the GPU_ROUTINE macro calls as literal !$omp declare target lines so
+            # the directive is visible to the Fortran front-end, not the C preprocessor.
+            import re
+
+            thermochem_code = thermochem_code.replace("#define GPU_ROUTINE(name) !$omp declare target\n", "")
+            thermochem_code = re.sub(r"[ \t]+GPU_ROUTINE\(\w+\)", "!$omp declare target", thermochem_code)
+
         common.file_write(os.path.join(modules_dir, "m_thermochem.f90"), thermochem_code, True)
 
         cons.unindent()

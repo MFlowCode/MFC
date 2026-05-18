@@ -32,6 +32,15 @@ END
         export ${key}='${value}'
     % endfor
 
+    % if gpu_mp:
+        # ifx + Level Zero: the OpenMP SPIR-V JIT runs on the main thread stack at
+        # startup, consuming 2-4 MB before user code runs. ifx also stack-allocates
+        # compiler-generated temporaries with no size threshold (unlike gfortran's
+        # 32 KB default). Together they overflow the default 12.5 MB stack for any
+        # non-trivial 3D case. Removing the limit avoids SIGSEGV at launch.
+        ulimit -s unlimited
+    % endif
+
     t_start=$(date +%s)
 % else:
     echo MFC case # ${name} @ ${input}:

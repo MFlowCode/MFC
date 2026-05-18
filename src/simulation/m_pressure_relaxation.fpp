@@ -51,8 +51,8 @@ contains
     !> The main pressure relaxation procedure
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: j, k, l
+        type(scalar_field), dimension(:), intent(inout) :: q_cons_vf
+        integer                                         :: j, k, l
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
         do l = 0, p
@@ -144,10 +144,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
         real(wp)                                               :: pres_relax, f_pres, df_pres
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: pres_K_init, rho_K_s
         #:else
-            real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
+            real(wp), dimension(num_fluids_max) :: pres_K_init, rho_K_s
         #:endif
         integer, parameter :: MAX_ITER = 50
         ! Pressure relaxation convergence tolerance
@@ -216,10 +216,10 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: alpha_rho, alpha
         #:else
-            real(wp), dimension(num_fluids) :: alpha_rho, alpha
+            real(wp), dimension(num_fluids_max) :: alpha_rho, alpha
         #:endif
         real(wp)               :: rho, dyn_pres, gamma, pi_inf, pres_relax, sum_alpha
         real(wp), dimension(2) :: Re

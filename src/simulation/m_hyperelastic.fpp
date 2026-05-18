@@ -83,7 +83,7 @@ contains
             real(wp), dimension(tensor_size) :: tensora, tensorb
         #:endif
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: alpha_k, alpha_rho_k
         #:else
             real(wp), dimension(num_fluids) :: alpha_k, alpha_rho_k

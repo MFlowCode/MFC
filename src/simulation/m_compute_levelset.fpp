@@ -25,48 +25,81 @@ contains
 
         type(ghost_point), dimension(:), intent(inout) :: gps
         integer, intent(in)                            :: num_gps
-        integer                                        :: i, patch_id, patch_geometry
+        integer                                        :: i, patch_id
 
-        !  3D Patch Geometries
+        ! One GPU loop per geometry type so each kernel calls exactly one
+        ! declare-target routine. A single if-else dispatch over multiple
+        ! declare-target callees triggers an LLVM phi-node dominance error
+        ! in ifx SPIR64 codegen; splitting into separate loops avoids it.
 
         if (p > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
             do i = 1, num_gps
                 patch_id = gps(i)%ib_patch_id
-                patch_geometry = patch_ib(patch_id)%geometry
-
-                if (patch_geometry == 8) then
-                    call s_sphere_levelset(gps(i))
-                else if (patch_geometry == 9) then
-                    call s_cuboid_levelset(gps(i))
-                else if (patch_geometry == 10) then
-                    call s_cylinder_levelset(gps(i))
-                else if (patch_geometry == 11) then
-                    call s_3d_airfoil_levelset(gps(i))
-                else if (patch_geometry == 12) then
-                    call s_model_levelset(gps(i))
-                end if
+                if (patch_ib(patch_id)%geometry == 8) call s_sphere_levelset(gps(i))
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! 2D Patch Geometries
-        else if (n > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
             do i = 1, num_gps
                 patch_id = gps(i)%ib_patch_id
-                patch_geometry = patch_ib(patch_id)%geometry
+                if (patch_ib(patch_id)%geometry == 9) call s_cuboid_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
-                if (patch_geometry == 2) then
-                    call s_circle_levelset(gps(i))
-                else if (patch_geometry == 3) then
-                    call s_rectangle_levelset(gps(i))
-                else if (patch_geometry == 4) then
-                    call s_airfoil_levelset(gps(i))
-                else if (patch_geometry == 5) then
-                    call s_model_levelset(gps(i))
-                else if (patch_geometry == 6) then
-                    call s_ellipse_levelset(gps(i))
-                end if
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 10) call s_cylinder_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 11) call s_3d_airfoil_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 12) call s_model_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (n > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 2) call s_circle_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 3) call s_rectangle_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 4) call s_airfoil_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 5) call s_model_levelset(gps(i))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            do i = 1, num_gps
+                patch_id = gps(i)%ib_patch_id
+                if (patch_ib(patch_id)%geometry == 6) call s_ellipse_levelset(gps(i))
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if

@@ -142,7 +142,7 @@ contains
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3)  :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3)  :: vel_L, vel_R
             real(wp), dimension(3)  :: alpha_L, alpha_R
@@ -828,7 +828,7 @@ contains
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3)    :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3)    :: vel_L, vel_R
             real(wp), dimension(3)    :: alpha_L, alpha_R
@@ -1699,7 +1699,7 @@ contains
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3) :: alpha_L, alpha_R
             real(wp), dimension(3) :: vel_L, vel_R
@@ -1713,7 +1713,7 @@ contains
         real(wp) :: pres_L, pres_R
         real(wp) :: E_L, E_R
         real(wp) :: H_L, H_R
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(10) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
             real(wp), dimension(10) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
         #:else
@@ -1743,7 +1743,7 @@ contains
         real(wp)               :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
         real(wp)               :: xi_M, xi_P
         real(wp)               :: xi_MP, xi_PP
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: R0_L, R0_R
             real(wp), dimension(3) :: V0_L, V0_R
             real(wp), dimension(3) :: P0_L, P0_R
@@ -1761,7 +1761,7 @@ contains
         real(wp)               :: R3Lbar, R3Rbar
         real(wp)               :: R3V2Lbar, R3V2Rbar
         real(wp), dimension(6) :: tau_e_L, tau_e_R
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: xi_field_L, xi_field_R
         #:else
             real(wp), dimension(num_dims) :: xi_field_L, xi_field_R
@@ -3337,7 +3337,7 @@ contains
 
         ! Local variables:
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
         #:else
             real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
@@ -4115,7 +4115,7 @@ contains
 
         ! Local variables
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3) :: avg_v_int     !< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
             real(wp), dimension(3) :: avg_dvdx_int  !< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
             real(wp), dimension(3) :: avg_dvdy_int  !< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
@@ -4286,7 +4286,7 @@ contains
 
         ! Local variables
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3, 3) :: vel_grad_avg          !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
             real(wp), dimension(3, 3) :: current_tau_shear     !< Current shear stress tensor.
             real(wp), dimension(3, 3) :: current_tau_bulk      !< Current bulk stress tensor.
@@ -4404,12 +4404,12 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         ! Arguments
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3, 3), intent(in)  :: vel_grad_avg
             real(wp), dimension(3, 3), intent(out) :: tau_shear_out
         #:else
-            real(wp), dimension(num_dims, num_dims), intent(in)  :: vel_grad_avg
-            real(wp), dimension(num_dims, num_dims), intent(out) :: tau_shear_out
+            real(wp), dimension(3, 3), intent(in)  :: vel_grad_avg
+            real(wp), dimension(3, 3), intent(out) :: tau_shear_out
         #:endif
         real(wp), intent(in) :: Re_shear
         real(wp), intent(in) :: divergence_v
@@ -4438,10 +4438,10 @@ contains
         ! Arguments
         real(wp), intent(in) :: Re_bulk
         real(wp), intent(in) :: divergence_v
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3, 3), intent(out) :: tau_bulk_out
         #:else
-            real(wp), dimension(num_dims, num_dims), intent(out) :: tau_bulk_out
+            real(wp), dimension(3, 3), intent(out) :: tau_bulk_out
         #:endif
 
         ! Local variables

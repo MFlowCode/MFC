@@ -136,7 +136,7 @@ contains
         integer, intent(in)                :: xp, yp            !< integers containing the periodicity projection information
         real(wp)                           :: f, ca_in, pa, ma, ta
         real(wp)                           :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer                            :: i, j, k, il, ir, jl, jr
+        integer                            :: i, j, k, kk, il, ir, jl, jr
         integer                            :: Np1, Np2
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xy_local, offset  !< x and y coordinates in local IB frame
@@ -227,8 +227,8 @@ contains
         call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, ma, &
-                            & ca_in, airfoil_grid_u, airfoil_grid_l]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, kk, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, &
+                            & ma, ca_in, airfoil_grid_u, airfoil_grid_l]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
@@ -246,8 +246,8 @@ contains
                     end if
                     if (xy_local(2) >= 0._wp) then
                         k = 1
-                        do while (airfoil_grid_u(k)%x < xy_local(1) .and. k <= Np)
-                            k = k + 1
+                        do kk = 1, Np - 1
+                            if (airfoil_grid_u(kk)%x < xy_local(1)) k = kk + 1
                         end do
                         if (f_approx_equal(airfoil_grid_u(k)%x, xy_local(1))) then
                             if (xy_local(2) <= airfoil_grid_u(k)%y) then
@@ -261,8 +261,8 @@ contains
                         end if
                     else
                         k = 1
-                        do while (airfoil_grid_l(k)%x < xy_local(1))
-                            k = k + 1
+                        do kk = 1, Np - 1
+                            if (airfoil_grid_l(kk)%x < xy_local(1)) k = kk + 1
                         end do
                         if (f_approx_equal(airfoil_grid_l(k)%x, xy_local(1))) then
                             if (xy_local(2) >= airfoil_grid_l(k)%y) then
@@ -290,7 +290,7 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in) :: xp, yp, zp                      !< integers containing the periodicity projection information
         real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer :: i, j, k, l, il, ir, jl, jr, ll, lr
+        integer :: i, j, k, kk, l, il, ir, jl, jr, ll, lr
         integer :: Np1, Np2
         integer :: encoded_patch_id
         real(wp), dimension(1:3) :: xyz_local, center, offset  !< x, y, z coordinates in local IB frame
@@ -385,8 +385,8 @@ contains
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
         call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, &
-                            & ma, ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, kk, f]', copyin='[encoded_patch_id, center, inverse_rotation, &
+                            & offset, ma, ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
         do l = ll, lr
             do j = jl, jr
                 do i = il, ir
@@ -399,8 +399,8 @@ contains
                         if (xyz_local(1) >= 0._wp .and. xyz_local(1) <= ca_in) then
                             if (xyz_local(2) >= 0._wp) then
                                 k = 1
-                                do while (airfoil_grid_u(k)%x < xyz_local(1))
-                                    k = k + 1
+                                do kk = 1, Np - 1
+                                    if (airfoil_grid_u(kk)%x < xyz_local(1)) k = kk + 1
                                 end do
                                 if (f_approx_equal(airfoil_grid_u(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) <= airfoil_grid_u(k)%y) then
@@ -415,8 +415,8 @@ contains
                                 end if
                             else
                                 k = 1
-                                do while (airfoil_grid_l(k)%x < xyz_local(1))
-                                    k = k + 1
+                                do kk = 1, Np - 1
+                                    if (airfoil_grid_l(kk)%x < xyz_local(1)) k = kk + 1
                                 end do
                                 if (f_approx_equal(airfoil_grid_l(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) >= airfoil_grid_l(k)%y) then

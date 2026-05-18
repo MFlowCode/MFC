@@ -799,257 +799,315 @@ contains
                                 do i = 1, nVar
                                     r = (i - 1) + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
                                     q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
+#if defined(__INTEL_COMPILER) && !defined(MFC_GPU)
                                     if (ieee_is_nan(q_comm(i)%sf(j + unpack_offset, k, l))) then
-                                        print *, "Error", j, k, l, i
-                                        call s_mpi_abort("NaN(s) in recv")
-                                    end if
+                                    print *, "Error", j, k, l, i
+                                    call s_mpi_abort("NaN(s) in recv")
+                                end if
 #endif
-                                end do
                             end do
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
+                end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
-                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, p
-                            do k = 0, n
-                                do j = -buff_size, -1
-                                    r = nVar + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
-                                    q_T_sf%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
+                if (chem_diff_comm) then
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = -buff_size, -1
+                                r = nVar + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
+                                q_T_sf%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER) && !defined(MFC_GPU)
                                     if (ieee_is_nan(q_T_sf%sf(j + unpack_offset, k, l))) then
-                                        print *, "Error", j, k, l
-                                        call s_mpi_abort("NaN(s) in recv")
-                                    end if
+                                print *, "Error", j, k, l
+                                call s_mpi_abort("NaN(s) in recv")
+                            end if
 #endif
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-
-                    if (qbmm_comm) then
-                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
-                        do l = 0, p
-                            do k = 0, n
-                                do j = -buff_size, -1
-                                    do i = nVar + 1, nVar + nnode
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*nnode + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
-                                            pb_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
-                        do l = 0, p
-                            do k = 0, n
-                                do j = -buff_size, -1
-                                    do i = nVar + 1, nVar + nnode
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
-                                            mv_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                #:elif mpi_dir == 2
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
-                    do i = 1, nVar
-                        do l = 0, p
-                            do k = -buff_size, -1
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
-                                    q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k + unpack_offset, l))) then
-                                        print *, "Error", j, k, l, i
-                                        call s_mpi_abort("NaN(s) in recv")
-                                    end if
-#endif
-                                end do
-                            end do
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-
-                    if (chem_diff_comm) then
-                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, p
-                            do k = -buff_size, -1
-                                do j = -buff_size, m + buff_size
-                                    r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
-                                    q_T_sf%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_T_sf%sf(j, k + unpack_offset, l))) then
-                                        print *, "Error", j, k, l
-                                        call s_mpi_abort("NaN(s) in recv")
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-
-                    if (qbmm_comm) then
-                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
-                        do i = nVar + 1, nVar + nnode
-                            do l = 0, p
-                                do k = -buff_size, -1
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
-                                                 & + buff_size) + buff_size*l))
-                                            pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
-                        do i = nVar + 1, nVar + nnode
-                            do l = 0, p
-                                do k = -buff_size, -1
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
-                                                 & + 1)*((k + buff_size) + buff_size*l))
-                                            mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                #:else
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
-                    do i = 1, nVar
-                        do l = -buff_size, -1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
-                                         & + 2*buff_size + 1)*(l + buff_size)))
-                                    q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l + unpack_offset))) then
-                                        print *, "Error", j, k, l, i
-                                        call s_mpi_abort("NaN(s) in recv")
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-
-                    if (chem_diff_comm) then
-                        $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = -buff_size, -1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
-                                                       & + 2*buff_size + 1)*(l + buff_size)))
-                                    q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_T_sf%sf(j, k, l + unpack_offset))) then
-                                        print *, "Error", j, k, l
-                                        call s_mpi_abort("NaN(s) in recv")
-                                    end if
-#endif
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-
-                    if (qbmm_comm) then
-                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
-                        do i = nVar + 1, nVar + nnode
-                            do l = -buff_size, -1
-                                do k = -buff_size, n + buff_size
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
-                                                 & + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
-                                            pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-
-                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
-                        do i = nVar + 1, nVar + nnode
-                            do l = -buff_size, -1
-                                do k = -buff_size, n + buff_size
-                                    do j = -buff_size, m + buff_size
-                                        do q = 1, nb
-                                            r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
-                                                 & + 1)*((k + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
-                                            mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                #:endif
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
-        #:endfor
-        call nvtxEndRange
+
+            if (qbmm_comm) then
+                $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = -buff_size, -1
+                            do i = nVar + 1, nVar + nnode
+                                do q = 1, nb
+                                    r = (i - 1) + (q - 1)*nnode + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
+                                    pb_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+
+                $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = -buff_size, -1
+                            do i = nVar + 1, nVar + nnode
+                                do q = 1, nb
+                                    r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
+                                    mv_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:elif mpi_dir == 2
+            $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+            do i = 1, nVar
+                do l = 0, p
+                    do k = -buff_size, -1
+                        do j = -buff_size, m + buff_size
+                            r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
+                            q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER) && !defined(MFC_GPU)
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k + unpack_offset, l))) then
+                            print *, "Error", j, k, l, i
+                            call s_mpi_abort("NaN(s) in recv")
+                        end if
+#endif
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (chem_diff_comm) then
+            $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+            do l = 0, p
+                do k = -buff_size, -1
+                    do j = -buff_size, m + buff_size
+                        r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
+                        q_T_sf%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER) && !defined(MFC_GPU)
+                                    if (ieee_is_nan(q_T_sf%sf(j, k + unpack_offset, l))) then
+                        print *, "Error", j, k, l
+                        call s_mpi_abort("NaN(s) in recv")
+                    end if
+#endif
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+    end if
+
+    if (qbmm_comm) then
+        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+        do i = nVar + 1, nVar + nnode
+            do l = 0, p
+                do k = -buff_size, -1
+                    do j = -buff_size, m + buff_size
+                        do q = 1, nb
+                            r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) &
+                                 & + buff_size*l))
+                            pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                        end do
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+        do i = nVar + 1, nVar + nnode
+            do l = 0, p
+                do k = -buff_size, -1
+                    do j = -buff_size, m + buff_size
+                        do q = 1, nb
+                            r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
+                                 & + buff_size) + buff_size*l))
+                            mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                        end do
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+    end if
+#:else
+    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+    do i = 1, nVar
+        do l = -buff_size, -1
+            do k = -buff_size, n + buff_size
+                do j = -buff_size, m + buff_size
+                    r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n + 2*buff_size + 1)*(l &
+                         & + buff_size)))
+                    q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER) && !defined(MFC_GPU)
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l + unpack_offset))) then
+                    print *, "Error", j, k, l, i
+                    call s_mpi_abort("NaN(s) in recv")
+                end if
+#endif
+            end do
+        end do
+    end do
+end do
+$:END_GPU_PARALLEL_LOOP()
+
+if (chem_diff_comm) then
+    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+    do l = -buff_size, -1
+        do k = -buff_size, n + buff_size
+            do j = -buff_size, m + buff_size
+                r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n + 2*buff_size + 1)*(l &
+                                   & + buff_size)))
+                q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER) && !defined(MFC_GPU)
+                                    if (ieee_is_nan(q_T_sf%sf(j, k, l + unpack_offset))) then
+                print *, "Error", j, k, l
+                call s_mpi_abort("NaN(s) in recv")
+            end if
+#endif
+        end do
+    end do
+end do
+$:END_GPU_PARALLEL_LOOP()
+end if
+
+if (qbmm_comm) then
+    $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+    do i = nVar + 1, nVar + nnode
+        do l = -buff_size, -1
+            do k = -buff_size, n + buff_size
+                do j = -buff_size, m + buff_size
+                    do q = 1, nb
+                        r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
+                             & + 2*buff_size + 1)*(l + buff_size)))
+                        pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
+                    end do
+                end do
+            end do
+        end do
+    end do
+    $:END_GPU_PARALLEL_LOOP()
+
+    $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+    do i = nVar + 1, nVar + nnode
+        do l = -buff_size, -1
+            do k = -buff_size, n + buff_size
+                do j = -buff_size, m + buff_size
+                    do q = 1, nb
+                        r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) &
+                             & + (n + 2*buff_size + 1)*(l + buff_size)))
+                        mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
+                    end do
+                end do
+            end do
+        end do
+    end do
+    $:END_GPU_PARALLEL_LOOP()
+end if
+#:endif
+end if
+#:endfor
+call nvtxEndRange
 #endif
 
-    end subroutine s_mpi_sendrecv_variables_buffers
+end subroutine s_mpi_sendrecv_variables_buffers
 
-    !> Decompose the computational domain among processors by balancing cells per rank in each coordinate direction.
-    subroutine s_mpi_decompose_computational_domain
+!> Decompose the computational domain among processors by balancing cells per rank in each coordinate direction.
+subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
-        integer :: num_procs_x, num_procs_y, num_procs_z  !< Optimal number of processors in the x-, y- and z-directions
-        !> Non-optimal number of processors in the x-, y- and z-directions
-        real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
-        real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
-        integer  :: MPI_COMM_CART  !< Cartesian processor topology communicator
-        integer  :: rem_cells      !< Remaining cells after distribution among processors
-        integer  :: recon_order    !< WENO or MUSCL reconstruction order
-        integer  :: i, j           !< Generic loop iterators
-        integer  :: ierr           !< Generic flag used to identify and report MPI errors
+    integer :: num_procs_x, num_procs_y, num_procs_z  !< Optimal number of processors in the x-, y- and z-directions
+    !> Non-optimal number of processors in the x-, y- and z-directions
+    real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
+    real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
+    integer  :: MPI_COMM_CART  !< Cartesian processor topology communicator
+    integer  :: rem_cells      !< Remaining cells after distribution among processors
+    integer  :: recon_order    !< WENO or MUSCL reconstruction order
+    integer  :: i, j           !< Generic loop iterators
+    integer  :: ierr           !< Generic flag used to identify and report MPI errors
 
-        if (recon_type == WENO_TYPE) then
-            recon_order = weno_order
-        else
-            recon_order = muscl_order
-        end if
+    if (recon_type == WENO_TYPE) then
+        recon_order = weno_order
+    else
+        recon_order = muscl_order
+    end if
 
-        if (num_procs == 1 .and. parallel_io) then
-            do i = 1, num_dims
-                start_idx(i) = 0
-            end do
-            return
-        end if
+    if (num_procs == 1 .and. parallel_io) then
+        do i = 1, num_dims
+            start_idx(i) = 0
+        end do
+        return
+    end if
 
-        if (igr) then
-            recon_order = igr_order
-        end if
+    if (igr) then
+        recon_order = igr_order
+    end if
 
-        ! 3D Cartesian Processor Topology
-        if (n > 0) then
-            if (p > 0) then
-                if (fft_wrt) then
+    ! 3D Cartesian Processor Topology
+    if (n > 0) then
+        if (p > 0) then
+            if (fft_wrt) then
+                ! Initial estimate of optimal processor topology
+                num_procs_x = 1
+                num_procs_y = 1
+                num_procs_z = num_procs
+                ierr = -1
+
+                ! Benchmarking the quality of this initial guess
+                tmp_num_procs_y = num_procs_y
+                tmp_num_procs_z = num_procs_z
+                fct_min = 10._wp*abs((n + 1)/tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
+
+                ! Optimization of the initial processor topology
+                do i = 1, num_procs
+                    if (mod(num_procs, i) == 0 .and. (n + 1)/i >= num_stcls_min*recon_order) then
+                        tmp_num_procs_y = i
+                        tmp_num_procs_z = num_procs/i
+
+                        if (fct_min >= abs((n + 1)/tmp_num_procs_y - (p + 1)/tmp_num_procs_z) .and. (p + 1) &
+                            & /tmp_num_procs_z >= num_stcls_min*recon_order) then
+                            num_procs_y = i
+                            num_procs_z = num_procs/i
+                            fct_min = abs((n + 1)/tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
+                            ierr = 0
+                        end if
+                    end if
+                end do
+            else
+                if (cyl_coord .and. p > 0) then
+                    ! Pencil blocking for cylindrical coordinates (Fourier filter near axis)
+
+                    ! Initial values of the processor factorization optimization
+                    num_procs_x = 1
+                    num_procs_y = num_procs
+                    num_procs_z = 1
+                    ierr = -1
+
+                    ! Computing minimization variable for these initial values
+                    tmp_num_procs_x = num_procs_x
+                    tmp_num_procs_y = num_procs_y
+                    tmp_num_procs_z = num_procs_z
+                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
+
+                    ! Searching for optimal computational domain distribution
+                    do i = 1, num_procs
+                        if (mod(num_procs, i) == 0 .and. (m + 1)/i >= num_stcls_min*recon_order) then
+                            tmp_num_procs_x = i
+                            tmp_num_procs_y = num_procs/i
+
+                            if (fct_min >= abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) .and. (n + 1) &
+                                & /tmp_num_procs_y >= num_stcls_min*recon_order) then
+                                num_procs_x = i
+                                num_procs_y = num_procs/i
+                                fct_min = abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
+                                ierr = 0
+                            end if
+                        end if
+                    end do
+                else
                     ! Initial estimate of optimal processor topology
                     num_procs_x = 1
                     num_procs_y = 1
@@ -1057,458 +1115,396 @@ contains
                     ierr = -1
 
                     ! Benchmarking the quality of this initial guess
+                    tmp_num_procs_x = num_procs_x
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
-                    fct_min = 10._wp*abs((n + 1)/tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
+                    fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + 10._wp*abs((n + 1)/tmp_num_procs_y &
+                                         & - (p + 1)/tmp_num_procs_z)
 
                     ! Optimization of the initial processor topology
                     do i = 1, num_procs
-                        if (mod(num_procs, i) == 0 .and. (n + 1)/i >= num_stcls_min*recon_order) then
-                            tmp_num_procs_y = i
-                            tmp_num_procs_z = num_procs/i
+                        if (mod(num_procs, i) == 0 .and. (m + 1)/i >= num_stcls_min*recon_order) then
+                            do j = 1, num_procs/i
+                                if (mod(num_procs/i, j) == 0 .and. (n + 1)/j >= num_stcls_min*recon_order) then
+                                    tmp_num_procs_x = i
+                                    tmp_num_procs_y = j
+                                    tmp_num_procs_z = num_procs/(i*j)
 
-                            if (fct_min >= abs((n + 1)/tmp_num_procs_y - (p + 1)/tmp_num_procs_z) .and. (p + 1) &
-                                & /tmp_num_procs_z >= num_stcls_min*recon_order) then
-                                num_procs_y = i
-                                num_procs_z = num_procs/i
-                                fct_min = abs((n + 1)/tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
-                                ierr = 0
-                            end if
+                                    if (fct_min >= abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + abs((n + 1) &
+                                        & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z) .and. (p + 1) &
+                                        & /tmp_num_procs_z >= num_stcls_min*recon_order) then
+                                        num_procs_x = i
+                                        num_procs_y = j
+                                        num_procs_z = num_procs/(i*j)
+                                        fct_min = abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + abs((n + 1) &
+                                                      & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
+                                        ierr = 0
+                                    end if
+                                end if
+                            end do
                         end if
                     end do
-                else
-                    if (cyl_coord .and. p > 0) then
-                        ! Pencil blocking for cylindrical coordinates (Fourier filter near axis)
-
-                        ! Initial values of the processor factorization optimization
-                        num_procs_x = 1
-                        num_procs_y = num_procs
-                        num_procs_z = 1
-                        ierr = -1
-
-                        ! Computing minimization variable for these initial values
-                        tmp_num_procs_x = num_procs_x
-                        tmp_num_procs_y = num_procs_y
-                        tmp_num_procs_z = num_procs_z
-                        fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
-
-                        ! Searching for optimal computational domain distribution
-                        do i = 1, num_procs
-                            if (mod(num_procs, i) == 0 .and. (m + 1)/i >= num_stcls_min*recon_order) then
-                                tmp_num_procs_x = i
-                                tmp_num_procs_y = num_procs/i
-
-                                if (fct_min >= abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) .and. (n + 1) &
-                                    & /tmp_num_procs_y >= num_stcls_min*recon_order) then
-                                    num_procs_x = i
-                                    num_procs_y = num_procs/i
-                                    fct_min = abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
-                                    ierr = 0
-                                end if
-                            end if
-                        end do
-                    else
-                        ! Initial estimate of optimal processor topology
-                        num_procs_x = 1
-                        num_procs_y = 1
-                        num_procs_z = num_procs
-                        ierr = -1
-
-                        ! Benchmarking the quality of this initial guess
-                        tmp_num_procs_x = num_procs_x
-                        tmp_num_procs_y = num_procs_y
-                        tmp_num_procs_z = num_procs_z
-                        fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + 10._wp*abs((n + 1) &
-                                             & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
-
-                        ! Optimization of the initial processor topology
-                        do i = 1, num_procs
-                            if (mod(num_procs, i) == 0 .and. (m + 1)/i >= num_stcls_min*recon_order) then
-                                do j = 1, num_procs/i
-                                    if (mod(num_procs/i, j) == 0 .and. (n + 1)/j >= num_stcls_min*recon_order) then
-                                        tmp_num_procs_x = i
-                                        tmp_num_procs_y = j
-                                        tmp_num_procs_z = num_procs/(i*j)
-
-                                        if (fct_min >= abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + abs((n + 1) &
-                                            & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z) .and. (p + 1) &
-                                            & /tmp_num_procs_z >= num_stcls_min*recon_order) then
-                                            num_procs_x = i
-                                            num_procs_y = j
-                                            num_procs_z = num_procs/(i*j)
-                                            fct_min = abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) + abs((n + 1) &
-                                                          & /tmp_num_procs_y - (p + 1)/tmp_num_procs_z)
-                                            ierr = 0
-                                        end if
-                                    end if
-                                end do
-                            end if
-                        end do
-                    end if
                 end if
-
-                ! Verifying that a valid decomposition of the computational domain has been established. If not, the simulation
-                ! exits.
-                if (proc_rank == 0 .and. ierr == -1) then
-                    call s_mpi_abort('Unsupported combination of values ' // 'of num_procs, m, n, p and ' &
-                                     & // 'weno/muscl/igr_order. Exiting.')
-                end if
-
-                ! Creating new communicator using the Cartesian topology
-                call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, num_procs_y, num_procs_z/), (/.true., .true., .true./), &
-                                     & .false., MPI_COMM_CART, ierr)
-
-                ! Finding the Cartesian coordinates of the local process
-                call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, proc_coords, ierr)
-
-                ! Global Parameters for z-direction
-
-                ! Number of remaining cells
-                rem_cells = mod(p + 1, num_procs_z)
-
-                ! Optimal number of cells per processor
-                p = (p + 1)/num_procs_z - 1
-
-                ! Distributing the remaining cells
-                do i = 1, rem_cells
-                    if (proc_coords(3) == i - 1) then
-                        p = p + 1; exit
-                    end if
-                end do
-
-                ! Boundary condition at the beginning
-                if (proc_coords(3) > 0 .or. (bc_z%beg == BC_PERIODIC .and. num_procs_z > 1)) then
-                    proc_coords(3) = proc_coords(3) - 1
-                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_z%beg, ierr)
-                    proc_coords(3) = proc_coords(3) + 1
-                end if
-
-                ! Boundary condition at the end
-                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == BC_PERIODIC .and. num_procs_z > 1)) then
-                    proc_coords(3) = proc_coords(3) + 1
-                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_z%end, ierr)
-                    proc_coords(3) = proc_coords(3) - 1
-                end if
-
-#ifdef MFC_POST_PROCESS
-                ! Ghost zone at the beginning
-                if (proc_coords(3) > 0 .and. format == 1) then
-                    offset_z%beg = 2
-                else
-                    offset_z%beg = 0
-                end if
-
-                ! Ghost zone at the end
-                if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
-                    offset_z%end = 2
-                else
-                    offset_z%end = 0
-                end if
-#endif
-
-                ! Beginning and end sub-domain boundary locations
-                if (parallel_io) then
-                    if (proc_coords(3) < rem_cells) then
-                        start_idx(3) = (p + 1)*proc_coords(3)
-                    else
-                        start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
-                    end if
-                else
-#ifdef MFC_PRE_PROCESS
-                    if (old_grid .neqv. .true.) then
-                        dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
-
-                        if (proc_coords(3) < rem_cells) then
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3))
-                            z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1) - (num_procs_z &
-                                                                  & - rem_cells))
-                        else
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3) + rem_cells)
-                            z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1))
-                        end if
-                    end if
-#endif
-                end if
-
-                ! 2D Cartesian Processor Topology
-            else
-                ! Initial estimate of optimal processor topology
-                num_procs_x = 1
-                num_procs_y = num_procs
-                ierr = -1
-
-                ! Benchmarking the quality of this initial guess
-                tmp_num_procs_x = num_procs_x
-                tmp_num_procs_y = num_procs_y
-                fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
-
-                ! Optimization of the initial processor topology
-                do i = 1, num_procs
-                    if (mod(num_procs, i) == 0 .and. (m + 1)/i >= num_stcls_min*recon_order) then
-                        tmp_num_procs_x = i
-                        tmp_num_procs_y = num_procs/i
-
-                        if (fct_min >= abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) .and. (n + 1) &
-                            & /tmp_num_procs_y >= num_stcls_min*recon_order) then
-                            num_procs_x = i
-                            num_procs_y = num_procs/i
-                            fct_min = abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
-                            ierr = 0
-                        end if
-                    end if
-                end do
-
-                ! Verifying that a valid decomposition of the computational domain has been established. If not, the simulation
-                ! exits.
-                if (proc_rank == 0 .and. ierr == -1) then
-                    call s_mpi_abort('Unsupported combination of values ' // 'of num_procs, m, n and ' &
-                                     & // 'weno/muscl/igr_order. Exiting.')
-                end if
-
-                ! Creating new communicator using the Cartesian topology
-                call MPI_CART_CREATE(MPI_COMM_WORLD, 2, (/num_procs_x, num_procs_y/), (/.true., .true./), .false., MPI_COMM_CART, &
-                                     & ierr)
-
-                ! Finding the Cartesian coordinates of the local process
-                call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, proc_coords, ierr)
             end if
 
-            ! Global Parameters for y-direction
+            ! Verifying that a valid decomposition of the computational domain has been established. If not, the simulation exits.
+            if (proc_rank == 0 .and. ierr == -1) then
+                call s_mpi_abort('Unsupported combination of values ' // 'of num_procs, m, n, p and ' &
+                                 & // 'weno/muscl/igr_order. Exiting.')
+            end if
+
+            ! Creating new communicator using the Cartesian topology
+            call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, num_procs_y, num_procs_z/), (/.true., .true., .true./), &
+                                 & .false., MPI_COMM_CART, ierr)
+
+            ! Finding the Cartesian coordinates of the local process
+            call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, proc_coords, ierr)
+
+            ! Global Parameters for z-direction
 
             ! Number of remaining cells
-            rem_cells = mod(n + 1, num_procs_y)
+            rem_cells = mod(p + 1, num_procs_z)
 
             ! Optimal number of cells per processor
-            n = (n + 1)/num_procs_y - 1
+            p = (p + 1)/num_procs_z - 1
 
             ! Distributing the remaining cells
             do i = 1, rem_cells
-                if (proc_coords(2) == i - 1) then
-                    n = n + 1; exit
+                if (proc_coords(3) == i - 1) then
+                    p = p + 1; exit
                 end if
             end do
 
             ! Boundary condition at the beginning
-            if (proc_coords(2) > 0 .or. (bc_y%beg == BC_PERIODIC .and. num_procs_y > 1)) then
-                proc_coords(2) = proc_coords(2) - 1
-                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_y%beg, ierr)
-                proc_coords(2) = proc_coords(2) + 1
+            if (proc_coords(3) > 0 .or. (bc_z%beg == BC_PERIODIC .and. num_procs_z > 1)) then
+                proc_coords(3) = proc_coords(3) - 1
+                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_z%beg, ierr)
+                proc_coords(3) = proc_coords(3) + 1
             end if
 
             ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == BC_PERIODIC .and. num_procs_y > 1)) then
-                proc_coords(2) = proc_coords(2) + 1
-                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_y%end, ierr)
-                proc_coords(2) = proc_coords(2) - 1
+            if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == BC_PERIODIC .and. num_procs_z > 1)) then
+                proc_coords(3) = proc_coords(3) + 1
+                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_z%end, ierr)
+                proc_coords(3) = proc_coords(3) - 1
             end if
 
 #ifdef MFC_POST_PROCESS
             ! Ghost zone at the beginning
-            if (proc_coords(2) > 0 .and. format == 1) then
-                offset_y%beg = 2
+            if (proc_coords(3) > 0 .and. format == 1) then
+                offset_z%beg = 2
             else
-                offset_y%beg = 0
+                offset_z%beg = 0
             end if
 
             ! Ghost zone at the end
-            if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
-                offset_y%end = 2
+            if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
+                offset_z%end = 2
             else
-                offset_y%end = 0
+                offset_z%end = 0
             end if
 #endif
 
             ! Beginning and end sub-domain boundary locations
             if (parallel_io) then
-                if (proc_coords(2) < rem_cells) then
-                    start_idx(2) = (n + 1)*proc_coords(2)
+                if (proc_coords(3) < rem_cells) then
+                    start_idx(3) = (p + 1)*proc_coords(3)
                 else
-                    start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
+                    start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
                 end if
             else
 #ifdef MFC_PRE_PROCESS
                 if (old_grid .neqv. .true.) then
-                    dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
+                    dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
 
-                    if (proc_coords(2) < rem_cells) then
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2))
-                        y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1) - (num_procs_y &
+                    if (proc_coords(3) < rem_cells) then
+                        z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3))
+                        z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1) - (num_procs_z &
                                                               & - rem_cells))
                     else
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2) + rem_cells)
-                        y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1))
+                        z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3) + rem_cells)
+                        z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1))
                     end if
                 end if
 #endif
             end if
 
-            ! 1D Cartesian Processor Topology
+            ! 2D Cartesian Processor Topology
         else
-            ! Optimal processor topology
-            num_procs_x = num_procs
+            ! Initial estimate of optimal processor topology
+            num_procs_x = 1
+            num_procs_y = num_procs
+            ierr = -1
+
+            ! Benchmarking the quality of this initial guess
+            tmp_num_procs_x = num_procs_x
+            tmp_num_procs_y = num_procs_y
+            fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
+
+            ! Optimization of the initial processor topology
+            do i = 1, num_procs
+                if (mod(num_procs, i) == 0 .and. (m + 1)/i >= num_stcls_min*recon_order) then
+                    tmp_num_procs_x = i
+                    tmp_num_procs_y = num_procs/i
+
+                    if (fct_min >= abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y) .and. (n + 1) &
+                        & /tmp_num_procs_y >= num_stcls_min*recon_order) then
+                        num_procs_x = i
+                        num_procs_y = num_procs/i
+                        fct_min = abs((m + 1)/tmp_num_procs_x - (n + 1)/tmp_num_procs_y)
+                        ierr = 0
+                    end if
+                end if
+            end do
+
+            ! Verifying that a valid decomposition of the computational domain has been established. If not, the simulation exits.
+            if (proc_rank == 0 .and. ierr == -1) then
+                call s_mpi_abort('Unsupported combination of values ' // 'of num_procs, m, n and ' &
+                                 & // 'weno/muscl/igr_order. Exiting.')
+            end if
 
             ! Creating new communicator using the Cartesian topology
-            call MPI_CART_CREATE(MPI_COMM_WORLD, 1, (/num_procs_x/), (/.true./), .false., MPI_COMM_CART, ierr)
+            call MPI_CART_CREATE(MPI_COMM_WORLD, 2, (/num_procs_x, num_procs_y/), (/.true., .true./), .false., MPI_COMM_CART, ierr)
 
             ! Finding the Cartesian coordinates of the local process
-            call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, proc_coords, ierr)
+            call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, proc_coords, ierr)
         end if
 
-        ! Global Parameters for x-direction
+        ! Global Parameters for y-direction
 
         ! Number of remaining cells
-        rem_cells = mod(m + 1, num_procs_x)
+        rem_cells = mod(n + 1, num_procs_y)
 
         ! Optimal number of cells per processor
-        m = (m + 1)/num_procs_x - 1
+        n = (n + 1)/num_procs_y - 1
 
         ! Distributing the remaining cells
         do i = 1, rem_cells
-            if (proc_coords(1) == i - 1) then
-                m = m + 1; exit
+            if (proc_coords(2) == i - 1) then
+                n = n + 1; exit
             end if
         end do
 
-        call s_update_cell_bounds(cells_bounds, m, n, p)
-
         ! Boundary condition at the beginning
-        if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then
-            proc_coords(1) = proc_coords(1) - 1
-            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
-            proc_coords(1) = proc_coords(1) + 1
+        if (proc_coords(2) > 0 .or. (bc_y%beg == BC_PERIODIC .and. num_procs_y > 1)) then
+            proc_coords(2) = proc_coords(2) - 1
+            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_y%beg, ierr)
+            proc_coords(2) = proc_coords(2) + 1
         end if
 
         ! Boundary condition at the end
-        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == BC_PERIODIC .and. num_procs_x > 1)) then
-            proc_coords(1) = proc_coords(1) + 1
-            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
-            proc_coords(1) = proc_coords(1) - 1
+        if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == BC_PERIODIC .and. num_procs_y > 1)) then
+            proc_coords(2) = proc_coords(2) + 1
+            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_y%end, ierr)
+            proc_coords(2) = proc_coords(2) - 1
         end if
 
 #ifdef MFC_POST_PROCESS
         ! Ghost zone at the beginning
-        if (proc_coords(1) > 0 .and. format == 1) then
-            offset_x%beg = 2
+        if (proc_coords(2) > 0 .and. format == 1) then
+            offset_y%beg = 2
         else
-            offset_x%beg = 0
+            offset_y%beg = 0
         end if
 
         ! Ghost zone at the end
-        if (proc_coords(1) < num_procs_x - 1 .and. format == 1) then
-            offset_x%end = 2
+        if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
+            offset_y%end = 2
         else
-            offset_x%end = 0
+            offset_y%end = 0
         end if
 #endif
 
         ! Beginning and end sub-domain boundary locations
         if (parallel_io) then
-            if (proc_coords(1) < rem_cells) then
-                start_idx(1) = (m + 1)*proc_coords(1)
+            if (proc_coords(2) < rem_cells) then
+                start_idx(2) = (n + 1)*proc_coords(2)
             else
-                start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
+                start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
             end if
         else
 #ifdef MFC_PRE_PROCESS
             if (old_grid .neqv. .true.) then
-                dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
+                dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
 
-                if (proc_coords(1) < rem_cells) then
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1))
-                    x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1) - (num_procs_x - rem_cells))
+                if (proc_coords(2) < rem_cells) then
+                    y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2))
+                    y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1) - (num_procs_y - rem_cells))
                 else
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1) + rem_cells)
-                    x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1))
+                    y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2) + rem_cells)
+                    y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1))
                 end if
             end if
 #endif
         end if
+
+        ! 1D Cartesian Processor Topology
+    else
+        ! Optimal processor topology
+        num_procs_x = num_procs
+
+        ! Creating new communicator using the Cartesian topology
+        call MPI_CART_CREATE(MPI_COMM_WORLD, 1, (/num_procs_x/), (/.true./), .false., MPI_COMM_CART, ierr)
+
+        ! Finding the Cartesian coordinates of the local process
+        call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, proc_coords, ierr)
+    end if
+
+    ! Global Parameters for x-direction
+
+    ! Number of remaining cells
+    rem_cells = mod(m + 1, num_procs_x)
+
+    ! Optimal number of cells per processor
+    m = (m + 1)/num_procs_x - 1
+
+    ! Distributing the remaining cells
+    do i = 1, rem_cells
+        if (proc_coords(1) == i - 1) then
+            m = m + 1; exit
+        end if
+    end do
+
+    call s_update_cell_bounds(cells_bounds, m, n, p)
+
+    ! Boundary condition at the beginning
+    if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then
+        proc_coords(1) = proc_coords(1) - 1
+        call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
+        proc_coords(1) = proc_coords(1) + 1
+    end if
+
+    ! Boundary condition at the end
+    if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == BC_PERIODIC .and. num_procs_x > 1)) then
+        proc_coords(1) = proc_coords(1) + 1
+        call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
+        proc_coords(1) = proc_coords(1) - 1
+    end if
+
+#ifdef MFC_POST_PROCESS
+    ! Ghost zone at the beginning
+    if (proc_coords(1) > 0 .and. format == 1) then
+        offset_x%beg = 2
+    else
+        offset_x%beg = 0
+    end if
+
+    ! Ghost zone at the end
+    if (proc_coords(1) < num_procs_x - 1 .and. format == 1) then
+        offset_x%end = 2
+    else
+        offset_x%end = 0
+    end if
 #endif
 
-    end subroutine s_mpi_decompose_computational_domain
-
-    !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
-    !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
-    !! cell-boundary locations may be calculated directly from those of the cell-width distributions.
-#ifndef MFC_PRE_PROCESS
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
-
-        integer, intent(in) :: mpi_dir
-        integer, intent(in) :: pbc_loc
-
-#ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-
-        if (mpi_dir == 1) then
-            if (pbc_loc == -1) then  ! PBC at the beginning
-
-                if (bc_x%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
-                                      & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-            else  ! PBC at the end
-                if (bc_x%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
-                                      & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-            end if
-        else if (mpi_dir == 2) then
-            if (pbc_loc == -1) then  ! PBC at the beginning
-
-                if (bc_y%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
-                                      & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-            else  ! PBC at the end
-                if (bc_y%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
-                                      & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-            end if
+    ! Beginning and end sub-domain boundary locations
+    if (parallel_io) then
+        if (proc_coords(1) < rem_cells) then
+            start_idx(1) = (m + 1)*proc_coords(1)
         else
-            if (pbc_loc == -1) then  ! PBC at the beginning
+            start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
+        end if
+    else
+#ifdef MFC_PRE_PROCESS
+        if (old_grid .neqv. .true.) then
+            dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
 
-                if (bc_z%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
-                                      & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-            else  ! PBC at the end
-                if (bc_z%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
-                                      & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
+            if (proc_coords(1) < rem_cells) then
+                x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1))
+                x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1) - (num_procs_x - rem_cells))
+            else
+                x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1) + rem_cells)
+                x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1))
             end if
         end if
 #endif
-
-    end subroutine s_mpi_sendrecv_grid_variables_buffers
+    end if
 #endif
 
-    !> Module deallocation and/or disassociation procedures
-    impure subroutine s_finalize_mpi_common_module
+end subroutine s_mpi_decompose_computational_domain
+
+!> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
+!! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
+!! cell-boundary locations may be calculated directly from those of the cell-width distributions.
+#ifndef MFC_PRE_PROCESS
+subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
+
+    integer, intent(in) :: mpi_dir
+    integer, intent(in) :: pbc_loc
 
 #ifdef MFC_MPI
-        deallocate (buff_send, buff_recv)
+    integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+    if (mpi_dir == 1) then
+        if (pbc_loc == -1) then  ! PBC at the beginning
+
+            if (bc_x%end >= 0) then  ! PBC at the beginning and end
+                call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
+                                  & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            else  ! PBC at the beginning only
+                call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+        else  ! PBC at the end
+            if (bc_x%beg >= 0) then  ! PBC at the end and beginning
+                call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+            else  ! PBC at the end only
+                call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+        end if
+    else if (mpi_dir == 2) then
+        if (pbc_loc == -1) then  ! PBC at the beginning
+
+            if (bc_y%end >= 0) then  ! PBC at the beginning and end
+                call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
+                                  & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            else  ! PBC at the beginning only
+                call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+        else  ! PBC at the end
+            if (bc_y%beg >= 0) then  ! PBC at the end and beginning
+                call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+            else  ! PBC at the end only
+                call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+        end if
+    else
+        if (pbc_loc == -1) then  ! PBC at the beginning
+
+            if (bc_z%end >= 0) then  ! PBC at the beginning and end
+                call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
+                                  & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            else  ! PBC at the beginning only
+                call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+        else  ! PBC at the end
+            if (bc_z%beg >= 0) then  ! PBC at the end and beginning
+                call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+            else  ! PBC at the end only
+                call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+        end if
+    end if
 #endif
 
-    end subroutine s_finalize_mpi_common_module
+end subroutine s_mpi_sendrecv_grid_variables_buffers
+#endif
+
+!> Module deallocation and/or disassociation procedures
+impure subroutine s_finalize_mpi_common_module
+
+#ifdef MFC_MPI
+    deallocate (buff_send, buff_recv)
+#endif
+
+end subroutine s_finalize_mpi_common_module
 
 end module m_mpi_common

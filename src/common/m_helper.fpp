@@ -27,10 +27,10 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)                :: vftmp
-        real(wp), dimension(nb), intent(in) :: Rtmp
         real(wp), intent(out)               :: ntmp
-        real(wp), dimension(nb), intent(in) :: weights
         real(wp)                            :: R3
+        real(wp), dimension(nb), intent(in) :: Rtmp
+        real(wp), dimension(nb), intent(in) :: weights
 
         R3 = dot_product(weights, Rtmp**3._wp)
         ntmp = (3._wp/(4._wp*pi))*vftmp/R3
@@ -42,10 +42,10 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)                :: vftmp
-        real(wp), dimension(nb), intent(in) :: nRtmp
         real(wp), intent(out)               :: ntmp
-        real(wp), dimension(nb), intent(in) :: weights
         real(wp)                            :: nR3
+        real(wp), dimension(nb), intent(in) :: nRtmp
+        real(wp), dimension(nb), intent(in) :: weights
 
         nR3 = dot_product(weights, nRtmp**3._wp)
         ntmp = sqrt((4._wp*pi/3._wp)*nR3/vftmp)

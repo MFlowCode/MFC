@@ -116,3 +116,12 @@ h-gpu NVCOMPILER_COMM_LIBS_HOME=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/com
 t     WPI Turing
 t-all slurm
 t-cpu gcc/12.1.0/i6yk33f openmpi/4.1.3/ebae7zc python/3.13.5/6anz4qy
+
+crnch     GT CRNCH RoboGator (Intel GPU Max 1100, Ponte Vecchio)
+crnch-gpu FC=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mpi/2021.14/bin/mpiifx
+crnch-gpu PATH=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/compiler/2025.0/bin:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mpi/2021.14/bin:${PATH}
+crnch-gpu MKLROOT=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mkl/2025.0
+crnch-gpu I_MPI_ROOT=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mpi/2021.14
+crnch-gpu LD_LIBRARY_PATH=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mkl/2025.0/lib:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/compiler/2025.0/lib:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/2025.0/lib:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mpi/2021.14/lib:${LD_LIBRARY_PATH}
+crnch-gpu LIBRARY_PATH=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mkl/2025.0/lib:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/compiler/2025.0/lib:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/2025.0/lib:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mpi/2021.14/lib:${LIBRARY_PATH}
+crnch-gpu I_MPI_FABRICS=shm

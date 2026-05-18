@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Forward and inverse FFT wrappers (FFTW/cuFFT/hipFFT) for azimuthal Fourier filtering in cylindrical geometries
+!> @brief Forward and inverse FFT wrappers (FFTW/cuFFT/hipFFT/oneMKL) for azimuthal Fourier filtering in cylindrical geometries
 module m_fftw
 
     use, intrinsic :: iso_c_binding
@@ -12,7 +12,14 @@ module m_fftw
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
-#if defined(MFC_GPU) && defined(__PGI)
+    ! GPU FFT backend selection:
+    !   cuFFT  - NVHPC/PGI (OpenACC or OpenMP target)
+    !   hipFFT - Cray/AMD (OpenMP target)
+    !   oneMKL - Intel ifx (OpenMP target + dispatch construct)
+    !   FFTW   - CPU-only builds
+#if defined(MFC_GPU) && defined(__INTEL_LLVM_COMPILER)
+    use mkl_dfti_omp_offload
+#elif defined(MFC_GPU) && defined(__PGI)
     use cufft
 #elif defined(MFC_GPU)
     use hipfort
@@ -34,7 +41,18 @@ module m_fftw
     real(c_double), pointer            :: data_real(:)        !< Real data
     complex(c_double_complex), pointer :: data_cmplx(:)       !< Complex data in Fourier space
     complex(c_double_complex), pointer :: data_fltr_cmplx(:)  !< Filtered complex data in Fourier space
-#if defined(MFC_GPU)
+
+#if defined(MFC_GPU) && defined(__INTEL_LLVM_COMPILER)
+    $:GPU_DECLARE(create='[real_size, cmplx_size, x_size, batch_size, Nfq, i2]')
+
+    real(dp), allocatable, target    :: data_real_gpu(:)
+    complex(dp), allocatable, target :: data_cmplx_gpu(:)
+    complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
+    $:GPU_DECLARE(create='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
+
+    type(DFTI_DESCRIPTOR), pointer :: fwd_plan_mkl => null()
+    type(DFTI_DESCRIPTOR), pointer :: bwd_plan_mkl => null()
+#elif defined(MFC_GPU)
     $:GPU_DECLARE(create='[real_size, cmplx_size, x_size, batch_size, Nfq, i2]')
 
     real(dp), allocatable, target    :: data_real_gpu(:)
@@ -62,16 +80,39 @@ contains
     impure subroutine s_initialize_fftw_module
 
         integer :: ierr  !< Generic flag used to identify and report GPU errors
-        ! Size of input array going into DFT
 
         real_size = p + 1
-        ! Size of output array coming out of DFT
         cmplx_size = (p + 1)/2 + 1
 
         x_size = m + 1
         batch_size = x_size*sys_size
 
-#if defined(MFC_GPU)
+#if defined(MFC_GPU) && defined(__INTEL_LLVM_COMPILER)
+        $:GPU_ENTER_DATA(copyin='[real_size, cmplx_size, x_size, sys_size, batch_size, Nfq]')
+        $:GPU_UPDATE(device='[real_size, cmplx_size, x_size, sys_size, batch_size]')
+
+        @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
+        @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+        @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
+
+        ! Forward R2C descriptor: batch of real_size transforms
+        ierr = DftiCreateDescriptor(fwd_plan_mkl, DFTI_DOUBLE, DFTI_REAL, 1, real_size)
+        ierr = DftiSetValue(fwd_plan_mkl, DFTI_NUMBER_OF_TRANSFORMS, batch_size)
+        ierr = DftiSetValue(fwd_plan_mkl, DFTI_PLACEMENT, DFTI_NOT_INPLACE)
+        ierr = DftiSetValue(fwd_plan_mkl, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX)
+        ierr = DftiSetValue(fwd_plan_mkl, DFTI_INPUT_DISTANCE, real_size)
+        ierr = DftiSetValue(fwd_plan_mkl, DFTI_OUTPUT_DISTANCE, cmplx_size)
+        ierr = DftiCommitDescriptor(fwd_plan_mkl)
+
+        ! Backward C2R descriptor
+        ierr = DftiCreateDescriptor(bwd_plan_mkl, DFTI_DOUBLE, DFTI_REAL, 1, real_size)
+        ierr = DftiSetValue(bwd_plan_mkl, DFTI_NUMBER_OF_TRANSFORMS, batch_size)
+        ierr = DftiSetValue(bwd_plan_mkl, DFTI_PLACEMENT, DFTI_NOT_INPLACE)
+        ierr = DftiSetValue(bwd_plan_mkl, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX)
+        ierr = DftiSetValue(bwd_plan_mkl, DFTI_INPUT_DISTANCE, cmplx_size)
+        ierr = DftiSetValue(bwd_plan_mkl, DFTI_OUTPUT_DISTANCE, real_size)
+        ierr = DftiCommitDescriptor(bwd_plan_mkl)
+#elif defined(MFC_GPU)
         rank = 1; istride = 1; ostride = 1
         allocate (gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
@@ -80,22 +121,7 @@ contains
         oembed(1) = cmplx_size
         $:GPU_ENTER_DATA(copyin='[real_size, cmplx_size, x_size, sys_size, batch_size, Nfq]')
         $:GPU_UPDATE(device='[real_size, cmplx_size, x_size, sys_size, batch_size]')
-#else
-        ! Allocate input and output DFT data sizes
-        fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
-        fftw_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
-        fftw_fltr_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
-        ! Associate input and output data pointers with allocated memory
-        call c_f_pointer(fftw_real_data, data_real, [real_size])
-        call c_f_pointer(fftw_cmplx_data, data_cmplx, [cmplx_size])
-        call c_f_pointer(fftw_fltr_cmplx_data, data_fltr_cmplx, [cmplx_size])
 
-        ! Generate plans for forward and backward DFTs
-        fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real, data_cmplx, FFTW_ESTIMATE)
-        bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
-#endif
-
-#if defined(MFC_GPU)
         @:ALLOCATE(data_real_gpu(1:real_size*x_size*sys_size))
         @:ALLOCATE(data_cmplx_gpu(1:cmplx_size*x_size*sys_size))
         @:ALLOCATE(data_fltr_cmplx_gpu(1:cmplx_size*x_size*sys_size))
@@ -111,6 +137,19 @@ contains
         ierr = hipfftPlanMany(bwd_plan_gpu, rank, gpu_fft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, &
                               & HIPFFT_Z2D, batch_size)
 #endif
+#else
+        ! Allocate input and output DFT data sizes
+        fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
+        fftw_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
+        fftw_fltr_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
+        ! Associate input and output data pointers with allocated memory
+        call c_f_pointer(fftw_real_data, data_real, [real_size])
+        call c_f_pointer(fftw_cmplx_data, data_cmplx, [cmplx_size])
+        call c_f_pointer(fftw_fltr_cmplx_data, data_fltr_cmplx, [cmplx_size])
+
+        ! Generate plans for forward and backward DFTs
+        fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real, data_cmplx, FFTW_ESTIMATE)
+        bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
 
     end subroutine s_initialize_fftw_module
@@ -124,7 +163,116 @@ contains
         ! Restrict filter to processors that have cells adjacent to axis
 
         if (bc_y%beg >= 0) return
-#if defined(MFC_GPU)
+#if defined(MFC_GPU) && defined(__INTEL_LLVM_COMPILER)
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do k = 1, sys_size
+            do j = 0, m
+                do l = 1, cmplx_size
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do k = 1, sys_size
+            do j = 0, m
+                do l = 0, p
+                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, 0, l)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_MKL_DISPATCH()
+        ierr = DftiComputeForward(fwd_plan_mkl, data_real_gpu, data_cmplx_gpu)
+
+        Nfq = 3
+        $:GPU_UPDATE(device='[Nfq]')
+
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do k = 1, sys_size
+            do j = 0, m
+                do l = 1, Nfq
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1) &
+                                        & *cmplx_size*x_size)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_MKL_DISPATCH()
+        ierr = DftiComputeBackward(bwd_plan_mkl, data_fltr_cmplx_gpu, data_real_gpu)
+
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do k = 1, sys_size
+            do j = 0, m
+                do l = 0, p
+                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1) &
+                                  & *real_size*x_size)/real(real_size, dp)
+                    q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        do i = 1, fourier_rings
+            i2 = i
+            $:GPU_UPDATE(device='[i2]')
+
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 1, cmplx_size
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 0, p
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i2, l)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_MKL_DISPATCH()
+            ierr = DftiComputeForward(fwd_plan_mkl, data_real_gpu, data_cmplx_gpu)
+
+            Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
+            $:GPU_UPDATE(device='[Nfq]')
+
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 1, Nfq
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k &
+                                            & - 1)*cmplx_size*x_size)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_MKL_DISPATCH()
+            ierr = DftiComputeBackward(bwd_plan_mkl, data_fltr_cmplx_gpu, data_real_gpu)
+
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 0, p
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k &
+                                      & - 1)*real_size*x_size)/real(real_size, dp)
+                        q_cons_vf(k)%sf(j, i2, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end do
+#elif defined(MFC_GPU)
         $:GPU_PARALLEL_LOOP(collapse=3)
         do k = 1, sys_size
             do j = 0, m
@@ -292,7 +440,13 @@ contains
     !> Finalize the FFTW module
     impure subroutine s_finalize_fftw_module
 
-#if defined(MFC_GPU)
+#if defined(MFC_GPU) && defined(__INTEL_LLVM_COMPILER)
+        integer :: ierr  !< Generic flag used to identify and report GPU errors
+
+        @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
+        ierr = DftiFreeDescriptor(fwd_plan_mkl)
+        ierr = DftiFreeDescriptor(bwd_plan_mkl)
+#elif defined(MFC_GPU)
         integer :: ierr  !< Generic flag used to identify and report GPU errors
 
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
