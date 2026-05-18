@@ -1,15 +1,3 @@
 # Spencer H. Bryngelson (sbryngelson) is the
 # default owner of all files in the repository.
 *                  @sbryngelson
-
-# @core-devs
-src/               @MFlowCode/core-devs
-docs/              @MFlowCode/core-devs
-toolchain/         @MFlowCode/core-devs
-tests/             @MFlowCode/core-devs
-benchmarks/        @MFlowCode/core-devs
-mfc.sh             @MFlowCode/core-devs
-CMakeLists.txt     @MFlowCode/core-devs
-
-# @physics-devs
-src/               @MFlowCode/physics-devs

@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Computes gravitational and user-defined body force source terms for the momentum equations
+!> @brief Computes gravitational and body force source terms for the momentum equations
 module m_body_forces
 
     use m_derived_types

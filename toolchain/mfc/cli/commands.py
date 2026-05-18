@@ -275,6 +275,14 @@ RUN_COMMAND = Command(
             dest="no_build",
         ),
         Argument(
+            name="prebuilt-prefix",
+            help="Use prebuilt MFC binaries from <PREFIX>/bin (e.g. a Spack install prefix). Implies --no-build. Also settable via MFC_PREBUILT_PREFIX.",
+            type=str,
+            default=None,
+            metavar="PREFIX",
+            dest="prebuilt_prefix",
+        ),
+        Argument(
             name="wait",
             help="(Batch) Wait for the job to finish.",
             action=ArgAction.STORE_TRUE,
@@ -436,6 +444,14 @@ TEST_COMMAND = Command(
             action=ArgAction.STORE_TRUE,
             default=False,
             dest="no_build",
+        ),
+        Argument(
+            name="prebuilt-prefix",
+            help="Use prebuilt MFC binaries from <PREFIX>/bin (e.g. a Spack install prefix). Implies --no-build. Also settable via MFC_PREBUILT_PREFIX.",
+            type=str,
+            default=None,
+            metavar="PREFIX",
+            dest="prebuilt_prefix",
         ),
         Argument(
             name="no-examples",
