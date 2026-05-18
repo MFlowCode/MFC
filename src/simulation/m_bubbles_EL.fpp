@@ -492,7 +492,7 @@ contains
         real(wp)                                               :: myPinf, aux1, aux2, myCson, myRho
         real(wp)                                               :: gamma, pi_inf, qv
 
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: myalpha_rho, myalpha
         #:else
             real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
@@ -699,12 +699,12 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_cson_from_pinf', parallelism='[seq]', cray_inline=True)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(in)                                :: pinf, rhol, gamma, pi_inf
-        integer, dimension(3), intent(in)                   :: cell
-        real(wp), intent(out)                               :: cson
-        real(wp)                                            :: E, H
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        type(scalar_field), dimension(:), intent(in) :: q_prim_vf
+        real(wp), intent(in)                         :: pinf, rhol, gamma, pi_inf
+        integer, dimension(3), intent(in)            :: cell
+        real(wp), intent(out)                        :: cson
+        real(wp)                                     :: E, H
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: vel
         #:else
             real(wp), dimension(3) :: vel
@@ -765,19 +765,19 @@ contains
 
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', cray_inline=True)
 
-        integer, intent(in)                                 :: bub_id, ptype
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(out)                               :: f_pinfl
-        integer, dimension(3), intent(out)                  :: cell
-        real(wp), intent(out), optional                     :: preterm1, term2, Romega
-        real(wp), dimension(3)                              :: scoord, psi
-        real(wp)                                            :: dc, vol, aux
-        real(wp)                                            :: volgas, term1, Rbeq, denom
-        real(wp)                                            :: charvol, charpres, charvol2, charpres2
-        integer, dimension(3)                               :: cellaux
-        integer                                             :: i, j, k
-        integer                                             :: smearGrid, smearGridz
-        logical                                             :: celloutside
+        integer, intent(in)                          :: bub_id, ptype
+        type(scalar_field), dimension(:), intent(in) :: q_prim_vf
+        real(wp), intent(out)                        :: f_pinfl
+        integer, dimension(3), intent(out)           :: cell
+        real(wp), intent(out), optional              :: preterm1, term2, Romega
+        real(wp), dimension(3)                       :: scoord, psi
+        real(wp)                                     :: dc, vol, aux
+        real(wp)                                     :: volgas, term1, Rbeq, denom
+        real(wp)                                     :: charvol, charpres, charvol2, charpres2
+        integer, dimension(3)                        :: cellaux
+        integer                                      :: i, j, k
+        integer                                      :: smearGrid, smearGridz
+        logical                                      :: celloutside
 
         scoord = mtn_s(bub_id,1:3,2)
         f_pinfl = 0._wp

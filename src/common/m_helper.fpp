@@ -26,11 +26,11 @@ contains
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)                :: vftmp
-        real(wp), intent(out)               :: ntmp
-        real(wp)                            :: R3
-        real(wp), dimension(nb), intent(in) :: Rtmp
-        real(wp), dimension(nb), intent(in) :: weights
+        real(wp), intent(in)               :: vftmp
+        real(wp), dimension(:), intent(in) :: Rtmp
+        real(wp), intent(out)              :: ntmp
+        real(wp), dimension(:), intent(in) :: weights
+        real(wp)                           :: R3
 
         R3 = dot_product(weights, Rtmp**3._wp)
         ntmp = (3._wp/(4._wp*pi))*vftmp/R3
@@ -41,11 +41,11 @@ contains
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)                :: vftmp
-        real(wp), intent(out)               :: ntmp
-        real(wp)                            :: nR3
-        real(wp), dimension(nb), intent(in) :: nRtmp
-        real(wp), dimension(nb), intent(in) :: weights
+        real(wp), intent(in)               :: vftmp
+        real(wp), dimension(:), intent(in) :: nRtmp
+        real(wp), intent(out)              :: ntmp
+        real(wp), dimension(:), intent(in) :: weights
+        real(wp)                           :: nR3
 
         nR3 = dot_product(weights, nRtmp**3._wp)
         ntmp = sqrt((4._wp*pi/3._wp)*nR3/vftmp)

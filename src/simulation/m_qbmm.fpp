@@ -949,8 +949,8 @@ contains
 
             $:GPU_ROUTINE(function_name='s_chyqmom',parallelism='[seq]', cray_inline=True)
 
-            real(wp), dimension(nmom), intent(in)     :: momin
-            real(wp), dimension(nnode), intent(inout) :: wght, abscX, abscY
+            real(wp), dimension(nmom), intent(in) :: momin
+            real(wp), dimension(:), intent(inout) :: wght, abscX, abscY
 
             ! Local variables
             real(wp), dimension(0:2,0:2) :: moms
@@ -1030,7 +1030,7 @@ contains
             #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
                 real(wp), dimension(4, 3), intent(in) :: abscX, abscY, wght_in
             #:else
-                real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+                real(wp), dimension(:,:), intent(in) :: abscX, abscY, wght_in
             #:endif
             real(wp), intent(in) :: q, r, s
             real(wp)             :: f_quad_RV, f_quad
@@ -1056,7 +1056,7 @@ contains
             #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
                 real(wp), dimension(4), intent(in) :: abscX, abscY, wght_in
             #:else
-                real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+                real(wp), dimension(:), intent(in) :: abscX, abscY, wght_in
             #:endif
             real(wp), dimension(3), intent(in) :: pow
             real(wp)                           :: f_quad2D

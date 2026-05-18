@@ -168,7 +168,7 @@ contains
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
-                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0._dp, 0._dp)
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                 end do
             end do
         end do
@@ -224,7 +224,7 @@ contains
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
-                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0._dp, 0._dp)
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                     end do
                 end do
             end do
@@ -243,7 +243,7 @@ contains
             $:GPU_MKL_DISPATCH()
             ierr = DftiComputeForward(fwd_plan_mkl, data_real_gpu, data_cmplx_gpu)
 
-            Nfq = min(floor(2._dp*real(i, dp)*pi), cmplx_size)
+            Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             $:GPU_UPDATE(device='[Nfq]')
 
             $:GPU_PARALLEL_LOOP(collapse=3)
@@ -277,7 +277,7 @@ contains
         do k = 1, sys_size
             do j = 0, m
                 do l = 1, cmplx_size
-                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0._dp, 0._dp)
+                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                 end do
             end do
         end do
@@ -344,7 +344,7 @@ contains
             do k = 1, sys_size
                 do j = 0, m
                     do l = 1, cmplx_size
-                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0._dp, 0._dp)
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                     end do
                 end do
             end do
@@ -369,7 +369,7 @@ contains
 #endif
             #:endcall GPU_HOST_DATA
 
-            Nfq = min(floor(2._dp*real(i, dp)*pi), cmplx_size)
+            Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             $:GPU_UPDATE(device='[Nfq]')
 
             $:GPU_PARALLEL_LOOP(collapse=3)
@@ -408,7 +408,7 @@ contains
         Nfq = 3
         do j = 0, m
             do k = 1, sys_size
-                data_fltr_cmplx(:) = (0._dp, 0._dp)
+                data_fltr_cmplx(:) = (0_dp, 0_dp)
                 data_real(1:p + 1) = q_cons_vf(k)%sf(j, 0,0:p)
                 call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                 data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)
@@ -420,10 +420,10 @@ contains
 
         ! Apply Fourier filter to additional rings
         do i = 1, fourier_rings
-            Nfq = min(floor(2._dp*real(i, dp)*pi), cmplx_size)
+            Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             do j = 0, m
                 do k = 1, sys_size
-                    data_fltr_cmplx(:) = (0._dp, 0._dp)
+                    data_fltr_cmplx(:) = (0_dp, 0_dp)
                     data_real(1:p + 1) = q_cons_vf(k)%sf(j, i,0:p)
                     call fftw_execute_dft_r2c(fwd_plan, data_real, data_cmplx)
                     data_fltr_cmplx(1:Nfq) = data_cmplx(1:Nfq)

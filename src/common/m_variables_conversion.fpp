@@ -91,12 +91,12 @@ contains
         real(wp), intent(in), optional  :: G, pres_mag
 
         ! Chemistry
-        real(wp), dimension(num_species), intent(in) :: rhoYks
-        real(wp), dimension(1:num_species)           :: Y_rs
-        real(wp)                                     :: E_e
-        real(wp)                                     :: e_Per_Kg, Pdyn_Per_Kg
-        real(wp)                                     :: T_guess
-        integer                                      :: s  !< Generic loop iterator
+        real(wp), dimension(:), intent(in) :: rhoYks
+        real(wp), dimension(1:num_species) :: Y_rs
+        real(wp)                           :: E_e
+        real(wp)                           :: e_Per_Kg, Pdyn_Per_Kg
+        real(wp)                           :: T_guess
+        integer                            :: s  !< Generic loop iterator
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
             ! procedure pointer
@@ -249,12 +249,12 @@ contains
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_acc', parallelism='[seq]', cray_noinline=True)
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(inout)        :: alpha_rho_K, alpha_K
             real(wp), optional, dimension(3), intent(in) :: G
         #:else
-            real(wp), dimension(num_fluids_max), intent(inout)        :: alpha_rho_K, alpha_K
-            real(wp), optional, dimension(num_fluids_max), intent(in) :: G
+            real(wp), dimension(:), intent(inout)        :: alpha_rho_K, alpha_K
+            real(wp), optional, dimension(:), intent(in) :: G
         #:endif
         real(wp), dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out)     :: G_K
@@ -283,7 +283,7 @@ contains
                     alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
                     alpha_K_sum = alpha_K_sum + alpha_K(i)
                 end do
-                alpha_K(1:num_fluids) = alpha_K(1:num_fluids)/max(alpha_K_sum, sgm_eps)
+                alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
             end if
             rho_K = 0._wp; gamma_K = 0._wp; pi_inf_K = 0._wp; qv_K = 0._wp
             do i = 1, num_fluids
@@ -473,7 +473,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: ibounds
 
-        #:if (USING_AMD or USING_INTEL) and not MFC_CASE_OPTIMIZATION
+        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
             real(wp), dimension(3) :: nRtmp
             real(wp)               :: rhoYks(1:10)
@@ -1037,7 +1037,7 @@ contains
         ! Partial densities, density, velocity, pressure, energy, advection variables, the specific heat ratio and liquid stiffness
         ! functions, the shear and volume Reynolds numbers and the Weber numbers
 
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)  :: alpha_rho_K
             real(wp), dimension(3)  :: alpha_K
             real(wp), dimension(3)  :: vel_K
@@ -1175,12 +1175,12 @@ contains
     subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
 
         $:GPU_ROUTINE(function_name='s_compute_species_fraction', parallelism='[seq]', cray_noinline=True)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
-        integer, intent(in)                                 :: k, l, r
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        type(scalar_field), dimension(:), intent(in) :: q_vf
+        integer, intent(in)                          :: k, l, r
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(out) :: alpha_rho_K, alpha_K
         #:else
-            real(wp), dimension(num_fluids_max), intent(out) :: alpha_rho_K, alpha_K
+            real(wp), dimension(:), intent(out) :: alpha_rho_K, alpha_K
         #:endif
         integer  :: i
         real(wp) :: alpha_K_sum
@@ -1215,7 +1215,7 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
                 alpha_K_sum = alpha_K_sum + alpha_K(i)
             end do
-            alpha_K(1:num_fluids) = alpha_K(1:num_fluids)/max(alpha_K_sum, 1.e-16_wp)
+            alpha_K = alpha_K/max(alpha_K_sum, 1.e-16_wp)
         end if
 
         if (num_fluids == 1 .and. bubbles_euler) alpha_K(1) = q_vf(eqn_idx%adv%beg)%sf(k, l, r)
@@ -1253,10 +1253,10 @@ contains
         real(wp), intent(in) :: pres
         real(wp), intent(in) :: rho, gamma, pi_inf, qv
         real(wp), intent(in) :: H
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(in) :: adv
         #:else
-            real(wp), dimension(num_fluids_max), intent(in) :: adv
+            real(wp), dimension(:), intent(in) :: adv
         #:endif
         real(wp), intent(in)  :: vel_sum
         real(wp), intent(in)  :: c_c

@@ -284,11 +284,11 @@ contains
     subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
-        type(scalar_field), optional, intent(inout)            :: q_T_sf
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer                                         :: j, i
+        type(scalar_field), optional, intent(inout)     :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
@@ -371,7 +371,7 @@ contains
     subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout)                                                      :: q_prim_vf
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
         integer, intent(in)                                                                                  :: k, l
@@ -619,7 +619,7 @@ contains
     subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout)                                                      :: q_prim_vf
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
         integer, intent(in)                                                                                  :: k, l
@@ -778,7 +778,7 @@ contains
     subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout)                                                      :: q_prim_vf
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
         integer, intent(in)                                                                                  :: k, l
         integer                                                                                              :: j, q, i
@@ -833,11 +833,11 @@ contains
     subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_slip_wall',parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
-        type(scalar_field), optional, intent(inout)            :: q_T_sf
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer                                         :: j, i
+        type(scalar_field), optional, intent(inout)     :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -986,11 +986,11 @@ contains
 
         $:GPU_ROUTINE(function_name='s_no_slip_wall',parallelism='[seq]', cray_inline=True)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
-        type(scalar_field), optional, intent(inout)            :: q_T_sf
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer                                         :: j, i
+        type(scalar_field), optional, intent(inout)     :: q_T_sf
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  !< bc_x%beg
@@ -1158,11 +1158,11 @@ contains
     subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_dirichlet',parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
-        type(scalar_field), optional, intent(inout)            :: q_T_sf
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer                                         :: j, i
+        type(scalar_field), optional, intent(inout)     :: q_T_sf
 
 #ifdef MFC_SIMULATION
         if (bc_dir == 1) then  !< x-direction
@@ -1461,10 +1461,10 @@ contains
     subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_periodic', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer                                                    :: j, i
+        type(scalar_field), dimension(:), intent(inout) :: c_divs
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer                                         :: j, i
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
@@ -1516,10 +1516,10 @@ contains
     subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_reflective', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer                                                    :: j, i
+        type(scalar_field), dimension(:), intent(inout) :: c_divs
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer                                         :: j, i
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
@@ -1595,10 +1595,10 @@ contains
     subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer                                                    :: j, i
+        type(scalar_field), dimension(:), intent(inout) :: c_divs
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer                                         :: j, i
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg

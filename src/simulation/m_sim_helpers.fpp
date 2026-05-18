@@ -45,7 +45,7 @@ contains
     function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(3), intent(in) :: vel
+        real(wp), dimension(:), intent(in) :: vel
         real(wp), intent(in)               :: c
         integer, intent(in)                :: j, k, l
         real(wp)                           :: cfl_terms
@@ -75,18 +75,18 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), intent(in), dimension(:) :: q_prim_vf
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), intent(inout), dimension(3) :: alpha
             real(wp), intent(inout), dimension(3) :: vel
         #:else
-            real(wp), intent(inout), dimension(num_fluids_max) :: alpha
-            real(wp), intent(inout), dimension(3)              :: vel
+            real(wp), intent(inout), dimension(:) :: alpha
+            real(wp), intent(inout), dimension(:) :: vel
         #:endif
         real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, H, pres
         real(wp), intent(out)                 :: qv
         integer, intent(in)                   :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
-        #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_rho, Gs
         #:else
             real(wp), dimension(num_fluids_max) :: alpha_rho, Gs
@@ -141,7 +141,7 @@ contains
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in), dimension(3)                        :: vel
+        real(wp), intent(in), dimension(:)                        :: vel
         real(wp), intent(in)                                      :: c, rho
         real(wp), dimension(0:m,0:n,0:p), intent(inout)           :: icfl_sf
         real(wp), dimension(0:m,0:n,0:p), intent(inout), optional :: vcfl_sf, Rc_sf
@@ -191,7 +191,7 @@ contains
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(3), intent(in)              :: vel
+        real(wp), dimension(:), intent(in)              :: vel
         real(wp), intent(in)                            :: c, rho
         real(wp), dimension(0:m,0:n,0:p), intent(inout) :: max_dt
         real(wp), dimension(2), intent(in)              :: Re_l

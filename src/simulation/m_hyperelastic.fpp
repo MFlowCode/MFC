@@ -194,13 +194,13 @@ contains
     subroutine s_neoHookean_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout)   :: btensor_in
-        real(wp), intent(in)                                   :: G_param
-        integer, intent(in)                                    :: j, k, l
-        real(wp)                                               :: trace
-        real(wp), parameter                                    :: f13 = 1._wp/3._wp
-        integer                                                :: i  !< Generic loop iterators
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout) :: btensor_in
+        real(wp), intent(in)                            :: G_param
+        integer, intent(in)                             :: j, k, l
+        real(wp)                                        :: trace
+        real(wp), parameter                             :: f13 = 1._wp/3._wp
+        integer                                         :: i  !< Generic loop iterators
         ! tensor is the symmetric tensor & calculate the trace of the tensor
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 
@@ -222,13 +222,13 @@ contains
     subroutine s_Mooney_Rivlin_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout)   :: btensor_in
-        real(wp), intent(in)                                   :: G_param
-        integer, intent(in)                                    :: j, k, l
-        real(wp)                                               :: trace
-        real(wp), parameter                                    :: f13 = 1._wp/3._wp
-        integer                                                :: i  !< Generic loop iterators
+        type(scalar_field), dimension(:), intent(inout) :: q_prim_vf
+        type(scalar_field), dimension(:), intent(inout) :: btensor_in
+        real(wp), intent(in)                            :: G_param
+        integer, intent(in)                             :: j, k, l
+        real(wp)                                        :: trace
+        real(wp), parameter                             :: f13 = 1._wp/3._wp
+        integer                                         :: i  !< Generic loop iterators
         ! TODO: Make 1D and 2D capable
         trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
 

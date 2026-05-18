@@ -36,8 +36,8 @@ contains
 
         $:GPU_ROUTINE(function_name='compute_viscosity_and_inversion',parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(inout)                         :: T_L, T_R, Re_L, Re_R
-        real(wp), dimension(num_species), intent(inout) :: Ys_R, Ys_L
+        real(wp), intent(inout)               :: T_L, T_R, Re_L, Re_R
+        real(wp), dimension(:), intent(inout) :: Ys_R, Ys_L
 
         call get_mixture_viscosity_mixavg(T_L, Ys_L, Re_L)
         call get_mixture_viscosity_mixavg(T_R, Ys_R, Re_R)

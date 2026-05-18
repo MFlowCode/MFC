@@ -2640,11 +2640,11 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in)                      :: E_L, gamma_L, pi_inf_L, rho_L
-        real(wp), intent(in)                      :: E_R, gamma_R, pi_inf_R, rho_R
-        real(wp), dimension(num_dims), intent(in) :: vel_L, vel_R
-        real(wp), intent(out)                     :: pres_L, pres_R, cfl
-        real(wp)                                  :: a_L, a_R
+        real(wp), intent(in)               :: E_L, gamma_L, pi_inf_L, rho_L
+        real(wp), intent(in)               :: E_R, gamma_R, pi_inf_R, rho_R
+        real(wp), dimension(:), intent(in) :: vel_L, vel_R
+        real(wp), intent(out)              :: pres_L, pres_R, cfl
+        real(wp)                           :: a_L, a_R
 
         if (num_dims == 2) then
             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L

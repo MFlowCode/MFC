@@ -26,7 +26,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: dvel_ds
         #:else
-            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
         #:endif
         real(wp) :: L1
         L1 = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
@@ -40,12 +40,12 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
         #:else
-            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(:), intent(in) :: mf, dalpha_rho_ds
         #:endif
         real(wp), intent(in) :: lambda_factor, lambda2, c
         real(wp), intent(in) :: dpres_ds
@@ -65,12 +65,12 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: dvel_ds
         #:else
-            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
         #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
         integer              :: i
@@ -89,12 +89,12 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: dadv_ds
         #:else
-            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+            real(wp), dimension(:), intent(in) :: dadv_ds
         #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
         integer              :: i
@@ -113,12 +113,12 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(10), intent(in) :: dYs_ds
         #:else
-            real(wp), dimension(num_species), intent(in) :: dYs_ds
+            real(wp), dimension(:), intent(in) :: dYs_ds
         #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
         integer              :: i
@@ -141,12 +141,12 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: dvel_ds
         #:else
-            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
         #:endif
         real(wp), intent(in) :: rho, c, dpres_ds
 
@@ -165,7 +165,7 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
@@ -173,10 +173,10 @@ contains
             real(wp), dimension(3), intent(in)  :: dadv_ds
             real(wp), dimension(10), intent(in) :: dYs_ds
         #:else
-            real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
-            real(wp), dimension(num_dims), intent(in)    :: dvel_ds
-            real(wp), dimension(num_fluids), intent(in)  :: dadv_ds
-            real(wp), dimension(num_species), intent(in) :: dYs_ds
+            real(wp), dimension(:), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dadv_ds
+            real(wp), dimension(:), intent(in) :: dYs_ds
         #:endif
         real(wp), intent(in) :: rho, c
         real(wp), intent(in) :: dpres_ds
@@ -205,12 +205,12 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: dvel_ds
         #:else
-            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
         #:endif
         real(wp), intent(in) :: rho, c, dpres_ds
 
@@ -229,7 +229,7 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
@@ -237,10 +237,10 @@ contains
             real(wp), dimension(3), intent(in)  :: dadv_ds
             real(wp), dimension(10), intent(in) :: dYs_ds
         #:else
-            real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
-            real(wp), dimension(num_dims), intent(in)    :: dvel_ds
-            real(wp), dimension(num_fluids), intent(in)  :: dadv_ds
-            real(wp), dimension(num_species), intent(in) :: dYs_ds
+            real(wp), dimension(:), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dadv_ds
+            real(wp), dimension(:), intent(in) :: dYs_ds
         #:endif
         real(wp), intent(in) :: rho, c
         real(wp), intent(in) :: dpres_ds
@@ -263,16 +263,16 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in) :: dvel_ds
             real(wp), dimension(3), intent(in) :: dadv_ds
         #:else
-            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
-            real(wp), dimension(num_dims), intent(in)   :: dvel_ds
-            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+            real(wp), dimension(:), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dadv_ds
         #:endif
         real(wp), intent(in) :: rho, c
         real(wp), intent(in) :: dpres_ds
@@ -294,16 +294,16 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in) :: dvel_ds
             real(wp), dimension(3), intent(in) :: dadv_ds
         #:else
-            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
-            real(wp), dimension(num_dims), intent(in)   :: dvel_ds
-            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+            real(wp), dimension(:), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dadv_ds
         #:endif
         real(wp), intent(in) :: rho, c
         real(wp), intent(in) :: dpres_ds
@@ -323,7 +323,7 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         L(1:eqn_idx%adv%end) = 0._wp
         if (chemistry) L(eqn_idx%species%beg:eqn_idx%species%end) = 0._wp
@@ -339,7 +339,7 @@ contains
         #:if (USING_AMD or USING_INTEL)
             real(wp), dimension(20), intent(inout) :: L
         #:else
-            real(wp), dimension(sys_size), intent(inout) :: L
+            real(wp), dimension(:), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and (USING_AMD or USING_INTEL)
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
@@ -347,10 +347,10 @@ contains
             real(wp), dimension(3), intent(in)  :: dadv_ds
             real(wp), dimension(10), intent(in) :: dYs_ds
         #:else
-            real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
-            real(wp), dimension(num_dims), intent(in)    :: dvel_ds
-            real(wp), dimension(num_fluids), intent(in)  :: dadv_ds
-            real(wp), dimension(num_species), intent(in) :: dYs_ds
+            real(wp), dimension(:), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(:), intent(in) :: dvel_ds
+            real(wp), dimension(:), intent(in) :: dadv_ds
+            real(wp), dimension(:), intent(in) :: dYs_ds
         #:endif
         real(wp), intent(in) :: rho, c
         real(wp), intent(in) :: dpres_ds
