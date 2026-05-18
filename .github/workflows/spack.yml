@@ -34,8 +34,8 @@ jobs:
                 key: spack-store-${{ runner.os }}-${{ hashFiles('spack-packages/repos/spack_repo/builtin/packages/mfc/package.py', 'spack-packages/repos/spack_repo/builtin/packages/cantera/package.py', 'spack-packages/repos/spack_repo/builtin/packages/py_pyrometheus/package.py') }}
                 restore-keys: spack-store-${{ runner.os }}-
 
-          - name: Install mfc+chemistry~mpi
-            run: spack install --reuse mfc+chemistry~mpi
+          - name: Install mfc (defaults to +mpi +chemistry +pre_process +simulation +post_process)
+            run: spack install --reuse mfc
 
           - name: Smoke test
             run: |
@@ -51,5 +51,5 @@ jobs:
                 echo "found shim: $prefix/bin/mfc"
                 cd "$prefix/share/mfc"
                 ./mfc.sh run --prebuilt-prefix="$prefix" \
-                             --no-mpi --dry-run \
+                             --mpi -N 1 -n 1 --dry-run \
                              examples/1D_sodshocktube/case.py
