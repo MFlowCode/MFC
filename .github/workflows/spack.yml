@@ -25,6 +25,15 @@ jobs:
                 packages_ref: add-mfc
                 buildcache: true
 
+          - name: Cache Spack install store
+            uses: actions/cache@v4
+            with:
+                path: |
+                    spack/opt
+                    spack/var/spack/cache
+                key: spack-store-${{ runner.os }}-${{ hashFiles('spack-packages/repos/spack_repo/builtin/packages/mfc/package.py', 'spack-packages/repos/spack_repo/builtin/packages/cantera/package.py', 'spack-packages/repos/spack_repo/builtin/packages/py_pyrometheus/package.py') }}
+                restore-keys: spack-store-${{ runner.os }}-
+
           - name: Install mfc+chemistry~mpi
             run: spack install --reuse mfc+chemistry~mpi
 
