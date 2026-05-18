@@ -130,8 +130,8 @@ contains
         pool_dims(4) = sys_size
         pool_starts(4) = 1
 #ifdef MFC_MIXED_PRECISION
-        pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end - idwbuff(3) &
-                         & %beg + 1)*sys_size
+        pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end &
+                         & - idwbuff(3)%beg + 1)*sys_size
         call hipCheck(hipMalloc_(cptr_device, pool_size*2_8))
         call c_f_pointer(cptr_device, q_cons_ts_pool_device, shape=pool_dims)
         q_cons_ts_pool_device(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_device
@@ -471,10 +471,10 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
-                    if (igr .or. dummy) then
+                    if (igr) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                     end if
-                    if (.not. igr .or. dummy) then
+                    if (.not. igr) then
                         call s_write_run_time_information(q_prim_vf, t_step)
                     end if
                 end if
@@ -638,7 +638,7 @@ contains
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
 
-        if (.not. igr .or. dummy) then
+        if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
@@ -748,8 +748,8 @@ contains
                              & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
                     call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                     ! update the moment of inertia to be based on the direction of the angular momentum
-                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i) &
-                             & %moment  ! convert back to angular velocity with the new moment of inertia
+                    ! convert back to angular velocity with the new moment of inertia
+                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment
                 end if
 
                 ! Update the angle of the IB

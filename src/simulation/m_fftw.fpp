@@ -30,12 +30,12 @@ module m_fftw
 
     type(c_ptr)                        :: fwd_plan, bwd_plan
     type(c_ptr)                        :: fftw_real_data, fftw_cmplx_data, fftw_fltr_cmplx_data
-    integer                            :: real_size, cmplx_size, x_size, batch_size, Nfq
+    integer                            :: real_size, cmplx_size, x_size, batch_size, Nfq, i2
     real(c_double), pointer            :: data_real(:)        !< Real data
     complex(c_double_complex), pointer :: data_cmplx(:)       !< Complex data in Fourier space
     complex(c_double_complex), pointer :: data_fltr_cmplx(:)  !< Filtered complex data in Fourier space
 #if defined(MFC_GPU)
-    $:GPU_DECLARE(create='[real_size, cmplx_size, x_size, batch_size, Nfq]')
+    $:GPU_DECLARE(create='[real_size, cmplx_size, x_size, batch_size, Nfq, i2]')
 
     real(dp), allocatable, target    :: data_real_gpu(:)
     complex(dp), allocatable, target :: data_cmplx_gpu(:)
@@ -76,8 +76,8 @@ contains
         allocate (gpu_fft_size(1:rank), iembed(1:rank), oembed(1:rank))
 
         gpu_fft_size(1) = real_size
-        iembed(1) = 0
-        oembed(1) = 0
+        iembed(1) = real_size
+        oembed(1) = cmplx_size
         $:GPU_ENTER_DATA(copyin='[real_size, cmplx_size, x_size, sys_size, batch_size, Nfq]')
         $:GPU_UPDATE(device='[real_size, cmplx_size, x_size, sys_size, batch_size]')
 #else
@@ -189,6 +189,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         do i = 1, fourier_rings
+            i2 = i
+            $:GPU_UPDATE(device='[i2]')
+
             $:GPU_PARALLEL_LOOP(collapse=3)
             do k = 1, sys_size
                 do j = 0, m
@@ -199,11 +202,11 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
-                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i, l)
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i2, l)
                     end do
                 end do
             end do
@@ -241,13 +244,13 @@ contains
 #endif
             #:endcall GPU_HOST_DATA
 
-            $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do k = 1, sys_size
                 do j = 0, m
                     do l = 0, p
                         data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k &
                                       & - 1)*real_size*x_size)/real(real_size, dp)
-                        q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
+                        q_cons_vf(k)%sf(j, i2, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                     end do
                 end do
             end do

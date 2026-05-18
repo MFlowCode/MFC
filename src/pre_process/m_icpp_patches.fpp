@@ -316,8 +316,9 @@ contains
                                & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                 end if
 
-                if (((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2 <= radius**2 .and. patch_icpp(patch_id) &
-                    & %alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, 0) == smooth_patch_id) then
+                if (((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2 <= radius**2 &
+                    & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
+                    & 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
@@ -367,8 +368,8 @@ contains
             do i = 0, m
                 myr = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
 
-                if (myr <= radius + thickness/2._wp .and. myr >= radius - thickness/2._wp .and. patch_icpp(patch_id) &
-                    & %alter_patch(patch_id_fp(i, j, 0))) then
+                if (myr <= radius + thickness/2._wp .and. myr >= radius - thickness/2._wp &
+                    & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
@@ -429,8 +430,8 @@ contains
                 do i = 0, m
                     myr = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
 
-                    if (myr <= radius + thickness/2._wp .and. myr >= radius - thickness/2._wp .and. patch_icpp(patch_id) &
-                        & %alter_patch(patch_id_fp(i, j, k))) then
+                    if (myr <= radius + thickness/2._wp .and. myr >= radius - thickness/2._wp &
+                        & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
@@ -489,8 +490,9 @@ contains
                                & + 0.5_wp
                 end if
 
-                if ((((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2 <= 1._wp .and. patch_icpp(patch_id) &
-                    & %alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, 0) == smooth_patch_id) then
+                if ((((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2 <= 1._wp &
+                    & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
+                    & 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
@@ -558,8 +560,8 @@ contains
                                    & - z_centroid)/c)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c) &
-                        & **2 <= 1._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
+                    if ((((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c)**2 <= 1._wp &
+                        & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -634,8 +636,8 @@ contains
                         if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                             ! zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i, j, 0) = (((q_prim_vf(eqn_idx%E)%sf(i, j, &
-                                      & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp - q_prim_vf(eqn_idx%alf) &
-                                      & %sf(i, j, 0))
+                                      & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp &
+                                      & - q_prim_vf(eqn_idx%alf)%sf(i, j, 0))
                         end if
 
                         ! Updating the patch identities bookkeeping variable
@@ -1067,8 +1069,8 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) &
-                        & .and. y_boundary%beg <= cart_y .and. y_boundary%end >= cart_y .and. z_boundary%beg <= cart_z .and. z_boundary%end >= cart_z) then
+                    if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. y_boundary%beg <= cart_y &
+                        & .and. y_boundary%end >= cart_y .and. z_boundary%beg <= cart_z .and. z_boundary%end >= cart_z) then
                         if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -1158,12 +1160,11 @@ contains
                         end if
                     end if
 
-                    if (((.not. f_is_default(length_x) .and. (cart_y - y_centroid)**2 + (cart_z - z_centroid) &
-                        & **2 <= radius**2 .and. x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i)) &
-                        & .or. (.not. f_is_default(length_y) .and. (x_cc(i) - x_centroid)**2 + (cart_z - z_centroid) &
-                        & **2 <= radius**2 .and. y_boundary%beg <= cart_y .and. y_boundary%end >= cart_y) &
-                        & .or. (.not. f_is_default(length_z) .and. (x_cc(i) - x_centroid)**2 + (cart_y - y_centroid) &
-                        & **2 <= radius**2 .and. z_boundary%beg <= cart_z .and. z_boundary%end >= cart_z) &
+                    if (((.not. f_is_default(length_x) .and. (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2 <= radius**2 &
+                        & .and. x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i)) .or. (.not. f_is_default(length_y) &
+                        & .and. (x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2 <= radius**2 .and. y_boundary%beg <= cart_y &
+                        & .and. y_boundary%end >= cart_y) .or. (.not. f_is_default(length_z) .and. (x_cc(i) - x_centroid)**2 &
+                        & + (cart_y - y_centroid)**2 <= radius**2 .and. z_boundary%beg <= cart_z .and. z_boundary%end >= cart_z) &
                         & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)

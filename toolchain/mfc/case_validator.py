@@ -133,7 +133,7 @@ PHYSICS_DOCS = {
     "check_muscl": {
         "title": "MUSCL Reconstruction",
         "category": "Numerical Schemes",
-        "explanation": "muscl_order must be 1 or 2. Second order requires muscl_lim in {1,2,3,4,5}.",
+        "explanation": "muscl_order must be 1 or 2. Second order requires muscl_lim in {0,1,2,3,4,5}.",
     },
     "check_time_stepping": {
         "title": "Time Stepping",
@@ -394,9 +394,14 @@ class CaseValidator:
         int_comp = self.get("int_comp", 0)
         n = self.get("n", 0)
         num_fluids = self.get("num_fluids", 0)
+        model_eqns = self.get("model_eqns", 2)
         self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
         self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
         self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
+        self.prohibit(
+            int_comp != 0 and model_eqns == 3,
+            "int_comp > 0 is not supported with model_eqns = 3: THINC does not update per-fluid internal energies, leaving thermodynamically inconsistent face states",
+        )
 
         recon_type = self.get("recon_type", 1)
         if recon_type == 1:  # WENO
@@ -679,16 +684,16 @@ class CaseValidator:
         cyl_coord = self.get("cyl_coord", "F") == "T"
         viscous = self.get("viscous", "F") == "T"
 
+        self.prohibit(riemann_solver is None, "riemann_solver must be specified (1=HLL, 2=HLLC, 4=HLLD, 5=Lax-Friedrichs)")
         if riemann_solver is None:
             return
 
-        self.prohibit(riemann_solver < 1 or riemann_solver > 5, "riemann_solver must be 1, 2, 3, 4 or 5")
+        self.prohibit(riemann_solver not in [1, 2, 4, 5], "riemann_solver must be 1 (HLL), 2 (HLLC), 4 (HLLD), or 5 (Lax-Friedrichs)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
-        self.prohibit(riemann_solver == 3 and wave_speeds is not None, "Exact Riemann (riemann_solver = 3) does not support wave_speeds")
         self.prohibit(avg_state is not None and avg_state not in [1, 2], "avg_state must be 1 or 2")
-        self.prohibit(riemann_solver not in [3, 5] and wave_speeds is None, "wave_speeds must be set if riemann_solver != 3,5")
-        self.prohibit(riemann_solver not in [3, 5] and avg_state is None, "avg_state must be set if riemann_solver != 3,5")
+        self.prohibit(riemann_solver != 5 and wave_speeds is None, "wave_speeds must be set for riemann_solver 1, 2, or 4")
+        self.prohibit(riemann_solver != 5 and avg_state is None, "avg_state must be set for riemann_solver 1, 2, or 4")
         self.prohibit(low_Mach not in [0, 1, 2], "low_Mach must be 0, 1, or 2")
         self.prohibit(riemann_solver != 2 and low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
         self.prohibit(low_Mach != 0 and model_eqns not in [2, 3], "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
@@ -809,7 +814,7 @@ class CaseValidator:
             return
 
         self.prohibit(muscl_order == 2 and muscl_lim is None, "muscl_lim must be defined if using muscl_order = 2")
-        self.prohibit(muscl_lim is not None and (muscl_lim < 1 or muscl_lim > 5), "muscl_lim must be 1, 2, 3, 4, or 5")
+        self.prohibit(muscl_lim is not None and (muscl_lim < 0 or muscl_lim > 5), "muscl_lim must be 0 (unlimited), 1, 2, 3, 4, or 5")
         if muscl_eps is not None:
             self.prohibit(muscl_eps < 0, "muscl_eps must be >= 0 (use 0 for textbook limiter behavior)")
 

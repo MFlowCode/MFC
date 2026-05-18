@@ -30,31 +30,13 @@ module m_thinc
     real(wp) :: gq3_pts(3) = [-5e-1_wp*0.7745966692414834_wp, 0._wp, 5e-1_wp*0.7745966692414834_wp]
     !> Weights: 5/18, 8/18, 5/18
     real(wp) :: gq3_wts(3) = [5._wp/18._wp, 8._wp/18._wp, 5._wp/18._wp]
-    !> ln(2)
-    real(wp) :: ln2 = 0.6931471805599453_wp
-    $:GPU_DECLARE(create='[gq3_pts, gq3_wts, ln2]')
+    $:GPU_DECLARE(copyin='[gq3_pts, gq3_wts]')
 
     real(wp), allocatable, dimension(:,:,:,:) :: mthinc_nhat !> Unit normal vector
     real(wp), allocatable, dimension(:,:,:)   :: mthinc_d    !> Interface position parameter
     $:GPU_DECLARE(create='[mthinc_nhat, mthinc_d]')
 
 contains
-
-    !> @brief Stable computation of ln(cosh(x))
-    function f_log_cosh(x) result(res)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: x
-        real(wp)             :: res, ax
-
-        ax = abs(x)
-        if (ax > 20._wp) then
-            res = ax - ln2
-        else
-            res = ax + log(1._wp + exp(-2._wp*ax)) - ln2
-        end if
-
-    end function f_log_cosh
 
     !> @brief Stable difference: log_cosh(a+h) - log_cosh(a-h) = 2*atanh(tanh(a)*tanh(h)). Avoids catastrophic cancellation when h
     !! is small relative to a.
@@ -259,16 +241,19 @@ contains
                     ac = v_vf(eqn_idx%adv%beg)%sf(j, k, l)
 
                     if (ac >= ic_eps .and. ac <= 1._wp - ic_eps) then
-                        nr_x = (v_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - v_vf(eqn_idx%adv%beg)%sf(j - 1, k, l))*5e-1_wp
+                        nr_x = (v_vf(eqn_idx%adv%beg)%sf(j + 1, k, l) - v_vf(eqn_idx%adv%beg)%sf(j - 1, k, &
+                                & l))*(x_cb(j) - x_cb(j - 1))/(x_cc(j + 1) - x_cc(j - 1))
 
                         nr_y = 0._wp
                         if (n > 0) then
-                            nr_y = (v_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - v_vf(eqn_idx%adv%beg)%sf(j, k - 1, l))*5e-1_wp
+                            nr_y = (v_vf(eqn_idx%adv%beg)%sf(j, k + 1, l) - v_vf(eqn_idx%adv%beg)%sf(j, k - 1, &
+                                    & l))*(y_cb(k) - y_cb(k - 1))/(y_cc(k + 1) - y_cc(k - 1))
                         end if
 
                         nr_z = 0._wp
                         if (p > 0) then
-                            nr_z = (v_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - v_vf(eqn_idx%adv%beg)%sf(j, k, l - 1))*5e-1_wp
+                            nr_z = (v_vf(eqn_idx%adv%beg)%sf(j, k, l + 1) - v_vf(eqn_idx%adv%beg)%sf(j, k, &
+                                    & l - 1))*(z_cb(l) - z_cb(l - 1))/(z_cc(l + 1) - z_cc(l - 1))
                         end if
 
                         nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
@@ -306,71 +291,67 @@ contains
 
     !> @brief Applies THINC (int_comp=1) or MTHINC (int_comp=2) interface compression to sharpen volume-fraction and density
     !! reconstructions at material interfaces. Called after WENO/MUSCL reconstruction per direction.
-    subroutine s_thinc_compression(v_rs_ws, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, recon_dir, &
-                                   & is1_d, is2_d, is3_d)
+    subroutine s_thinc_compression(v_rs_ws, vL_rs_vf_x, vR_rs_vf_x, recon_dir, is1_d, is2_d, is3_d)
 
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in)    :: v_rs_ws
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vL_rs_vf_y, &
-             & vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z
-        integer, intent(in)               :: recon_dir
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: v_rs_ws
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vR_rs_vf_x
+        integer, intent(in) :: recon_dir
         type(int_bounds_info), intent(in) :: is1_d, is2_d, is3_d
-        integer                           :: j, k, l, ix, iy, iz
-        real(wp)                          :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C
-        real(wp)                          :: sgn, moncon, beta_eff
-        real(wp)                          :: nh1, nh2, nh3, d_local, rho1, rho2
-        real(wp)                          :: rho_b, rho_e
+        integer :: j, k, l
+        real(wp) :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C
+        real(wp) :: sgn, moncon, beta_eff
+        real(wp) :: nh1, nh2, nh3, d_local, rho1, rho2
+        real(wp) :: rho_b, rho_e
 
-        #:for REC_DIR, XYZ, CC_PRI in [(1, 'x', 'x_cc'), (2, 'y', 'y_cc'), (3, 'z', 'z_cc')]
+        #:for REC_DIR, XYZ, CC_PRI,  STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
+                    [(1, 'x', 'x_cc', 'j', '{STENCIL_IDX}, k, l', 'is1_d', 'is2_d', 'is3_d'), &
+                     (2, 'y', 'y_cc', 'k', 'j, {STENCIL_IDX}, l', 'is2_d', 'is1_d', 'is3_d'), &
+                     (3, 'z', 'z_cc', 'l', 'j, k, {STENCIL_IDX}', 'is3_d', 'is2_d', 'is1_d')]
+            #:set SV = STENCIL_VAR
+            #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (recon_dir == ${REC_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, ix, iy, iz, aCL, aC, aCR, aTHINC, moncon, sgn, qmin, qmax, A, &
-                                    & B, C, beta_eff, nh1, nh2, nh3, d_local, rho1, rho2, rho_b, rho_e]')
-                do l = is3_d%beg, is3_d%end
-                    do k = is2_d%beg, is2_d%end
-                        do j = is1_d%beg, is1_d%end
-                            aCL = v_rs_ws(j - 1, k, l, eqn_idx%adv%beg)
-                            aC = v_rs_ws(j, k, l, eqn_idx%adv%beg)
-                            aCR = v_rs_ws(j + 1, k, l, eqn_idx%adv%beg)
+                $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, aCL, aC, aCR, aTHINC, moncon, sgn, qmin, qmax, A, B, C, &
+                                    & beta_eff, nh1, nh2, nh3, d_local, rho1, rho2, rho_b, rho_e]')
+                do l = ${Z_BND}$%beg, ${Z_BND}$%end
+                    do k = ${Y_BND}$%beg, ${Y_BND}$%end
+                        do j = ${X_BND}$%beg, ${X_BND}$%end
+                            aCL = v_rs_ws(${SF(' - 1')}$, eqn_idx%adv%beg)
+                            aC = v_rs_ws(${SF('')}$, eqn_idx%adv%beg)
+                            aCR = v_rs_ws(${SF(' + 1')}$, eqn_idx%adv%beg)
 
                             if (aC >= ic_eps .and. aC <= 1._wp - ic_eps) then
                                 if (int_comp == 2 .and. n > 0) then  ! MTHINC
                                     ! Map reshaped (j,k,l) to physical (ix,iy,iz)
-                                    #:if REC_DIR == 1
-                                        ix = j; iy = k; iz = l
-                                    #:elif REC_DIR == 2
-                                        ix = k; iy = j; iz = l
-                                    #:else
-                                        ix = l; iy = k; iz = j
-                                    #:endif
 
-                                    nh1 = mthinc_nhat(1, ix, iy, iz)
-                                    nh2 = mthinc_nhat(2, ix, iy, iz)
-                                    nh3 = mthinc_nhat(3, ix, iy, iz)
-                                    d_local = mthinc_d(ix, iy, iz)
+                                    nh1 = mthinc_nhat(1, j, k, l)
+                                    nh2 = mthinc_nhat(2, j, k, l)
+                                    nh3 = mthinc_nhat(3, j, k, l)
+                                    d_local = mthinc_d(j, k, l)
 
                                     ! Skip if no valid normal was computed
                                     if (nh1*nh1 + nh2*nh2 + nh3*nh3 > 5e-1_wp) then
-                                        rho1 = v_rs_ws(j, k, l, eqn_idx%cont%beg)/aC
-                                        rho2 = v_rs_ws(j, k, l, eqn_idx%cont%end)/(1._wp - aC)
+                                        rho1 = v_rs_ws(${SF('')}$, eqn_idx%cont%beg)/aC
+                                        rho2 = v_rs_ws(${SF('')}$, eqn_idx%cont%end)/(1._wp - aC)
 
                                         ! Left face
                                         aTHINC = f_mthinc_face_average(nh1, nh2, nh3, d_local, ic_beta, ${REC_DIR}$, -5e-1_wp, &
                                                                        & num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
+                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
+                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
 
                                         ! Right face
                                         aTHINC = f_mthinc_face_average(nh1, nh2, nh3, d_local, ic_beta, ${REC_DIR}$, 5e-1_wp, &
                                                                        & num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
+                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
+                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
                                     end if
                                 else  ! THINC
                                     moncon = (aCR - aC)*(aC - aCL)
@@ -391,26 +372,26 @@ contains
                                         B = exp(sgn*beta_eff*(2._wp*C - 1._wp))
                                         A = (B/cosh(beta_eff) - 1._wp)/tanh(beta_eff)
 
-                                        rho_b = v_rs_ws(j, k, l, eqn_idx%cont%beg)/aC
-                                        rho_e = v_rs_ws(j, k, l, eqn_idx%cont%end)/(1._wp - aC)
+                                        rho_b = v_rs_ws(${SF('')}$, eqn_idx%cont%beg)/aC
+                                        rho_e = v_rs_ws(${SF('')}$, eqn_idx%cont%end)/(1._wp - aC)
 
                                         ! Left face
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*A)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
+                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
+                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
 
                                         ! Right face
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*(tanh(beta_eff) + A)/(1._wp + A*tanh(beta_eff)))
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
+                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
+                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
+                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
                                     end if
                                 end if
                             end if

@@ -193,7 +193,7 @@ contains
 
         $:GPU_UPDATE(device='[isc1, isc2, isc3]')
 
-        if (chemistry .or. dummy) then
+        if (chemistry) then
             ! Set offsets based on direction using array indexing
             offsets = 0
             offsets(idir) = 1

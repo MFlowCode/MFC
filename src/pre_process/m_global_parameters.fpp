@@ -189,7 +189,6 @@ module m_global_parameters
     real(wp)                               :: Bx0        !< Constant magnetic field in the x-direction (1D)
     integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
     logical                                :: fft_wrt
-    logical                                :: dummy      !< AMDFlang workaround for case-optimization + GPU-kernel bug
 
 contains
 
@@ -308,7 +307,6 @@ contains
         elliptic_smoothing = .false.
 
         fft_wrt = .false.
-        dummy = .false.
 
         simplex_perturb = .false.
         simplex_params%perturb_vel(:) = .false.

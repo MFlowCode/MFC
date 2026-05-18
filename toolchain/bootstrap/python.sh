@@ -4,6 +4,12 @@ MFC_PYTHON_MIN_MAJOR=3
 MFC_PYTHON_MIN_MINOR=9
 MFC_PYTHON_MIN_STR="$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR"
 
+# Prebuilt/spack mode: skip the venv entirely. The caller must already have
+# python3 + the MFC toolchain deps + the `mfc` package importable on PYTHONPATH.
+if [ -n "${MFC_PREBUILT_PREFIX:-}" ]; then
+    return 0
+fi
+
 is_python_compatible() {
     if ! ${1:-python3} -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and sys.version_info[1] >= $MFC_PYTHON_MIN_MINOR)))"; then
         return 1
@@ -407,4 +413,21 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
 
     fi  # end of USE_UV=0 (pip) block
+fi
+
+
+# Apply patches to installed packages.
+# fypp: always emit a resync linemarker after single-line $: macro calls so
+# that the compiler attributes the following Fortran statement to the correct
+# source line rather than the call-site line (off-by-1 in backtraces).
+FYPP_PY="$(python3 -c "import fypp; print(fypp.__file__)" 2>/dev/null)"
+FYPP_PATCH="$(pwd)/toolchain/patches/fypp-linemarker-resync.patch"
+if [ -n "$FYPP_PY" ] && [ -f "$FYPP_PATCH" ]; then
+    if ! grep -q "Always emit a resync marker" "$FYPP_PY" 2>/dev/null; then
+        if patch -p1 --forward --silent "$FYPP_PY" < "$FYPP_PATCH" 2>/dev/null; then
+            ok "(venv) Applied$MAGENTA fypp$COLOR_RESET linemarker-resync patch."
+        else
+            warn "(venv) Failed to apply$MAGENTA fypp$COLOR_RESET linemarker-resync patch (fypp version may have changed)."
+        fi
+    fi
 fi

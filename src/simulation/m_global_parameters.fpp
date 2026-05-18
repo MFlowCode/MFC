@@ -464,7 +464,6 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
-    logical :: dummy  !< AMDFlang workaround for case-optimization + GPU-kernel bug
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star       !< Stress threshold for continuum damage modeling
@@ -695,7 +694,6 @@ contains
         #:endfor
 
         fft_wrt = .false.
-        dummy = .false.
 
         do j = 1, num_probes_max
             acoustic(j)%pulse = dflt_int

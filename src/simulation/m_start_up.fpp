@@ -933,10 +933,10 @@ contains
 
         ! Computation of parameters, allocation of memory, association of pointers, and/or execution of any other tasks that are
         ! needed to properly configure the modules. The preparations below DO DEPEND on the grid being complete.
-        if (igr .or. dummy) then
+        if (igr) then
             call s_initialize_igr_module()
         end if
-        if (.not. igr .or. dummy) then
+        if (.not. igr) then
             if (recon_type == WENO_TYPE) then
                 call s_initialize_weno_module()
             else if (recon_type == MUSCL_TYPE) then

@@ -378,8 +378,8 @@ contains
         xy_local = matmul(inverse_rotation, xy_local)
 
         normal_vector = xy_local
-        normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2)) &
-                      & **2._wp  ! get the normal direction via the coordinate transformation method
+        ! get the normal direction via the coordinate transformation method
+        normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp
         normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector))  ! normalize the vector
         gp%levelset_norm = matmul(rotation, normal_vector)  ! save after rotating the vector to the global frame
 
