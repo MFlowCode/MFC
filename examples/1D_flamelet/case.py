@@ -7,7 +7,7 @@ import os
 import cantera as ct
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-ctfile = "sandiego.yaml"
+ctfile = "h2o2.yaml"
 sol_L = ct.Solution(ctfile)
 sol_L.TPX = 300, 8000, "O2:2,N2:2,H2O:5"
 L = 0.016
