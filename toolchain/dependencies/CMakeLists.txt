@@ -38,6 +38,7 @@ if (MFC_FFTW)
                 CMAKE_ARGS -DBUILD_TESTS=OFF
                            -DBUILD_SHARED_LIBS=OFF
                            "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+                           -DCMAKE_POLICY_VERSION_MINIMUM=3.5
             )
         else()
             message(WARNING "The Fortran compiler vendor is Cray so FFTW3 will not be built. We will use cray-fftw instead.")
@@ -95,11 +96,9 @@ if (MFC_SILO)
 
         ExternalProject_Add(silo
             GIT_REPOSITORY "https://github.com/LLNL/Silo"
-            GIT_TAG        4.12.0
+            GIT_TAG        4.12.1-pre1
             GIT_SHALLOW    ON
             GIT_PROGRESS   ON
-            PATCH_COMMAND  "${GIT_EXECUTABLE}" stash
-                        && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo.patch"
             CMAKE_ARGS     -DSILO_ENABLE_SHARED=OFF
                            -DSILO_ENABLE_SILOCK=OFF
                            -DSILO_ENABLE_BROWSER=OFF

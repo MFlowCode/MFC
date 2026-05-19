@@ -49,7 +49,7 @@ print(
     json.dumps(
         {
             # Logistics
-            "run_time_info": "T",
+            "run_time_info": "F",
             # Computational Domain Parameters
             "x_domain%beg": -math.pi * L,
             "x_domain%end": math.pi * L,

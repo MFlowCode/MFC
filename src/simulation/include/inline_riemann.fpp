@@ -33,51 +33,28 @@
         eps = 0.001_wp
         call get_species_enthalpies_rt(T%L, h_iL)
         call get_species_enthalpies_rt(T%R, h_iR)
-        #:if USING_AMD
-            h_iL = h_iL*gas_constant/molecular_weights_nonparameter*T%L
-            h_iR = h_iR*gas_constant/molecular_weights_nonparameter*T%R
-        #:else
-            h_iL = h_iL*gas_constant/molecular_weights*T%L
-            h_iR = h_iR*gas_constant/molecular_weights*T%R
-        #:endif
+        h_iL = h_iL*gas_constant/molecular_weights*T%L
+        h_iR = h_iR*gas_constant/molecular_weights*T%R
         call get_species_specific_heats_r(T%L, Cp_iL)
         call get_species_specific_heats_r(T%R, Cp_iR)
 
         h_avg_2 = (sqrt(rho%L)*h_iL + sqrt(rho%R)*h_iR)/(sqrt(rho%L) + sqrt(rho%R))
         Yi_avg = (sqrt(rho%L)*Ys_L + sqrt(rho%R)*Ys_R)/(sqrt(rho%L) + sqrt(rho%R))
         T_avg = (sqrt(rho%L)*T%L + sqrt(rho%R)*T%R)/(sqrt(rho%L) + sqrt(rho%R))
-        #:if USING_AMD
-            if (abs(T%L - T%R) < eps) then
-                ! Case when T%L and T%R are very close
-                Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:))
-                Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:) &
-                             & - gas_constant/molecular_weights_nonparameter(:)))
-            else
-                ! Normal calculation when T%L and T%R are sufficiently different
-                Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T%R - T%L))
-                Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T%R - T%L) - gas_constant/molecular_weights_nonparameter(:)))
-            end if
-            gamma_avg = Cp_avg/Cv_avg
+        if (abs(T%L - T%R) < eps) then
+            ! Case when T%L and T%R are very close
+            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
+            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
+                         & - gas_constant/molecular_weights(:)))
+        else
+            ! Normal calculation when T%L and T%R are sufficiently different
+            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T%R - T%L))
+            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T%R - T%L) - gas_constant/molecular_weights(:)))
+        end if
+        gamma_avg = Cp_avg/Cv_avg
 
-            Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) &
-                    & + gamma_avg*gas_constant/molecular_weights_nonparameter(:)*T_avg
-            c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
-        #:else
-            if (abs(T%L - T%R) < eps) then
-                ! Case when T%L and T%R are very close
-                Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
-                Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
-                             & - gas_constant/molecular_weights(:)))
-            else
-                ! Normal calculation when T%L and T%R are sufficiently different
-                Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T%R - T%L))
-                Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T%R - T%L) - gas_constant/molecular_weights(:)))
-            end if
-            gamma_avg = Cp_avg/Cv_avg
-
-            Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
-            c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
-        #:endif
+        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
+        c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
     end if
 #:enddef roe_avg
 
