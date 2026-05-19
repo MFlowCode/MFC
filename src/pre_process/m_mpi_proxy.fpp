@@ -22,12 +22,9 @@ contains
     impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
-        ! Generic loop iterator
         integer :: i, j
-        ! Generic flag used to identify and report MPI errors
         integer :: ierr
 
-        ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['t_step_old', 't_step_start', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
@@ -141,7 +138,7 @@ contains
             #:endfor
         end do
 
-        ! Variables from input files for hardcoded patches
+        ! Hardcoded patches variables
         call MPI_BCAST(interface_file, len(interface_file), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(normFac, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(normMag, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)

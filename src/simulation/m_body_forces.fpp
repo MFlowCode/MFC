@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Computes gravitational and user-defined body force source terms for the momentum equations
+!> @brief Computes gravitational and body force source terms for the momentum equations
 module m_body_forces
 
     use m_derived_types
@@ -24,26 +24,22 @@ module m_body_forces
 
 contains
 
-    !> This subroutine initializes the module global array of mixture densities in each grid cell
+    !> Initialize the body forces module
     impure subroutine s_initialize_body_forces_module
 
-        ! Simulation is at least 2D
         if (n > 0) then
-            ! Simulation is 3D
             if (p > 0) then
                 @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
-                ! Simulation is 2D
             else
                 @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
             end if
-            ! Simulation is 1D
         else
             @:ALLOCATE(rhoM(-buff_size:buff_size + m, 0:0, 0:0))
         end if
 
     end subroutine s_initialize_body_forces_module
 
-    !> This subroutine computes the acceleration at time t
+    !> Compute the acceleration at time t
     subroutine s_compute_acceleration(t)
 
         real(wp), intent(in) :: t
@@ -58,8 +54,7 @@ contains
 
     end subroutine s_compute_acceleration
 
-    !> This subroutine calculates the mixture density at each cell center
-    !! @param q_cons_vf Conservative variables
+    !> Compute the mixture density at each cell center
     subroutine s_compute_mixture_density(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -80,10 +75,7 @@ contains
 
     end subroutine s_compute_mixture_density
 
-    !> This subroutine calculates the source term due to body forces so the system can be advanced in time
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf Primitive variables
-    !! @param rhs_vf Right-hand side accumulator
+    !> Compute the body force source terms for momentum and energy equations
     subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
@@ -154,7 +146,7 @@ contains
 
     end subroutine s_compute_body_forces_rhs
 
-    !> @brief Deallocates module variables used for body force computations.
+    !> Finalize the body forces module
     impure subroutine s_finalize_body_forces_module
 
         @:DEALLOCATE(rhoM)

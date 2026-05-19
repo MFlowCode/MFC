@@ -49,7 +49,6 @@ contains
     end subroutine s_finalize_pressure_relaxation_module
 
     !> The main pressure relaxation procedure
-    !! @param q_cons_vf Cell-average conservative variables
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -150,7 +149,8 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
         #:endif
-        integer, parameter  :: MAX_ITER = 50
+        integer, parameter :: MAX_ITER = 50
+        ! Pressure relaxation convergence tolerance
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
         integer             :: iter, i
 

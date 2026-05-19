@@ -23,10 +23,6 @@ module m_helper
 contains
 
     !> Computes the bubble number density n from the primitive variables
-    !! @param vftmp is the void fraction
-    !! @param Rtmp is the  bubble radii
-    !! @param ntmp is the output number bubble density
-    !! @param weights is the quadrature weights
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -41,7 +37,7 @@ contains
 
     end subroutine s_comp_n_from_prim
 
-    !> @brief Computes the bubble number density from the conservative void fraction and weighted bubble radii.
+    !> Compute the bubble number density from the conservative void fraction and weighted bubble radii.
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -56,7 +52,7 @@ contains
 
     end subroutine s_comp_n_from_cons
 
-    !> @brief Prints a 2D real array to standard output, optionally dividing each element by a given scalar.
+    !> Print a 2D real array to standard output, optionally dividing each element by a given scalar.
     impure subroutine s_print_2D_array(A, div)
 
         real(wp), dimension(:,:), intent(in) :: A
@@ -86,7 +82,7 @@ contains
 
     end subroutine s_print_2D_array
 
-    !> bubbles_euler + polytropic bubbles_euler + non-polytropic bubbles_lagrange + non-polytropic
+    !> Initialize bubble model arrays for Euler or Lagrangian bubbles with polytropic or non-polytropic gas.
     impure subroutine s_initialize_bubbles_model()
 
         ! Allocate memory
@@ -116,7 +112,7 @@ contains
 
     end subroutine s_initialize_bubbles_model
 
-    !>
+    !> Set bubble physical parameters and nondimensional numbers from the input configuration.
     impure subroutine s_initialize_bubble_vars()
 
         R0ref = bub_pp%R0ref; p0ref = bub_pp%p0ref
@@ -132,7 +128,6 @@ contains
             R_v = bub_pp%R_v; R_g = bub_pp%R_g
             Tw = bub_pp%T0ref
         end if
-
         if (bubbles_lagrange) then
             cp_v = bub_pp%cp_v; cp_g = bub_pp%cp_g
             k_vl = bub_pp%k_v; k_gl = bub_pp%k_g
@@ -177,18 +172,18 @@ contains
         real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN
         real(wp), parameter     :: k_poly = 1._wp  !< polytropic index used to compute isothermal natural frequency
 
-        ! phi_vg & phi_gv (phi_gg = phi_vv = 1) (Eq. 2.22 in Ando 2010)
+        ! Chapman-Enskog transport coefficients for vapor-gas mixture, Ando JAS (2010)
 
         phi_vg = (1._wp + sqrt(mu_v/mu_g)*(M_g/M_v)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_v/M_g))
         phi_gv = (1._wp + sqrt(mu_g/mu_v)*(M_v/M_g)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_g/M_v))
 
-        ! internal bubble pressure
+        ! Initial internal bubble pressure (Euler number + Laplace pressure)
         pb0 = Eu + 2._wp/Web/R0
 
-        ! mass fraction of vapor (Eq. 2.19 in Ando 2010)
+        ! Vapor mass fraction at bubble wall, Ando JAS (2010)
         chi_vw0 = 1._wp/(1._wp + R_v/R_g*(pb0/pv - 1._wp))
 
-        ! specific heat for gas/vapor mixture
+        ! Mixture specific heat from mass-weighted vapor/gas contributions
         cp_m0 = chi_vw0*R_v*gam_v/(gam_v - 1._wp) + (1._wp - chi_vw0)*R_g*gam_g/(gam_g - 1._wp)
 
         ! mole fraction of vapor (Eq. 2.23 in Ando 2010)
@@ -209,7 +204,7 @@ contains
         ! Peclet numbers
         Pe_T(:) = rho_m0*cp_m0(:)/k_m0(:)
 
-        ! natural frequencies (Eq. B.1)
+        ! Bubble natural frequency, Ando JAS (2010)
         omegaN(:) = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0/sqrt(rho0ref)
         do ir = 1, nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), Re_trans_T(ir), Im_trans_T(ir))
@@ -220,10 +215,6 @@ contains
     end subroutine s_initialize_nonpoly
 
     !> Computes the transfer coefficient for the non-polytropic bubble compression process
-    !! @param omega natural frequencies
-    !! @param peclet Peclet number
-    !! @param Re_trans Real part of the transport coefficients
-    !! @param Im_trans Imaginary part of the transport coefficients
     elemental subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
         real(wp), intent(in)  :: omega, peclet
@@ -242,7 +233,7 @@ contains
 
     end subroutine s_transcoeff
 
-    !> @brief Converts an integer to its trimmed string representation.
+    !> Convert an integer to its trimmed string representation.
     elemental subroutine s_int_to_str(i, res)
 
         integer, intent(in)             :: i
@@ -253,7 +244,7 @@ contains
 
     end subroutine s_int_to_str
 
-    !> Computes the Simpson weights for quadrature
+    !> Compute the Simpson weights for quadrature
     subroutine s_simpson(local_weight, local_R0)
 
         real(wp), dimension(:), intent(inout) :: local_weight
@@ -293,10 +284,7 @@ contains
 
     end subroutine s_simpson
 
-    !> This procedure computes the cross product of two vectors.
-    !! @param a First vector.
-    !! @param b Second vector.
-    !! @return The cross product of the two vectors.
+    !> Compute the cross product of two vectors.
     pure function f_cross(a, b) result(c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -310,22 +298,7 @@ contains
 
     end function f_cross
 
-    !> @brief Computes the cross product c = a x b of two 3D vectors.
-    subroutine s_cross_product(a, b, c)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)  :: a(3), b(3)
-        real(wp), intent(out) :: c(3)
-
-        c(1) = a(2)*b(3) - a(3)*b(2)
-        c(2) = a(3)*b(1) - a(1)*b(3)
-        c(3) = a(1)*b(2) - a(2)*b(1)
-
-    end subroutine s_cross_product
-
-    !> This procedure swaps two real numbers.
-    !! @param lhs Left-hand side.
-    !! @param rhs Right-hand side.
+    !> Swap two real numbers.
     elemental subroutine s_swap(lhs, rhs)
 
         real(wp), intent(inout) :: lhs, rhs
@@ -337,10 +310,7 @@ contains
 
     end subroutine s_swap
 
-    !> This procedure creates a transformation matrix.
-    !! @param param Parameters for the transformation.
-    !! @param center Optional center point for the transformation.
-    !! @return Transformation matrix.
+    !> Create a transformation matrix.
     function f_create_transform_matrix(param, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in)          :: param
@@ -378,9 +348,7 @@ contains
 
     end function f_create_transform_matrix
 
-    !> This procedure transforms a vector by a matrix.
-    !! @param vec Vector to transform.
-    !! @param matrix Transformation matrix.
+    !> Transform a vector by a matrix.
     subroutine s_transform_vec(vec, matrix)
 
         real(wp), dimension(1:3), intent(inout)  :: vec
@@ -392,10 +360,7 @@ contains
 
     end subroutine s_transform_vec
 
-    !> This procedure transforms a triangle by a matrix, one vertex at a time.
-    !! @param triangle Triangle to transform.
-    !! @param matrix   Transformation matrix.
-    !! @param matrix_n Normal transformation matrix.
+    !> Transform a triangle by a matrix, one vertex at a time.
     subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout)          :: triangle
@@ -410,10 +375,7 @@ contains
 
     end subroutine s_transform_triangle
 
-    !> This procedure transforms a model by a matrix, one triangle at a time.
-    !! @param model    Model to transform.
-    !! @param matrix   Transformation matrix.
-    !! @param matrix_n Normal transformation matrix.
+    !> Transform a model by a matrix, one triangle at a time.
     subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout)             :: model
@@ -426,9 +388,7 @@ contains
 
     end subroutine s_transform_model
 
-    !> This procedure creates a bounding box for a model.
-    !! @param model Model to create bounding box for.
-    !! @return Bounding box.
+    !> Create a bounding box for a model.
     function f_create_bbox(model) result(bbox)
 
         type(t_model), intent(in) :: model
@@ -453,10 +413,7 @@ contains
 
     end function f_create_bbox
 
-    !> This procedure performs xor on lhs and rhs.
-    !! @param lhs logical input.
-    !! @param rhs other logical input.
-    !! @return xored result.
+    !> Perform XOR on lhs and rhs.
     elemental function f_xor(lhs, rhs) result(res)
 
         logical, intent(in) :: lhs, rhs
@@ -466,9 +423,7 @@ contains
 
     end function f_xor
 
-    !> This procedure converts logical to 1 or 0.
-    !! @param predicate A Logical argument.
-    !! @return 1 if .true., 0 if .false..
+    !> convert a logical to 1 or 0.
     elemental function f_logical_to_int(predicate) result(int)
 
         logical, intent(in) :: predicate
@@ -514,7 +469,6 @@ contains
     !! @param x argument (typically cos(theta)), should be in [-1,1]
     !! @param l degree (>= 0)
     !! @param m_order order (0 <= m_order <= l)
-    !! @return result_P P_l^m(x)
     recursive function associated_legendre(x, l, m_order) result(result_P)
 
         integer, intent(in)  :: l, m_order
@@ -549,9 +503,7 @@ contains
 
     end function associated_legendre
 
-    !> This function calculates the double factorial value of an integer
-    !! @param n_in is the input integer
-    !! @return R is the double factorial value of n
+    !> Calculate the double factorial value of an integer
     elemental function double_factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
@@ -563,9 +515,7 @@ contains
 
     end function double_factorial
 
-    !> The following function calculates the factorial value of an integer
-    !! @param n_in is the input integer
-    !! @return R is the factorial value of n
+    !> Calculate the factorial value of an integer
     elemental function factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
@@ -577,11 +527,8 @@ contains
 
     end function factorial
 
-    !> This function calculates a smooth cut-on function that is zero for x values smaller than zero and goes to one. It can be used
-    !! for generating smooth initial conditions
-    !! @param x is the input value
-    !! @param eps is the smoothing parameter
-    !! @return fx is the cut-on function evaluated at x
+    !> Calculate a smooth cut-on function that is zero for x values smaller than zero and goes to one, for generating smooth initial
+    !! conditions
     function f_cut_on(x, eps) result(fx)
 
         real(wp), intent(in) :: x, eps
@@ -591,11 +538,8 @@ contains
 
     end function f_cut_on
 
-    !> This function calculates a smooth cut-off function that is one for x values smaller than zero and goes to zero. It can be
-    !! used for generating smooth initial conditions
-    !! @param x is the input value
-    !! @param eps is the smoothing parameter
-    !! @return fx is the cut-ff function evaluated at x
+    !> Calculate a smooth cut-off function that is one for x values smaller than zero and goes to zero, for generating smooth
+    !! initial conditions
     function f_cut_off(x, eps) result(fx)
 
         real(wp), intent(in) :: x, eps
@@ -605,9 +549,7 @@ contains
 
     end function f_cut_off
 
-    !> This function is a helper function for the functions f_cut_on and f_cut_off
-    !! @param x is the input value
-    !! @return gx is the result
+    !> Helper function for f_cut_on and f_cut_off
     function f_gx(x) result(gx)
 
         real(wp), intent(in) :: x
@@ -621,7 +563,7 @@ contains
 
     end function f_gx
 
-    !> @brief Downsamples conservative variable fields by a factor of 3 in each direction using volume averaging.
+    !> Downsample conservative variable fields by a factor of 3 in each direction using volume averaging.
     subroutine s_downsample_data(q_cons_vf, q_cons_temp, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_cons_temp
@@ -663,7 +605,7 @@ contains
 
     end subroutine s_downsample_data
 
-    !> @brief Upsamples conservative variable fields from a coarsened grid back to the original resolution using interpolation.
+    !> Upsample conservative variable fields from a coarsened grid back to the original resolution using interpolation.
     subroutine s_upsample_data(q_cons_vf, q_cons_temp)
 
         type(scalar_field), intent(inout), dimension(sys_size) :: q_cons_vf, q_cons_temp

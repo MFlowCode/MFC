@@ -40,6 +40,7 @@ module m_surface_tension
 
 contains
 
+    !> Allocate and initialize surface tension module arrays
     impure subroutine s_initialize_surface_tension_module
 
         integer :: j
@@ -205,7 +206,7 @@ contains
 
     end subroutine s_compute_capillary_source_flux
 
-    !> @brief Computes color-function gradients and their norms, then reconstructs them at cell boundaries.
+    !> Compute color-function gradients and reconstruct them at cell boundaries
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
@@ -264,14 +265,14 @@ contains
                     do i = 1, num_dims
                         c_divs(num_dims + 1)%sf(j, k, l) = c_divs(num_dims + 1)%sf(j, k, l) + c_divs(i)%sf(j, k, l)**2._wp
                     end do
-                    ! c_divs(num_dims + 1)%sf(j, k, l) = & sqrt(c_divs(num_dims + 1)%sf(j, k, l))
+
                     c_divs(num_dims + 1)%sf(j, k, l) = sqrt(real(c_divs(num_dims + 1)%sf(j, k, l), kind=wp))
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_populate_capillary_buffers(c_divs, bc_type)
+        call s_populate_capillary_buffers(c_divs, bc_type, bc_xyz_info(bc_x, bc_y, bc_z))
 
         iv%beg = 1; iv%end = num_dims + 1
 
@@ -306,7 +307,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
-    !> @brief Deallocates the color-gradient divergence and reconstructed boundary arrays for surface tension.
+    !> Finalize the surface tension module
     impure subroutine s_finalize_surface_tension_module
 
         integer :: j

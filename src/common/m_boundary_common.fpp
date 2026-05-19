@@ -1,6 +1,6 @@
 !>
 !! @file
-!! Contains module m_boundary_common
+!! @brief Contains module m_boundary_common
 
 !> @brief Noncharacteristic and processor boundary condition application for ghost cells and buffer regions
 #:include 'case.fpp'
@@ -100,6 +100,8 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
         integer                                                                                              :: k, l
         type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
+
+        ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
 
         if (bc%x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in, q_T_sf)
@@ -786,7 +788,7 @@ contains
 
     end subroutine s_periodic
 
-    !> Applies axis boundary conditions for cylindrical coordinates by reflecting values across the axis with azimuthal phase shift.
+    !> Apply axis boundary conditions for cylindrical coordinates by reflecting values across the axis with azimuthal phase shift.
     subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1254,7 +1256,7 @@ contains
 
     end subroutine s_dirichlet
 
-    !> Extrapolates QBMM bubble pressure and mass-vapor variables into ghost cells by copying boundary values.
+    !> Extrapolate QBMM bubble pressure and mass-vapor variables into ghost cells by copying boundary values.
     subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1836,7 +1838,7 @@ contains
 
     end subroutine s_populate_capillary_buffers
 
-    !> Applies periodic boundary conditions to the color function and its divergence fields.
+    !> Apply periodic boundary conditions to the color function and its divergence fields.
     subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_periodic', parallelism='[seq]', cray_inline=True)
@@ -1891,7 +1893,7 @@ contains
 
     end subroutine s_color_function_periodic
 
-    !> Applies reflective boundary conditions to the color function and its divergence fields.
+    !> Apply reflective boundary conditions to the color function and its divergence fields.
     subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_reflective', parallelism='[seq]', cray_inline=True)
@@ -1970,7 +1972,7 @@ contains
 
     end subroutine s_color_function_reflective
 
-    !> Extrapolates the color function and its divergence into ghost cells by copying boundary values.
+    !> Extrapolate the color function and its divergence into ghost cells by copying boundary values.
     subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
 
         $:GPU_ROUTINE(function_name='s_color_function_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
@@ -2025,7 +2027,7 @@ contains
 
     end subroutine s_color_function_ghost_cell_extrapolation
 
-    !> Populates ghost cell buffers for the Jacobian scalar field used in the IGR elliptic solver.
+    !> Populate ghost cell buffers for the Jacobian scalar field used in the IGR elliptic solver.
     impure subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -2192,7 +2194,7 @@ contains
 
     end subroutine s_populate_F_igr_buffers
 
-    !> Creates MPI derived datatypes for boundary condition type arrays and buffer arrays used in parallel I/O.
+    !> Create MPI derived datatypes for boundary condition type arrays and buffer arrays used in parallel I/O.
     impure subroutine s_create_mpi_types(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -2329,7 +2331,7 @@ contains
 
     end subroutine s_write_parallel_boundary_condition_files
 
-    !> Reads boundary condition type and buffer data from serial (unformatted) restart files.
+    !> Read boundary condition type and buffer data from serial (unformatted) restart files.
     subroutine s_read_serial_boundary_condition_files(step_dirpath, bc_type)
 
         character(LEN=*), intent(in)                                  :: step_dirpath
@@ -2373,7 +2375,7 @@ contains
 
     end subroutine s_read_serial_boundary_condition_files
 
-    !> Reads boundary condition type and buffer data from per-rank parallel files using MPI I/O.
+    !> Read boundary condition type and buffer data from per-rank parallel files using MPI I/O.
     subroutine s_read_parallel_boundary_condition_files(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
@@ -2496,7 +2498,7 @@ contains
 
     end subroutine s_pack_boundary_condition_buffers
 
-    !> Initializes the per-cell boundary condition type arrays with the global default BC values.
+    !> Initialize the per-cell boundary condition type arrays with the global default BC values.
     subroutine s_assign_default_bc_type(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -2522,8 +2524,8 @@ contains
 
     end subroutine s_assign_default_bc_type
 
-    !> The purpose of this subroutine is to populate the buffers of the grid variables, which are constituted of the cell- boundary
-    !! locations and cell-width distributions, based on the boundary conditions.
+    !> Populate the buffers of the grid variables, which are constituted of the cell-boundary locations and cell-width
+    !! distributions, based on the boundary conditions.
     subroutine s_populate_grid_variables_buffers
 
         integer :: i
@@ -2560,7 +2562,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-        ! Populating cell-width distribution buffer at bc%x%beg
+        ! Populate cell-width distribution buffer at bc%x%beg
         if (bc%x%beg >= 0) then
             if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(1, -1)
         else if (bc%x%beg <= BC_GHOST_EXTRAP) then
@@ -2577,7 +2579,7 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc%x%beg. Skip when parallel_io has already filled the ghost
+        ! Compute the cell-boundary and center locations buffer at bc%x%beg. Skip when parallel_io has already filled the ghost
         ! x_cb / x_cc bitwise from the global grid file via s_apply_grid_from_global_dim
         if (.not. (bc%x%beg >= 0 .and. parallel_io)) then
             do i = 1, offset_x%beg
@@ -2589,7 +2591,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-width distribution buffer at bc%x%end
+        ! Populate the cell-width distribution buffer at bc%x%end
         if (bc%x%end >= 0) then
             if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(1, 1)
         else if (bc%x%end <= BC_GHOST_EXTRAP) then
@@ -2606,7 +2608,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc%x%end. Skip when parallel_io has already filled the ghost.
+        ! Populate the cell-boundary and center locations buffer at bc%x%end. Skip when parallel_io has already filled the ghost.
         if (.not. (bc%x%end >= 0 .and. parallel_io)) then
             do i = 1, offset_x%end
                 x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
@@ -2617,7 +2619,7 @@ contains
             end do
         end if
 
-        ! Populating cell-width distribution buffer at bc%y%beg
+        ! Populate cell-width distribution buffer at bc%y%beg
         if (n == 0) then
             return
         else if (bc%y%beg >= 0) then
@@ -2636,7 +2638,7 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc%y%beg. Skip when parallel_io has already filled the ghost.
+        ! Compute the cell-boundary and center locations buffer at bc%y%beg. Skip when parallel_io has already filled the ghost.
         if (.not. (bc%y%beg >= 0 .and. parallel_io)) then
             do i = 1, offset_y%beg
                 y_cb(-1 - i) = y_cb(-i) - dy(-i)
@@ -2647,7 +2649,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-width distribution buffer at bc%y%end
+        ! Populate the cell-width distribution buffer at bc%y%end
         if (bc%y%end >= 0) then
             if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(2, 1)
         else if (bc%y%end <= BC_GHOST_EXTRAP) then
@@ -2664,7 +2666,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc%y%end. Skip when parallel_io has already filled the ghost.
+        ! Populate the cell-boundary and center locations buffer at bc%y%end. Skip when parallel_io has already filled the ghost.
         if (.not. (bc%y%end >= 0 .and. parallel_io)) then
             do i = 1, offset_y%end
                 y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
@@ -2675,7 +2677,7 @@ contains
             end do
         end if
 
-        ! Populating cell-width distribution buffer at bc%z%beg
+        ! Populate cell-width distribution buffer at bc%z%beg
         if (p == 0) then
             return
         else if (bc%z%beg >= 0) then
@@ -2694,7 +2696,7 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc%z%beg. Skip when parallel_io has already filled the ghost.
+        ! Compute the cell-boundary and center locations buffer at bc%z%beg. Skip when parallel_io has already filled the ghost.
         if (.not. (bc%z%beg >= 0 .and. parallel_io)) then
             do i = 1, offset_z%beg
                 z_cb(-1 - i) = z_cb(-i) - dz(-i)
@@ -2705,7 +2707,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-width distribution buffer at bc%z%end
+        ! Populate the cell-width distribution buffer at bc%z%end
         if (bc%z%end >= 0) then
             if (.not. parallel_io) call s_mpi_sendrecv_grid_variables_buffers(3, 1)
         else if (bc%z%end <= BC_GHOST_EXTRAP) then
@@ -2722,7 +2724,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc%z%end. Skip when parallel_io has already filled the ghost.
+        ! Populate the cell-boundary and center locations buffer at bc%z%end. Skip when parallel_io has already filled the ghost.
         if (.not. (bc%z%end >= 0 .and. parallel_io)) then
             do i = 1, offset_z%end
                 z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
@@ -2736,7 +2738,7 @@ contains
 
     end subroutine s_populate_grid_variables_buffers
 
-    !> Deallocates boundary condition buffer arrays allocated during module initialization.
+    !> Deallocate boundary condition buffer arrays allocated during module initialization.
     subroutine s_finalize_boundary_common_module()
 
         if (bc_io) then

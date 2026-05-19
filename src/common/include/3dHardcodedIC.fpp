@@ -19,7 +19,7 @@
 
     eps = 1e-9_wp
 
-    if (patch_icpp(patch_id)%hcid == 303) then
+    if (patch_icpp(patch_id)%hcid == 303) then  ! IGR Multijet
         eps_smooth = 3._wp
         inquire (file="njet.txt", exist=file_exist)
         if (file_exist) then
@@ -75,7 +75,7 @@
         end if
     end if
 
-    if (patch_icpp(patch_id)%hcid == 304) then
+    if (patch_icpp(patch_id)%hcid == 304) then  ! 3D Cartesian interface from file
         @:ALLOCATE(ih(0:n_glb, 0:p_glb))
 
         if (interface_file == '.') then
@@ -108,7 +108,7 @@
         end if
     end if
 
-    if (patch_icpp(patch_id)%hcid == 305) then
+    if (patch_icpp(patch_id)%hcid == 305) then  ! 3D Axisymmetric interface from file
         @:ALLOCATE(ih(0:n_glb, 0:0))
         if (interface_file == '.') then
             call s_mpi_abort("Error: interface_file must be specified for hcid=305")
@@ -240,9 +240,6 @@
 
         q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)*(950._wp/1000._wp)
         q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = q_prim_vf(eqn_idx%adv%end)%sf(i, j, k)*(1._wp/1000._wp)
-
-        ! h = x_cc(i) - ih(start_idx(2) + j, start_idx(3) + k) q_prim_vf(momxb)%sf(i,j,k) = -1._wp * (ih(start_idx(2) + j,
-        ! start_idx(3) + k) - normFac) * exp(-h * h / 1000) / 100._wp
 
         q_prim_vf(eqn_idx%E)%sf(i, j, k) = p0_ic + (q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) + q_prim_vf(eqn_idx%cont%end)%sf(i, &
                   & j, k))*g0_ic*(ih(start_idx(2) + j, start_idx(3) + k) - x_cc(i))

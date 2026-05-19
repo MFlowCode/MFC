@@ -18,11 +18,8 @@ module m_helper_basic
 
 contains
 
-    !> This procedure checks if two floating point numbers of wp are within tolerance.
-    !! @param a First number.
-    !! @param b Second number.
+    !> Check if two floating point numbers of wp are within tolerance.
     !! @param tol_input Relative error (default = 1.e-10_wp).
-    !! @return Result of the comparison.
     logical elemental function f_approx_equal(a, b, tol_input) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -50,11 +47,8 @@ contains
 
     end function f_approx_equal
 
-    !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
-    !! @param a First number.
-    !! @param b Array that contains several point numbers.
+    !> Check if a wp value approximately matches any element of an array within tolerance.
     !! @param tol_input Relative error (default = 1e-10_wp).
-    !! @return Result of the comparison.
     logical function f_approx_in_array(a, b, tol_input) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -85,8 +79,7 @@ contains
 
     end function f_approx_in_array
 
-    !> Checks if a real(wp) variable is of default value.
-    !! @param var Variable to check.
+    !> Check if a real(wp) variable is of default value.
     logical elemental function f_is_default(var) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -96,24 +89,16 @@ contains
 
     end function f_is_default
 
-    !> Checks if ALL elements of a real(wp) array are of default value.
-    !! @param var_array Array to check.
+    !> Check if ALL elements of a real(wp) array are of default value.
     logical function f_all_default(var_array) result(res)
 
         real(wp), intent(in) :: var_array(:)
 
         res = all(f_is_default(var_array))
 
-        ! logical :: res_array(size(var_array)) integer :: i
-
-        ! do i = 1, size(var_array) res_array(i) = f_is_default(var_array(i)) end do
-
-        ! res = all(res_array)
-
     end function f_all_default
 
-    !> Checks if a real(wp) variable is an integer.
-    !! @param var Variable to check.
+    !> Check if a real(wp) variable is an integer.
     logical elemental function f_is_integer(var) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -123,6 +108,7 @@ contains
 
     end function f_is_integer
 
+    !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
         & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
@@ -134,8 +120,7 @@ contains
         logical, intent(in)                                :: igr
         logical, intent(in)                                :: ib
 
-        ! Determining the number of cells that are needed in order to store sufficient boundary conditions data as to iterate the
-        ! solution in the physical computational domain from one time-step iteration to the next one
+        ! Determine ghost cell buffer size for boundary conditions
 
         if (igr) then
             buff_size = (igr_order - 1)/2 + 2
@@ -172,11 +157,8 @@ contains
 
     end subroutine s_configure_coordinate_bounds
 
-    !> Updates the min and max number of cells in each set of axes
+    !> Update the min and max number of cells in each set of axes
     !! @param bounds Min ans max values to update
-    !! @param m Number of cells in x-axis
-    !! @param n Number of cells in y-axis
-    !! @param p Number of cells in z-axis
     elemental subroutine s_update_cell_bounds(bounds, m, n, p)
 
         type(cell_num_bounds), intent(out) :: bounds

@@ -10,7 +10,6 @@ module m_muscl
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
-
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -36,6 +35,7 @@ module m_muscl
 
 contains
 
+    !> Allocate and initialize MUSCL reconstruction working arrays
     subroutine s_initialize_muscl_module()
 
         ! Initializing in x-direction
@@ -82,7 +82,9 @@ contains
     end subroutine s_initialize_muscl_module
 
     !> Perform MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables
-    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, is2_muscl_d, is3_muscl_d)
+    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, &
+
+        & is2_muscl_d, is3_muscl_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vR_rs_vf_x
@@ -229,6 +231,7 @@ contains
 
     end subroutine s_muscl
 
+    !> Finalize the MUSCL module
     subroutine s_finalize_muscl_module()
 
         @:DEALLOCATE(v_rs_ws_muscl)
