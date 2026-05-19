@@ -874,7 +874,9 @@ contains
         ! Additional Physics and Source Terms Additions for acoustic_source
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
-            call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
+            if (.not. hypo_nc_dual_pass .or. is_hat_L) then
+                call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
+            end if
             call nvtxEndRange
         end if
 

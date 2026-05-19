@@ -4470,14 +4470,6 @@ contains
 
                             S_M = ((pTot_R - pTot_L) + A_L*u_n_L - A_R*u_n_R)/(A_L - A_R + verysmall)
 
-                            ! Threshold S_M when it is indistinguishable from (u_n_L+u_n_R)/2 within roundoff. Without this, the
-                            ! star-state stress computation amplifies the roundoff in S_M by O(G_hat) \approx 1e9, producing O(1)
-                            ! spurious stress fluxes from O(1e-13) velocity differences. The threshold is relative to the wave speed
-                            ! scale |S_L|+|S_R|.
-                            if (abs(S_M - 5e-1_wp*(u_n_L + u_n_R)) < 1e-12_wp*(abs(S_L) + abs(S_R) + abs(u_n_L) + abs(u_n_R))) then
-                                S_M = 5e-1_wp*(u_n_L + u_n_R)
-                            end if
-
                             ! Degenerate wave structure: denom ~ 0 or S_M not in [S_L,S_R]
                             if (abs(denomA) < verysmall .or. .not. (S_L - verysmall <= S_M .and. S_M <= S_R + verysmall)) then
                                 ! HLL (or one-sided) fallback for degenerate wave structure
