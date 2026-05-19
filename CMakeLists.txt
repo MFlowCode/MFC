@@ -715,7 +715,7 @@ exit 0
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
                     HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
                 target_include_directories(${a_target} PRIVATE
-                    "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn")
+                    "$ENV{OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn")
                 target_link_libraries(${a_target} PRIVATE
                     ${HIP_LIB} ${HIPFORT_AMDGCN_LIB})
 
