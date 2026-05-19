@@ -463,8 +463,11 @@ module m_global_parameters
     $:GPU_DECLARE(create='[sigma, surface_tension]')
     !> @}
 
+    integer, allocatable, dimension(:)  :: eos_idxs
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+    real(wp), allocatable, dimension(:) :: jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s
+    $:GPU_DECLARE(create='[eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+    $:GPU_DECLARE(create='[jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s]')
 
     real(wp)                                    :: mytime     !< Current simulation time
     real(wp)                                    :: finaltime  !< Final simulation time
@@ -620,6 +623,7 @@ contains
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
+            fluid_pp(i)%eos = 1
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
             fluid_pp(i)%cv = 0._wp
@@ -627,6 +631,12 @@ contains
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%jwl_A = dflt_real
+            fluid_pp(i)%jwl_B = dflt_real
+            fluid_pp(i)%jwl_R1 = dflt_real
+            fluid_pp(i)%jwl_R2 = dflt_real
+            fluid_pp(i)%jwl_omega = dflt_real
+            fluid_pp(i)%jwl_rho0 = dflt_real
         end do
 
         ! Subgrid bubble parameters

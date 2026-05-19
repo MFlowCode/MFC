@@ -140,7 +140,8 @@ contains
 
         ! Simplex noise  and fluid physical parameters
         do i = 1, num_fluids_max
-            #:for VAR in [ 'gamma','pi_inf', 'G', 'cv', 'qv', 'qvp' ]
+            call MPI_BCAST(fluid_pp(i)%eos, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:for VAR in [ 'gamma','pi_inf', 'G', 'cv', 'qv', 'qvp', 'jwl_A', 'jwl_B', 'jwl_R1', 'jwl_R2', 'jwl_omega', 'jwl_rho0' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 

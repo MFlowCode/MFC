@@ -347,12 +347,19 @@ contains
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
+            fluid_pp(i)%eos = 1
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
             fluid_pp(i)%cv = 0._wp
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = dflt_real
+            fluid_pp(i)%jwl_A = dflt_real
+            fluid_pp(i)%jwl_B = dflt_real
+            fluid_pp(i)%jwl_R1 = dflt_real
+            fluid_pp(i)%jwl_R2 = dflt_real
+            fluid_pp(i)%jwl_omega = dflt_real
+            fluid_pp(i)%jwl_rho0 = dflt_real
         end do
 
         ! Subgrid bubble parameters

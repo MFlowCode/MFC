@@ -309,6 +309,7 @@ module m_derived_types
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
     type physical_parameters
+        integer                :: eos     !< Equation of state: 1=stiffened gas, 2=JWL
         real(wp)               :: gamma   !< Sp. heat ratio
         real(wp)               :: pi_inf  !< Liquid stiffness
         real(wp), dimension(2) :: Re      !< Reynolds number
@@ -316,6 +317,12 @@ module m_derived_types
         real(wp)               :: qv      !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
         real(wp)               :: qvp     !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp)               :: G
+        real(wp)               :: jwl_A
+        real(wp)               :: jwl_B
+        real(wp)               :: jwl_R1
+        real(wp)               :: jwl_R2
+        real(wp)               :: jwl_omega
+        real(wp)               :: jwl_rho0
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models

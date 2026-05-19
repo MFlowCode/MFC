@@ -39,8 +39,11 @@ module m_variables_conversion
 
     ! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
 #ifndef MFC_SIMULATION
+    integer, allocatable, public, dimension(:)  :: eos_idxs
     real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+    real(wp), allocatable, public, dimension(:) :: jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s
+    $:GPU_DECLARE(create='[eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+    $:GPU_DECLARE(create='[jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s]')
 #endif
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -77,6 +80,36 @@ contains
 
     end subroutine s_convert_to_mixture_variables
 
+    !> Compute the JWL cold pressure term with relative volume V = rho0/rho.
+    subroutine s_jwl_pcold(rho, A, B, R1, R2, omega, rho0, pcold)
+
+        $:GPU_ROUTINE(function_name='s_jwl_pcold',parallelism='[seq]', cray_noinline=True)
+
+        real(wp), intent(in)  :: rho, A, B, R1, R2, omega, rho0
+        real(wp), intent(out) :: pcold
+        real(wp)              :: V
+
+        V = rho0/max(rho, sgm_eps)
+        pcold = A*(1._wp - omega/(R1*V))*exp(-R1*V) + B*(1._wp - omega/(R2*V))*exp(-R2*V)
+
+    end subroutine s_jwl_pcold
+
+    !> Compute d(pcold)/d(rho) for the JWL EOS.
+    subroutine s_jwl_dpcold_drho(rho, A, B, R1, R2, omega, rho0, dpcold_drho)
+
+        $:GPU_ROUTINE(function_name='s_jwl_dpcold_drho',parallelism='[seq]', cray_noinline=True)
+
+        real(wp), intent(in)  :: rho, A, B, R1, R2, omega, rho0
+        real(wp), intent(out) :: dpcold_drho
+        real(wp)              :: V, rho_safe
+
+        rho_safe = max(rho, sgm_eps)
+        V = rho0/rho_safe
+        dpcold_drho = A*exp(-R1*V)*(V/rho_safe)*(R1 - omega/V - omega/(R1*V**2)) + B*exp(-R2*V)*(V/rho_safe)*(R2 - omega/V &
+                            & - omega/(R2*V**2))
+
+    end subroutine s_jwl_dpcold_drho
+
     !> Compute the pressure from the appropriate equation of state
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
 
@@ -96,12 +129,18 @@ contains
         real(wp)                                       :: E_e
         real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
         real(wp)                                       :: T_guess
+        real(wp)                                       :: pcold, eint
         integer                                        :: s  !< Generic loop iterator
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
             ! procedure pointer
 
-            if (mhd) then
+            if ((num_fluids == 1) .and. (eos_idxs(1) == 2) .and. (.not. mhd) .and. (model_eqns /= 4) .and. (bubbles_euler &
+                & .neqv. .true.)) then
+                call s_jwl_pcold(rho, jwl_As(1), jwl_Bs(1), jwl_R1s(1), jwl_R2s(1), jwl_omegas(1), jwl_rho0s(1), pcold)
+                eint = energy - dyn_p
+                pres = pcold + jwl_omegas(1)*eint
+            else if (mhd) then
                 ! MHD pressure: subtract magnetic pressure from total energy
                 pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
             else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
@@ -128,7 +167,13 @@ contains
                     end if
                 end do
 
-                pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
+                if ((num_fluids == 1) .and. (eos_idxs(1) == 2) .and. (.not. mhd) .and. (model_eqns /= 4) .and. (bubbles_euler &
+                    & .neqv. .true.)) then
+                    call s_jwl_pcold(rho, jwl_As(1), jwl_Bs(1), jwl_R1s(1), jwl_R2s(1), jwl_omegas(1), jwl_rho0s(1), pcold)
+                    pres = pcold + jwl_omegas(1)*(energy - 0.5_wp*(mom**2._wp)/rho - E_e)
+                else
+                    pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
+                end if
             end if
         #:else
             ! Reacting mixture pressure from temperature and species
@@ -327,6 +372,7 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[is1b, is1e, is2b, is2e, is3b, is3e]')
 
+        @:ALLOCATE(eos_idxs(1:num_fluids))
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
@@ -334,9 +380,16 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
+        @:ALLOCATE(jwl_As    (1:num_fluids))
+        @:ALLOCATE(jwl_Bs    (1:num_fluids))
+        @:ALLOCATE(jwl_R1s   (1:num_fluids))
+        @:ALLOCATE(jwl_R2s   (1:num_fluids))
+        @:ALLOCATE(jwl_omegas(1:num_fluids))
+        @:ALLOCATE(jwl_rho0s (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
         do i = 1, num_fluids
+            eos_idxs(i) = fluid_pp(i)%eos
             gammas(i) = fluid_pp(i)%gamma
             gs_min(i) = 1.0_wp/gammas(i) + 1.0_wp
             pi_infs(i) = fluid_pp(i)%pi_inf
@@ -345,8 +398,31 @@ contains
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
+            jwl_As(i) = fluid_pp(i)%jwl_A
+            jwl_Bs(i) = fluid_pp(i)%jwl_B
+            jwl_R1s(i) = fluid_pp(i)%jwl_R1
+            jwl_R2s(i) = fluid_pp(i)%jwl_R2
+            jwl_omegas(i) = fluid_pp(i)%jwl_omega
+            jwl_rho0s(i) = fluid_pp(i)%jwl_rho0
         end do
-        $:GPU_UPDATE(device='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc]')
+
+        do i = 1, num_fluids
+            if (eos_idxs(i) == 2) then
+                if (num_fluids /= 1) call s_mpi_abort('JWL EOS currently supports single-fluid cases only.')
+                if (mhd) call s_mpi_abort('JWL EOS is not currently supported with MHD.')
+                if (bubbles_euler) call s_mpi_abort('JWL EOS is not currently supported with Eulerian bubbles.')
+                if (chemistry) call s_mpi_abort('JWL EOS is not currently supported with chemistry.')
+                if (model_eqns == 4) call s_mpi_abort('JWL EOS is not currently supported with model_eqns = 4.')
+                if (jwl_R1s(i) <= 0._wp .or. jwl_R2s(i) <= 0._wp .or. jwl_omegas(i) <= 0._wp .or. jwl_rho0s(i) <= 0._wp) then
+                    call s_mpi_abort('JWL EOS requires positive R1, R2, omega, and rho0 parameters.')
+                end if
+            else if (eos_idxs(i) /= 1) then
+                call s_mpi_abort('Unsupported fluid_pp%eos selector. Use 1 for stiffened gas or 2 for JWL.')
+            end if
+        end do
+
+        $:GPU_UPDATE(device='[eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc]')
+        $:GPU_UPDATE(device='[jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s]')
 
 #ifdef MFC_SIMULATION
         if (viscous) then
@@ -799,6 +875,7 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp)                         :: e_mix, mix_mol_weight, T
         real(wp)                         :: pres_mag
+        real(wp)                         :: pcold
         real(wp)                         :: Ga          !< Lorentz factor (gamma in relativity)
         real(wp)                         :: h           !< relativistic enthalpy
         real(wp)                         :: v2          !< Square of the velocity magnitude
@@ -908,7 +985,11 @@ contains
                         q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + rho*e_mix
                     else
                         ! Computing the energy from the pressure
-                        if (mhd) then
+                        if ((num_fluids == 1) .and. (eos_idxs(1) == 2) .and. (.not. mhd) .and. (model_eqns /= 4) &
+                            & .and. (bubbles_euler .neqv. .true.)) then
+                            call s_jwl_pcold(rho, jwl_As(1), jwl_Bs(1), jwl_R1s(1), jwl_R2s(1), jwl_omegas(1), jwl_rho0s(1), pcold)
+                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (q_prim_vf(eqn_idx%E)%sf(j, k, l) - pcold)/jwl_omegas(1)
+                        else if (mhd) then
                             if (n == 0) then
                                 pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(eqn_idx%B%beg)%sf(j, k, &
                                                    & l)**2 + q_prim_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
@@ -1058,6 +1139,7 @@ contains
         real(wp), dimension(2) :: Re_K
         real(wp)               :: G_K
         real(wp)               :: T_K, mix_mol_weight, R_gas
+        real(wp)               :: pcold
         integer                :: i, j, k, l  !< Generic loop iterators
 
         is1b = is1%beg; is1e = is1%end
@@ -1070,7 +1152,7 @@ contains
         ! capillarity
 #ifdef MFC_SIMULATION
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]')
+                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas, pcold]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1118,7 +1200,14 @@ contains
                         E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
                     else
                         ! Computing the energy from the pressure
-                        E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                        if ((num_fluids == 1) .and. (eos_idxs(1) == 2) .and. (.not. mhd) .and. (model_eqns /= 4) &
+                            & .and. (bubbles_euler .neqv. .true.)) then
+                            call s_jwl_pcold(rho_K, jwl_As(1), jwl_Bs(1), jwl_R1s(1), jwl_R2s(1), jwl_omegas(1), jwl_rho0s(1), &
+                                             & pcold)
+                            E_K = (pres_K - pcold)/jwl_omegas(1) + 5.e-1_wp*rho_K*vel_K_sum
+                        else
+                            E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                        end if
                     end if
 
                     ! mass flux, this should be \alpha_i \rho_i u_i
@@ -1231,12 +1320,14 @@ contains
 #endif
 
 #ifdef MFC_SIMULATION
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
+        @:DEALLOCATE(eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+        @:DEALLOCATE(jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, Gs_vc)
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
 #else
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
+        @:DEALLOCATE(eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
+        @:DEALLOCATE(jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, Gs_vc)
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1262,6 +1353,7 @@ contains
         real(wp), intent(in)  :: c_c
         real(wp), intent(out) :: c
         real(wp)              :: blkmod1, blkmod2
+        real(wp)              :: pcold, dpcold_drho
         integer               :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
@@ -1273,7 +1365,12 @@ contains
         else if (relativity) then  ! Relativistic sound speed
             c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
         else
-            if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
+            if ((num_fluids == 1) .and. (eos_idxs(1) == 2) .and. (.not. mhd) .and. (model_eqns /= 4) .and. (bubbles_euler &
+                & .neqv. .true.)) then
+                call s_jwl_pcold(rho, jwl_As(1), jwl_Bs(1), jwl_R1s(1), jwl_R2s(1), jwl_omegas(1), jwl_rho0s(1), pcold)
+                call s_jwl_dpcold_drho(rho, jwl_As(1), jwl_Bs(1), jwl_R1s(1), jwl_R2s(1), jwl_omegas(1), jwl_rho0s(1), dpcold_drho)
+                c = dpcold_drho + ((1._wp + jwl_omegas(1))*pres - pcold)/rho
+            else if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
                 blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))

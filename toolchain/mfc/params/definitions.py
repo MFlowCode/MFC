@@ -433,11 +433,18 @@ HINTS = {
         "perturb_vel_offset": "Velocity perturbation offset seed",
     },
     "fluid_pp": {
+        "eos": "Equation of state: 1=stiffened gas, 2=JWL",
         "gamma": "Specific heat ratio (EOS)",
         "pi_inf": "Stiffness pressure (EOS)",
         "cv": "Specific heat at constant volume",
         "qv": "Heat of formation",
         "qvp": "Heat of formation derivative",
+        "jwl_A": "JWL pressure constant A",
+        "jwl_B": "JWL pressure constant B",
+        "jwl_R1": "JWL exponential coefficient R1",
+        "jwl_R2": "JWL exponential coefficient R2",
+        "jwl_omega": "JWL Gruneisen coefficient omega",
+        "jwl_rho0": "JWL reference density",
     },
 }
 
@@ -1148,7 +1155,20 @@ def _load():
     # fluid_pp (10 fluids)
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
-        for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
+        _r(f"{px}eos", INT)
+        for a, sym in [
+            ("gamma", r"\f$\gamma_k\f$"),
+            ("pi_inf", r"\f$\pi_{\infty,k}\f$"),
+            ("cv", r"\f$c_{v,k}\f$"),
+            ("qv", r"\f$q_{v,k}\f$"),
+            ("qvp", r"\f$q'_{v,k}\f$"),
+            ("jwl_A", r"\f$A_k\f$"),
+            ("jwl_B", r"\f$B_k\f$"),
+            ("jwl_R1", r"\f$R_{1,k}\f$"),
+            ("jwl_R2", r"\f$R_{2,k}\f$"),
+            ("jwl_omega", r"\f$\omega_k\f$"),
+            ("jwl_rho0", r"\f$\rho_{0,k}\f$"),
+        ]:
             _r(f"{px}{a}", REAL, math=sym)
         _r(f"{px}mul0", REAL, {"viscosity"}, math=r"\f$\mu_{l,k}\f$")
         _r(f"{px}ss", REAL, {"surface_tension"}, math=r"\f$\sigma_k\f$")
