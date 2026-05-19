@@ -871,8 +871,8 @@ if (MFC_SIMULATION)
     # -UMFC_OpenMP suppresses all #ifdef MFC_OpenMP target directives so those
     # files compile as CPU-only. All affected files are either init-only or
     # specialized solvers called from CPU context, so correctness is preserved.
-    # For m_rhs/m_time_steppers (the hot-path GPU kernels), -O0 is tried first;
-    # if they still ICE they will need -UMFC_OpenMP too.
+    # m_rhs and m_time_steppers were tested directly at -O3 and compile cleanly;
+    # no per-file workaround is needed for the hot-path GPU kernels.
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM" AND MFC_OpenMP)
         set_source_files_properties(
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_ib_patches.fpp.f90"
@@ -880,11 +880,6 @@ if (MFC_SIMULATION)
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_igr.fpp.f90"
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_compute_levelset.fpp.f90"
             PROPERTIES COMPILE_FLAGS "-UMFC_OpenMP"
-        )
-        set_source_files_properties(
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_rhs.fpp.f90"
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_time_steppers.fpp.f90"
-            PROPERTIES COMPILE_OPTIONS "-O0"
         )
     endif()
 endif()
