@@ -14,7 +14,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 from rich.text import Text
 
 from .case import Case
-from .common import MFCException, create_directory, debug, delete_directory, format_list_to_string, system
+from .common import MFCException, create_directory, debug, delete_directory, format_list_to_string, get_prebuilt_prefix, system
 from .printer import cons
 from .run import input
 from .state import ARG, CFG, gpuConfigOptions
@@ -336,6 +336,9 @@ class MFCTarget:
         return os.sep.join([os.getcwd()])
 
     def get_install_binpath(self, case: Case) -> str:
+        prebuilt = get_prebuilt_prefix()
+        if prebuilt:
+            return os.sep.join([prebuilt, "bin", self.name])
         # <root>/install/<slug>/bin/<target>
         return os.sep.join([self.get_install_dirpath(case), "bin", self.name])
 
@@ -357,6 +360,9 @@ class MFCTarget:
 
     def is_buildable(self) -> bool:
         if ARG("no_build"):
+            return False
+
+        if get_prebuilt_prefix():
             return False
 
         if self.isDependency and ARG(f"sys_{self.name}", False):

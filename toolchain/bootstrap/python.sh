@@ -4,6 +4,12 @@ MFC_PYTHON_MIN_MAJOR=3
 MFC_PYTHON_MIN_MINOR=9
 MFC_PYTHON_MIN_STR="$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR"
 
+# Prebuilt/spack mode: skip the venv entirely. The caller must already have
+# python3 + the MFC toolchain deps + the `mfc` package importable on PYTHONPATH.
+if [ -n "${MFC_PREBUILT_PREFIX:-}" ]; then
+    return 0
+fi
+
 is_python_compatible() {
     if ! ${1:-python3} -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and sys.version_info[1] >= $MFC_PYTHON_MIN_MINOR)))"; then
         return 1

@@ -42,6 +42,17 @@ MFC_TEMPLATE_DIR = abspath(join(MFC_TOOLCHAIN_DIR, "templates"))
 MFC_BENCH_FILEPATH = abspath(join(MFC_TOOLCHAIN_DIR, "bench.yaml"))
 MFC_MECHANISMS_DIR = abspath(join(MFC_TOOLCHAIN_DIR, "mechanisms"))
 
+
+def get_prebuilt_prefix() -> typing.Optional[str]:
+    # Returns the prebuilt install prefix when MFC is run against pre-built binaries
+    # (e.g. a Spack install). The CLI flag --prebuilt-prefix takes precedence over the
+    # MFC_PREBUILT_PREFIX environment variable. Returns None when running normally.
+    from .state import ARG
+
+    cli = ARG("prebuilt_prefix", "") or None
+    return cli or os.environ.get("MFC_PREBUILT_PREFIX") or None
+
+
 MFC_LOGO = """\
      .=++*:          -+*+=.
     :+   -*-        ==   =* .

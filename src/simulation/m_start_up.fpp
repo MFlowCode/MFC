@@ -1094,14 +1094,6 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[igr, nb, igr_order]')
         #:endif
-        #:if USING_AMD
-            block
-                use m_thermochem, only: molecular_weights
-                use m_chemistry, only: molecular_weights_nonparameter
-                molecular_weights_nonparameter(:) = molecular_weights(:)
-                $:GPU_UPDATE(device='[molecular_weights_nonparameter]')
-            end block
-        #:endif
 
     end subroutine s_initialize_gpu_vars
 
