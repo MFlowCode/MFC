@@ -860,28 +860,6 @@ if (MFC_SIMULATION)
             target_compile_options(simulation PRIVATE -Oipa0)
         endif()
     endif()
-    # ifx SPIR64 ICEs: multiple patterns in the ifx 2023.2 SPIR-V backend crash
-    # during GPU offload compilation. Two root causes observed:
-    #   (a) Module-level !$omp declare target derived-type arrays with pointer
-    #       members accessed inside inner sequential loops in target regions →
-    #       "Instruction does not dominate all uses!" (error #5623)
-    #   (b) Complex GPU kernels with ghost_point / ib_patch_parameters struct
-    #       mapping + !$omp declare target (seq) geometry routines → segfault
-    #       in SPIR-V lowering (errors #5623/#5633)
-    # -UMFC_OpenMP suppresses all #ifdef MFC_OpenMP target directives so those
-    # files compile as CPU-only. All affected files are either init-only or
-    # specialized solvers called from CPU context, so correctness is preserved.
-    # m_rhs and m_time_steppers were tested directly at -O3 and compile cleanly;
-    # no per-file workaround is needed for the hot-path GPU kernels.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM" AND MFC_OpenMP)
-        set_source_files_properties(
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_ib_patches.fpp.f90"
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_surface_tension.fpp.f90"
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_igr.fpp.f90"
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_compute_levelset.fpp.f90"
-            PROPERTIES COMPILE_FLAGS "-UMFC_OpenMP"
-        )
-    endif()
 endif()
 
 if (MFC_POST_PROCESS)
