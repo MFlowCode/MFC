@@ -860,6 +860,17 @@ if (MFC_SIMULATION)
             target_compile_options(simulation PRIVATE -Oipa0)
         endif()
     endif()
+    # ifx 2025.1.1 SPIR-V ICE (#5633) on m_compute_levelset: the backend segfaults
+    # when declare-target geometry subroutines (s_sphere_levelset etc.) are inlined
+    # into the target teams loop region. -fno-inline prevents the inlining; the calls
+    # are resolved at SPIR-V link time via !$omp declare target, so GPU execution is
+    # preserved. Tested: -O1/-O2/-O3 all ICE; only -O3 -fno-inline compiles cleanly.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM" AND MFC_OpenMP)
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_compute_levelset.fpp.f90"
+            PROPERTIES COMPILE_FLAGS "-fno-inline"
+        )
+    endif()
 endif()
 
 if (MFC_POST_PROCESS)
