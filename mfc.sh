@@ -102,9 +102,12 @@ if [ $code -ne 0 ]; then
     error "main.py finished with a $code exit code."
 fi
 
-# Deactivate the Python virtualenv in case the user "source"'d this script
-log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
-deactivate
+# Deactivate the Python virtualenv in case the user "source"'d this script.
+# In prebuilt/spack mode the venv was never created, so there's nothing to deactivate.
+if type deactivate > /dev/null 2>&1; then
+    log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+    deactivate
+fi
 
 # Exit with proper exit code
 exit $code

@@ -454,14 +454,16 @@ contains
                 call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
-            $:GPU_UPDATE(device='[source_spatials(ai)%coord]')
-            $:GPU_UPDATE(device='[source_spatials(ai)%val]')
-            if (support(ai) >= 5) then
-                if (dim == 2) then
-                    $:GPU_UPDATE(device='[source_spatials(ai)%angle]')
-                end if
-                if (dim == 3) then
-                    $:GPU_UPDATE(device='[source_spatials(ai)%xyz_to_r_ratios]')
+            if (count > 0) then
+                $:GPU_UPDATE(device='[source_spatials(ai)%coord]')
+                $:GPU_UPDATE(device='[source_spatials(ai)%val]')
+                if (support(ai) >= 5) then
+                    if (dim == 2) then
+                        $:GPU_UPDATE(device='[source_spatials(ai)%angle]')
+                    end if
+                    if (dim == 3) then
+                        $:GPU_UPDATE(device='[source_spatials(ai)%xyz_to_r_ratios]')
+                    end if
                 end if
             end if
         end do

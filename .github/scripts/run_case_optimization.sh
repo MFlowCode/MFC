@@ -23,13 +23,14 @@ benchmarks=(
 
 # For Frontier/Frontier AMD: deps were fetched on the login node via --deps-only;
 # build case-optimized binaries here on the compute node before running.
-# For Phoenix: prebuild-case-optimization.sh already built everything in a prior SLURM job.
+# For Phoenix and frontier_amd: prebuild-case-optimization.sh already built
+# everything in a prior SLURM job (via --dry-run), so skip the build here.
 #
 # Clean stale MFC target staging before building. On self-hosted CI runners,
 # corrupted intermediate files from a prior failed build (e.g. CCE optcg crash)
 # can persist and poison subsequent builds. Each case-opt config gets its own
 # hash-named staging dir, but install dirs and other artifacts may be stale.
-if [ "$job_cluster" != "phoenix" ]; then
+if [ "$job_cluster" != "phoenix" ] && [ "$job_cluster" != "frontier_amd" ]; then
     # Clean stale MFC target dirs (hash-named) from prior builds, but
     # preserve dependency dirs (hipfort, fftw, etc.) since the compute
     # node has no internet to re-fetch them.

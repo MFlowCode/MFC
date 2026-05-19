@@ -220,7 +220,7 @@ contains
         #:call GPU_PARALLEL(copyout='[icfl_max_loc]', copyin='[icfl_sf]')
             icfl_max_loc = maxval(icfl_sf)
         #:endcall GPU_PARALLEL
-        if (viscous .or. dummy) then
+        if (viscous) then
             #:call GPU_PARALLEL(copyout='[vcfl_max_loc, Rc_min_loc]', copyin='[vcfl_sf,Rc_sf]')
                 vcfl_max_loc = maxval(vcfl_sf)
                 Rc_min_loc = minval(Rc_sf)

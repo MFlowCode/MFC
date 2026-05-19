@@ -644,7 +644,7 @@ exit 0
                     target_link_options(${a_target} PRIVATE -fopenmp)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
                     target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -fopenmp-target-fast -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription)
-                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a)
+                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS})
                 endif()
             endif()
 
@@ -710,14 +710,15 @@ exit 0
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-                find_library(HIP_LIB amdhip64
+		        find_library(HIP_LIB amdhip64
                     HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
                     HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
                 target_include_directories(${a_target} PRIVATE
                     "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn")
                 target_link_libraries(${a_target} PRIVATE
-                    ${HIP_LIB} ${HIPFORT_AMDGCN_LIB} flang_rt.hostdevice)
+                    ${HIP_LIB} ${HIPFORT_AMDGCN_LIB})
+
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
@@ -790,6 +791,12 @@ if (MFC_POST_PROCESS)
 
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)
+
+    # flang-23/LLD defaults to PIE; SILO and LAPACK static libs on Frontier are
+    # non-PIC, producing R_X86_64_32 relocations that LLD rejects in PIE mode.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+        target_link_options(post_process PRIVATE -no-pie)
+    endif()
 endif()
 
 if (MFC_SYSCHECK)

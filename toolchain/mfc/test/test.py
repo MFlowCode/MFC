@@ -112,13 +112,23 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
             raise MFCException(f"--only filter matched zero test cases. Specified: {ARG('only')}. Check that UUIDs/names are valid.")
 
     # Convergence cases are slow (multiple resolutions × MPI ranks). Skip
-    # by default unless the user explicitly opted in via --only "Convergence"
-    # or a convergence UUID. _filter_only above has already narrowed cases
-    # to the user's selection, so any convergence case still present here
-    # was selected on purpose. Listing (`-l`) shows all cases regardless.
-    if not ARG("only") and not ARG("list"):
-        convergence_cases = [c for c in cases if getattr(c, "kind", "golden") == "convergence"]
-        if convergence_cases:
+    # unless the user explicitly opted in via --only "Convergence" or a
+    # specific convergence UUID. A label like --only "2D" must not
+    # accidentally pull in "Convergence -> 2D -> ..." cases.
+    if not ARG("list"):
+
+        def is_uuid(term):
+            return len(term) == 8 and all(c in "0123456789abcdefABCDEF" for c in term)
+
+        only_terms = ARG("only")
+        only_labels = [t for t in only_terms if not is_uuid(t)]
+        only_uuids = [t for t in only_terms if is_uuid(t)]
+
+        convergence_uuids = {c.get_uuid() for c in cases if getattr(c, "kind", "golden") == "convergence"}
+        user_wants_convergence = "Convergence" in only_labels or any(u in convergence_uuids for u in only_uuids)
+
+        if not user_wants_convergence:
+            convergence_cases = [c for c in cases if getattr(c, "kind", "golden") == "convergence"]
             for c in convergence_cases:
                 cases.remove(c)
                 skipped_cases.append(c)

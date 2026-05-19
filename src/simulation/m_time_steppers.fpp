@@ -471,10 +471,10 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
-                    if (igr .or. dummy) then
+                    if (igr) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                     end if
-                    if (.not. igr .or. dummy) then
+                    if (.not. igr) then
                         call s_write_run_time_information(q_prim_vf, t_step)
                     end if
                 end if
@@ -638,7 +638,7 @@ contains
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
 
-        if (.not. igr .or. dummy) then
+        if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
