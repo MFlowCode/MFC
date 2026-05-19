@@ -31,6 +31,8 @@ option(MFC_DOCUMENTATION "Build documentation"                               OFF
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
 option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
+option(MFC_Intel_AOT       "Build Intel GPU with AOT (spir64_gen) instead of JIT (spir64)" OFF)
+set(MFC_Intel_AOT_DEVICE "pvc" CACHE STRING "ocloc device target for Intel AOT compilation (e.g. pvc, 0xbda)")
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -715,8 +717,19 @@ exit 0
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
                     # Intel GPU: OpenMP target offload to SPIR64 (Xe-HPC / Ponte Vecchio).
                     # GPU FFT uses oneMKL DFTI via the OpenMP dispatch construct.
-                    target_compile_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64)
-                    target_link_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64)
+                    if (MFC_Intel_AOT)
+                        # AOT: compile to native ISA via ocloc for Intel GPU Max (pvc).
+                        # Avoids JIT zeModuleCreate failures at runtime on Level Zero.
+                        # SHELL: prevents CMake deduplication and preserves the quoted
+                        # "-device pvc" as a single argument to -Xopenmp-target-backend.
+                        target_compile_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64_gen
+                            "SHELL:-Xopenmp-target-backend \"-device ${MFC_Intel_AOT_DEVICE}\"")
+                        target_link_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64_gen
+                            "SHELL:-Xopenmp-target-backend \"-device ${MFC_Intel_AOT_DEVICE}\"")
+                    else()
+                        target_compile_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64)
+                        target_link_options(${a_target} PRIVATE -fiopenmp -fopenmp-targets=spir64)
+                    endif()
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
                     target_compile_options(${a_target} PRIVATE -fopenmp)
                     target_link_options(${a_target} PRIVATE -fopenmp)
