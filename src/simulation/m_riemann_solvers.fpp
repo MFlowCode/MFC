@@ -315,8 +315,11 @@ contains
 
                                 call get_mixture_molecular_weight(Ys_L, MW%L)
                                 call get_mixture_molecular_weight(Ys_R, MW%R)
-                                Xs_L(:) = Ys_L(:)*MW%L/molecular_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW%R/molecular_weights(:)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_species
+                                    Xs_L(i) = Ys_L(i)*MW%L/molecular_weights(i)
+                                    Xs_R(i) = Ys_R(i)*MW%R/molecular_weights(i)
+                                end do
 
                                 R_gas%L = gas_constant/MW%L
                                 R_gas%R = gas_constant/MW%R
@@ -984,8 +987,11 @@ contains
                                 call get_mixture_molecular_weight(Ys_L, MW%L)
                                 call get_mixture_molecular_weight(Ys_R, MW%R)
 
-                                Xs_L(:) = Ys_L(:)*MW%L/molecular_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW%R/molecular_weights(:)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_species
+                                    Xs_L(i) = Ys_L(i)*MW%L/molecular_weights(i)
+                                    Xs_R(i) = Ys_R(i)*MW%R/molecular_weights(i)
+                                end do
 
                                 R_gas%L = gas_constant/MW%L
                                 R_gas%R = gas_constant/MW%R
@@ -2847,8 +2853,11 @@ contains
                                     call get_mixture_molecular_weight(Ys_L, MW%L)
                                     call get_mixture_molecular_weight(Ys_R, MW%R)
 
-                                    Xs_L(:) = Ys_L(:)*MW%L/molecular_weights(:)
-                                    Xs_R(:) = Ys_R(:)*MW%R/molecular_weights(:)
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_species
+                                        Xs_L(i) = Ys_L(i)*MW%L/molecular_weights(i)
+                                        Xs_R(i) = Ys_R(i)*MW%R/molecular_weights(i)
+                                    end do
 
                                     R_gas%L = gas_constant/MW%L
                                     R_gas%R = gas_constant/MW%R
@@ -3300,13 +3309,13 @@ contains
                             end do
 
                             ! NOTE: unlike HLL & HLLC, vel%L here is permutated by dir_idx for simpler logic
+                            vel_rms%L = 0._wp; vel_rms%R = 0._wp
                             do i = 1, num_vels
                                 vel%L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(i))
                                 vel%R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%cont%end + dir_idx(i))
+                                vel_rms%L = vel_rms%L + vel%L(i)**2._wp
+                                vel_rms%R = vel_rms%R + vel%R(i)**2._wp
                             end do
-
-                            vel_rms%L = sum(vel%L**2._wp)
-                            vel_rms%R = sum(vel%R**2._wp)
 
                             do i = 1, num_fluids
                                 alpha_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
@@ -3319,17 +3328,19 @@ contains
                             ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
                             if (mhd) then
                                 if (n == 0) then  ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
-                                    B%L = [Bx0, qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg), qL_prim_rsx_vf(${SF('')}$, &
-                                                               & eqn_idx%B%beg + 1)]
-                                    B%R = [Bx0, qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg), qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                               & eqn_idx%B%beg + 1)]
+                                    B%L(1) = Bx0
+                                    B%L(2) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg)
+                                    B%L(3) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + 1)
+                                    B%R(1) = Bx0
+                                    B%R(2) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg)
+                                    B%R(3) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + 1)
                                 else  ! 2D/3D: Bx, By, Bz as variables
-                                    B%L = [qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(1) - 1), qL_prim_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%B%beg + dir_idx(2) - 1), qL_prim_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%B%beg + dir_idx(3) - 1)]
-                                    B%R = [qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(1) - 1), &
-                                                          & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(2) - 1), &
-                                                          & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(3) - 1)]
+                                    B%L(1) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(1) - 1)
+                                    B%L(2) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(2) - 1)
+                                    B%L(3) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(3) - 1)
+                                    B%R(1) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(1) - 1)
+                                    B%R(2) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(2) - 1)
+                                    B%R(3) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(3) - 1)
                                 end if
                             end if
 
@@ -3349,8 +3360,8 @@ contains
                                 qv%R = qv%R + alpha_rho_R(i)*qvs(i)
                             end do
 
-                            pres_mag%L = 0.5_wp*sum(B%L**2._wp)
-                            pres_mag%R = 0.5_wp*sum(B%R**2._wp)
+                            pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
+                            pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                             E%L = gamma%L*pres%L + pi_inf%L + 0.5_wp*rho%L*vel_rms%L + qv%L + pres_mag%L
                             E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R  ! includes magnetic energy
                             H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
@@ -3383,26 +3394,41 @@ contains
                             E_star%R = ((s%R - vel%R(1))*E%R - pTot%R*vel%R(1) + p_star*s_M)/(s%R - s_M)
 
                             ! (5) Compute left/right state vectors and fluxes
-                            U%L = [rho%L, rho%L*vel%L(1:3), B%L(2:3), E%L]
-                            U_star%L = [rho_star%L, rho_star%L*s_M, rho_star%L*vel%L(2:3), B%L(2:3), E_star%L]
-                            U%R = [rho%R, rho%R*vel%R(1:3), B%R(2:3), E%R]
-                            U_star%R = [rho_star%R, rho_star%R*s_M, rho_star%R*vel%R(2:3), B%R(2:3), E_star%R]
+                            U%L(1) = rho%L; U%R(1) = rho%R
+                            U%L(2) = rho%L*vel%L(1); U%R(2) = rho%R*vel%R(1)
+                            U%L(3) = rho%L*vel%L(2); U%R(3) = rho%R*vel%R(2)
+                            U%L(4) = rho%L*vel%L(3); U%R(4) = rho%R*vel%R(3)
+                            U%L(5) = B%L(2); U%R(5) = B%R(2)
+                            U%L(6) = B%L(3); U%R(6) = B%R(3)
+                            U%L(7) = E%L; U%R(7) = E%R
+                            U_star%L(1) = rho_star%L; U_star%R(1) = rho_star%R
+                            U_star%L(2) = rho_star%L*s_M; U_star%R(2) = rho_star%R*s_M
+                            U_star%L(3) = rho_star%L*vel%L(2); U_star%R(3) = rho_star%R*vel%R(2)
+                            U_star%L(4) = rho_star%L*vel%L(3); U_star%R(4) = rho_star%R*vel%R(3)
+                            U_star%L(5) = B%L(2); U_star%R(5) = B%R(2)
+                            U_star%L(6) = B%L(3); U_star%R(6) = B%R(3)
+                            U_star%L(7) = E_star%L; U_star%R(7) = E_star%R
 
                             ! Compute the left/right fluxes
                             F%L(1) = U%L(2)
                             F%L(2) = U%L(2)*vel%L(1) - B%L(1)*B%L(1) + pTot%L
-                            F%L(3:4) = U%L(2)*vel%L(2:3) - B%L(1)*B%L(2:3)
-                            F%L(5:6) = vel%L(1)*B%L(2:3) - vel%L(2:3)*B%L(1)
+                            F%L(3) = U%L(2)*vel%L(2) - B%L(1)*B%L(2)
+                            F%L(4) = U%L(2)*vel%L(3) - B%L(1)*B%L(3)
+                            F%L(5) = vel%L(1)*B%L(2) - vel%L(2)*B%L(1)
+                            F%L(6) = vel%L(1)*B%L(3) - vel%L(3)*B%L(1)
                             F%L(7) = (E%L + pTot%L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
-
                             F%R(1) = U%R(2)
                             F%R(2) = U%R(2)*vel%R(1) - B%R(1)*B%R(1) + pTot%R
-                            F%R(3:4) = U%R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
-                            F%R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
+                            F%R(3) = U%R(2)*vel%R(2) - B%R(1)*B%R(2)
+                            F%R(4) = U%R(2)*vel%R(3) - B%R(1)*B%R(3)
+                            F%R(5) = vel%R(1)*B%R(2) - vel%R(2)*B%R(1)
+                            F%R(6) = vel%R(1)*B%R(3) - vel%R(3)*B%R(1)
                             F%R(7) = (E%R + pTot%R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
                             ! HLLD star-state fluxes via HLL jump relation
-                            F_star%L = F%L + s%L*(U_star%L - U%L)
-                            F_star%R = F%R + s%R*(U_star%R - U%R)
+                            do i = 1, 7
+                                F_star%L(i) = F%L(i) + s%L*(U_star%L(i) - U%L(i))
+                                F_star%R(i) = F%R(i) + s%R*(U_star%R(i) - U%R(i))
+                            end do
                             ! Alfven wave speeds bounding the rotational discontinuities
                             s_starL = s_M - abs(B%L(1))/sqrt(rho_star%L)
                             s_starR = s_M + abs(B%L(1))/sqrt(rho_star%R)
@@ -3427,24 +3453,39 @@ contains
                                 & + w_double*Bz_double))*sign_Bx
                             E_double = 0.5_wp*(E_double_lr%L + E_double_lr%R)
 
-                            U_double%L = [rho_star%L, rho_star%L*s_M, rho_star%L*v_double, rho_star%L*w_double, By_double, &
-                                & Bz_double, E_double]
-                            U_double%R = [rho_star%R, rho_star%R*s_M, rho_star%R*v_double, rho_star%R*w_double, By_double, &
-                                & Bz_double, E_double]
+                            U_double%L(1) = rho_star%L; U_double%R(1) = rho_star%R
+                            U_double%L(2) = rho_star%L*s_M; U_double%R(2) = rho_star%R*s_M
+                            U_double%L(3) = rho_star%L*v_double; U_double%R(3) = rho_star%R*v_double
+                            U_double%L(4) = rho_star%L*w_double; U_double%R(4) = rho_star%R*w_double
+                            U_double%L(5) = By_double; U_double%R(5) = By_double
+                            U_double%L(6) = Bz_double; U_double%R(6) = Bz_double
+                            U_double%L(7) = E_double; U_double%R(7) = E_double
 
                             ! Select HLLD flux region
                             if (0.0_wp <= s%L) then
-                                F_hlld = F%L
+                                do i = 1, 7
+                                    F_hlld(i) = F%L(i)
+                                end do
                             else if (0.0_wp <= s_starL) then
-                                F_hlld = F%L + s%L*(U_star%L - U%L)
+                                do i = 1, 7
+                                    F_hlld(i) = F_star%L(i)
+                                end do
                             else if (0.0_wp <= s_M) then
-                                F_hlld = F_star%L + s_starL*(U_double%L - U_star%L)
+                                do i = 1, 7
+                                    F_hlld(i) = F_star%L(i) + s_starL*(U_double%L(i) - U_star%L(i))
+                                end do
                             else if (0.0_wp <= s_starR) then
-                                F_hlld = F_star%R + s_starR*(U_double%R - U_star%R)
+                                do i = 1, 7
+                                    F_hlld(i) = F_star%R(i) + s_starR*(U_double%R(i) - U_star%R(i))
+                                end do
                             else if (0.0_wp <= s%R) then
-                                F_hlld = F%R + s%R*(U_star%R - U%R)
+                                do i = 1, 7
+                                    F_hlld(i) = F_star%R(i)
+                                end do
                             else
-                                F_hlld = F%R
+                                do i = 1, 7
+                                    F_hlld(i) = F%R(i)
+                                end do
                             end if
 
                             ! (12) Write HLLD flux to output arrays

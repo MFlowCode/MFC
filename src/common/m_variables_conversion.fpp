@@ -1318,7 +1318,7 @@ contains
         integer, intent(in)   :: norm
         real(wp)              :: B2, term, disc
 
-        B2 = sum(B**2)
+        B2 = B(1)**2 + B(2)**2 + B(3)**2
 
         if (.not. relativity) then
             term = c**2 + B2/rho

@@ -33,27 +33,38 @@
         eps = 0.001_wp
         call get_species_enthalpies_rt(T%L, h_iL)
         call get_species_enthalpies_rt(T%R, h_iR)
-        h_iL = h_iL*gas_constant/molecular_weights*T%L
-        h_iR = h_iR*gas_constant/molecular_weights*T%R
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_species
+            h_iL(i) = h_iL(i)*gas_constant/molecular_weights(i)*T%L
+            h_iR(i) = h_iR(i)*gas_constant/molecular_weights(i)*T%R
+        end do
         call get_species_specific_heats_r(T%L, Cp_iL)
         call get_species_specific_heats_r(T%R, Cp_iR)
 
         h_avg_2 = (sqrt(rho%L)*h_iL + sqrt(rho%R)*h_iR)/(sqrt(rho%L) + sqrt(rho%R))
         Yi_avg = (sqrt(rho%L)*Ys_L + sqrt(rho%R)*Ys_R)/(sqrt(rho%L) + sqrt(rho%R))
         T_avg = (sqrt(rho%L)*T%L + sqrt(rho%R)*T%R)/(sqrt(rho%L) + sqrt(rho%R))
+        Cp_avg = 0._wp
+        Cv_avg = 0._wp
         if (abs(T%L - T%R) < eps) then
-            ! Case when T%L and T%R are very close
-            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
-            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
-                         & - gas_constant/molecular_weights(:)))
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_species
+                Cp_avg = Cp_avg + Yi_avg(i)*(0.5_wp*Cp_iL(i) + 0.5_wp*Cp_iR(i))*gas_constant/molecular_weights(i)
+                Cv_avg = Cv_avg + Yi_avg(i)*((0.5_wp*Cp_iL(i) + 0.5_wp*Cp_iR(i)) - 1._wp)*gas_constant/molecular_weights(i)
+            end do
         else
-            ! Normal calculation when T%L and T%R are sufficiently different
-            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T%R - T%L))
-            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T%R - T%L) - gas_constant/molecular_weights(:)))
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_species
+                Cp_avg = Cp_avg + Yi_avg(i)*(h_iR(i) - h_iL(i))/(T%R - T%L)
+                Cv_avg = Cv_avg + Yi_avg(i)*((h_iR(i) - h_iL(i))/(T%R - T%L) - gas_constant/molecular_weights(i))
+            end do
         end if
         gamma_avg = Cp_avg/Cv_avg
 
-        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_species
+            Phi_avg(i) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(i)) + gamma_avg*gas_constant/molecular_weights(i)*T_avg
+        end do
         c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
     end if
 #:enddef roe_avg
