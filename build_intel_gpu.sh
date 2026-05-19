@@ -17,4 +17,4 @@ export CARGO_HOME=/scratch/user/u.sb27915/.cargo
 export PATH=$CARGO_HOME/bin:$PATH
 
 cd /scratch/user/u.sb27915/MFC-intel
-./mfc.sh build -t simulation --gpu mp --intel-aot -j 8
+./mfc.sh build -t pre_process simulation --gpu mp --intel-aot -j 8
