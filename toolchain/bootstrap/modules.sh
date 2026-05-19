@@ -139,7 +139,7 @@ if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' '
 fi
 
 if [ "$u_c" '==' 'famd' ]; then 
-    export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/therock-23.1.0-gfx90a-7.12.0-bb5005b6"
+    export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/therock-afar-23.2.0-gfx90a-7.13.0-663ad81964a"
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
     export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD_LIBRARY_PATH}
