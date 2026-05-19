@@ -19,10 +19,11 @@ jobs:
           - name: Set up Spack with buildcache
             uses: spack/setup-spack@v3
             with:
-                # Pin to the sbryngelson/add-mfc branch until upstream
-                # spack/spack-packages merges the mfc recipe.
+                # Pinned to a specific commit of sbryngelson/spack-packages
+                # until spack/spack-packages merges the mfc recipe.
+                # Update this SHA when the recipe branch advances.
                 packages_repository: sbryngelson/spack-packages
-                packages_ref: add-mfc
+                packages_ref: f0bb11a611fb7f311e788da778208be234601797
                 buildcache: true
 
           - name: Cache Spack install store
