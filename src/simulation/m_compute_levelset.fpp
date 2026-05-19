@@ -20,6 +20,20 @@ module m_compute_levelset
 
 contains
 
+    !> 3x3 matrix-vector multiply; replaces the matmul() intrinsic which triggers an ifx 2025.1.1 SPIR-V ICE (#5633) when inlined
+    !! into a target teams loop kernel via declare target.
+    pure function f_mv3(M, v) result(w)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: M(3, 3), v(3)
+        real(wp)             :: w(3)
+        w(1) = M(1, 1)*v(1) + M(1, 2)*v(2) + M(1, 3)*v(3)
+        w(2) = M(2, 1)*v(1) + M(2, 2)*v(2) + M(2, 3)*v(3)
+        w(3) = M(3, 1)*v(1) + M(3, 2)*v(2) + M(3, 3)*v(3)
+
+    end function f_mv3
+
     !> Dispatch level-set distance and normal computations for all ghost points based on patch geometry type
     impure subroutine s_apply_levelset(gps, num_gps)
 
@@ -159,7 +173,7 @@ contains
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
         xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
-        xy_local = matmul(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinate
+        xy_local = f_mv3(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinate
         xy_local = xy_local - offset  ! airfoils are a patch that require a centroid offset
 
         if (xy_local(2) >= 0._wp) then
@@ -209,7 +223,7 @@ contains
         if (f_approx_equal(dist, 0._wp)) then
             gp%levelset_norm = 0._wp
         else
-            gp%levelset_norm = matmul(rotation, dist_vec(:))/dist  ! convert the normal vector back to global grid coordinates
+            gp%levelset_norm = f_mv3(rotation, dist_vec(:))/dist  ! convert the normal vector back to global grid coordinates
         end if
 
     end subroutine s_airfoil_levelset
@@ -244,7 +258,7 @@ contains
         z_min = -lz/2
 
         xyz_local = [x_cc(i), y_cc(j), z_cc(l)] - center
-        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+        xyz_local = f_mv3(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
         xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
         if (xyz_local(2) >= 0._wp) then
@@ -299,13 +313,13 @@ contains
             else
                 normal(3) = 1._wp
             end if
-            gp%levelset_norm = matmul(rotation, normal)
+            gp%levelset_norm = f_mv3(rotation, normal)
         else
             gp%levelset = dist_surf
             if (f_approx_equal(dist_surf, 0._wp)) then
                 gp%levelset_norm = 0._wp
             else
-                gp%levelset_norm = matmul(rotation, dist_vec(:)/dist_surf)
+                gp%levelset_norm = f_mv3(rotation, dist_vec(:)/dist_surf)
             end if
         end if
 
@@ -345,7 +359,7 @@ contains
 
         ! convert grid to local coordinates
         xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
-        xy_local = matmul(inverse_rotation, xy_local)
+        xy_local = f_mv3(inverse_rotation, xy_local)
 
         side_dists(1) = bottom_left(1) - xy_local(1)
         side_dists(2) = top_right(1) - xy_local(1)
@@ -372,7 +386,7 @@ contains
                 dist_vec(2) = side_dists(idx)/abs(side_dists(idx))
             end if
             ! convert the normal vector back into the global coordinate system
-            gp%levelset_norm = matmul(rotation, dist_vec)
+            gp%levelset_norm = f_mv3(rotation, dist_vec)
         else
             gp%levelset_norm = 0._wp
         end if
@@ -408,13 +422,13 @@ contains
         ellipse_coeffs(2) = 0.5_wp*length_y
 
         xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
-        xy_local = matmul(inverse_rotation, xy_local)
+        xy_local = f_mv3(inverse_rotation, xy_local)
 
         normal_vector = xy_local
         ! get the normal direction via the coordinate transformation method
         normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp
         normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector))  ! normalize the vector
-        gp%levelset_norm = matmul(rotation, normal_vector)  ! save after rotating the vector to the global frame
+        gp%levelset_norm = f_mv3(rotation, normal_vector)  ! save after rotating the vector to the global frame
 
         ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
         quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
@@ -467,7 +481,7 @@ contains
         Back = -length_z/2
 
         xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
-        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinate
+        xyz_local = f_mv3(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinate
 
         dist_left = Left - xyz_local(1)
         dist_right = xyz_local(1) - Right
@@ -511,7 +525,7 @@ contains
             end if
         end if
 
-        gp%levelset_norm = matmul(rotation, dist_vec)
+        gp%levelset_norm = f_mv3(rotation, dist_vec)
 
     end subroutine s_cuboid_levelset
 
@@ -600,7 +614,7 @@ contains
         end if
 
         xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
-        xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+        xyz_local = f_mv3(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
 
         ! get distance to flat edge of cylinder
         side_pos = dot_product(xyz_local, dist_sides_vec)
@@ -612,15 +626,15 @@ contains
             ! if the closest edge is flat
             gp%levelset = -dist_side
             if (f_approx_equal(dist_side, abs(side_pos - boundary(1)))) then
-                gp%levelset_norm = matmul(rotation, -dist_sides_vec)
+                gp%levelset_norm = f_mv3(rotation, -dist_sides_vec)
             else
-                gp%levelset_norm = matmul(rotation, dist_sides_vec)
+                gp%levelset_norm = f_mv3(rotation, dist_sides_vec)
             end if
         else
             gp%levelset = dist_surface
             xyz_local = xyz_local*dist_surface_vec
             xyz_local = xyz_local/max(norm2(xyz_local), sgm_eps)
-            gp%levelset_norm = matmul(rotation, xyz_local)
+            gp%levelset_norm = f_mv3(rotation, xyz_local)
         end if
 
     end subroutine s_cylinder_levelset
@@ -663,7 +677,7 @@ contains
         if (p > 0) then
             xyz_local(3) = z_cc(k) - center(3)
         end if
-        xyz_local = matmul(inverse_rotation, xyz_local)
+        xyz_local = f_mv3(inverse_rotation, xyz_local)
 
         ! 3D models
         if (p > 0) then
@@ -675,12 +689,12 @@ contains
             gp%levelset = -abs(gp%levelset)
 
             ! Assign the levelset_norm
-            gp%levelset_norm = matmul(rotation, normals(1:3))
+            gp%levelset_norm = f_mv3(rotation, normals(1:3))
         else
             ! 2D models
             call s_distance_normals_2D(patch_id, boundary_edge_count, xyz_local, normals, distance)
             gp%levelset = -abs(distance)
-            gp%levelset_norm = matmul(rotation, normals(1:3))
+            gp%levelset_norm = f_mv3(rotation, normals(1:3))
         end if
 
     end subroutine s_model_levelset
