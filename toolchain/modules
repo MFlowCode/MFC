@@ -117,6 +117,11 @@ t     WPI Turing
 t-all slurm
 t-cpu gcc/12.1.0/i6yk33f openmpi/4.1.3/ebae7zc python/3.13.5/6anz4qy
 
+aces     TAMU HPRC ACES (Intel GPU Max 1100, Ponte Vecchio)
+aces-all iimpi/2023b imkl/2023.2.0 CMake/3.27.6 Python/3.11.5
+aces-gpu I_MPI_F90=ifx
+aces-gpu FC=mpif90
+
 crnch     GT CRNCH RoboGator (Intel GPU Max 1100, Ponte Vecchio)
 crnch-gpu FC=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mpi/2021.14/bin/mpiifx
 crnch-gpu PATH=/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/compiler/2025.0/bin:/net/projects/tools/x86_64/rhel-8/intel-oneapi/2025.1/mpi/2021.14/bin:${PATH}

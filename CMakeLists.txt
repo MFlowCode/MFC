@@ -629,7 +629,7 @@ exit 0
                     cmake_path(GET _IFX_REAL PARENT_PATH _ifx_bin)
                     find_program(CLANG_OFFLOAD_BUNDLER
                         NAMES clang-offload-bundler
-                        HINTS "${_ifx_bin}/compiler" "${_ifx_bin}"
+                        HINTS "${_ifx_bin}/compiler" "${_ifx_bin}" "${_ifx_bin}-llvm"
                         REQUIRED)
                     add_custom_command(
                         OUTPUT  "${_mkl_omp_obj}"
@@ -665,9 +665,11 @@ exit 0
                     target_link_libraries(${a_target} PRIVATE "${_mkl_omp_obj_host}")
                     # Link MKL threading + core + SYCL DFT backend
                     target_link_options(${a_target} PRIVATE -qmkl=parallel)
-                    find_library(MKL_SYCL_DFT mkl_sycl_dft HINTS "$ENV{MKLROOT}/lib" REQUIRED)
-                    find_library(SYCL_LIB sycl HINTS ENV LIBRARY_PATH REQUIRED)
-                    find_library(OPENCL_LIB OpenCL HINTS ENV LIBRARY_PATH REQUIRED)
+                    # mkl_sycl_dft is the name in MKL >= 2023.2; older versions use monolithic mkl_sycl
+                    find_library(MKL_SYCL_DFT NAMES mkl_sycl_dft mkl_sycl
+                        HINTS "$ENV{MKLROOT}/lib" "$ENV{MKLROOT}/lib/intel64" REQUIRED)
+                    find_library(SYCL_LIB sycl HINTS ENV LIBRARY_PATH "${_ifx_bin}/../lib" REQUIRED)
+                    find_library(OPENCL_LIB OpenCL HINTS ENV LIBRARY_PATH "${_ifx_bin}/../lib" REQUIRED)
                     target_link_libraries(${a_target} PRIVATE ${MKL_SYCL_DFT} ${SYCL_LIB} ${OPENCL_LIB})
                 else()
                     find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
@@ -858,15 +860,31 @@ if (MFC_SIMULATION)
             target_compile_options(simulation PRIVATE -Oipa0)
         endif()
     endif()
-    # ifx SPIR64 ICE: the LLVM inliner pulls !$omp declare target (seq) geometry
-    # routines into target teams loop kernels and generates SPIR-V IR that crashes
-    # llvm-spirv at O1+. -fno-inline keeps them as proper device-side calls.
-    # Each GPU loop calls exactly one geometry routine (split-loop pattern in
-    # m_compute_levelset.fpp), so device-call overhead is small. See PR intel-gpu.
+    # ifx SPIR64 ICEs: multiple patterns in the ifx 2023.2 SPIR-V backend crash
+    # during GPU offload compilation. Two root causes observed:
+    #   (a) Module-level !$omp declare target derived-type arrays with pointer
+    #       members accessed inside inner sequential loops in target regions →
+    #       "Instruction does not dominate all uses!" (error #5623)
+    #   (b) Complex GPU kernels with ghost_point / ib_patch_parameters struct
+    #       mapping + !$omp declare target (seq) geometry routines → segfault
+    #       in SPIR-V lowering (errors #5623/#5633)
+    # -UMFC_OpenMP suppresses all #ifdef MFC_OpenMP target directives so those
+    # files compile as CPU-only. All affected files are either init-only or
+    # specialized solvers called from CPU context, so correctness is preserved.
+    # For m_rhs/m_time_steppers (the hot-path GPU kernels), -O0 is tried first;
+    # if they still ICE they will need -UMFC_OpenMP too.
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM" AND MFC_OpenMP)
         set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_ib_patches.fpp.f90"
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_surface_tension.fpp.f90"
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_igr.fpp.f90"
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_compute_levelset.fpp.f90"
-            PROPERTIES COMPILE_OPTIONS "-fno-inline"
+            PROPERTIES COMPILE_FLAGS "-UMFC_OpenMP"
+        )
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_rhs.fpp.f90"
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_time_steppers.fpp.f90"
+            PROPERTIES COMPILE_OPTIONS "-O0"
         )
     endif()
 endif()
