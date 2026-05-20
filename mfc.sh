@@ -103,7 +103,7 @@ if [ $code -ne 0 ]; then
 fi
 
 # Deactivate the Python virtualenv in case the user "source"'d this script.
-# In prebuilt/spack mode the venv was never created, so there's nothing to deactivate.
+# Guard against the case where no venv was activated (e.g. system Python).
 if type deactivate > /dev/null 2>&1; then
     log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
     deactivate
