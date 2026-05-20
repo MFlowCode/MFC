@@ -1,6 +1,6 @@
 !>
 !! @file
-!! Contains module m_global_parameters
+!! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
 
@@ -41,19 +41,14 @@ module m_global_parameters
     integer               :: num_vels             !< Number of velocity components (different from num_dims for mhd)
     logical               :: cyl_coord
     integer               :: grid_geometry        !< Cylindrical coordinates (either axisymmetric or full 3D)
-
     !> Locations of cell-centers (cc) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
-
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
     real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     logical :: stretch_x, stretch_y, stretch_z         !< Grid stretching flags for the x-, y- and z-coordinate directions
-
-    ! Parameters of the grid stretching function for the x-, y- and z-coordinate directions. The "a" parameters are a measure of the
-    ! rate at which the grid is stretched while the remaining parameters are indicative of the location on the grid at which the
-    ! stretching begins.
+    ! Grid stretching: a_x/a_y/a_z = rate, x_a/y_a/z_a = location
     real(wp) :: a_x, a_y, a_z
     integer  :: loops_x, loops_y, loops_z
     real(wp) :: x_a, y_a, z_a
@@ -86,17 +81,15 @@ module m_global_parameters
     logical            :: igr                          !< Use information geometric regularization
     integer            :: igr_order                    !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
-
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(eqn_idx_info)  :: eqn_idx   !< All conserved-variable equation index ranges and scalars.
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings.
-
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
-    ! Cell Indices for the entire (local) domain. In simulation and post_process, this includes the buffer region. idwbuff and
-    ! idwint are the same otherwise. Stands for "InDices With BUFFer".
+    ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
+
     integer               :: fd_order   !< Finite-difference order for CoM/probe derivative approximations
     integer               :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
 
@@ -153,7 +146,6 @@ module m_global_parameters
     logical :: bc_io  !< whether or not to save BC data
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc  !< BC patch parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
-
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     real(wp)                                 :: rhoref, pref  !< Reference parameters for Tait EOS
@@ -212,11 +204,11 @@ module m_global_parameters
 
 contains
 
-    !> Assigns default values to user inputs prior to reading them in.
+    !> Assigns default values to user inputs prior to reading them in. This allows for an easier consistency check of these
+    !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i  !< Generic loop operator
-
         ! Logistics
 
         case_dir = '.'
@@ -875,7 +867,7 @@ contains
 
     end subroutine s_initialize_global_parameters_module
 
-    !> Configures MPI parallel I/O settings and allocates processor coordinate arrays.
+    !> Configure MPI parallel I/O settings and allocate processor coordinate arrays.
     impure subroutine s_initialize_parallel_io
 
 #ifdef MFC_MPI
@@ -909,7 +901,7 @@ contains
 
     end subroutine s_initialize_parallel_io
 
-    !> Deallocates all global grid, index, and equation-of-state parameter arrays.
+    !> Deallocate all global grid, index, and equation-of-state parameter arrays.
     impure subroutine s_finalize_global_parameters_module
 
         integer :: i

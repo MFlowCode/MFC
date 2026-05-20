@@ -18,7 +18,7 @@ module m_sim_helpers
 
 contains
 
-    !> Computes the modified dtheta for Fourier filtering in azimuthal direction.
+    !> Computes the modified dtheta for Fourier filtering in azimuthal direction
     function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -41,7 +41,7 @@ contains
 
     end function f_compute_filtered_dtheta
 
-    !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only).
+    !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only)
     function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -69,7 +69,7 @@ contains
 
     end function f_compute_multidim_cfl_terms
 
-    !> Computes enthalpy.
+    !> Computes enthalpy
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', cray_inline=True)
@@ -137,7 +137,7 @@ contains
 
     end subroutine s_compute_enthalpy
 
-    !> Computes stability criterion for a specified dt.
+    !> Computes stability criterion for a specified dt
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -180,7 +180,7 @@ contains
 
     end subroutine s_compute_stability_from_dt
 
-    !> Computes dt for a specified CFL number.
+    !> Computes dt for a specified CFL number
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')

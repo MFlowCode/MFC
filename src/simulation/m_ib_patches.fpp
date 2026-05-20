@@ -1,6 +1,6 @@
 !>
 !! @file
-!! Contains module m_ib_patches
+!! @brief Contains module m_ib_patches
 
 #:include 'case.fpp'
 #:include 'ExtrusionHardcodedIC.fpp'
@@ -25,7 +25,7 @@ module m_ib_patches
 
 contains
 
-    !> Applies all immersed boundary patch geometries to mark interior cells in the IB marker array.
+    !> Apply all immersed boundary patch geometries to mark interior cells in the IB marker array
     impure subroutine s_apply_ib_patches(ib_markers)
 
         type(integer_field), intent(inout) :: ib_markers
@@ -86,7 +86,7 @@ contains
 
     end subroutine s_apply_ib_patches
 
-    !> Mark cells inside a 2D circular immersed boundary defined by centroid and radius.
+    !> Mark cells inside a circular immersed boundary
     subroutine s_ib_circle(patch_id, ib_markers, xp, yp)
 
         integer, intent(in)                :: patch_id
@@ -112,6 +112,8 @@ contains
         call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
 
+        ! Assign primitive variables if circle covers cell and patch has write permission
+
         $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[encoded_patch_id, center, radius]', collapse=2)
         do j = jl, jr
             do i = il, ir
@@ -124,7 +126,7 @@ contains
 
     end subroutine s_ib_circle
 
-    !> Marks cells inside a 2D NACA 4-digit airfoil immersed boundary using upper and lower surface grids.
+    !> Mark cells inside a 2D NACA 4-digit airfoil immersed boundary
     subroutine s_ib_airfoil(patch_id, ib_markers, xp, yp)
 
         integer, intent(in)                :: patch_id
@@ -279,7 +281,7 @@ contains
 
     end subroutine s_ib_airfoil
 
-    !> Marks cells inside a 3D extruded NACA 4-digit airfoil immersed boundary with finite span.
+    !> Mark cells inside a 3D extruded NACA 4-digit airfoil immersed boundary with finite span
     subroutine s_ib_3D_airfoil(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in) :: patch_id
@@ -435,7 +437,7 @@ contains
 
     end subroutine s_ib_3D_airfoil
 
-    !> Marks cells inside a 2D rectangular immersed boundary defined by centroid and side lengths.
+    !> Mark cells inside a rectangular immersed boundary
     subroutine s_ib_rectangle(patch_id, ib_markers, xp, yp)
 
         integer, intent(in)                :: patch_id
@@ -466,7 +468,7 @@ contains
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
 
-        ! this cell.
+        ! Assign primitive variables if rectangle covers cell and patch has write permission
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, &
                             & y_cc]', collapse=2)
         do j = jl, jr
@@ -486,13 +488,12 @@ contains
 
     end subroutine s_ib_rectangle
 
-    !> Marks cells inside a 3D spherical immersed boundary defined by centroid and radius.
+    !> Mark cells inside a spherical immersed boundary
     subroutine s_ib_sphere(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
-
         ! Generic loop iterators
         integer                  :: i, j, k
         integer                  :: il, ir, jl, jr, kl, kr
@@ -500,8 +501,9 @@ contains
         real(wp)                 :: radius
         real(wp), dimension(1:3) :: center
 
-        !! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al.
-        !! (2013)
+        ! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
+
+        ! Transferring spherical patch's radius, centroid, smoothing patch identity and smoothing coefficient information
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
@@ -546,7 +548,7 @@ contains
 
     end subroutine s_ib_sphere
 
-    !> Marks cells inside a 3D cuboidal immersed boundary defined by centroid and side lengths.
+    !> Mark cells inside a cuboidal immersed boundary
     subroutine s_ib_cuboid(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in)                :: patch_id
@@ -581,6 +583,7 @@ contains
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
 
+        ! Checking whether the cuboid covers a particular cell in the domain and verifying whether the current patch has permission
         ! to write to to that cell. If both queries check out, the primitive variables of the current patch are assigned to this
         ! cell.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center, length, inverse_rotation]', &
@@ -604,7 +607,7 @@ contains
 
     end subroutine s_ib_cuboid
 
-    !> Marks cells inside a 3D cylindrical immersed boundary defined by centroid, radius, and axis length.
+    !> Mark cells inside a cylindrical immersed boundary
     subroutine s_ib_cylinder(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in)                :: patch_id
@@ -640,6 +643,8 @@ contains
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
 
+        ! Checking whether the cylinder covers a particular cell in the domain and verifying whether the current patch has the
+        ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
         ! this cell.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center, length, radius, &
                             & inverse_rotation]', collapse=3)
@@ -665,7 +670,7 @@ contains
 
     end subroutine s_ib_cylinder
 
-    !> Marks cells inside a 2D elliptical immersed boundary defined by semi-axis lengths and rotation.
+    !> Mark cells inside a 2D elliptical immersed boundary
     subroutine s_ib_ellipse(patch_id, ib_markers, xp, yp)
 
         integer, intent(in)                :: patch_id
@@ -695,6 +700,7 @@ contains
         call get_bounding_indices(center(1) - maxval(ellipse_coeffs)*2._wp, center(1) + maxval(ellipse_coeffs)*2._wp, x_cc, il, ir)
         call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y_cc, jl, jr)
 
+        ! Checking whether the ellipse covers a particular cell in the domain
         $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, ellipse_coeffs, inverse_rotation, &
                             & x_cc, y_cc]', collapse=2)
         do j = jl, jr
@@ -878,7 +884,7 @@ contains
 
     end subroutine s_ib_3d_model
 
-    !> Subroutine that computes a rotation matrix for converting to the rotating frame of the boundary
+    !> Compute a rotation matrix for converting to the rotating frame of the boundary
     subroutine s_update_ib_rotation_matrix(patch_id)
 
         integer, intent(in)          :: patch_id
@@ -962,7 +968,7 @@ contains
 
     end subroutine get_bounding_indices
 
-    !> encodes the patch id with a unique offset that contains information on how the IB marker wraps periodically
+    !> Encode the patch ID with a unique offset containing periodicity information
     subroutine s_encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
 
         integer, intent(in)  :: patch_id, x_periodicity, y_periodicity, z_periodicity
@@ -980,7 +986,7 @@ contains
 
     end subroutine s_encode_patch_periodicity
 
-    !> decodes the encoded id to get out the original id and the way in which it is periodic
+    !> Decode the encoded ID to recover the original patch ID and periodicity
     subroutine s_decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1009,7 +1015,7 @@ contains
 
     end subroutine s_decode_patch_periodicity
 
-    !> Determines if we should wrap periodically
+    !> Determine the periodic wrapping bounds in each direction
     subroutine s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
 
         integer, intent(out)           :: xp_lower, xp_upper, yp_lower, yp_upper

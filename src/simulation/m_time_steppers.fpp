@@ -33,7 +33,6 @@ module m_time_steppers
     type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< Cell-average primitive variables at the current time-stage
     type(scalar_field), allocatable, dimension(:)    :: rhs_vf     !< Cell-average RHS variables at the current time-stage
     type(integer_field), allocatable, dimension(:,:) :: bc_type    !< Boundary condition identifiers
-
     !> Cell-average primitive variables at consecutive TIMESTEPS
     type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2
     real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_pb
@@ -59,8 +58,7 @@ module m_time_steppers
 
 contains
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the time steppers module
     impure subroutine s_initialize_time_steppers_module
 
 #ifdef FRONTIER_UNIFIED
@@ -444,7 +442,7 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
-    !> @brief Advances the solution one full step using a TVD Runge-Kutta time integrator.
+    !> Advance the solution one full step using a TVD Runge-Kutta time integrator
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 
 #ifdef _CRAYFTN
@@ -586,7 +584,6 @@ contains
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
-    !! @param stage Current time-stage
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
@@ -611,7 +608,7 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
-    !> @brief Computes the global time step size from CFL stability constraints across all cells.
+    !> Compute the global time step size from CFL stability constraints across all cells
     impure subroutine s_compute_dt()
 
         real(wp) :: rho  !< Cell-avg. density
@@ -672,10 +669,7 @@ contains
 
     end subroutine s_compute_dt
 
-    !> This subroutine applies the body forces source term at each Runge-Kutta stage
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf_in Primitive variables
-    !! @param rhs_vf_in Right-hand side variables
+    !> Apply the body forces source term at each Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
@@ -703,7 +697,7 @@ contains
 
     end subroutine s_apply_bodyforces
 
-    !> @brief Updates immersed boundary positions and velocities at the current Runge-Kutta stage.
+    !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
     subroutine s_propagate_immersed_boundaries(s)
 
         integer, intent(in) :: s
@@ -743,9 +737,9 @@ contains
                     ! update the velocity from the force value
                     patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
 
-                    ! Update angular velocity from torque, then recompute moment of inertia
+                    ! update the angular velocity with the torque value
                     patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, &
-                             & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))
+                             & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
                     call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                     ! update the moment of inertia to be based on the direction of the angular momentum
                     ! convert back to angular velocity with the new moment of inertia
@@ -773,8 +767,7 @@ contains
 
     end subroutine s_propagate_immersed_boundaries
 
-    !> This subroutine saves the temporary q_prim_vf vector into the q_prim_ts vector that is then used in p_main
-    !! @param t_step current time-step
+    !> Save the temporary q_prim_vf vector into q_prim_ts for use in p_main
     subroutine s_time_step_cycling(t_step)
 
         integer, intent(in) :: t_step
@@ -856,7 +849,6 @@ contains
         use hipfort_check
 #endif
         integer :: i, j  !< Generic loop iterators
-
         ! Deallocating the cell-average conservative variables
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         do j = 1, sys_size

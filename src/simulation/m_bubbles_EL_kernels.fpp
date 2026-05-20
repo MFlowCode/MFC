@@ -29,15 +29,8 @@ module m_bubbles_EL_kernels
 
 contains
 
-    !> The purpose of this subroutine is to smear the strength of the lagrangian bubbles into the Eulerian framework using different
-    !! approaches.
-    !! @param nBubs Number of lagrangian bubbles in the current domain
-    !! @param lbk_rad Radius of the bubbles
-    !! @param lbk_vel Interface velocity of the bubbles
-    !! @param lbk_s Computational coordinates of the bubbles
-    !! @param lbk_pos Spatial coordinates of the bubbles
-    !! @param updatedvar Eulerian variable to be updated
-    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar, kcomp)
+    !> Smear the Lagrangian bubble effects onto the Eulerian grid using the selected kernel
+    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in)                                             :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb,1:3,1:2), intent(in) :: lbk_s, lbk_pos
@@ -56,8 +49,6 @@ contains
 
     !> Builds a sorted cell list mapping each interior cell (0:m,0:n,0:p) to its resident bubbles. Uses a counting-sort on the host
     !! (O(nBubs + N_cells)). Must be called before s_gaussian each RK stage.
-    !! @param nBubs Number of lagrangian bubbles in the current domain
-    !! @param lbk_s Computational coordinates of the bubbles
     subroutine s_build_cell_list(nBubs, lbk_s)
 
         integer, intent(in)                                             :: nBubs
@@ -284,7 +275,7 @@ contains
 
     end subroutine s_gaussian
 
-    !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
+    !> Evaluate the Gaussian kernel at a grid node for a given bubble center
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
 
         $:GPU_ROUTINE(function_name='s_applygaussian',parallelism='[seq]', cray_inline=True)
@@ -344,10 +335,7 @@ contains
 
     end subroutine s_applygaussian
 
-    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost
-    !! cells).
-    !! @param cellaux Tested cell to smear the bubble effect in.
-    !! @param celloutside If true, then cellaux is outside the computational domain.
+    !> Check if the current cell is outside the computational domain including ghost cells
     subroutine s_check_celloutside(cellaux, celloutside)
 
         $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', cray_inline=True)
@@ -379,9 +367,7 @@ contains
 
     end subroutine s_check_celloutside
 
-    !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
-    !! @param cell Cell of the current bubble
-    !! @param cellaux Cell to map the bubble effect in.
+    !> Relocate cells that intersect a symmetric boundary
     subroutine s_shift_cell_symmetric_bc(cellaux, cell)
 
         $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', parallelism='[seq]', cray_inline=True)
@@ -418,9 +404,6 @@ contains
     end subroutine s_shift_cell_symmetric_bc
 
     !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
-    !! @param cell Cell where the bubble is located
-    !! @param volpart Volume of the bubble
-    !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
 
         $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', cray_inline=True)
@@ -456,11 +439,7 @@ contains
 
     end subroutine s_compute_stddsv
 
-    !> The purpose of this procedure is to calculate the characteristic cell volume
-    !! @param cellx x-direction cell index
-    !! @param celly y-direction cell index
-    !! @param cellz z-direction cell index
-    !! @param Charvol Characteristic volume
+    !> Compute the characteristic cell volume
     subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
 
         $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', cray_inline=True)
@@ -480,9 +459,7 @@ contains
 
     end subroutine s_get_char_vol
 
-    !> This subroutine transforms the computational coordinates of the bubble from real type into integer.
-    !! @param s_cell Computational coordinates of the bubble, real type
-    !! @param get_cell Computational coordinates of the bubble, integer type
+    !> Convert bubble computational coordinates from real to integer cell indices
     subroutine s_get_cell(s_cell, get_cell)
 
         $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', cray_inline=True)
@@ -498,10 +475,7 @@ contains
 
     end subroutine s_get_cell
 
-    !> Precomputes cell-centered pressure gradients (dp/dx, dp/dy, dp/dz) at all cell centers using finite-difference coefficients
-    !! of the specified order. This avoids scattered memory accesses to the pressure field when computing translational bubble
-    !! forces.
-    !! @param q_prim_vf Primitive variables (pressure is at index eqn_idx%E)
+    !> Precompute cell-centered pressure gradients (dp/dx, dp/dy, dp/dz) 
     subroutine s_compute_pressure_gradients(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -559,12 +533,7 @@ contains
 
     end subroutine s_compute_pressure_gradients
 
-    !! This function interpolates the velocity of Eulerian field at the position of the bubble.
-    !! @param pos Position of the bubble in directiion i
-    !! @param cell Computational coordinates of the bubble
-    !! @param i Direction of the velocity (1: x, 2: y, 3: z)
-    !! @param q_prim_vf Eulerian field with primitive variables
-    !! @return v Interpolated velocity at the position of the bubble
+    !! Interpolate the velocity of Eulerian field at the position of the bubble.
     function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
 
         $:GPU_ROUTINE(function_name='f_interpolate_velocity', parallelism='[seq]', cray_noinline=True)
@@ -657,19 +626,11 @@ contains
 
     end function f_interpolate_velocity
 
-    !! This function calculates the force on a bubble based on the pressure gradient, velocity, and drag model.
-    !! @param pos Position of the bubble in direction i
-    !! @param rad Radius of the bubble
-    !! @param rdot Radial velocity of the bubble
-    !! @param vel Velocity of the bubble
+    !! Calculate the force on a bubble based on the pressure gradient, velocity, and drag model.
     !! @param mg Mass of the gas in the bubble
     !! @param mv Mass of the liquid in the bubble
     !! @param Re Reynolds number
-    !! @param rho Density of the fluid
-    !! @param cell Computational coordinates of the bubble
     !! @param i Direction of the velocity (1: x, 2: y, 3: z)
-    !! @param q_prim_vf Eulerian field with primitive variables
-    !! @return a Acceleration of the bubble in direction i
     function f_get_bubble_force(pos, rad, rdot, vel, mg, mv, Re, rho, cell, i, q_prim_vf) result(force)
 
         $:GPU_ROUTINE(parallelism='[seq]')

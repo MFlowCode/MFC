@@ -43,13 +43,12 @@ module m_start_up
 
     abstract interface
 
-        !> @brief Abstract interface for reading grid data files in serial or parallel.
+        !> Abstract interface for reading grid data files in serial or parallel.
         impure subroutine s_read_abstract_grid_data_files
 
         end subroutine s_read_abstract_grid_data_files
 
-        !> @brief Abstract interface for reading initial condition data files in serial or parallel.
-        !! @param q_cons_vf Conservative variables
+        !> Abstract interface for reading initial condition data files in serial or parallel.
         impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in)
 
             import :: scalar_field, integer_field, sys_size, pres_field
@@ -60,11 +59,7 @@ module m_start_up
     end interface
 
     character(LEN=path_len + name_len) :: proc_rank_dir  !< Location of the folder associated with the rank of the local processor
-
-    !> Possible location of time-step folder containing preexisting grid and/or conservative variables data to be used as starting
-    !! point for pre-process
     character(LEN=path_len + 2*name_len), private :: t_step_dir  !< Path to preexisting time-step folder for restart
-
     procedure(s_read_abstract_grid_data_files), pointer :: s_read_grid_data_files => null()
     procedure(s_read_abstract_ic_data_files), pointer :: s_read_ic_data_files => null()
 
@@ -75,15 +70,9 @@ contains
     impure subroutine s_read_input_file
 
         character(LEN=name_len) :: file_loc
-
-        !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
-        logical :: file_check
-        integer :: iostatus
-        !! Integer to check iostat of file read
-
-        character(len=1000) :: line
-
-        ! Namelist for all of the parameters to be inputted by the user
+        logical                 :: file_check
+        integer                 :: iostatus
+        character(len=1000)     :: line
 
         namelist /user_inputs/ case_dir, old_grid, old_ic, t_step_old, t_step_start, m, n, p, x_domain, y_domain, z_domain, &
             & stretch_x, stretch_y, stretch_z, a_x, a_y, a_z, x_a, y_a, z_a, x_b, y_b, z_b, model_eqns, num_fluids, mpp_lim, &
@@ -98,11 +87,9 @@ contains
             & muscl_order, fft_wrt, fd_order, lag_params, simplex_perturb, simplex_params, interface_file, normFac, normMag, &
             & g0_ic, p0_ic, hyper_cleaning
 
-        ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)
 
-        ! Checking whether the input file is there. If it is, the input file is read. If not, the program is terminated.
         if (file_check) then
             open (1, FILE=trim(file_loc), form='formatted', STATUS='old', ACTION='read')
             read (1, NML=user_inputs, iostat=iostatus)
@@ -116,7 +103,6 @@ contains
 
             call s_update_cell_bounds(cells_bounds, m, n, p)
 
-            ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
             p_glb = p
@@ -141,8 +127,6 @@ contains
         character(LEN=len_trim(case_dir)) :: file_loc
         logical                           :: dir_check
 
-        ! Checking the existence of the case folder
-
         case_dir = adjustl(case_dir)
 
         file_loc = trim(case_dir) // '/.'
@@ -158,7 +142,6 @@ contains
         call s_check_inputs_common()
         call s_check_inputs()
 
-        ! Check all the patch properties
         call s_check_patches()
 
         if (ib) call s_check_ib_patches()
@@ -169,16 +152,9 @@ contains
     !! necessary global computational domain parameters.
     impure subroutine s_read_serial_grid_data_files
 
-        ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
-
-        ! Logical variable used to test the existence of folders
-        logical :: dir_check
-
-        ! Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
-        logical :: file_check
-
-        ! Setting address of the local processor rank and time-step directory
+        logical                                        :: dir_check
+        logical                                        :: file_check
 
         write (proc_rank_dir, '(A,I0)') '/p_all/p', proc_rank
         proc_rank_dir = trim(case_dir) // trim(proc_rank_dir)
@@ -186,22 +162,16 @@ contains
         write (t_step_dir, '(A,I0)') '/', t_step_start
         t_step_dir = trim(proc_rank_dir) // trim(t_step_dir)
 
-        ! Inquiring as to the existence of the time-step directory
         file_loc = trim(t_step_dir) // '/.'
         call my_inquire(file_loc, dir_check)
 
-        ! If the time-step directory is missing, the pre-process exits
         if (dir_check .neqv. .true.) then
             call s_mpi_abort('Time-step folder ' // trim(t_step_dir) // ' is missing. Exiting.')
         end if
 
-        ! Reading the Grid Data File for the x-direction
-
-        ! Checking whether x_cb.dat exists
         file_loc = trim(t_step_dir) // '/x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_check)
 
-        ! If it exists, x_cb.dat is read
         if (file_check) then
             open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
             read (1) x_cb(-1:m)
@@ -210,25 +180,18 @@ contains
             call s_mpi_abort('File x_cb.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
         end if
 
-        ! Computing cell-center locations
         x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
 
-        ! Computing minimum cell-width
         dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
         if (num_procs > 1) call s_mpi_reduce_min(dx)
 
-        ! Setting locations of domain bounds
         x_domain%beg = x_cb(-1)
         x_domain%end = x_cb(m)
 
-        ! Reading the Grid Data File for the y-direction
-
         if (n > 0) then
-            ! Checking whether y_cb.dat exists
             file_loc = trim(t_step_dir) // '/y_cb.dat'
             inquire (FILE=trim(file_loc), EXIST=file_check)
 
-            ! If it exists, y_cb.dat is read
             if (file_check) then
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
                 read (1) y_cb(-1:n)
@@ -237,24 +200,18 @@ contains
                 call s_mpi_abort('File y_cb.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
             end if
 
-            ! Computing cell-center locations
             y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
 
-            ! Computing minimum cell-width
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
             if (num_procs > 1) call s_mpi_reduce_min(dy)
 
-            ! Setting locations of domain bounds
             y_domain%beg = y_cb(-1)
             y_domain%end = y_cb(n)
 
-            ! Reading the Grid Data File for the z-direction
             if (p > 0) then
-                ! Checking whether z_cb.dat exists
                 file_loc = trim(t_step_dir) // '/z_cb.dat'
                 inquire (FILE=trim(file_loc), EXIST=file_check)
 
-                ! If it exists, z_cb.dat is read
                 if (file_check) then
                     open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
                     read (1) z_cb(-1:p)
@@ -263,23 +220,17 @@ contains
                     call s_mpi_abort('File z_cb.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
                 end if
 
-                ! Computing cell-center locations
                 z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
 
-                ! Computing minimum cell-width
                 dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
                 if (num_procs > 1) call s_mpi_reduce_min(dz)
 
-                ! Setting locations of domain bounds
                 z_domain%beg = z_cb(-1)
                 z_domain%end = z_cb(p)
             end if
         end if
 
-        ! If only the preexisting grid data files are read in and there will not be any preexisting initial condition data files
-        ! imported, then the directory associated with the rank of the local processor may be cleaned to make room for the new
-        ! pre-process data. In addition, the time-step directory that will contain the new grid and initial condition data are also
-        ! generated.
+        ! Clean processor dir and create time-step dir (unless reading preexisting IC)
         if (old_ic .neqv. .true.) then
             call s_delete_directory(trim(proc_rank_dir))
             call s_create_directory(trim(proc_rank_dir) // '/0')
@@ -291,20 +242,14 @@ contains
     !! coordinate directions and making sure that all of the cell-widths are positively valued
     impure subroutine s_check_grid_data_files
 
-        ! Cell-boundary Data Consistency Check in x-direction
-
         if (any(x_cb(0:m) - x_cb(-1:m - 1) <= 0._wp)) then
             call s_mpi_abort('x_cb.dat in ' // trim(t_step_dir) // ' contains non-positive cell-spacings. Exiting.')
         end if
-
-        ! Cell-boundary Data Consistency Check in y-direction
 
         if (n > 0) then
             if (any(y_cb(0:n) - y_cb(-1:n - 1) <= 0._wp)) then
                 call s_mpi_abort('y_cb.dat in ' // trim(t_step_dir) // ' contains non-positive cell-spacings. ' // 'Exiting.')
             end if
-
-            ! Cell-boundary Data Consistency Check in z-direction
 
             if (p > 0) then
                 if (any(z_cb(0:p) - z_cb(-1:p - 1) <= 0._wp)) then
@@ -317,29 +262,19 @@ contains
 
     !> The goal of this subroutine is to read in any preexisting initial condition data files so that they may be used by the
     !! pre-process as a starting point in the creation of an all new initial condition.
-    !! @param q_cons_vf_in Conservative variables
     impure subroutine s_read_serial_ic_data_files(q_cons_vf_in)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf_in
-        character(LEN=len_trim(case_dir) + 3*name_len)         :: file_loc
-        ! Generic string used to store the address of a particular file
-
-        !> Used to store the variable position, in character form, of the currently manipulated conservative variable file
+        type(scalar_field), dimension(sys_size), intent(inout)   :: q_cons_vf_in
+        character(LEN=len_trim(case_dir) + 3*name_len)           :: file_loc
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1) :: file_num
-
-        !> Generic logical used for the purpose of asserting whether a file is or is not present in the designated location
-        logical :: file_check
-        integer :: i, r
-
-        ! Reading the Conservative Variables Data Files
+        logical                                                  :: file_check
+        integer                                                  :: i, r
 
         do i = 1, sys_size
-            ! Checking whether data file associated with variable position of the currently manipulated conservative variable exists
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir) // '/q_cons_vf' // trim(file_num) // '.dat'
             inquire (FILE=trim(file_loc), EXIST=file_check)
 
-            ! If it exists, the data file is read
             if (file_check) then
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
                 read (1) q_cons_vf_in(i)%sf
@@ -349,17 +284,13 @@ contains
             end if
         end do
 
-        ! Read bubble variables pb and mv for non-polytropic qbmm
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
-                    ! Checking whether data file associated with variable position of the currently manipulated bubble variable
-                    ! exists
                     write (file_num, '(I0)') sys_size + r + (i - 1)*nnode
                     file_loc = trim(t_step_dir) // '/pb' // trim(file_num) // '.dat'
                     inquire (FILE=trim(file_loc), EXIST=file_check)
 
-                    ! If it exists, the data file is read
                     if (file_check) then
                         open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
                         read (1) pb%sf(:,:,:,r, i)
@@ -372,13 +303,10 @@ contains
 
             do i = 1, nb
                 do r = 1, nnode
-                    ! Checking whether data file associated with variable position of the currently manipulated bubble variable
-                    ! exists
                     write (file_num, '(I0)') sys_size + r + (i - 1)*nnode
                     file_loc = trim(t_step_dir) // '/mv' // trim(file_num) // '.dat'
                     inquire (FILE=trim(file_loc), EXIST=file_check)
 
-                    ! If it exists, the data file is read
                     if (file_check) then
                         open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
                         read (1) mv%sf(:,:,:,r, i)
@@ -413,7 +341,6 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
-        ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -426,19 +353,14 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting. ')
         end if
 
-        ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        ! Computing cell center locations
         x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
-        ! Computing minimum cell width
         dx = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
         if (num_procs > 1) call s_mpi_reduce_min(dx)
-        ! Setting locations of domain bounds
         x_domain%beg = x_cb(-1)
         x_domain%end = x_cb(m)
 
         if (n > 0) then
-            ! Read in cell boundary locations in y-direction
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -451,19 +373,14 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting. ')
             end if
 
-            ! Assigning local cell boundary locations
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            ! Computing cell center locations
             y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
-            ! Computing minimum cell width
             dy = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
             if (num_procs > 1) call s_mpi_reduce_min(dy)
-            ! Setting locations of domain bounds
             y_domain%beg = y_cb(-1)
             y_domain%end = y_cb(n)
 
             if (p > 0) then
-                ! Read in cell boundary locations in z-direction
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
                 inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -476,14 +393,10 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting. ')
                 end if
 
-                ! Assigning local cell boundary locations
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                ! Computing cell center locations
                 z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
-                ! Computing minimum cell width
                 dz = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
                 if (num_procs > 1) call s_mpi_reduce_min(dz)
-                ! Setting locations of domain bounds
                 z_domain%beg = z_cb(-1)
                 z_domain%end = z_cb(p)
             end if
@@ -496,7 +409,6 @@ contains
 
     !> The goal of this subroutine is to read in any preexisting initial condition data files so that they may be used by the
     !! pre-process as a starting point in the creation of an all new initial condition.
-    !! @param q_cons_vf_in Conservative variables
     impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf_in
@@ -512,7 +424,6 @@ contains
         logical                              :: file_exist
         integer                              :: i
 
-        ! Open the file to read
         if (cfl_adap_dt) then
             write (file_loc, '(I0,A)') n_start, '.dat'
         else
@@ -526,7 +437,6 @@ contains
 
             call s_initialize_mpi_data(q_cons_vf_in)
 
-            ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
 
             ! Resize some integers so MPI can read even the biggest files
@@ -536,7 +446,6 @@ contains
             WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
 
-            ! Read the data for each variable
             do i = 1, sys_size
                 var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -571,10 +480,9 @@ contains
 
     end subroutine s_read_parallel_ic_data_files
 
-    !> @brief Initializes all pre-process modules, allocates data structures, and sets I/O procedure pointers.
+    !> Initialize all pre-process modules, allocate data structures, and set I/O procedure pointers.
     impure subroutine s_initialize_modules
 
-        ! Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the modules
         call s_initialize_global_parameters_module()
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
@@ -592,7 +500,6 @@ contains
         ! Create the D directory if it doesn't exit, to store the serial data files
         call s_create_directory('D')
 
-        ! Associate pointers for serial or parallel I/O
         if (parallel_io .neqv. .true.) then
             s_generate_grid => s_generate_serial_grid
             s_read_grid_data_files => s_read_serial_grid_data_files
@@ -607,7 +514,7 @@ contains
 
     end subroutine s_initialize_modules
 
-    !> @brief Reads an existing grid from data files or generates a new grid from user inputs.
+    !> Read an existing grid from data files or generate a new grid from user inputs.
     impure subroutine s_read_grid()
 
         if (old_grid) then
@@ -626,20 +533,12 @@ contains
 
     end subroutine s_read_grid
 
-    !> @brief Generates or reads the initial condition, applies relaxation if needed, and writes output data files.
+    !> Generate or read the initial condition, apply relaxation if needed, and write output data files.
     impure subroutine s_apply_initial_condition(start, finish)
 
         real(wp), intent(inout) :: start, finish
         integer                 :: j, k, l
         real(wp)                :: r2
-
-        ! Setting up the grid and the initial condition. If the grid is read in from preexisting grid data files, it is checked for
-        ! consistency. If the grid is not read in, it is generated from scratch according to the inputs provided by the user. The
-        ! initial condition may also be read in. It in turn is not checked for consistency since it WILL further be edited by the
-        ! pre-process and also because it may be incomplete at the time it is read in. Finally, when the grid and initial condition
-        ! are completely setup, they are written to their respective data files.
-
-        ! Setting up grid and initial condition
 
         call cpu_time(start)
 
@@ -681,7 +580,7 @@ contains
 
     end subroutine s_apply_initial_condition
 
-    !> @brief Gathers processor timing data and writes elapsed wall-clock time to a summary file.
+    !> Gather processor timing data and write elapsed wall-clock time to a summary file.
     impure subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
 
         real(wp), dimension(:), intent(inout) :: proc_time
@@ -717,16 +616,10 @@ contains
 
     end subroutine s_save_data
 
-    !> @brief Initializes MPI, reads and validates user inputs on rank 0, and decomposes the computational domain.
+    !> Initialize MPI, read and validate user inputs on rank 0, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
 
-        ! Initialization of the MPI environment
-
         call s_mpi_initialize()
-
-        ! Rank 0 processor assigns default values to user inputs prior to reading those in from the input file. Next, the user
-        ! inputs are read in and their consistency is checked. The detection of any inconsistencies automatically leads to the
-        ! termination of the pre-process.
 
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
@@ -746,16 +639,14 @@ contains
 
     end subroutine s_initialize_mpi_domain
 
-    !> @brief Finalizes all pre-process modules, deallocates resources, and shuts down MPI.
+    !> Finalize all pre-process modules, deallocate resources, and shut down MPI.
     impure subroutine s_finalize_modules
 
-        ! Disassociate pointers for serial and parallel I/O
         s_generate_grid => null()
         s_read_grid_data_files => null()
         s_read_ic_data_files => null()
         s_write_data_files => null()
 
-        ! Deallocation procedures for the modules
         call s_finalize_mpi_common_module()
         call s_finalize_grid_module()
         call s_finalize_variables_conversion_module()
@@ -766,7 +657,6 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         call s_finalize_initial_condition_module()
-        ! Finalization of the MPI environment
         call s_mpi_finalize()
 
     end subroutine s_finalize_modules

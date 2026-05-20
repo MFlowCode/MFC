@@ -1,6 +1,6 @@
 !>
 !! @file
-!! Contains module m_global_parameters
+!! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
@@ -14,21 +14,20 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
-
     ! $:USE_GPU_MODULE()
 
     implicit none
 
-    real(wp)                :: wall_time = 0
-    real(wp)                :: wall_time_avg = 0
+    real(wp) :: wall_time = 0
+    real(wp) :: wall_time_avg = 0
+
+    ! Logistics
     integer                 :: num_procs      !< Number of processors
     character(LEN=path_len) :: case_dir       !< Case folder location
     logical                 :: run_time_info  !< Run-time output flag
     integer                 :: t_step_old     !< Existing IC/grid folder
-
     ! Computational Domain Parameters
     integer :: proc_rank  !< Rank of the local processor
-
     !> @name Number of cells in the x-, y- and z-directions, respectively
     !> @{
     integer :: m, n, p
@@ -59,14 +58,13 @@ module m_global_parameters
     !> @{
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-
+    ! type(bounds_info) :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
     real(wp) :: dt  !< Size of the time-step
-
     $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p, glb_bounds]')
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number of time-step iterations between successive
@@ -84,7 +82,6 @@ module m_global_parameters
 
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     integer :: t_step_print  !< Number of time-steps between printouts
-
     ! Simulation Algorithm Parameters
     integer :: model_eqns  !< Multicomponent flow model
     #:if MFC_CASE_OPTIMIZATION
@@ -213,7 +210,6 @@ module m_global_parameters
     integer  :: relax_model   !< Relaxation model
     real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
     real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
-
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
 
     integer               :: num_bc_patches
@@ -249,12 +245,9 @@ module m_global_parameters
 
     integer, allocatable, dimension(:)           :: proc_coords  !< Processor coordinates in MPI_CART_COMM
     type(bounds_info), allocatable, dimension(:) :: pcomm_coords
-    $:GPU_DECLARE(create='[pcomm_coords]')
-    !! Coordinates for EL particle transfer
-
     type(int_bounds_info), dimension(3)    :: nidx  !< Indices for neighboring processors
     integer, allocatable, dimension(:,:,:) :: neighbor_ranks
-    !! Neighbor ranks
+    $:GPU_DECLARE(create='[pcomm_coords]')
 
     integer, allocatable, dimension(:)            :: start_idx  !< Starting cell-center index of local processor in global grid
     type(mpi_io_var), public                      :: MPI_IO_DATA
@@ -300,9 +293,7 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
 
-    ! The WENO average (WA) flag regulates whether the calculation of any cell- average spatial derivatives is carried out in each
-    ! cell by utilizing the arithmetic mean of the left and right, WENO-reconstructed, cell-boundary values or simply, the unaltered
-    ! left and right, WENO-reconstructed, cell- boundary values.
+    ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values
     !> @{
     real(wp) :: wa_flg
     !> @}
@@ -321,14 +312,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
 
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
-
     $:GPU_DECLARE(create='[buff_size]')
 
     integer                  :: shear_num              !< Number of shear stress components
     integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
     integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
     integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
-
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 
     ! END: Simulation Algorithm Parameters
@@ -336,11 +325,10 @@ module m_global_parameters
     ! Fluids Physical Parameters
 
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
-
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
     integer                                  :: fd_order   !< Finite-difference order for CoM and flow probe derivatives
-    integer                                  :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
+    integer                                  :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
     logical                                              :: probe_wrt
@@ -490,7 +478,6 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
-
     !> @name Continuum damage model parameters
     !> @{!
     real(wp) :: tau_star       !< Stress threshold for continuum damage modeling
@@ -868,8 +855,7 @@ contains
 
     end subroutine s_assign_default_values_to_user_inputs
 
-    !> The computation of parameters, the allocation of memory, the association of pointers and/or the execution of any other
-    !! procedures that are necessary to setup the module.
+    !> Initialize the global parameters module
     impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, k
@@ -1069,8 +1055,7 @@ contains
                 end if
             end if
 
-            ! Determining the number of fluids for which the shear and the volume Reynolds numbers, e.g. viscous effects, are
-            ! important
+            ! Count fluids with non-negligible viscous effects (Re > 0)
             do i = 1, num_fluids
                 if (fluid_pp(i)%Re(1) > 0) Re_size(1) = Re_size(1) + 1
                 if (fluid_pp(i)%Re(2) > 0) Re_size(2) = Re_size(2) + 1
@@ -1198,9 +1183,7 @@ contains
             end do
         end if
 
-        ! Configuring the WENO average flag that will be used to regulate whether any spatial derivatives are to computed in each
-        ! cell by using the arithmetic mean of left and right, WENO-reconstructed, cell-boundary values or otherwise, the unaltered
-        ! left and right, WENO-reconstructed, cell-boundary values
+        ! Configure WENO averaging flag (arithmetic mean vs. unaltered values)
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
         $:GPU_UPDATE(device='[wa_flg]')
 

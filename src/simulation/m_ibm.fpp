@@ -115,6 +115,7 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
 
@@ -125,9 +126,7 @@ contains
 
     end subroutine s_ibm_setup
 
-    !> Subroutine that updates the conservative variables at the ghost points
-    !! @param pb_in Internal bubble pressure
-    !! @param mv_in Mass of vapor in bubble
+    !> Update the conservative variables at the ghost points
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
@@ -156,7 +155,7 @@ contains
             real(wp), dimension(nb*nmom)    :: nmom_IP
             real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
         #:endif
-        !! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
+        ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
         real(wp), dimension(3) :: physical_loc       !< Physical loc of GP
@@ -169,6 +168,7 @@ contains
         type(ghost_point)      :: innerp
 
         ! set the Moving IBM interior conservative variables
+
         $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', collapse=3)
         do l = 0, p
             do k = 0, n
@@ -375,8 +375,7 @@ contains
 
     end subroutine s_ibm_correct_state
 
-    !> Function that computes the image points for each ghost point
-    !! @param ghost_points_in Ghost Points
+    !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
@@ -460,7 +459,7 @@ contains
                             print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
                             if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
                             print *, "Image point is located approximately ", &
-                                & (ghost_points_in(q)%loc(dim) - ghost_points_in(q)%ip_loc(dim))/(s_cc(1) - s_cc(0)), &
+                                & (ghost_points_in(q)%loc(dim) - ghost_points_in(q) %ip_loc(dim))/(s_cc(1) - s_cc(0)), &
                                 & " grid cells away"
                             print *, "Levelset ", dist, " and Norm: ", norm(:)
                             print *, &
@@ -485,7 +484,7 @@ contains
 
     end subroutine s_compute_image_points
 
-    !> Subroutine that finds the number of ghost points, used for allocating memory.
+    !> Count the number of ghost points for memory allocation
     subroutine s_find_num_ghost_points(num_gps_out)
 
         integer, intent(out) :: num_gps_out
@@ -530,7 +529,7 @@ contains
 
     end subroutine s_find_num_ghost_points
 
-    !> Function that finds the ghost points
+    !> Locate all ghost points in the domain
     subroutine s_find_ghost_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
@@ -613,7 +612,7 @@ contains
 
     end subroutine s_find_ghost_points
 
-    !> Function that computes the interpolation coefficients of image points
+    !> Compute the interpolation coefficients for image points
     subroutine s_compute_interpolation_coeffs(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
@@ -718,25 +717,7 @@ contains
 
     end subroutine s_compute_interpolation_coeffs
 
-    !> Function that uses the interpolation coefficients and the current state at the cell centers in order to estimate the state at
-    !! the image point
-    !! @param gp Ghost point data structure
-    !> @brief Interpolates primitive variables from the fluid domain to a ghost point's image point using bilinear or trilinear
-    !! interpolation.
-    !! @param alpha_rho_IP Partial density at image point
-    !! @param alpha_IP Volume fraction at image point
-    !! @param pres_IP Pressure at image point
-    !! @param vel_IP Velocity at image point
-    !! @param c_IP Speed of sound at image point
-    !! @param r_IP Bubble radius at image point
-    !! @param v_IP Bubble radial velocity at image point
-    !! @param pb_IP Bubble pressure at image point
-    !! @param mv_IP Bubble vapor mass at image point
-    !! @param nmom_IP Bubble moment at image point
-    !! @param pb_in Internal bubble pressure array
-    !! @param mv_in Mass of vapor in bubble array
-    !! @param presb_IP Bubble node pressure at image point
-    !! @param massv_IP Bubble node vapor mass at image point
+    !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
                                          & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -899,11 +880,9 @@ contains
 
     end subroutine s_update_mib
 
-    !> @brief Computes pressure and viscous forces and torques on immersed bodies via a volume integration method.
+    !> Compute pressure and viscous forces and torques on immersed bodies via volume integration
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, & idwbuff(2)%beg:idwbuff(2)%end, & idwbuff(3)%beg:idwbuff(3)%end),
-        ! intent(in) :: pressure
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
         integer                                                        :: i, j, k, l, encoded_ib_idx, ib_idx, fluid_idx
@@ -1056,7 +1035,7 @@ contains
 
     end subroutine s_compute_ib_forces
 
-    !> Subroutine to deallocate memory reserved for the IBM module
+    !> Finalize the IBM module
     impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
@@ -1127,7 +1106,6 @@ contains
     end subroutine s_compute_centroid_offset
 
     !> Computes the moment of inertia for an immersed boundary
-    !! @param ib_marker Immersed boundary marker index
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
         real(wp), dimension(3), intent(in) :: axis  !< the axis about which we compute the moment. Only required in 3D.
@@ -1161,6 +1139,7 @@ contains
             count = 0
             moment = 0._wp
             cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
+            ! computed without grid stretching. Update in the loop to perform with stretching
             if (p /= 0) then
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
@@ -1204,7 +1183,7 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
-    !> @brief Checks for periodic boundary conditions in all directions, and if so, moves patch location if it left the domain
+    !> Wrap immersed boundary positions across periodic domain boundaries
     subroutine s_wrap_periodic_ibs()
 
         integer :: patch_id
