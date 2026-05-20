@@ -475,7 +475,7 @@ contains
 
     end subroutine s_get_cell
 
-    !> Precompute cell-centered pressure gradients (dp/dx, dp/dy, dp/dz) 
+    !> Precompute cell-centered pressure gradients (dp/dx, dp/dy, dp/dz)
     subroutine s_compute_pressure_gradients(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

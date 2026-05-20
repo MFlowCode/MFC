@@ -245,8 +245,8 @@ module m_global_parameters
 
     integer, allocatable, dimension(:)           :: proc_coords  !< Processor coordinates in MPI_CART_COMM
     type(bounds_info), allocatable, dimension(:) :: pcomm_coords
-    type(int_bounds_info), dimension(3)    :: nidx  !< Indices for neighboring processors
-    integer, allocatable, dimension(:,:,:) :: neighbor_ranks
+    type(int_bounds_info), dimension(3)          :: nidx         !< Indices for neighboring processors
+    integer, allocatable, dimension(:,:,:)       :: neighbor_ranks
     $:GPU_DECLARE(create='[pcomm_coords]')
 
     integer, allocatable, dimension(:)            :: start_idx  !< Starting cell-center index of local processor in global grid

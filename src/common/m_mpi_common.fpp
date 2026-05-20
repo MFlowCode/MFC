@@ -24,9 +24,8 @@ module m_mpi_common
     $:GPU_DECLARE(create='[v_size]')
 
     real(wp), private, allocatable, dimension(:) :: buff_send  !< Primitive variable send buffer for halo exchange
-    real(wp), private, allocatable, dimension(:) :: buff_recv  !< Primitive variable receive buffer for halo exchange
-
-    !! Variables for EL bubbles communication
+    !> Primitive variable receive buffer for halo exchange Variables for EL bubbles communication
+    real(wp), private, allocatable, dimension(:) :: buff_recv
     type(int_bounds_info)                        :: comm_coords(3)
     integer                                      :: comm_size(3)
     !> q_beta indices to communicate: 1=void fraction, 2=d(beta)/dt, 5=energy source
@@ -1316,10 +1315,10 @@ contains
         real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
         real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
         integer  :: MPI_COMM_CART  !< Cartesian processor topology communicator
-        integer :: rem_cells    !< Remaining cells after distribution among processors
-        integer :: recon_order  !< WENO or MUSCL reconstruction order
-        integer :: i, j, k      !< Generic loop iterators
-        integer :: ierr         !< Generic flag used to identify and report MPI errors
+        integer  :: rem_cells      !< Remaining cells after distribution among processors
+        integer  :: recon_order    !< WENO or MUSCL reconstruction order
+        integer  :: i, j, k        !< Generic loop iterators
+        integer  :: ierr           !< Generic flag used to identify and report MPI errors
 
         ! temp array to store neighbor rank coordinates
         integer, dimension(1:num_dims) :: neighbor_coords

@@ -89,7 +89,6 @@ module m_global_parameters
 
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
-
     integer               :: fd_order   !< Finite-difference order for CoM/probe derivative approximations
     integer               :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
 
