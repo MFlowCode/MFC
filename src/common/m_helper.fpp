@@ -171,7 +171,6 @@ contains
         integer                 :: ir
         real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN
         real(wp), parameter     :: k_poly = 1._wp  !< polytropic index used to compute isothermal natural frequency
-
         ! Chapman-Enskog transport coefficients for vapor-gas mixture, Ando JAS (2010)
 
         phi_vg = (1._wp + sqrt(mu_v/mu_g)*(M_g/M_v)**(0.25_wp))**2/(sqrt(8._wp)*sqrt(1._wp + M_v/M_g))
@@ -436,7 +435,7 @@ contains
 
     end function f_xor
 
-    !> convert a logical to 1 or 0.
+    !> Convert a logical to 1 or 0.
     elemental function f_logical_to_int(predicate) result(int)
 
         logical, intent(in) :: predicate
@@ -516,7 +515,7 @@ contains
 
     end function associated_legendre
 
-    !> Calculate the double factorial value of an integer
+    !> Calculate the double factorial of an integer
     elemental function double_factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
@@ -528,7 +527,7 @@ contains
 
     end function double_factorial
 
-    !> Calculate the factorial value of an integer
+    !> Calculate the factorial of an integer
     elemental function factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in

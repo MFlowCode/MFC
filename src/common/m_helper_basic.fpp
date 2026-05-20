@@ -158,7 +158,7 @@ contains
     end subroutine s_configure_coordinate_bounds
 
     !> Update the min and max number of cells in each set of axes
-    !! @param bounds Min ans max values to update
+    !! @param bounds min and max values to update
     elemental subroutine s_update_cell_bounds(bounds, m, n, p)
 
         type(cell_num_bounds), intent(out) :: bounds

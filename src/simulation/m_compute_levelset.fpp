@@ -20,7 +20,7 @@ module m_compute_levelset
 
 contains
 
-    !> Dispatche level-set distance and normal computations for all ghost points based on their patch geometry type.
+    !> Dispatch level-set distance and normal computations for all ghost points based on patch geometry type
     impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), dimension(:), intent(inout) :: gps
@@ -75,7 +75,7 @@ contains
 
     end subroutine s_apply_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a circular immersed boundary.
+    !> Compute the signed distance and outward normal from a ghost point to a circular immersed boundary
     subroutine s_circle_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -106,7 +106,7 @@ contains
 
     end subroutine s_circle_levelset
 
-    !> Compute the signed distance and outward normal from a ghost point to a 2D NACA airfoil surface.
+    !> Compute the signed distance and outward normal from a ghost point to a 2D NACA airfoil surface
     subroutine s_airfoil_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -119,7 +119,6 @@ contains
         real(wp), dimension(1:2)         :: center
         real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
         integer                          :: i, j, k, ib_patch_id  !< Loop index variables
-
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -283,7 +282,7 @@ contains
 
     end subroutine s_3d_airfoil_levelset
 
-    !> Compute the levelset values at a ghost point belonging to the rectangle IB
+    !> Compute the signed distance and outward normal from a ghost point to a 2D rectangle
     subroutine s_rectangle_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')

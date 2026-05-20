@@ -28,7 +28,7 @@ module m_model
     public :: s_instantiate_STL_models
 #endif
 
-    type(t_model_array), allocatable, target  :: models(:)
+    type(t_model_array), allocatable, target  :: models(:)    !< STL/OBJ models for IB markers and levelset
     integer, allocatable                      :: gpu_ntrs(:)  !< GPU-friendly flat arrays for STL model data
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_trs_v
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
@@ -384,7 +384,7 @@ contains
 
     end subroutine s_write_obj
 
-    !> Write a model to file
+    !> Write a mesh to a file.
     impure subroutine s_model_write(filepath, model)
 
         character(LEN=*), intent(in) :: filepath
@@ -649,8 +649,9 @@ contains
         real(wp), dimension(1:(3*model%ntrs),1:2,1:2) :: temp_boundary_v    !< Temporary boundary vertex buffer
         integer, dimension(1:(3*model%ntrs)) :: edge_occurrence             !< The manifoldness of the edges
         real(wp) :: edgetan, initial, v_norm, xnormal, ynormal              !< The manifoldness of the edges
+        ! Total number of edges in 2D STL
 
-        edge_count = 3*model%ntrs  ! Total number of edges in 2D STL
+        edge_count = 3*model%ntrs
 
         ! Initialize edge_occurrence array to zero
         edge_occurrence = 0

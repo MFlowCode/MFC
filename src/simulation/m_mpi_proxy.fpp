@@ -707,9 +707,7 @@ contains
 
     end subroutine s_mpi_sendrecv_particles
 
-    !! This function returns a unique tag for each neighbor based on its position relative to the current process.
-    !! @param i, j, k Indices of the neighbor in the range [-1, 1]
-    !! @return tag Unique integer tag for the neighbor
+    !> Return a unique tag for each neighbor based on its position relative to the current process.
     integer function neighbor_tag(i, j, k) result(tag)
 
         integer, intent(in) :: i, j, k

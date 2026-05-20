@@ -53,6 +53,7 @@ module m_constants
     real(wp), parameter :: mthinc_align_tol = 1.e-8_wp  !< Grid aligned snap tolerance for MTHINC normals
     ! Chemistry
     real(wp), parameter :: dflt_T_guess = 1200._wp  !< Default guess for temperature (when a previous value is not available)
+
     ! IBM+STL interpolation constants
     integer, parameter  :: num_ray = 20                        !< Default number of rays traced per cell
     real(wp), parameter :: ray_tracing_threshold = 0.9_wp      !< Threshold above which the cell is marked as the model patch
@@ -63,6 +64,7 @@ module m_constants
     integer, parameter  :: mapCells = 3      !< Number of cells around the bubble where the smoothening function will have effect
     real(wp), parameter :: R_uni = 8314._wp  !< Universal gas constant - J/kmol/K
     integer, parameter  :: lag_io_vars = 21  !< Number of variables per particle for MPI_IO
+
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp   !< Default tolerance for adaptive step size
     integer, parameter  :: dflt_adap_dt_max_iters = 100  !< Default max iteration for adaptive step size
@@ -73,16 +75,21 @@ module m_constants
     real(wp), parameter :: scale_first_guess = 1.e-3_wp        !< Scale factor for initial step size
     real(wp), parameter :: scale_guess = 1.e-2_wp              !< Scale factor for step size adjustment
     real(wp), parameter :: small_guess = 1.e-6_wp              !< Minimum initial step size
+
     ! Relativity
+    !> Max Newton-Raphson iterations for relativistic primitive recovery
     integer, parameter :: relativity_cons_to_prim_max_iter = 100
+
     ! Linear congruential pseudo-random number generator parameters
     integer, parameter  :: modulus = 2**30 - 1     !< PRNG modulus
     integer, parameter  :: multiplier = 1664525    !< PRNG multiplier
     integer, parameter  :: increment = 1013904223  !< PRNG increment
     integer, parameter  :: amplifier = 3**13       !< PRNG amplifier for mixing
     real(wp), parameter :: decimal_trim = 1.e5_wp  !< PRNG decimal truncation factor
+
     ! System constants
     integer, parameter :: CASE_FILE_ERROR_CODE = 22  !< Exit code for case file validation errors
+
     ! Boundary condition enumeration Abbreviations CHAR - Characteristic NR - Non-reflecting SUB - subsonic SUP - supersonic FF -
     ! Force-free CP - Constant pressure
     integer, parameter :: BC_PERIODIC = -1

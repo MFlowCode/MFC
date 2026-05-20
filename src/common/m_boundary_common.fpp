@@ -42,7 +42,7 @@ module m_boundary_common
 
 contains
 
-    !> Allocates and sets up boundary condition buffer arrays for all coordinate directions.
+    !> Allocate and set up boundary condition buffer arrays for all coordinate directions.
     impure subroutine s_initialize_boundary_common_module()
 
         integer :: i, j, sys_size_alloc
@@ -1337,8 +1337,6 @@ contains
         integer, intent(in)                                        :: nvar
         integer                                                    :: k, l
 
-        !> x-direction
-
         if (bc%x%beg < 0) then
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
@@ -1377,7 +1375,6 @@ contains
             call s_mpi_reduce_beta_variables_buffers(q_beta, kahan_comp, 1, 1, nvar)
         end if
 
-        !> y-direction
         if (bc%y%beg < 0) then
             $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
@@ -1419,7 +1416,6 @@ contains
         if (num_dims == 2) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            !> z-direction
             if (bc%z%beg < 0) then
                 $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
                 do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
@@ -1543,8 +1539,6 @@ contains
         integer, intent(in)                                        :: k, l
         integer, intent(in)                                        :: nvar
         integer                                                    :: j, i
-
-        ! Set beta in buffer regions equal to zero
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc%x%beg
@@ -2533,6 +2527,7 @@ contains
 #ifdef MFC_SIMULATION
         ! Required for compatibility between codes
         type(int_bounds_info) :: offset_x, offset_y, offset_z
+
         offset_x%beg = buff_size; offset_x%end = buff_size
         offset_y%beg = buff_size; offset_y%end = buff_size
         offset_z%beg = buff_size; offset_z%end = buff_size

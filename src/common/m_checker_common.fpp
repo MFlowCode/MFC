@@ -19,7 +19,7 @@ module m_checker_common
 
 contains
 
-    !> Check compatibility of parameters in the input file. Used by all three stages
+    !> Checks compatibility of parameters in the input file. Used by all three stages
     impure subroutine s_check_inputs_common
 
 #ifndef MFC_SIMULATION
@@ -42,8 +42,8 @@ contains
         call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
 
         @:PROHIBIT(nGlobal < min_cells, &
-                   & "Total number of cells must be at least (2^[number of dimensions])*num_procs, " &
-                   & // "which is currently "//trim(numStr))
+                   & "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // "which is currently " &
+                   & // trim(numStr))
 
     end subroutine s_check_total_cells
 #endif

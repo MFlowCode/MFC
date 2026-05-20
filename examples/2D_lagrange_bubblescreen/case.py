@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json
 import math
+import os
+import random
 
 # Bubble screen
 # Description: A planar acoustic wave interacts with a bubble cloud
@@ -56,6 +58,75 @@ Ny = 50  # number of elements into y direction
 
 dt = 7.5e-9  # constant time-step - sec
 
+
+def generate_bubble_cloud():
+    """Generate bubble cloud with log-normal size distribution"""
+    # Bubble properties
+    void_fraction = 4e-5
+    mean_radius = 10e-6  # 10 μm in meters
+    shape_param = 0.3  # shape parameter for log-normal distribution
+
+    # Domain: 5mm x 5mm x 5mm cube centered at origin
+    box_size = 5.0e-3  # 5 mm in meters
+
+    # Convert to nondimensional units
+    mean_radius_nd = mean_radius / x0  # in units of x0
+    box_size_nd = box_size / x0
+
+    # Log-normal distribution parameters
+    # For log-normal: sigma is the shape parameter (std dev of log(r))
+    # mean = exp(mu + sigma^2/2)
+    # Solving: mean_radius = exp(mu + sigma^2/2)
+    sigma = shape_param
+    mu = math.log(mean_radius_nd) - sigma**2 / 2
+
+    # Set random seed for reproducibility
+    random.seed(42)
+
+    # Calculate box volume
+    box_volume = box_size_nd**3
+
+    # Estimate initial number of bubbles
+    # Average volume per bubble: (4/3)*pi*r_mean^3
+    mean_vol_per_bubble = (4.0 / 3.0) * math.pi * math.exp(mu + sigma**2 / 2.0) ** 3
+    n_bubbles_estimate = int(void_fraction * box_volume / mean_vol_per_bubble)
+
+    # Generate bubble radii using log-normal distribution
+    # Python's random.lognormvariate generates from lognormal(mu, sigma)
+    radii = [random.lognormvariate(mu, sigma) for _ in range(n_bubbles_estimate)]
+
+    # Adjust radii to match target void fraction
+    current_void = sum((4.0 / 3.0) * math.pi * r**3 for r in radii) / box_volume
+    if current_void > 0:
+        scale_factor = (void_fraction / current_void) ** (1.0 / 3.0)
+        radii = [r * scale_factor for r in radii]
+
+    n_bubbles = len(radii)
+
+    # Generate random positions in the cube
+    box_half = box_size_nd / 2.0
+    positions = [(random.uniform(-box_half, box_half), random.uniform(-box_half, box_half), random.uniform(-box_half, box_half)) for _ in range(n_bubbles)]
+
+    # Create output directory if needed
+    input_dir = os.path.join(os.path.dirname(__file__), "input")
+    os.makedirs(input_dir, exist_ok=True)
+
+    # Write bubble file
+    bubble_file = os.path.join(input_dir, "lag_bubbles.dat")
+    with open(bubble_file, "w") as f:
+        for i in range(n_bubbles):
+            # Format: x y z vx vy vz radius interface_velocity
+            # All velocities are zero at initialization
+            x, y, z = positions[i]
+            r = radii[i]
+            f.write(f"{x:.6e}\t{y:.6e}\t{z:.6e}\t0.0\t0.0\t0.0\t{r:.6e}\t0.0\n")
+
+    return n_bubbles
+
+
+# Generate bubble cloud
+nBubs = generate_bubble_cloud()
+
 # Configuring case dictionary
 print(
     json.dumps(
@@ -75,7 +146,7 @@ print(
             "dt": dt * (c0 / x0),
             "t_step_start": 0,
             "t_step_stop": 3000,
-            "t_step_save": 500,
+            "t_step_save": 30,
             # Simulation Algorithm Parameters
             "model_eqns": 2,
             "time_stepper": 3,
@@ -130,7 +201,7 @@ print(
             "bubble_model": 2,  # Keller-Miksis model
             "thermal": 3,
             "polytropic": "F",
-            "lag_params%nBubs_glb": 1194,  # Number of bubbles
+            "lag_params%nBubs_glb": nBubs,  # Number of bubbles
             "lag_params%solver_approach": 2,
             "lag_params%cluster_type": 2,
             "lag_params%pressure_corrector": "T",
@@ -171,6 +242,7 @@ print(
             "fluid_pp(2)%gamma": 1.0 / (gam_g - 1.0),
             "fluid_pp(2)%pi_inf": 0.0e00,
             "fluid_pp(2)%Re(1)": 1.0 / (mu_g / (rho0 * c0 * x0)),
-        }
+        },
+        indent=4,
     )
 )

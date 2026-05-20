@@ -273,16 +273,14 @@ module m_derived_types
 
     type ib_patch_parameters
 
-        integer :: geometry  !< Type of geometry for the patch
-
-        !> Location of the geometric center, i.e. the centroid, of the patch. It is specified through its x-, y- and z-coordinates,
-        !! respectively.
+        integer  :: geometry                            !< Type of geometry for the patch
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
         !> Centroid locations of intermediate steps in the time_stepper module
-        real(wp)                     :: step_x_centroid, step_y_centroid, step_z_centroid
-        real(wp), dimension(1:3)     :: centroid_offset  !< offset of center of mass from computed cell center for odd-shaped IBs
-        real(wp), dimension(1:3)     :: angles
-        real(wp), dimension(1:3)     :: step_angles
+        real(wp)                 :: step_x_centroid, step_y_centroid, step_z_centroid
+        real(wp), dimension(1:3) :: centroid_offset  !< offset of center of mass from computed cell center for odd-shaped IBs
+        real(wp), dimension(1:3) :: angles
+        real(wp), dimension(1:3) :: step_angles
+        !> matrix that converts from IB reference frame to fluid reference frame
         real(wp), dimension(1:3,1:3) :: rotation_matrix
         !> matrix that converts from fluid reference frame to IB reference frame
         real(wp), dimension(1:3,1:3) :: rotation_matrix_inverse
@@ -292,10 +290,11 @@ module m_derived_types
         real(wp)                     :: theta
         logical                      :: slip
 
-        !! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath  !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3) :: model_translate  !< Translation of the STL object.
-        real(wp), dimension(1:3) :: model_scale  !< Scale factor for the STL object.
+        ! STL or OBJ model input parameter
+        character(LEN=pathlen_max) :: model_filepath   !< Path the STL file relative to case_dir.
+        real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
+        real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
+        !> Angle to rotate the STL object along each cartesian coordinate axis, in radians.
         real(wp), dimension(1:3) :: model_rotate
         integer :: model_spc  !< Number of samples per cell to use when discretizing the STL object.
         real(wp) :: model_threshold  !< Threshold to turn on smoothen STL patch. Patch conditions for moving imersed boundaries
