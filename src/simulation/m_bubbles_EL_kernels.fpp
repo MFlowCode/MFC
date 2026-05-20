@@ -30,7 +30,7 @@ module m_bubbles_EL_kernels
 contains
 
     !> Smear the Lagrangian bubble effects onto the Eulerian grid using the selected kernel
-    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar, kcomp)
 
         integer, intent(in)                                             :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb,1:3,1:2), intent(in) :: lbk_s, lbk_pos

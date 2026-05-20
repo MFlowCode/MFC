@@ -79,7 +79,7 @@ module m_bubbles_EL
 contains
 
     !> Initializes the lagrangian subgrid bubble solver
-    impure subroutine s_initialize_bubbles_EL_module(q_cons_vf)
+    impure subroutine s_initialize_bubbles_EL_module(q_cons_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type

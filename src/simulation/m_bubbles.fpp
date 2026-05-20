@@ -24,7 +24,7 @@ module m_bubbles
 contains
 
     !> Compute the bubble radial acceleration based on the selected bubble model
-    elemental function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
+    function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, fCson)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf

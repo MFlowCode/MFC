@@ -271,67 +271,6 @@ module m_derived_types
         real(wp)                 :: model_threshold  !< Threshold to turn on smoothen STL patch.
     end type ic_patch_parameters
 
-    !> Derived type adding initial condition (ic) patch parameters as attributes NOTE: The requirements for the specification of the
-    !! above parameters are strongly dependent on both the choice of the multicomponent flow model as well as the choice of the
-    !! patch geometry.
-    type ic_patch_parameters
-
-        integer :: geometry  !< Type of geometry for the patch
-        real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
-        real(wp) :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
-        real(wp) :: radius  !< Dimensions of the patch. radius.
-        real(wp), dimension(3) :: radii  !< Elliptical/ellipsoidal patch radii in x, y, z
-        real(wp) :: epsilon, beta  !< The isentropic vortex parameters for the amplitude of the disturbance and domain of influence.
-        real(wp), dimension(2:9) :: a  !< Used by hardcoded IC and as temporary variables.
-        logical :: non_axis_sym
-
-        ! Geometry 13 (2D modal Fourier): fourier_cos(n), fourier_sin(n) for mode n
-        real(wp), dimension(1:max_2d_fourier_modes) :: fourier_cos, fourier_sin
-        logical :: modal_clip_r_to_min  !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
-        real(wp) :: modal_r_min  !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
-        logical :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
-        ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
-        real(wp), dimension(0:max_sph_harm_degree,-max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
-        real(wp), dimension(3) :: normal                          !< Patch orientation normal vector (x, y, z)
-        logical, dimension(0:num_patches_max - 1) :: alter_patch  !< Overwrite permissions for preceding patches
-
-        !> Permission indicating to the current patch whether its boundaries will be smoothed out across a few cells or whether they
-        !! are to remain sharp
-        logical :: smoothen         !< Whether patch boundaries are smoothed across cells
-        integer :: smooth_patch_id  !< Identity (id) of the patch with which current patch is to get smoothed
-
-        !> Smoothing coefficient (coeff) for the size of the stencil of cells across which boundaries of the current patch will be
-        !! smeared out
-        real(wp)                            :: smooth_coeff  !< Smoothing stencil size coefficient
-        real(wp), dimension(num_fluids_max) :: alpha_rho
-        real(wp)                            :: rho
-        real(wp), dimension(3)              :: vel
-        real(wp)                            :: pres
-        real(wp), dimension(num_fluids_max) :: alpha
-        real(wp)                            :: gamma
-        real(wp)                            :: pi_inf
-        real(wp)                            :: cv
-        real(wp)                            :: qv
-        !> Primitive variables associated with the patch. In order, these include the partial densities, density, velocity,
-        !! pressure, volume fractions, specific heat ratio function and the liquid stiffness function.
-        real(wp)                   :: qvp               !< Reference entropy per unit mass (SGEOS)
-        real(wp)                   :: Bx, By, Bz        !< Magnetic field components; B%x is not used for 1D
-        real(wp), dimension(6)     :: tau_e             !< Elastic stresses added to primitive variables if hypoelasticity = True
-        real(wp)                   :: R0                !< Bubble size
-        real(wp)                   :: V0                !< Bubble velocity
-        real(wp)                   :: p0                !< Bubble size
-        real(wp)                   :: m0                !< Bubble velocity
-        integer                    :: hcid              !< Hardcoded initial condition ID id for hard coded initial condition
-        real(wp)                   :: cf_val            !< Color function value
-        real(wp)                   :: Y(1:num_species)  !< Species mass fractions STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath    !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate   !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale       !< Scale factor for the STL object.
-        real(wp), dimension(1:3)   :: model_rotate
-        integer                    :: model_spc         !< Number of samples per cell to use when discretizing the STL object.
-        real(wp)                   :: model_threshold   !< Threshold to turn on smoothen STL patch.
-    end type ic_patch_parameters
-
     type ib_patch_parameters
 
         integer :: geometry  !< Type of geometry for the patch
