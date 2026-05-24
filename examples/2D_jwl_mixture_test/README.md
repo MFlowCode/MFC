@@ -1,13 +1,104 @@
-# 2D JWL Mixture Test
+# 2D JWL Blast With Moving Particle Bed
 
-This is a small 2D sanity test for the mixed-material JWL EOS path in MFC.
+This case is an idealized 2D blast interaction problem for the current MFC JWL implementation. A compact TNT-like JWL products region is placed near the lower boundary, the lower boundary acts as a ghost-cell extrapolation, and the blast loads a semicircular bed of small moving immersed-boundary particles.
+
+The goal is not to reproduce a specific experiment. The goal is to stress the pieces that matter for this branch: mixed JWL/air thermodynamics, strong shock propagation, moving IBM bodies, particle-particle collision settings, and IBM state output.
+
+## Geometry
+
+The domain is larger than the earlier smoke test so that particles have space to move:
+
+```text
+domain     2.0 x 1.2
+grid       200 x 120
+dx = dy    about 1.0e-2
+```
+
+That grid is intentionally moderate so the case is easier to run while debugging the moving-IBM behavior. For a sharper production-style check with roughly 10 cells across each particle diameter, use about `m = 1000` and `n = 600`.
+
+The blast is initialized near the bottom wall:
+
+```text
+blast center    (1.0, 0.06)
+blast radius    0.025
+blast pressure  2.0e10 Pa
+```
+
+The particles are 2D circular immersed boundaries. In a 2D simulation, this is best interpreted as a cross-section through long cylinders, not as true 3D spherical particles.
+
+```text
+number of particles  40
+particle radius      0.01
+particle diameter D  0.02
+particle mass        1.5e-3
+```
+
+The particle bed is arranged as an upper half-cylinder around the blast. The center-to-center spacing is about `1.2D`, so the clear surface gap is about `0.2D`. That spacing is tight enough to look like a bed, but it avoids initial overlap.
+
+## Boundaries
+
+The bottom boundary is a ghost-cell extrapolation:
+
+```python
+"bc_y%beg": -3
+```
+
+The left, right, and top boundaries are ghost-cell extrapolation/open boundaries:
+
+```python
+"bc_x%beg": -3
+"bc_x%end": -3
+"bc_y%end": -3
+```
+
+Important: `-3` is a fluid boundary condition. It does not delete IBM particles and it does not stop the run when a particle leaves the domain. If particle escape should terminate or remove particles, that needs separate IBM logic.
+
+## Physics Model
 
 The case uses two fluids:
 
-- `fluid_pp(1)%eos = 2`: JWL explosive products
-- `fluid_pp(2)%eos = 1`: ideal-gas air
+```text
+fluid 1  JWL explosive products
+fluid 2  ideal-gas air
+```
 
-The domain starts as mostly air with a circular JWL-rich, high-pressure driver placed very close to a small circular immersed boundary. The IB body uses the two-way moving-IBM path with zero initial translational and angular velocity, and a moderate low mass so the blast pressure force can accelerate it without immediately destabilizing the IB pressure correction. This exercises the same mixed JWL pressure/energy/sound-speed path as the 1D case, plus transverse fluxes, 2D IBM marker generation, moving IBM state handling, and IB-state post-processing.
+The JWL constants are TNT-like:
+
+```text
+A      3.712e11 Pa
+B      3.231e9 Pa
+R1     4.15
+R2     0.95
+omega  0.30
+rho0   1630 kg/m3
+E0     1.0089e10 J/kg
+```
+
+The small `eps = 1.0e-8` volume fraction is intentional. It prevents exactly pure-fluid cells in the mixture model, which helps avoid singular mass-fraction and EOS states at sharp JWL/air interfaces.
+
+The exact equation is described in the root `README-JWL-EOS.md`. This case uses the current piecewise implementation: ideal-gas air fallback for very small JWL mass fraction, effective JWL constants in mixed cells, and the standard JWL pressure form in JWL-rich cells.
+
+## IBM Settings
+
+Each particle starts at rest:
+
+```text
+velocity        0
+angular velocity 0
+moving_ibm      2
+slip            T
+```
+
+Collision settings are enabled:
+
+```python
+"collision_model": 1
+"ib_coefficient_of_friction": 0.03
+"collision_time": 5.0e-7
+"coefficient_of_restitution": 0.8
+```
+
+These settings make the case useful for testing particle-bed response, but they should not be treated as calibrated material data.
 
 ## Run
 
@@ -17,52 +108,22 @@ From the MFC repository root:
 ./mfc.sh run examples/2D_jwl_mixture_test/case.py --no-build
 ```
 
-If the current build is stale, omit `--no-build`:
+If the build is stale:
 
 ```bash
 ./mfc.sh run examples/2D_jwl_mixture_test/case.py
 ```
 
-## Expected Result
+The case writes primitive variables, pressure, density, sound speed, energy, and IBM state files.
 
-A successful run completes:
+## What To Look For
 
-- `syscheck`
-- `pre_process`
-- `simulation`
-- `post_process`
+A healthy run should show:
 
-and exits with code `0`.
+- a strong pressure wave expanding upward from the bottom blast,
+- wave reflection from the bottom slip wall,
+- shock interaction with the semicircular particle bed,
+- nonzero particle forces and velocities in `restart_data/ib_state_*.dat`,
+- no negative pressure, NaNs, or immediate IBM instability.
 
-The case is intentionally small: `63x31x0` cells with adaptive-CFL time stepping from a fresh start, `n_start = 0`. The initial timestep is `2.5e-8` s, `cfl_target = 0.5`, and the final physical time is `9.15e-5` s, which matches the previous `3660` fixed-step window. Output is requested every `2.5e-7` s. The IB starts from rest with zero translational and angular velocity, while the nearby JWL driver is initialized at `5.0e9` Pa.
-
-## Key Parameters
-
-- JWL constants are TNT-like:
-  - `A = 3.712e11`
-  - `B = 3.231e9`
-  - `R1 = 4.15`
-  - `R2 = 0.95`
-  - `omega = 0.30`
-  - `rho0 = 1630.0`
-- Mixed JWL support is exercised through:
-  - `fluid_pp(1)%jwl_E0`
-  - `fluid_pp(1)%jwl_air_e0`
-  - `fluid_pp(1)%jwl_air_rho0`
-  - `fluid_pp(1)%jwl_air_gamma`
-- Moving IBM support is exercised through:
-  - `ib = T`
-  - `num_ibs = 1`
-  - `patch_ib(1)%geometry = 2`
-  - `patch_ib(1)%moving_ibm = 2`
-  - `patch_ib(1)%slip = T`
-  - `patch_ib(1)%vel(1) = 0.0`
-  - `patch_ib(1)%angular_vel(3) = 0.0`
-  - `patch_ib(1)%mass = 0.25`
-  - `ib_state_wrt = T`
-
-## Notes
-
-This is a numerical smoke test. It is meant to answer, “does the mixed JWL implementation run in 2D with a nearby light immersed body using the moving-IBM setup and IB-state output?” It is not a calibrated detonation, blast, or fluid-structure validation case.
-
-On macOS, an occasional dynamic-loader failure can occur before `pre_process` starts. If that happens, rerun the same command; the case itself should run cleanly.
+This is a strong regression test for “does the coupled JWL + moving IBM path work?” It is still not a full validation-quality blast-particle calculation.

@@ -1,13 +1,35 @@
-# 1D JWL Mixture Test
+# 1D JWL Mixture Smoke Test
 
-This is a small sanity test for the mixed-material JWL EOS path in MFC.
+This is the smallest practical test for the mixed JWL/air EOS path. It keeps the geometry simple so that failures are easy to diagnose: a JWL-rich high-pressure driver expands into mostly ideal-gas air.
 
-The case uses two fluids:
+The case is intentionally modest. It is not a calibrated detonation problem and it is not meant to match explosive test data. It is a quick check that the new EOS path can initialize pressure, convert between primitive and conservative variables, compute sound speed, march a few steps, and post-process output without producing bad thermodynamic states.
 
-- `fluid_pp(1)%eos = 2`: JWL explosive products
-- `fluid_pp(2)%eos = 1`: ideal-gas air
+## What It Exercises
 
-The domain starts as mostly air with a JWL-rich, high-pressure driver on the left. The purpose is not to model a calibrated detonation, but to verify that pressure, energy conversion, sound speed, and post-processing all work for a simple mixed JWL/air setup.
+The case uses:
+
+```text
+model_eqns  2
+num_fluids  2
+fluid 1     JWL explosive products
+fluid 2     ideal-gas air
+```
+
+The JWL fluid is selected with:
+
+```python
+"fluid_pp(1)%eos": 2
+```
+
+Air remains the standard ideal/stiffened-gas path:
+
+```python
+"fluid_pp(2)%eos": 1
+```
+
+The mixed cells use a tiny volume-fraction floor, `eps = 1.0e-8`, to avoid exactly zero volume fraction for either material. That is a numerical safety device for the mixture model, not a physical interface thickness.
+
+The exact EOS used by this case is documented in the root `README-JWL-EOS.md`. In short, cells with `Y_JWL <= 1.0e-2` use the ideal-gas air fallback, partially mixed cells use effective JWL constants, and JWL-rich cells use the standard JWL pressure form.
 
 ## Run
 
@@ -17,7 +39,7 @@ From the MFC repository root:
 ./mfc.sh run examples/1D_jwl_mixture_test/case.py --no-build
 ```
 
-If the current build is stale, omit `--no-build`:
+If the build is stale:
 
 ```bash
 ./mfc.sh run examples/1D_jwl_mixture_test/case.py
@@ -27,30 +49,37 @@ If the current build is stale, omit `--no-build`:
 
 A successful run completes:
 
-- `syscheck`
-- `pre_process`
-- `simulation`
-- `post_process`
+```text
+syscheck
+pre_process
+simulation
+post_process
+```
 
 and exits with code `0`.
 
-The case is intentionally tiny: `79x0x0` cells and `20` simulation steps.
+Because this is a smoke test, the important result is not a particular shock location. The important result is that pressure, density, energy, and sound speed stay finite and the run completes.
 
-## Key Parameters
+## Parameters
 
-- JWL constants are TNT-like:
-  - `A = 3.712e11`
-  - `B = 3.231e9`
-  - `R1 = 4.15`
-  - `R2 = 0.95`
-  - `omega = 0.30`
-  - `rho0 = 1630.0`
-- Mixed JWL support is exercised through:
-  - `fluid_pp(1)%jwl_E0`
-  - `fluid_pp(1)%jwl_air_e0`
-  - `fluid_pp(1)%jwl_air_rho0`
-  - `fluid_pp(1)%jwl_air_gamma`
+The JWL constants are TNT-like:
 
-## Notes
+```text
+A      3.712e11 Pa
+B      3.231e9 Pa
+R1     4.15
+R2     0.95
+omega  0.30
+rho0   1630 kg/m3
+E0     1.0089e10 J/kg
+```
 
-This is a numerical smoke test. It checks that the implementation runs and produces output without NaNs or EOS conversion failures. It is not a validation case against experimental explosive data.
+The mixed JWL/air helper also uses reference air values:
+
+```text
+air_e0      2.5575e5 J/kg
+air_rho0    1.225 kg/m3
+air_gamma   0.4
+```
+
+In this branch, `jwl_air_gamma` is the `gamma - 1` coefficient used by the current mixed JWL/air helper, matching the convention used in the implementation.
