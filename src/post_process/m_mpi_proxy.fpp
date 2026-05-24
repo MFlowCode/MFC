@@ -125,6 +125,10 @@ contains
             call MPI_BCAST(fluid_pp(i)%jwl_R2, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%jwl_omega, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%jwl_rho0, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%jwl_E0, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%jwl_air_e0, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%jwl_air_rho0, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%jwl_air_gamma, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         end do
 
         ! Subgrid bubble parameters

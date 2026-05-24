@@ -1,36 +1,107 @@
 # JWL EOS in MFC
 
-This branch adds a single-fluid Jones-Wilkins-Lee (JWL) equation of state option.
+This branch adds Jones-Wilkins-Lee (JWL) equation-of-state support to MFC, including mixed-material JWL explosive products with ideal-gas air.
 
-## Select the EOS
+The implementation follows the ROCFLU-style JWL thermodynamic path for pressure, pressure-to-energy conversion, temperature, and sound speed, then wires that path into MFC primitive/conservative conversion, flux conversion, MPI parameter broadcast, GPU-visible parameter arrays, and the Python case schema.
 
-Set the EOS selector for fluid 1 in a case file:
+## Current Capabilities
+
+- Single JWL material in a case through `fluid_pp(i)%eos = 2`.
+- Mixed JWL/air cases with `num_fluids = 2`, using the JWL material mass fraction.
+- JWL pressure from density, specific internal energy, and JWL mass fraction.
+- JWL specific internal energy from pressure, density, and JWL mass fraction.
+- JWL temperature estimate from pressure, density, energy, mass fraction, and `cv`.
+- JWL and mixed JWL/air sound speed.
+- Primitive-to-conservative initialization from pressure.
+- Conservative-to-primitive pressure recovery during the simulation.
+- Flux-state energy conversion.
+- MPI broadcast of all JWL parameters.
+- GPU-visible storage/update for all JWL parameter arrays.
+- Case-file schema and parameter descriptions for JWL inputs.
+- Example 1D and 2D smoke tests.
+- 2D high-pressure JWL blast test with a nearby light moving-IBM body initialized from rest.
+
+## Limitations
+
+The current implementation supports one JWL fluid per case. It explicitly rejects:
+
+- more than one JWL fluid,
+- MHD with JWL,
+- Eulerian bubbles with JWL,
+- chemistry with JWL,
+- `model_eqns = 4` with JWL.
+
+For mixed-material use, `fluid_pp(i)%jwl_E0` must be positive. JWL `R1`, `R2`, `omega`, `rho0`, `jwl_air_e0`, `jwl_air_rho0`, and `jwl_air_gamma` must also be positive.
+
+## EOS Selector
+
+Use:
 
 ```python
 "fluid_pp(1)%eos": 2,
 ```
 
-Values are:
+Supported values are:
 
 ```text
-1 = existing stiffened-gas EOS
+1 = stiffened-gas EOS
 2 = JWL EOS
 ```
 
-The current JWL implementation supports single-fluid, non-chemistry, non-MHD, non-bubble cases. Use `model_eqns = 2` and `num_fluids = 1`.
+For the current mixed JWL/air examples:
 
+```python
+"model_eqns": 2,
+"num_fluids": 2,
+
+"fluid_pp(1)%eos": 2,  # JWL explosive products
+"fluid_pp(2)%eos": 1,  # ideal-gas air
+```
+
+## JWL Parameters
+
+The JWL material requires:
+
+```python
+"fluid_pp(1)%jwl_A": 3.712e11,
+"fluid_pp(1)%jwl_B": 3.231e9,
+"fluid_pp(1)%jwl_R1": 4.15,
+"fluid_pp(1)%jwl_R2": 0.95,
+"fluid_pp(1)%jwl_omega": 0.30,
+"fluid_pp(1)%jwl_rho0": 1630.0,
+```
+
+Mixed JWL/air support also uses:
+
+```python
+"fluid_pp(1)%jwl_E0": 1.0089e10,
+"fluid_pp(1)%jwl_air_e0": 2.5575e5,
+"fluid_pp(1)%jwl_air_rho0": 1.225,
+"fluid_pp(1)%jwl_air_gamma": 0.4,
+```
+
+Parameter meaning:
+
+```text
+jwl_A, jwl_B       JWL pressure constants
+jwl_R1, jwl_R2     JWL exponential coefficients
+jwl_omega          JWL Gruneisen coefficient
+jwl_rho0           JWL reference density
+jwl_E0             reference explosive energy for mixed JWL/air states
+jwl_air_e0         reference air specific internal energy
+jwl_air_rho0       reference air density
+jwl_air_gamma      gamma - 1 for the reference air contribution
+```
+
+Keep units consistent. For example, if pressure is in Pa, use Pa for `A` and `B`; if density is in kg/m3, use kg/m3 for `rho0`.
 
 ## Equation Form
 
-The JWL EOS implemented here uses the relative specific volume
+For a pure JWL state, the pressure form is:
 
 ```text
 V = rho0 / rho
-```
 
-and computes pressure as
-
-```text
 p = A * (1 - omega / (R1 * V)) * exp(-R1 * V)
   + B * (1 - omega / (R2 * V)) * exp(-R2 * V)
   + omega * rho * e
@@ -39,135 +110,74 @@ p = A * (1 - omega / (R1 * V)) * exp(-R1 * V)
 where:
 
 ```text
-p     = pressure
-rho   = current density
-rho0  = reference density
-V     = relative specific volume
-e     = specific internal energy
-A, B  = pressure constants
-R1,R2 = exponential constants
-omega = JWL Gruneisen coefficient
+p     pressure
+rho   mixture or material density
+rho0  JWL reference density
+V     relative specific volume
+e     specific internal energy
+A, B  pressure constants
+R1,R2 exponential constants
+omega JWL Gruneisen coefficient
 ```
 
-In the MFC implementation, total energy and kinetic energy are stored per volume, so
+In MFC, total energy and kinetic energy are stored per volume, so:
 
 ```text
 rho * e = total_energy - kinetic_energy
 ```
 
-The code therefore evaluates the pressure as
+For pressure initialization, the inverse is direct once the cold pressure term is known:
 
 ```text
-pcold = A * (1 - omega / (R1 * V)) * exp(-R1 * V)
-      + B * (1 - omega / (R2 * V)) * exp(-R2 * V)
-
-p = pcold + omega * (total_energy - kinetic_energy)
+e = (p - pcold) / (omega * rho)
 ```
 
-For primitive-to-conservative initialization from pressure, the inverse is direct:
+For mixed JWL/air states, MFC passes the JWL mass fraction `Y` into the JWL helpers. The implementation uses ROCFLU-style mixture pressure, pressure-to-energy, temperature, and sound-speed helpers:
 
 ```text
-total_energy = kinetic_energy + (p - pcold) / omega
+s_jwl_pressure_er
+s_jwl_energy_pr
+s_jwl_temperature_pr
+s_jwl_mixture_sound_speed_squared
 ```
 
-The JWL sound-speed branch uses
+## Code Map
+
+Main implementation:
 
 ```text
-c^2 = dpcold/drho + ((1 + omega) * p - pcold) / rho
+src/common/m_variables_conversion.fpp
 ```
 
-## Required JWL Parameters
-
-Add the six JWL constants to the case file:
-
-```python
-"fluid_pp(1)%jwl_A": 3.712e11,
-"fluid_pp(1)%jwl_B": 3.231e9,
-"fluid_pp(1)%jwl_R1": 4.15,
-"fluid_pp(1)%jwl_R2": 0.95,
-"fluid_pp(1)%jwl_omega": 0.30,
-"fluid_pp(1)%jwl_rho0": 1630.0,
-```
-
-Keep units consistent: `A`, `B`, and pressure must use the same pressure unit; `rho0` and density must use the same density unit.
-
-## Minimal Case Settings
-
-A minimal JWL setup should include:
-
-```python
-"model_eqns": 2,
-"num_fluids": 1,
-"mhd": "F",
-"bubbles_euler": "F",
-
-"patch_icpp(1)%geometry": 1,
-"patch_icpp(1)%x_centroid": 0.0005,
-"patch_icpp(1)%length_x": 0.001,
-"patch_icpp(1)%vel(1)": 0.0,
-"patch_icpp(1)%pres": 2.0e10,
-"patch_icpp(1)%alpha_rho(1)": 1630.0,
-"patch_icpp(1)%alpha(1)": 1.0,
-
-"fluid_pp(1)%eos": 2,
-"fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
-"fluid_pp(1)%pi_inf": 0.0,
-"fluid_pp(1)%jwl_A": 3.712e11,
-"fluid_pp(1)%jwl_B": 3.231e9,
-"fluid_pp(1)%jwl_R1": 4.15,
-"fluid_pp(1)%jwl_R2": 0.95,
-"fluid_pp(1)%jwl_omega": 0.30,
-"fluid_pp(1)%jwl_rho0": 1630.0,
-```
-
-`gamma` and `pi_inf` are still read by existing MFC setup paths, but the JWL pressure/energy branch uses the JWL constants.
-
-Make sure the initial pressure is high enough that `(p - pcold) / omega` is positive. Otherwise the initialized internal energy is negative.
-
-## Build and Run
-
-From the MFC repository root:
-
-```bash
-./mfc.sh build --no-mpi -j 4
-./mfc.sh run path/to/case.py --no-mpi --no-build
-```
-
-To write useful fields, enable output such as:
-
-```python
-"prim_vars_wrt": "T",
-"rho_wrt": "T",
-"E_wrt": "T",
-"pres_wrt": "T",
-```
-
-## Where the EOS Is Implemented
-
-The JWL pressure helper is in `src/common/m_variables_conversion.fpp`:
-
-```fortran
-subroutine s_jwl_pcold(rho, A, B, R1, R2, omega, rho0, pcold)
-```
-
-The full pressure uses:
+Key helpers:
 
 ```text
-p = pcold + omega * (total_energy - kinetic_energy)
+s_jwl_pcold
+s_jwl_dpcold_drho
+s_jwl_sound_speed_squared
+s_jwl_mixture_sound_speed_squared
+s_jwl_pressure_er
+s_jwl_energy_pr
+s_jwl_temperature_pr
 ```
 
-Since MFC stores total and kinetic energy per volume, `(total_energy - kinetic_energy)` is `rho * e`.
+Integration points in `m_variables_conversion.fpp`:
 
+```text
+s_compute_pressure
+s_convert_conservative_to_primitive_variables
+s_convert_primitive_to_conservative_variables
+s_convert_primitive_to_flux_variables
+s_compute_speed_of_sound
+```
 
-## Modified Code Map
-
-The implementation touches these files:
+JWL material parameters are stored in:
 
 ```text
 src/common/m_derived_types.fpp
 ```
 
-Adds the EOS selector and JWL material constants to `type physical_parameters`:
+as:
 
 ```text
 fluid_pp(i)%eos
@@ -177,31 +187,13 @@ fluid_pp(i)%jwl_R1
 fluid_pp(i)%jwl_R2
 fluid_pp(i)%jwl_omega
 fluid_pp(i)%jwl_rho0
+fluid_pp(i)%jwl_E0
+fluid_pp(i)%jwl_air_e0
+fluid_pp(i)%jwl_air_rho0
+fluid_pp(i)%jwl_air_gamma
 ```
 
-```text
-src/common/m_variables_conversion.fpp
-```
-
-Adds the JWL thermodynamic implementation:
-
-```text
-s_jwl_pcold              computes the JWL cold pressure terms
-s_jwl_dpcold_drho       computes d(pcold)/d(rho) for sound speed
-s_compute_pressure      selects JWL when fluid_pp(1)%eos = 2
-s_convert_primitive_to_conservative_variables
-                         computes total energy from JWL pressure
-s_convert_primitive_to_flux_variables
-                         computes JWL total energy for fluxes
-s_compute_speed_of_sound
-                         uses the JWL sound-speed expression
-```
-
-It also allocates GPU-visible arrays for the EOS selector and JWL constants:
-
-```text
-eos_idxs, jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s
-```
+Defaults are set in:
 
 ```text
 src/pre_process/m_global_parameters.fpp
@@ -209,11 +201,7 @@ src/simulation/m_global_parameters.fpp
 src/post_process/m_global_parameters.fpp
 ```
 
-Set default values for the new fields. The default remains stiffened gas:
-
-```text
-fluid_pp(i)%eos = 1
-```
+MPI broadcasts are handled in:
 
 ```text
 src/pre_process/m_mpi_proxy.fpp
@@ -221,22 +209,136 @@ src/simulation/m_mpi_proxy.fpp
 src/post_process/m_mpi_proxy.fpp
 ```
 
-Broadcast the new EOS selector and JWL constants for MPI runs.
+Case schema and descriptions are registered in:
 
 ```text
 toolchain/mfc/params/definitions.py
 toolchain/mfc/params/descriptions.py
 ```
 
-Register the new case-file parameters so cases can use:
+## Example Cases
 
-```python
-"fluid_pp(1)%eos": 2,
-"fluid_pp(1)%jwl_A": ...,
-"fluid_pp(1)%jwl_B": ...,
-"fluid_pp(1)%jwl_R1": ...,
-"fluid_pp(1)%jwl_R2": ...,
-"fluid_pp(1)%jwl_omega": ...,
-"fluid_pp(1)%jwl_rho0": ...,
+### 1D Mixed JWL/Air Smoke Test
+
+```text
+examples/1D_jwl_mixture_test/case.py
+examples/1D_jwl_mixture_test/README.md
 ```
 
+This is a small 1D JWL-rich pressure driver expanding into mostly air.
+
+Current settings:
+
+```text
+grid          79x0x0
+dt            1.0e-7
+steps         20
+save period   10
+driver p      1.0e7 Pa
+```
+
+Run:
+
+```bash
+./mfc.sh run examples/1D_jwl_mixture_test/case.py --no-build
+```
+
+### 2D Mixed JWL/Air Blast With Light IBM Body
+
+```text
+examples/2D_jwl_mixture_test/case.py
+examples/2D_jwl_mixture_test/README.md
+```
+
+This is a 2D high-pressure JWL blast near a circular immersed body. The body uses the moving-IBM path, starts with zero translational and angular velocity, and has low mass so pressure forces can accelerate it.
+
+Current settings:
+
+```text
+grid              63x31x0
+dt                2.5e-8
+steps             1000
+save period       250
+driver p          5.0e9 Pa
+driver center     (0.20, 0.25)
+driver radius     0.09
+IB center         (0.34, 0.25)
+IB radius         0.045
+IB surface gap    about 0.005
+IB initial vel    0
+IB angular vel    0
+IB mass           0.01
+```
+
+Run:
+
+```bash
+./mfc.sh run examples/2D_jwl_mixture_test/case.py --no-build
+```
+
+Expected post-process output times:
+
+```text
+0, 250, 500, 750, 1000
+```
+
+Expected moving-IBM output includes:
+
+```text
+restart_data/ib_state_250.dat
+restart_data/ib_state_500.dat
+restart_data/ib_state_750.dat
+restart_data/ib_state_1000.dat
+
+p_all/p0/250/ib_data.dat
+p_all/p0/500/ib_data.dat
+p_all/p0/750/ib_data.dat
+p_all/p0/1000/ib_data.dat
+```
+
+## Build and Verification
+
+Build:
+
+```bash
+./mfc.sh build -j 2
+```
+
+Run the smoke tests:
+
+```bash
+./mfc.sh run examples/1D_jwl_mixture_test/case.py --no-build
+./mfc.sh run examples/2D_jwl_mixture_test/case.py --no-build
+```
+
+The current branch has been verified with:
+
+```text
+./mfc.sh build -j 2
+./mfc.sh run examples/1D_jwl_mixture_test/case.py --no-build
+./mfc.sh run examples/2D_jwl_mixture_test/case.py --no-build
+```
+
+The 2D case completed 1000 steps with the stronger `5.0e9` Pa driver and the light `0.01` mass IBM body.
+
+On macOS, `mpirun` may occasionally fail before `pre_process` starts with a dynamic-loader `dyld` error. That failure is outside the case physics; rerunning the same command has completed cleanly.
+
+## Files Changed
+
+```text
+README-JWL-EOS.md
+src/common/m_derived_types.fpp
+src/common/m_variables_conversion.fpp
+src/pre_process/m_global_parameters.fpp
+src/pre_process/m_mpi_proxy.fpp
+src/simulation/m_global_parameters.fpp
+src/simulation/m_mpi_proxy.fpp
+src/post_process/m_global_parameters.fpp
+src/post_process/m_mpi_proxy.fpp
+toolchain/mfc/params/definitions.py
+toolchain/mfc/params/descriptions.py
+examples/1D_jwl_mixture_test/case.py
+examples/1D_jwl_mixture_test/README.md
+examples/2D_jwl_mixture_test/case.py
+examples/2D_jwl_mixture_test/README.md
+```

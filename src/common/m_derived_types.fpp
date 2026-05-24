@@ -323,6 +323,10 @@ module m_derived_types
         real(wp)               :: jwl_R2
         real(wp)               :: jwl_omega
         real(wp)               :: jwl_rho0
+        real(wp)               :: jwl_E0
+        real(wp)               :: jwl_air_e0
+        real(wp)               :: jwl_air_rho0
+        real(wp)               :: jwl_air_gamma
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models

@@ -445,6 +445,10 @@ HINTS = {
         "jwl_R2": "JWL exponential coefficient R2",
         "jwl_omega": "JWL Gruneisen coefficient omega",
         "jwl_rho0": "JWL reference density",
+        "jwl_E0": "JWL reference explosive energy",
+        "jwl_air_e0": "JWL air/reference specific internal energy",
+        "jwl_air_rho0": "JWL air/reference density",
+        "jwl_air_gamma": "JWL air/reference gamma-minus-one",
     },
 }
 
@@ -1168,6 +1172,10 @@ def _load():
             ("jwl_R2", r"\f$R_{2,k}\f$"),
             ("jwl_omega", r"\f$\omega_k\f$"),
             ("jwl_rho0", r"\f$\rho_{0,k}\f$"),
+            ("jwl_E0", r"\f$E_{0,k}\f$"),
+            ("jwl_air_e0", r"\f$e_{\mathrm{air},k}\f$"),
+            ("jwl_air_rho0", r"\f$\rho_{\mathrm{air},k}\f$"),
+            ("jwl_air_gamma", r"\f$\gamma_{\mathrm{air},k}-1\f$"),
         ]:
             _r(f"{px}{a}", REAL, math=sym)
         _r(f"{px}mul0", REAL, {"viscosity"}, math=r"\f$\mu_{l,k}\f$")
