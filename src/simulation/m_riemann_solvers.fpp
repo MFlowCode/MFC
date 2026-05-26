@@ -244,8 +244,7 @@ contains
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
                                     & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, &
-                                        & xi_P]', copyin='[norm_dir]')
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, xi_P]', copyin='[norm_dir]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -440,11 +439,11 @@ contains
                                     pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                                 #:endif
                                 E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R &
-                                    & + pres_mag%R  ! includes magnetic energy
+                                ! includes magnetic energy
+                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R
                                 H_L = (E_L + pres_L - pres_mag%L)/rho_L
-                                H_R = (E_R + pres_R - pres_mag%R) &
-                                       & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                H_R = (E_R + pres_R - pres_mag%R)/rho_R
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
@@ -821,9 +820,8 @@ contains
                                                           & eqn_idx%psi) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, &
                                                           & eqn_idx%psi)))/(s_M - s_P)
                                     else
-                                        flux_rs${XYZ}$_vf(j, k, l, &
-                                                          & eqn_idx%B%beg + norm_dir - 1) &
-                                                          & = 0._wp  ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
+                                        ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
+                                        flux_rs${XYZ}$_vf(j, k, l, eqn_idx%B%beg + norm_dir - 1) = 0._wp
                                     end if
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, eqn_idx%adv%beg) = 0._wp
@@ -1183,11 +1181,11 @@ contains
                                 pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
                                 pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                                 E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R &
-                                    & + pres_mag%R  ! includes magnetic energy
+                                ! includes magnetic energy
+                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R
                                 H_L = (E_L + pres_L - pres_mag%L)/rho_L
-                                H_R = (E_R + pres_R - pres_mag%R) &
-                                       & /rho_R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                H_R = (E_R + pres_R - pres_mag%R)/rho_R
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
@@ -3882,8 +3880,8 @@ contains
                             E%L = gamma%L*pres%L + pi_inf%L + 0.5_wp*rho%L*vel_rms%L + qv%L + pres_mag%L
                             E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R  ! includes magnetic energy
                             H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
-                            H_no_mag%R = (E%R + pres%R - pres_mag%R) &
-                                          & /rho%R  ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                            ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                            H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R
 
                             ! (2) Compute fast wave speeds
                             call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, &
@@ -4185,8 +4183,8 @@ contains
 
                             ! NOTE: unlike HLL & HLLC, vel%L here is permutated by dir_idx for simpler logic
                             do i = 1, num_vels
-                                vel%L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, &
-                                      & eqn_idx%cont%end + i)  ! Don't permutate here; permutate u <-> v later at u_n_L = vel%L(1)
+                                ! Don't permutate here; permutate u <-> v later at u_n_L = vel%L(1)
+                                vel%L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, eqn_idx%cont%end + i)
                                 vel%R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, eqn_idx%cont%end + i)
 
                                 vel_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, eqn_idx%cont%end + i)

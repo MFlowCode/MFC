@@ -262,6 +262,7 @@ _SIMPLE_DESCS = {
     "muscl_order": "MUSCL reconstruction order",
     "muscl_lim": "MUSCL limiter type",
     "muscl_eps": "MUSCL limiter slope-product threshold",
+    "recon_comp_rho": "Reconstruct per-component density instead of partial density",
     "low_Mach": "Low Mach number correction",
     "bubble_model": "Bubble dynamics model",
     "Ca": "Cavitation number",
@@ -902,6 +903,7 @@ def _load():
     _r("muscl_order", INT)
     _r("muscl_lim", INT)
     _r("muscl_eps", REAL)
+    _r("recon_comp_rho", LOG)
     _r("weno_eps", REAL, {"weno"}, math=r"\f$\varepsilon\f$")
     _r("teno_CT", REAL, {"weno"}, math=r"\f$C_T\f$")
     _r("wenoz_q", REAL, {"weno"})

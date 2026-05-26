@@ -149,6 +149,7 @@ module m_global_parameters
     !> @}
 
     real(wp) :: muscl_eps               !< MUSCL limiter slope-product threshold
+    logical  :: recon_comp_rho          !< When T, reconstruct per-component rho_K instead of alpha_K*rho_K
     real(wp) :: weno_eps                !< Binding for the WENO nonlinear weights
     real(wp) :: teno_CT                 !< Smoothness threshold for TENO
     logical  :: mp_weno                 !< Monotonicity preserving (MP) WENO
@@ -211,7 +212,7 @@ module m_global_parameters
         $:GPU_DECLARE(create='[recon_type, muscl_order, muscl_polyn, muscl_lim]')
     #:endif
 
-    $:GPU_DECLARE(create='[muscl_eps]')
+    $:GPU_DECLARE(create='[muscl_eps, recon_comp_rho]')
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
@@ -539,6 +540,7 @@ contains
         mpp_lim = .false.
         time_stepper = dflt_int
         muscl_eps = dflt_real
+        recon_comp_rho = .false.
         weno_eps = dflt_real
         teno_CT = dflt_real
         mp_weno = .false.
@@ -1235,8 +1237,8 @@ contains
         ! HLL Method 1 (alpha-interface): flux_src(adv_idx%beg:adv_idx%end) carries interface alpha_k per fluid.
         adv_src_alpha_iface = (riemann_solver == 1 .and. .not. hll_u_interface)
         ! HLLC, HLL Method 2 (u-interface), exact, LF: flux_src(adv_idx%beg) carries one shared face-normal interface velocity.
-        adv_src_vel_iface = (riemann_solver == 1 .and. hll_u_interface) &
-                             & .or. riemann_solver == 2 .or. riemann_solver == 3 .or. riemann_solver == 5
+        adv_src_vel_iface = (riemann_solver == 1 .and. hll_u_interface) .or. riemann_solver == 2 .or. riemann_solver == 3 &
+                             & .or. riemann_solver == 5
         ! MHD HLLD: single species, so there is no volume fraction to advect. Hypo HLLD: the dual-pass formulation keeps all NC
         ! terms inside the Riemann flux.
         adv_src_none = (riemann_solver == 4)
@@ -1266,8 +1268,8 @@ contains
         ! 1. adv_src_alpha_iface + alt_soundspeed: face-normal velocity only, for the KdivU correction (flux_src already carries
         ! alpha in this mode) 2. hypo_nc_interface: all components for the hypoelastic velocity-gradient tensor 3. hypo_nc_dual_pass
         ! + axisym: normal + tangential velocity for the axisymmetric geometry correction
-        use_nc_iface_vel = hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            & .or. (adv_src_alpha_iface .and. alt_soundspeed)
+        use_nc_iface_vel = hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) .or. (adv_src_alpha_iface &
+            & .and. alt_soundspeed)
 
         $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
         $:GPU_UPDATE(device='[b_size, tensor_size]')
@@ -1298,7 +1300,7 @@ contains
         #:endif
 
         $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')
-        $:GPU_UPDATE(device='[muscl_eps]')
+        $:GPU_UPDATE(device='[muscl_eps, recon_comp_rho]')
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')
