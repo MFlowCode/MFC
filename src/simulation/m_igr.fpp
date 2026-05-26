@@ -302,7 +302,7 @@ contains
 
             call s_populate_F_igr_buffers(bc_type, jac_sf)
 
-            if (igr_iter_solver == 1 .or. dummy) then  ! Jacobi iteration
+            if (igr_iter_solver == 1) then  ! Jacobi iteration
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end

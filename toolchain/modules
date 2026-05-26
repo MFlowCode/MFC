@@ -50,6 +50,7 @@ famd    OLCF Frontier AMD
 famd-all python cmake
 famd-all cpe/25.09
 famd-all PrgEnv-amd
+famd-all amd/7.2.0 rocm/7.2.0
 
 tuo     OLCF Tuolumne
 tuo-all cpe/25.03 rocm/6.3.1

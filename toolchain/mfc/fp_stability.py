@@ -79,6 +79,57 @@ _EXTERNAL_SRCS = ("xalt", "dl-init", "ld-linux", "libc.so", "libm.so")
 # Matches the first "at" frame in a Valgrind stack trace: "(file.fpp:LINE)".
 _VGFRAME_RE = re.compile(r"\(([^):]+\.(?:fpp|f90|F90|c|cpp))\s*:(\d+)\)")
 
+# Lines that are clearly control-flow delimiters rather than arithmetic.
+# dd_line sometimes reports these when the responsible arithmetic is on the
+# preceding line but shares DWARF debug info with the delimiter (e.g. loop
+# boundaries in #:for-expanded code, or inlined functions at call sites).
+_CONTROL_FLOW_RE = re.compile(
+    r"^\s*("
+    r"end\s+(do|if|select|where|forall|subroutine|function|module|program|block)\b"
+    r"|do\s+\w+\s*=\s*[\w,\s]+"  # naked do-loop header (no arithmetic)
+    r"|else(\s+if\s*\(.*\)\s*then)?\s*$"  # else / else if (...) then
+    r"|(recursive\s+|pure\s+|elemental\s+)*subroutine\s+\w+"  # subroutine declaration
+    r"|\$:END_GPU\w+"  # fypp GPU macro closers
+    r"|#:end\w*"  # fypp directive closers (#:endfor, #:enddef, etc.)
+    r"|\s*!\s*$"  # comment-only lines
+    r"|\s*$"  # blank lines
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _read_source_line(fname: str, lineno: int) -> str:
+    """Return the raw source line at lineno (1-based), or '' if unavailable."""
+    if os.path.isabs(fname) and os.path.isfile(fname):
+        candidates = [fname]
+    else:
+        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
+    if not candidates:
+        return ""
+    try:
+        with open(candidates[0]) as fh:
+            lines = fh.readlines()
+        return lines[lineno - 1] if 0 < lineno <= len(lines) else ""
+    except OSError:
+        return ""
+
+
+def _is_arithmetic_loc(fname: str, start: int, end: int) -> bool:
+    """Return True if any line in [start, end] contains non-trivial arithmetic.
+
+    Filters out loop delimiters and fypp directive lines that dd_line sometimes
+    reports when the responsible arithmetic shares DWARF info with its enclosing
+    control-flow boundary (inlining, #:for template expansion, etc.).
+    Returns True (keep) when uncertain so we never silently drop real hotspots.
+    """
+    for lineno in range(start, end + 1):
+        line = _read_source_line(fname, lineno)
+        if not line:
+            return True  # can't read — keep to be safe
+        if not _CONTROL_FLOW_RE.match(line):
+            return True
+    return False
+
 
 def _get_source_context(fname: str, lineno: int, context: int = 2) -> str:
     """Return a annotated source snippet around lineno, or '' if file not found.
@@ -572,7 +623,12 @@ def _run_cancellation_check(case: dict, verrou_bin: str, sim_bin: str, work_dir:
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="nearest", extra_flags=flags)
     except MFCException:
         pass
-    return _parse_cancel_gen(gen_path)
+    raw = _parse_cancel_gen(gen_path)
+    filtered = [(f, ln) for f, ln in raw if _is_arithmetic_loc(f, ln, ln)]
+    skipped = len(raw) - len(filtered)
+    if skipped:
+        cons.print(f"  [dim]cancellation: filtered {skipped} control-flow boundary site(s)[/dim]")
+    return filtered
 
 
 def _run_mca_samples(
@@ -683,8 +739,15 @@ def _write_dd_run_sh(path: str, verrou_bin: str, sim_bin: str, ic_dir: str):
         # test steps while letting the reference use nearest-rounding.
         ROUND="${{VERROU_ROUNDING_MODE:-float}}"
 
+        # verrou_dd_sym injects VERROU_EXCLUDE (symbols to exclude from perturbation).
+        # verrou_dd_line injects VERROU_SOURCE (source lines to restrict perturbation to).
+        # Forward them as valgrind flags when set.
+        EXTRA=""
+        [ -n "${{VERROU_EXCLUDE:-}}" ] && EXTRA="$EXTRA --exclude=$VERROU_EXCLUDE"
+        [ -n "${{VERROU_SOURCE:-}}" ]  && EXTRA="$EXTRA --source=$VERROU_SOURCE"
+
         cd "$TMPDIR_RUN"
-        "$VERROU_BIN" --tool=verrou --error-limit=no --rounding-mode="$ROUND" "$SIM_BIN"
+        "$VERROU_BIN" --tool=verrou --error-limit=no --rounding-mode="$ROUND" $EXTRA "$SIM_BIN"
         rc=$?
 
         [ -d "$TMPDIR_RUN/D" ] && cp -a "$TMPDIR_RUN/D/." "$RUNDIR/"
@@ -741,10 +804,17 @@ def _dd_env(verrou_bin: str) -> dict:
 
 
 def _parse_rddmin_locs(summary_path: str) -> list:
-    """Extract [(rel_path, start_line, end_line)] from a dd_line rddmin_summary."""
+    """Extract [(rel_path, start_line, end_line)] from a dd_line rddmin_summary.
+
+    Filters out locations whose source lines are pure control-flow delimiters
+    (loop boundaries, fypp directive closers, blank/comment lines).  These can
+    appear when the responsible arithmetic shares DWARF debug info with an
+    enclosing boundary due to inlining or #:for template expansion.
+    """
     if not os.path.isfile(summary_path):
         return []
     locs = []
+    skipped = []
     with open(summary_path) as fh:
         for line in fh:
             m = _LOC_RE.search(line)
@@ -759,16 +829,41 @@ def _parse_rddmin_locs(summary_path: str) -> list:
                     rel = path
             except ValueError:
                 rel = path
-            locs.append((rel.replace("\\", "/"), start, end))
+            rel = rel.replace("\\", "/")
+            if _is_arithmetic_loc(path, start, end):
+                locs.append((rel, start, end))
+            else:
+                skipped.append((rel, start, end))
+    for rel, start, end in skipped:
+        loc = f"{rel}:{start}" if start == end else f"{rel}:{start}-{end}"
+        cons.print(f"  [dim]dd_line: skipped control-flow boundary {loc}[/dim]")
     return locs
 
 
 def _parse_rddmin_syms(summary_path: str) -> list:
-    """Extract symbol/function names from a dd_sym rddmin_summary."""
+    """Extract symbol/function names from a dd_sym rddmin_summary.
+
+    rddmin_summary format:
+      ddmin0:\\tFail Ratio: ...\\tFail indexes: ...
+      \\t<funcname>\\t<binary_path>
+      ddmin1:\\t...
+      \\t<funcname>\\t<binary_path>
+
+    Lines starting with 'ddmin' are metadata; function names are on the
+    indented (tab-prefixed) lines as the first tab-delimited field.
+    """
     if not os.path.isfile(summary_path):
         return []
+    syms = []
     with open(summary_path) as fh:
-        return [ln.strip() for ln in fh if ln.strip()]
+        for ln in fh:
+            stripped = ln.strip()
+            if not stripped or stripped.startswith("ddmin"):
+                continue
+            sym = stripped.split("\t")[0].strip()
+            if sym:
+                syms.append(sym)
+    return syms
 
 
 def _run_dd_tool(
@@ -821,7 +916,14 @@ def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_di
     return _parse_rddmin_syms(os.path.join(dd_dir, "dd.sym", "rddmin_summary"))
 
 
-def _run_dd_line(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str, threshold: float = None) -> list:
+def _run_dd_line(
+    case: dict,
+    verrou_bin: str,
+    sim_bin: str,
+    work_dir: str,
+    log_dir: str,
+    threshold: float = None,
+) -> list:
     """Run verrou_dd_line; return list of (rel_path, start_line, end_line) tuples."""
     dd_bin = _find_dd_line(verrou_bin)
     if not dd_bin:
@@ -833,12 +935,8 @@ def _run_dd_line(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_d
     dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
     dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
     effective_threshold = threshold if threshold is not None else case["threshold"]
-    if not os.path.isfile(dd_run_sh):
-        _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
-        _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
-    else:
-        # dd_sym already wrote dd_cmp.py with its threshold; rewrite with ours if different
-        _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
+    _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
+    _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_line.log", "dd.line", "verrou_dd_line")
     return _parse_rddmin_locs(os.path.join(dd_dir, "dd.line", "rddmin_summary"))
 
@@ -954,7 +1052,14 @@ def _run_case(
                 cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
         if dd_threshold > 0 and run_dd_line:
             try:
-                result["dd_line_locs"] = _run_dd_line(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=dd_threshold)
+                result["dd_line_locs"] = _run_dd_line(
+                    case,
+                    verrou_bin,
+                    sim_bin,
+                    work_dir,
+                    log_dir,
+                    threshold=dd_threshold,
+                )
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
 

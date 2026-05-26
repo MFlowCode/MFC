@@ -101,6 +101,12 @@ jobs:
         run: ~/.local/verrou/bin/valgrind --version
 
       - name: Build MFC (debug, serial)
+        # FFLAGS=-fno-inline prevents gfortran from inlining small functions into
+        # their callers.  Without it, DWARF debug info attributes inlined ops to
+        # the caller's line (often a do-loop header), making Verrou dd_line point
+        # to loop boundaries instead of the actual arithmetic.
+        env:
+          FFLAGS: "-fno-inline"
         run: ./mfc.sh build -t pre_process simulation --no-mpi --debug -j"$(nproc)"
 
       - name: Run FP Stability Suite

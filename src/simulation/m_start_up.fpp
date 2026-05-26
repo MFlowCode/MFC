@@ -933,10 +933,10 @@ contains
 
         ! Computation of parameters, allocation of memory, association of pointers, and/or execution of any other tasks that are
         ! needed to properly configure the modules. The preparations below DO DEPEND on the grid being complete.
-        if (igr .or. dummy) then
+        if (igr) then
             call s_initialize_igr_module()
         end if
-        if (.not. igr .or. dummy) then
+        if (.not. igr) then
             if (recon_type == WENO_TYPE) then
                 call s_initialize_weno_module()
             else if (recon_type == MUSCL_TYPE) then
@@ -1093,14 +1093,6 @@ contains
         end if
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[igr, nb, igr_order]')
-        #:endif
-        #:if USING_AMD
-            block
-                use m_thermochem, only: molecular_weights
-                use m_chemistry, only: molecular_weights_nonparameter
-                molecular_weights_nonparameter(:) = molecular_weights(:)
-                $:GPU_UPDATE(device='[molecular_weights_nonparameter]')
-            end block
         #:endif
 
     end subroutine s_initialize_gpu_vars
