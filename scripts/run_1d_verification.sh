@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 CASES=(
   "examples/1D_sodshocktube_muscl/case.py"
-  "examples/1D_inert_shocktube/case.py --no-chem"
+  "examples/1D_laxshocktube/case.py"
   "examples/1D_jwl_single_material_shocktube/case.py"
 )
 
@@ -21,6 +21,6 @@ for case_cmd in "${CASES[@]}"; do
   echo "Completed: $case_cmd"
   echo "============================================================"
   echo
- done
+done
 
- echo "All 1D verification cases completed."
+echo "All 1D verification cases completed."
