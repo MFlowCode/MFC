@@ -132,8 +132,8 @@ contains
         if (xy_local(2) >= 0._wp) then
             ! finds the location on the airfoil grid with the minimum distance (closest)
             do k = 1, Np
-                dist_vec(1) = xy_local(1) - airfoil_grid_u(k)%x
-                dist_vec(2) = xy_local(2) - airfoil_grid_u(k)%y
+                dist_vec(1) = airfoil_grid_u(k)%x - xy_local(1)
+                dist_vec(2) = airfoil_grid_u(k)%y - xy_local(2)
                 dist_vec(3) = 0._wp
                 dist = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -146,14 +146,14 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = xy_local(1) - airfoil_grid_u(global_id)%x
-            dist_vec(2) = xy_local(2) - airfoil_grid_u(global_id)%y
+            dist_vec(1) = airfoil_grid_u(global_id)%x - xy_local(1)
+            dist_vec(2) = airfoil_grid_u(global_id)%y - xy_local(2)
             dist_vec(3) = 0
             dist = global_dist
         else
             do k = 1, Np
-                dist_vec(1) = xy_local(1) - airfoil_grid_l(k)%x
-                dist_vec(2) = xy_local(2) - airfoil_grid_l(k)%y
+                dist_vec(1) = airfoil_grid_l(k)%x - xy_local(1)
+                dist_vec(2) = airfoil_grid_l(k)%y - xy_local(2)
                 dist_vec(3) = 0
                 dist = sqrt(sum(dist_vec**2))
                 if (k == 1) then
