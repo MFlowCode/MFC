@@ -440,8 +440,6 @@ contains
     !> @brief function checks if this local MPI processor owns this specific collision
     function f_neighborhood_ranks_own_location(location) result(owns_collision)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
-
         real(wp), dimension(3), intent(in) :: location
         logical                            :: owns_collision, periodic_owner
         real(wp)                           :: temp_neighbor_domain

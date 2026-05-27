@@ -1227,6 +1227,8 @@ contains
 
         num_gbl_ibs = num_ibs
         num_local_ibs = num_ibs
+        @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
+                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
         do i = 1, num_local_ibs_max
             local_ib_patch_ids(i) = i
         end do

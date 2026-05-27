@@ -1364,28 +1364,28 @@ contains
         real(wp), dimension(:), allocatable             :: angle_x, angle_y, angle_z
         real(wp), dimension(:), allocatable             :: ib_diameter
 
-        ! Build path to per-timestep IB state file
-        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
-        file_loc = trim(case_dir) // trim(file_loc)
+        if (proc_rank == 0) then
+            ! Build path to per-timestep IB state file
+            write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+            file_loc = trim(case_dir) // trim(file_loc)
 
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (.not. file_exist) then
-            call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
-        end if
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (.not. file_exist) then
+                call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
+            end if
 
-        nBodies = num_ibs
+            nBodies = num_ibs
 
-        if (nBodies > 0) then
-            allocate (ib_data(nBodies, NFIELDS_PER_IB))
-            allocate (px(nBodies), py(nBodies), pz(nBodies))
-            allocate (force_x(nBodies), force_y(nBodies), force_z(nBodies))
-            allocate (torque_x(nBodies), torque_y(nBodies), torque_z(nBodies))
-            allocate (vel_x(nBodies), vel_y(nBodies), vel_z(nBodies))
-            allocate (omega_x(nBodies), omega_y(nBodies), omega_z(nBodies))
-            allocate (angle_x(nBodies), angle_y(nBodies), angle_z(nBodies))
-            allocate (ib_diameter(nBodies))
+            if (nBodies > 0) then
+                allocate (ib_data(nBodies, NFIELDS_PER_IB))
+                allocate (px(nBodies), py(nBodies), pz(nBodies))
+                allocate (force_x(nBodies), force_y(nBodies), force_z(nBodies))
+                allocate (torque_x(nBodies), torque_y(nBodies), torque_z(nBodies))
+                allocate (vel_x(nBodies), vel_y(nBodies), vel_z(nBodies))
+                allocate (omega_x(nBodies), omega_y(nBodies), omega_z(nBodies))
+                allocate (angle_x(nBodies), angle_y(nBodies), angle_z(nBodies))
+                allocate (ib_diameter(nBodies))
 
-            if (proc_rank == 0) then
                 open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
                 if (ios /= 0) call s_mpi_abort('Cannot open IB state file: ' // trim(file_loc))
 
@@ -1430,12 +1430,12 @@ contains
                 call s_write_ib_variable('ib_angle_y', t_step, angle_y, nBodies)
                 call s_write_ib_variable('ib_angle_z', t_step, angle_z, nBodies)
                 call s_write_ib_variable('ib_diameter', t_step, ib_diameter, nBodies)
-            end if
 
-            deallocate (ib_data, px, py, pz, force_x, force_y, force_z)
-            deallocate (torque_x, torque_y, torque_z, vel_x, vel_y, vel_z)
-            deallocate (omega_x, omega_y, omega_z, angle_x, angle_y, angle_z)
-            deallocate (ib_diameter)
+                deallocate (ib_data, px, py, pz, force_x, force_y, force_z)
+                deallocate (torque_x, torque_y, torque_z, vel_x, vel_y, vel_z)
+                deallocate (omega_x, omega_y, omega_z, angle_x, angle_y, angle_z)
+                deallocate (ib_diameter)
+            end if
         end if
 #endif
 
