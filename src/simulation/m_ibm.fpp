@@ -143,7 +143,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
         integer :: i, j, k, l, q, r                                          !< Iterator variables
-        integer :: patch_id                                                  !< Patch ID of ghost point
+        integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
         real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
@@ -178,15 +178,14 @@ contains
         type(ghost_point)      :: innerp
 
         ! set the Moving IBM interior conservative variables
-
         $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     patch_id = ib_markers%sf(j, k, l)
                     if (patch_id /= 0) then
-                        call s_decode_patch_periodicity(patch_id, patch_id)
-                        call s_get_neighborhood_idx(patch_id, patch_id)
+                        call s_decode_patch_periodicity(patch_id, patch_id_temp)
+                        call s_get_neighborhood_idx(patch_id_temp, patch_id)
                         if (patch_id > 0) then
                             q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                             rho = 0._wp
@@ -903,7 +902,7 @@ contains
 
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
-        integer                                                        :: i, j, k, l, encoded_ib_idx, ib_idx, fluid_idx
+        integer                                                        :: i, j, k, l, encoded_ib_idx, ib_idx, ib_idx_temp, fluid_idx
         real(wp), dimension(num_ibs, 3)                                :: forces, torques
         ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3,1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2
@@ -931,17 +930,17 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, cell_volume, &
-                            & local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, &
-                            & viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', copyin='[patch_ib, &
-                            & dynamic_viscosities]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, &
+                            & cell_volume, local_torque_contribution, dynamic_viscosity, viscous_stress_div, &
+                            & viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', &
+                            & copyin='[patch_ib, dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
                     encoded_ib_idx = ib_markers%sf(i, j, k)
                     if (encoded_ib_idx /= 0) then
-                        call s_decode_patch_periodicity(encoded_ib_idx, ib_idx)
-                        call s_get_neighborhood_idx(ib_idx, ib_idx)  ! global patch ID -> local index
+                        call s_decode_patch_periodicity(encoded_ib_idx, ib_idx_temp)
+                        call s_get_neighborhood_idx(ib_idx_temp, ib_idx)  ! global patch ID -> local index
                         if (ib_idx > 0) then
                             ! get the vector pointing to the grid cell from the IB centroid
                             if (num_dims == 3) then
