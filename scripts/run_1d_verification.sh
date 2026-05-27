@@ -14,11 +14,11 @@ if [[ "${1:-}" == "--build" ]]; then
   ./mfc.sh build -j "${MFC_BUILD_JOBS:-2}"
 fi
 
-for case_cmd in "${CASES[@]}"; do
+for case_path in "${CASES[@]}"; do
   echo "============================================================"
-  echo "Running: $case_cmd"
-  ./mfc.sh run $case_cmd --no-build
-  echo "Completed: $case_cmd"
+  echo "Running: $case_path"
+  ./mfc.sh run "$case_path" --no-build
+  echo "Completed: $case_path"
   echo "============================================================"
   echo
 done
