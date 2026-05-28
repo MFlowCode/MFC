@@ -64,8 +64,7 @@ class ParamDef:
     tags: Set[str] = field(default_factory=set)  # Feature tags: "mhd", "bubbles", etc.
     hint: str = ""  # Constraint/usage hint for docs (e.g. "Used with grcbc_in")
     math_symbol: str = ""  # LaTeX math symbol (Doxygen format, e.g. "\\f$\\gamma_k\\f$")
-    str_len: str = "name_len"
-    # For STR type: Fortran character length constant. Default "name_len"; set "path_len" for case_dir.
+    str_len: str = "name_len"  # For STR type: Fortran character length constant ("path_len" for case_dir)
 
     def __post_init__(self):
         # Validate name
