@@ -9,8 +9,7 @@ Output format matches ffmt (the MFC Fortran formatter) so that
 """
 
 import re
-from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import mfc.params.definitions  # noqa: F401 - triggers registry population
 
@@ -146,15 +145,3 @@ def generate_decls_fpp(target: str) -> str:
         padded = type_str.ljust(_DECL_COL)
         lines.append(f"{padded}:: {name}")
     return "\n".join(lines) + "\n"
-
-
-def get_generated_files(include_dir: Path) -> List[Tuple[Path, str]]:
-    """Return (output_path, content) for all six generated .fpp files."""
-    return [
-        (include_dir / "generated_namelist_pre.fpp", generate_namelist_fpp("pre")),
-        (include_dir / "generated_namelist_sim.fpp", generate_namelist_fpp("sim")),
-        (include_dir / "generated_namelist_post.fpp", generate_namelist_fpp("post")),
-        (include_dir / "generated_decls_pre.fpp", generate_decls_fpp("pre")),
-        (include_dir / "generated_decls_sim.fpp", generate_decls_fpp("sim")),
-        (include_dir / "generated_decls_post.fpp", generate_decls_fpp("post")),
-    ]

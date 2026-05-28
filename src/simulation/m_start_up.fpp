@@ -82,7 +82,7 @@ contains
 
         character(len=1000) :: line
 
-        #:include 'generated_namelist_sim.fpp'
+        #:include 'generated_namelist.fpp'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
 

@@ -17,7 +17,7 @@ module m_global_parameters
 
     implicit none
 
-    #:include 'generated_decls_post.fpp'
+    #:include 'generated_decls.fpp'
 
     !> @name Logistics
     !> @{

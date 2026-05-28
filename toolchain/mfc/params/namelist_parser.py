@@ -408,14 +408,16 @@ def parse_namelist_from_file(filepath: Path) -> Set[str]:
     """
     content = filepath.read_text()
 
-    # Handle #:include 'generated_namelist_*.fpp' — resolve to the included file.
-    include_match = re.search(r"#:include\s+'(generated_namelist_\w+\.fpp)'", content)
-    if include_match:
-        include_name = include_match.group(1)
-        include_path = filepath.parent.parent / "common" / "include" / include_name
-        if not include_path.exists():
-            raise ValueError(f"Included namelist file not found: {include_path}")
-        content = include_path.read_text()
+    # Handle #:include 'generated_namelist.fpp' — generate content in-memory.
+    if re.search(r"#:include\s+'generated_namelist\.fpp'", content):
+        _target_map = {"pre_process": "pre", "simulation": "sim", "post_process": "post"}
+        target_name = filepath.parent.name
+        short = _target_map.get(target_name)
+        if short is None:
+            raise ValueError(f"Cannot determine MFC target from path: {filepath}")
+        from .generators.fortran_gen import generate_namelist_fpp
+
+        content = generate_namelist_fpp(short)
 
     # Find the namelist block - starts with "namelist /user_inputs/"
     # and continues until a line without continuation (&), a blank line, or end-of-string

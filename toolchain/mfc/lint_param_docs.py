@@ -84,13 +84,14 @@ def _parse_namelist_params(fpp_path: Path) -> set[str]:
     """Parse parameter names from a namelist /user_inputs/ block in an fpp file."""
     text = fpp_path.read_text(encoding="utf-8")
 
-    # If the namelist is in a #:include'd generated file, resolve it.
-    include_match = re.search(r"#:include\s+'(generated_namelist_\w+\.fpp)'", text)
-    if include_match:
-        include_name = include_match.group(1)
-        include_path = fpp_path.parent.parent / "common" / "include" / include_name
-        if include_path.exists():
-            text = include_path.read_text(encoding="utf-8")
+    # If the namelist is in a #:include'd generated file, generate in-memory.
+    if re.search(r"#:include\s+'generated_namelist\.fpp'", text):
+        _target_map = {"pre_process": "pre", "simulation": "sim", "post_process": "post"}
+        short = _target_map.get(fpp_path.parent.name)
+        if short:
+            from mfc.params.generators.fortran_gen import generate_namelist_fpp
+
+            text = generate_namelist_fpp(short)
 
     params = set()
 

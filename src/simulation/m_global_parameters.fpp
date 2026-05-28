@@ -18,7 +18,7 @@ module m_global_parameters
 
     implicit none
 
-    #:include 'generated_decls_sim.fpp'
+    #:include 'generated_decls.fpp'
 
     real(wp) :: wall_time = 0
     real(wp) :: wall_time_avg = 0
@@ -70,7 +70,7 @@ module m_global_parameters
         integer :: num_dims  !< Number of spatial dimensions
         integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
     #:endif
-    ! mpp_lim, time_stepper, prim_vars_wrt now in generated_decls_sim.fpp
+    ! mpp_lim, time_stepper, prim_vars_wrt now in generated_decls.fpp
 
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: recon_type = ${recon_type}$    !< Reconstruction type

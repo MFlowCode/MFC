@@ -17,7 +17,7 @@ module m_global_parameters
 
     implicit none
 
-    #:include 'generated_decls_pre.fpp'
+    #:include 'generated_decls.fpp'
 
     ! Logistics
     integer :: num_procs     !< Number of processors

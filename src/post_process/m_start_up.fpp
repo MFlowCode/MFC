@@ -59,7 +59,7 @@ contains
         integer                 :: iostatus
         character(len=1000)     :: line
 
-        #:include 'generated_namelist_post.fpp'
+        #:include 'generated_namelist.fpp'
 
         file_loc = 'post_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)
