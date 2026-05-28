@@ -59,6 +59,21 @@ done
 # CI runs the full suite via ./mfc.sh lint without this variable.
 export MFC_SKIP_RENDER_TESTS=1
 
+# Detect whether any Fortran sources or CMakeLists changed — if so, run a build.
+# This catches compilation errors (duplicate declarations, missing symbols, etc.)
+# cheaply: Python-only changes pay zero build cost.
+if git diff HEAD --name-only 2>/dev/null | grep -qE '\.(fpp|f90)$|CMakeLists\.txt'; then
+    BUILD_FORTRAN=1
+else
+    BUILD_FORTRAN=0
+fi
+
+if [ "$BUILD_FORTRAN" = "1" ]; then
+    NCHECK=9
+else
+    NCHECK=8
+fi
+
 log "Running$MAGENTA precheck$COLOR_RESET (same checks as CI lint-gate)..."
 echo ""
 
@@ -79,7 +94,7 @@ else
     fi
 fi
 
-# --- Phase 2: All remaining checks in parallel (read-only) ---
+# --- Phase 2: All fast checks in parallel (read-only) ---
 
 # Spell check
 (
@@ -127,6 +142,16 @@ fi
 ) &
 PID_PARAM_DOCS=$!
 
+# Generated files check (JSON schema, completions, docs)
+(
+    if ./mfc.sh generate --check > /dev/null 2>&1; then
+        echo "0" > "$TMPDIR_PC/generate_exit"
+    else
+        echo "1" > "$TMPDIR_PC/generate_exit"
+    fi
+) &
+PID_GENERATE=$!
+
 # Example case validation
 (
     failed=0
@@ -140,11 +165,11 @@ PID_PARAM_DOCS=$!
 ) &
 PID_EXAMPLES=$!
 
-# --- Collect results ---
+# --- Collect results (fast checks) ---
 
 FAILED=0
 
-log "[$CYAN 1/7$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
+log "[$CYAN 1/$NCHECK$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
 if [ "$FORMAT_OK" = "1" ]; then
     error "Formatting check failed to run."
     FAILED=1
@@ -159,7 +184,7 @@ else
 fi
 
 wait $PID_SPELL
-log "[$CYAN 2/7$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
+log "[$CYAN 2/$NCHECK$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 SPELL_RC=$(cat "$TMPDIR_PC/spell_exit" 2>/dev/null || echo "1")
 if [ "$SPELL_RC" = "0" ]; then
     ok "Spell check passed."
@@ -169,7 +194,7 @@ else
 fi
 
 wait $PID_LINT
-log "[$CYAN 3/7$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
+log "[$CYAN 3/$NCHECK$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
 LINT_RC=$(cat "$TMPDIR_PC/lint_exit" 2>/dev/null || echo "1")
 if [ "$LINT_RC" = "0" ]; then
     ok "Toolchain lint passed."
@@ -179,7 +204,7 @@ else
 fi
 
 wait $PID_SOURCE
-log "[$CYAN 4/7$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
+log "[$CYAN 4/$NCHECK$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
 SOURCE_RC=$(cat "$TMPDIR_PC/source_exit" 2>/dev/null || echo "1")
 if [ "$SOURCE_RC" = "0" ]; then
     ok "Source lint passed."
@@ -188,7 +213,7 @@ else
     FAILED=1
 fi
 
-log "[$CYAN 5/7$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
+log "[$CYAN 5/$NCHECK$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if [ $DOC_FAILED -eq 0 ]; then
     ok "Doc references are valid."
 else
@@ -197,7 +222,7 @@ else
 fi
 
 wait $PID_PARAM_DOCS
-log "[$CYAN 6/7$COLOR_RESET] Checking$MAGENTA parameter docs$COLOR_RESET..."
+log "[$CYAN 6/$NCHECK$COLOR_RESET] Checking$MAGENTA parameter docs$COLOR_RESET..."
 PARAM_DOCS_RC=$(cat "$TMPDIR_PC/param_docs_exit" 2>/dev/null || echo "1")
 if [ "$PARAM_DOCS_RC" = "0" ]; then
     ok "Parameter documentation check passed."
@@ -206,14 +231,37 @@ else
     FAILED=1
 fi
 
+wait $PID_GENERATE
+log "[$CYAN 7/$NCHECK$COLOR_RESET] Checking$MAGENTA generated files$COLOR_RESET..."
+GENERATE_RC=$(cat "$TMPDIR_PC/generate_exit" 2>/dev/null || echo "1")
+if [ "$GENERATE_RC" = "0" ]; then
+    ok "Generated files are up to date."
+else
+    error "Generated files are out of date. Run$MAGENTA ./mfc.sh generate$COLOR_RESET to update."
+    FAILED=1
+fi
+
 wait $PID_EXAMPLES
-log "[$CYAN 7/7$COLOR_RESET] Validating$MAGENTA example cases$COLOR_RESET..."
+log "[$CYAN 8/$NCHECK$COLOR_RESET] Validating$MAGENTA example cases$COLOR_RESET..."
 EXAMPLES_FAILED=$(cat "$TMPDIR_PC/examples_exit" 2>/dev/null || echo "1")
 if [ "$EXAMPLES_FAILED" = "0" ]; then
     ok "All example cases are valid."
 else
     error "$EXAMPLES_FAILED example case(s) failed validation. Run$MAGENTA ./mfc.sh validate examples/\*/case.py$COLOR_RESET for details."
     FAILED=1
+fi
+
+# --- Phase 3: Build (only when Fortran sources changed) ---
+
+if [ "$BUILD_FORTRAN" = "1" ]; then
+    log "[$CYAN 9/9$COLOR_RESET] Building$MAGENTA (Fortran changes detected)$COLOR_RESET..."
+    if ./mfc.sh build -j "$JOBS" > "$TMPDIR_PC/build_out" 2>&1; then
+        ok "Build passed."
+    else
+        error "Build failed. Output:"
+        cat "$TMPDIR_PC/build_out" | tail -20
+        FAILED=1
+    fi
 fi
 
 echo ""
