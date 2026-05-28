@@ -17,10 +17,11 @@ module m_global_parameters
 
     implicit none
 
+    #:include 'generated_decls_post.fpp'
+
     !> @name Logistics
     !> @{
-    integer                 :: num_procs  !< Number of processors
-    character(LEN=path_len) :: case_dir   !< Case folder location
+    integer :: num_procs  !< Number of processors
     !> @}
 
     ! Computational Domain Parameters
@@ -28,9 +29,7 @@ module m_global_parameters
     integer :: proc_rank  !< Rank of the local processor
     !> @name Number of cells in the x-, y- and z-coordinate directions
     !> @{
-    integer :: m, m_root
-    integer :: n
-    integer :: p
+    integer :: m_root
     !> @}
 
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
@@ -39,7 +38,6 @@ module m_global_parameters
 
     !> @name Cylindrical coordinates (either axisymmetric or full 3D)
     !> @{
-    logical :: cyl_coord
     integer :: grid_geometry
     !> @}
 
@@ -66,50 +64,24 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    integer :: buff_size     !< Number of ghost cells for boundary condition storage
-    integer :: t_step_start  !< First time-step directory
-    integer :: t_step_stop   !< Last time-step directory
-    integer :: t_step_save   !< Interval between consecutive time-step directory
+    integer :: buff_size  !< Number of ghost cells for boundary condition storage
     !> @name IO options for adaptive time-stepping
     !> @{
-    logical  :: cfl_adap_dt, cfl_const_dt, cfl_dt
-    real(wp) :: t_save
-    real(wp) :: t_stop
-    real(wp) :: cfl_target
-    integer  :: n_save
-    integer  :: n_start
+    logical :: cfl_dt
+    integer :: n_save
     !> @}
 
     ! NOTE: m_root, x_root_cb, x_root_cc = defragmented grid (1D only; equals m, x_cb, x_cc in serial)
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    integer            :: model_eqns                   !< Multicomponent flow model
-    integer            :: num_fluids                   !< Number of different fluids present in the flow
-    logical            :: relax                        !< phase change
-    integer            :: relax_model                  !< Phase change relaxation model
-    logical            :: mpp_lim                      !< Maximum volume fraction limiter
     integer            :: sys_size                     !< Number of unknowns in the system of equations
-    integer            :: recon_type                   !< Which type of reconstruction to use
-    integer            :: weno_order                   !< Order of accuracy for the WENO reconstruction
-    integer            :: muscl_order                  !< Order of accuracy for the MUSCL reconstruction
-    logical            :: mixture_err                  !< Mixture error limiter
-    logical            :: alt_soundspeed               !< Alternate sound speed
-    logical            :: mhd                          !< Magnetohydrodynamics
-    logical            :: relativity                   !< Relativity for RMHD
-    logical            :: hypoelasticity               !< Turn hypoelasticity on
-    logical            :: hyperelasticity              !< Turn hyperelasticity on
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
     integer            :: b_size                       !< Number of components in the b tensor
     integer            :: tensor_size                  !< Number of components in the nonsymmetric tensor
-    logical            :: cont_damage                  !< Continuum damage modeling
-    logical            :: hyper_cleaning               !< Hyperbolic cleaning for MHD
-    logical            :: igr                          !< enable IGR
-    integer            :: igr_order                    !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
     !> @}
 
-    integer :: avg_state  !< Average state evaluation method
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
     type(eqn_idx_info)  :: eqn_idx   !< All conserved-variable equation index ranges and scalars.
@@ -122,7 +94,6 @@ module m_global_parameters
 
     ! Cell indices (InDices With BUFFer): includes buffer in simulation only
     type(int_bounds_info) :: idwbuff(1:3)
-    integer               :: num_bc_patches
     logical               :: bc_io
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
@@ -133,12 +104,8 @@ module m_global_parameters
     integer, dimension(3)              :: shear_indices  !< Indices of the stress components that represent shear stress
     integer                            :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
     integer, dimension(3, 2)           :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
-    logical                            :: parallel_io  !< Format of the data files
-    logical                            :: sim_data
-    logical                            :: file_per_process  !< output format
     integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
     integer, allocatable, dimension(:) :: start_idx  !< Starting cell-center index of local processor in global grid
-    integer                            :: num_ibs  !< Number of immersed boundaries
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
@@ -159,10 +126,6 @@ module m_global_parameters
     real(wp), allocatable, dimension(:)      :: adv  !< Advection variables
     ! Formatted Database File(s) Structure Parameters
 
-    integer               :: format                                    !< Format of the database file(s)
-    integer               :: precision                                 !< Floating point precision of the database file(s)
-    logical               :: down_sample                               !< down sampling of the database file(s)
-    logical               :: output_partial_domain                     !< Specify portion of domain to output for post-processing
     type(bounds_info)     :: x_output, y_output, z_output              !< Portion of domain to output for post-processing
     type(int_bounds_info) :: x_output_idx, y_output_idx, z_output_idx  !< Indices of domain to output for post-processing
     !> @name Size of the ghost zone layer in the x-, y- and z-coordinate directions. The definition of the ghost zone layers is only
@@ -178,95 +141,31 @@ module m_global_parameters
     !! Schlieren function.
     !> @{
     logical, dimension(num_fluids_max) :: alpha_rho_wrt
-    logical                            :: rho_wrt
     logical, dimension(3)              :: mom_wrt
     logical, dimension(3)              :: vel_wrt
-    integer                            :: flux_lim
     logical, dimension(3)              :: flux_wrt
-    logical                            :: E_wrt
     logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
-    logical                            :: fft_wrt
-    logical                            :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
-    logical                            :: gamma_wrt
-    logical                            :: heat_ratio_wrt
-    logical                            :: pi_inf_wrt
-    logical                            :: pres_inf_wrt
-    logical                            :: prim_vars_wrt
-    logical                            :: cons_vars_wrt
-    logical                            :: c_wrt
     logical, dimension(3)              :: omega_wrt
-    logical                            :: qm_wrt
-    logical                            :: liutex_wrt
-    logical                            :: schlieren_wrt
-    logical                            :: cf_wrt
-    logical                            :: ib
-    logical                            :: ib_state_wrt
     logical                            :: chem_wrt_Y(1:num_species)
-    logical                            :: chem_wrt_T
-    logical                            :: lag_header
-    logical                            :: lag_txt_wrt
-    logical                            :: lag_db_wrt
-    logical                            :: lag_id_wrt
-    logical                            :: lag_pos_wrt
-    logical                            :: lag_pos_prev_wrt
-    logical                            :: lag_vel_wrt
-    logical                            :: lag_rad_wrt
-    logical                            :: lag_rvel_wrt
-    logical                            :: lag_r0_wrt
-    logical                            :: lag_rmax_wrt
-    logical                            :: lag_rmin_wrt
-    logical                            :: lag_dphidt_wrt
-    logical                            :: lag_pres_wrt
-    logical                            :: lag_mv_wrt
-    logical                            :: lag_mg_wrt
-    logical                            :: lag_betaT_wrt
-    logical                            :: lag_betaC_wrt
     !> @}
 
     real(wp), dimension(num_fluids_max) :: schlieren_alpha  !< Per-fluid Schlieren intensity amplitude coefficients
-    integer                             :: fd_order         !< Finite-difference order for vorticity and Schlieren derivatives
     integer                             :: fd_number        !< Finite-difference half-stencil size: MAX(1, fd_order/2)
-    !> @name Reference parameters for Tait EOS
-    !> @{
-    real(wp) :: rhoref, pref
-    !> @}
-
-    type(chemistry_parameters) :: chem_params
+    type(chemistry_parameters)          :: chem_params
     !> @name Bubble modeling variables and parameters
     !> @{
-    integer :: nb
-    real(wp) :: Eu, Ca, Web, Re_inv
+    real(wp) :: Eu
     real(wp), dimension(:), allocatable :: weight, R0
-    logical :: bubbles_euler
-    logical :: qbmm
-    logical :: polytropic
-    logical :: polydisperse
-    logical :: adv_n
-    integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
     real(wp) :: gam_m
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(wp) :: R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
+    real(wp) :: p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
     real(wp) :: G
-    real(wp) :: poly_sigma
-    real(wp) :: sigR
     integer :: nmom
     !> @}
 
-    !> @name surface tension coefficient
-    !> @{
-    real(wp) :: sigma
-    logical  :: surface_tension
-    !> @}
-
-    !> @name Lagrangian bubbles
-    !> @{
-    logical :: bubbles_lagrange
-    !> @}
-
-    real(wp) :: Bx0                       !< Constant magnetic field in the x-direction (1D)
     real(wp) :: wall_time, wall_time_avg  !< Wall time measurements
 
 contains

@@ -17,21 +17,16 @@ module m_global_parameters
 
     implicit none
 
+    #:include 'generated_decls_pre.fpp'
+
     ! Logistics
-    integer                 :: num_procs                 !< Number of processors
-    character(LEN=path_len) :: case_dir                  !< Case folder location
-    logical                 :: old_grid                  !< Use existing grid data
-    logical                 :: old_ic, non_axis_sym      !< Use existing IC data
-    integer                 :: t_step_old, t_step_start  !< Existing IC/grid folder
-    logical                 :: cfl_adap_dt, cfl_const_dt, cfl_dt
-    integer                 :: n_start, n_start_old
+    integer :: num_procs     !< Number of processors
+    logical :: non_axis_sym  !< Use existing IC data
+    logical :: cfl_dt
 
     ! Computational Domain Parameters
 
     integer :: proc_rank  !< Rank of the local processor Number of cells in the x-, y- and z-coordinate directions
-    integer :: m
-    integer :: n
-    integer :: p
 
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
@@ -39,7 +34,6 @@ module m_global_parameters
     integer               :: m_glb, n_glb, p_glb  !< Global number of cells in each direction
     integer               :: num_dims             !< Number of spatial dimensions
     integer               :: num_vels             !< Number of velocity components (different from num_dims for mhd)
-    logical               :: cyl_coord
     integer               :: grid_geometry        !< Cylindrical coordinates (either axisymmetric or full 3D)
     !> Locations of cell-centers (cc) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
@@ -47,39 +41,14 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
     real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
-    logical :: stretch_x, stretch_y, stretch_z         !< Grid stretching flags for the x-, y- and z-coordinate directions
-    ! Grid stretching: a_x/a_y/a_z = rate, x_a/y_a/z_a = location
-    real(wp) :: a_x, a_y, a_z
-    integer  :: loops_x, loops_y, loops_z
-    real(wp) :: x_a, y_a, z_a
-    real(wp) :: x_b, y_b, z_b
 
     ! Simulation Algorithm Parameters
-    integer            :: model_eqns                   !< Multicomponent flow model
-    logical            :: relax                        !< activate phase change
-    integer            :: relax_model                  !< Relax Model
-    real(wp)           :: palpha_eps                   !< trigger parameter for the p relaxation procedure, phase change model
-    real(wp)           :: ptgalpha_eps                 !< trigger parameter for the pTg relaxation procedure, phase change model
-    integer            :: num_fluids                   !< Number of different fluids present in the flow
-    logical            :: mpp_lim                      !< Alpha limiter
     integer            :: sys_size                     !< Number of unknowns in the system of equations
-    integer            :: recon_type                   !< Reconstruction Type
     integer            :: weno_polyn                   !< Degree of the WENO polynomials (polyn)
     integer            :: muscl_polyn                  !< Degree of the MUSCL polynomials (polyn)
-    integer            :: weno_order                   !< Order of accuracy for the WENO reconstruction
-    integer            :: muscl_order                  !< Order of accuracy for the MUSCL reconstruction
-    logical            :: hypoelasticity               !< activate hypoelasticity
-    logical            :: hyperelasticity              !< activate hyperelasticity
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
-    logical            :: mhd                          !< Magnetohydrodynamics
-    logical            :: relativity                   !< Relativity for RMHD
     integer            :: b_size                       !< Number of components in the b tensor
     integer            :: tensor_size                  !< Number of components in the nonsymmetric tensor
-    logical            :: pre_stress                   !< activate pre_stressed domain
-    logical            :: cont_damage                  !< continuum damage modeling
-    logical            :: hyper_cleaning               !< Hyperbolic cleaning for MHD
-    logical            :: igr                          !< Use information geometric regularization
-    integer            :: igr_order                    !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(eqn_idx_info)  :: eqn_idx   !< All conserved-variable equation index ranges and scalars.
@@ -94,32 +63,12 @@ module m_global_parameters
     integer, dimension(3)      :: shear_indices          !< Indices of the stress components that represent shear stress
     integer                    :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
     integer, dimension(3, 2)   :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
-    logical                    :: parallel_io            !< Format of the data files
-    logical                    :: file_per_process       !< type of data output
-    integer                    :: precision              !< Precision of output files
-    logical                    :: down_sample            !< Down-sample the output data
-    logical                    :: mixlayer_vel_profile   !< Set hyperbolic tangent streamwise velocity profile
-    real(wp)                   :: mixlayer_vel_coef      !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    logical                    :: mixlayer_perturb       !< Superimpose instability waves to surrounding fluid flow
-    integer                    :: mixlayer_perturb_nk    !< Number of Fourier modes for perturbation with mixlayer_perturb flag
-    real(wp)                   :: mixlayer_perturb_k0    !< Peak wavenumber for mixlayer perturbation (default: most unstable mode)
-    logical                    :: simplex_perturb
     type(simplex_noise_params) :: simplex_params
-    real(wp)                   :: pi_fac                 !< Factor for artificial pi_inf
-    logical                    :: viscous
-    logical                    :: bubbles_lagrange
 
     ! Perturb density of surrounding air so as to break symmetry of grid
-    logical                             :: perturb_flow
-    integer                             :: perturb_flow_fluid  !< Fluid to be perturbed with perturb_flow flag
-    real(wp)                            :: perturb_flow_mag    !< Magnitude of perturbation with perturb_flow flag
-    logical                             :: perturb_sph
-    integer                             :: perturb_sph_fluid   !< Fluid to be perturbed with perturb_sph flag
     real(wp), dimension(num_fluids_max) :: fluid_rho
-    logical                             :: elliptic_smoothing
-    integer                             :: elliptic_smoothing_iters
-    integer, allocatable, dimension(:)  :: proc_coords         !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:)  :: start_idx           !< Starting cell-center index of local processor in global grid
+    integer, allocatable, dimension(:)  :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:)  :: start_idx    !< Starting cell-center index of local processor in global grid
 #ifdef MFC_MPI
     type(mpi_io_var), public :: MPI_IO_DATA
     character(LEN=name_len)  :: mpiiofs
@@ -127,34 +76,24 @@ module m_global_parameters
 #endif
 
     ! Initial Condition Parameters
-    integer                                                  :: num_patches     !< Number of patches composing initial condition
-    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp      !< IC patch parameters (max: num_patches_max)
-    integer                                                  :: num_bc_patches  !< Number of boundary condition patches
-    logical                                                  :: bc_io           !< whether or not to save BC data
-    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc        !< Boundary condition patch parameters
+    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp  !< IC patch parameters (max: num_patches_max)
+    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc    !< Boundary condition patch parameters
+    logical                                                  :: bc_io       !< whether or not to save BC data
 
     ! Fluids Physical Parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
-    real(wp)                                 :: rhoref, pref  !< Reference parameters for Tait EOS
     type(chemistry_parameters)               :: chem_params
     !> @name Bubble modeling
     !> @{
-    integer                             :: nb
-    real(wp)                            :: Ca, Web, Re_inv, Eu
+    real(wp)                            :: Eu
     real(wp), dimension(:), allocatable :: weight, R0
-    logical                             :: bubbles_euler
-    logical                             :: qbmm  !< Quadrature moment method
     integer                             :: nmom  !< Number of carried moments
-    real(wp)                            :: sigR, sigV, rhoRV  !< standard deviations in R/V
-    logical                             :: adv_n  !< Solve the number density equation and compute alpha from number density
     !> @}
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                                  :: ib        !< Turn immersed boundaries on
-    integer                                                  :: num_ibs   !< Number of immersed boundaries
     integer                                                  :: Np
     type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
     type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
@@ -162,30 +101,17 @@ module m_global_parameters
 
     !> @name Non-polytropic bubble gas compression
     !> @{
-    logical :: polytropic
-    logical :: polydisperse
-    real(wp) :: poly_sigma
-    integer :: dist_type  !< 1 = binormal, 2 = lognormal-normal
-    integer :: thermal    !< 1 = adiabatic, 2 = isotherm, 3 = transfer
     real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
     real(wp) :: gam_m
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(wp) :: R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
-    !> @}
-
-    !> @name Surface Tension Modeling
-    !> @{
-    real(wp) :: sigma
-    logical  :: surface_tension
+    real(wp) :: p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
     !> @}
 
     integer, allocatable, dimension(:,:,:) :: logic_grid
     type(pres_field)                       :: pb
     type(pres_field)                       :: mv
-    real(wp)                               :: Bx0        !< Constant magnetic field in the x-direction (1D)
     integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
-    logical                                :: fft_wrt
 
 contains
 

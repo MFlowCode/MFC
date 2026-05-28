@@ -898,7 +898,7 @@ def _load():
 
     # Bubbles
     _r("R0ref", REAL, {"bubbles"}, math=r"\f$R_0\f$")
-    _r("nb", REAL, {"bubbles"}, math=r"\f$N_b\f$")
+    _r("nb", INT, {"bubbles"}, math=r"\f$N_b\f$")
     _r("Web", REAL, {"bubbles"}, math=r"\f$\mathrm{We}\f$")
     _r("Ca", REAL, {"bubbles"}, math=r"\f$\mathrm{Ca}\f$")
     _r("Re_inv", REAL, {"bubbles", "viscosity"}, math=r"\f$\mathrm{Re}^{-1}\f$")
@@ -942,25 +942,18 @@ def _load():
     # Output
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
-    _r("schlieren_alpha", REAL, {"output"})
     for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
-        "alpha_rho_wrt",
         "rho_wrt",
-        "mom_wrt",
-        "vel_wrt",
-        "flux_wrt",
         "E_wrt",
         "pres_wrt",
-        "alpha_wrt",
         "gamma_wrt",
         "heat_ratio_wrt",
         "pi_inf_wrt",
         "pres_inf_wrt",
         "c_wrt",
-        "omega_wrt",
         "qm_wrt",
         "liutex_wrt",
         "cf_wrt",
@@ -1036,7 +1029,6 @@ def _load():
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
         "perturb_flow_mag",
-        "fluid_rho",
         "sigR",
         "sigV",
         "rhoRV",

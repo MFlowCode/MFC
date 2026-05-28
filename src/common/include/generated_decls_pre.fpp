@@ -22,7 +22,6 @@ logical                 :: elliptic_smoothing
 integer                 :: elliptic_smoothing_iters
 logical                 :: fft_wrt
 logical                 :: file_per_process
-real(wp)                :: fluid_rho
 logical                 :: hyper_cleaning
 logical                 :: hyperelasticity
 logical                 :: hypoelasticity
@@ -45,7 +44,7 @@ integer                 :: muscl_order
 integer                 :: n
 integer                 :: n_start
 integer                 :: n_start_old
-real(wp)                :: nb
+integer                 :: nb
 integer                 :: num_bc_patches
 integer                 :: num_fluids
 integer                 :: num_ibs

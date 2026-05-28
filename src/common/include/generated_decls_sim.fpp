@@ -70,7 +70,7 @@ integer                 :: muscl_lim
 integer                 :: muscl_order
 integer                 :: n
 integer                 :: n_start
-real(wp)                :: nb
+integer                 :: nb
 logical                 :: null_weights
 integer                 :: num_bc_patches
 integer                 :: num_fluids

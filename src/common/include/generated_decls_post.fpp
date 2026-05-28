@@ -7,8 +7,6 @@ real(wp)                :: R0ref
 real(wp)                :: Re_inv
 real(wp)                :: Web
 logical                 :: adv_n
-logical                 :: alpha_rho_wrt
-logical                 :: alpha_wrt
 logical                 :: alt_soundspeed
 integer                 :: avg_state
 logical                 :: bubbles_euler
@@ -28,7 +26,6 @@ integer                 :: fd_order
 logical                 :: fft_wrt
 logical                 :: file_per_process
 integer                 :: flux_lim
-logical                 :: flux_wrt
 integer                 :: format
 logical                 :: gamma_wrt
 logical                 :: heat_ratio_wrt
@@ -62,16 +59,14 @@ integer                 :: m
 logical                 :: mhd
 logical                 :: mixture_err
 integer                 :: model_eqns
-logical                 :: mom_wrt
 logical                 :: mpp_lim
 integer                 :: muscl_order
 integer                 :: n
 integer                 :: n_start
-real(wp)                :: nb
+integer                 :: nb
 integer                 :: num_bc_patches
 integer                 :: num_fluids
 integer                 :: num_ibs
-logical                 :: omega_wrt
 logical                 :: output_partial_domain
 integer                 :: p
 logical                 :: parallel_io
@@ -92,7 +87,6 @@ logical                 :: relax
 integer                 :: relax_model
 logical                 :: rho_wrt
 real(wp)                :: rhoref
-real(wp)                :: schlieren_alpha
 logical                 :: schlieren_wrt
 real(wp)                :: sigR
 real(wp)                :: sigma
@@ -104,5 +98,4 @@ integer                 :: t_step_start
 integer                 :: t_step_stop
 real(wp)                :: t_stop
 integer                 :: thermal
-logical                 :: vel_wrt
 integer                 :: weno_order
