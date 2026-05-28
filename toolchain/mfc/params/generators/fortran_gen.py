@@ -87,9 +87,20 @@ def generate_namelist_fpp(target: str) -> str:
     normal = [v for v in all_vars if v not in CASE_OPT_PARAMS]
     opt = sorted(v for v in CASE_OPT_PARAMS if v in NAMELIST_VARS and "sim" in NAMELIST_VARS[v])
     nl_lines = _pack_namelist(normal, _FIRST_PREFIX, _CONT_PREFIX, _MAX_LINE)
-    nl_lines[-1] += ", &"
-    opt_lines = _pack_namelist(opt, _CONT_PREFIX, _CONT2_PREFIX, _MAX_LINE)
-    parts = [_HEADER.rstrip()] + nl_lines + ["#:if not MFC_CASE_OPTIMIZATION"] + opt_lines + ["#:endif"]
+    if opt:
+        opt_lines = _pack_namelist(opt, _CONT_PREFIX, _CONT2_PREFIX, _MAX_LINE)
+        nl_with_cont = nl_lines[:]
+        nl_with_cont[-1] += ", &"
+        parts = (
+            [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"] +
+            nl_lines +
+            ["#:else"] +
+            nl_with_cont +
+            opt_lines +
+            ["#:endif"]
+        )
+    else:
+        parts = [_HEADER.rstrip()] + nl_lines
     return "\n".join(parts) + "\n"
 
 

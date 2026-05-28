@@ -61,9 +61,17 @@ def test_sim_namelist_case_opt_guard():
     from mfc.params.generators.fortran_gen import generate_namelist_fpp
 
     c = generate_namelist_fpp("sim")
-    assert "#:if not MFC_CASE_OPTIMIZATION" in c
+    # Case-opt guard: two complete namelist statements wrapped in #:if/#:else/#:endif
+    assert "#:if MFC_CASE_OPTIMIZATION" in c
+    assert "#:else" in c
+    assert "#:endif" in c
     assert "weno_order" in c
     assert "num_fluids" in c
+    # No dangling continuation before the #:if block or after #:else
+    lines = c.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() in ("#:if MFC_CASE_OPTIMIZATION", "#:endif"):
+            assert not lines[i - 1].rstrip().endswith("&"), f"Dangling & before {line!r}"
 
 
 def test_pre_namelist_has_patch_icpp():
