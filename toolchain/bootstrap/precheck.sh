@@ -15,17 +15,6 @@ show_help() {
   exit 0
 }
 
-# Cross-platform hash function (macOS uses md5, Linux uses md5sum)
-compute_hash() {
-    if command -v md5sum > /dev/null 2>&1; then
-        md5sum | cut -d' ' -f1
-    elif command -v md5 > /dev/null 2>&1; then
-        md5 -q
-    else
-        # Fallback: use cksum if neither available
-        cksum | cut -d' ' -f1
-    fi
-}
 
 JOBS=1
 
@@ -68,17 +57,14 @@ echo ""
 TMPDIR_PC=$(mktemp -d)
 trap "rm -rf $TMPDIR_PC" EXIT
 
-# --- Phase 1: Format (modifies files, must run alone) ---
-BEFORE_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | compute_hash)
-if ! ./mfc.sh format -j "$JOBS" > /dev/null 2>&1; then
-    FORMAT_OK=1
-else
-    AFTER_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | compute_hash)
-    if [ "$BEFORE_HASH" != "$AFTER_HASH" ]; then
-        FORMAT_OK=2
-    else
-        FORMAT_OK=0
-    fi
+# --- Phase 1: Format check (non-mutating; mirrors CI's format+diff check) ---
+# Use --check mode so staged-but-unformatted code is caught even if the
+# working tree was already reformatted by a prior ./mfc.sh format run.
+FORMAT_OK=0
+if ! ruff format --check toolchain/ examples/ benchmarks/ > /dev/null 2>&1; then
+    FORMAT_OK=2
+elif ! ffmt --check -j "$JOBS" src/ > /dev/null 2>&1; then
+    FORMAT_OK=2
 fi
 
 # --- Phase 2: All fast checks in parallel (read-only) ---
@@ -147,14 +133,8 @@ PID_EXAMPLES=$!
 FAILED=0
 
 log "[$CYAN 1/$NCHECK$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
-if [ "$FORMAT_OK" = "1" ]; then
-    error "Formatting check failed to run."
-    FAILED=1
-elif [ "$FORMAT_OK" = "2" ]; then
-    error "Code was not formatted. Files have been auto-formatted; review and stage the changes."
-    echo ""
-    git diff --stat -- '*.f90' '*.fpp' '*.py' 2>/dev/null || true
-    echo ""
+if [ "$FORMAT_OK" = "2" ]; then
+    error "Code is not formatted. Run$MAGENTA ./mfc.sh format$COLOR_RESET and re-stage the changes."
     FAILED=1
 else
     ok "Formatting check passed."

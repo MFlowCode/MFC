@@ -99,14 +99,7 @@ def generate_namelist_fpp(target: str) -> str:
         opt_lines = _pack_namelist(opt, _CONT_PREFIX, _CONT2_PREFIX, _MAX_LINE)
         nl_with_cont = nl_lines[:]
         nl_with_cont[-1] += ", &"
-        parts = (
-            [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"]
-            + nl_lines
-            + ["#:else"]
-            + nl_with_cont
-            + opt_lines
-            + ["#:endif"]
-        )
+        parts = [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"] + nl_lines + ["#:else"] + nl_with_cont + opt_lines + ["#:endif"]
     else:
         parts = [_HEADER.rstrip()] + nl_lines
     return "\n".join(parts) + "\n"
@@ -124,10 +117,7 @@ def generate_decls_fpp(target: str) -> str:
         if name in FORTRAN_ARRAY_DIMS:
             member = REGISTRY.all_params.get(f"{name}(1)")
             if member is None:
-                raise ValueError(
-                    f"FORTRAN_ARRAY_DIMS[{name!r}] has no {name}(1) in the registry. "
-                    "Register at least one indexed variant (e.g. _r(f'{name}(1)', ...))."
-                )
+                raise ValueError(f"FORTRAN_ARRAY_DIMS[{name!r}] has no {name}(1) in the registry. " "Register at least one indexed variant (e.g. _r(f'{name}(1)', ...)).")
             ftype = fortran_type_decl(member)
             dim = FORTRAN_ARRAY_DIMS[name]
             lines.append(f"{(ftype + ', dimension(' + dim + ')').ljust(_ARRAY_DECL_COL)}:: {name}")
@@ -136,10 +126,7 @@ def generate_decls_fpp(target: str) -> str:
         if param is None:
             continue
         if any(k.startswith(f"{name}(") for k in REGISTRY.all_params):
-            raise ValueError(
-                f"{name!r} has indexed variants (e.g. {name}(1)) but is missing from "
-                "FORTRAN_ARRAY_DIMS. Add it there with its Fortran dimension expression."
-            )
+            raise ValueError(f"{name!r} has indexed variants (e.g. {name}(1)) but is missing from " "FORTRAN_ARRAY_DIMS. Add it there with its Fortran dimension expression.")
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")
     return "\n".join(lines) + "\n"
 
