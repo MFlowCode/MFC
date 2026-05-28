@@ -1,12 +1,12 @@
 def test_common_vars_in_all_targets():
-    from mfc.params.namelist_targets import NAMELIST_VARS
+    from mfc.params.definitions import NAMELIST_VARS
 
     for var in ["m", "n", "p", "bc_x", "bc_y", "bc_z", "model_eqns", "cyl_coord", "fluid_pp", "case_dir"]:
         assert {"pre", "sim", "post"}.issubset(NAMELIST_VARS.get(var, set())), f"{var!r} not marked for all targets"
 
 
 def test_sim_only_vars():
-    from mfc.params.namelist_targets import NAMELIST_VARS
+    from mfc.params.definitions import NAMELIST_VARS
 
     for var in ["run_time_info", "dt", "riemann_solver", "acoustic", "probe"]:
         targets = NAMELIST_VARS.get(var, set())
@@ -16,7 +16,7 @@ def test_sim_only_vars():
 
 
 def test_pre_only_vars():
-    from mfc.params.namelist_targets import NAMELIST_VARS
+    from mfc.params.definitions import NAMELIST_VARS
 
     for var in ["old_grid", "old_ic", "patch_icpp", "simplex_params"]:
         targets = NAMELIST_VARS.get(var, set())
@@ -25,7 +25,7 @@ def test_pre_only_vars():
 
 
 def test_post_only_vars():
-    from mfc.params.namelist_targets import NAMELIST_VARS
+    from mfc.params.definitions import NAMELIST_VARS
 
     for var in ["format", "sim_data", "lag_header", "output_partial_domain"]:
         targets = NAMELIST_VARS.get(var, set())
@@ -33,16 +33,16 @@ def test_post_only_vars():
         assert "sim" not in targets, f"{var!r} incorrectly in sim"
 
 
-def test_case_opt_exclude_vars():
-    from mfc.params.namelist_targets import CASE_OPT_EXCLUDE
+def test_case_opt_params_in_namelist():
+    from mfc.params.definitions import CASE_OPT_PARAMS
 
     for var in ["nb", "mapped_weno", "wenoz", "weno_order", "num_fluids"]:
-        assert var in CASE_OPT_EXCLUDE
+        assert var in CASE_OPT_PARAMS
 
 
-def test_case_opt_exclude_vars_also_in_sim_namelist():
-    from mfc.params.namelist_targets import CASE_OPT_EXCLUDE, NAMELIST_VARS
+def test_case_opt_params_in_sim_namelist():
+    from mfc.params.definitions import CASE_OPT_PARAMS, NAMELIST_VARS
 
-    for var in CASE_OPT_EXCLUDE:
+    for var in CASE_OPT_PARAMS:
         targets = NAMELIST_VARS.get(var, set())
-        assert "sim" in targets, f"CASE_OPT_EXCLUDE var {var!r} must also be in sim namelist"
+        assert "sim" in targets, f"CASE_OPT_PARAMS var {var!r} must also be in sim namelist"

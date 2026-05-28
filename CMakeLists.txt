@@ -464,16 +464,37 @@ endmacro()
 # Generate Fortran parameter namelist/decl includes into the per-target build
 # include directories before HANDLE_SOURCES globs them for Fypp.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-execute_process(
-    COMMAND "${Python3_EXECUTABLE}"
-            "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/cmake_gen.py"
-            "${CMAKE_BINARY_DIR}"
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    RESULT_VARIABLE _mfc_gen_result
-    ERROR_VARIABLE  _mfc_gen_error
+set(_mfc_gen_stamp "${CMAKE_BINARY_DIR}/mfc_params_gen.stamp")
+set(_mfc_gen_inputs
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/cmake_gen.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/fortran_gen.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/namelist_targets.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/definitions.py"
 )
-if(NOT _mfc_gen_result EQUAL 0)
-    message(FATAL_ERROR "Fortran param generation failed:\n${_mfc_gen_error}")
+set(_mfc_needs_regen FALSE)
+if(NOT EXISTS "${_mfc_gen_stamp}")
+    set(_mfc_needs_regen TRUE)
+else()
+    foreach(_input IN LISTS _mfc_gen_inputs)
+        if("${_input}" IS_NEWER_THAN "${_mfc_gen_stamp}")
+            set(_mfc_needs_regen TRUE)
+            break()
+        endif()
+    endforeach()
+endif()
+if(_mfc_needs_regen)
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/cmake_gen.py"
+                "${CMAKE_BINARY_DIR}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        RESULT_VARIABLE _mfc_gen_result
+        ERROR_VARIABLE  _mfc_gen_error
+    )
+    if(NOT _mfc_gen_result EQUAL 0)
+        message(FATAL_ERROR "Fortran param generation failed:\n${_mfc_gen_error}")
+    endif()
+    file(TOUCH "${_mfc_gen_stamp}")
 endif()
 
 HANDLE_SOURCES(pre_process ON)

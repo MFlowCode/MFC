@@ -514,28 +514,18 @@ PATTERNS = [
 
 
 def get_description(param_name: str) -> str:
-    """Get description for a parameter from hand-curated or auto-generated sources.
+    """Get the best available description for a parameter.
 
-    Priority: hand-curated DESCRIPTIONS > PATTERNS > auto-generated param.description.
+    Priority: hand-curated DESCRIPTIONS > PATTERNS > naming-convention inference.
+    (param.description in REGISTRY is now populated from this function at registration
+    time, so it can be read directly without calling this function again.)
     """
-    # 1. Hand-curated descriptions (highest quality)
     if param_name in DESCRIPTIONS:
         return DESCRIPTIONS[param_name]
-
-    # 2. Pattern matching for indexed params (hand-curated templates)
     for pattern, template in PATTERNS:
         match = re.fullmatch(pattern, param_name)
         if match:
             return template.format(*match.groups())
-
-    # 3. Auto-generated description from registry (set by _auto_describe at registration)
-    from . import REGISTRY
-
-    param = REGISTRY.all_params.get(param_name)
-    if param and param.description:
-        return param.description
-
-    # 4. Last resort: naming convention inference
     return _infer_from_naming(param_name)
 
 

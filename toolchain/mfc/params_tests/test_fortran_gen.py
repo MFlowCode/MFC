@@ -120,8 +120,9 @@ def test_get_generated_files_returns_six():
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
-    files = get_generated_files(Path("/tmp"))
+    files = get_generated_files(Path("/build"))
     assert len(files) == 6
-    names = {p.name for p, _ in files}
-    assert "generated_namelist_pre.fpp" in names
-    assert "generated_decls_sim.fpp" in names
+    paths = [str(p) for p, _ in files]
+    assert any("pre_process/generated_namelist.fpp" in p for p in paths)
+    assert any("simulation/generated_decls.fpp" in p for p in paths)
+    assert any("post_process/generated_namelist.fpp" in p for p in paths)

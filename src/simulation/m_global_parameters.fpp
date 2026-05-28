@@ -70,8 +70,6 @@ module m_global_parameters
         integer :: num_dims  !< Number of spatial dimensions
         integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
     #:endif
-    ! mpp_lim, time_stepper, prim_vars_wrt now in generated_decls.fpp
-
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: recon_type = ${recon_type}$    !< Reconstruction type
         integer, parameter :: weno_polyn = ${weno_polyn}$    !< Degree of the WENO polynomials (polyn)

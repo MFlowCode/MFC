@@ -9,14 +9,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp  # noqa: E402
+from mfc.params.generators.fortran_gen import get_generated_files  # noqa: E402
 
 if len(sys.argv) != 2:
     sys.exit(f"Usage: {sys.argv[0]} <cmake_binary_dir>")
 
 build_dir = Path(sys.argv[1])
-for short, full in [("pre", "pre_process"), ("sim", "simulation"), ("post", "post_process")]:
-    out_dir = build_dir / "include" / full
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "generated_namelist.fpp").write_text(generate_namelist_fpp(short))
-    (out_dir / "generated_decls.fpp").write_text(generate_decls_fpp(short))
+for path, content in get_generated_files(build_dir):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)

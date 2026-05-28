@@ -80,49 +80,6 @@ def _param_appears_in_case_md(param_base: str, tokens: set[str], text: str) -> b
     return False
 
 
-def _parse_namelist_params(fpp_path: Path) -> set[str]:
-    """Parse parameter names from a namelist /user_inputs/ block in an fpp file."""
-    text = fpp_path.read_text(encoding="utf-8")
-
-    # If the namelist is in a #:include'd generated file, generate in-memory.
-    if re.search(r"#:include\s+'generated_namelist\.fpp'", text):
-        _target_map = {"pre_process": "pre", "simulation": "sim", "post_process": "post"}
-        short = _target_map.get(fpp_path.parent.name)
-        if short:
-            from mfc.params.generators.fortran_gen import generate_namelist_fpp
-
-            text = generate_namelist_fpp(short)
-
-    params = set()
-
-    in_namelist = False
-    accum = ""
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("!") or stripped.startswith("#:") or stripped.startswith("#"):
-            continue
-        lower = stripped.lower()
-        if "namelist /user_inputs/" in lower:
-            idx = lower.index("/user_inputs/") + len("/user_inputs/")
-            accum += " " + stripped[idx:]
-            in_namelist = accum.rstrip().endswith("&")
-            continue
-        if in_namelist:
-            if stripped.startswith("&"):
-                stripped = stripped[1:]
-            accum += " " + stripped
-            if not accum.rstrip().endswith("&"):
-                in_namelist = False
-
-    accum = accum.replace("&", " ")
-    for raw_token in accum.split(","):
-        name = raw_token.strip()
-        if name and re.match(r"^[a-zA-Z_]\w*$", name):
-            params.add(name)
-
-    return params
-
-
 def check_descriptions_in_case_md(repo_root: Path) -> list[str]:
     """Tier 1, Check 1+2: Params with DESCRIPTIONS entries should appear in case.md."""
     REGISTRY, DESCRIPTIONS = _import_registry(repo_root)
@@ -185,13 +142,14 @@ def _is_derived_type_parent_or_field(name: str, all_params: dict) -> bool:
 def check_namelist_registry_sync(repo_root: Path) -> list[str]:
     """Tier 2: Unknown Fortran namelist params must be in REGISTRY (blocking)."""
     REGISTRY, _ = _import_registry(repo_root)
+    from mfc.params.namelist_parser import parse_namelist_from_file
 
     errors = []
     startup_files = sorted((repo_root / "src").rglob("m_start_up.fpp"))
     all_params = REGISTRY.all_params
 
     for fpp in startup_files:
-        nl_params = _parse_namelist_params(fpp)
+        nl_params = parse_namelist_from_file(fpp)
         rel = fpp.relative_to(repo_root)
 
         for p in sorted(nl_params):
