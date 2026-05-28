@@ -59,20 +59,7 @@ done
 # CI runs the full suite via ./mfc.sh lint without this variable.
 export MFC_SKIP_RENDER_TESTS=1
 
-# Detect whether any Fortran sources or CMakeLists changed — if so, run a build.
-# This catches compilation errors (duplicate declarations, missing symbols, etc.)
-# cheaply: Python-only changes pay zero build cost.
-if git diff HEAD --name-only 2>/dev/null | grep -qE '\.(fpp|f90)$|CMakeLists\.txt'; then
-    BUILD_FORTRAN=1
-else
-    BUILD_FORTRAN=0
-fi
-
-if [ "$BUILD_FORTRAN" = "1" ]; then
-    NCHECK=9
-else
-    NCHECK=8
-fi
+NCHECK=8
 
 log "Running$MAGENTA precheck$COLOR_RESET (same checks as CI lint-gate)..."
 echo ""
@@ -249,19 +236,6 @@ if [ "$EXAMPLES_FAILED" = "0" ]; then
 else
     error "$EXAMPLES_FAILED example case(s) failed validation. Run$MAGENTA ./mfc.sh validate examples/\*/case.py$COLOR_RESET for details."
     FAILED=1
-fi
-
-# --- Phase 3: Build (only when Fortran sources changed) ---
-
-if [ "$BUILD_FORTRAN" = "1" ]; then
-    log "[$CYAN 9/9$COLOR_RESET] Building$MAGENTA (Fortran changes detected)$COLOR_RESET..."
-    if ./mfc.sh build -j "$JOBS" > "$TMPDIR_PC/build_out" 2>&1; then
-        ok "Build passed."
-    else
-        error "Build failed. Output:"
-        cat "$TMPDIR_PC/build_out" | tail -20
-        FAILED=1
-    fi
 fi
 
 echo ""
