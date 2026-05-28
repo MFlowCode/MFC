@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List, Tuple
 
-from ..definitions import CASE_OPT_PARAMS, NAMELIST_VARS  # noqa: F401 - triggers registry population
+from ..definitions import CASE_OPT_PARAMS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS  # noqa: F401 - triggers registry population
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
@@ -15,7 +15,8 @@ _MAX_LINE = 130
 _FIRST_PREFIX = "namelist /user_inputs/ "
 _CONT_PREFIX = "    & "
 _CONT2_PREFIX = "        & "  # inside #:if block
-_DECL_COL = 24  # '::' column, matches ffmt alignment
+_DECL_COL = 24  # '::' column for scalars, matches ffmt alignment
+_ARRAY_DECL_COL = 36  # '::' column for array decls
 
 _FORTRAN_TYPES = {
     ParamType.INT: "integer",
@@ -98,20 +99,24 @@ def generate_namelist_fpp(target: str) -> str:
 
 
 def generate_decls_fpp(target: str) -> str:
-    """Return simple scalar Fortran declarations for a target as a string."""
+    """Return Fortran declarations (scalars + known arrays) for a target."""
     assert target in ("pre", "sim", "post")
     lines = [_HEADER.rstrip()]
     for name in _vars_for_target(target):
         if not _is_simple_scalar(name):
             continue
-        # Skip sim case-opt params: declared as compile-time parameters by the
-        # manual #:if MFC_CASE_OPTIMIZATION / #:else block in m_global_parameters.fpp
         if target == "sim" and name in CASE_OPT_PARAMS:
+            continue
+        if name in FORTRAN_ARRAY_DIMS:
+            member = REGISTRY.all_params.get(f"{name}(1)")
+            if member is not None:
+                ftype = fortran_type_decl(member)
+                dim = FORTRAN_ARRAY_DIMS[name]
+                lines.append(f"{(ftype + ', dimension(' + dim + ')').ljust(_ARRAY_DECL_COL)}:: {name}")
             continue
         param = REGISTRY.all_params.get(name)
         if param is None:
             continue
-        # Skip if also registered as an indexed family — Fortran declares it as an array.
         if any(k.startswith(f"{name}(") for k in REGISTRY.all_params):
             continue
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")

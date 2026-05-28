@@ -135,24 +135,10 @@ module m_global_parameters
     type(int_bounds_info) :: offset_x, offset_y, offset_z
     !> @}
 
-    !> @name The list of all possible flow variables that may be written to a database file. It includes partial densities, density,
-    !! momentum, velocity, energy, pressure, volume fraction(s), specific heat ratio function, specific heat ratio, liquid stiffness
-    !! function, liquid stiffness, primitive variables, conservative variables, speed of sound, the vorticity, and the numerical
-    !! Schlieren function.
-    !> @{
-    logical, dimension(num_fluids_max) :: alpha_rho_wrt
-    logical, dimension(3)              :: mom_wrt
-    logical, dimension(3)              :: vel_wrt
-    logical, dimension(3)              :: flux_wrt
-    logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
-    logical, dimension(num_fluids_max) :: alpha_wrt
-    logical, dimension(3)              :: omega_wrt
-    logical                            :: chem_wrt_Y(1:num_species)
-    !> @}
-
-    real(wp), dimension(num_fluids_max) :: schlieren_alpha  !< Per-fluid Schlieren intensity amplitude coefficients
-    integer                             :: fd_number        !< Finite-difference half-stencil size: MAX(1, fd_order/2)
-    type(chemistry_parameters)          :: chem_params
+    ! alpha_rho_wrt, mom_wrt, vel_wrt, flux_wrt, alpha_rho_e_wrt, alpha_wrt,
+    ! omega_wrt, chem_wrt_Y, schlieren_alpha: auto-generated in generated_decls.fpp
+    integer                    :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+    type(chemistry_parameters) :: chem_params
     !> @name Bubble modeling variables and parameters
     !> @{
     real(wp) :: Eu

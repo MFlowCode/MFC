@@ -65,10 +65,9 @@ module m_global_parameters
     integer, dimension(3, 2)   :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
     type(simplex_noise_params) :: simplex_params
 
-    ! Perturb density of surrounding air so as to break symmetry of grid
-    real(wp), dimension(num_fluids_max) :: fluid_rho
-    integer, allocatable, dimension(:)  :: proc_coords  !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:)  :: start_idx    !< Starting cell-center index of local processor in global grid
+    ! Perturb density of surrounding air so as to break symmetry of grid fluid_rho: auto-generated in generated_decls.fpp
+    integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:) :: start_idx    !< Starting cell-center index of local processor in global grid
 #ifdef MFC_MPI
     type(mpi_io_var), public :: MPI_IO_DATA
     character(LEN=name_len)  :: mpiiofs

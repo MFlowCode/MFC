@@ -1029,6 +1029,22 @@ _init_registry()
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 
+# Maps indexed-family base names to their Fortran dimension expression.
+# The generator emits `{type}, dimension({dim}) :: {name}` for each entry.
+# Add here whenever a new array param needs no manual Fortran declaration.
+FORTRAN_ARRAY_DIMS: dict[str, str] = {
+    "fluid_rho": "num_fluids_max",  # pre
+    "alpha_rho_wrt": "num_fluids_max",  # post
+    "alpha_rho_e_wrt": "num_fluids_max",  # post
+    "alpha_wrt": "num_fluids_max",  # post
+    "schlieren_alpha": "num_fluids_max",  # post
+    "chem_wrt_Y": "num_species",  # post (imported from m_thermochem)
+    "flux_wrt": "3",  # post
+    "mom_wrt": "3",  # post
+    "omega_wrt": "3",  # post
+    "vel_wrt": "3",  # post
+}
+
 
 def _nv(targets: set, *names: str) -> None:
     for n in names:
