@@ -91,14 +91,7 @@ def generate_namelist_fpp(target: str) -> str:
         opt_lines = _pack_namelist(opt, _CONT_PREFIX, _CONT2_PREFIX, _MAX_LINE)
         nl_with_cont = nl_lines[:]
         nl_with_cont[-1] += ", &"
-        parts = (
-            [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"] +
-            nl_lines +
-            ["#:else"] +
-            nl_with_cont +
-            opt_lines +
-            ["#:endif"]
-        )
+        parts = [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"] + nl_lines + ["#:else"] + nl_with_cont + opt_lines + ["#:endif"]
     else:
         parts = [_HEADER.rstrip()] + nl_lines
     return "\n".join(parts) + "\n"
