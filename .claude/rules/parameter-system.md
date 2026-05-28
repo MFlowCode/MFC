@@ -23,19 +23,21 @@ MFC has ~3,400 simulation parameters defined in Python and read by Fortran via n
    - Reads `&user_inputs` namelist
    - Each parameter must be declared in the namelist statement
 
-## Adding a New Parameter (4-location checklist)
+## Adding a New Parameter (2-location checklist)
 
-YOU MUST update the first 3 locations. Missing any causes silent failures or compile errors.
-Location 4 is required only if the parameter has physics constraints.
+Fortran declarations and namelist bindings are now auto-generated from definitions.py
+at CMake configure time — no manual Fortran edits needed for simple scalar parameters.
 
-1. **`toolchain/mfc/params/definitions.py`**: Add parameter with type, default, constraints
-2. **`src/*/m_global_parameters.fpp`**: Declare the Fortran variable in the relevant
-   target(s). If the param is used by simulation only, add it there. If shared, add to
-   all three targets' m_global_parameters.fpp.
-3. **`src/*/m_start_up.fpp`**: Add to the Fortran `namelist` declaration in the relevant
-   target(s).
-4. **`toolchain/mfc/case_validator.py`**: Add validation rules if the parameter has
+1. **`toolchain/mfc/params/definitions.py`**: Add parameter with `_r()` (type, default,
+   constraints) AND add it to `NAMELIST_VARS` via `_nv()` for the relevant target(s).
+   After editing, re-run cmake (or `./mfc.sh build`) to regenerate the Fortran includes.
+2. **`toolchain/mfc/case_validator.py`**: Add validation rules if the parameter has
    physics constraints. Include `PHYSICS_DOCS` entry with title, category, explanation.
+
+**Exceptions — still require manual Fortran edits:**
+- Array variables (e.g. `logical, dimension(num_fluids_max)`) → declare in `src/*/m_global_parameters.fpp`
+- Derived-type members (`fluid_pp%attr`, `patch_icpp(i)%attr`) → declare in the relevant derived type
+- Case-optimization parameters → add to `CASE_OPT_PARAMS` and the `#:else` block in `src/simulation/m_global_parameters.fpp`
 
 ## Case Files
 - Case files are Python scripts (`.py`) that define a dict of parameters
