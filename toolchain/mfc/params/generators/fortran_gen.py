@@ -26,6 +26,13 @@ _FORTRAN_TYPES = {
     ParamType.LOG: "logical",
 }
 
+_VALID_TARGETS = ("pre", "sim", "post")
+
+
+def _check_target(target: str) -> None:
+    if target not in _VALID_TARGETS:
+        raise ValueError(f"Unknown target {target!r}; expected one of {_VALID_TARGETS}")
+
 
 def get_namelist_var(name: str) -> str:
     """Return the Fortran namelist root for a parameter name."""
@@ -79,7 +86,7 @@ def _format_namelist(vars_list: List[str]) -> str:
 
 def generate_namelist_fpp(target: str) -> str:
     """Return the namelist /user_inputs/ statement for a target as a string."""
-    assert target in ("pre", "sim", "post")
+    _check_target(target)
     all_vars = _vars_for_target(target)
 
     if target != "sim":
@@ -92,7 +99,14 @@ def generate_namelist_fpp(target: str) -> str:
         opt_lines = _pack_namelist(opt, _CONT_PREFIX, _CONT2_PREFIX, _MAX_LINE)
         nl_with_cont = nl_lines[:]
         nl_with_cont[-1] += ", &"
-        parts = [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"] + nl_lines + ["#:else"] + nl_with_cont + opt_lines + ["#:endif"]
+        parts = (
+            [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"]
+            + nl_lines
+            + ["#:else"]
+            + nl_with_cont
+            + opt_lines
+            + ["#:endif"]
+        )
     else:
         parts = [_HEADER.rstrip()] + nl_lines
     return "\n".join(parts) + "\n"
@@ -100,7 +114,7 @@ def generate_namelist_fpp(target: str) -> str:
 
 def generate_decls_fpp(target: str) -> str:
     """Return Fortran declarations (scalars + known arrays) for a target."""
-    assert target in ("pre", "sim", "post")
+    _check_target(target)
     lines = [_HEADER.rstrip()]
     for name in _vars_for_target(target):
         if not _is_simple_scalar(name):
@@ -109,16 +123,23 @@ def generate_decls_fpp(target: str) -> str:
             continue
         if name in FORTRAN_ARRAY_DIMS:
             member = REGISTRY.all_params.get(f"{name}(1)")
-            if member is not None:
-                ftype = fortran_type_decl(member)
-                dim = FORTRAN_ARRAY_DIMS[name]
-                lines.append(f"{(ftype + ', dimension(' + dim + ')').ljust(_ARRAY_DECL_COL)}:: {name}")
+            if member is None:
+                raise ValueError(
+                    f"FORTRAN_ARRAY_DIMS[{name!r}] has no {name}(1) in the registry. "
+                    "Register at least one indexed variant (e.g. _r(f'{name}(1)', ...))."
+                )
+            ftype = fortran_type_decl(member)
+            dim = FORTRAN_ARRAY_DIMS[name]
+            lines.append(f"{(ftype + ', dimension(' + dim + ')').ljust(_ARRAY_DECL_COL)}:: {name}")
             continue
         param = REGISTRY.all_params.get(name)
         if param is None:
             continue
         if any(k.startswith(f"{name}(") for k in REGISTRY.all_params):
-            continue
+            raise ValueError(
+                f"{name!r} has indexed variants (e.g. {name}(1)) but is missing from "
+                "FORTRAN_ARRAY_DIMS. Add it there with its Fortran dimension expression."
+            )
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")
     return "\n".join(lines) + "\n"
 
@@ -144,4 +165,9 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
     Paths match the cmake include directory structure:
       build_dir/include/{full_target}/generated_{namelist,decls}.fpp
     """
-    return [(build_dir / "include" / full / f"generated_{kind}.fpp", gen(short)) for short, full in TARGETS for kind, gen in [("namelist", generate_namelist_fpp), ("decls", generate_decls_fpp)]]
+    result = []
+    for short, full in TARGETS:
+        inc = build_dir / "include" / full
+        result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
+        result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
+    return result

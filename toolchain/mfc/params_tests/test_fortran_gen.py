@@ -123,6 +123,32 @@ def test_decls_case_dir():
         assert "character(LEN=path_len) :: case_dir" in generate_decls_fpp(target)
 
 
+def test_decls_array_dims():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp
+
+    post = generate_decls_fpp("post")
+    assert "dimension(num_fluids_max)" in post and ":: alpha_wrt" in post
+    assert "dimension(num_fluids_max)" in post and ":: alpha_rho_wrt" in post
+    assert "dimension(3)" in post and ":: mom_wrt" in post
+    # Structs and families must NOT appear as bare scalar declarations
+    assert ":: fluid_pp" not in post
+    assert ":: bc_x" not in post
+
+    pre = generate_decls_fpp("pre")
+    assert "dimension(num_fluids_max)" in pre and ":: fluid_rho" in pre
+
+
+def test_check_target_raises_on_bad_target():
+    import pytest
+
+    from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp
+
+    with pytest.raises(ValueError, match="Unknown target"):
+        generate_namelist_fpp("bad")
+    with pytest.raises(ValueError, match="Unknown target"):
+        generate_decls_fpp("bad")
+
+
 def test_get_generated_files_returns_six():
     from pathlib import Path
 
