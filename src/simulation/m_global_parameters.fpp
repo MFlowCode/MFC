@@ -93,10 +93,26 @@ module m_global_parameters
         logical, parameter  :: igr_pres_lim = (${igr_pres_lim}$ /= 0)  !< Limit to positive pressures for IGR
         logical, parameter  :: viscous = (${viscous}$ /= 0)            !< Viscous effects
     #:else
-        integer :: weno_polyn         !< Degree of the WENO polynomials (polyn)
-        integer :: muscl_polyn        !< Degree of the MUSCL polynomials (polyn)i
-        integer :: weno_num_stencils  !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
-        logical :: wenojs             !< WENO-JS (default)
+        integer  :: recon_type
+        integer  :: weno_polyn
+        integer  :: muscl_polyn
+        integer  :: weno_order
+        integer  :: muscl_order
+        integer  :: weno_num_stencils
+        integer  :: muscl_lim
+        integer  :: num_fluids
+        logical  :: wenojs
+        logical  :: mapped_weno
+        logical  :: wenoz
+        logical  :: teno
+        real(wp) :: wenoz_q
+        logical  :: mhd
+        logical  :: relativity
+        integer  :: igr_iter_solver
+        integer  :: igr_order
+        logical  :: igr
+        logical  :: igr_pres_lim
+        logical  :: viscous
     #:endif
 
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
@@ -254,6 +270,8 @@ module m_global_parameters
     !> @{
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: nb = ${nb}$  !< Number of eq. bubble sizes
+    #:else
+        integer :: nb
     #:endif
 
     real(wp) :: Eu  !< Euler number
