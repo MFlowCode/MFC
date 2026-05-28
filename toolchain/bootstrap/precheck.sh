@@ -127,11 +127,24 @@ fi
 ) &
 PID_PARAM_DOCS=$!
 
+# Example case validation
+(
+    failed=0
+    for case in examples/*/case.py; do
+        [ -f "$case" ] || continue
+        if ! ./mfc.sh validate "$case" > /dev/null 2>&1; then
+            failed=$((failed + 1))
+        fi
+    done
+    echo "$failed" > "$TMPDIR_PC/examples_exit"
+) &
+PID_EXAMPLES=$!
+
 # --- Collect results ---
 
 FAILED=0
 
-log "[$CYAN 1/6$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
+log "[$CYAN 1/7$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
 if [ "$FORMAT_OK" = "1" ]; then
     error "Formatting check failed to run."
     FAILED=1
@@ -146,7 +159,7 @@ else
 fi
 
 wait $PID_SPELL
-log "[$CYAN 2/6$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
+log "[$CYAN 2/7$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 SPELL_RC=$(cat "$TMPDIR_PC/spell_exit" 2>/dev/null || echo "1")
 if [ "$SPELL_RC" = "0" ]; then
     ok "Spell check passed."
@@ -156,7 +169,7 @@ else
 fi
 
 wait $PID_LINT
-log "[$CYAN 3/6$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
+log "[$CYAN 3/7$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
 LINT_RC=$(cat "$TMPDIR_PC/lint_exit" 2>/dev/null || echo "1")
 if [ "$LINT_RC" = "0" ]; then
     ok "Toolchain lint passed."
@@ -166,7 +179,7 @@ else
 fi
 
 wait $PID_SOURCE
-log "[$CYAN 4/6$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
+log "[$CYAN 4/7$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
 SOURCE_RC=$(cat "$TMPDIR_PC/source_exit" 2>/dev/null || echo "1")
 if [ "$SOURCE_RC" = "0" ]; then
     ok "Source lint passed."
@@ -175,7 +188,7 @@ else
     FAILED=1
 fi
 
-log "[$CYAN 5/6$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
+log "[$CYAN 5/7$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if [ $DOC_FAILED -eq 0 ]; then
     ok "Doc references are valid."
 else
@@ -184,12 +197,22 @@ else
 fi
 
 wait $PID_PARAM_DOCS
-log "[$CYAN 6/6$COLOR_RESET] Checking$MAGENTA parameter docs$COLOR_RESET..."
+log "[$CYAN 6/7$COLOR_RESET] Checking$MAGENTA parameter docs$COLOR_RESET..."
 PARAM_DOCS_RC=$(cat "$TMPDIR_PC/param_docs_exit" 2>/dev/null || echo "1")
 if [ "$PARAM_DOCS_RC" = "0" ]; then
     ok "Parameter documentation check passed."
 else
     error "Parameter documentation check failed. Run$MAGENTA python3 toolchain/mfc/lint_param_docs.py$COLOR_RESET for details."
+    FAILED=1
+fi
+
+wait $PID_EXAMPLES
+log "[$CYAN 7/7$COLOR_RESET] Validating$MAGENTA example cases$COLOR_RESET..."
+EXAMPLES_FAILED=$(cat "$TMPDIR_PC/examples_exit" 2>/dev/null || echo "1")
+if [ "$EXAMPLES_FAILED" = "0" ]; then
+    ok "All example cases are valid."
+else
+    error "$EXAMPLES_FAILED example case(s) failed validation. Run$MAGENTA ./mfc.sh validate examples/\*/case.py$COLOR_RESET for details."
     FAILED=1
 fi
 

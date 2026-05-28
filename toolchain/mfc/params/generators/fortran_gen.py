@@ -107,6 +107,9 @@ def generate_decls_fpp(target: str) -> str:
         param = REGISTRY.all_params.get(name)
         if param is None:
             continue
+        # Skip if also registered as an indexed family — Fortran declares it as an array.
+        if any(k.startswith(f"{name}(") for k in REGISTRY.all_params):
+            continue
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")
     return "\n".join(lines) + "\n"
 
