@@ -623,7 +623,6 @@ def _load():
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
-        "alpha_wrt",
         "rho_wrt",
         "E_wrt",
         "pres_wrt",
