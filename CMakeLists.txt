@@ -465,12 +465,8 @@ endmacro()
 # include directories before HANDLE_SOURCES globs them for Fypp.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(_mfc_gen_stamp "${CMAKE_BINARY_DIR}/mfc_params_gen.stamp")
-set(_mfc_gen_inputs
-    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/cmake_gen.py"
-    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/fortran_gen.py"
-    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/definitions.py"
-    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/registry.py"
-    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/schema.py"
+file(GLOB_RECURSE _mfc_gen_inputs
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/*.py"
 )
 set(_mfc_needs_regen FALSE)
 if(NOT EXISTS "${_mfc_gen_stamp}")
