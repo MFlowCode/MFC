@@ -100,7 +100,7 @@ contains
             ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
-            alt_soundspeed, mixture_err, weno_Re_flux, &
+            alt_soundspeed, mixture_err, jwl_contact_blend, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &

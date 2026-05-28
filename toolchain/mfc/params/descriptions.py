@@ -57,6 +57,7 @@ DESCRIPTIONS = {
     "mpp_lim": "Enable mixture pressure positivity limiter",
     "mixture_err": "Enable mixture error checking",
     "alt_soundspeed": "Use alternative sound speed formulation",
+    "jwl_contact_blend": "Blend HLLC toward HLL across JWL contacts (contact-preserving guard; currently unused in the solver)",
     # WENO reconstruction
     "weno_order": "Order of WENO reconstruction",
     "weno_eps": "WENO epsilon parameter for smoothness",

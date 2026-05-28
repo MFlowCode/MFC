@@ -149,24 +149,25 @@ module m_global_parameters
     logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
-    real(wp) :: muscl_eps        !< MUSCL limiter slope-product threshold
-    real(wp) :: weno_eps         !< Binding for the WENO nonlinear weights
-    real(wp) :: teno_CT          !< Smoothness threshold for TENO
-    logical  :: mp_weno          !< Monotonicity preserving (MP) WENO
-    logical  :: weno_avg         !< Average left/right cell-boundary states
-    logical  :: weno_Re_flux     !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer  :: riemann_solver   !< Riemann solver algorithm
-    integer  :: low_Mach         !< Low Mach number fix to HLLC Riemann solver
-    integer  :: wave_speeds      !< Wave speeds estimation method
-    integer  :: avg_state        !< Average state evaluation method
-    logical  :: alt_soundspeed   !< Alternate mixture sound speed
-    logical  :: null_weights     !< Null undesired WENO weights
-    logical  :: mixture_err      !< Mixture properties correction
-    logical  :: hypoelasticity   !< hypoelasticity modeling
-    logical  :: hyperelasticity  !< hyperelasticity modeling
-    integer  :: int_comp         !< Interface compression: 0=off, 1=THINC, 2=MTHINC
-    real(wp) :: ic_eps           !< THINC Epsilon to compress on surface cells
-    real(wp) :: ic_beta          !< THINC Sharpness Parameter
+    real(wp) :: muscl_eps          !< MUSCL limiter slope-product threshold
+    real(wp) :: weno_eps           !< Binding for the WENO nonlinear weights
+    real(wp) :: teno_CT            !< Smoothness threshold for TENO
+    logical  :: mp_weno            !< Monotonicity preserving (MP) WENO
+    logical  :: weno_avg           !< Average left/right cell-boundary states
+    logical  :: weno_Re_flux       !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer  :: riemann_solver     !< Riemann solver algorithm
+    integer  :: low_Mach           !< Low Mach number fix to HLLC Riemann solver
+    integer  :: wave_speeds        !< Wave speeds estimation method
+    integer  :: avg_state          !< Average state evaluation method
+    logical  :: alt_soundspeed     !< Alternate mixture sound speed
+    logical  :: null_weights       !< Null undesired WENO weights
+    logical  :: mixture_err        !< Mixture properties correction
+    logical  :: jwl_contact_blend  !< Blend HLLC->HLL across JWL contacts (contact-preserving fix)
+    logical  :: hypoelasticity     !< hypoelasticity modeling
+    logical  :: hyperelasticity    !< hyperelasticity modeling
+    integer  :: int_comp           !< Interface compression: 0=off, 1=THINC, 2=MTHINC
+    real(wp) :: ic_eps             !< THINC Epsilon to compress on surface cells
+    real(wp) :: ic_beta            !< THINC Sharpness Parameter
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer            :: hyper_model                  !< hyperelasticity solver algorithm
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
@@ -202,6 +203,7 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[muscl_eps]')
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
+    $:GPU_DECLARE(create='[jwl_contact_blend]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress, cont_damage, hyper_cleaning]')
@@ -562,6 +564,7 @@ contains
         alt_soundspeed = .false.
         null_weights = .false.
         mixture_err = .false.
+        jwl_contact_blend = .true.
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
@@ -1265,6 +1268,7 @@ contains
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
+        $:GPU_UPDATE(device='[jwl_contact_blend]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
                      & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
                      & hyperelasticity, hyper_model, elasticity, low_Mach]')

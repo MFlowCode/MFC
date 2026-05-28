@@ -433,6 +433,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `adv_n`   	               | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
 | `mpp_lim`	                 | Logical | Mixture physical parameters limits |
 | `mixture_err`              | Logical | Mixture properties correction |
+| `jwl_contact_blend`        | Logical | Blend HLLC toward HLL across JWL contacts (contact-preserving guard; currently unused in the solver) |
 | `time_stepper`             | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`                  | Logical | Strang splitting scheme with adaptive time stepping |
 | `recon_type`               | Integer | Reconstruction Type: [1] WENO; [2] MUSCL |

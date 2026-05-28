@@ -30,6 +30,8 @@ module m_variables_conversion
               s_convert_primitive_to_conservative_variables, &
               s_convert_primitive_to_flux_variables, &
               s_compute_pressure, &
+              s_jwl_energy_pr, &
+              jwl_idx, &
               s_compute_species_fraction, &
 #ifndef MFC_PRE_PROCESS
     s_compute_speed_of_sound, &
@@ -121,17 +123,16 @@ contains
 
         real(wp), intent(in)  :: rho, pres, A, B, R1, R2, omega, rho0
         real(wp), intent(out) :: c2
-        real(wp)              :: rho_safe, exp1, exp2, v, e, isentrope_const
+        real(wp)              :: rho_safe, exp1, exp2, v, e
 
         rho_safe = max(rho, sgm_eps)
-        v = 1._wp/rho_safe
-        exp1 = exp(-R1*rho0*v)
-        exp2 = exp(-R2*rho0*v)
+        v = rho0/rho_safe
+        exp1 = exp(-R1*v)
+        exp2 = exp(-R2*v)
 
-        e = pres*v/omega - A*(v/omega - 1._wp/(rho0*R1))*exp1 - B*(v/omega - 1._wp/(rho0*R2))*exp2
-        isentrope_const = (rho0*e - A/R1*exp1 - B/R2*exp2)*omega*(rho0*v)**omega
-
-        c2 = rho0*v**2._wp*(A*R1*exp1 + B*R2*exp2 + isentrope_const*(1._wp + omega)/(rho0*v)**(2._wp + omega))
+        e = (v/omega)*(pres - A*(1._wp - omega/(R1*v))*exp1 - B*(1._wp - omega/(R2*v))*exp2)
+        c2 = A*exp1*(omega/(R1*v**2._wp) - R1*(1._wp - omega/(R1*v))) + B*exp2*(omega/(R2*v**2._wp) - R2*(1._wp - omega/(R2*v)))
+        c2 = c2*(-rho0/(rho_safe*rho_safe)) + omega*e/rho0 + omega*pres/(rho_safe*rho0)
         c2 = max(c2, sgm_eps)
 
     end subroutine s_jwl_sound_speed_squared
@@ -150,6 +151,11 @@ contains
 
         if (Y_safe <= 1.e-2_wp) then
             c2 = max(air_gamma*(pres/rho_safe + pres/rho_safe/air_gamma), sgm_eps)
+            return
+        end if
+
+        if (E0 <= 0._wp .or. Y_safe > 0.99_wp) then
+            call s_jwl_sound_speed_squared(rho_safe, pres, A, B, R1, R2, omega0, rho0, c2)
             return
         end if
 
@@ -237,7 +243,7 @@ contains
         end if
 
         pres = A_eff*(1._wp - omega*rho_safe/(R1*rho0))*exp(-R1*rho0/rho_safe) + B_eff*(1._wp - omega*rho_safe/(R2*rho0)) &
-                      & *exp(-R2*rho0/rho_safe) + omega*rho_safe*e
+                      & *exp(-R2*rho0/rho_safe) + omega*rho_safe*e/max(rho0, sgm_eps)
 
     end subroutine s_jwl_pressure_er
 
@@ -279,15 +285,15 @@ contains
             e = (pres + (ma*eJ - A)*C1 + (mb*eJ - B)*C2)/max(ma*C1 + mb*C2 + omega*rho_safe, sgm_eps)
 
             if (e < air_e0 .or. e > eJ) then
-                e = pres/(omega*rho_safe) - A*(1._wp/(omega*rho_safe) - 1._wp/(rho0*R1))*exp(-R1*rho0/rho_safe) &
-                          & - B*(1._wp/(omega*rho_safe) - 1._wp/(rho0*R2))*exp(-R2*rho0/rho_safe)
+                e = pres*rho0/(omega*rho_safe) - A*(rho0/(omega*rho_safe) - 1._wp/R1)*exp(-R1*rho0/rho_safe) &
+                               & - B*(rho0/(omega*rho_safe) - 1._wp/R2)*exp(-R2*rho0/rho_safe)
             end if
         else
-            e = pres/(omega*rho_safe) - A*(1._wp/(omega*rho_safe) - 1._wp/(rho0*R1))*exp(-R1*rho0/rho_safe) &
-                      & - B*(1._wp/(omega*rho_safe) - 1._wp/(rho0*R2))*exp(-R2*rho0/rho_safe)
+            e = pres*rho0/(omega*rho_safe) - A*(rho0/(omega*rho_safe) - 1._wp/R1)*exp(-R1*rho0/rho_safe) &
+                           & - B*(rho0/(omega*rho_safe) - 1._wp/R2)*exp(-R2*rho0/rho_safe)
         end if
 
-        if (e <= 0._wp) e = air_e0
+        if (e <= 0._wp .and. E0 > 0._wp .and. Y_work <= 0.99_wp) e = air_e0
 
     end subroutine s_jwl_energy_pr
 
@@ -366,6 +372,7 @@ contains
                 call s_jwl_pressure_er(rho, e_sp, Y_jwl, jwl_As(jwl_idx), jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), &
                                        & jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
                                        & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), pres)
+                pres = max(pres, 1._wp)
             else if (mhd) then
                 ! MHD pressure: subtract magnetic pressure from total energy
                 pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
@@ -1642,6 +1649,7 @@ contains
                                                        & jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), &
                                                        & jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), &
                                                        & jwl_air_gammas(jwl_idx), c)
+                c = max(c, jwl_omegas(jwl_idx)*max(pres, 1._wp)/(max(rho, sgm_eps)*jwl_rho0s(jwl_idx)))
             else if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
                 blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)

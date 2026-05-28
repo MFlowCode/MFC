@@ -411,8 +411,28 @@ contains
                                 ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                                 H_R = (E_R + pres_R - pres_mag%R)/rho_R
                             else
-                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
+                                if ((jwl_idx > 0) .and. (.not. mhd) .and. (model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) &
+                                    & then
+                                    Y_L = 1._wp
+                                    Y_R = 1._wp
+                                    if (jwl_idx <= eqn_idx%cont%end) then
+                                        Y_L = alpha_rho_L(jwl_idx)/max(rho_L, sgm_eps)
+                                        Y_R = alpha_rho_R(jwl_idx)/max(rho_R, sgm_eps)
+                                    end if
+                                    call s_jwl_energy_pr(rho_L, pres_L, Y_L, jwl_As(jwl_idx), jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), &
+                                                         & jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), &
+                                                         & jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), &
+                                                         & jwl_air_gammas(jwl_idx), eps)
+                                    E_L = rho_L*eps + 5.e-1_wp*rho_L*vel_L_rms
+                                    call s_jwl_energy_pr(rho_R, pres_R, Y_R, jwl_As(jwl_idx), jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), &
+                                                         & jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), &
+                                                         & jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), &
+                                                         & jwl_air_gammas(jwl_idx), eps)
+                                    E_R = rho_R*eps + 5.e-1_wp*rho_R*vel_R_rms
+                                else
+                                    E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
+                                    E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
+                                end if
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             end if
@@ -1093,8 +1113,28 @@ contains
                                 ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                                 H_R = (E_R + pres_R - pres_mag%R)/rho_R
                             else
-                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
+                                if ((jwl_idx > 0) .and. (.not. mhd) .and. (model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) &
+                                    & then
+                                    Y_L = 1._wp
+                                    Y_R = 1._wp
+                                    if (jwl_idx <= eqn_idx%cont%end) then
+                                        Y_L = alpha_rho_L(jwl_idx)/max(rho_L, sgm_eps)
+                                        Y_R = alpha_rho_R(jwl_idx)/max(rho_R, sgm_eps)
+                                    end if
+                                    call s_jwl_energy_pr(rho_L, pres_L, Y_L, jwl_As(jwl_idx), jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), &
+                                                         & jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), &
+                                                         & jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), &
+                                                         & jwl_air_gammas(jwl_idx), eps)
+                                    E_L = rho_L*eps + 5.e-1_wp*rho_L*vel_L_rms
+                                    call s_jwl_energy_pr(rho_R, pres_R, Y_R, jwl_As(jwl_idx), jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), &
+                                                         & jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), &
+                                                         & jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), &
+                                                         & jwl_air_gammas(jwl_idx), eps)
+                                    E_R = rho_R*eps + 5.e-1_wp*rho_R*vel_R_rms
+                                else
+                                    E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
+                                    E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
+                                end if
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             end if
@@ -2833,6 +2873,8 @@ contains
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
+                                    alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                    alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                     alpha_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
                                     alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
                                 end do
@@ -2954,9 +2996,28 @@ contains
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
                                 else
-                                    E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                    E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
-
+                                    if ((jwl_idx > 0) .and. (.not. mhd) .and. (model_eqns /= 4) .and. (bubbles_euler &
+                                        & .neqv. .true.)) then
+                                        Y_L = 1._wp
+                                        Y_R = 1._wp
+                                        if (jwl_idx <= eqn_idx%cont%end) then
+                                            Y_L = alpha_rho_L(jwl_idx)/max(rho_L, sgm_eps)
+                                            Y_R = alpha_rho_R(jwl_idx)/max(rho_R, sgm_eps)
+                                        end if
+                                        call s_jwl_energy_pr(rho_L, pres_L, Y_L, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
+                                                             & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
+                                                             & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
+                                                             & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                        E_L = rho_L*eps + 5.e-1_wp*rho_L*vel_L_rms
+                                        call s_jwl_energy_pr(rho_R, pres_R, Y_R, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
+                                                             & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
+                                                             & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
+                                                             & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                        E_R = rho_R*eps + 5.e-1_wp*rho_R*vel_R_rms
+                                    else
+                                        E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
+                                        E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
+                                    end if
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
                                 end if

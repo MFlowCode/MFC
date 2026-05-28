@@ -304,6 +304,7 @@ _SIMPLE_DESCS = {
     # Misc physics
     "alt_soundspeed": "Alternative sound speed formulation",
     "mixture_err": "Enable mixture error checking",
+    "jwl_contact_blend": "Blend HLLC toward HLL across JWL contacts (contact-preserving fix)",
     "cont_damage": "Enable continuum damage model",
 }
 
@@ -1081,6 +1082,7 @@ def _load():
         "simplex_perturb",
         "alt_soundspeed",
         "mixture_err",
+        "jwl_contact_blend",
         "rdma_mpi",
         "igr_pres_lim",
         "nv_uvm_out_of_core",
