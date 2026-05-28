@@ -28,7 +28,7 @@ def _mfc_config_zsh_flags() -> List[str]:
     from ..state import MFCConfig, gpuConfigOptions
 
     specs = []
-    modes = ":".join(e.value for e in gpuConfigOptions if e.value != gpuConfigOptions.NONE.value)
+    modes = " ".join(e.value for e in gpuConfigOptions if e.value != gpuConfigOptions.NONE.value)
     for f in dataclasses.fields(MFCConfig):
         cli = f.name.replace("_", "-")
         label = cli.replace("-", " ").title()

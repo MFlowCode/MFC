@@ -87,7 +87,7 @@ def generate_namelist_fpp(target: str) -> str:
     normal = [v for v in all_vars if v not in CASE_OPT_PARAMS]
     opt = sorted(v for v in CASE_OPT_PARAMS if v in NAMELIST_VARS and "sim" in NAMELIST_VARS[v])
     nl_lines = _pack_namelist(normal, _FIRST_PREFIX, _CONT_PREFIX, _MAX_LINE)
-    if opt:
+    if opt and nl_lines:
         opt_lines = _pack_namelist(opt, _CONT_PREFIX, _CONT2_PREFIX, _MAX_LINE)
         nl_with_cont = nl_lines[:]
         nl_with_cont[-1] += ", &"

@@ -468,8 +468,9 @@ set(_mfc_gen_stamp "${CMAKE_BINARY_DIR}/mfc_params_gen.stamp")
 set(_mfc_gen_inputs
     "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/cmake_gen.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/fortran_gen.py"
-    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/namelist_targets.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/definitions.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/registry.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/schema.py"
 )
 set(_mfc_needs_regen FALSE)
 if(NOT EXISTS "${_mfc_gen_stamp}")

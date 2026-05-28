@@ -463,8 +463,8 @@ def generate_parameter_docs() -> str:
             pattern_has_symbols = False
             for _pattern, examples in patterns.items():
                 for ex in examples:
-                    p = REGISTRY.all_params[ex]
-                    if p.constraints or ex in by_trigger or ex in by_param:
+                    p = REGISTRY.all_params.get(ex)
+                    if p and (p.constraints or ex in by_trigger or ex in by_param):
                         pattern_has_constraints = True
                     if get_math_symbol(ex):
                         pattern_has_symbols = True
@@ -484,7 +484,8 @@ def generate_parameter_docs() -> str:
 
             for pattern, examples in sorted(patterns.items()):
                 example = examples[0]
-                desc = REGISTRY.all_params[example].description
+                _ep = REGISTRY.all_params.get(example)
+                desc = _ep.description if _ep else ""
                 # Truncate long descriptions
                 if len(desc) > 60:
                     desc = desc[:57] + "..."
@@ -497,8 +498,9 @@ def generate_parameter_docs() -> str:
                     sym = get_math_symbol(example)
                     row += f" | {sym}"
                 if pattern_has_constraints:
-                    p = REGISTRY.all_params[example]
-                    row += f" | {_format_constraints_cell(example, p, by_trigger, by_param)}"
+                    p = REGISTRY.all_params.get(example)
+                    if p:
+                        row += f" | {_format_constraints_cell(example, p, by_trigger, by_param)}"
                 lines.append(row + " |")
 
             lines.append("")

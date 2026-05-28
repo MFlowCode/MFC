@@ -260,10 +260,7 @@ class CaseValidator:
         self.prohibit(p > 0 and p + 1 < order, f"For 3D: p must be at least {param_name} - 1 (= {order - 1})")
 
     def _get_recon_type(self) -> int:
-        """Return recon_type after validating it is 1 (WENO) or 2 (MUSCL)."""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-        return recon_type
+        return self.get("recon_type", 1)
 
     def check_parameter_types(self):
         """Validate parameter types before other checks.
@@ -279,6 +276,8 @@ class CaseValidator:
         for param in logical_params:
             if param in self.params:  # Only validate params that are set
                 self._validate_logical(param)
+
+        self.prohibit(self.get("recon_type", 1) not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
 
         # Required domain parameters when m > 0
         m = self.get("m")
