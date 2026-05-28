@@ -815,7 +815,7 @@ DEPENDENCIES = {
 }
 
 
-def _r(name, ptype, tags=None, desc=None, hint=None, math=None):
+def _r(name, ptype, tags=None, desc=None, hint=None, math=None, str_len=None):
     """Register a parameter with optional feature tags and description."""
     if hint is None:
         hint = _lookup_hint(name)
@@ -836,6 +836,7 @@ def _r(name, ptype, tags=None, desc=None, hint=None, math=None):
             tags=tags if tags else set(),
             hint=hint,
             math_symbol=math or "",
+            str_len=str_len if str_len is not None else "name_len",
         )
     )
 
@@ -1072,7 +1073,7 @@ def _load():
     ]:
         _r(n, LOG)
     _r("int_comp", INT)
-    _r("case_dir", STR)
+    _r("case_dir", STR, str_len="path_len")
 
     # Body force
     for d in ["x", "y", "z"]:
