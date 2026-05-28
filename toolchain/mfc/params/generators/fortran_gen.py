@@ -100,6 +100,10 @@ def generate_decls_fpp(target: str) -> str:
     for name in _vars_for_target(target):
         if not _is_simple_scalar(name):
             continue
+        # Skip sim case-opt params: declared as compile-time parameters by the
+        # manual #:if MFC_CASE_OPTIMIZATION / #:else block in m_global_parameters.fpp
+        if target == "sim" and name in CASE_OPT_PARAMS:
+            continue
         param = REGISTRY.all_params.get(name)
         if param is None:
             continue
