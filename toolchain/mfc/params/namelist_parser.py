@@ -408,9 +408,18 @@ def parse_namelist_from_file(filepath: Path) -> Set[str]:
     """
     content = filepath.read_text()
 
+    # Handle #:include 'generated_namelist_*.fpp' — resolve to the included file.
+    include_match = re.search(r"#:include\s+'(generated_namelist_\w+\.fpp)'", content)
+    if include_match:
+        include_name = include_match.group(1)
+        include_path = filepath.parent.parent / "common" / "include" / include_name
+        if not include_path.exists():
+            raise ValueError(f"Included namelist file not found: {include_path}")
+        content = include_path.read_text()
+
     # Find the namelist block - starts with "namelist /user_inputs/"
-    # and continues until a line without continuation (&) or a blank line
-    namelist_match = re.search(r"namelist\s+/user_inputs/\s*(.+?)(?=\n\s*\n|\n\s*!(?!\s*&)|\n\s*[a-zA-Z_]+\s*=)", content, re.DOTALL | re.IGNORECASE)
+    # and continues until a line without continuation (&), a blank line, or end-of-string
+    namelist_match = re.search(r"namelist\s+/user_inputs/\s*(.+?)(?=\n\s*\n|\n\s*!(?!\s*&)|\n\s*[a-zA-Z_]+\s*=|$)", content, re.DOTALL | re.IGNORECASE)
 
     if not namelist_match:
         raise ValueError(f"Could not find namelist /user_inputs/ in {filepath}")

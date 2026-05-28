@@ -64,7 +64,6 @@ logical                 :: mixture_err
 integer                 :: model_eqns
 logical                 :: mom_wrt
 logical                 :: mpp_lim
-integer                 :: muscl_lim
 integer                 :: muscl_order
 integer                 :: n
 integer                 :: n_start
@@ -75,7 +74,6 @@ integer                 :: num_ibs
 logical                 :: omega_wrt
 logical                 :: output_partial_domain
 integer                 :: p
-real(wp)                :: palpha_eps
 logical                 :: parallel_io
 logical                 :: pi_inf_wrt
 real(wp)                :: poly_sigma
@@ -86,7 +84,6 @@ real(wp)                :: pref
 logical                 :: pres_inf_wrt
 logical                 :: pres_wrt
 logical                 :: prim_vars_wrt
-real(wp)                :: ptgalpha_eps
 logical                 :: qbmm
 logical                 :: qm_wrt
 integer                 :: recon_type

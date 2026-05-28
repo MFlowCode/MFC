@@ -83,6 +83,15 @@ def _param_appears_in_case_md(param_base: str, tokens: set[str], text: str) -> b
 def _parse_namelist_params(fpp_path: Path) -> set[str]:
     """Parse parameter names from a namelist /user_inputs/ block in an fpp file."""
     text = fpp_path.read_text(encoding="utf-8")
+
+    # If the namelist is in a #:include'd generated file, resolve it.
+    include_match = re.search(r"#:include\s+'(generated_namelist_\w+\.fpp)'", text)
+    if include_match:
+        include_name = include_match.group(1)
+        include_path = fpp_path.parent.parent / "common" / "include" / include_name
+        if include_path.exists():
+            text = include_path.read_text(encoding="utf-8")
+
     params = set()
 
     in_namelist = False
