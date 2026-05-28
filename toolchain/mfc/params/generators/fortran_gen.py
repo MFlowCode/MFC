@@ -18,8 +18,10 @@ _CONT2_PREFIX = "        & "  # inside #:if block
 _DECL_COL = 24  # '::' column, matches ffmt alignment
 
 _FORTRAN_TYPES = {
-    ParamType.INT: "integer",       ParamType.ANALYTIC_INT: "integer",
-    ParamType.REAL: "real(wp)",     ParamType.ANALYTIC_REAL: "real(wp)",
+    ParamType.INT: "integer",
+    ParamType.ANALYTIC_INT: "integer",
+    ParamType.REAL: "real(wp)",
+    ParamType.ANALYTIC_REAL: "real(wp)",
     ParamType.LOG: "logical",
 }
 
@@ -126,8 +128,4 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
     Paths match the cmake include directory structure:
       build_dir/include/{full_target}/generated_{namelist,decls}.fpp
     """
-    return [
-        (build_dir / "include" / full / f"generated_{kind}.fpp", gen(short))
-        for short, full in TARGETS
-        for kind, gen in [("namelist", generate_namelist_fpp), ("decls", generate_decls_fpp)]
-    ]
+    return [(build_dir / "include" / full / f"generated_{kind}.fpp", gen(short)) for short, full in TARGETS for kind, gen in [("namelist", generate_namelist_fpp), ("decls", generate_decls_fpp)]]

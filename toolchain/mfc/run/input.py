@@ -62,7 +62,8 @@ class MFCInputFile(Case):
         for candidate in candidates:
             try:
                 return ct.Solution(candidate)
-            except Exception:
+            except Exception as e:
+                cons.print(f"[dim]  Cantera: skipping '{candidate}': {e}[/dim]")
                 continue
 
         raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
