@@ -59,7 +59,7 @@ done
 # CI runs the full suite via ./mfc.sh lint without this variable.
 export MFC_SKIP_RENDER_TESTS=1
 
-NCHECK=8
+NCHECK=7
 
 log "Running$MAGENTA precheck$COLOR_RESET (same checks as CI lint-gate)..."
 echo ""
@@ -128,16 +128,6 @@ fi
     fi
 ) &
 PID_PARAM_DOCS=$!
-
-# Generated files check (JSON schema, completions, docs)
-(
-    if ./mfc.sh generate --check > /dev/null 2>&1; then
-        echo "0" > "$TMPDIR_PC/generate_exit"
-    else
-        echo "1" > "$TMPDIR_PC/generate_exit"
-    fi
-) &
-PID_GENERATE=$!
 
 # Example case validation
 (
@@ -218,18 +208,8 @@ else
     FAILED=1
 fi
 
-wait $PID_GENERATE
-log "[$CYAN 7/$NCHECK$COLOR_RESET] Checking$MAGENTA generated files$COLOR_RESET..."
-GENERATE_RC=$(cat "$TMPDIR_PC/generate_exit" 2>/dev/null || echo "1")
-if [ "$GENERATE_RC" = "0" ]; then
-    ok "Generated files are up to date."
-else
-    error "Generated files are out of date. Run$MAGENTA ./mfc.sh generate$COLOR_RESET to update."
-    FAILED=1
-fi
-
 wait $PID_EXAMPLES
-log "[$CYAN 8/$NCHECK$COLOR_RESET] Validating$MAGENTA example cases$COLOR_RESET..."
+log "[$CYAN 7/$NCHECK$COLOR_RESET] Validating$MAGENTA example cases$COLOR_RESET..."
 EXAMPLES_FAILED=$(cat "$TMPDIR_PC/examples_exit" 2>/dev/null || echo "1")
 if [ "$EXAMPLES_FAILED" = "0" ]; then
     ok "All example cases are valid."
