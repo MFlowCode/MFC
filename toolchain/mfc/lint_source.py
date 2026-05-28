@@ -185,10 +185,7 @@ def check_double_precision(repo_root: Path) -> list[str]:
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
     precision_re = re.compile(
-        r"\b(?:double_precision|double\s+precision|dsqrt|dexp|dlog|dble|dabs|"
-        r"dprod|dmin|dmax|dfloat|dreal|dcos|dsin|dtan|dsign|dtanh|dsinh|dcosh)\b|"
-        r"\breal\s*\(\s*[48]\s*\)|"
-        r"[0-9]d0",
+        r"\b(?:double_precision|double\s+precision|dsqrt|dexp|dlog|dble|dabs|" r"dprod|dmin|dmax|dfloat|dreal|dcos|dsin|dtan|dsign|dtanh|dsinh|dcosh)\b|" r"\breal\s*\(\s*[48]\s*\)|" r"[0-9]d0",
         re.IGNORECASE,
     )
 
