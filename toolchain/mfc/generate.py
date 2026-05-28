@@ -76,6 +76,11 @@ def generate():
         (docs_dir / "parameters.md", generate_parameter_docs()),
     ] + _constraint_docs(docs_dir)
 
+    from .params.generators.fortran_gen import get_generated_files
+
+    include_dir = Path(MFC_ROOT_DIR) / "src" / "common" / "include"
+    files += get_generated_files(include_dir)
+
     all_ok = True
     for path, content in files:
         if not _check_or_write(path, content, check_mode):

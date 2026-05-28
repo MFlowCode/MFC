@@ -3,23 +3,32 @@ Fortran parameter code generator.
 
 Generates namelist fragments and simple scalar declaration fragments
 per target (pre/sim/post). Output consumed by generate.py.
+
+Output format matches ffmt (the MFC Fortran formatter) so that
+./mfc.sh format is idempotent on these generated files.
 """
 
 import re
 from pathlib import Path
 from typing import List, Tuple
 
-import mfc.params.definitions  # noqa: F401 — triggers registry population
+import mfc.params.definitions  # noqa: F401 - triggers registry population
 
 from ..namelist_targets import CASE_OPT_EXCLUDE, NAMELIST_VARS
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
-_HEADER = (
-    "! AUTO-GENERATED — do not edit directly.\n"
-    "! Regenerate: ./mfc.sh generate\n"
-    "!\n"
-)
+# ffmt collapses the two header lines into one and uses ASCII hyphen
+_HEADER = "! AUTO-GENERATED - do not edit directly. Regenerate: ./mfc.sh generate\n!\n"
+
+# ffmt formats Fortran with max 130-char lines and 4-space continuation indent
+_MAX_LINE = 130
+_FIRST_PREFIX = "namelist /user_inputs/ "
+_CONT_PREFIX = "    & "
+_CONT2_PREFIX = "        & "  # second-level continuation (inside Fypp #:if block)
+
+# ffmt aligns '::' to a fixed column; widest type is character(LEN=path_len) = 23 chars
+_DECL_COL = 24  # pad type string to this width before '::'
 
 
 def get_namelist_var(param_name: str) -> str:
@@ -47,7 +56,7 @@ def fortran_type_decl(param: ParamDef) -> str:
 
 
 def _is_simple_scalar(name: str) -> bool:
-    """Return True if name has no '%' and no '(' — i.e. a plain simple variable."""
+    """Return True if name has no '%' and no '(' - i.e. a plain simple variable."""
     return "%" not in name and "(" not in name
 
 
@@ -56,44 +65,42 @@ def _vars_for_target(target: str) -> List[str]:
     return sorted(v for v, ts in NAMELIST_VARS.items() if target in ts)
 
 
-def _format_namelist(vars_list: List[str]) -> str:
+def _pack_namelist(vars_list: List[str], first_prefix: str, cont_prefix: str, max_line: int) -> List[str]:
     """
-    Format a list of variable names as a Fortran namelist continuation block.
+    Pack a list of variable names into Fortran namelist continuation lines.
 
-    The first line starts with 'namelist /user_inputs/ '.
-    Continuation lines use '    & ' prefix (4 spaces + ampersand + space).
-    All lines except the last end with ', &' for continuation.
-    Lines are wrapped at 80 characters.
+    Returns a list of lines WITHOUT trailing newlines.
+    All lines except the last end with ', &'.
     """
     if not vars_list:
-        return ""
-
-    FIRST_PREFIX = "namelist /user_inputs/ "
-    CONT_PREFIX = "    & "
-    MAX_WIDTH = 80
+        return []
 
     lines: List[str] = []
-    prefix = FIRST_PREFIX
+    prefix = first_prefix
     current_vars: List[str] = []
     current_len = len(prefix)
 
     for var in vars_list:
-        # Each var takes len(var) + 2 for ", " separator (except possibly last)
         additional = len(var) + (2 if current_vars else 0)
-        if current_vars and current_len + additional > MAX_WIDTH:
-            # Flush current line with continuation
+        if current_vars and current_len + additional + 3 > max_line:
+            # Flush with continuation marker
             lines.append(prefix + ", ".join(current_vars) + ", &")
-            prefix = CONT_PREFIX
+            prefix = cont_prefix
             current_vars = [var]
-            current_len = len(CONT_PREFIX) + len(var)
+            current_len = len(cont_prefix) + len(var)
         else:
             current_vars.append(var)
             current_len += additional
 
-    # Emit the last line (no trailing continuation — caller adds if needed)
     if current_vars:
         lines.append(prefix + ", ".join(current_vars))
 
+    return lines
+
+
+def _format_namelist(vars_list: List[str]) -> str:
+    """Format vars as a Fortran namelist statement block (no trailing newline)."""
+    lines = _pack_namelist(vars_list, _FIRST_PREFIX, _CONT_PREFIX, _MAX_LINE)
     return "\n".join(lines)
 
 
@@ -109,28 +116,22 @@ def generate_namelist_fpp(target: str) -> str:
     normal = [v for v in all_vars if v not in CASE_OPT_EXCLUDE]
     opt = sorted(v for v in CASE_OPT_EXCLUDE if v in NAMELIST_VARS and "sim" in NAMELIST_VARS[v])
 
-    lines = [_HEADER.rstrip()]
+    # Normal vars: last line gets ', &' since opt vars follow
+    nl_lines = _pack_namelist(normal, _FIRST_PREFIX, _CONT_PREFIX, _MAX_LINE)
+    nl_lines[-1] += ", &"
 
-    # Normal vars always end with ", &" because opt vars follow (inside the #:if block)
-    nl = _format_namelist(normal)
-    lines.append(nl + ", &")
-    lines.append("#:if not MFC_CASE_OPTIMIZATION")
+    # Opt vars: pack using cont_prefix for first line, cont2_prefix for subsequent
+    opt_lines = _pack_namelist(opt, _CONT_PREFIX, _CONT2_PREFIX, _MAX_LINE)
 
-    # Opt vars: each line except the last ends with ", &"
-    for i, var in enumerate(opt):
-        is_last = (i == len(opt) - 1)
-        if is_last:
-            lines.append(f"    & {var}")
-        else:
-            lines.append(f"    & {var}, &")
-
-    lines.append("#:endif")
-
-    return "\n".join(lines) + "\n"
+    all_lines = [_HEADER.rstrip()] + nl_lines + ["#:if not MFC_CASE_OPTIMIZATION"] + opt_lines + ["#:endif"]
+    return "\n".join(all_lines) + "\n"
 
 
 def generate_decls_fpp(target: str) -> str:
-    """Generate simple scalar Fortran variable declarations for a target."""
+    """Generate simple scalar Fortran variable declarations for a target.
+
+    Column-aligns '::' to match ffmt output (type padded to _DECL_COL chars).
+    """
     assert target in ("pre", "sim", "post")
     all_params = REGISTRY.all_params
     vars_for_target = _vars_for_target(target)
@@ -141,17 +142,19 @@ def generate_decls_fpp(target: str) -> str:
         param = all_params.get(name)
         if param is None:
             continue
-        lines.append(f"{fortran_type_decl(param)} :: {name}")
+        type_str = fortran_type_decl(param)
+        padded = type_str.ljust(_DECL_COL)
+        lines.append(f"{padded}:: {name}")
     return "\n".join(lines) + "\n"
 
 
 def get_generated_files(include_dir: Path) -> List[Tuple[Path, str]]:
     """Return (output_path, content) for all six generated .fpp files."""
     return [
-        (include_dir / "generated_namelist_pre.fpp",  generate_namelist_fpp("pre")),
-        (include_dir / "generated_namelist_sim.fpp",  generate_namelist_fpp("sim")),
+        (include_dir / "generated_namelist_pre.fpp", generate_namelist_fpp("pre")),
+        (include_dir / "generated_namelist_sim.fpp", generate_namelist_fpp("sim")),
         (include_dir / "generated_namelist_post.fpp", generate_namelist_fpp("post")),
-        (include_dir / "generated_decls_pre.fpp",     generate_decls_fpp("pre")),
-        (include_dir / "generated_decls_sim.fpp",     generate_decls_fpp("sim")),
-        (include_dir / "generated_decls_post.fpp",    generate_decls_fpp("post")),
+        (include_dir / "generated_decls_pre.fpp", generate_decls_fpp("pre")),
+        (include_dir / "generated_decls_sim.fpp", generate_decls_fpp("sim")),
+        (include_dir / "generated_decls_post.fpp", generate_decls_fpp("post")),
     ]
