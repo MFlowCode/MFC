@@ -29,17 +29,17 @@ Run `./mfc.sh <command> --help` for the full flag set; the most-used invocations
 ./mfc.sh build -j 8                 # all 3 targets; flags: -t <target>, --gpu acc|mp, --debug,
                                     #   -i case.py --case-optimization (10x speedup)
 ./mfc.sh run case.py -n 4           # run with 4 MPI ranks; --no-build; -e batch (toolchain/templates/)
-./mfc.sh test -j 8                  # full suite (560+); --only <1D|Bubbles|UUID>, -l, -% N (sample),
+./mfc.sh test -j 8                  # full suite; --only <1D|Bubbles|UUID>, -l, -% N (sample),
                                     #   --generate (regenerate golden files after an intended output change)
 
 # Verify before committing
-./mfc.sh precheck -j 8              # all 7 CI lint checks
+./mfc.sh precheck -j 8              # all CI lint checks
 ./mfc.sh format -j 8               # auto-format Fortran (.fpp/.f90) + Python
 ./mfc.sh lint                       # ruff lint + Python unit tests   (spelling: ./mfc.sh spelling)
 
 # Case files
 ./mfc.sh validate case.py           # validate without running
-./mfc.sh params <query>             # search 3,400 case parameters
+./mfc.sh params <query>             # search case parameters
 ./mfc.sh new <name>                 # new case from template       (clean: ./mfc.sh clean)
 ```
 
@@ -66,7 +66,7 @@ IMPORTANT: Follow this loop for ALL code changes. Do not skip steps.
 2. **Plan** — For multi-file changes, outline your approach before implementing.
 3. **Implement** — Make small, focused changes. One logical change per commit.
 4. **Format** — Run `./mfc.sh format -j 8` to auto-format.
-5. **Verify** — Run `./mfc.sh precheck -j 8` (same 7 checks as CI lint gate).
+5. **Verify** — Run `./mfc.sh precheck -j 8` (same checks as the CI lint gate).
 6. **Build** — Run `./mfc.sh build -j 8` to verify compilation.
 7. **Test** — Run relevant tests: `./mfc.sh test --only <feature> -j 8`.
    For changes to `src/common/`, test ALL three targets: `./mfc.sh test -j 8`.
@@ -86,11 +86,11 @@ src/
   simulation/     # CFD solver (GPU-accelerated via OpenACC / OpenMP target offload)
   post_process/   # Data output and visualization
 toolchain/        # Python CLI, build system, testing, parameter management
-  mfc/params/definitions.py   # ~3,400 parameter definitions (source of truth)
+  mfc/params/definitions.py   # parameter definitions (source of truth)
   mfc/case_validator.py       # Physics constraint validation
   mfc/test/                   # Test runner and case generation
 examples/         # Example simulation cases (case.py files)
-tests/            # 560+ regression test golden files
+tests/            # regression test golden files
 ```
 
 Source files are `.fpp` (Fortran + Fypp macros), preprocessed to `.f90` by CMake.

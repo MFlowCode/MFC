@@ -33,7 +33,7 @@ Full set with signatures in `parallel_macros.fpp`. The ones you reach for most:
 Others in `parallel_macros.fpp`: `GPU_ENTER_DATA`/`GPU_EXIT_DATA`, `GPU_DECLARE`, `GPU_ROUTINE`,
 `GPU_ATOMIC`, `GPU_WAIT`, and the block macros `GPU_DATA`, `GPU_HOST_DATA`.
 
-Typical GPU loop pattern (used 750+ times in the codebase):
+Typical GPU loop pattern (the dominant spatial-loop idiom):
 ```
 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
 do l = idwbuff(3)%beg, idwbuff(3)%end

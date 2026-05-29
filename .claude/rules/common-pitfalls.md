@@ -4,9 +4,9 @@
 - Grid dimensions: `m`, `n`, `p` (cells in x, y, z). 1D: n=p=0. 2D: p=0.
 - Interior domain: `0:m`, `0:n`, `0:p`
 - Buffer/ghost region: `-buff_size:m+buff_size` (similar for n, p in multi-D)
-- `buff_size` is set per reconstruction scheme in `s_configure_coordinate_bounds` (`m_helper_basic.fpp`):
-  WENO `weno_polyn + 2` (`2*weno_polyn + 2` if `viscous`), MUSCL `muscl_polyn + 2`, IGR `(igr_order-1)/2 + 2`;
-  then floored to `max(.,6)` with Lagrange bubbles and `max(.,10)` with IB. Don't assume `2*weno_polyn + 2`.
+- `buff_size` is **not** a single formula: it's set per reconstruction scheme (WENO/MUSCL/IGR) in
+  `s_configure_coordinate_bounds` (`m_helper_basic.fpp`) and floored higher for Lagrange bubbles and IB.
+  Read that routine for the current value rather than assuming one.
 - Domain bounds: `idwint(1:3)` (interior `0:m`), `idwbuff(1:3)` (with ghost cells)
 - Cell-center coords: `x_cc(-buff_size:m+buff_size)`, `y_cc(...)`, `z_cc(...)`
 - Cell-boundary coords: `x_cb(-1-buff_size:m+buff_size)`

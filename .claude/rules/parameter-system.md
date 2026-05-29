@@ -1,7 +1,7 @@
 # Parameter System
 
 ## Overview
-MFC has ~3,400 simulation parameters defined in Python and read by Fortran via namelist files.
+MFC's simulation parameters are defined in Python and read by Fortran via namelist files.
 
 ## Parameter Flow: Python → Fortran
 
