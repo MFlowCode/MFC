@@ -33,6 +33,16 @@ def test_fortran_type_real():
     assert fortran_type_decl(ParamDef(name="x", param_type=ParamType.REAL)) == "real(wp)"
 
 
+def test_fortran_type_real_storage_precision():
+    from mfc.params.generators.fortran_gen import fortran_type_decl
+    from mfc.params.schema import ParamDef, ParamType
+
+    p = ParamDef(name="x", param_type=ParamType.REAL, storage_precision=True)
+    assert fortran_type_decl(p) == "real(stp)"
+    a = ParamDef(name="x", param_type=ParamType.ANALYTIC_REAL, storage_precision=True)
+    assert fortran_type_decl(a) == "real(stp)"
+
+
 def test_fortran_type_log():
     from mfc.params.generators.fortran_gen import fortran_type_decl
     from mfc.params.schema import ParamDef, ParamType
