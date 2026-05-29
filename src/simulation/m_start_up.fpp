@@ -85,38 +85,7 @@ contains
 
         character(len=1000) :: line
 
-        namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, mpp_lim, time_stepper, weno_eps, muscl_eps, &
-            rdma_mpi, teno_CT, mp_weno, weno_avg, &
-            riemann_solver, low_Mach, wave_speeds, avg_state, &
-            bc_x, bc_y, bc_z, &
-            x_a, y_a, z_a, x_b, y_b, z_b, &
-            x_domain, y_domain, z_domain, &
-            hypoelasticity, &
-            ib, num_ibs, ib_neighborhood_radius, patch_ib, &
-            num_particle_beds, particle_bed, &
-            collision_model, coefficient_of_restitution, collision_time, &
-            ib_coefficient_of_friction, ib_state_wrt, &
-            fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
-            fd_order, probe, num_probes, t_step_old, &
-            alt_soundspeed, mixture_err, weno_Re_flux, &
-            null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles_euler, bubble_model, &
-            R0ref, chem_params, &
-        #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
-            num_fluids, mhd, relativity, igr_order, viscous, &
-            igr_iter_solver, igr, igr_pres_lim, &
-            recon_type, muscl_order, muscl_lim, &
-        #:endif
-        Ca, Web, Re_inv, acoustic_source, acoustic, num_source, polytropic, thermal, integral, integral_wrt, num_integrals, &
-            & polydisperse, poly_sigma, qbmm, relax, relax_model, palpha_eps, ptgalpha_eps, file_per_process, sigma, pi_fac, &
-            & adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, bf_x, bf_y, bf_z, k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, g_x, &
-            & g_y, g_z, n_start, t_save, t_stop, cfl_adap_dt, cfl_const_dt, cfl_target, surface_tension, bubbles_lagrange, &
-            & lag_params, hyperelasticity, R0ref, num_bc_patches, Bx0, cont_damage, tau_star, cont_damage_s, alpha_bar, &
-            & hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, alf_factor, num_igr_iters, num_igr_warm_start_iters, &
-            & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
+        #:include 'generated_namelist.fpp'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
 

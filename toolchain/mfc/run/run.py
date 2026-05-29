@@ -33,25 +33,20 @@ def __validate_job_options() -> None:
             raise MFCException(f"RUN: {ARG('email')} is not a valid e-mail address.")
 
 
+_PROFILERS = [
+    ("ncu", "ncu", "[bold green]NVIDIA Nsight Compute[/bold green]", lambda: ["ncu", "--nvtx", "--mode=launch-and-attach", "--cache-control=none", "--clock-control=none"] + ARG("ncu")),
+    ("nsys", "nsys", "[bold green]NVIDIA Nsight Systems[/bold green]", lambda: ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")),
+    ("rcu", "rocprof-compute", "[bold red]ROCM rocprof-compute[/bold red]", lambda: ["rocprof-compute", "profile", "-n", ARG("name").replace("-", "_").replace(".", "_")] + ARG("rcu") + ["--"]),
+    ("rsys", "rocprof", "[bold red]ROCM rocprof-systems[/bold red]", lambda: ["rocprof"] + ARG("rsys")),
+]
+
+
 def __profiler_prepend() -> typing.List[str]:
-    if ARG("ncu") is not None:
-        if not does_command_exist("ncu"):
-            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
-
-        return ["ncu", "--nvtx", "--mode=launch-and-attach", "--cache-control=none", "--clock-control=none"] + ARG("ncu")
-
-    if ARG("nsys") is not None:
-        if not does_command_exist("nsys"):
-            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Systems[/bold green] (nsys).")
-
-        return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
-
-    if ARG("rcu") is not None:
-        if not does_command_exist("rocprof-compute"):
-            raise MFCException("Failed to locate [bold red]ROCM rocprof-compute[/bold red] (rocprof-compute).")
-
-        return ["rocprof-compute", "profile", "-n", ARG("name").replace("-", "_").replace(".", "_")] + ARG("rcu") + ["--"]
-
+    for arg, cmd, label, build_args in _PROFILERS:
+        if ARG(arg) is not None:
+            if not does_command_exist(cmd):
+                raise MFCException(f"Failed to locate {label} ({cmd}).")
+            return build_args()
     return []
 
 

@@ -139,11 +139,12 @@ NEVER use `stop` or `error stop`. Use `call s_mpi_abort()` or `@:PROHIBIT()`/`@:
 NEVER use `goto`, `COMMON` blocks, or global `save` variables.
 
 Every `@:ALLOCATE(...)` MUST have a matching `@:DEALLOCATE(...)`.
-Every new parameter MUST be added in at least 3 places (4 if it has constraints):
-  1. `toolchain/mfc/params/definitions.py` (parameter definition)
-  2. Fortran variable declaration in `src/*/m_global_parameters.fpp`
-  3. Fortran namelist in `src/*/m_start_up.fpp` (namelist binding)
-  4. `toolchain/mfc/case_validator.py` (only if parameter has physics constraints)
+Every new parameter MUST be added in at least 2 places (3 if it has constraints):
+  1. `toolchain/mfc/params/definitions.py` (parameter definition + NAMELIST_VARS target set)
+  2. `toolchain/mfc/case_validator.py` (only if parameter has physics constraints)
+  Note: Fortran declarations and namelist bindings are auto-generated from definitions.py
+  at CMake configure time. Simple scalars need no manual Fortran edits. Array/derived-type
+  variables still require a manual declaration in `src/*/m_global_parameters.fpp`.
 
 Changes to `src/common/` affect ALL three executables. Test comprehensively.
 

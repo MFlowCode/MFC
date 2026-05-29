@@ -15,17 +15,6 @@ show_help() {
   exit 0
 }
 
-# Cross-platform hash function (macOS uses md5, Linux uses md5sum)
-compute_hash() {
-    if command -v md5sum > /dev/null 2>&1; then
-        md5sum | cut -d' ' -f1
-    elif command -v md5 > /dev/null 2>&1; then
-        md5 -q
-    else
-        # Fallback: use cksum if neither available
-        cksum | cut -d' ' -f1
-    fi
-}
 
 JOBS=1
 
@@ -59,6 +48,8 @@ done
 # CI runs the full suite via ./mfc.sh lint without this variable.
 export MFC_SKIP_RENDER_TESTS=1
 
+NCHECK=7
+
 log "Running$MAGENTA precheck$COLOR_RESET (same checks as CI lint-gate)..."
 echo ""
 
@@ -66,20 +57,17 @@ echo ""
 TMPDIR_PC=$(mktemp -d)
 trap "rm -rf $TMPDIR_PC" EXIT
 
-# --- Phase 1: Format (modifies files, must run alone) ---
-BEFORE_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | compute_hash)
-if ! ./mfc.sh format -j "$JOBS" > /dev/null 2>&1; then
-    FORMAT_OK=1
-else
-    AFTER_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | compute_hash)
-    if [ "$BEFORE_HASH" != "$AFTER_HASH" ]; then
-        FORMAT_OK=2
-    else
-        FORMAT_OK=0
-    fi
+# --- Phase 1: Format check (non-mutating; mirrors CI's format+diff check) ---
+# Use --check mode so staged-but-unformatted code is caught even if the
+# working tree was already reformatted by a prior ./mfc.sh format run.
+FORMAT_OK=0
+if ! ruff format --check toolchain/ examples/ benchmarks/ > /dev/null 2>&1; then
+    FORMAT_OK=2
+elif ! ffmt --check -j "$JOBS" src/ > /dev/null 2>&1; then
+    FORMAT_OK=2
 fi
 
-# --- Phase 2: All remaining checks in parallel (read-only) ---
+# --- Phase 2: All fast checks in parallel (read-only) ---
 
 # Spell check
 (
@@ -127,26 +115,33 @@ fi
 ) &
 PID_PARAM_DOCS=$!
 
-# --- Collect results ---
+# Example case validation
+(
+    failed=0
+    for case in examples/*/case.py; do
+        [ -f "$case" ] || continue
+        if ! ./mfc.sh validate "$case" > /dev/null 2>&1; then
+            failed=$((failed + 1))
+        fi
+    done
+    echo "$failed" > "$TMPDIR_PC/examples_exit"
+) &
+PID_EXAMPLES=$!
+
+# --- Collect results (fast checks) ---
 
 FAILED=0
 
-log "[$CYAN 1/6$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
-if [ "$FORMAT_OK" = "1" ]; then
-    error "Formatting check failed to run."
-    FAILED=1
-elif [ "$FORMAT_OK" = "2" ]; then
-    error "Code was not formatted. Files have been auto-formatted; review and stage the changes."
-    echo ""
-    git diff --stat -- '*.f90' '*.fpp' '*.py' 2>/dev/null || true
-    echo ""
+log "[$CYAN 1/$NCHECK$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
+if [ "$FORMAT_OK" = "2" ]; then
+    error "Code is not formatted. Run$MAGENTA ./mfc.sh format$COLOR_RESET and re-stage the changes."
     FAILED=1
 else
     ok "Formatting check passed."
 fi
 
 wait $PID_SPELL
-log "[$CYAN 2/6$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
+log "[$CYAN 2/$NCHECK$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 SPELL_RC=$(cat "$TMPDIR_PC/spell_exit" 2>/dev/null || echo "1")
 if [ "$SPELL_RC" = "0" ]; then
     ok "Spell check passed."
@@ -156,7 +151,7 @@ else
 fi
 
 wait $PID_LINT
-log "[$CYAN 3/6$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
+log "[$CYAN 3/$NCHECK$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
 LINT_RC=$(cat "$TMPDIR_PC/lint_exit" 2>/dev/null || echo "1")
 if [ "$LINT_RC" = "0" ]; then
     ok "Toolchain lint passed."
@@ -166,7 +161,7 @@ else
 fi
 
 wait $PID_SOURCE
-log "[$CYAN 4/6$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
+log "[$CYAN 4/$NCHECK$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET..."
 SOURCE_RC=$(cat "$TMPDIR_PC/source_exit" 2>/dev/null || echo "1")
 if [ "$SOURCE_RC" = "0" ]; then
     ok "Source lint passed."
@@ -175,7 +170,7 @@ else
     FAILED=1
 fi
 
-log "[$CYAN 5/6$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
+log "[$CYAN 5/$NCHECK$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if [ $DOC_FAILED -eq 0 ]; then
     ok "Doc references are valid."
 else
@@ -184,12 +179,22 @@ else
 fi
 
 wait $PID_PARAM_DOCS
-log "[$CYAN 6/6$COLOR_RESET] Checking$MAGENTA parameter docs$COLOR_RESET..."
+log "[$CYAN 6/$NCHECK$COLOR_RESET] Checking$MAGENTA parameter docs$COLOR_RESET..."
 PARAM_DOCS_RC=$(cat "$TMPDIR_PC/param_docs_exit" 2>/dev/null || echo "1")
 if [ "$PARAM_DOCS_RC" = "0" ]; then
     ok "Parameter documentation check passed."
 else
     error "Parameter documentation check failed. Run$MAGENTA python3 toolchain/mfc/lint_param_docs.py$COLOR_RESET for details."
+    FAILED=1
+fi
+
+wait $PID_EXAMPLES
+log "[$CYAN 7/$NCHECK$COLOR_RESET] Validating$MAGENTA example cases$COLOR_RESET..."
+EXAMPLES_FAILED=$(cat "$TMPDIR_PC/examples_exit" 2>/dev/null || echo "1")
+if [ "$EXAMPLES_FAILED" = "0" ]; then
+    ok "All example cases are valid."
+else
+    error "$EXAMPLES_FAILED example case(s) failed validation. Run$MAGENTA ./mfc.sh validate examples/\*/case.py$COLOR_RESET for details."
     FAILED=1
 fi
 
