@@ -1237,7 +1237,7 @@ contains
 
     end subroutine s_wrap_periodic_ibs
 
-    !> @brief reasseses ownership of IBs and passes ownership of IBs to neighbor processors
+    !> @brief Swaps ownership of IBs and passes ownership of IBs to neighbor processors
     !> Reduces forces and torques across the local neighborhood without a global allreduce. Accumulation phase: 2 passes per
     !! dimension receiving from the low-index (-X) neighbor. Pass 1: add received values; save what was received as recv_snap. Pass
     !! 2: send current (post-pass-1) values; add received; subtract recv_snap to remove double-counting of the direct contribution
