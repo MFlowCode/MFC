@@ -104,6 +104,7 @@ NEVER use double-precision intrinsics: `dsqrt`, `dexp`, `dlog`, `dble`, `dabs`, 
 NEVER use `d` exponent literals (`1.0d0`). Use `1.0_wp` instead.
 NEVER use `stop` or `error stop`. Use `call s_mpi_abort()` or `@:PROHIBIT()`/`@:ASSERT()`.
 NEVER use `goto`, `COMMON` blocks, or global `save` variables.
+  (Headline subset; full lint-enforced list — incl. Python/shell rules — in `.claude/rules/fortran-conventions.md`.)
 
 Every `@:ALLOCATE(...)` MUST have a matching `@:DEALLOCATE(...)`.
 Every new parameter MUST be added in at least 2 places (3 if it has constraints):

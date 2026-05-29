@@ -53,10 +53,8 @@ Enforced by convention/code review (not automated):
 - Fortran-side runtime validation also exists in `m_checker*.fpp` files using `@:PROHIBIT`
 
 ## Precision Types
-- `wp` (working precision): used for computation. Double by default.
-- `stp` (storage precision): used for field data arrays and I/O. Double by default.
-- In single-precision mode (`--single`): both become single.
-- In mixed-precision mode (`--mixed`): wp=double, stp=half.
+`wp`/`stp` are defined in `CLAUDE.md` (`wp` = computation, `stp` = field-data storage + I/O). Detail:
+- Modes: default both double; `--single` → both single; `--mixed` → wp=double, stp=half.
 - MPI type matching: `mpi_p` must match `wp`, `mpi_io_p` must match `stp`.
 - Always use generic intrinsics: `sqrt` not `dsqrt`, `abs` not `dabs`.
 - Cast with `real(..., wp)` or `real(..., stp)`, never `dble(...)`.
