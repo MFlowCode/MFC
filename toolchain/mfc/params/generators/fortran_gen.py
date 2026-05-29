@@ -21,10 +21,10 @@ _ARRAY_DECL_COL = 36  # '::' column for array decls
 _FORTRAN_TYPES = {
     ParamType.INT: "integer",
     ParamType.ANALYTIC_INT: "integer",
-    ParamType.REAL: "real(wp)",
-    ParamType.ANALYTIC_REAL: "real(wp)",
     ParamType.LOG: "logical",
 }
+
+_REAL_TYPES = (ParamType.REAL, ParamType.ANALYTIC_REAL)
 
 _VALID_TARGETS = ("pre", "sim", "post")
 
@@ -46,6 +46,8 @@ def get_namelist_var(name: str) -> str:
 def fortran_type_decl(param: ParamDef) -> str:
     if param.param_type == ParamType.STR:
         return f"character(LEN={param.str_len})"
+    if param.param_type in _REAL_TYPES:
+        return f"real({'stp' if param.storage_precision else 'wp'})"
     return _FORTRAN_TYPES[param.param_type]
 
 
