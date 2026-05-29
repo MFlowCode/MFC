@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Tuple
 
 from .. import definitions  # noqa: F401
 from ..ast_analyzer import analyze_case_validator, classify_message
-from ..descriptions import get_description, get_math_symbol
+from ..descriptions import get_math_symbol
 from ..registry import REGISTRY
 from ..schema import ParamType
 
@@ -342,6 +342,14 @@ def _format_validator_rules(param_name: str, by_trigger: Dict[str, list], by_par
     return "; ".join(parts)
 
 
+def _format_constraints_cell(name: str, param, by_trigger, by_param) -> str:
+    """Format the Constraints table cell for a single parameter."""
+    extra = "; ".join(filter(None, [_format_constraints(param), _format_validator_rules(name, by_trigger, by_param)]))
+    if not extra:
+        extra = _format_tag_annotation(name, param)
+    return _escape_pct_outside_backticks(extra)
+
+
 def generate_parameter_docs() -> str:
     """Generate markdown documentation for all parameters."""
     # AST-extract rules from case_validator.py
@@ -455,8 +463,8 @@ def generate_parameter_docs() -> str:
             pattern_has_symbols = False
             for _pattern, examples in patterns.items():
                 for ex in examples:
-                    p = REGISTRY.all_params[ex]
-                    if p.constraints or ex in by_trigger or ex in by_param:
+                    p = REGISTRY.all_params.get(ex)
+                    if p and (p.constraints or ex in by_trigger or ex in by_param):
                         pattern_has_constraints = True
                     if get_math_symbol(ex):
                         pattern_has_symbols = True
@@ -476,7 +484,8 @@ def generate_parameter_docs() -> str:
 
             for pattern, examples in sorted(patterns.items()):
                 example = examples[0]
-                desc = get_description(example) or ""
+                _ep = REGISTRY.all_params.get(example)
+                desc = _ep.description if _ep else ""
                 # Truncate long descriptions
                 if len(desc) > 60:
                     desc = desc[:57] + "..."
@@ -489,14 +498,9 @@ def generate_parameter_docs() -> str:
                     sym = get_math_symbol(example)
                     row += f" | {sym}"
                 if pattern_has_constraints:
-                    p = REGISTRY.all_params[example]
-                    constraints = _format_constraints(p)
-                    deps = _format_validator_rules(example, by_trigger, by_param)
-                    extra = "; ".join(filter(None, [constraints, deps]))
-                    if not extra:
-                        extra = _format_tag_annotation(example, p)
-                    extra = _escape_pct_outside_backticks(extra)
-                    row += f" | {extra}"
+                    p = REGISTRY.all_params.get(example)
+                    if p:
+                        row += f" | {_format_constraints_cell(example, p, by_trigger, by_param)}"
                 lines.append(row + " |")
 
             lines.append("")
@@ -514,24 +518,17 @@ def generate_parameter_docs() -> str:
 
             for name, param in params:
                 type_str = _type_to_str(param.param_type)
-                desc = get_description(name) or ""
+                desc = param.description
                 # Truncate long descriptions
                 if len(desc) > 80:
                     desc = desc[:77] + "..."
-                constraints = _format_constraints(param)
-                deps = _format_validator_rules(name, by_trigger, by_param)
-                extra = "; ".join(filter(None, [constraints, deps]))
-                if not extra:
-                    extra = _format_tag_annotation(name, param)
-                extra = _escape_pct_outside_backticks(extra)
-                # Escape % for Doxygen (even inside backtick code spans)
                 name_escaped = _escape_percent(name)
                 desc = _escape_percent(desc)
                 row = f"| `{name_escaped}` | {type_str} | {desc}"
                 if full_has_symbols:
                     sym = get_math_symbol(name)
                     row += f" | {sym}"
-                row += f" | {extra}"
+                row += f" | {_format_constraints_cell(name, param, by_trigger, by_param)}"
                 lines.append(row + " |")
 
             lines.append("")

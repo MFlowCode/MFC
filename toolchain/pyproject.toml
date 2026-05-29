@@ -23,9 +23,10 @@ dependencies = [
 
     # Code Health
     "typos",
-    "ruff",
+    "ruff==0.6.5",
     "ffmt==0.4.1",
     "ansi2txt",
+    "pytest",
 
     # Profiling
     "numpy",
@@ -56,6 +57,10 @@ dependencies = [
     "scikit-image",
     "tqdm",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["."]
 
 [tool.hatch.metadata]
 allow-direct-references = true
