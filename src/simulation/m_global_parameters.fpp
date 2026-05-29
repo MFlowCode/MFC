@@ -166,6 +166,7 @@ module m_global_parameters
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
+    integer :: ib_neighborhood_radius
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z]')
     $:GPU_DECLARE(create='[down_sample]')
 
