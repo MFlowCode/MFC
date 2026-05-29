@@ -239,6 +239,32 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
+    tests.extend(
+        [
+            ConstraintTest(
+                method="check_interface_compression",
+                line_number=0,
+                message="int_comp > 0 is not supported with model_eqns = 3",
+                condition="int_comp != 0 and model_eqns == 3",
+                test_params={
+                    **BASE_CASE,
+                    "n": 10,
+                    "bc_y%beg": -3,
+                    "bc_y%end": -3,
+                    "y_domain%beg": 0.0,
+                    "y_domain%end": 1.0,
+                    "num_fluids": 2,
+                    "model_eqns": 3,
+                    "int_comp": 1,
+                    "fluid_pp(2)%gamma": 2.5,
+                    "fluid_pp(2)%pi_inf": 0.0,
+                    "patch_icpp(1)%alpha_rho(2)": 0.0,
+                    "patch_icpp(1)%alpha(2)": 0.0,
+                },
+            ),
+        ]
+    )
+
     return tests
 
 

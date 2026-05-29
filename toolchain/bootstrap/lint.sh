@@ -32,12 +32,8 @@ ruff check benchmarks/*/case.py
 if [ "$RUN_TESTS" = true ]; then
     log "(venv) Running$MAGENTA unit tests$COLOR_RESET on$MAGENTA MFC$COLOR_RESET's $MAGENTA""toolchain$COLOR_RESET."
 
-    # Run tests as modules from the toolchain directory to resolve relative imports
     cd toolchain
-    python3 -m unittest mfc.params_tests.test_registry mfc.params_tests.test_definitions mfc.params_tests.test_validate mfc.params_tests.test_integration -v
-    python3 -m unittest mfc.cli.test_cli -v
-    python3 -m unittest mfc.viz.test_viz -v
-    python3 -m unittest mfc.run.test_archive -v
+    python3 -m pytest . -v
     cd - > /dev/null
 fi
 

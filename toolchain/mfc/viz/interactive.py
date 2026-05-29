@@ -1693,7 +1693,6 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         overlay_vol_nsurf,
         playing_st,
     ):
-
         _t0 = time.perf_counter()
         _GRAPH_SHOW = {"height": "100vh", "display": "block"}
         _GRAPH_HIDE = {"height": "100vh", "display": "none"}

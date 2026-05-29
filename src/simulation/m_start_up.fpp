@@ -15,6 +15,7 @@ module m_start_up
     use m_variables_conversion
     use m_weno
     use m_muscl
+    use m_thinc
     use m_riemann_solvers
     use m_cbc
     use m_boundary_common
@@ -81,37 +82,7 @@ contains
 
         character(len=1000) :: line
 
-        namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, mpp_lim, time_stepper, weno_eps, muscl_eps, &
-            rdma_mpi, teno_CT, mp_weno, weno_avg, &
-            riemann_solver, low_Mach, wave_speeds, avg_state, &
-            bc_x, bc_y, bc_z, &
-            x_a, y_a, z_a, x_b, y_b, z_b, &
-            x_domain, y_domain, z_domain, &
-            hypoelasticity, &
-            ib, num_ibs, patch_ib, &
-            collision_model, coefficient_of_restitution, collision_time, &
-            ib_coefficient_of_friction, ib_state_wrt, &
-            fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
-            fd_order, probe, num_probes, t_step_old, &
-            alt_soundspeed, mixture_err, weno_Re_flux, &
-            null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles_euler, bubble_model, &
-            R0ref, chem_params, &
-        #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
-            num_fluids, mhd, relativity, igr_order, viscous, &
-            igr_iter_solver, igr, igr_pres_lim, &
-            recon_type, muscl_order, muscl_lim, &
-        #:endif
-        Ca, Web, Re_inv, acoustic_source, acoustic, num_source, polytropic, thermal, integral, integral_wrt, num_integrals, &
-            & polydisperse, poly_sigma, qbmm, relax, relax_model, palpha_eps, ptgalpha_eps, file_per_process, sigma, pi_fac, &
-            & adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, bf_x, bf_y, bf_z, k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, g_x, &
-            & g_y, g_z, n_start, t_save, t_stop, cfl_adap_dt, cfl_const_dt, cfl_target, surface_tension, bubbles_lagrange, &
-            & lag_params, hyperelasticity, R0ref, num_bc_patches, Bx0, cont_damage, tau_star, cont_damage_s, alpha_bar, &
-            & hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, alf_factor, num_igr_iters, num_igr_warm_start_iters, &
-            & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
+        #:include 'generated_namelist.fpp'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
 
@@ -174,7 +145,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the starting time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
-        logical :: file_exist
+        logical :: file_exist                               !< Logical used to check the existence of the input file
         integer :: i, r
 
         if (cfl_dt) then
@@ -680,7 +651,6 @@ contains
 
     !> Collect per-process wall-clock times and write aggregate performance metrics to file
     impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
-
         & file_exists)
 
         real(wp), intent(inout)               :: time_avg, time_final
@@ -933,10 +903,10 @@ contains
 
         ! Computation of parameters, allocation of memory, association of pointers, and/or execution of any other tasks that are
         ! needed to properly configure the modules. The preparations below DO DEPEND on the grid being complete.
-        if (igr .or. dummy) then
+        if (igr) then
             call s_initialize_igr_module()
         end if
-        if (.not. igr .or. dummy) then
+        if (.not. igr) then
             if (recon_type == WENO_TYPE) then
                 call s_initialize_weno_module()
             else if (recon_type == MUSCL_TYPE) then
@@ -945,7 +915,7 @@ contains
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
-
+        if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
@@ -1094,14 +1064,6 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[igr, nb, igr_order]')
         #:endif
-        #:if USING_AMD
-            block
-                use m_thermochem, only: molecular_weights
-                use m_chemistry, only: molecular_weights_nonparameter
-                molecular_weights_nonparameter(:) = molecular_weights(:)
-                $:GPU_UPDATE(device='[molecular_weights_nonparameter]')
-            end block
-        #:endif
 
     end subroutine s_initialize_gpu_vars
 
@@ -1125,6 +1087,7 @@ contains
                 call s_finalize_muscl_module()
             end if
         end if
+        if (int_comp > 0) call s_finalize_thinc_module()
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()

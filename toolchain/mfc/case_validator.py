@@ -133,7 +133,7 @@ PHYSICS_DOCS = {
     "check_muscl": {
         "title": "MUSCL Reconstruction",
         "category": "Numerical Schemes",
-        "explanation": "muscl_order must be 1 or 2. Second order requires muscl_lim in {1,2,3,4,5}.",
+        "explanation": "muscl_order must be 1 or 2. Second order requires muscl_lim in {0,1,2,3,4,5}.",
     },
     "check_time_stepping": {
         "title": "Time Stepping",
@@ -250,6 +250,18 @@ class CaseValidator:
         if val is not None and val not in ("T", "F"):
             self.errors.append(f"{key} must be 'T' or 'F', got '{val}'")
 
+    def _check_order_fits_grid(self, order: int, param_name: str) -> None:
+        """Prohibit reconstruction order that exceeds grid cell count in any active dimension."""
+        m = self.get("m", 0)
+        n = self.get("n", 0) or 0
+        p = self.get("p", 0) or 0
+        self.prohibit(m + 1 < order, f"m must be at least {param_name} - 1 (= {order - 1})")
+        self.prohibit(n > 0 and n + 1 < order, f"For 2D: n must be at least {param_name} - 1 (= {order - 1})")
+        self.prohibit(p > 0 and p + 1 < order, f"For 3D: p must be at least {param_name} - 1 (= {order - 1})")
+
+    def _get_recon_type(self) -> int:
+        return self.get("recon_type", 1)
+
     def check_parameter_types(self):
         """Validate parameter types before other checks.
 
@@ -264,6 +276,8 @@ class CaseValidator:
         for param in logical_params:
             if param in self.params:  # Only validate params that are set
                 self._validate_logical(param)
+
+        self.prohibit(self.get("recon_type", 1) not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
 
         # Required domain parameters when m > 0
         m = self.get("m")
@@ -316,76 +330,66 @@ class CaseValidator:
             return
 
         igr_order = self.get("igr_order")
-        m = self.get("m", 0)
-        n = self.get("n", 0)
-        p = self.get("p", 0)
         self.prohibit(igr_order not in [None, 3, 5], "igr_order must be 3 or 5")
         if igr_order:
-            self.prohibit(m + 1 < igr_order, f"m must be at least igr_order - 1 (= {igr_order - 1})")
-            self.prohibit(n is not None and n > 0 and n + 1 < igr_order, f"n must be at least igr_order - 1 (= {igr_order - 1})")
-            self.prohibit(p is not None and p > 0 and p + 1 < igr_order, f"p must be at least igr_order - 1 (= {igr_order - 1})")
+            self._check_order_fits_grid(igr_order, "igr_order")
 
     def check_weno(self):
         """Checks constraints regarding WENO order"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        # WENO_TYPE = 1
-        if recon_type != 1:
+        if self._get_recon_type() != 1:
             return
 
         for param in ["muscl_order", "muscl_lim"]:
             self.prohibit(self.is_set(param), f"recon_type = 1 (WENO) is not compatible with {param}")
 
         weno_order = self.get("weno_order")
-        m = self.get("m", 0)
-        n = self.get("n", 0)
-        p = self.get("p", 0)
-
         if weno_order is None:
             return
 
         self.prohibit(weno_order not in [1, 3, 5, 7], "weno_order must be 1, 3, 5, or 7")
-        self.prohibit(m + 1 < weno_order, f"m must be at least weno_order - 1 (= {weno_order - 1})")
-        self.prohibit(n is not None and n > 0 and n + 1 < weno_order, f"For 2D simulation, n must be at least weno_order - 1 (= {weno_order - 1})")
-        self.prohibit(p is not None and p > 0 and p + 1 < weno_order, f"For 3D simulation, p must be at least weno_order - 1 (= {weno_order - 1})")
+        self._check_order_fits_grid(weno_order, "weno_order")
 
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        int_comp = self.get("int_comp", "F") == "T"
-
-        self.prohibit(int_comp and recon_type != 2, "int_comp (THINC interface compression) requires recon_type = 2 (MUSCL)")
-
-        # MUSCL_TYPE = 2
-        if recon_type != 2:
+        if self._get_recon_type() != 2:
             return
 
-        weno_log_params = ["mapped_weno", "wenoz", "teno", "mp_weno", "weno_avg", "null_weights", "weno_Re_flux"]
-        for param in weno_log_params:
+        for param in ["mapped_weno", "wenoz", "teno", "mp_weno", "weno_avg", "null_weights", "weno_Re_flux"]:
             self.prohibit(self.get(param) == "T", f"recon_type = 2 (MUSCL) is not compatible with {param} = T")
-
-        weno_numeric_params = ["wenoz_q", "teno_CT", "weno_eps"]
-        for param in weno_numeric_params:
+        for param in ["wenoz_q", "teno_CT", "weno_eps"]:
             self.prohibit(self.is_set(param), f"recon_type = 2 (MUSCL) is not compatible with {param}")
 
         weno_order = self.get("weno_order")
         self.prohibit(weno_order is not None and weno_order != 0, f"recon_type = 2 (MUSCL) requires weno_order unset or 0, but got {weno_order}")
 
         muscl_order = self.get("muscl_order")
-        m = self.get("m", 0)
-        n = self.get("n", 0)
-        p = self.get("p", 0)
-
         if muscl_order is None:
             return
 
         self.prohibit(muscl_order not in [1, 2], "muscl_order must be 1 or 2")
-        self.prohibit(m + 1 < muscl_order, f"m must be at least muscl_order - 1 (= {muscl_order - 1})")
-        self.prohibit(n is not None and n > 0 and n + 1 < muscl_order, f"For 2D simulation, n must be at least muscl_order - 1 (= {muscl_order - 1})")
-        self.prohibit(p is not None and p > 0 and p + 1 < muscl_order, f"For 3D simulation, p must be at least muscl_order - 1 (= {muscl_order - 1})")
+        self._check_order_fits_grid(muscl_order, "muscl_order")
+
+    def check_interface_compression(self):
+        """Check constraints regarding interface compression"""
+        int_comp = self.get("int_comp", 0)
+        n = self.get("n", 0)
+        num_fluids = self.get("num_fluids", 0)
+        model_eqns = self.get("model_eqns", 2)
+        self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
+        self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
+        self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
+        self.prohibit(
+            int_comp != 0 and model_eqns == 3,
+            "int_comp > 0 is not supported with model_eqns = 3: THINC does not update per-fluid internal energies, leaving thermodynamically inconsistent face states",
+        )
+
+        recon_type = self.get("recon_type", 1)
+        if recon_type == 1:  # WENO
+            weno_order = self.get("weno_order")
+            self.prohibit(weno_order == 1 and int_comp != 0, "int_comp must be 0 (off) when weno_order = 1")
+        elif recon_type == 2:  # MUSCL
+            muscl_order = self.get("muscl_order")
+            self.prohibit(muscl_order == 1 and int_comp != 0, "int_comp must be 0 (off) when muscl_order = 1")
 
     def check_boundary_conditions(self):
         """Checks constraints on boundary conditions"""
@@ -660,16 +664,16 @@ class CaseValidator:
         cyl_coord = self.get("cyl_coord", "F") == "T"
         viscous = self.get("viscous", "F") == "T"
 
+        self.prohibit(riemann_solver is None, "riemann_solver must be specified (1=HLL, 2=HLLC, 4=HLLD, 5=Lax-Friedrichs)")
         if riemann_solver is None:
             return
 
-        self.prohibit(riemann_solver < 1 or riemann_solver > 5, "riemann_solver must be 1, 2, 3, 4 or 5")
+        self.prohibit(riemann_solver not in [1, 2, 4, 5], "riemann_solver must be 1 (HLL), 2 (HLLC), 4 (HLLD), or 5 (Lax-Friedrichs)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
-        self.prohibit(riemann_solver == 3 and wave_speeds is not None, "Exact Riemann (riemann_solver = 3) does not support wave_speeds")
         self.prohibit(avg_state is not None and avg_state not in [1, 2], "avg_state must be 1 or 2")
-        self.prohibit(riemann_solver not in [3, 5] and wave_speeds is None, "wave_speeds must be set if riemann_solver != 3,5")
-        self.prohibit(riemann_solver not in [3, 5] and avg_state is None, "avg_state must be set if riemann_solver != 3,5")
+        self.prohibit(riemann_solver != 5 and wave_speeds is None, "wave_speeds must be set for riemann_solver 1, 2, or 4")
+        self.prohibit(riemann_solver != 5 and avg_state is None, "avg_state must be set for riemann_solver 1, 2, or 4")
         self.prohibit(low_Mach not in [0, 1, 2], "low_Mach must be 0, 1, or 2")
         self.prohibit(riemann_solver != 2 and low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
         self.prohibit(low_Mach != 0 and model_eqns not in [2, 3], "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
@@ -734,11 +738,7 @@ class CaseValidator:
 
     def check_weno_simulation(self):
         """Checks WENO-specific constraints for simulation"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        # WENO_TYPE = 1
-        if recon_type != 1:
+        if self._get_recon_type() != 1:
             return
 
         weno_order = self.get("weno_order")
@@ -775,11 +775,7 @@ class CaseValidator:
 
     def check_muscl_simulation(self):
         """Checks MUSCL-specific constraints for simulation"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        # MUSCL_TYPE = 2
-        if recon_type != 2:
+        if self._get_recon_type() != 2:
             return
 
         muscl_order = self.get("muscl_order")
@@ -790,7 +786,7 @@ class CaseValidator:
             return
 
         self.prohibit(muscl_order == 2 and muscl_lim is None, "muscl_lim must be defined if using muscl_order = 2")
-        self.prohibit(muscl_lim is not None and (muscl_lim < 1 or muscl_lim > 5), "muscl_lim must be 1, 2, 3, 4, or 5")
+        self.prohibit(muscl_lim is not None and (muscl_lim < 0 or muscl_lim > 5), "muscl_lim must be 0 (unlimited), 1, 2, 3, 4, or 5")
         if muscl_eps is not None:
             self.prohibit(muscl_eps < 0, "muscl_eps must be >= 0 (use 0 for textbook limiter behavior)")
 
@@ -909,6 +905,7 @@ class CaseValidator:
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         probe_wrt = self.get("probe_wrt", "F") == "T"
+        int_comp = self.get("int_comp", 0)
 
         self.prohibit(num_igr_iters is not None and num_igr_iters < 0, "num_igr_iters must be greater than or equal to 0")
         self.prohibit(num_igr_warm_start_iters is not None and num_igr_warm_start_iters < 0, "num_igr_warm_start_iters must be greater than or equal to 0")
@@ -927,6 +924,7 @@ class CaseValidator:
         self.prohibit(hyperelasticity, "IGR does not support hyperelasticity")
         self.prohibit(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt, "IGR does not support probe writes")
+        self.prohibit(int_comp > 0, "IGR does not support int_comp > 0")
 
         # Check BCs - IGR does not support characteristic BCs
         # Characteristic BCs are BC_CHAR_SLIP_WALL (-5) through BC_CHAR_SUP_OUTFLOW (-12)
@@ -2070,6 +2068,7 @@ class CaseValidator:
         self.check_riemann_solver()
         self.check_weno_simulation()
         self.check_muscl_simulation()
+        self.check_interface_compression()
         self.check_model_eqns_simulation()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()

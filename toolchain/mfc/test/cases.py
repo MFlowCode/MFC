@@ -5,7 +5,181 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f
+from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .convergence import ConvergenceSpec, run_dt_sweep, run_h_sweep, run_sod_l1
+
+# Convergence test specs.
+# One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
+# the filter handle (`./mfc.sh test --only Convergence`); convergence cases
+# are skipped by default.
+
+# Advection convergence cases. Cell-shift mode: T = K*h per resolution, compare
+# q(T) to np.roll(q(0), +K) per dim. Cost is O(1) in N (Nt = K*c/CFL independent
+# of resolution) — wins ~10-100x vs period mode (full advection period).
+# WENO7/TENO7 stay in period mode: at typical N their cell-shift signal sinks
+# below machine precision (h^8 < 1e-15 at N=64) before any rate develops.
+#
+# expected_order is always the scheme's spatial order p. The runner subtracts
+# 1 from the displayed rate in cell-shift mode (where raw rate = p+1) so the
+# reported "spatial order" matches expected_order in both modes.
+_CONS_VARS_1D = [("density", 1), ("x-momentum", 2), ("energy", 3)]
+_CONS_VARS_2D = [("density", 1), ("energy", 4)]
+_CONS_VARS_3D = [("density", 1), ("energy", 5)]
+
+# (label, extra_args, expected_order, tol, resolutions)
+# WENO3-JS at smooth extrema empirically achieves ~1.5 in MFC (Henrick mapping
+# enabled). MUSCL2 unlimited central → effective spatial order 2.
+_CONVERGENCE_1D_SCHEMES = [
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [32, 64, 128]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 1.5, 0.3, [64, 128, 256]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [64, 128, 256]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [64, 128, 256]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64, 128]),
+]
+# WENO7/TENO7 in 1D: period mode (full period T=1.0, see 1D case.py).
+_CONVERGENCE_1D_PERIOD_SCHEMES = [
+    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [64, 128]),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [64, 128]),
+]
+
+_CONVERGENCE_2D_SCHEMES = [
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [32, 64, 96]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 1.5, 0.3, [32, 64, 128]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64, 128]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [32, 64, 128]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64, 96]),
+]
+_CONVERGENCE_2D_PERIOD_SCHEMES = [
+    ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [80, 96]),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [80, 96]),
+]
+
+# 3D diagonal advection: only cell-shift mode (period T=1/3 with N^3 cells
+# would dominate CI even at N=64). WENO7/TENO7 skipped — at N=64 with K=1
+# the spatial error signal is below machine precision.
+_CONVERGENCE_3D_SCHEMES = [
+    ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [32, 64]),
+    ("WENO3", ["--order", "3", "--cfl", "0.02"], 1.5, 0.3, [32, 64]),
+    ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64]),
+    ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [32, 64]),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64]),
+]
+
+# Sod L1 self-convergence: any conservative monotone scheme converges at L1
+# rate ~1 (Godunov). SUPERBEE is over-compressive; min_N=128 skips its
+# pre-asymptotic point.
+_RES_SOD_DEFAULT = [128, 256, 512, 1024]
+_CONVERGENCE_SOD_SCHEMES = [
+    ("WENO1", ["--order", "1"], 1, 0.5, None),
+    ("WENO3", ["--order", "3"], 1, 0.3, None),
+    ("WENO5", ["--order", "5"], 1, 0.3, None),
+    ("WENO7", ["--order", "7"], 1, 0.3, None),
+    ("MUSCL-minmod", ["--muscl", "--muscl-lim", "1"], 1, 0.3, None),
+    ("MUSCL-MC", ["--muscl", "--muscl-lim", "2"], 1, 0.3, None),
+    ("MUSCL-VanLeer", ["--muscl", "--muscl-lim", "4"], 1, 0.3, None),
+    ("MUSCL-SUPERBEE", ["--muscl", "--muscl-lim", "5"], 1, 0.5, 128),
+    ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6"], 1, 0.3, None),
+    ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9"], 1, 0.3, None),
+]
+
+# Temporal order: fixed N=512 / WENO5; vary CFL.
+_CONVERGENCE_TEMPORAL_SCHEMES = [
+    ("RK1", ["--order", "5", "--time-stepper", "1"], 1, 0.1, [0.10, 0.05]),
+    ("RK2", ["--order", "5", "--time-stepper", "2"], 2, 0.2, [0.50, 0.25]),
+    ("RK3", ["--order", "5", "--time-stepper", "3"], 3, 0.3, [0.50, 0.25]),
+]
+
+
+def add_convergence_cases(cases):
+    num_ranks = 4
+
+    def _h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift):
+        return ConvergenceSpec(
+            runner=run_h_sweep,
+            case_path=case_path,
+            extra_args=extra_args,
+            expected_order=expected,
+            tol=tol,
+            cons_vars=cons_vars,
+            resolutions=resolutions,
+            ndim=ndim,
+            cell_shift=cell_shift,
+            num_ranks=num_ranks,  # ignored by run_h_sweep when cell_shift > 0
+        )
+
+    advection_groups = [
+        (_CONVERGENCE_1D_SCHEMES, "1D", "examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, 1, 1),
+        (_CONVERGENCE_1D_PERIOD_SCHEMES, "1D", "examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, 0, num_ranks),
+        (_CONVERGENCE_2D_SCHEMES, "2D", "examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, 1, 1),
+        (_CONVERGENCE_2D_PERIOD_SCHEMES, "2D", "examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, 0, num_ranks),
+        (_CONVERGENCE_3D_SCHEMES, "3D", "examples/3D_advection_convergence/case.py", 3, _CONS_VARS_3D, 1, 1),
+    ]
+    for schemes, dim_label, case_path, ndim, cons_vars, cell_shift, ppn in advection_groups:
+        for label, extra_args, expected, tol, resolutions in schemes:
+            cases.append(
+                define_convergence_case(
+                    f"Convergence -> {dim_label} -> {label}",
+                    spec=_h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift),
+                    ppn=ppn,
+                )
+            )
+
+    for label, extra_args, expected, tol, min_N in _CONVERGENCE_SOD_SCHEMES:
+        resolutions = [N for N in _RES_SOD_DEFAULT if min_N is None or N >= min_N]
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> Sod -> {label}",
+                spec=ConvergenceSpec(
+                    runner=run_sod_l1,
+                    case_path="examples/1D_sod_convergence/case.py",
+                    extra_args=extra_args,
+                    expected_order=expected,
+                    tol=tol,
+                    resolutions=resolutions,
+                    num_ranks=num_ranks,
+                ),
+                ppn=num_ranks,
+            )
+        )
+
+    for label, extra_args, expected, tol, cfls in _CONVERGENCE_TEMPORAL_SCHEMES:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> Temporal -> {label}",
+                spec=ConvergenceSpec(
+                    runner=run_dt_sweep,
+                    case_path="examples/1D_euler_convergence/case.py",
+                    extra_args=extra_args,
+                    expected_order=expected,
+                    tol=tol,
+                    cons_vars=_CONS_VARS_1D,
+                    cfls=cfls,
+                    fixed_N=512,
+                    num_ranks=num_ranks,
+                ),
+                ppn=num_ranks,
+            )
+        )
+
+
+def make_3d_box_patches(
+    z_centroids=(0.05, 0.45, 0.9),
+    z_lengths=(0.1, 0.7, 0.2),
+    geometry=9,
+) -> dict:
+    """3-patch 3D box IC: uniform xy plane (centroid=0.5, length=1), z spacing given."""
+    d = {}
+    for pid in range(1, 4):
+        d[f"patch_icpp({pid})%geometry"] = geometry
+        for vel in (1, 2, 3):
+            d[f"patch_icpp({pid})%vel({vel})"] = 0.0
+        d[f"patch_icpp({pid})%x_centroid"] = 0.5
+        d[f"patch_icpp({pid})%length_x"] = 1
+        d[f"patch_icpp({pid})%y_centroid"] = 0.5
+        d[f"patch_icpp({pid})%length_y"] = 1
+        d[f"patch_icpp({pid})%z_centroid"] = z_centroids[pid - 1]
+        d[f"patch_icpp({pid})%length_z"] = z_lengths[pid - 1]
+    return d
 
 
 def get_bc_mods(bc: int, dimInfo):
@@ -302,14 +476,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for muscl_order in [1, 2]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
 
-            if muscl_order == 1:
-                for int_comp in ["T", "F"]:
-                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {"int_comp": int_comp}))
-            elif muscl_order == 2:
-                for int_comp in ["T", "F"]:
-                    stack.push(f"int_comp={int_comp}", {"int_comp": int_comp})
-                    cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
-                    stack.pop()
+            if muscl_order == 2:
                 for muscl_lim in [2, 3, 4, 5]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
                 stack.push("muscl_eps=0", {"muscl_eps": 0})
@@ -352,6 +519,55 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_int_comp(dimInfo):
+        eps = 1e-6
+        sharp_ic = {
+            "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
+            "patch_icpp(1)%alpha(1)": 1.0 - eps,
+            "patch_icpp(1)%alpha_rho(2)": eps,
+            "patch_icpp(1)%alpha(2)": eps,
+            "patch_icpp(2)%alpha_rho(1)": 1.0 - eps,
+            "patch_icpp(2)%alpha(1)": 1.0 - eps,
+            "patch_icpp(2)%alpha_rho(2)": eps,
+            "patch_icpp(2)%alpha(2)": eps,
+            "patch_icpp(3)%alpha_rho(1)": eps,
+            "patch_icpp(3)%alpha(1)": eps,
+            "patch_icpp(3)%alpha_rho(2)": 1.0 - eps,
+            "patch_icpp(3)%alpha(2)": 1.0 - eps,
+        }
+
+        stack.push("", sharp_ic)
+
+        stack.push("weno_order=5", {"weno_order": 5})
+        cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+        if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+            cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
+            stack.push(
+                "surface_tension=T",
+                {
+                    "surface_tension": "T",
+                    "sigma": 1,
+                    "patch_icpp(1)%cf_val": 1,
+                    "patch_icpp(2)%cf_val": 0,
+                    "patch_icpp(3)%cf_val": 1,
+                },
+            )
+            cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+            stack.pop()
+        stack.pop()
+
+        stack.push("muscl_order=2", {"muscl_order": 2, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
+        stack.push("int_comp=1", {"int_comp": 1})
+        cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
+        stack.pop()
+        if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+            stack.push("int_comp=2", {"int_comp": 2})
+            cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
+            stack.pop()
+        stack.pop()
+
+        stack.pop()  # sharp IC
+
     def alter_num_fluids(dimInfo):
         for num_fluids in [1, 2]:
             stack.push(f"{num_fluids} Fluid(s)", {"num_fluids": num_fluids})
@@ -385,6 +601,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
                 alter_igr()
+
+            if num_fluids == 2:
+                alter_int_comp(dimInfo)
 
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
@@ -1536,6 +1755,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_titarevtorro_analytical",
                 "2D_acoustic_pulse_analytical",
                 "2D_isentropicvortex_analytical",
+                "1D_euler_convergence",
+                "1D_advection_convergence",
+                "1D_sod_convergence",
+                "2D_advection_convergence",
+                "3D_advection_convergence",
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",
@@ -1823,25 +2047,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_z%end": -3,
         }
 
-        for patchID in range(1, 4):
-            base_3d[f"patch_icpp({patchID})%geometry"] = 9
-            base_3d[f"patch_icpp({patchID})%vel(1)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(2)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(3)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%x_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_x"] = 1
-            base_3d[f"patch_icpp({patchID})%y_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_y"] = 1
-        base_3d.update(
-            {
-                "patch_icpp(1)%z_centroid": 0.05,
-                "patch_icpp(1)%length_z": 0.1,
-                "patch_icpp(2)%z_centroid": 0.45,
-                "patch_icpp(2)%length_z": 0.7,
-                "patch_icpp(3)%z_centroid": 0.9,
-                "patch_icpp(3)%length_z": 0.2,
-            }
-        )
+        base_3d.update(make_3d_box_patches())
 
         # Bubbles with 2 MPI ranks
         stack.push(
@@ -1999,25 +2205,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_z%beg": -3,
             "bc_z%end": -3,
         }
-        for patchID in range(1, 4):
-            base_3d[f"patch_icpp({patchID})%geometry"] = 9
-            base_3d[f"patch_icpp({patchID})%vel(1)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(2)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(3)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%x_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_x"] = 1
-            base_3d[f"patch_icpp({patchID})%y_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_y"] = 1
-        base_3d.update(
-            {
-                "patch_icpp(1)%z_centroid": 0.05,
-                "patch_icpp(1)%length_z": 0.1,
-                "patch_icpp(2)%z_centroid": 0.45,
-                "patch_icpp(2)%length_z": 0.7,
-                "patch_icpp(3)%z_centroid": 0.9,
-                "patch_icpp(3)%length_z": 0.2,
-            }
-        )
+        base_3d.update(make_3d_box_patches())
         stack.push("Restart Roundtrip -> 3D", base_3d)
         cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
@@ -2031,6 +2219,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         three directions. Stretching interacts with WENO reconstruction
         and gradient calculations in direction-specific ways. Not covered
         by any dynamic test (only via examples at reduced resolution).
+
+        MTHINC on stretched 2D grid: a circular bubble creates diagonal
+        interface normals that have components in both x and y. With a
+        non-uniform x grid, the reference-space normal weighting
+        (Δx_j / (x_cc(j+1)-x_cc(j-1))) differs from 0.5, exercising the
+        grid-spacing correction in s_compute_mthinc_normals.
         """
         base_3d = {
             "m": 24,
@@ -2049,25 +2243,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_z%beg": -3,
             "bc_z%end": -3,
         }
-        for patchID in range(1, 4):
-            base_3d[f"patch_icpp({patchID})%geometry"] = 9
-            base_3d[f"patch_icpp({patchID})%vel(1)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(2)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(3)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%x_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_x"] = 1
-            base_3d[f"patch_icpp({patchID})%y_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_y"] = 1
-        base_3d.update(
-            {
-                "patch_icpp(1)%z_centroid": 0.05,
-                "patch_icpp(1)%length_z": 0.1,
-                "patch_icpp(2)%z_centroid": 0.45,
-                "patch_icpp(2)%length_z": 0.7,
-                "patch_icpp(3)%z_centroid": 0.9,
-                "patch_icpp(3)%length_z": 0.2,
-            }
-        )
+        base_3d.update(make_3d_box_patches())
 
         # 3D grid stretching in all directions.
         # The cosh-based stretching expands the domain beyond the original
@@ -2115,7 +2291,73 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # 2D MTHINC on a stretched (non-uniform) x-grid.
+        # A circular bubble creates diagonal interface normals (components in both
+        # x and y), so the reference-space weighting Δx_j/(x_cc(j+1)-x_cc(j-1))
+        # differs from 0.5 and changes the normalized normal on non-uniform grids.
+        # Axis-aligned interfaces would not catch this because the unit normal is
+        # the same regardless of the gradient scaling.
+        eps = 1e-6
+        stack.push(
+            "Kernel -> 2D -> MTHINC -> Grid Stretching",
+            {
+                "m": 24,
+                "n": 24,
+                "p": 0,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "num_patches": 2,
+                "num_fluids": 2,
+                "fluid_pp(2)%gamma": 2.5,
+                "fluid_pp(2)%pi_inf": 0.0,
+                # Patch 1: fluid 1 background rectangle; length covers stretched extent (~1.39).
+                # vel(1)=0.5 provides advection so MTHINC reconstruction affects the solution.
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.75,
+                "patch_icpp(1)%length_x": 1.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps,
+                "patch_icpp(1)%alpha_rho(2)": eps,
+                "patch_icpp(1)%alpha(2)": eps,
+                # Patch 2: fluid 2 circular bubble centered in the stretched region;
+                # alter_patch(1)=T needed so patch 2 can overwrite patch 1 cells
+                "patch_icpp(2)%geometry": 2,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%radius": 0.2,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%alpha_rho(1)": eps,
+                "patch_icpp(2)%alpha(1)": eps,
+                "patch_icpp(2)%alpha_rho(2)": 1.0 - eps,
+                "patch_icpp(2)%alpha(2)": 1.0 - eps,
+                # MTHINC
+                "int_comp": 2,
+                # x-stretching creates non-uniform cells at the bubble interface
+                "stretch_x": "T",
+                "a_x": 2.0,
+                "x_a": 0.3,
+                "x_b": 0.7,
+                "loops_x": 1,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     kernel_golden_tests()
+
+    add_convergence_cases(cases)
 
     # Sanity Check 1
     if stack.size() != 0:

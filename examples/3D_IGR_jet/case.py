@@ -78,6 +78,7 @@ print(
             "num_fluids": 2,
             "mpp_lim": "T",
             "time_stepper": 3,
+            "riemann_solver": 5,
             "igr": "T",
             "igr_order": 3,
             "igr_pres_lim": "T",

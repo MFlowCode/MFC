@@ -25,6 +25,9 @@ jobs:
   update-homebrew-tap:
     name: Update homebrew-mfc tap
     runs-on: ubuntu-latest
+    environment:
+      name: homebrew
+      url: https://github.com/MFlowCode/homebrew-mfc
 
     steps:
       - name: Determine version
