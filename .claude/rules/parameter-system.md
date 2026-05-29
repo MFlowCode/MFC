@@ -47,10 +47,14 @@ at CMake configure time — no manual Fortran edits needed for simple scalar par
 - Search parameters with `./mfc.sh params <query>`
 
 ## Fortran-Side Runtime Validation
-Each target has `m_checker*.fpp` files (e.g., `src/simulation/m_checker.fpp`,
-`src/common/m_checker_common.fpp`) containing runtime parameter validation using
-`@:PROHIBIT(condition, message)`. When adding parameters with physics constraints,
-add Fortran-side checks here in addition to `case_validator.py`.
+Runtime parameter validation uses `@:PROHIBIT(condition, message)`. Put a check where it runs:
+- **Shared across all three targets** → `src/common/m_checker_common.fpp` (`s_check_inputs_common`,
+  with `#ifndef MFC_*` gates for target-specific exclusions). This holds most checks.
+- **Simulation-only** → `src/simulation/m_checker.fpp` (WENO/MUSCL/IGR/time-stepping/compiler checks).
+- **Pre/post-only** → `src/{pre,post}_process/m_checker.fpp`. Note: their `s_check_inputs` are
+  currently empty — that's the right place for a pre/post-only constraint, not `m_checker_common.fpp`.
+
+Add Fortran-side checks in addition to `case_validator.py`.
 
 ## Analytical Initial Conditions
 String expressions in parameters become Fortran code via `case.py.__get_analytic_ic_fpp()`.
