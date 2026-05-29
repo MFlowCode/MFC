@@ -6,6 +6,13 @@ toolchain for building/running/testing, and supports GPU acceleration via OpenAC
 OpenMP target offload. It must compile with gfortran, nvfortran, Cray ftn, and Intel ifx (CI-gated).
 AMD flang is additionally supported for OpenMP target offload GPU builds.
 
+## Working Style
+
+Make surgical changes: every changed line should trace to the request. Don't refactor,
+reformat, or "improve" adjacent code — in a four-compiler, golden-file-gated codebase,
+incidental edits are how regressions slip in. For general behavioral guidance (simplicity,
+surfacing assumptions, verifiable success criteria), invoke the `karpathy-guidelines` skill.
+
 ## Commands
 
 Prefer using `./mfc.sh` as the entry point for building, running, testing, formatting,
@@ -39,7 +46,7 @@ All commands run from the repo root via `./mfc.sh`.
 ./mfc.sh test --generate --only <feature>  # Regenerate golden files after intentional output change
 
 # Verification (pre-commit CI checks)
-./mfc.sh precheck -j 8                     # Run all 6 lint checks (same as CI gate)
+./mfc.sh precheck -j 8                     # Run all 7 checks (same as CI gate)
 ./mfc.sh format -j 8                       # Auto-format Fortran (.fpp/.f90) + Python
 ./mfc.sh lint                              # Ruff lint + Python unit tests
 ./mfc.sh spelling                          # Spell check
@@ -58,38 +65,16 @@ source ./mfc.sh load -c p -m c             # Load Phoenix CPU modules
 
 ## System Identification and Module Loading
 
-MFC targets HPC clusters. Before building on a cluster, load the correct modules
-via `source ./mfc.sh load -c <slug> -m <mode>`.
+On an HPC cluster, load modules before building: `source ./mfc.sh load -c <slug> -m <mode>`
+(`-m g`/`gpu` or `c`/`cpu`). The `source` is required — plain `./mfc.sh load` errors, since
+the command sets environment variables in the current shell.
 
-To identify the current system, check multiple signals — hostname alone is not always
-sufficient (compute nodes may differ from login nodes):
-
-```bash
-hostname                    # e.g., login-phoenix-gnr-2.pace.gatech.edu
-echo $LMOD_SYSHOST          # e.g., "phoenix" (most reliable when set)
-echo $CRAY_LD_LIBRARY_PATH  # Non-empty → Cray system (Frontier, Carpenter Cray)
-echo $MODULESHOME           # Confirms module system is available
-```
-
-Supported systems and their slugs (full list in `toolchain/modules`):
-
-| Slug | System | GPU Backend | Example |
-|------|--------|-------------|---------|
-| `p` | GT Phoenix | OpenACC (nvfortran) | `source ./mfc.sh load -c p -m g` |
-| `f` | OLCF Frontier | OpenACC/OpenMP (Cray ftn) | `source ./mfc.sh load -c f -m g` |
-| `tuo` | LLNL Tuolumne | OpenMP (Cray ftn) | `source ./mfc.sh load -c tuo -m g` |
-| `d` | NCSA Delta | OpenACC (nvfortran) | `source ./mfc.sh load -c d -m g` |
-| `b` | PSC Bridges2 | OpenACC (nvfortran) | `source ./mfc.sh load -c b -m g` |
-| `cc` | DoD Carpenter (Cray) | CPU only | `source ./mfc.sh load -c cc -m c` |
-| `c` | DoD Carpenter (GNU) | CPU only | `source ./mfc.sh load -c c -m c` |
-| `o` | Brown Oscar | OpenACC (nvfortran) | `source ./mfc.sh load -c o -m g` |
-| `h` | UF HiPerGator | OpenACC (nvfortran) | `source ./mfc.sh load -c h -m g` |
-
-The `-m` flag selects mode: `g`/`gpu` for GPU builds, `c`/`cpu` for CPU-only.
-Batch job templates for `./mfc.sh run -e batch -c <system>` are in `toolchain/templates/`.
-
-IMPORTANT: `source` (or `.`) is required for `load` — it sets environment variables
-in the current shell. Using `./mfc.sh load` without `source` will error.
+Slugs live in `toolchain/modules` (e.g. `p` Phoenix, `f` Frontier, `tuo` Tuolumne, `d` Delta,
+`b` Bridges2, `c`/`cc` Carpenter GNU/Cray, `o` Oscar, `h` HiPerGator; GPU backend per system
+is defined there). To identify the current system, check `$LMOD_SYSHOST` (most reliable),
+then a non-empty `$CRAY_LD_LIBRARY_PATH` (→ Cray: Frontier / Carpenter-Cray), then `hostname`
+— login and compute nodes may differ. Batch templates for `./mfc.sh run -e batch -c <system>`
+are in `toolchain/templates/`.
 
 ## Development Workflow Contract
 
@@ -99,7 +84,7 @@ IMPORTANT: Follow this loop for ALL code changes. Do not skip steps.
 2. **Plan** — For multi-file changes, outline your approach before implementing.
 3. **Implement** — Make small, focused changes. One logical change per commit.
 4. **Format** — Run `./mfc.sh format -j 8` to auto-format.
-5. **Verify** — Run `./mfc.sh precheck -j 8` (same 6 checks as CI lint gate).
+5. **Verify** — Run `./mfc.sh precheck -j 8` (same 7 checks as CI lint gate).
 6. **Build** — Run `./mfc.sh build -j 8` to verify compilation.
 7. **Test** — Run relevant tests: `./mfc.sh test --only <feature> -j 8`.
    For changes to `src/common/`, test ALL three targets: `./mfc.sh test -j 8`.
@@ -153,13 +138,14 @@ Changes to `src/common/` affect ALL three executables. Test comprehensively.
 - Modules: `m_<feature>` (e.g., `m_bubbles`)
 - Public subroutines: `s_<verb>_<noun>` (e.g., `s_compute_pressure`)
 - Public functions: `f_<verb>_<noun>`
+- Private/local variables: no prefix required. Constants: descriptive names, not ALL_CAPS.
 - 2-space indentation, lowercase keywords, explicit `intent` on all arguments
 
 ## Precision System
 
 - `wp` = working precision (computation). `stp` = storage precision (field data arrays and I/O).
-- Default: both double. Single mode: both single. Mixed: wp=double, stp=half.
-- MPI types must match: `mpi_p` ↔ `wp`, `mpi_io_p` ↔ `stp`.
+- Both double by default. See `.claude/rules/fortran-conventions.md` for single/mixed
+  modes, casting rules, and MPI type matching (`mpi_p` ↔ `wp`, `mpi_io_p` ↔ `stp`).
 
 ## Code Review Priorities
 

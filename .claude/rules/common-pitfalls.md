@@ -38,8 +38,8 @@
 - Boundary condition symmetry requirements must be maintained
 
 ## Compiler-Specific Issues
-- CI-gated compilers (must always pass): gfortran, nvfortran, Cray ftn, and Intel ifx
-- AMD flang is additionally supported for `--gpu mp` builds but not in the CI matrix
+- See the compiler-backend matrix in `.claude/rules/gpu-and-mpi.md` for which compilers
+  are CI-gated and which backends each supports.
 - Each compiler has different strictness levels and warning behavior
 - Fypp macros must expand correctly for both GPU and CPU builds
 
@@ -54,12 +54,8 @@
 - Do not regenerate ALL golden files unless you understand every output change
 
 ## PR Checklist
-Before submitting a PR:
-- [ ] `./mfc.sh format -j 8` (auto-format)
-- [ ] `./mfc.sh precheck -j 8` (5 CI lint checks)
-- [ ] `./mfc.sh build -j 8` (compiles)
-- [ ] `./mfc.sh test --only <relevant> -j 8` (tests pass)
+The base loop (format → precheck → build → test → one logical commit) is the
+Development Workflow Contract in `CLAUDE.md`. Beyond it, watch for:
 - [ ] If adding parameters: definitions.py (_r + _nv) updated; cmake reconfigured; case_validator.py if constraints
 - [ ] If modifying `src/common/`: all three targets tested
-- [ ] If changing output: golden files regenerated for affected tests
-- [ ] One logical change per commit
+- [ ] If changing output: golden files regenerated for affected tests (`./mfc.sh test --generate --only <tests>`)

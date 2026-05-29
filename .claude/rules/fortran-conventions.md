@@ -15,11 +15,7 @@ Every Fortran module follows this pattern:
 - Finalization subroutine: `s_finalize_<feature>_module`
 
 ## Naming
-- Modules: `m_<feature>`
-- Public subroutines: `s_<verb>_<noun>`
-- Public functions: `f_<verb>_<noun>`
-- Private/local variables: no prefix required
-- Constants: descriptive names, not ALL_CAPS
+See "Naming Conventions" in `CLAUDE.md`.
 
 ## Forbidden Patterns
 
