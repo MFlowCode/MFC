@@ -1233,6 +1233,7 @@ contains
             local_ib_patch_ids(i) = i
         end do
 
+        $:GPU_EXIT_DATA(delete='[patch_ib]')
         deallocate (patch_ib)
 
 #ifdef MFC_MPI
@@ -1275,6 +1276,7 @@ contains
         deallocate (patch_ib_gbl)
 #endif
 
+        $:GPU_ENTER_DATA(create='[patch_ib]')
         @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
 
     end subroutine s_reduce_ib_patch_array
