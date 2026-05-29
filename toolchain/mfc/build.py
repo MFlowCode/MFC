@@ -405,6 +405,7 @@ class MFCTarget:
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
             f"-DMFC_SINGLE_PRECISION={'ON' if (ARG('single') or ARG('mixed')) else 'OFF'}",
             f"-DMFC_MIXED_PRECISION={'ON' if ARG('mixed') else 'OFF'}",
+            f"-DMFC_BUILD_JOBS={ARG('jobs')}",
         ]
 
         # Verbosity level 3 (-vvv): add cmake debug flags

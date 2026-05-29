@@ -166,8 +166,6 @@ def bench(targets=None):
         cons.unindent()
 
 
-# TODO: This function is too long and not nicely written at all. Someone should
-#       refactor it...
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
     lhs_path = os.path.relpath(ARG("lhs"))

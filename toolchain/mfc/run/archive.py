@@ -11,6 +11,15 @@ from ..printer import cons
 from ..state import ARG, CFG
 from . import input
 
+
+def _relpath_safe(path: str, dirpath: str) -> str:
+    """Return relpath(path, dirpath), falling back to basename on cross-device paths."""
+    try:
+        return os.path.relpath(path, dirpath)
+    except ValueError:
+        return os.path.basename(path)
+
+
 ARTIFACT_FILENAMES = [
     "equations.dat",
     "run_time.inf",
@@ -74,13 +83,7 @@ def __collect_sources(case: input.MFCInputFile, targets) -> list:
 
 def __build_manifest(case: input.MFCInputFile, targets, sources: list, archive_path: str, archive_format: str) -> dict:
     dirpath = case.dirpath
-    relative_sources = []
-    for src in sources:
-        try:
-            rel = os.path.relpath(src, dirpath)
-        except ValueError:
-            rel = src
-        relative_sources.append(rel)
+    relative_sources = [_relpath_safe(src, dirpath) for src in sources]
 
     return {
         "timestamp": datetime.datetime.now().astimezone().isoformat(),
@@ -101,11 +104,7 @@ def __copy_dir(sources: list, case: input.MFCInputFile, dest: str) -> None:
     dirpath = case.dirpath
 
     for src in sources:
-        try:
-            rel = os.path.relpath(src, dirpath)
-        except ValueError:
-            rel = os.path.basename(src)
-
+        rel = _relpath_safe(src, dirpath)
         target_path = os.path.join(dest, rel)
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
@@ -120,10 +119,7 @@ def __write_tar(sources: list, case: input.MFCInputFile, dest: str, compressed: 
     arcroot = os.path.basename(dest).removesuffix(".tar.zst").removesuffix(".tar")
 
     def rel_for(path: str) -> str:
-        try:
-            return os.path.relpath(path, dirpath)
-        except ValueError:
-            return os.path.basename(path)
+        return _relpath_safe(path, dirpath)
 
     if compressed:
         if not does_command_exist("tar"):

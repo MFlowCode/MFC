@@ -194,7 +194,7 @@ DESCRIPTIONS = {
     "ic_eps": "Interface compression epsilon",
     "ic_beta": "Interface compression beta",
     "igr_pres_lim": "Enable IGR pressure limiting",
-    "int_comp": "Enable interface compression",
+    "int_comp": "Interface compression: 0=off, 1=THINC, 2=MTHINC",
     "nv_uvm_out_of_core": "Enable NVIDIA UVM out-of-core",
     "nv_uvm_pref_gpu": "Prefer GPU for NVIDIA UVM",
     "nv_uvm_igr_temps_on_gpu": "Store IGR temporaries on GPU",
@@ -514,28 +514,18 @@ PATTERNS = [
 
 
 def get_description(param_name: str) -> str:
-    """Get description for a parameter from hand-curated or auto-generated sources.
+    """Get the best available description for a parameter.
 
-    Priority: hand-curated DESCRIPTIONS > PATTERNS > auto-generated param.description.
+    Priority: hand-curated DESCRIPTIONS > PATTERNS > naming-convention inference.
+    (param.description in REGISTRY is now populated from this function at registration
+    time, so it can be read directly without calling this function again.)
     """
-    # 1. Hand-curated descriptions (highest quality)
     if param_name in DESCRIPTIONS:
         return DESCRIPTIONS[param_name]
-
-    # 2. Pattern matching for indexed params (hand-curated templates)
     for pattern, template in PATTERNS:
         match = re.fullmatch(pattern, param_name)
         if match:
             return template.format(*match.groups())
-
-    # 3. Auto-generated description from registry (set by _auto_describe at registration)
-    from . import REGISTRY
-
-    param = REGISTRY.all_params.get(param_name)
-    if param and param.description:
-        return param.description
-
-    # 4. Last resort: naming convention inference
     return _infer_from_naming(param_name)
 
 

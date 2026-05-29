@@ -59,7 +59,7 @@ Before submitting a PR:
 - [ ] `./mfc.sh precheck -j 8` (5 CI lint checks)
 - [ ] `./mfc.sh build -j 8` (compiles)
 - [ ] `./mfc.sh test --only <relevant> -j 8` (tests pass)
-- [ ] If adding parameters: all 4 locations updated
+- [ ] If adding parameters: definitions.py (_r + _nv) updated; cmake reconfigured; case_validator.py if constraints
 - [ ] If modifying `src/common/`: all three targets tested
 - [ ] If changing output: golden files regenerated for affected tests
 - [ ] One logical change per commit
