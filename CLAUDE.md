@@ -22,46 +22,28 @@ compilers directly unless you have a specific reason.
 
 All commands run from the repo root via `./mfc.sh`.
 
+Run `./mfc.sh <command> --help` for the full flag set; the most-used invocations:
+
 ```bash
-# Building
-./mfc.sh build -j 8                        # Build all 3 targets (pre_process, simulation, post_process)
-./mfc.sh build -t simulation -j 8          # Build only simulation
-./mfc.sh build --gpu acc -j 8              # Build with OpenACC GPU support
-./mfc.sh build --gpu mp -j 8              # Build with OpenMP target offload GPU support
-./mfc.sh build --debug -j 8                # Debug build
-./mfc.sh build -i case.py --case-optimization -j 8  # Case-optimized build (10x speedup)
+# Build / run / test  (-j N = parallel jobs)
+./mfc.sh build -j 8                 # all 3 targets; flags: -t <target>, --gpu acc|mp, --debug,
+                                    #   -i case.py --case-optimization (10x speedup)
+./mfc.sh run case.py -n 4           # run with 4 MPI ranks; --no-build; -e batch (toolchain/templates/)
+./mfc.sh test -j 8                  # full suite (560+); --only <1D|Bubbles|UUID>, -l, -% N (sample),
+                                    #   --generate (regenerate golden files after an intended output change)
 
-# Running
-./mfc.sh run case.py -n 4                  # Run case with 4 MPI ranks
-./mfc.sh run case.py --no-build            # Run without rebuilding
-./mfc.sh run case.py -e batch -N 2 -n 4 -c phoenix -a ACCOUNT  # Batch submit on Phoenix
+# Verify before committing
+./mfc.sh precheck -j 8              # all 7 CI lint checks
+./mfc.sh format -j 8               # auto-format Fortran (.fpp/.f90) + Python
+./mfc.sh lint                       # ruff lint + Python unit tests   (spelling: ./mfc.sh spelling)
 
-# Testing
-./mfc.sh test -j 8                         # Run full test suite (560+ tests)
-./mfc.sh test --only 1D -j 8              # Only 1D tests
-./mfc.sh test --only 2D Bubbles -j 8      # Only 2D bubble tests
-./mfc.sh test --only <UUID> -j 8          # Run one specific test by UUID
-./mfc.sh test -l                           # List all tests with UUIDs and traces
-./mfc.sh test -% 10 -j 8                  # Run 10% random sample
-./mfc.sh test --generate --only <feature>  # Regenerate golden files after intentional output change
-
-# Verification (pre-commit CI checks)
-./mfc.sh precheck -j 8                     # Run all 7 checks (same as CI gate)
-./mfc.sh format -j 8                       # Auto-format Fortran (.fpp/.f90) + Python
-./mfc.sh lint                              # Ruff lint + Python unit tests
-./mfc.sh spelling                          # Spell check
-
-# Module loading (HPC clusters only — must use `source`)
-source ./mfc.sh load -c p -m g             # Load Phoenix GPU modules
-source ./mfc.sh load -c f -m g             # Load Frontier GPU modules
-source ./mfc.sh load -c p -m c             # Load Phoenix CPU modules
-
-# Other
-./mfc.sh validate case.py                  # Validate case file without running
-./mfc.sh params <query>                    # Search 3,400 case parameters
-./mfc.sh clean                             # Remove build artifacts
-./mfc.sh new <name>                        # Create new case from template
+# Case files
+./mfc.sh validate case.py           # validate without running
+./mfc.sh params <query>             # search 3,400 case parameters
+./mfc.sh new <name>                 # new case from template       (clean: ./mfc.sh clean)
 ```
+
+Module loading (`source ./mfc.sh load -c <slug> -m <mode>`) is covered under System Identification below.
 
 ## System Identification and Module Loading
 
