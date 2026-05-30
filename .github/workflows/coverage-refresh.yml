@@ -22,8 +22,14 @@ jobs:
       group:  phoenix
       labels: gt
     steps:
+      # persist-credentials: false stops actions/checkout from configuring the
+      # default GITHUB_TOKEN as an http.extraheader, which otherwise OVERRIDES the
+      # app-token credentials embedded in the push URL below — making the push
+      # authenticate as github-actions[bot] (not a ruleset bypass actor) and get
+      # rejected by the require-PR rule. With it off, the app token is used and the
+      # mfc-map-bot bypass applies.
       - uses: actions/checkout@v4
-        with: { clean: false }
+        with: { clean: false, persist-credentials: false }
       - name: Build + collect coverage map (SLURM)
         run: bash .github/scripts/submit-slurm-job.sh .github/workflows/common/coverage-refresh.sh cpu none phoenix
       # Mint a short-lived GitHub App installation token. The app is on the master
