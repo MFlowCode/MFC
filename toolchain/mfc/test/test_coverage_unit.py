@@ -1,7 +1,9 @@
 import tempfile
+import types as _types
 from pathlib import Path
+from unittest.mock import patch
 
-from mfc.test.coverage import is_always_run_all, load_map, param_hash, save_map, select_tests
+from mfc.test.coverage import get_changed_files, is_always_run_all, load_map, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -134,3 +136,35 @@ def test_case_coverage_key_ignores_trace():
     a = TestCase("1D -> Foo", {"m": 100})
     b = TestCase("totally -> different -> trace", {"m": 100})
     assert a.coverage_key() == b.coverage_key()
+
+
+def test_changed_files_prefers_explicit_list():
+    files = get_changed_files("/repo", "master", explicit="src/a.fpp\nsrc/b.fpp\n")
+    assert files == {"src/a.fpp", "src/b.fpp"}
+
+
+def test_changed_files_deepens_then_recovers():
+    state = {"deepened": False}
+
+    def fake_run(cmd, **kw):
+        sub = cmd[1] if len(cmd) > 1 else ""
+        if sub == "fetch":
+            state["deepened"] = True
+            return _types.SimpleNamespace(returncode=0, stdout="", stderr="")
+        if sub == "merge-base":
+            return _types.SimpleNamespace(returncode=0 if state["deepened"] else 1, stdout="base\n", stderr="")
+        if sub == "diff":
+            return _types.SimpleNamespace(returncode=0, stdout="src/x.fpp\n", stderr="")
+        return _types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    with patch("subprocess.run", fake_run):
+        assert get_changed_files("/repo", "master") == {"src/x.fpp"}
+
+
+def test_changed_files_returns_none_when_unrecoverable():
+    def fake_run(cmd, **kw):
+        rc = 1 if (len(cmd) > 1 and cmd[1] == "merge-base") else 0
+        return _types.SimpleNamespace(returncode=rc, stdout="", stderr="boom")
+
+    with patch("subprocess.run", fake_run):
+        assert get_changed_files("/repo", "master") is None

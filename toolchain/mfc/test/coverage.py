@@ -8,6 +8,7 @@ import datetime
 import gzip
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -115,3 +116,39 @@ def select_tests(cases, coverage_map, changed_files):
         else:  # rung 7: skip
             skipped.append(case)
     return to_run, skipped, f"selected {len(to_run)}/{len(cases)} by coverage overlap"
+
+
+def _git(args, cwd, timeout=60):
+    return subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False)
+
+
+def _merge_base(cwd, branch):
+    for ref in (branch, f"origin/{branch}"):
+        r = _git(["merge-base", ref, "HEAD"], cwd)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    return None
+
+
+def get_changed_files(root_dir, compare_branch="master", explicit: Optional[str] = None):
+    """Set of changed repo-relative paths, or None if undeterminable (-> run all).
+
+    `explicit` is a newline-separated list from CI (paths-filter); preferred when given.
+    Otherwise use git merge-base, self-healing a shallow clone with a deepen+retry.
+    """
+    if explicit is not None:
+        return {f for f in explicit.splitlines() if f.strip()}
+    try:
+        base = _merge_base(root_dir, compare_branch)
+        if base is None:
+            _git(["fetch", "origin", f"{compare_branch}:{compare_branch}", "--depth=1"], root_dir, 120)
+            _git(["fetch", "--deepen=200"], root_dir, 120)
+            base = _merge_base(root_dir, compare_branch)
+        if base is None:
+            return None
+        diff = _git(["diff", base, "HEAD", "--name-only", "--no-color"], root_dir)
+        if diff.returncode != 0:
+            return None
+        return {f for f in diff.stdout.splitlines() if f.strip()}
+    except (subprocess.TimeoutExpired, OSError):
+        return None
