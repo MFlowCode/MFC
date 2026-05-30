@@ -299,10 +299,30 @@ def test_cases_py_change_runs_new_tests_not_skipall():
     assert [c.coverage_key() for c in skip] == ["mapped"]
 
 
+def test_unattributable_nonsource_change_runs_all():
+    cases = _cases("a")
+    for f in ("mfc.sh", "toolchain/pyproject.toml", "tests/ABC12345/golden.txt", ".github/workflows/test.yml"):
+        run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, {f})
+        assert len(run) == 1 and "run all" in reason, f
+
+
 def test_docs_only_still_skips_all():
     cases = _cases("a")
-    run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, {"README.md"})
-    assert run == [] and len(skip) == 1 and "rung7" in reason
+    for f in ("README.md", "docs/foo.rst", "LICENSE", ".claude/x.md"):
+        run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, {f})
+        assert run == [] and "rung7" in reason, f
+
+
+def test_load_map_rejects_malformed_entry(tmp_path):
+    import gzip
+    import json
+
+    from mfc.test.coverage import load_map
+
+    p = tmp_path / "m.json.gz"
+    with gzip.open(p, "wt") as fh:
+        json.dump({"_meta": {"built_at": "x"}, "good": ["a.fpp"], "bad": "not-a-list"}, fh)
+    assert load_map(Path(p)) == (None, None)
 
 
 def test_uppercase_fortran_extension_forces_all():

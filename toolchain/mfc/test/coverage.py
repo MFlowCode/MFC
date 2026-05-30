@@ -55,6 +55,19 @@ ALWAYS_RUN_ALL_PREFIXES = (
     "toolchain/bootstrap/",  # build/run scripts
 )
 
+# Conservative allowlist of files that are provably irrelevant to test outcomes.
+# Only add files here if you are 100% certain a change cannot affect any test result.
+# Err toward run-all: a false "irrelevant" classification causes under-inclusion (skipping
+# a test that should run), which violates the soundness invariant.
+_IRRELEVANT_SUFFIXES = (".md", ".rst")
+_IRRELEVANT_EXACT = frozenset(["LICENSE", "LICENSE.md", ".gitignore", ".gitattributes", ".mailmap", ".editorconfig", "CITATION.cff"])
+_IRRELEVANT_PREFIXES = ("docs/", ".claude/", ".github/ISSUE_TEMPLATE/")
+
+
+def _is_test_irrelevant(f: str) -> bool:
+    """Return True iff the file is provably irrelevant to test outcomes (docs, config)."""
+    return f.endswith(_IRRELEVANT_SUFFIXES) or f in _IRRELEVANT_EXACT or f.startswith(_IRRELEVANT_PREFIXES)
+
 
 def is_always_run_all(changed_files: set) -> bool:
     """True if any changed file forces the full suite (un-attributable by the CPU map)."""
@@ -89,6 +102,9 @@ def load_map(path: Path) -> Tuple[Optional[dict], Optional[dict]]:
     if not isinstance(data, dict) or "_meta" not in data:
         return None, None
     meta = data.pop("_meta")
+    for k, v in data.items():
+        if not isinstance(k, str) or not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+            return None, None
     return data, meta
 
 
@@ -120,11 +136,17 @@ def select_tests(cases, coverage_map, changed_files):
         return list(cases), [], "rung3: hand-written .f90/.f changed"
 
     changed_fpp = {f for f in changed_files if f.endswith(".fpp")}
-    # Skip-all only when nothing test-relevant changed. If cases.py changed (no .fpp), fall
-    # through to per-test: new/modified tests have a fresh param_hash absent from the map and
-    # run via rung 5; unchanged tests have no .fpp overlap and are skipped.
+    # Unattributable-change guard: if any changed file is not a .fpp (handled by the
+    # coverage map), not cases.py (handled by rung 5), and not provably test-irrelevant
+    # (docs), we cannot attribute the change to individual tests -> run all.  This is the
+    # catch-all that covers mfc.sh, .github/**, tests/**, toolchain/pyproject.toml, etc.
+    # The old ALWAYS_RUN_ALL_* sets are still checked first (rungs 2-3) for common cases.
+    unattributable = [f for f in changed_files if not f.endswith(".fpp") and f != CASES_PY and not _is_test_irrelevant(f)]
+    if unattributable:
+        return list(cases), [], "rung2: unattributable change (not .fpp/cases.py/docs) -> run all"
+    # Only .fpp + cases.py + irrelevant docs remain.
     if not changed_fpp and CASES_PY not in changed_files:
-        return [], list(cases), "rung7: no Fortran or test-definition change"
+        return [], list(cases), "rung7: only docs/irrelevant files changed"
 
     # Rung 4: a changed .fpp that no test covers -> run all (GPU-only blind spot).
     covered = _covered_fpp(coverage_map)
