@@ -481,7 +481,7 @@ TEST_COMMAND = Command(
             default=False,
             help="With --only-changes, actually skip unselected tests (otherwise shadow: print selection, run all).",
         ),
-        Argument(name="changed-files", dest="changed_files", type=str, default=None, help="Newline- or comma-separated changed-file list (from CI paths-filter). Overrides git detection."),
+        Argument(name="changed-files", dest="changed_files", type=str, default=None, help="Changed-file list (newline-, space-, or comma-separated; from CI paths-filter). Overrides git detection."),
         Argument(name="changes-branch", dest="changes_branch", type=str, default="master", help="Branch to diff against for --only-changes."),
     ],
     mutually_exclusive=[
