@@ -282,10 +282,12 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     # Use --bind-to none to avoid binding issues with concurrent launches.
     if shutil.which("mpirun"):
         mpi_cmd = ["mpirun", "--bind-to", "none", "-np", str(ppn)]
+    elif shutil.which("mpiexec"):
+        mpi_cmd = ["mpiexec", "-n", str(ppn)]
     elif shutil.which("srun"):
         mpi_cmd = ["srun", "--ntasks", str(ppn)]
     else:
-        raise MFCException("No MPI launcher found (mpirun or srun). MFC binaries require an MPI launcher.\n  On Ubuntu: sudo apt install openmpi-bin\n  On macOS:  brew install open-mpi")
+        raise MFCException("No MPI launcher found (mpirun, mpiexec, or srun). MFC binaries require an MPI launcher.\n  On Ubuntu: sudo apt install openmpi-bin\n  On macOS:  brew install open-mpi")
 
     failures = []
     for target_name, bin_path in binaries:
