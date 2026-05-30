@@ -270,7 +270,7 @@ jobs:
           # run-all). Pushes to master run the full suite (SELECT empty) as a backstop,
           # and the NVHPC jobs below still run --test-all as a pre-merge full check.
           SELECT=()
-          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--only-changes --select-enforce --changed-files "$CHANGED_FILES")
+          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--select-enforce --changed-files "$CHANGED_FILES")
           /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) "${SELECT[@]}" $TEST_ALL $TEST_PCT $PRECISION
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
