@@ -27,18 +27,18 @@ jobs:
       - name: Build + collect coverage map (SLURM)
         run: bash .github/scripts/submit-slurm-job.sh .github/workflows/common/coverage-refresh.sh cpu none phoenix
       - name: Commit refreshed map
+        env:
+          CACHE_PUSH_TOKEN: ${{ secrets.CACHE_PUSH_TOKEN }}
         run: |
           if ! git diff --quiet tests/coverage_map.json.gz; then
             git config user.name  "mfc-bot"
             git config user.email "mfc-bot@users.noreply.github.com"
             git add tests/coverage_map.json.gz
             git commit -m "test: refresh coverage map [skip ci]"
-            # NOTE: pushing to a protected default branch requires a token or
-            # GitHub App with bypass-branch-protection permission.  The default
-            # GITHUB_TOKEN may be rejected by branch protection rules; if so,
-            # configure a PAT or App token with the `contents: write` scope and
-            # pass it as `GITHUB_TOKEN` in the environment for this step.
-            git push origin HEAD:master
+            # Push to protected master via CACHE_PUSH_TOKEN (a PAT/App token with
+            # contents:write + branch-protection bypass), mirroring deploy-tap.yml's
+            # x-access-token push. The default GITHUB_TOKEN is rejected by protection.
+            git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" HEAD:master
           else
             echo "Coverage map unchanged."
           fi
