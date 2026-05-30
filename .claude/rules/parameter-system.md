@@ -1,7 +1,7 @@
 # Parameter System
 
 ## Overview
-MFC has ~3,400 simulation parameters defined in Python and read by Fortran via namelist files.
+MFC's simulation parameters are defined in Python and read by Fortran via namelist files.
 
 ## Parameter Flow: Python → Fortran
 
@@ -37,7 +37,10 @@ at CMake configure time — no manual Fortran edits needed for simple scalar par
 **Exceptions — still require manual Fortran edits:**
 - Array variables (e.g. `logical, dimension(num_fluids_max)`) → declare in `src/*/m_global_parameters.fpp`
 - Derived-type members (`fluid_pp%attr`, `patch_icpp(i)%attr`) → declare in the relevant derived type
-- Case-optimization parameters → add to `CASE_OPT_PARAMS` and the `#:else` block in `src/simulation/m_global_parameters.fpp`
+- Case-optimization parameters → add to `CASE_OPT_PARAMS` and the `#:else` block in `src/simulation/m_global_parameters.fpp`.
+  Gotcha: under `--case-optimization` these are baked into the binary and dropped from the simulation namelist
+  (`case_dicts.py` filters them), so changing one needs a *rebuild*, not just a case edit — and building without
+  the flag makes them read from `.inp` again.
 
 ## Case Files
 - Case files are Python scripts (`.py`) that define a dict of parameters
@@ -47,14 +50,23 @@ at CMake configure time — no manual Fortran edits needed for simple scalar par
 - Search parameters with `./mfc.sh params <query>`
 
 ## Fortran-Side Runtime Validation
-Each target has `m_checker*.fpp` files (e.g., `src/simulation/m_checker.fpp`,
-`src/common/m_checker_common.fpp`) containing runtime parameter validation using
-`@:PROHIBIT(condition, message)`. When adding parameters with physics constraints,
-add Fortran-side checks here in addition to `case_validator.py`.
+Runtime parameter validation uses `@:PROHIBIT(condition, message)`. Put a check where it runs:
+- **Shared across all three targets** → `src/common/m_checker_common.fpp` (`s_check_inputs_common`,
+  with `#ifndef MFC_*` gates for target-specific exclusions). This holds most checks.
+- **Simulation-only** → `src/simulation/m_checker.fpp` (WENO/MUSCL/IGR/time-stepping/compiler checks).
+- **Pre/post-only** → `src/{pre,post}_process/m_checker.fpp`. Note: their `s_check_inputs` are
+  currently empty — that's the right place for a pre/post-only constraint, not `m_checker_common.fpp`.
+
+Add Fortran-side checks in addition to `case_validator.py`.
 
 ## Analytical Initial Conditions
 String expressions in parameters become Fortran code via `case.py.__get_analytic_ic_fpp()`.
 These are compiled into the binary, so syntax errors cause build failures, not runtime errors.
+
+Gotcha: each IC variable (`alpha_rho`, `vel`, `pres`, `alpha`, `Y`, `Bx`...) maps to an `eqn_idx%…`
+expression in `QPVF_IDX_VARS` (`case.py`). Adding a conserved variable that patches can set means
+updating that map *and* the Fortran `eqn_idx` builder to agree — a mismatch is a silent wrong-index, not
+an error. (This is also why `Bx`/`By`/`Bz` use `eqn_idx%B%end-1/%end`, to stay valid in 1D/2D.)
 
 Available variables in analytical IC expressions:
 - `x`, `y`, `z` — cell-center coordinates (mapped to `x_cc(i)`, `y_cc(j)`, `z_cc(k)`)
