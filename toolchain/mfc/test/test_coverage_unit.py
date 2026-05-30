@@ -234,3 +234,23 @@ def test_health_undercoverage_fails():
         min_fraction=0.8,
     )
     assert not ok and "coverage" in msg.lower()
+
+
+def test_builder_has_coverage_key_matching_case():
+    from mfc.test.case import TestCaseBuilder
+
+    b = TestCaseBuilder(trace="1D -> Foo", mods={"m": 100, "weno_order": 5}, path="", args=[], ppn=1, functor=None)
+    assert b.coverage_key() == b.to_case().coverage_key()
+
+
+def test_rung5_empty_coverage_is_included():
+    # a test whose map entry is [] (uncertain) must be RUN, not skipped, on a .fpp change.
+    # "anchor" covers the changed .fpp so rung4 passes and we reach the per-test rungs.
+    cases = _cases("hasempty", "anchor")
+    cov_map = {
+        "hasempty": [],
+        "anchor": ["src/simulation/m_rhs.fpp"],
+    }
+    run, skip, _ = select_tests(cases, cov_map, {"src/simulation/m_rhs.fpp"})
+    run_keys = {c.coverage_key() for c in run}
+    assert "hasempty" in run_keys and skip == []

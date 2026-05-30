@@ -109,7 +109,7 @@ def select_tests(cases, coverage_map, changed_files):
     for case in cases:
         key = case.coverage_key()
         cov = coverage_map.get(key)
-        if cov is None:  # rung 5: unmapped/new test
+        if not cov:  # rung 5: unmapped/new test, or empty (uncertain) coverage -> run
             to_run.append(case)
         elif set(cov) & changed_fpp:  # rung 6: overlap
             to_run.append(case)

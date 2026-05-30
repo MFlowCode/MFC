@@ -376,6 +376,9 @@ class TestCaseBuilder:
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
 
+    def coverage_key(self) -> str:
+        return self.to_case().coverage_key()
+
     def to_case(self) -> TestCase:
         if self.kind == "convergence":
             # Convergence cases drive their own runs — the BASE_CFG mods/path
