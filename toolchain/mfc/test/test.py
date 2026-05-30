@@ -133,64 +133,6 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 cases.remove(c)
                 skipped_cases.append(c)
 
-    # --only-changes: filter based on file-level gcov coverage
-    if ARG("only_changes"):
-        from .coverage import (
-            filter_tests_by_coverage,
-            get_changed_files,
-            load_coverage_cache,
-            should_run_all_tests,
-        )
-
-        cache = load_coverage_cache(common.MFC_ROOT_DIR)
-        if cache is None:
-            cons.print("[yellow]Coverage cache missing or stale.[/yellow]")
-            cons.print("[yellow]Run: ./mfc.sh build --gcov -j 8 && ./mfc.sh test --build-coverage-cache --gcov -j 8[/yellow]")
-            cons.print("[yellow]Falling back to full test suite.[/yellow]")
-        else:
-            changed_files = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"))
-
-            if changed_files is None:
-                cons.print("[yellow]git diff failed — falling back to full test suite.[/yellow]")
-            elif should_run_all_tests(changed_files):
-                cons.print()
-                cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                cons.print("-" * 50)
-                cons.print("[yellow]Infrastructure or macro file changed — running full test suite.[/yellow]")
-                cons.print("-" * 50)
-            else:
-                changed_fpp = {f for f in changed_files if f.endswith(".fpp")}
-                changed_f90 = {f for f in changed_files if f.startswith("src/") and (f.endswith(".f90") or f.endswith(".f"))}
-                if changed_f90:
-                    cons.print()
-                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                    cons.print("-" * 50)
-                    cons.print("[yellow].f90/.f source changed — running full test suite.[/yellow]")
-                    for f in sorted(changed_f90):
-                        cons.print(f"  [yellow]*[/yellow] {f}")
-                    cons.print("-" * 50)
-                elif not changed_fpp:
-                    cons.print()
-                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                    cons.print("-" * 50)
-                    cons.print("[green]No Fortran source changes detected — skipping all tests.[/green]")
-                    cons.print("-" * 50)
-                    cons.print()
-                    skipped_cases += cases
-                    cases = []
-                else:
-                    cons.print()
-                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                    cons.print("-" * 50)
-                    for fpp_file in sorted(changed_fpp):
-                        cons.print(f"  [green]*[/green] {fpp_file}")
-
-                    cases, new_skipped = filter_tests_by_coverage(cases, cache, changed_files)
-                    skipped_cases += new_skipped
-                    cons.print(f"\n[bold]Tests to run: {len(cases)} / {len(cases) + len(new_skipped)}[/bold]")
-                    cons.print("-" * 50)
-                    cons.print()
-
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
             cases.remove(case)
@@ -236,6 +178,25 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
+    if ARG("only_changes"):
+        import datetime
+
+        from .. import common
+        from .coverage import COVERAGE_MAP_PATH, format_summary, get_changed_files, load_map, select_tests
+
+        entries, meta = load_map(COVERAGE_MAP_PATH)
+        if entries is None:
+            cons.print("[yellow]Coverage selection: map missing/corrupt — running full suite.[/yellow]")
+        else:
+            changed = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"), explicit=ARG("changed_files"))
+            to_run, to_skip, reason = select_tests(cases, entries, changed)
+            cons.print(format_summary(ran=len(to_run), total=len(cases), reason=reason, meta=meta, now=datetime.datetime.now(datetime.timezone.utc).isoformat()))
+            if ARG("select_enforce"):
+                skipped_cases += to_skip
+                cases = to_run
+            else:
+                cons.print("[dim](shadow mode: running full suite; pass --select-enforce to actually skip)[/dim]")
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 
@@ -266,22 +227,17 @@ def test():
 
         return
 
-    if ARG("build_coverage_cache"):
-        from .coverage import build_coverage_cache
+    if ARG("build_coverage_map"):
+        from .coverage_build import build_coverage_map
 
         all_cases = [b.to_case() for b in cases]
-
-        # Build all unique slugs (Chemistry, case-optimization, etc.) so every
-        # test has a pre-built binary available for direct execution in Phase 2.
-        codes = [PRE_PROCESS, SIMULATION, POST_PROCESS]
-        unique_builds = set()
-        for case, code in itertools.product(all_cases, codes):
+        unique = set()
+        for case, code in itertools.product(all_cases, [PRE_PROCESS, SIMULATION, POST_PROCESS]):
             slug = code.get_slug(case.to_input_file())
-            if slug not in unique_builds:
+            if slug not in unique:
                 build(code, case.to_input_file())
-                unique_builds.add(slug)
-
-        build_coverage_cache(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
+                unique.add(slug)
+        build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
         return
 
     cases, skipped_cases = __filter(cases)

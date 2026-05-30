@@ -491,7 +491,7 @@ DEPENDENCIES = {
 }
 
 
-def _r(name, ptype, tags=None, desc=None, hint=None, math=None, str_len=None):
+def _r(name, ptype, tags=None, desc=None, hint=None, math=None, str_len=None, storage_precision=False):
     """Register a parameter with optional feature tags and description."""
     if hint is None:
         hint = _lookup_hint(name)
@@ -516,6 +516,7 @@ def _r(name, ptype, tags=None, desc=None, hint=None, math=None, str_len=None):
             hint=hint,
             math_symbol=math or "",
             str_len=str_len if str_len is not None else "name_len",
+            storage_precision=storage_precision,
         )
     )
 

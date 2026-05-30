@@ -1,0 +1,18 @@
+# .github/workflows/coverage-health.yml
+name: 'Coverage Map Health'
+on:
+  schedule:
+    - cron: '0 7 * * *'      # daily; loud if the refresh stopped working
+  workflow_dispatch:
+jobs:
+  health:
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Initialize MFC
+        run: ./mfc.sh init
+      - name: Check coverage map freshness
+        run: build/venv/bin/python3 .github/scripts/check_coverage_map_health.py
