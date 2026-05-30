@@ -152,3 +152,13 @@ def get_changed_files(root_dir, compare_branch="master", explicit: Optional[str]
         return {f for f in diff.stdout.splitlines() if f.strip()}
     except (subprocess.TimeoutExpired, OSError):
         return None
+
+
+def format_summary(*, ran, total, reason, meta, now) -> str:
+    if meta and meta.get("built_at"):
+        built = datetime.datetime.fromisoformat(meta["built_at"])
+        age_days = (datetime.datetime.fromisoformat(now) - built).days
+        age = f"map age {age_days}d"
+    else:
+        age = "map age unknown"
+    return f"Coverage selection: ran {ran}/{total} tests · {age} · {reason}"

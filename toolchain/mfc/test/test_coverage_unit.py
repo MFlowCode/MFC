@@ -3,7 +3,7 @@ import types as _types
 from pathlib import Path
 from unittest.mock import patch
 
-from mfc.test.coverage import get_changed_files, is_always_run_all, load_map, param_hash, save_map, select_tests
+from mfc.test.coverage import format_summary, get_changed_files, is_always_run_all, load_map, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -168,3 +168,25 @@ def test_changed_files_returns_none_when_unrecoverable():
 
     with patch("subprocess.run", fake_run):
         assert get_changed_files("/repo", "master") is None
+
+
+def test_summary_mentions_counts_age_reason():
+    s = format_summary(
+        ran=47,
+        total=610,
+        reason="selected 47/610 by coverage overlap",
+        meta={"built_at": "2026-05-20T00:00:00+00:00"},
+        now="2026-05-29T00:00:00+00:00",
+    )
+    assert "47/610" in s and "9d" in s and "coverage overlap" in s
+
+
+def test_summary_handles_missing_meta():
+    s = format_summary(
+        ran=610,
+        total=610,
+        reason="rung1: changed-file list unavailable",
+        meta=None,
+        now="2026-05-29T00:00:00+00:00",
+    )
+    assert "610/610" in s and "map age unknown" in s
