@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-from mfc.test.coverage import is_always_run_all, load_map, param_hash, save_map
+from mfc.test.coverage import is_always_run_all, load_map, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -67,3 +67,55 @@ def test_ordinary_common_module_does_not_force_all():
 
 def test_ordinary_sim_module_does_not_force_all():
     assert not is_always_run_all({"src/simulation/m_rhs.fpp"})
+
+
+class _Case:
+    def __init__(self, ph, params=None):
+        self._ph = ph
+        self.params = params or {}
+
+    def coverage_key(self):
+        return self._ph
+
+
+def _cases(*phs):
+    return [_Case(p) for p in phs]
+
+
+def test_rung1_no_changed_files_runs_all():
+    cases = _cases("a", "b")
+    run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, None)
+    assert len(run) == 2 and skip == [] and reason.startswith("rung1")
+
+
+def test_rung2_always_run_all():
+    cases = _cases("a", "b")
+    run, skip, reason = select_tests(cases, {"a": [], "b": []}, {"CMakeLists.txt"})
+    assert len(run) == 2 and reason.startswith("rung2")
+
+
+def test_rung3_f90_change_runs_all():
+    cases = _cases("a")
+    run, skip, reason = select_tests(cases, {"a": []}, {"src/common/m_precision_select.f90"})
+    assert len(run) == 1 and reason.startswith("rung3")
+
+
+def test_rung4_changed_fpp_with_zero_coverage_runs_all():
+    cases = _cases("a")
+    # m_gpu_only.fpp is covered by no test in the map
+    run, skip, reason = select_tests(cases, {"a": ["src/simulation/m_rhs.fpp"]}, {"src/simulation/m_gpu_only.fpp"})
+    assert len(run) == 1 and reason.startswith("rung4")
+
+
+def test_rung5_unmapped_test_is_included():
+    cases = _cases("a", "new")  # 'new' not in map
+    run, skip, _ = select_tests(cases, {"a": ["src/simulation/m_rhs.fpp"]}, {"src/simulation/m_rhs.fpp"})
+    assert {c.coverage_key() for c in run} == {"a", "new"}
+
+
+def test_rung6_and_7_overlap_selects_subset():
+    cases = _cases("hit", "miss")
+    cov = {"hit": ["src/simulation/m_bubbles_EE.fpp"], "miss": ["src/simulation/m_rhs.fpp"]}
+    run, skip, _ = select_tests(cases, cov, {"src/simulation/m_bubbles_EE.fpp"})
+    assert [c.coverage_key() for c in run] == ["hit"]
+    assert [c.coverage_key() for c in skip] == ["miss"]

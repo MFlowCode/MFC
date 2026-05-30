@@ -67,3 +67,51 @@ def load_map(path: Path) -> Tuple[Optional[dict], Optional[dict]]:
         return None, None
     meta = data.pop("_meta")
     return data, meta
+
+
+def _covered_fpp(coverage_map: dict) -> set:
+    files = set()
+    for cov in coverage_map.values():
+        files.update(cov)
+    return files
+
+
+def select_tests(cases, coverage_map, changed_files):
+    """Return (to_run, skipped, reason). Conservative ladder -- only over-includes.
+
+    `cases` items expose `.coverage_key()`. `changed_files` is a set of repo-relative
+    paths, or None if detection failed.
+    """
+    # Rung 1: no changed-file info -> run all.
+    if changed_files is None:
+        return list(cases), [], "rung1: changed-file list unavailable"
+
+    # Rung 2: macro/codegen/build inputs -> run all.
+    if is_always_run_all(changed_files):
+        return list(cases), [], "rung2: macro/codegen/build input changed"
+
+    # Rung 3: changed .f90/.f under src/ (map tracks .fpp only) -> run all.
+    if any(f.startswith("src/") and f.endswith((".f90", ".f")) for f in changed_files):
+        return list(cases), [], "rung3: hand-written .f90/.f changed"
+
+    changed_fpp = {f for f in changed_files if f.endswith(".fpp")}
+    if not changed_fpp:
+        return [], list(cases), "rung7: no Fortran source changed"
+
+    # Rung 4: a changed .fpp that no test covers -> run all (GPU-only blind spot).
+    covered = _covered_fpp(coverage_map)
+    if changed_fpp - covered:
+        return list(cases), [], "rung4: changed .fpp not covered by any test"
+
+    # Rungs 5-7: per-test.
+    to_run, skipped = [], []
+    for case in cases:
+        key = case.coverage_key()
+        cov = coverage_map.get(key)
+        if cov is None:  # rung 5: unmapped/new test
+            to_run.append(case)
+        elif set(cov) & changed_fpp:  # rung 6: overlap
+            to_run.append(case)
+        else:  # rung 7: skip
+            skipped.append(case)
+    return to_run, skipped, f"selected {len(to_run)}/{len(cases)} by coverage overlap"
