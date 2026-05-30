@@ -57,4 +57,12 @@ if [ -n "${job_shard:-}" ]; then
     shard_opts="--shard $job_shard"
 fi
 
-./mfc.sh test -v --max-attempts 3 --no-build -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
+# Coverage-based test selection in SHADOW mode on PRs: prints what it WOULD select but the
+# full suite still runs (no --select-enforce). Changed files come from git detection
+# (self-healing deepen) since the SLURM job doesn't receive the paths-filter list.
+select_opts=""
+if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
+    select_opts="--only-changes"
+fi
+
+./mfc.sh test -v --max-attempts 3 --no-build $select_opts -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster

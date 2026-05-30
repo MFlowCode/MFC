@@ -53,6 +53,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
+      changed_files: ${{ steps.changes.outputs.checkall_files }}
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -62,6 +63,7 @@ jobs:
         id: changes
         with:
           filters: ".github/file-filter.yml"
+          list-files: shell
 
   github:
     name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || format('Github ({0}, {1}, {2}, {3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel && 'intel' || 'GNU') }}
@@ -262,11 +264,17 @@ jobs:
       - name: Test
         if:   '!matrix.nvhpc'
         run:  |
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT $PRECISION
+          # Coverage-based test selection in SHADOW mode on PRs: the selector
+          # prints what it WOULD run, but the full suite still runs (no
+          # --select-enforce). Enforcement is a separate, later change.
+          SELECT=()
+          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--only-changes --changed-files "$CHANGED_FILES")
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) "${SELECT[@]}" $TEST_ALL $TEST_PCT $PRECISION
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
+          CHANGED_FILES: ${{ needs.file-changes.outputs.changed_files }}
 
       # ── NVHPC build + test (via docker exec into long-lived container) ──
       - name: Build (NVHPC)

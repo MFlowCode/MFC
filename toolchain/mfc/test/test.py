@@ -178,6 +178,25 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
+    if ARG("only_changes"):
+        import datetime
+
+        from .. import common
+        from .coverage import COVERAGE_MAP_PATH, format_summary, get_changed_files, load_map, select_tests
+
+        entries, meta = load_map(COVERAGE_MAP_PATH)
+        if entries is None:
+            cons.print("[yellow]Coverage selection: map missing/corrupt — running full suite.[/yellow]")
+        else:
+            changed = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"), explicit=ARG("changed_files"))
+            to_run, to_skip, reason = select_tests(cases, entries, changed)
+            cons.print(format_summary(ran=len(to_run), total=len(cases), reason=reason, meta=meta, now=datetime.datetime.now(datetime.timezone.utc).isoformat()))
+            if ARG("select_enforce"):
+                skipped_cases += to_skip
+                cases = to_run
+            else:
+                cons.print("[dim](shadow mode: running full suite; pass --select-enforce to actually skip)[/dim]")
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 
@@ -206,6 +225,19 @@ def test():
             cons.print(f"[bold red]Deleting:[/bold red] {old_uuid}")
             common.delete_directory(f"{common.MFC_TEST_DIR}/{old_uuid}")
 
+        return
+
+    if ARG("build_coverage_map"):
+        from .coverage_build import build_coverage_map
+
+        all_cases = [b.to_case() for b in cases]
+        unique = set()
+        for case, code in itertools.product(all_cases, [PRE_PROCESS, SIMULATION, POST_PROCESS]):
+            slug = code.get_slug(case.to_input_file())
+            if slug not in unique:
+                build(code, case.to_input_file())
+                unique.add(slug)
+        build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
         return
 
     cases, skipped_cases = __filter(cases)
