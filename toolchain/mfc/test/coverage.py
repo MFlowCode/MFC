@@ -133,11 +133,12 @@ def _merge_base(cwd, branch):
 def get_changed_files(root_dir, compare_branch="master", explicit: Optional[str] = None):
     """Set of changed repo-relative paths, or None if undeterminable (-> run all).
 
-    `explicit` is a newline-separated list from CI (paths-filter); preferred when given.
+    `explicit` is a changed-file list from CI (paths-filter); preferred when given. It may
+    be separated by newlines, spaces, or commas (paths-filter's shell output is space-sep).
     Otherwise use git merge-base, self-healing a shallow clone with a deepen+retry.
     """
     if explicit is not None:
-        return {f for f in explicit.splitlines() if f.strip()}
+        return {f for f in explicit.replace(",", " ").split() if f.strip()}
     try:
         base = _merge_base(root_dir, compare_branch)
         if base is None:

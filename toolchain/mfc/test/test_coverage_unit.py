@@ -254,3 +254,10 @@ def test_rung5_empty_coverage_is_included():
     run, skip, _ = select_tests(cases, cov_map, {"src/simulation/m_rhs.fpp"})
     run_keys = {c.coverage_key() for c in run}
     assert "hasempty" in run_keys and skip == []
+
+
+def test_changed_files_explicit_space_and_comma_separated():
+    from mfc.test.coverage import get_changed_files
+
+    assert get_changed_files("/r", "master", explicit="src/a.fpp src/b.fpp") == {"src/a.fpp", "src/b.fpp"}
+    assert get_changed_files("/r", "master", explicit="src/a.fpp,src/b.fpp") == {"src/a.fpp", "src/b.fpp"}
