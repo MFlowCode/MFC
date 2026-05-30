@@ -1,0 +1,37 @@
+# .github/workflows/coverage-refresh.yml
+name: 'Coverage Map Refresh'
+on:
+  schedule:
+    - cron: '0 6 * * 1'      # weekly floor
+  push:
+    branches: [master]
+    paths:
+      - 'toolchain/mfc/test/cases.py'
+      - 'src/**/*.fpp'
+  workflow_dispatch:
+concurrency:
+  group: coverage-refresh
+  cancel-in-progress: true
+jobs:
+  refresh:
+    if: github.repository == 'MFlowCode/MFC'
+    timeout-minutes: 240
+    runs-on:
+      group:  phoenix
+      labels: gt
+    steps:
+      - uses: actions/checkout@v4
+        with: { clean: false }
+      - name: Build + collect coverage map (SLURM)
+        run: bash .github/scripts/submit-slurm-job.sh .github/workflows/common/coverage-refresh.sh cpu none phoenix
+      - name: Commit refreshed map
+        run: |
+          if ! git diff --quiet tests/coverage_map.json.gz; then
+            git config user.name  "mfc-bot"
+            git config user.email "mfc-bot@users.noreply.github.com"
+            git add tests/coverage_map.json.gz
+            git commit -m "test: refresh coverage map [skip ci]"
+            git push origin HEAD:master
+          else
+            echo "Coverage map unchanged."
+          fi
