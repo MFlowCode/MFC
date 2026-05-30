@@ -47,19 +47,12 @@ CASES_PY = "toolchain/mfc/test/cases.py"
 ALWAYS_RUN_ALL_EXACT = frozenset(
     [
         "CMakeLists.txt",
-        # Toolchain infra that affects EVERY test's generation/execution -> run all.
-        "toolchain/mfc/test/case.py",  # TestCase: how a case runs
-        "toolchain/mfc/test/test.py",  # the test runner
-        "toolchain/mfc/test/coverage.py",  # the selector itself
-        "toolchain/mfc/test/coverage_build.py",  # the map collector
     ]
 )
 ALWAYS_RUN_ALL_PREFIXES = (
     "src/common/include/",  # GPU/Fypp macro & include files (CPU map can't line-attribute)
     "toolchain/cmake/",  # build system
-    "toolchain/mfc/params/",  # parameter codegen -> emits Fortran broadly
     "toolchain/bootstrap/",  # build/run scripts
-    "toolchain/mfc/run/",  # .inp generation / case dicts -> affects every test's input
 )
 
 
@@ -68,6 +61,14 @@ def is_always_run_all(changed_files: set) -> bool:
     if changed_files & ALWAYS_RUN_ALL_EXACT:
         return True
     if any(f.startswith(ALWAYS_RUN_ALL_PREFIXES) for f in changed_files):
+        return True
+    # Any toolchain/mfc/*.py change (params/, run/, test infra, case.py, common.py,
+    # build.py, state.py, sched.py, …) affects EVERY test's generation or execution and
+    # cannot be attributed to individual tests by the coverage map.  Treat the entire
+    # toolchain/mfc/ subtree as run-all EXCEPT cases.py, which is handled precisely by
+    # rung 5 (new/modified tests have a fresh param_hash absent from the map and run
+    # individually; unchanged tests have no .fpp overlap and are skipped).
+    if any(f.startswith("toolchain/mfc/") and f.endswith(".py") and f != CASES_PY for f in changed_files):
         return True
     # gcov rolls #:include'd .fpp into the parent compilation unit, so include files
     # (inline_*.fpp, HardcodedIC, macros) are not reliably attributed in the map. Force a
@@ -112,8 +113,10 @@ def select_tests(cases, coverage_map, changed_files):
     if is_always_run_all(changed_files):
         return list(cases), [], "rung2: macro/codegen/build input changed"
 
-    # Rung 3: changed .f90/.f under src/ (map tracks .fpp only) -> run all.
-    if any(f.startswith("src/") and f.endswith((".f90", ".f")) for f in changed_files):
+    # Rung 3: changed hand-written Fortran source under src/ (map tracks .fpp only) -> run
+    # all.  Match case-insensitively to catch .F90, .F95, .FOR, etc.
+    _FORTRAN_EXTS = (".f90", ".f", ".f95", ".f03", ".f08", ".for")
+    if any(f.startswith("src/") and f.lower().endswith(_FORTRAN_EXTS) for f in changed_files):
         return list(cases), [], "rung3: hand-written .f90/.f changed"
 
     changed_fpp = {f for f in changed_files if f.endswith(".fpp")}

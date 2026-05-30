@@ -303,3 +303,22 @@ def test_docs_only_still_skips_all():
     cases = _cases("a")
     run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, {"README.md"})
     assert run == [] and len(skip) == 1 and "rung7" in reason
+
+
+def test_uppercase_fortran_extension_forces_all():
+    cases = _cases("a")
+    run, skip, reason = select_tests(cases, {"a": []}, {"src/common/m_x.F90"})
+    assert len(run) == 1 and reason.startswith("rung3")
+
+
+def test_toolchain_py_change_forces_all_except_cases():
+    assert is_always_run_all({"toolchain/mfc/case.py"})
+    assert is_always_run_all({"toolchain/mfc/build.py"})
+    assert is_always_run_all({"toolchain/mfc/common.py"})
+    assert not is_always_run_all({"toolchain/mfc/test/cases.py"})
+
+
+def test_empty_map_with_fpp_change_runs_all_rung4():
+    cases = _cases("a", "b")
+    run, skip, reason = select_tests(cases, {}, {"src/simulation/m_rhs.fpp"})
+    assert len(run) == 2 and reason.startswith("rung4")
