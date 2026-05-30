@@ -26,22 +26,30 @@ jobs:
         with: { clean: false }
       - name: Build + collect coverage map (SLURM)
         run: bash .github/scripts/submit-slurm-job.sh .github/workflows/common/coverage-refresh.sh cpu none phoenix
+      # Mint a short-lived GitHub App installation token. The app is on the master
+      # ruleset's bypass list (Integration actor), so its push satisfies the
+      # "require pull request" rule that rejects the default GITHUB_TOKEN.
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.MAP_BOT_APP_ID }}
+          private-key: ${{ secrets.MAP_BOT_APP_PRIVATE_KEY }}
       - name: Commit refreshed map
         env:
-          CACHE_PUSH_TOKEN: ${{ secrets.CACHE_PUSH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           if ! git diff --quiet tests/coverage_map.json.gz; then
-            git config user.name  "mfc-bot"
-            git config user.email "mfc-bot@users.noreply.github.com"
+            git config user.name  "mfc-map-bot[bot]"
+            git config user.email "mfc-map-bot[bot]@users.noreply.github.com"
             git add tests/coverage_map.json.gz
             # --no-verify: this bot commit stages only the binary coverage map; it
             # must not run the repo pre-commit hook (./mfc.sh precheck/spelling),
             # which is for source changes and aborts the commit on the runner.
             git commit --no-verify -m "test: refresh coverage map [skip ci]"
-            # Push to protected master via CACHE_PUSH_TOKEN (a PAT/App token with
-            # contents:write + branch-protection bypass), mirroring deploy-tap.yml's
-            # x-access-token push. The default GITHUB_TOKEN is rejected by protection.
-            git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" HEAD:master
+            # Push to master via the app installation token. The app is a bypass
+            # actor on the master ruleset, so the require-PR rule does not reject it.
+            git push "https://x-access-token:${GH_TOKEN}@github.com/MFlowCode/MFC.git" HEAD:master
           else
             echo "Coverage map unchanged."
           fi
