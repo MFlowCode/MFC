@@ -123,11 +123,19 @@ def test_rung6_and_7_overlap_selects_subset():
     assert [c.coverage_key() for c in skip] == ["miss"]
 
 
-def test_case_coverage_key_matches_param_hash():
+def test_case_coverage_key_uses_full_params():
     from mfc.test.case import TestCase
 
     tc = TestCase("1D -> Foo", {"m": 100, "weno_order": 5})
-    assert tc.coverage_key() == param_hash({"m": 100, "weno_order": 5})
+    assert tc.coverage_key() == param_hash(tc.params)
+
+
+def test_case_coverage_key_changes_with_params():
+    from mfc.test.case import TestCase
+
+    a = TestCase("1D -> Foo", {"weno_order": 5})
+    b = TestCase("1D -> Foo", {"weno_order": 3})
+    assert a.coverage_key() != b.coverage_key()
 
 
 def test_case_coverage_key_ignores_trace():
