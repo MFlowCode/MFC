@@ -279,3 +279,27 @@ def test_empty_explicit_is_uncertainty_not_skipall():
     with patch("subprocess.run", fail_git):
         assert get_changed_files("/r", "master", explicit="") is None
         assert get_changed_files("/r", "master", explicit="  ,  ") is None
+
+
+def test_run_and_test_infra_force_all():
+    assert is_always_run_all({"toolchain/mfc/run/input.py"})
+    assert is_always_run_all({"toolchain/mfc/test/case.py"})
+    assert is_always_run_all({"toolchain/mfc/test/test.py"})
+
+
+def test_cases_py_is_not_always_run():
+    assert not is_always_run_all({"toolchain/mfc/test/cases.py"})
+
+
+def test_cases_py_change_runs_new_tests_not_skipall():
+    # cases.py-only change must run the NEW/modified tests (rung 5), not skip everything.
+    cases = _cases("mapped", "newtest")  # "newtest" absent from map
+    run, skip, _ = select_tests(cases, {"mapped": ["src/simulation/m_rhs.fpp"]}, {"toolchain/mfc/test/cases.py"})
+    assert [c.coverage_key() for c in run] == ["newtest"]
+    assert [c.coverage_key() for c in skip] == ["mapped"]
+
+
+def test_docs_only_still_skips_all():
+    cases = _cases("a")
+    run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, {"README.md"})
+    assert run == [] and len(skip) == 1 and "rung7" in reason

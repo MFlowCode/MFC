@@ -39,12 +39,27 @@ def save_map(path: Path, entries: dict, *, n_tests: int, git_sha: str, gfortran_
         json.dump(payload, f, indent=2, sort_keys=True)
 
 
-ALWAYS_RUN_ALL_EXACT = frozenset(["CMakeLists.txt"])
+# Test-definition file: changing it adds/modifies tests, but only the tests it touches
+# (their param_hash changes -> not in map -> rung 5 runs them). NOT in ALWAYS_RUN_ALL so a
+# test addition doesn't blanket-run the whole suite.
+CASES_PY = "toolchain/mfc/test/cases.py"
+
+ALWAYS_RUN_ALL_EXACT = frozenset(
+    [
+        "CMakeLists.txt",
+        # Toolchain infra that affects EVERY test's generation/execution -> run all.
+        "toolchain/mfc/test/case.py",  # TestCase: how a case runs
+        "toolchain/mfc/test/test.py",  # the test runner
+        "toolchain/mfc/test/coverage.py",  # the selector itself
+        "toolchain/mfc/test/coverage_build.py",  # the map collector
+    ]
+)
 ALWAYS_RUN_ALL_PREFIXES = (
     "src/common/include/",  # GPU/Fypp macro & include files (CPU map can't line-attribute)
     "toolchain/cmake/",  # build system
     "toolchain/mfc/params/",  # parameter codegen -> emits Fortran broadly
     "toolchain/bootstrap/",  # build/run scripts
+    "toolchain/mfc/run/",  # .inp generation / case dicts -> affects every test's input
 )
 
 
@@ -102,8 +117,11 @@ def select_tests(cases, coverage_map, changed_files):
         return list(cases), [], "rung3: hand-written .f90/.f changed"
 
     changed_fpp = {f for f in changed_files if f.endswith(".fpp")}
-    if not changed_fpp:
-        return [], list(cases), "rung7: no Fortran source changed"
+    # Skip-all only when nothing test-relevant changed. If cases.py changed (no .fpp), fall
+    # through to per-test: new/modified tests have a fresh param_hash absent from the map and
+    # run via rung 5; unchanged tests have no .fpp overlap and are skipped.
+    if not changed_fpp and CASES_PY not in changed_files:
+        return [], list(cases), "rung7: no Fortran or test-definition change"
 
     # Rung 4: a changed .fpp that no test covers -> run all (GPU-only blind spot).
     covered = _covered_fpp(coverage_map)
