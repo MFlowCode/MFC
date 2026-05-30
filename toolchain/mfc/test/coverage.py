@@ -38,6 +38,22 @@ def save_map(path: Path, entries: dict, *, n_tests: int, git_sha: str, gfortran_
         json.dump(payload, f, indent=2, sort_keys=True)
 
 
+ALWAYS_RUN_ALL_EXACT = frozenset(["CMakeLists.txt"])
+ALWAYS_RUN_ALL_PREFIXES = (
+    "src/common/include/",  # GPU/Fypp macro & include files (CPU map can't line-attribute)
+    "toolchain/cmake/",  # build system
+    "toolchain/mfc/params/",  # parameter codegen -> emits Fortran broadly
+    "toolchain/bootstrap/",  # build/run scripts
+)
+
+
+def is_always_run_all(changed_files: set) -> bool:
+    """True if any changed file forces the full suite (un-attributable by the CPU map)."""
+    if changed_files & ALWAYS_RUN_ALL_EXACT:
+        return True
+    return any(f.startswith(ALWAYS_RUN_ALL_PREFIXES) for f in changed_files)
+
+
 def load_map(path: Path) -> Tuple[Optional[dict], Optional[dict]]:
     """Return (entries_without_meta, meta), or (None, None) if missing/corrupt."""
     if not Path(path).exists():

@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-from mfc.test.coverage import load_map, param_hash, save_map
+from mfc.test.coverage import is_always_run_all, load_map, param_hash, save_map
 
 
 def test_param_hash_is_order_independent():
@@ -46,3 +46,24 @@ def test_load_corrupt_returns_none():
         p = Path(d) / "m.json.gz"
         p.write_bytes(b"not gzip")
         assert load_map(p) == (None, None)
+
+
+def test_macro_file_forces_all():
+    assert is_always_run_all({"src/common/include/parallel_macros.fpp"})
+
+
+def test_cmake_forces_all():
+    assert is_always_run_all({"CMakeLists.txt"})
+    assert is_always_run_all({"toolchain/cmake/foo.cmake"})
+
+
+def test_param_codegen_forces_all():
+    assert is_always_run_all({"toolchain/mfc/params/definitions.py"})
+
+
+def test_ordinary_common_module_does_not_force_all():
+    assert not is_always_run_all({"src/common/m_helper.fpp"})
+
+
+def test_ordinary_sim_module_does_not_force_all():
+    assert not is_always_run_all({"src/simulation/m_rhs.fpp"})
