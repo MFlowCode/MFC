@@ -133,8 +133,13 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> Optional[set]:
         except json.JSONDecodeError:
             remaining = len(text) - pos
             if remaining > 0:
-                cons.print(f"[yellow]Warning: gcov JSON parse error at offset {pos} ({remaining} bytes remaining) — partial coverage recorded for this test.[/yellow]")
-            break
+                cons.print(f"[yellow]Warning: gcov JSON parse error at offset {pos} ({remaining} bytes remaining) — coverage for this test is untrustworthy, omitting from map.[/yellow]")
+            # A mid-stream parse error means the JSON stream was truncated or
+            # corrupted.  A partial coverage set is untrustworthy: a .fpp that
+            # would have been recorded in the missing portion would be silently
+            # skipped by select_tests on future runs.  Return None so the caller
+            # omits this test from the map entirely (conservatively included).
+            return None
 
         for file_entry in data.get("files", []):
             file_path = file_entry.get("file", "")
@@ -367,10 +372,11 @@ def _prepare_test(case) -> dict:
         params["t_stop"] = t_save  # n_save = 2: indices 0 and 1
 
     # Heavy 3D tests: remove vorticity output (omega_wrt + fd_order) for
-    # 3D QBMM tests.  Normal test execution never runs post_process (only
-    # PRE_PROCESS + SIMULATION, never POST_PROCESS), so post_process on
-    # heavy 3D configs is untested.  Vorticity FD computation on large grids
-    # with many QBMM variables causes post_process to crash (exit code 2).
+    # 3D QBMM tests.  The regular test suite runs post_process only under
+    # --test-all (which CI sets); heavy 3D QBMM configs are known to crash
+    # post_process (exit code 2) when vorticity FD is enabled on large grids
+    # with many QBMM variables.  Strip those params here so the coverage
+    # build does not fail on those tests.
     if int(params.get("p", 0)) > 0 and params.get("qbmm", "F") == "T":
         for key in POST_PROCESS_3D_PARAMS:
             params.pop(key, None)
@@ -478,9 +484,17 @@ def build_coverage_map(
                     info = futures[future]
                     cons.print(f"  [yellow]Warning: {info['uuid']} failed to run: {exc}[/yellow]")
                     continue
-                test_results[uuid] = test_gcda
                 if failures:
+                    # A test that crashed mid-pipeline produced only partial .gcda
+                    # files (e.g. simulation failed after pre_process ran).  That
+                    # truncated coverage is untrustworthy: a later .fpp change that
+                    # ran only in the missing stage would be incorrectly skipped.
+                    # Record the failure for the warning summary but do NOT add this
+                    # test to test_results — absent entries are conservatively
+                    # included by select_tests (rung 5), never skipped.
                     all_failures[uuid] = failures
+                    continue
+                test_results[uuid] = test_gcda
                 if (i + 1) % 50 == 0 or (i + 1) == len(test_infos):
                     cons.print(f"  [{i + 1:3d}/{len(test_infos):3d}] tests completed")
 
