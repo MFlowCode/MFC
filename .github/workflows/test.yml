@@ -267,9 +267,9 @@ jobs:
           # Coverage-based test selection in SHADOW mode on PRs: the selector
           # prints what it WOULD run, but the full suite still runs (no
           # --select-enforce). Enforcement is a separate, later change.
-          SELECT=""
-          [ "${{ github.event_name }}" = "pull_request" ] && SELECT="--only-changes"
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $SELECT --changed-files "$CHANGED_FILES" $TEST_ALL $TEST_PCT $PRECISION
+          SELECT=()
+          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--only-changes --changed-files "$CHANGED_FILES")
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) "${SELECT[@]}" $TEST_ALL $TEST_PCT $PRECISION
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
