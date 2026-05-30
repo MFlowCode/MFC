@@ -162,3 +162,17 @@ def format_summary(*, ran, total, reason, meta, now) -> str:
     else:
         age = "map age unknown"
     return f"Coverage selection: ran {ran}/{total} tests · {age} · {reason}"
+
+
+def map_health(*, meta, current_keys, mapped_keys, now, max_age_days, min_fraction):
+    """Return (ok, message). Loud anti-rot check used by the health workflow."""
+    if not meta or not meta.get("built_at"):
+        return False, "Coverage map has no build metadata."
+    age = (datetime.datetime.fromisoformat(now) - datetime.datetime.fromisoformat(meta["built_at"])).days
+    if age > max_age_days:
+        return False, f"Coverage map is STALE: {age}d old (max {max_age_days}d). Refresh workflow may be broken."
+    if current_keys:
+        frac = len(current_keys & mapped_keys) / len(current_keys)
+        if frac < min_fraction:
+            return False, f"Coverage map under-covers: {frac:.0%} of current tests mapped (min {min_fraction:.0%})."
+    return True, f"Coverage map healthy: {age}d old."

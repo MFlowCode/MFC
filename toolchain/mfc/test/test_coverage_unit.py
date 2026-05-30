@@ -3,7 +3,7 @@ import types as _types
 from pathlib import Path
 from unittest.mock import patch
 
-from mfc.test.coverage import format_summary, get_changed_files, is_always_run_all, load_map, param_hash, save_map, select_tests
+from mfc.test.coverage import format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -190,3 +190,39 @@ def test_summary_handles_missing_meta():
         now="2026-05-29T00:00:00+00:00",
     )
     assert "610/610" in s and "map age unknown" in s
+
+
+def test_health_ok():
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-28T00:00:00+00:00", "n_tests": 600},
+        current_keys=set(str(i) for i in range(600)),
+        mapped_keys=set(str(i) for i in range(580)),
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+    )
+    assert ok, msg
+
+
+def test_health_stale_fails():
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-01T00:00:00+00:00", "n_tests": 600},
+        current_keys=set(["a"]),
+        mapped_keys=set(["a"]),
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+    )
+    assert not ok and "stale" in msg.lower()
+
+
+def test_health_undercoverage_fails():
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-28T00:00:00+00:00", "n_tests": 10},
+        current_keys=set(str(i) for i in range(100)),
+        mapped_keys=set(str(i) for i in range(50)),
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+    )
+    assert not ok and "coverage" in msg.lower()
