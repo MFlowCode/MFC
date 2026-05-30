@@ -52,7 +52,13 @@ def is_always_run_all(changed_files: set) -> bool:
     """True if any changed file forces the full suite (un-attributable by the CPU map)."""
     if changed_files & ALWAYS_RUN_ALL_EXACT:
         return True
-    return any(f.startswith(ALWAYS_RUN_ALL_PREFIXES) for f in changed_files)
+    if any(f.startswith(ALWAYS_RUN_ALL_PREFIXES) for f in changed_files):
+        return True
+    # gcov rolls #:include'd .fpp into the parent compilation unit, so include files
+    # (inline_*.fpp, HardcodedIC, macros) are not reliably attributed in the map. Force a
+    # full run for ANY src/**/include/ change so this attribution gap can never cause
+    # under-inclusion — by rule, not by relying on the file being absent from the map.
+    return any(f.startswith("src/") and "/include/" in f and f.endswith(".fpp") for f in changed_files)
 
 
 def load_map(path: Path) -> Tuple[Optional[dict], Optional[dict]]:

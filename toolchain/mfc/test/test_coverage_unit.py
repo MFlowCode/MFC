@@ -261,3 +261,9 @@ def test_changed_files_explicit_space_and_comma_separated():
 
     assert get_changed_files("/r", "master", explicit="src/a.fpp src/b.fpp") == {"src/a.fpp", "src/b.fpp"}
     assert get_changed_files("/r", "master", explicit="src/a.fpp,src/b.fpp") == {"src/a.fpp", "src/b.fpp"}
+
+
+def test_sim_include_fpp_forces_all():
+    # gcov can't reliably attribute #:include'd files; any src include change runs all.
+    assert is_always_run_all({"src/simulation/include/inline_riemann.fpp"})
+    assert is_always_run_all({"src/pre_process/include/2dHardcodedIC.fpp"})
