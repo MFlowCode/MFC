@@ -136,8 +136,8 @@ contains
         if (xy_local(2) >= 0._wp) then
             ! finds the location on the airfoil grid with the minimum distance (closest)
             do k = 1, Np
-                dist_vec(1) = xy_local(1) - airfoil_grid_u(k)%x
-                dist_vec(2) = xy_local(2) - airfoil_grid_u(k)%y
+                dist_vec(1) = airfoil_grid_u(k)%x - xy_local(1)
+                dist_vec(2) = airfoil_grid_u(k)%y - xy_local(2)
                 dist_vec(3) = 0._wp
                 dist = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -150,14 +150,14 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = xy_local(1) - airfoil_grid_u(global_id)%x
-            dist_vec(2) = xy_local(2) - airfoil_grid_u(global_id)%y
+            dist_vec(1) = airfoil_grid_u(global_id)%x - xy_local(1)
+            dist_vec(2) = airfoil_grid_u(global_id)%y - xy_local(2)
             dist_vec(3) = 0
             dist = global_dist
         else
             do k = 1, Np
-                dist_vec(1) = xy_local(1) - airfoil_grid_l(k)%x
-                dist_vec(2) = xy_local(2) - airfoil_grid_l(k)%y
+                dist_vec(1) = airfoil_grid_l(k)%x - xy_local(1)
+                dist_vec(2) = airfoil_grid_l(k)%y - xy_local(2)
                 dist_vec(3) = 0
                 dist = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -170,9 +170,9 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = xy_local(1) - airfoil_grid_l(global_id)%x
-            dist_vec(2) = xy_local(2) - airfoil_grid_l(global_id)%y
-            dist_vec(3) = 0
+            dist_vec(1) = airfoil_grid_l(global_id)%x - xy_local(1)
+            dist_vec(2) = airfoil_grid_l(global_id)%y - xy_local(2)
+            dist_vec(3) = 0._wp
             dist = global_dist
         end if
 
@@ -234,14 +234,14 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = xyz_local(1) - airfoil_grid_u(global_id)%x
-            dist_vec(2) = xyz_local(2) - airfoil_grid_u(global_id)%y
+            dist_vec(1) = airfoil_grid_u(global_id)%x - xyz_local(1)
+            dist_vec(2) = airfoil_grid_u(global_id)%y - xyz_local(2)
             dist_vec(3) = 0._wp
             dist_surf = global_dist
         else
             do k = 1, Np
-                dist_vec(1) = xyz_local(1) - airfoil_grid_l(k)%x
-                dist_vec(2) = xyz_local(2) - airfoil_grid_l(k)%y
+                dist_vec(1) = airfoil_grid_l(k)%x - xyz_local(1)
+                dist_vec(2) = airfoil_grid_l(k)%y - xyz_local(2)
                 dist_vec(3) = 0
                 dist_surf = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -254,8 +254,8 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = xyz_local(1) - airfoil_grid_l(global_id)%x
-            dist_vec(2) = xyz_local(2) - airfoil_grid_l(global_id)%y
+            dist_vec(1) = airfoil_grid_l(global_id)%x - xyz_local(1)
+            dist_vec(2) = airfoil_grid_l(global_id)%y - xyz_local(2)
             dist_vec(3) = 0._wp
             dist_surf = global_dist
         end if

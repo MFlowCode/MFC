@@ -47,22 +47,21 @@ class MFCInputFile(Case):
 
         if self.params.get("chemistry", "F") == "T":
             cantera_file = self.params["cantera_file"]
-
             candidates = [
                 cantera_file,
                 os.path.join(self.dirpath, cantera_file),
                 os.path.join(common.MFC_MECHANISMS_DIR, cantera_file),
             ]
         else:
-            # If Chemistry is turned off, we return a default (dummy) solution
-            # that will not be used in the simulation, so that MFC can still
-            # be compiled.
-            candidates = ["h2o2.yaml"]
+            # Chemistry is off — return a dummy solution so MFC still compiles.
+            cantera_file = "h2o2.yaml"
+            candidates = [cantera_file]
 
         for candidate in candidates:
             try:
                 return ct.Solution(candidate)
-            except Exception:
+            except Exception as e:
+                cons.print(f"[dim]  Cantera: skipping '{candidate}': {e}[/dim]")
                 continue
 
         raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")

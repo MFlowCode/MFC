@@ -48,19 +48,14 @@ def generate_json_schema(include_descriptions: bool = True) -> Dict[str, Any]:
     Returns:
         JSON Schema dict
     """
-    from ..descriptions import get_description
-
     properties = {}
     all_params = []
 
     for name, param in sorted(REGISTRY.all_params.items()):
         prop_schema = _param_type_to_json_schema(param.param_type, param.constraints)
 
-        if include_descriptions:
-            # Get description from descriptions module
-            desc = get_description(name)
-            if desc:
-                prop_schema["description"] = desc
+        if include_descriptions and param.description:
+            prop_schema["description"] = param.description
 
         # Add deprecation notice if applicable
         if param.dependencies and "deprecated" in param.dependencies:
@@ -104,15 +99,13 @@ def write_json_schema(output_path: str, include_descriptions: bool = True) -> No
 
 def get_schema_stats() -> Dict[str, int]:
     """Get statistics about the generated schema."""
-    from ..descriptions import get_description
-
     schema = generate_json_schema(include_descriptions=False)
     props = schema.get("properties", {})
 
     stats = {
         "total_params": len(props),
         "with_constraints": sum(1 for p in props.values() if "enum" in p or "minimum" in p or "maximum" in p),
-        "with_descriptions": sum(1 for name in REGISTRY.all_params if get_description(name)),
+        "with_descriptions": sum(1 for _, p in REGISTRY.all_params.items() if p.description),
     }
 
     return stats

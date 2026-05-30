@@ -250,6 +250,18 @@ class CaseValidator:
         if val is not None and val not in ("T", "F"):
             self.errors.append(f"{key} must be 'T' or 'F', got '{val}'")
 
+    def _check_order_fits_grid(self, order: int, param_name: str) -> None:
+        """Prohibit reconstruction order that exceeds grid cell count in any active dimension."""
+        m = self.get("m", 0)
+        n = self.get("n", 0) or 0
+        p = self.get("p", 0) or 0
+        self.prohibit(m + 1 < order, f"m must be at least {param_name} - 1 (= {order - 1})")
+        self.prohibit(n > 0 and n + 1 < order, f"For 2D: n must be at least {param_name} - 1 (= {order - 1})")
+        self.prohibit(p > 0 and p + 1 < order, f"For 3D: p must be at least {param_name} - 1 (= {order - 1})")
+
+    def _get_recon_type(self) -> int:
+        return self.get("recon_type", 1)
+
     def check_parameter_types(self):
         """Validate parameter types before other checks.
 
@@ -264,6 +276,8 @@ class CaseValidator:
         for param in logical_params:
             if param in self.params:  # Only validate params that are set
                 self._validate_logical(param)
+
+        self.prohibit(self.get("recon_type", 1) not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
 
         # Required domain parameters when m > 0
         m = self.get("m")
@@ -316,72 +330,44 @@ class CaseValidator:
             return
 
         igr_order = self.get("igr_order")
-        m = self.get("m", 0)
-        n = self.get("n", 0)
-        p = self.get("p", 0)
         self.prohibit(igr_order not in [None, 3, 5], "igr_order must be 3 or 5")
         if igr_order:
-            self.prohibit(m + 1 < igr_order, f"m must be at least igr_order - 1 (= {igr_order - 1})")
-            self.prohibit(n is not None and n > 0 and n + 1 < igr_order, f"n must be at least igr_order - 1 (= {igr_order - 1})")
-            self.prohibit(p is not None and p > 0 and p + 1 < igr_order, f"p must be at least igr_order - 1 (= {igr_order - 1})")
+            self._check_order_fits_grid(igr_order, "igr_order")
 
     def check_weno(self):
         """Checks constraints regarding WENO order"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        # WENO_TYPE = 1
-        if recon_type != 1:
+        if self._get_recon_type() != 1:
             return
 
         for param in ["muscl_order", "muscl_lim"]:
             self.prohibit(self.is_set(param), f"recon_type = 1 (WENO) is not compatible with {param}")
 
         weno_order = self.get("weno_order")
-        m = self.get("m", 0)
-        n = self.get("n", 0)
-        p = self.get("p", 0)
-
         if weno_order is None:
             return
 
         self.prohibit(weno_order not in [1, 3, 5, 7], "weno_order must be 1, 3, 5, or 7")
-        self.prohibit(m + 1 < weno_order, f"m must be at least weno_order - 1 (= {weno_order - 1})")
-        self.prohibit(n is not None and n > 0 and n + 1 < weno_order, f"For 2D simulation, n must be at least weno_order - 1 (= {weno_order - 1})")
-        self.prohibit(p is not None and p > 0 and p + 1 < weno_order, f"For 3D simulation, p must be at least weno_order - 1 (= {weno_order - 1})")
+        self._check_order_fits_grid(weno_order, "weno_order")
 
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        # MUSCL_TYPE = 2
-        if recon_type != 2:
+        if self._get_recon_type() != 2:
             return
 
-        weno_log_params = ["mapped_weno", "wenoz", "teno", "mp_weno", "weno_avg", "null_weights", "weno_Re_flux"]
-        for param in weno_log_params:
+        for param in ["mapped_weno", "wenoz", "teno", "mp_weno", "weno_avg", "null_weights", "weno_Re_flux"]:
             self.prohibit(self.get(param) == "T", f"recon_type = 2 (MUSCL) is not compatible with {param} = T")
-
-        weno_numeric_params = ["wenoz_q", "teno_CT", "weno_eps"]
-        for param in weno_numeric_params:
+        for param in ["wenoz_q", "teno_CT", "weno_eps"]:
             self.prohibit(self.is_set(param), f"recon_type = 2 (MUSCL) is not compatible with {param}")
 
         weno_order = self.get("weno_order")
         self.prohibit(weno_order is not None and weno_order != 0, f"recon_type = 2 (MUSCL) requires weno_order unset or 0, but got {weno_order}")
 
         muscl_order = self.get("muscl_order")
-        m = self.get("m", 0)
-        n = self.get("n", 0)
-        p = self.get("p", 0)
-
         if muscl_order is None:
             return
 
         self.prohibit(muscl_order not in [1, 2], "muscl_order must be 1 or 2")
-        self.prohibit(m + 1 < muscl_order, f"m must be at least muscl_order - 1 (= {muscl_order - 1})")
-        self.prohibit(n is not None and n > 0 and n + 1 < muscl_order, f"For 2D simulation, n must be at least muscl_order - 1 (= {muscl_order - 1})")
-        self.prohibit(p is not None and p > 0 and p + 1 < muscl_order, f"For 3D simulation, p must be at least muscl_order - 1 (= {muscl_order - 1})")
+        self._check_order_fits_grid(muscl_order, "muscl_order")
 
     def check_interface_compression(self):
         """Check constraints regarding interface compression"""
@@ -752,11 +738,7 @@ class CaseValidator:
 
     def check_weno_simulation(self):
         """Checks WENO-specific constraints for simulation"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        # WENO_TYPE = 1
-        if recon_type != 1:
+        if self._get_recon_type() != 1:
             return
 
         weno_order = self.get("weno_order")
@@ -793,11 +775,7 @@ class CaseValidator:
 
     def check_muscl_simulation(self):
         """Checks MUSCL-specific constraints for simulation"""
-        recon_type = self.get("recon_type", 1)
-        self.prohibit(recon_type not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
-
-        # MUSCL_TYPE = 2
-        if recon_type != 2:
+        if self._get_recon_type() != 2:
             return
 
         muscl_order = self.get("muscl_order")

@@ -23,26 +23,17 @@ compiles to either OpenACC or OpenMP target offload depending on the build flag:
 
 ### Key GPU Macros (always use the `GPU_*` prefix)
 
-Inline macros (use `$:` prefix):
-- `$:GPU_PARALLEL_LOOP(collapse=N, private=[...], reduction=[...], reductionOp='+')` —
-  Parallel loop over GPU threads. Most common GPU macro.
-- `$:END_GPU_PARALLEL_LOOP()` — Required closing for GPU_PARALLEL_LOOP.
-- `$:GPU_LOOP(collapse=N, ...)` — Inner loop within a GPU parallel region.
-- `$:GPU_ENTER_DATA(create=[...])` — Allocate device memory (unscoped).
-- `$:GPU_EXIT_DATA(delete=[...])` — Free device memory.
-- `$:GPU_UPDATE(host=[...])` — Copy device → host (before MPI send).
-- `$:GPU_UPDATE(device=[...])` — Copy host → device (after MPI receive).
-- `$:GPU_ROUTINE(parallelism='[seq]')` — Mark routine for device compilation.
-- `$:GPU_DECLARE(create=[...])` — Declare device-resident data.
-- `$:GPU_ATOMIC(atomic='update')` — Atomic operation on device.
-- `$:GPU_WAIT()` — Synchronization barrier.
+Full set with signatures in `parallel_macros.fpp`. The ones you reach for most:
+- `$:GPU_PARALLEL_LOOP(collapse=N, private=[...], reduction=[...], reductionOp='+')`
+  + `$:END_GPU_PARALLEL_LOOP()` — parallel spatial loop; by far the most common (see pattern below).
+- `$:GPU_LOOP(collapse=N, ...)` — inner loop *within* a parallel region.
+- `$:GPU_UPDATE(host=[...])` / `$:GPU_UPDATE(device=[...])` — device↔host copies (around MPI; see below).
+- `#:call GPU_PARALLEL(...)` — block region for scalar reductions (`maxval`/`minval`).
 
-Block macros (use `#:call`/`#:endcall`):
-- `GPU_PARALLEL(...)` — GPU parallel region (used for scalar reductions like `maxval`/`minval`).
-- `GPU_DATA(copy=..., create=..., ...)` — Scoped data region.
-- `GPU_HOST_DATA(use_device_addr=[...])` — Host code with device pointers.
+Others in `parallel_macros.fpp`: `GPU_ENTER_DATA`/`GPU_EXIT_DATA`, `GPU_DECLARE`, `GPU_ROUTINE`,
+`GPU_ATOMIC`, `GPU_WAIT`, and the block macros `GPU_DATA`, `GPU_HOST_DATA`.
 
-Typical GPU loop pattern (used 750+ times in the codebase):
+Typical GPU loop pattern (the dominant spatial-loop idiom):
 ```
 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -108,16 +99,10 @@ Use `#ifdef` for feature, target, compiler, and library gating:
 - `MFC_POST_PROCESS` — Only in post_process builds
 
 ### Compiler gating (for compiler-specific workarounds)
-- `_CRAYFTN` — Cray Fortran compiler
-- `__NVCOMPILER_GPU_UNIFIED_MEM` — NVIDIA unified memory (GH-200 / `--unified`)
-- `__PGI` — Legacy PGI/NVIDIA compiler
-- `__INTEL_COMPILER` — Intel compiler
-- `FRONTIER_UNIFIED` — Frontier HPC unified memory
-
-### Library-specific code
-- FFTW (`m_fftw.fpp`) uses heavy `#ifdef` gating for `MFC_GPU` and `__PGI`
-- CUDA Fortran (`cudafor` module) is gated behind `__NVCOMPILER_GPU_UNIFIED_MEM`
-- SILO/HDF5 interfaces may have conditional paths
+Compiler/feature macros: `_CRAYFTN`, `__NVCOMPILER_GPU_UNIFIED_MEM` (NVIDIA unified mem, GH-200 /
+`--unified`), `__PGI` (legacy PGI/NVIDIA), `__INTEL_COMPILER`, `FRONTIER_UNIFIED`. Library code is
+similarly gated (FFTW in `m_fftw.fpp` on `MFC_GPU`/`__PGI`; CUDA Fortran `cudafor` on
+`__NVCOMPILER_GPU_UNIFIED_MEM`; SILO/HDF5 paths). Grep the relevant file for exact usage.
 
 When adding new `#ifdef` blocks, always provide an `#else` or `#endif` path so
 the code compiles in all configurations (CPU-only, GPU-ACC, GPU-OMP, with/without MPI).

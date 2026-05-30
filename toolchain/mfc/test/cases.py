@@ -162,6 +162,26 @@ def add_convergence_cases(cases):
         )
 
 
+def make_3d_box_patches(
+    z_centroids=(0.05, 0.45, 0.9),
+    z_lengths=(0.1, 0.7, 0.2),
+    geometry=9,
+) -> dict:
+    """3-patch 3D box IC: uniform xy plane (centroid=0.5, length=1), z spacing given."""
+    d = {}
+    for pid in range(1, 4):
+        d[f"patch_icpp({pid})%geometry"] = geometry
+        for vel in (1, 2, 3):
+            d[f"patch_icpp({pid})%vel({vel})"] = 0.0
+        d[f"patch_icpp({pid})%x_centroid"] = 0.5
+        d[f"patch_icpp({pid})%length_x"] = 1
+        d[f"patch_icpp({pid})%y_centroid"] = 0.5
+        d[f"patch_icpp({pid})%length_y"] = 1
+        d[f"patch_icpp({pid})%z_centroid"] = z_centroids[pid - 1]
+        d[f"patch_icpp({pid})%length_z"] = z_lengths[pid - 1]
+    return d
+
+
 def get_bc_mods(bc: int, dimInfo):
     params = {}
     for dimCmp in dimInfo[0]:
@@ -2067,25 +2087,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_z%end": -3,
         }
 
-        for patchID in range(1, 4):
-            base_3d[f"patch_icpp({patchID})%geometry"] = 9
-            base_3d[f"patch_icpp({patchID})%vel(1)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(2)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(3)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%x_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_x"] = 1
-            base_3d[f"patch_icpp({patchID})%y_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_y"] = 1
-        base_3d.update(
-            {
-                "patch_icpp(1)%z_centroid": 0.05,
-                "patch_icpp(1)%length_z": 0.1,
-                "patch_icpp(2)%z_centroid": 0.45,
-                "patch_icpp(2)%length_z": 0.7,
-                "patch_icpp(3)%z_centroid": 0.9,
-                "patch_icpp(3)%length_z": 0.2,
-            }
-        )
+        base_3d.update(make_3d_box_patches())
 
         # Bubbles with 2 MPI ranks
         stack.push(
@@ -2243,25 +2245,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_z%beg": -3,
             "bc_z%end": -3,
         }
-        for patchID in range(1, 4):
-            base_3d[f"patch_icpp({patchID})%geometry"] = 9
-            base_3d[f"patch_icpp({patchID})%vel(1)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(2)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(3)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%x_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_x"] = 1
-            base_3d[f"patch_icpp({patchID})%y_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_y"] = 1
-        base_3d.update(
-            {
-                "patch_icpp(1)%z_centroid": 0.05,
-                "patch_icpp(1)%length_z": 0.1,
-                "patch_icpp(2)%z_centroid": 0.45,
-                "patch_icpp(2)%length_z": 0.7,
-                "patch_icpp(3)%z_centroid": 0.9,
-                "patch_icpp(3)%length_z": 0.2,
-            }
-        )
+        base_3d.update(make_3d_box_patches())
         stack.push("Restart Roundtrip -> 3D", base_3d)
         cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
@@ -2299,25 +2283,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_z%beg": -3,
             "bc_z%end": -3,
         }
-        for patchID in range(1, 4):
-            base_3d[f"patch_icpp({patchID})%geometry"] = 9
-            base_3d[f"patch_icpp({patchID})%vel(1)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(2)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%vel(3)"] = 0.0
-            base_3d[f"patch_icpp({patchID})%x_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_x"] = 1
-            base_3d[f"patch_icpp({patchID})%y_centroid"] = 0.5
-            base_3d[f"patch_icpp({patchID})%length_y"] = 1
-        base_3d.update(
-            {
-                "patch_icpp(1)%z_centroid": 0.05,
-                "patch_icpp(1)%length_z": 0.1,
-                "patch_icpp(2)%z_centroid": 0.45,
-                "patch_icpp(2)%length_z": 0.7,
-                "patch_icpp(3)%z_centroid": 0.9,
-                "patch_icpp(3)%length_z": 0.2,
-            }
-        )
+        base_3d.update(make_3d_box_patches())
 
         # 3D grid stretching in all directions.
         # The cosh-based stretching expands the domain beyond the original

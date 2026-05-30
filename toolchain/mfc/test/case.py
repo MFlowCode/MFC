@@ -246,6 +246,11 @@ class TestCase(case.Case):
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
 
+    def coverage_key(self) -> str:
+        from .coverage import param_hash
+
+        return param_hash(self.params)
+
     def get_dirpath(self):
         return os.path.join(common.MFC_TEST_DIR, self.get_uuid())
 
@@ -370,6 +375,9 @@ class TestCaseBuilder:
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
+
+    def coverage_key(self) -> str:
+        return self.to_case().coverage_key()
 
     def to_case(self) -> TestCase:
         if self.kind == "convergence":
