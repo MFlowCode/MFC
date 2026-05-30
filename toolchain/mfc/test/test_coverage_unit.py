@@ -1,4 +1,7 @@
-from mfc.test.coverage import param_hash
+import tempfile
+from pathlib import Path
+
+from mfc.test.coverage import load_map, param_hash, save_map
 
 
 def test_param_hash_is_order_independent():
@@ -22,3 +25,24 @@ def test_param_hash_nested_order_independent():
     a = param_hash({"patch": {"x": 1, "y": 2}})
     b = param_hash({"patch": {"y": 2, "x": 1}})
     assert a == b
+
+
+def test_save_then_load_roundtrip():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "m.json.gz"
+        save_map(p, {"abc": ["src/simulation/m_rhs.fpp"]}, n_tests=1, git_sha="deadbee", gfortran_version="13")
+        entries, meta = load_map(p)
+        assert entries == {"abc": ["src/simulation/m_rhs.fpp"]}
+        assert meta["n_tests"] == 1 and meta["git_sha"] == "deadbee"
+        assert "built_at" in meta
+
+
+def test_load_missing_returns_none():
+    assert load_map(Path("/nonexistent/m.json.gz")) == (None, None)
+
+
+def test_load_corrupt_returns_none():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "m.json.gz"
+        p.write_bytes(b"not gzip")
+        assert load_map(p) == (None, None)
