@@ -267,3 +267,15 @@ def test_sim_include_fpp_forces_all():
     # gcov can't reliably attribute #:include'd files; any src include change runs all.
     assert is_always_run_all({"src/simulation/include/inline_riemann.fpp"})
     assert is_always_run_all({"src/pre_process/include/2dHardcodedIC.fpp"})
+
+
+def test_empty_explicit_is_uncertainty_not_skipall():
+    # An empty/whitespace --changed-files must NOT become an empty set (skip-all under
+    # enforce). It falls through to git detection -> None when that fails -> run all.
+    def fail_git(cmd, **kw):
+        rc = 1 if (len(cmd) > 1 and cmd[1] == "merge-base") else 0
+        return _types.SimpleNamespace(returncode=rc, stdout="", stderr="x")
+
+    with patch("subprocess.run", fail_git):
+        assert get_changed_files("/r", "master", explicit="") is None
+        assert get_changed_files("/r", "master", explicit="  ,  ") is None

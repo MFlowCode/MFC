@@ -144,7 +144,13 @@ def get_changed_files(root_dir, compare_branch="master", explicit: Optional[str]
     Otherwise use git merge-base, self-healing a shallow clone with a deepen+retry.
     """
     if explicit is not None:
-        return {f for f in explicit.replace(",", " ").split() if f.strip()}
+        files = {f for f in explicit.replace(",", " ").split() if f.strip()}
+        if files:
+            return files
+        # explicit was given but empty/whitespace -> ambiguous (a paths-filter/env failure vs
+        # genuinely nothing). Per the soundness invariant, uncertainty must run, not skip:
+        # fall through to git detection, ultimately None -> rung 1 (run all). Never return
+        # an empty set here, which would be read as "nothing changed -> skip all".
     try:
         base = _merge_base(root_dir, compare_branch)
         if base is None:
