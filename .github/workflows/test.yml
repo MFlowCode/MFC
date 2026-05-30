@@ -264,11 +264,13 @@ jobs:
       - name: Test
         if:   '!matrix.nvhpc'
         run:  |
-          # Coverage-based test selection in SHADOW mode on PRs: the selector
-          # prints what it WOULD run, but the full suite still runs (no
-          # --select-enforce). Enforcement is a separate, later change.
+          # Coverage-based test selection ENFORCED on PRs: runs only the tests whose
+          # recorded coverage overlaps the PR's changed files (conservative ladder in
+          # coverage.py — non-.fpp changes and .fpp files no test covers fall back to
+          # run-all). Pushes to master run the full suite (SELECT empty) as a backstop,
+          # and the NVHPC jobs below still run --test-all as a pre-merge full check.
           SELECT=()
-          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--only-changes --changed-files "$CHANGED_FILES")
+          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--only-changes --select-enforce --changed-files "$CHANGED_FILES")
           /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) "${SELECT[@]}" $TEST_ALL $TEST_PCT $PRECISION
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
