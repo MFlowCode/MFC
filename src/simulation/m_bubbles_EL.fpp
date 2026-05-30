@@ -1510,6 +1510,8 @@ contains
             do while (pos(3) >= z_cb(cell(3)))
                 cell(3) = cell(3) + 1
             end do
+        else
+            cell(3) = 0
         end if
 
         ! The numbering of the cell of which left boundary is the domain boundary is 0. if comp.coord of the pos is s, the real
@@ -1521,10 +1523,6 @@ contains
         scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
         scoord(3) = 0._wp
         if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
-        cell(:) = int(scoord(:))
-        do i = 1, num_dims
-            if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
-        end do
 
     end subroutine s_locate_cell
 
