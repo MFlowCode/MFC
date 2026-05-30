@@ -261,7 +261,7 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    type(ib_patch_parameters), allocatable, dimension(:) :: patch_ib  !< Immersed boundary patch parameters
+    type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib  !< Immersed boundary patch parameters
     integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
     integer :: num_particle_beds  !< Number of particle bed specifications
     type(particle_bed_parameters), dimension(num_particle_beds_max) :: particle_bed  !< Particle bed specifications
@@ -697,7 +697,6 @@ contains
             particle_bed(i)%seed = 0
         end do
 
-        allocate (patch_ib(num_ib_patches_max_namelist))
         do i = 1, num_ib_patches_max_namelist
             patch_ib(i)%gbl_patch_id = i
             patch_ib(i)%geometry = dflt_int

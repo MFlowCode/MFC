@@ -889,7 +889,7 @@ contains
         if (ib) then
             block
                 type(ib_patch_parameters), allocatable :: particle_bed_ibs(:)
-                
+
                 if (cfl_dt .and. n_start > 0) then
                     call s_read_ib_restart_data(n_start)
                     allocate (particle_bed_ibs(0))
@@ -998,8 +998,6 @@ contains
 #else
             "on CPUs"
 #endif
-        else
-            allocate (patch_ib(num_ib_patches_max_namelist))
         end if
 
         call s_mpi_bcast_user_inputs()
@@ -1274,7 +1272,6 @@ contains
         end do
 #endif
 
-        $:GPU_ENTER_DATA(create='[patch_ib]')
         @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
 
     end subroutine s_reduce_ib_patch_array

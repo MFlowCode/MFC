@@ -16,17 +16,18 @@ module m_constants
     real(wp), parameter  :: verysmall = 1.e-12_wp       !< Very small number
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
-    integer, parameter  :: num_stcls_min = 5             !< Minimum # of stencils
-    integer, parameter  :: path_len = 400                !< Maximum path length
-    integer, parameter  :: name_len = 50                 !< Maximum name length
-    integer, parameter  :: dflt_int = -100               !< Default integer value
-    integer, parameter  :: fourier_rings = 5             !< Fourier filter ring limit
-    integer, parameter  :: num_fluids_max = 10           !< Maximum number of fluids in the simulation
-    integer, parameter  :: num_probes_max = 10           !< Maximum number of flow probes in the simulation
-    integer, parameter  :: num_patches_max = 10          !< Maximum number of IC patches
-    integer, parameter  :: num_ib_patches_max = 2050000  !< Maximum number of immersed boundary patches (patch_ib)
-    !> Max patches readable from the namelist; patch_ib grows to num_ib_patches_max only when particle beds are used
-    integer, parameter  :: num_ib_patches_max_namelist = 50000
+    integer, parameter  :: num_stcls_min = 5     !< Minimum # of stencils
+    integer, parameter  :: path_len = 400        !< Maximum path length
+    integer, parameter  :: name_len = 50         !< Maximum name length
+    integer, parameter  :: dflt_int = -100       !< Default integer value
+    integer, parameter  :: fourier_rings = 5     !< Fourier filter ring limit
+    integer, parameter  :: num_fluids_max = 10   !< Maximum number of fluids in the simulation
+    integer, parameter  :: num_probes_max = 10   !< Maximum number of flow probes in the simulation
+    integer, parameter  :: num_patches_max = 10  !< Maximum number of IC patches
+    !> Maximum number of immersed boundary patches (legacy, not used for patch_ib sizing)
+    integer, parameter :: num_ib_patches_max = 2050000
+    !> Fixed capacity of patch_ib (namelist patches + local particle bed subset after reduction)
+    integer, parameter  :: num_ib_patches_max_namelist = 54000
     integer, parameter  :: num_local_ibs_max = 2000            !< Maximum number of immersed boundary patches (patch_ib)
     integer, parameter  :: num_particle_beds_max = 10          !< Maximum number of particle bed patch specifications
     integer, parameter  :: num_bc_patches_max = 10             !< Maximum number of boundary condition patches
