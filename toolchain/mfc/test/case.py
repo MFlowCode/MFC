@@ -165,6 +165,7 @@ class TestCase(case.Case):
         self.restart_check = restart_check
         self.kind = kind
         self.convergence_spec = convergence_spec
+        self.mods = mods
         merge = {**BASE_CFG.copy(), **mods}
         merge = {key: val for key, val in merge.items() if val is not None}
         super().__init__(merge)
@@ -245,6 +246,11 @@ class TestCase(case.Case):
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
+
+    def coverage_key(self) -> str:
+        from .coverage import param_hash
+
+        return param_hash(self.mods)
 
     def get_dirpath(self):
         return os.path.join(common.MFC_TEST_DIR, self.get_uuid())

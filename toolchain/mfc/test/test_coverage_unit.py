@@ -119,3 +119,18 @@ def test_rung6_and_7_overlap_selects_subset():
     run, skip, _ = select_tests(cases, cov, {"src/simulation/m_bubbles_EE.fpp"})
     assert [c.coverage_key() for c in run] == ["hit"]
     assert [c.coverage_key() for c in skip] == ["miss"]
+
+
+def test_case_coverage_key_matches_param_hash():
+    from mfc.test.case import TestCase
+
+    tc = TestCase("1D -> Foo", {"m": 100, "weno_order": 5})
+    assert tc.coverage_key() == param_hash({"m": 100, "weno_order": 5})
+
+
+def test_case_coverage_key_ignores_trace():
+    from mfc.test.case import TestCase
+
+    a = TestCase("1D -> Foo", {"m": 100})
+    b = TestCase("totally -> different -> trace", {"m": 100})
+    assert a.coverage_key() == b.coverage_key()
