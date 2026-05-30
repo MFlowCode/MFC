@@ -887,16 +887,22 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            if (cfl_dt .and. n_start > 0) then
-                call s_read_ib_restart_data(n_start)
-            else if (t_step_start > 0) then
-                call s_read_ib_restart_data(t_step_start)
-            else
-                ! particle bed generated on first time step
-                call s_generate_particle_beds()
-            end if
-            call s_instantiate_STL_models()
-            call s_reduce_ib_patch_array()
+            block
+                type(ib_patch_parameters), allocatable :: particle_bed_ibs(:)
+                
+                if (cfl_dt .and. n_start > 0) then
+                    call s_read_ib_restart_data(n_start)
+                    allocate (particle_bed_ibs(0))
+                else if (t_step_start > 0) then
+                    call s_read_ib_restart_data(t_step_start)
+                    allocate (particle_bed_ibs(0))
+                else
+                    call s_generate_particle_beds(particle_bed_ibs)
+                end if
+                call s_instantiate_STL_models()
+                call s_reduce_ib_patch_array(particle_bed_ibs)
+                deallocate (particle_bed_ibs)
+            end block
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
                 call s_write_ib_data_file(0)
@@ -1169,65 +1175,65 @@ contains
 
     end subroutine s_read_ib_restart_data
 
-    !> @brief takes the patch_ib struct array that contains all global IB patches and reduces to only contain patches that are in
-    !! the local computational domain.
-    subroutine s_reduce_ib_patch_array()
+    !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_bed_ibs (CPU-only, exact size)
+    !! and reduces to only the patches in or near the local computational domain. patch_ib is never reallocated; the local subset is
+    !! written in-place from the front. particle_bed_ibs is owned by the caller and freed there after this returns.
+    subroutine s_reduce_ib_patch_array(particle_bed_ibs)
 
-        type(ib_patch_parameters), allocatable :: patch_ib_gbl(:)
-        real(wp), dimension(3)                 :: centroid
-        integer                                :: i, j
-        integer                                :: num_aware_ibs
-        logical                                :: is_in_neighborhood, is_local
+        type(ib_patch_parameters), intent(in), dimension(:) :: particle_bed_ibs
+        real(wp), dimension(3)                              :: centroid
+        integer                                             :: i
+        integer                                             :: num_namelist_ibs, num_bed_ibs
 
-        ! do all set up for moving immersed boundaries
+        num_namelist_ibs = num_ibs
+        num_bed_ibs = size(particle_bed_ibs)
 
+        ! Check for moving IBs across both namelist and particle bed patches.
         moving_immersed_boundary_flag = .false.
-        do i = 1, num_ibs
+        do i = 1, num_namelist_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 moving_immersed_boundary_flag = .true.
                 exit
             end if
         end do
+        if (.not. moving_immersed_boundary_flag) then
+            do i = 1, num_bed_ibs
+                if (particle_bed_ibs(i)%moving_ibm /= 0) then
+                    moving_immersed_boundary_flag = .true.
+                    exit
+                end if
+            end do
+        end if
 
-        allocate (patch_ib_gbl(num_ibs))
-        patch_ib_gbl(1:num_ibs) = patch_ib(1:num_ibs)
-        call get_neighbor_bounds()  ! make sure the bounds of the neighbors are correctly set up
-        call s_compute_ib_neighbor_ranks()  ! build lookup of all neighbor MPI ranks
+        call get_neighbor_bounds()
+        call s_compute_ib_neighbor_ranks()
 
-        num_gbl_ibs = num_ibs
-        num_local_ibs = num_ibs
-        @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
-                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
-        do i = 1, num_local_ibs_max
-            local_ib_patch_ids(i) = i
-        end do
-
-        $:GPU_EXIT_DATA(delete='[patch_ib]')
-        deallocate (patch_ib)
+        num_gbl_ibs = num_namelist_ibs + num_bed_ibs
 
 #ifdef MFC_MPI
         if (num_procs == 1) then
-            ! single-rank: every patch is local; allocate to exact size and copy
-            allocate (patch_ib(num_gbl_ibs))
-            patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
-            deallocate (patch_ib_gbl)
-        else
-            ! multi-rank: carve out the local neighbourhood subset
-            num_aware_ibs = min(num_local_ibs_max*(2*ib_neighborhood_radius + 1)**num_dims, num_ib_patches_max)
-            allocate (patch_ib(num_aware_ibs))
-
-            num_local_ibs = 0
-            num_ibs = 0
+            ! single-rank: all patches are local; append particle bed entries directly into patch_ib.
+            @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
+                       & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+            do i = 1, num_bed_ibs
+                patch_ib(num_namelist_ibs + i) = particle_bed_ibs(i)
+                patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
+            end do
+            num_ibs = num_gbl_ibs
+            num_local_ibs = num_gbl_ibs
             do i = 1, num_gbl_ibs
-                ! catch the edge case where th collision lies just outside the computational domain
-                is_in_neighborhood = .true.
-                is_local = .true.
-                centroid = [patch_ib_gbl(i)%x_centroid, patch_ib_gbl(i)%y_centroid, 0._wp]
-                if (num_dims == 3) centroid(3) = patch_ib_gbl(i)%z_centroid
-
+                local_ib_patch_ids(i) = i
+            end do
+        else
+            ! multi-rank: compact namelist patches in-place (write_idx <= read_idx, no aliasing), then append local particle beds.
+            num_ibs = 0
+            num_local_ibs = 0
+            do i = 1, num_namelist_ibs
+                centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
                 if (f_neighborhood_ranks_own_location(centroid)) then
                     num_ibs = num_ibs + 1
-                    patch_ib(num_ibs) = patch_ib_gbl(i)
+                    patch_ib(num_ibs) = patch_ib(i)
                     patch_ib(num_ibs)%gbl_patch_id = i
                     if (f_local_rank_owns_location(centroid)) then
                         num_local_ibs = num_local_ibs + 1
@@ -1235,14 +1241,37 @@ contains
                     end if
                 end if
             end do
-
-            deallocate (patch_ib_gbl)
+            do i = 1, num_bed_ibs
+                centroid = [particle_bed_ibs(i)%x_centroid, particle_bed_ibs(i)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = particle_bed_ibs(i)%z_centroid
+                if (f_neighborhood_ranks_own_location(centroid)) then
+                    num_ibs = num_ibs + 1
+                    @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
+                               & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                    patch_ib(num_ibs) = particle_bed_ibs(i)
+                    patch_ib(num_ibs)%gbl_patch_id = num_namelist_ibs + i
+                    if (f_local_rank_owns_location(centroid)) then
+                        num_local_ibs = num_local_ibs + 1
+                        local_ib_patch_ids(num_local_ibs) = num_ibs
+                    end if
+                end if
+            end do
+            @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
+                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
         end if
 #else
-        ! no-MPI: every patch is local; allocate to exact size and copy
-        allocate (patch_ib(num_gbl_ibs))
-        patch_ib(1:num_gbl_ibs) = patch_ib_gbl(1:num_gbl_ibs)
-        deallocate (patch_ib_gbl)
+        ! no-MPI: all patches are local; append particle bed entries directly into patch_ib.
+        @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
+                   & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+        do i = 1, num_bed_ibs
+            patch_ib(num_namelist_ibs + i) = particle_bed_ibs(i)
+            patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
+        end do
+        num_ibs = num_gbl_ibs
+        num_local_ibs = num_gbl_ibs
+        do i = 1, num_gbl_ibs
+            local_ib_patch_ids(i) = i
+        end do
 #endif
 
         $:GPU_ENTER_DATA(create='[patch_ib]')
