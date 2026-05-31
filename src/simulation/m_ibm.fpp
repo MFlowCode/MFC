@@ -215,7 +215,6 @@ contains
                 k = gp%loc(2)
                 l = gp%loc(3)
                 patch_id = ghost_points(i)%ib_patch_id
-                call s_decode_patch_periodicity(patch_id, patch_id)
 
                 ! Calculate physical location of GP
                 if (p > 0) then
@@ -261,7 +260,7 @@ contains
                         ! Pressure correction for moving IB: accounts for acceleration of IB surface
                         q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
                                   & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
-                                  & *dot_product(patch_ib(patch_id) %force/patch_ib(patch_id)%mass, gp%levelset_norm))
+                                  & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
                     end do
                 end if
 
