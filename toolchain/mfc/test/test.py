@@ -230,7 +230,18 @@ def test():
     if ARG("build_coverage_map"):
         from .coverage_build import build_coverage_map
 
-        all_cases = [b.to_case() for b in cases]
+        # Convergence tests are order-of-accuracy checks driven by convergence.py,
+        # which fills in grid resolution and patch geometry per refinement level at
+        # runtime. Their base params are skeletons (m=n=p=0, no geometry) that cannot
+        # run standalone, so the direct-invocation collector cannot map them. Exclude
+        # them: absent from the map, select_tests conservatively always-runs them
+        # (rung 5), which is the desired behavior for convergence checks anyway.
+        convergence = [b for b in cases if getattr(b, "kind", "golden") == "convergence"]
+        coverage_cases = [b for b in cases if getattr(b, "kind", "golden") != "convergence"]
+        if convergence:
+            cons.print(f"[yellow]Excluding {len(convergence)} convergence tests from the coverage map (always-run by design).[/yellow]")
+
+        all_cases = [b.to_case() for b in coverage_cases]
         unique = set()
         for case, code in itertools.product(all_cases, [PRE_PROCESS, SIMULATION, POST_PROCESS]):
             slug = code.get_slug(case.to_input_file())
