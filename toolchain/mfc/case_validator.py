@@ -1323,6 +1323,15 @@ class CaseValidator:
         # Fetch global chemistry and diffusion flags
         chemistry = self.get("chemistry", "F") == "T"
         diffusion = self.get("chem_params%diffusion", "F") == "T"
+        num_fluids = self.get("num_fluids")
+
+        # Chemistry assumes a single reacting gas phase: the temperature/pressure
+        # inversion recovers T from the total internal energy via Cantera's ideal-gas
+        # EOS (ignoring pi_inf), and the cons->prim conversion collapses all partial
+        # densities onto the species-summed total density. Both are only correct for
+        # num_fluids = 1; with a second (e.g. stiffened-gas) fluid the state is
+        # inconsistent and the simulation NaNs. See MFlowCode/MFC#1470.
+        self.prohibit(chemistry and num_fluids is not None and num_fluids != 1, "chemistry is only supported for single-component flows (num_fluids = 1)")
 
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
