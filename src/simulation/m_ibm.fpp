@@ -1537,7 +1537,11 @@ contains
         end if
 
         if (allocated(models)) then
-            @:DEALLOCATE(models)
+            if (size(models) > 0) then
+                @:DEALLOCATE(models)
+            else
+                deallocate (models)
+            end if
         end if
 
         if (collision_model > 0) call s_finalize_collisions_module()

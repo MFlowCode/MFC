@@ -166,7 +166,7 @@ module m_global_parameters
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
-    integer           :: ib_neighborhood_radius, num_gbl_ibs, num_local_ibs
+    integer           :: num_gbl_ibs, num_local_ibs
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z]')
     $:GPU_DECLARE(create='[down_sample]')
 
@@ -263,7 +263,6 @@ module m_global_parameters
     !> @{
     type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib  !< Immersed boundary patch parameters
     integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
-    integer :: num_particle_beds  !< Number of particle bed specifications
     type(particle_bed_parameters), dimension(num_particle_beds_max) :: particle_bed  !< Particle bed specifications
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l

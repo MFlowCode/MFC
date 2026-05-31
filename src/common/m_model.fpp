@@ -983,7 +983,12 @@ contains
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
-        @:ALLOCATE(models(num_ibs))
+        ! AMD HSA rejects zero-size GPU allocations; only create GPU mapping when there are actual models.
+        if (num_ibs > 0) then
+            @:ALLOCATE(models(num_ibs))
+        else
+            allocate (models(0))
+        end if
         allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
 
         do patch_id = 1, num_ibs

@@ -1184,7 +1184,11 @@ contains
         integer                                             :: num_namelist_ibs, num_bed_ibs
 
         num_namelist_ibs = num_ibs
-        num_bed_ibs = size(particle_bed_ibs)
+        num_bed_ibs = 0
+        do i = 1, num_particle_beds
+            num_bed_ibs = num_bed_ibs + particle_bed(i)%num_particles
+        end do
+        print *, "num_bed_ibs", num_bed_ibs
 
         ! Check for moving IBs across both namelist and particle bed patches.
         moving_immersed_boundary_flag = .false.
@@ -1207,6 +1211,7 @@ contains
         call s_compute_ib_neighbor_ranks()
 
         num_gbl_ibs = num_namelist_ibs + num_bed_ibs
+        print *, "num_gbl_ibs", num_gbl_ibs
 
 #ifdef MFC_MPI
         if (num_procs == 1) then
