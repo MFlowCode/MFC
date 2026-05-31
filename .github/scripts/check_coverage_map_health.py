@@ -24,7 +24,8 @@ for b in list_cases():
     try:
         current_keys.add(b.to_case().coverage_key())
     except Exception as exc:  # noqa: BLE001 — a case file that won't import must not crash the health check
-        unloadable.append((getattr(b, "trace", repr(b)), str(exc).strip().splitlines()[-1][:140]))
+        last_line = (str(exc).strip().splitlines() or ["(no message)"])[-1][:140]
+        unloadable.append((getattr(b, "trace", repr(b)), last_line))
 if unloadable:
     print(f"Note: {len(unloadable)} case(s) could not be loaded in this lightweight job (excluded from the check):")
     for trace, err in unloadable[:15]:
