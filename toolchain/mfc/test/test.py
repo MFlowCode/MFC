@@ -178,7 +178,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
-    if ARG("only_changes"):
+    if ARG("only_changes") or ARG("select_enforce"):
         import datetime
 
         from .. import common
