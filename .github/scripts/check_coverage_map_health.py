@@ -13,7 +13,22 @@ MIN_FRACTION = 0.80
 entries, meta = load_map(COVERAGE_MAP_PATH)
 if entries is None:
     sys.exit("Coverage map missing or corrupt.")
-current_keys = {b.to_case().coverage_key() for b in list_cases()}
+# Compute each current test's coverage key. Loading a case executes its case
+# file; some (e.g. chemistry examples) import optional deps like cantera that are
+# not installed in this lightweight job. Skip any case that fails to load instead
+# of crashing — map_health measures the fraction of *loadable* current tests that
+# are mapped, so a smaller current_keys cannot produce a false "stale" result.
+current_keys = set()
+unloadable = []
+for b in list_cases():
+    try:
+        current_keys.add(b.to_case().coverage_key())
+    except Exception as exc:  # noqa: BLE001 — a case file that won't import must not crash the health check
+        unloadable.append((getattr(b, "trace", repr(b)), str(exc).strip().splitlines()[-1][:140]))
+if unloadable:
+    print(f"Note: {len(unloadable)} case(s) could not be loaded in this lightweight job (excluded from the check):")
+    for trace, err in unloadable[:15]:
+        print(f"  - {trace}: {err}")
 ok, msg = map_health(
     meta=meta,
     current_keys=current_keys,
