@@ -365,7 +365,7 @@ contains
         ib = .false.
         num_ibs = dflt_int
 
-        do i = 1, num_ib_patches_max
+        do i = 1, num_ib_patches_max_namelist
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = dflt_real
             patch_ib(i)%y_centroid = dflt_real
