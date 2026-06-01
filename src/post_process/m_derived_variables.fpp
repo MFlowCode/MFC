@@ -501,7 +501,9 @@ contains
                         do i = 1, eqn_idx%adv%end - eqn_idx%E
                             q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, l)*gm_rho_sf(j, &
                                  & k, l)/gm_rho_max(1)
-                            alpha_last = alpha_last - q_cons_vf(i + eqn_idx%E)%sf(j, k, l)
+                            if (igr) then
+                                alpha_last = alpha_last - q_cons_vf(i + eqn_idx%E)%sf(j, k, l)
+                            end if
                         end do
 
                         ! IGR stores only num_fluids-1 volume fractions; the last fluid's volume fraction is untracked.
