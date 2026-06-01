@@ -87,7 +87,7 @@ print(
             "precision": 2,
             "prim_vars_wrt": "T",
             "E_wrt": "T",
-            "ib_state_wrt": "T",
+            "ib_state_wrt": "F",
             "parallel_io": "T",
             # Patch: Constant Tube filled with air
             # Specify the cylindrical air tube grid geometry

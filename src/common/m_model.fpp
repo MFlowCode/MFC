@@ -983,12 +983,18 @@ contains
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
+        ! AMD HSA rejects zero-size GPU allocations; only create GPU mapping when there are actual models.
+        if (num_ibs > 0) then
+            @:ALLOCATE(models(num_ibs))
+        else
+            allocate (models(0))
+        end if
         allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
 
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
                 allocate (models(patch_id)%model)
-                print *, " * Reading model: " // trim(patch_ib(patch_id)%model_filepath)
+                if (proc_rank == 0) print *, " * Reading model: " // trim(patch_ib(patch_id)%model_filepath)
 
                 model = f_model_read(patch_ib(patch_id)%model_filepath)
                 params%scale(:) = patch_ib(patch_id)%model_scale(:)
@@ -1001,9 +1007,7 @@ contains
                     params%scale(:) = 1._wp
                 end if
 
-                if (proc_rank == 0) then
-                    print *, " * Transforming model."
-                end if
+                if (proc_rank == 0) print *, " * Transforming model."
 
                 ! Get the model center before transforming the model
                 bbox_old = f_create_bbox(model)
