@@ -295,7 +295,7 @@ class Case:
             # each element separated by new line characters. Then write those
             # new lines as a fully concatenated string with fortran syntax
             srcs.append(f"""\
-    if (i == {pid}) then
+    if (gbl_id == {pid}) then
 {f"{chr(10)}".join(lines)}
     end if\
 """)
@@ -305,6 +305,7 @@ class Case:
 ! parameterize the velocity and rotation rate of a moving IB.
 
 #:def mib_analytical()
+gbl_id = patch_ib(i)%gbl_patch_id
 {f"{chr(10)}{chr(10)}".join(srcs)}
 #:enddef
 """
