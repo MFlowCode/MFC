@@ -20,6 +20,16 @@ D. verrou_dd_sym on failure (--no-dd-sym to skip)
 
 E. verrou_dd_line on failure, after dd_sym (--no-dd-line to skip)
    Further bisects to exact *source lines* within the responsible functions.
+   Each reported line is then *confirmed* by a positive control: --gen-source
+   captures the symbol-correct executed lines, those are filtered to the suspect
+   set, and a float-mode run with --source restricted to just them must
+   reproduce the instability.  Lines that do not reproduce it are reported as
+   unconfirmed (downgraded from ::warning:: to ::notice::).  Each line is then
+   perturbed alone and ranked by the share of the single-precision deviation it
+   reproduces, so the most flagrant computation is identified rather than a flat
+   list.  Hotspots are additionally cross-referenced against the stage-F
+   cancellation sites (to name the offending subtraction) and flagged as
+   instance-ambiguous when the .fpp line sits inside a #:for/#:def expansion.
 
 F. Cancellation detection (--no-cancellation to skip)
    One run with --check-cancellation=yes; reports MFC source lines that
@@ -79,6 +89,15 @@ _EXTERNAL_SRCS = ("xalt", "dl-init", "ld-linux", "libc.so", "libm.so")
 # Matches the first "at" frame in a Valgrind stack trace: "(file.fpp:LINE)".
 _VGFRAME_RE = re.compile(r"\(([^):]+\.(?:fpp|f90|F90|c|cpp))\s*:(\d+)\)")
 
+# Fypp block directives. The duplicating ones (#:for expands to N copies, #:def
+# defines a macro instantiated at multiple call sites) collapse many distinct
+# generated computations onto a single .fpp source line, so a dd_line hit inside
+# one cannot be pinned to a unique runtime instance. #:if/#:with/#:mute select
+# code but do not duplicate it, so they are tracked for balance but not flagged.
+_FYPP_BLOCK_OPEN = re.compile(r"^\s*#:(for|def|block|call|if|with|mute)\b", re.IGNORECASE)
+_FYPP_BLOCK_CLOSE = re.compile(r"^\s*#:end(for|def|block|call|if|with|mute)?\b", re.IGNORECASE)
+_FYPP_DUPLICATING = ("for", "def", "block", "call")
+
 # Lines that are clearly control-flow delimiters rather than arithmetic.
 # dd_line sometimes reports these when the responsible arithmetic is on the
 # preceding line but shares DWARF debug info with the delimiter (e.g. loop
@@ -112,6 +131,44 @@ def _read_source_line(fname: str, lineno: int) -> str:
         return lines[lineno - 1] if 0 < lineno <= len(lines) else ""
     except OSError:
         return ""
+
+
+def _macro_context_in_lines(lines: list, lineno: int) -> str:
+    """Return the innermost code-duplicating fypp block ('#:for'/'#:def'/...) that
+    encloses `lineno` (1-based) in `lines`, or None if none does.
+
+    Used to flag dd_line hotspots whose .fpp line is shared across multiple
+    expanded instances (a #:for body, a #:def macro used in many places), where
+    line-level attribution cannot identify which instance is responsible.
+    """
+    stack = []
+    for raw in lines[: max(0, lineno - 1)]:
+        mo = _FYPP_BLOCK_OPEN.match(raw)
+        if mo:
+            stack.append(mo.group(1).lower())
+            continue
+        if _FYPP_BLOCK_CLOSE.match(raw) and stack:
+            stack.pop()
+    for kw in reversed(stack):
+        if kw in _FYPP_DUPLICATING:
+            return f"#:{kw}"
+    return None
+
+
+def _macro_context(fname: str, lineno: int) -> str:
+    """File-backed wrapper around _macro_context_in_lines; '' path safe."""
+    if os.path.isabs(fname) and os.path.isfile(fname):
+        candidates = [fname]
+    else:
+        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
+    if not candidates:
+        return None
+    try:
+        with open(candidates[0]) as fh:
+            lines = fh.readlines()
+    except OSError:
+        return None
+    return _macro_context_in_lines(lines, lineno)
 
 
 def _is_arithmetic_loc(fname: str, start: int, end: int) -> bool:
@@ -804,7 +861,9 @@ def _dd_env(verrou_bin: str) -> dict:
 
 
 def _parse_rddmin_locs(summary_path: str) -> list:
-    """Extract [(rel_path, start_line, end_line)] from a dd_line rddmin_summary.
+    """Extract dd_line locations from an rddmin_summary as
+    [{path, start, end, macro}] dicts (path is repo-relative; macro is the
+    enclosing fypp duplicating block, e.g. '#:for', or None).
 
     Filters out locations whose source lines are pure control-flow delimiters
     (loop boundaries, fypp directive closers, blank/comment lines).  These can
@@ -831,7 +890,7 @@ def _parse_rddmin_locs(summary_path: str) -> list:
                 rel = path
             rel = rel.replace("\\", "/")
             if _is_arithmetic_loc(path, start, end):
-                locs.append((rel, start, end))
+                locs.append({"path": rel, "start": start, "end": end, "macro": _macro_context(path, start)})
             else:
                 skipped.append((rel, start, end))
     for rel, start, end in skipped:
@@ -864,6 +923,75 @@ def _parse_rddmin_syms(summary_path: str) -> list:
             if sym:
                 syms.append(sym)
     return syms
+
+
+def _build_source_filter(gen_lines: list, suspect_locs: list) -> list:
+    """Select the Verrou --source lines (FILE\\tLINE\\tSYMBOL) that fall on a
+    suspect dd_line location.
+
+    gen_lines come from a --gen-source run and carry the exact symbol Verrou
+    requires (--source matches on file+line+symbol, not file+line alone).
+    suspect_locs are (path, start, end) tuples whose path may be a repo-relative
+    path while gen-source emits a basename, so matching is by basename + line.
+    """
+    ranges = {}
+    for path, start, end in suspect_locs:
+        ranges.setdefault(os.path.basename(path), []).append((start, end))
+    out = []
+    for raw in gen_lines:
+        parts = raw.rstrip("\n").split("\t")
+        if len(parts) < 2:
+            continue
+        base = os.path.basename(parts[0].strip())
+        try:
+            ln = int(parts[1].strip())
+        except ValueError:
+            continue
+        if any(s <= ln <= e for s, e in ranges.get(base, [])):
+            out.append(raw if raw.endswith("\n") else raw + "\n")
+    return out
+
+
+def _confirm_decision(suspect_dev, dd_threshold: float):
+    """Decide whether perturbing only the suspect lines reproduces the instability.
+
+    Returns True (confirmed), False (suspect lines are inert -> attribution
+    suspect, e.g. macro-collapse misattribution), or None if unmeasured.
+    """
+    if suspect_dev is None:
+        return None
+    return suspect_dev >= dd_threshold
+
+
+def _rank_locs(locs: list, total: float) -> list:
+    """Attach a 'share' (per-line deviation / total) to each loc dict — which
+    must already carry 'share_dev' from a single-line positive control — and
+    return the locs sorted by that deviation, most flagrant first.
+
+    'total' is normally float_proxy, so share is the fraction of the full
+    single-precision deviation that perturbing that one line alone reproduces.
+    A non-positive total yields share=None (cannot normalize).
+    """
+    for loc in locs:
+        dev = loc.get("share_dev")
+        loc["share"] = (dev / total) if (dev is not None and total and total > 0) else None
+    return sorted(locs, key=lambda loc: (loc.get("share_dev") or 0.0), reverse=True)
+
+
+def _mark_cancellation(dd_line_locs: list, cancellation_locs: list) -> list:
+    """Set loc['cancellation']=True for each dd_line loc whose line range covers a
+    catastrophic-cancellation site (stage F), matched by basename + line.
+
+    This pins the flagrant operation on a multi-op line to the subtraction that
+    cancels, rather than just naming the line.
+    """
+    by_base = {}
+    for fname, lineno in cancellation_locs:
+        by_base.setdefault(os.path.basename(fname), set()).add(lineno)
+    for loc in dd_line_locs:
+        lines = by_base.get(os.path.basename(loc["path"]), set())
+        loc["cancellation"] = any(ln in lines for ln in range(loc["start"], loc["end"] + 1))
+    return dd_line_locs
 
 
 def _run_dd_tool(
@@ -924,7 +1052,7 @@ def _run_dd_line(
     log_dir: str,
     threshold: float = None,
 ) -> list:
-    """Run verrou_dd_line; return list of (rel_path, start_line, end_line) tuples."""
+    """Run verrou_dd_line; return [{path, start, end, macro}] location dicts."""
     dd_bin = _find_dd_line(verrou_bin)
     if not dd_bin:
         cons.print("  [dim]verrou_dd_line not found; skipping line-level debug[/dim]")
@@ -939,6 +1067,86 @@ def _run_dd_line(
     _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_line.log", "dd.line", "verrou_dd_line")
     return _parse_rddmin_locs(os.path.join(dd_dir, "dd.line", "rddmin_summary"))
+
+
+def _source_perturb_dev(verrou_bin, sim_bin, work_dir, ref_dir, conf_dir, src_lines, compare, tag):
+    """Perturb only the lines in src_lines (deterministic float mode) and return
+    the L-inf deviation from the nearest-rounding reference, or None on failure."""
+    src_path = os.path.join(conf_dir, f"source_{tag}.txt")
+    with open(src_path, "w") as fh:
+        fh.writelines(src_lines)
+    run_dir = os.path.join(conf_dir, f"perturb_{tag}")
+    os.makedirs(run_dir, exist_ok=True)
+    try:
+        _run_simulation_verrou(
+            verrou_bin,
+            sim_bin,
+            work_dir,
+            run_dir,
+            rounding_mode="float",
+            extra_flags=[f"--source={src_path}"],
+        )
+    except MFCException:
+        return None
+    return _max_diff_np(ref_dir, run_dir, compare)
+
+
+def _run_confirmation(case, verrou_bin, sim_bin, work_dir, ref_dir, dd_line_locs, dd_threshold, float_proxy):
+    """Positive control for dd_line: perturb ONLY the suspect lines and confirm
+    the instability reproduces, then rank each line by its individual share.
+
+    Verrou's --source matches file+line+symbol (not file+line alone), so we first
+    capture the symbol-correct executed source lines via --gen-source, filter them
+    to the suspect set, then run deterministic float-mode restricted to just those
+    lines.  If the suspect-only deviation reaches dd_threshold the attribution is
+    confirmed; if it stays near zero the reported lines do not actually carry the
+    instability (e.g. a #:for-expanded line blamed for the wrong instance).
+
+    Each line is then perturbed alone so its 'share_dev' (and 'share' of
+    float_proxy) shows which computation dominates.
+
+    Returns (confirmed, suspect_dev, ranked_locs).
+    """
+    if not dd_line_locs:
+        return None, None, dd_line_locs
+    conf_dir = os.path.join(work_dir, "confirm")
+    os.makedirs(conf_dir, exist_ok=True)
+    gen_path = os.path.join(conf_dir, "gen_source.txt")
+    try:
+        _run_simulation_verrou(
+            verrou_bin,
+            sim_bin,
+            work_dir,
+            conf_dir,
+            rounding_mode="nearest",
+            extra_flags=[f"--gen-source={gen_path}"],
+        )
+    except MFCException:
+        return None, None, dd_line_locs
+    if not os.path.isfile(gen_path):
+        return None, None, dd_line_locs
+    with open(gen_path) as fh:
+        gen_lines = fh.readlines()
+    compare = case["compare"]
+
+    # whole-set positive control
+    suspects = [(loc["path"], loc["start"], loc["end"]) for loc in dd_line_locs]
+    set_src = _build_source_filter(gen_lines, suspects)
+    if not set_src:
+        # none of the reported lines performs an instrumented FP op -> not reproduced
+        return False, 0.0, dd_line_locs
+    set_dev = _source_perturb_dev(verrou_bin, sim_bin, work_dir, ref_dir, conf_dir, set_src, compare, "set")
+    confirmed = _confirm_decision(set_dev, dd_threshold)
+
+    # per-line ranking (a single line trivially owns the whole set deviation)
+    if len(dd_line_locs) == 1:
+        dd_line_locs[0]["share_dev"] = set_dev
+    else:
+        for i, loc in enumerate(dd_line_locs):
+            one = _build_source_filter(gen_lines, [(loc["path"], loc["start"], loc["end"])])
+            loc["share_dev"] = _source_perturb_dev(verrou_bin, sim_bin, work_dir, ref_dir, conf_dir, one, compare, f"line{i:02d}") if one else 0.0
+    ranked = _rank_locs(dd_line_locs, total=(float_proxy or set_dev))
+    return confirmed, set_dev, ranked
 
 
 def _run_case(
@@ -976,6 +1184,8 @@ def _run_case(
         "vprec": [],
         "dd_sym_syms": [],
         "dd_line_locs": [],
+        "dd_line_confirmed": None,
+        "dd_line_confirm_dev": None,
         "cancellation_locs": [],
         "mca_dev": None,
         "mca_sigbits": None,
@@ -1060,8 +1270,29 @@ def _run_case(
                     log_dir,
                     threshold=dd_threshold,
                 )
+                macro_n = sum(1 for loc in result["dd_line_locs"] if loc["macro"])
+                if macro_n:
+                    cons.print(f"  [dim]dd_line: {macro_n} hotspot(s) inside fypp-expanded code (instance-ambiguous)[/dim]")
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
+
+        # --- E2: confirm dd_line hotspots and rank each by its individual share ---
+        if dd_threshold > 0 and run_dd_line and result["dd_line_locs"]:
+            cons.print("  [dim]confirming + ranking dd_line hotspots (per-line perturbation)...[/dim]")
+            try:
+                confirmed, cdev, ranked = _run_confirmation(case, verrou_bin, sim_bin, work_dir, ref_dir, result["dd_line_locs"], dd_threshold, float_proxy)
+                result["dd_line_locs"] = ranked
+                result["dd_line_confirmed"] = confirmed
+                result["dd_line_confirm_dev"] = cdev
+                if confirmed is True:
+                    cons.print(f"  [bold green]dd_line confirmed[/bold green]: suspect-only dev={cdev:.3e} >= {dd_threshold:.1e}")
+                elif confirmed is False:
+                    cons.print(f"  [bold yellow]dd_line UNCONFIRMED[/bold yellow]: suspect-only dev={cdev:.3e} < {dd_threshold:.1e} (attribution suspect)")
+                top = ranked[0] if ranked else None
+                if top and top.get("share") is not None:
+                    cons.print(f"  most flagrant: {top['path']}:{top['start']} ({top['share'] * 100:.0f}% of float-proxy)")
+            except Exception as exc:
+                cons.print(f"  [bold yellow]dd_line confirmation error[/bold yellow]: {exc}")
 
         # --- F: cancellation detection ---
         if run_cancellation:
@@ -1073,6 +1304,12 @@ def _run_case(
                     cons.print(f"  cancellation: {len(locs)} unique source location(s)")
                 else:
                     cons.print("  cancellation: none detected")
+                # cross-reference: label dd_line hotspots that sit on a cancellation site
+                if result["dd_line_locs"] and locs:
+                    _mark_cancellation(result["dd_line_locs"], locs)
+                    n_xref = sum(1 for loc in result["dd_line_locs"] if loc.get("cancellation"))
+                    if n_xref:
+                        cons.print(f"  {n_xref} hotspot(s) coincide with a catastrophic-cancellation site")
             except Exception as exc:
                 cons.print(f"  [bold yellow]cancellation check error[/bold yellow]: {exc}")
 
@@ -1114,23 +1351,37 @@ def _emit_github_annotations(results: list):
     Only runs inside GitHub Actions (GITHUB_ACTIONS env var set). Annotations
     appear inline on the responsible source lines in the PR diff view.
 
-    Up to 3 dd_line locations are emitted as ::warning:: per case (minimal
-    responsible lines from delta-debug).  Up to 3 cancellation sites per case
-    are emitted as ::notice:: so the diff also highlights subtraction-
-    cancellation hotspots identified by --check-cancellation.
+    Up to 3 dd_line locations are emitted per case (minimal responsible lines
+    from delta-debug).  Confirmed hotspots (suspect-only perturbation reproduced
+    the instability) are ::warning::; unconfirmed ones are downgraded to
+    ::notice:: so a suspect attribution is not presented as fact.  Up to 3
+    cancellation sites per case are emitted as ::notice:: so the diff also
+    highlights subtraction-cancellation hotspots from --check-cancellation.
     """
     if not os.environ.get("GITHUB_ACTIONS"):
         return
     for r in results:
         status = "FAIL" if not r["passed"] else "hotspot"
         dev_str = f"max_dev={r['max_dev']:.2e} (threshold {r['threshold']:.0e})"
+        unconfirmed = r.get("dd_line_confirmed") is False
 
-        for rel_path, start, end in r.get("dd_line_locs", [])[:3]:
-            loc = f"file={rel_path},line={start}"
-            if end != start:
-                loc += f",endLine={end}"
-            title = f"FP {status} [{r['name']}]"
-            print(f"::warning {loc},title={title}::{dev_str}", flush=True)
+        for loc in r.get("dd_line_locs", [])[:3]:
+            location = f"file={loc['path']},line={loc['start']}"
+            if loc["end"] != loc["start"]:
+                location += f",endLine={loc['end']}"
+            note = dev_str
+            if loc.get("share") is not None:
+                note += f" — reproduces {loc['share'] * 100:.0f}% of float-proxy alone"
+            if loc.get("cancellation"):
+                note += " — catastrophic cancellation site"
+            if loc.get("macro"):
+                note += f" — {loc['macro']}-expanded line, may represent multiple instances"
+            if unconfirmed:
+                title = f"FP candidate (unconfirmed) [{r['name']}]"
+                print(f"::notice {location},title={title}::{note}", flush=True)
+            else:
+                title = f"FP {status} [{r['name']}]"
+                print(f"::warning {location},title={title}::{note}", flush=True)
 
         for fname, lineno in r.get("cancellation_locs", [])[:3]:
             loc = f"file={fname},line={lineno}"
@@ -1192,12 +1443,23 @@ def _emit_github_summary(results: list, n_samples: int):
     cases_with_locs = [r for r in results if r["dd_line_locs"]]
     if cases_with_locs:
         md.append("### Top FP hotspots (dd\\_line)\n")
+        _confirm_label = {True: "✅ confirmed", False: "⚠️ unconfirmed (suspect-only perturbation did not reproduce)", None: "— not checked"}
         for r in cases_with_locs:
             status = "❌ FAIL" if not r["passed"] else "✅ pass"
-            md.append(f"**`{r['name']}`** ({status})\n")
-            for rel_path, start, end in r["dd_line_locs"][:10]:
-                loc = f"{rel_path}:{start}" if start == end else f"{rel_path}:{start}-{end}"
-                md.append(f"- `{loc}`")
+            md.append(f"**`{r['name']}`** ({status}) — attribution {_confirm_label[r.get('dd_line_confirmed')]}")
+            md.append("_Ranked by the share of the single-precision deviation each line reproduces alone._\n")
+            for loc in r["dd_line_locs"][:10]:
+                rel_path, start, end = loc["path"], loc["start"], loc["end"]
+                where = f"{rel_path}:{start}" if start == end else f"{rel_path}:{start}-{end}"
+                tags = []
+                if loc.get("share") is not None:
+                    tags.append(f"**{loc['share'] * 100:.0f}%** of float-proxy")
+                if loc.get("cancellation"):
+                    tags.append("catastrophic cancellation")
+                if loc.get("macro"):
+                    tags.append(f"_{loc['macro']}-expanded, may represent multiple instances_")
+                suffix = f" — {', '.join(tags)}" if tags else ""
+                md.append(f"- `{where}`{suffix}")
                 snippet = _get_source_context(rel_path, start)
                 if snippet:
                     md.append("  ```fortran")
@@ -1328,6 +1590,8 @@ def fp_stability():
                 "vprec": [],
                 "dd_sym_syms": [],
                 "dd_line_locs": [],
+                "dd_line_confirmed": None,
+                "dd_line_confirm_dev": None,
                 "cancellation_locs": [],
                 "mca_dev": None,
                 "mca_sigbits": None,
