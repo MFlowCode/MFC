@@ -495,22 +495,24 @@ contains
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end
                         q_sf(j, k, l) = 0._wp
+
                         ! Tracks the volume fraction of the fluid not explicitly stored (IGR reconstructs it as 1 - sum)
-                        alpha_last = 1._wp
-
-                        do i = 1, eqn_idx%adv%end - eqn_idx%E
-                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, l)*gm_rho_sf(j, &
-                                 & k, l)/gm_rho_max(1)
-                            if (igr) then
-                                alpha_last = alpha_last - q_cons_vf(i + eqn_idx%E)%sf(j, k, l)
-                            end if
-                        end do
-
-                        ! IGR stores only num_fluids-1 volume fractions; the last fluid's volume fraction is untracked.
-                        ! For a single fluid this is simply 1.0 everywhere. Without this term, the entire single-fluid
-                        ! Schlieren field) is dropped, leaving exp(0) = 1 everywhere. Compute that term below.
                         if (igr) then
+                            ! IGR stores only num_fluids-1 volume fractions; the last fluid's volume fraction is untracked.
+                            ! For a single fluid this is simply 1.0 everywhere. Without this term, the entire single-fluid
+                            ! Schlieren field is dropped, leaving exp(0) = 1 everywhere. Compute that term below.
+                            alpha_last = 1._wp
+                            do i = 1, eqn_idx%adv%end - eqn_idx%E
+                                q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, l)*gm_rho_sf(j, &
+                                    & k, l)/gm_rho_max(1)
+                                alpha_last = alpha_last - q_cons_vf(i + eqn_idx%E)%sf(j, k, l)
+                            end do
                             q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(num_fluids)*alpha_last*gm_rho_sf(j, k, l)/gm_rho_max(1)
+                        else 
+                            do i = 1, eqn_idx%adv%end - eqn_idx%E
+                                q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, l)*gm_rho_sf(j, &
+                                    & k, l)/gm_rho_max(1)
+                            end do
                         end if
                     end do
                 end do
