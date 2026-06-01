@@ -84,7 +84,9 @@ contains
             & ptgalpha_eps, ib, num_ibs, patch_ib, sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, n_start_old, &
             & surface_tension, hyperelasticity, pre_stress, elliptic_smoothing, elliptic_smoothing_iters, viscous, &
             & bubbles_lagrange, num_bc_patches, patch_bc, Bx0, relativity, cont_damage, igr, igr_order, down_sample, recon_type, &
-            & muscl_order, hyper_cleaning, simplex_perturb, simplex_params, fft_wrt
+            & muscl_order, hyper_cleaning, simplex_perturb, simplex_params, fft_wrt, jwl_reactive, jwl_unr_A, jwl_unr_B, &
+            & jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0, jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x, jwl_lt_G1, &
+            & jwl_lt_c, jwl_lt_d, jwl_lt_y, jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z, jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min
 
         file_loc = 'pre_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)

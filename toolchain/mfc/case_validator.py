@@ -661,6 +661,16 @@ class CaseValidator:
                 "JWL EOS currently supports at most two fluids; the interface-compression path assumes num_fluids = 2",
             )
 
+        jwl_reactive = self.get("jwl_reactive", "F") == "T"
+        if jwl_reactive:
+            self.prohibit(num_jwl == 0, "jwl_reactive = T requires a JWL fluid (fluid_pp%eos = 2)")
+            for suffix in ("jwl_unr_A", "jwl_unr_R1", "jwl_unr_R2", "jwl_unr_omega", "jwl_unr_rho0"):
+                value = self.get(suffix)
+                self.prohibit(value is None, f"jwl_reactive = T requires {suffix}")
+                self.prohibit(value is not None and value <= 0, f"jwl_reactive = T requires {suffix} > 0")
+            unr_b = self.get("jwl_unr_B")
+            self.prohibit(unr_b is not None and unr_b < 0, "jwl_reactive = T requires jwl_unr_B >= 0")
+
     def check_surface_tension(self):
         """Checks constraints on surface tension"""
         surface_tension = self.get("surface_tension", "F") == "T"

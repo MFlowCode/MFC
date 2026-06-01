@@ -419,6 +419,42 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 > Setting `gamma = 1.4` for air is a common mistake; the correct value is `1.0 / (1.4 - 1.0) = 2.5`.
 > See @ref sec-stored-forms and @ref sec-material-values in the Equations reference for the full table.
 
+#### JWL Equation of State {#sec-jwl-eos}
+
+Setting `fluid_pp(i)%%eos = 2` selects the Jones--Wilkins--Lee (JWL) equation of state for fluid $i$, used to model the high-pressure gaseous products of a detonating energetic material. The pressure is
+
+\f[
+p(\rho, e) = A\left(1 - \frac{\omega \rho}{R_1 \rho_0}\right)e^{-R_1 \rho_0 / \rho}
+           + B\left(1 - \frac{\omega \rho}{R_2 \rho_0}\right)e^{-R_2 \rho_0 / \rho}
+           + \frac{\omega}{\rho_0}\,\rho\, e ,
+\f]
+
+where \f$A\f$, \f$B\f$, \f$R_1\f$, \f$R_2\f$ are the JWL pressure constants, \f$\omega\f$ is the Grüneisen coefficient, \f$\rho_0\f$ is the reference (products) density, and \f$E_0\f$ is the reference detonation energy. These map to `fluid_pp(i)%%jwl_A`, `jwl_B`, `jwl_R1`, `jwl_R2`, `jwl_omega`, `jwl_rho0`, and `jwl_E0`. For two-fluid (JWL + air) cases, the companion ideal-gas closure parameters `jwl_air_e0`, `jwl_air_rho0`, and `jwl_air_gamma` (\f$\gamma_\mathrm{air}-1\f$) describe the ambient phase, and the mixture pressure is obtained from a closed-form mechanical-equilibrium (isobaric) partition of the cell internal energy between the two phases. JWL currently supports at most two fluids and is incompatible with the HLLD/MHD flux solver.
+
+#### Reactive (Progressive-Burn) JWL {#sec-jwl-reactive}
+
+Setting `jwl_reactive = T` turns the standard (fully-reacted, fixed products) JWL fluid into a *progressively burning* explosive whose pressure and density evolve in time as the material converts from solid explosive to gaseous products. A reaction-progress variable \f$\lambda \in [0, 1]\f$ (0 = unreacted solid, 1 = fully-reacted products) is transported with the flow, and the condensed-phase equation of state is a \f$\lambda\f$-blend of an *unreacted-explosive* JWL EOS and the *products* JWL EOS:
+
+\f[
+p_\mathrm{ref}(\rho_1, \lambda) = (1-\lambda)\,p_\mathrm{ref}^{\,\mathrm{unr}}(\rho_1) + \lambda\,p_\mathrm{ref}^{\,\mathrm{prod}}(\rho_1), \qquad
+K(\lambda) = (1-\lambda)\,\frac{\rho_0^\mathrm{unr}}{\omega^\mathrm{unr}} + \lambda\,\frac{\rho_0^\mathrm{prod}}{\omega^\mathrm{prod}} .
+\f]
+
+At \f$\lambda = 1\f$ this reduces exactly to the standard JWL closure above. The unreacted-explosive constants are supplied through the global parameters `jwl_unr_A`, `jwl_unr_B`, `jwl_unr_R1`, `jwl_unr_R2`, `jwl_unr_omega`, `jwl_unr_rho0`, and `jwl_unr_E0` (only one JWL/reactive fluid is supported per case, so these are case-global rather than per-fluid).
+
+The burn is driven by the **Lee--Tarver Ignition & Growth** reaction rate, a three-term model:
+
+\f[
+\frac{\mathrm{d}\lambda}{\mathrm{d}t} =
+\underbrace{I\,(1-\lambda)^{b}\left(\frac{\rho}{\rho_0} - 1 - a\right)^{x}}_{\text{ignition}, \; \lambda < \texttt{figmax}}
++ \underbrace{G_1\,(1-\lambda)^{c}\lambda^{d}\,p^{y}}_{\text{growth}, \; \lambda < \texttt{fg1max}}
++ \underbrace{G_2\,(1-\lambda)^{e}\lambda^{g}\,p^{z}}_{\text{completion}, \; \lambda > \texttt{fg2min}} .
+\f]
+
+The coefficients map to `jwl_lt_I`, `jwl_lt_b`, `jwl_lt_a`, `jwl_lt_x` (ignition); `jwl_lt_G1`, `jwl_lt_c`, `jwl_lt_d`, `jwl_lt_y` (growth); `jwl_lt_G2`, `jwl_lt_e`, `jwl_lt_g`, `jwl_lt_z` (completion); and the reaction-window limiters `jwl_lt_figmax`, `jwl_lt_fg1max`, `jwl_lt_fg2min`. Coefficient units must be chosen consistently with the pressure units used in the case. The ignition term fires only under compression (\f$\rho/\rho_0 - 1 - a > 0\f$).
+
+The full list of reactive parameters appears in the [Simulation Algorithm](#sec-simulation-algorithm) table below. When `jwl_reactive = F` (the default) none of these parameters have any effect and the solver behaves identically to a standard JWL case.
+
 ### 6. Simulation Algorithm {#sec-simulation-algorithm}
 
 See @ref equations "Equations" for the mathematical models these parameters control.
@@ -434,6 +470,29 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `mpp_lim`	                 | Logical | Mixture physical parameters limits |
 | `mixture_err`              | Logical | Mixture properties correction |
 | `jwl_contact_blend`        | Logical | Blend HLLC toward HLL across JWL contacts (contact-preserving guard; currently unused in the solver) |
+| `jwl_reactive`             | Logical | Enable progressive (reactive) JWL burn: transport a reaction-progress variable lambda with a Lee--Tarver Ignition & Growth source |
+| `jwl_unr_A`                | Real    | Reactive JWL: unreacted-explosive JWL pressure constant A |
+| `jwl_unr_B`                | Real    | Reactive JWL: unreacted-explosive JWL pressure constant B |
+| `jwl_unr_R1`               | Real    | Reactive JWL: unreacted-explosive JWL exponential coefficient R1 |
+| `jwl_unr_R2`               | Real    | Reactive JWL: unreacted-explosive JWL exponential coefficient R2 |
+| `jwl_unr_omega`            | Real    | Reactive JWL: unreacted-explosive JWL Gruneisen coefficient omega |
+| `jwl_unr_rho0`             | Real    | Reactive JWL: unreacted-explosive reference density |
+| `jwl_unr_E0`               | Real    | Reactive JWL: unreacted-explosive reference energy |
+| `jwl_lt_I`                 | Real    | Lee--Tarver ignition rate coefficient I |
+| `jwl_lt_b`                 | Real    | Lee--Tarver ignition exponent b on (1-lambda) |
+| `jwl_lt_a`                 | Real    | Lee--Tarver ignition compression offset a |
+| `jwl_lt_x`                 | Real    | Lee--Tarver ignition exponent x on compression |
+| `jwl_lt_G1`                | Real    | Lee--Tarver growth rate coefficient G1 |
+| `jwl_lt_c`                 | Real    | Lee--Tarver growth exponent c on (1-lambda) |
+| `jwl_lt_d`                 | Real    | Lee--Tarver growth exponent d on lambda |
+| `jwl_lt_y`                 | Real    | Lee--Tarver growth pressure exponent y |
+| `jwl_lt_G2`                | Real    | Lee--Tarver completion rate coefficient G2 |
+| `jwl_lt_e`                 | Real    | Lee--Tarver completion exponent e on (1-lambda) |
+| `jwl_lt_g`                 | Real    | Lee--Tarver completion exponent g on lambda |
+| `jwl_lt_z`                 | Real    | Lee--Tarver completion pressure exponent z |
+| `jwl_lt_figmax`            | Real    | Lee--Tarver max lambda for the ignition term |
+| `jwl_lt_fg1max`            | Real    | Lee--Tarver max lambda for the growth term |
+| `jwl_lt_fg2min`            | Real    | Lee--Tarver min lambda for the completion term |
 | `time_stepper`             | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`                  | Logical | Strang splitting scheme with adaptive time stepping |
 | `recon_type`               | Integer | Reconstruction Type: [1] WENO; [2] MUSCL |

@@ -84,28 +84,34 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    integer            :: model_eqns                   !< Multicomponent flow model
-    integer            :: num_fluids                   !< Number of different fluids present in the flow
-    logical            :: relax                        !< phase change
-    integer            :: relax_model                  !< Phase change relaxation model
-    logical            :: mpp_lim                      !< Maximum volume fraction limiter
-    integer            :: sys_size                     !< Number of unknowns in the system of equations
-    integer            :: recon_type                   !< Which type of reconstruction to use
-    integer            :: weno_order                   !< Order of accuracy for the WENO reconstruction
-    integer            :: muscl_order                  !< Order of accuracy for the MUSCL reconstruction
-    logical            :: mixture_err                  !< Mixture error limiter
-    logical            :: alt_soundspeed               !< Alternate sound speed
-    logical            :: mhd                          !< Magnetohydrodynamics
-    logical            :: relativity                   !< Relativity for RMHD
-    logical            :: hypoelasticity               !< Turn hypoelasticity on
-    logical            :: hyperelasticity              !< Turn hyperelasticity on
-    logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
-    integer            :: b_size                       !< Number of components in the b tensor
-    integer            :: tensor_size                  !< Number of components in the nonsymmetric tensor
-    logical            :: cont_damage                  !< Continuum damage modeling
-    logical            :: hyper_cleaning               !< Hyperbolic cleaning for MHD
-    logical            :: igr                          !< enable IGR
-    integer            :: igr_order                    !< IGR reconstruction order
+    integer            :: model_eqns  !< Multicomponent flow model
+    integer            :: num_fluids  !< Number of different fluids present in the flow
+    logical            :: jwl_reactive  !< Enable progressive (reactive) JWL burn (transported reaction-progress variable)
+    real(wp)           :: jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0
+    real(wp)           :: jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x
+    real(wp)           :: jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y
+    real(wp)           :: jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z
+    real(wp)           :: jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min
+    logical            :: relax  !< phase change
+    integer            :: relax_model  !< Phase change relaxation model
+    logical            :: mpp_lim  !< Maximum volume fraction limiter
+    integer            :: sys_size  !< Number of unknowns in the system of equations
+    integer            :: recon_type  !< Which type of reconstruction to use
+    integer            :: weno_order  !< Order of accuracy for the WENO reconstruction
+    integer            :: muscl_order  !< Order of accuracy for the MUSCL reconstruction
+    logical            :: mixture_err  !< Mixture error limiter
+    logical            :: alt_soundspeed  !< Alternate sound speed
+    logical            :: mhd  !< Magnetohydrodynamics
+    logical            :: relativity  !< Relativity for RMHD
+    logical            :: hypoelasticity  !< Turn hypoelasticity on
+    logical            :: hyperelasticity  !< Turn hyperelasticity on
+    logical            :: elasticity  !< elasticity modeling, true for hyper or hypo
+    integer            :: b_size  !< Number of components in the b tensor
+    integer            :: tensor_size  !< Number of components in the nonsymmetric tensor
+    logical            :: cont_damage  !< Continuum damage modeling
+    logical            :: hyper_cleaning  !< Hyperbolic cleaning for MHD
+    logical            :: igr  !< enable IGR
+    integer            :: igr_order  !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
     !> @}
 
@@ -307,6 +313,13 @@ contains
         muscl_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
+        jwl_reactive = .false.
+        jwl_unr_A = 0._wp; jwl_unr_B = 0._wp; jwl_unr_R1 = 0._wp; jwl_unr_R2 = 0._wp
+        jwl_unr_omega = 0._wp; jwl_unr_rho0 = 0._wp; jwl_unr_E0 = 0._wp
+        jwl_lt_I = 0._wp; jwl_lt_b = 0._wp; jwl_lt_a = 0._wp; jwl_lt_x = 0._wp
+        jwl_lt_G1 = 0._wp; jwl_lt_c = 0._wp; jwl_lt_d = 0._wp; jwl_lt_y = 0._wp
+        jwl_lt_G2 = 0._wp; jwl_lt_e = 0._wp; jwl_lt_g = 0._wp; jwl_lt_z = 0._wp
+        jwl_lt_figmax = 1._wp; jwl_lt_fg1max = 1._wp; jwl_lt_fg2min = 0._wp
         relax = .false.
         relax_model = dflt_int
 
@@ -744,6 +757,12 @@ contains
         else
             eqn_idx%species%beg = 1
             eqn_idx%species%end = 1
+        end if
+
+        eqn_idx%reac = 0
+        if (jwl_reactive) then
+            eqn_idx%reac = sys_size + 1
+            sys_size = eqn_idx%reac
         end if
 
         if (output_partial_domain) then

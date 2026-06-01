@@ -129,6 +129,16 @@ contains
                        & "JWL EOS currently supports at most two fluids; the interface-compression path assumes num_fluids = 2.")
         end if
 
+        if (jwl_reactive) then
+            @:PROHIBIT(num_jwl == 0, "jwl_reactive = T requires a JWL fluid (fluid_pp%eos = 2).")
+            @:PROHIBIT(jwl_unr_A <= 0._wp, "jwl_reactive = T requires jwl_unr_A > 0.")
+            @:PROHIBIT(jwl_unr_B < 0._wp, "jwl_reactive = T requires jwl_unr_B >= 0.")
+            @:PROHIBIT(jwl_unr_R1 <= 0._wp, "jwl_reactive = T requires jwl_unr_R1 > 0.")
+            @:PROHIBIT(jwl_unr_R2 <= 0._wp, "jwl_reactive = T requires jwl_unr_R2 > 0.")
+            @:PROHIBIT(jwl_unr_omega <= 0._wp, "jwl_reactive = T requires jwl_unr_omega > 0.")
+            @:PROHIBIT(jwl_unr_rho0 <= 0._wp, "jwl_reactive = T requires jwl_unr_rho0 > 0.")
+        end if
+
     end subroutine s_check_inputs_eos
 
     !> Validate NVIDIA unified virtual memory configuration parameters

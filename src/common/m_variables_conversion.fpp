@@ -34,6 +34,9 @@ module m_variables_conversion
               s_jwl_pcold, &
               s_jwl_sound_speed_squared, &
               s_jwl_energy_pr, &
+              s_jwl_reactive_pressure_er, &
+              s_jwl_reactive_energy_pr, &
+              f_lee_tarver_rate, &
               jwl_idx, &
               s_compute_species_fraction, &
 #ifndef MFC_PRE_PROCESS
@@ -253,6 +256,130 @@ contains
         e = max(e, 0._wp)
 
     end subroutine s_jwl_energy_pr
+
+    !> Reactive (progressive-burn) JWL/ideal-gas mixture pressure from specific internal energy and density. The condensed phase is
+    !! a reaction-progress (lambda) blend of the unreacted-explosive JWL EOS (lambda=0) and the products JWL EOS (lambda=1), so the
+    !! products' pressure and density evolve as the burn proceeds instead of being a fixed constant state. The unreacted-explosive
+    !! constants are taken from the module globals jwl_unr_*. Reduces to s_jwl_pressure_er when lambda=1.
+    subroutine s_jwl_reactive_pressure_er(rho, e, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma, pres)
+
+        $:GPU_ROUTINE(function_name='s_jwl_reactive_pressure_er',parallelism='[seq]', cray_noinline=True)
+
+        real(wp), intent(in)  :: rho, e, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma
+        real(wp), intent(out) :: pres
+        real(wp)              :: rho_safe, Y_safe, a_j, a_a, rho1, rhoe, lam, pref_p, pref_u, pref1, K_p, K_u, Kj
+
+        rho_safe = max(rho, sgm_eps)
+        Y_safe = min(max(Y, 0._wp), 1._wp)
+        a_j = min(max(alpha_j, 0._wp), 1._wp)
+        a_a = 1._wp - a_j
+        rhoe = rho_safe*e
+        lam = min(max(lambda, 0._wp), 1._wp)
+
+        if (a_j <= sgm_eps) then
+            pres = air_gamma*rhoe
+            return
+        end if
+
+        if (a_a <= sgm_eps) then
+            rho1 = rho_safe
+        else
+            rho1 = max(Y_safe*rho_safe/a_j, sgm_eps)
+        end if
+
+        pref_p = A*(1._wp - omega0*rho1/(R1*rho0))*exp(-R1*rho0/rho1) + B*(1._wp - omega0*rho1/(R2*rho0))*exp(-R2*rho0/rho1)
+        K_p = rho0/max(omega0, sgm_eps)
+        pref_u = jwl_unr_A*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R1*jwl_unr_rho0))*exp(-jwl_unr_R1*jwl_unr_rho0/rho1) &
+                            & + jwl_unr_B*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R2*jwl_unr_rho0))*exp(-jwl_unr_R2*jwl_unr_rho0/rho1)
+        K_u = jwl_unr_rho0/max(jwl_unr_omega, sgm_eps)
+
+        pref1 = (1._wp - lam)*pref_u + lam*pref_p
+        Kj = (1._wp - lam)*K_u + lam*K_p
+
+        pres = (rhoe + a_j*Kj*pref1)/max(a_j*Kj + a_a/max(air_gamma, sgm_eps), sgm_eps)
+
+    end subroutine s_jwl_reactive_pressure_er
+
+    !> Specific internal energy from pressure and density for the reactive JWL mixture: exact inverse of s_jwl_reactive_pressure_er,
+    !! keeping primitive<->conservative consistent across the burn.
+    subroutine s_jwl_reactive_energy_pr(rho, pres, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma, e)
+
+        $:GPU_ROUTINE(function_name='s_jwl_reactive_energy_pr',parallelism='[seq]', cray_noinline=True)
+
+        real(wp), intent(in)  :: rho, pres, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma
+        real(wp), intent(out) :: e
+        real(wp)              :: rho_safe, Y_safe, a_j, a_a, rho1, lam, pref_p, pref_u, pref1, K_p, K_u, Kj
+
+        rho_safe = max(rho, sgm_eps)
+        Y_safe = min(max(Y, 0._wp), 1._wp)
+        a_j = min(max(alpha_j, 0._wp), 1._wp)
+        a_a = 1._wp - a_j
+        lam = min(max(lambda, 0._wp), 1._wp)
+
+        if (a_j <= sgm_eps) then
+            e = max(pres/max(air_gamma*rho_safe, sgm_eps), 0._wp)
+            return
+        end if
+
+        if (a_a <= sgm_eps) then
+            rho1 = rho_safe
+        else
+            rho1 = max(Y_safe*rho_safe/a_j, sgm_eps)
+        end if
+
+        pref_p = A*(1._wp - omega0*rho1/(R1*rho0))*exp(-R1*rho0/rho1) + B*(1._wp - omega0*rho1/(R2*rho0))*exp(-R2*rho0/rho1)
+        K_p = rho0/max(omega0, sgm_eps)
+        pref_u = jwl_unr_A*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R1*jwl_unr_rho0))*exp(-jwl_unr_R1*jwl_unr_rho0/rho1) &
+                            & + jwl_unr_B*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R2*jwl_unr_rho0))*exp(-jwl_unr_R2*jwl_unr_rho0/rho1)
+        K_u = jwl_unr_rho0/max(jwl_unr_omega, sgm_eps)
+
+        pref1 = (1._wp - lam)*pref_u + lam*pref_p
+        Kj = (1._wp - lam)*K_u + lam*K_p
+
+        e = (pres*(a_j*Kj + a_a/max(air_gamma, sgm_eps)) - a_j*Kj*pref1)/rho_safe
+        e = max(e, 0._wp)
+
+    end subroutine s_jwl_reactive_energy_pr
+
+    !> Lee-Tarver Ignition & Growth reaction rate dlambda/dt for progressive JWL burn. Three additive terms (ignition, growth,
+    !! completion) gated by the lambda-window limiters jwl_lt_figmax/fg1max/fg2min. Coefficients (jwl_lt_*) and the unreacted
+    !! reference density (jwl_unr_rho0) are read from the module globals. The caller supplies pressure and (condensed-phase)
+    !! density; coefficient units must be consistent with the case's pressure units.
+    pure function f_lee_tarver_rate(lambda, rho, pres) result(rate)
+
+        $:GPU_ROUTINE(function_name='f_lee_tarver_rate',parallelism='[seq]', cray_noinline=True)
+
+        real(wp), intent(in) :: lambda, rho, pres
+        real(wp)             :: rate
+        real(wp)             :: lam, one_m_lam, p_pos, comp, rho0u
+
+        lam = min(max(lambda, 0._wp), 1._wp)
+        one_m_lam = max(1._wp - lam, 0._wp)
+        p_pos = max(pres, 0._wp)
+        rho0u = max(jwl_unr_rho0, sgm_eps)
+        rate = 0._wp
+
+        ! Ignition term: hot-spot creation driven by compression (rho/rho0 - 1 - a)
+        if (lam < jwl_lt_figmax) then
+            comp = rho/rho0u - 1._wp - jwl_lt_a
+            if (comp > 0._wp) then
+                rate = rate + jwl_lt_I*one_m_lam**jwl_lt_b*comp**jwl_lt_x
+            end if
+        end if
+
+        ! Growth term: pressure-driven burn spreading from hot spots
+        if (lam < jwl_lt_fg1max .and. lam > 0._wp) then
+            rate = rate + jwl_lt_G1*one_m_lam**jwl_lt_c*lam**jwl_lt_d*p_pos**jwl_lt_y
+        end if
+
+        ! Completion term: fast burnout at high reaction progress
+        if (lam > jwl_lt_fg2min .and. one_m_lam > 0._wp) then
+            rate = rate + jwl_lt_G2*one_m_lam**jwl_lt_e*lam**jwl_lt_g*p_pos**jwl_lt_z
+        end if
+
+        rate = max(rate, 0._wp)
+
+    end function f_lee_tarver_rate
 
     !> Rocflu-style temperature from pressure and density.
     subroutine s_jwl_temperature_pr(rho, pres, e, Y, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma, cv, T)

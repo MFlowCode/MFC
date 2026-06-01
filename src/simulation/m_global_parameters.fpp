@@ -163,11 +163,20 @@ module m_global_parameters
     logical  :: null_weights       !< Null undesired WENO weights
     logical  :: mixture_err        !< Mixture properties correction
     logical  :: jwl_contact_blend  !< Blend HLLC->HLL across JWL contacts (contact-preserving fix)
-    logical  :: hypoelasticity     !< hypoelasticity modeling
-    logical  :: hyperelasticity    !< hyperelasticity modeling
-    integer  :: int_comp           !< Interface compression: 0=off, 1=THINC, 2=MTHINC
-    real(wp) :: ic_eps             !< THINC Epsilon to compress on surface cells
-    real(wp) :: ic_beta            !< THINC Sharpness Parameter
+    logical  :: jwl_reactive       !< Enable progressive (reactive) JWL burn with a transported reaction-progress variable
+    !> @name Reactive JWL: unreacted-explosive JWL EOS constants and Lee-Tarver Ignition & Growth rate coefficients
+    !> @{
+    real(wp) :: jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0
+    real(wp) :: jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x
+    real(wp) :: jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y
+    real(wp) :: jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z
+    real(wp) :: jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min
+    !> @}
+    logical  :: hypoelasticity   !< hypoelasticity modeling
+    logical  :: hyperelasticity  !< hyperelasticity modeling
+    integer  :: int_comp         !< Interface compression: 0=off, 1=THINC, 2=MTHINC
+    real(wp) :: ic_eps           !< THINC Epsilon to compress on surface cells
+    real(wp) :: ic_beta          !< THINC Sharpness Parameter
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer            :: hyper_model                  !< hyperelasticity solver algorithm
     logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
@@ -204,6 +213,9 @@ module m_global_parameters
     $:GPU_DECLARE(create='[muscl_eps]')
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
     $:GPU_DECLARE(create='[jwl_contact_blend]')
+    $:GPU_DECLARE(create='[jwl_reactive, jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0]')
+    $:GPU_DECLARE(create='[jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x, jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y]')
+    $:GPU_DECLARE(create='[jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z, jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress, cont_damage, hyper_cleaning]')
@@ -565,6 +577,13 @@ contains
         null_weights = .false.
         mixture_err = .false.
         jwl_contact_blend = .true.
+        jwl_reactive = .false.
+        jwl_unr_A = 0._wp; jwl_unr_B = 0._wp; jwl_unr_R1 = 0._wp; jwl_unr_R2 = 0._wp
+        jwl_unr_omega = 0._wp; jwl_unr_rho0 = 0._wp; jwl_unr_E0 = 0._wp
+        jwl_lt_I = 0._wp; jwl_lt_b = 0._wp; jwl_lt_a = 0._wp; jwl_lt_x = 0._wp
+        jwl_lt_G1 = 0._wp; jwl_lt_c = 0._wp; jwl_lt_d = 0._wp; jwl_lt_y = 0._wp
+        jwl_lt_G2 = 0._wp; jwl_lt_e = 0._wp; jwl_lt_g = 0._wp; jwl_lt_z = 0._wp
+        jwl_lt_figmax = 1._wp; jwl_lt_fg1max = 1._wp; jwl_lt_fg2min = 0._wp
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
@@ -1190,6 +1209,12 @@ contains
             sys_size = eqn_idx%species%end
         end if
 
+        eqn_idx%reac = 0
+        if (jwl_reactive) then
+            eqn_idx%reac = sys_size + 1
+            sys_size = eqn_idx%reac
+        end if
+
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
@@ -1269,6 +1294,9 @@ contains
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
         $:GPU_UPDATE(device='[jwl_contact_blend]')
+        $:GPU_UPDATE(device='[jwl_reactive, jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0]')
+        $:GPU_UPDATE(device='[jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x, jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y]')
+        $:GPU_UPDATE(device='[jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z, jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
                      & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
                      & hyperelasticity, hyper_model, elasticity, low_Mach]')

@@ -152,6 +152,7 @@ module m_derived_types
         integer               :: c        !< Color function equation
         integer               :: damage   !< Damage variable equation
         integer               :: psi      !< Psi variable equation
+        integer               :: reac     !< Reactive-JWL reaction-progress variable (rho*lambda)
     end type eqn_idx_info
 
     type bc_patch_parameters
