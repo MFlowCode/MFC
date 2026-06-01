@@ -196,8 +196,8 @@ def run(targets=None, case=None):
         if ARG("nodes") > 1 or ARG("tasks_per_node") > 1:
             cons.print(f"  [dim]MPI: {ARG('nodes')} nodes × {ARG('tasks_per_node')} tasks/node = {ARG('nodes') * ARG('tasks_per_node')} total ranks[/dim]")
 
-    __generate_job_script(targets, case)
     __validate_job_options()
+    __generate_job_script(targets, case)
     __generate_input_files(targets, case)
 
     if verbosity >= 2:
