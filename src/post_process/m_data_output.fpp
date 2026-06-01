@@ -707,6 +707,55 @@ contains
 
     end subroutine s_write_variable_to_formatted_database_file
 
+    !> Read the shared Lagrangian-bubble restart header: file metadata and per-proc bubble counts.
+    !> Extracted from duplicate blocks in s_write_lag_bubbles_results_to_text and
+    !> s_write_lag_bubbles_to_formatted_database_file.
+    impure subroutine s_read_lag_restart_header(file_loc, file_tot_part, file_time, file_dt, &
+                                                file_num_procs, proc_bubble_counts)
+
+        character(len=*), intent(in)                               :: file_loc
+        integer, intent(out)                                       :: file_tot_part
+        real(wp), intent(out)                                      :: file_time, file_dt
+        integer, intent(out)                                       :: file_num_procs
+        integer, dimension(:), allocatable, intent(out)            :: proc_bubble_counts
+        integer(KIND=MPI_OFFSET_KIND)                              :: disp
+        integer, dimension(MPI_STATUS_SIZE)                        :: status
+        integer                                                    :: ifile, ierr
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        allocate (proc_bubble_counts(file_num_procs))
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+            ! Skip to processor counts position
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), MPI_OFFSET_KIND)
+            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
+
+            call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
+
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+    end subroutine s_read_lag_restart_header
+
     !> Write the post-processed results in the folder 'lag_bubbles_data'
     impure subroutine s_write_lag_bubbles_results_to_text(t_step)
 
@@ -744,37 +793,9 @@ contains
 
         if (.not. parallel_io) return
 
-        if (proc_rank == 0) then
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
-            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
-            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
-            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call s_read_lag_restart_header(file_loc, file_tot_part, file_time, file_dt, &
+                                       file_num_procs, proc_bubble_counts)
         time_real = file_time
-
-        allocate (proc_bubble_counts(file_num_procs))
-
-        if (proc_rank == 0) then
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-            ! Skip to processor counts position
-            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), MPI_OFFSET_KIND)
-            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
-            call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
         gsizes(1) = file_tot_part
         gsizes(2) = lag_io_vars
@@ -903,37 +924,9 @@ contains
 
         if (.not. parallel_io) return
 
-        if (proc_rank == 0) then
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
-            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
-            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
-            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call s_read_lag_restart_header(file_loc, file_tot_part, file_time, file_dt, &
+                                       file_num_procs, proc_bubble_counts)
         time_real = file_time
-
-        allocate (proc_bubble_counts(file_num_procs))
-
-        if (proc_rank == 0) then
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-            ! Skip to processor counts position
-            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), MPI_OFFSET_KIND)
-            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
-            call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
         ! Set time variables from file
 
