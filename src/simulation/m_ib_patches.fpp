@@ -177,7 +177,7 @@ contains
         radius = patch_ib(patch_id)%radius
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -227,7 +227,7 @@ contains
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -327,7 +327,7 @@ contains
         z_min = -lz/2
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -421,7 +421,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -465,16 +465,12 @@ contains
         real(wp)                 :: radius
         real(wp), dimension(1:3) :: center
 
-        ! Variables to initialize the pressure field that corresponds to the bubble-collapse test case found in Tiwari et al. (2013)
-
-        ! Transferring spherical patch's radius, centroid, smoothing patch identity and smoothing coefficient information
-
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         radius = patch_ib(patch_id)%radius
 
-        ! completely skip particles no in the domain
+        ! completely skip particles not in the domain
         if (center(1) - radius > x_cc(m + gp_layers + 1) .or. center(1) + radius < x_cc(-gp_layers - 1) .or. center(2) &
             & - radius > y_cc(n + gp_layers + 1) .or. center(2) + radius < y_cc(-gp_layers - 1) .or. center(3) - radius > z_cc(p &
             & + gp_layers + 1) .or. center(3) + radius < z_cc(-gp_layers - 1)) then
@@ -482,7 +478,7 @@ contains
         end if
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -535,7 +531,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -598,7 +594,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers - 1
         jl = -gp_layers - 1
@@ -660,7 +656,7 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -717,7 +713,7 @@ contains
         threshold = stl_models(model_id)%model_threshold
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         il = -gp_layers - 1
         jl = -gp_layers - 1
@@ -794,7 +790,7 @@ contains
         rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
 
         ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers - 1
         jl = -gp_layers - 1
@@ -951,7 +947,7 @@ contains
         temp_y_per = y_periodicity; if (y_periodicity == -1) temp_y_per = 2
         temp_z_per = z_periodicity; if (z_periodicity == -1) temp_z_per = 2
 
-        offset = (num_ibs + 1)*temp_x_per + 3*(num_ibs + 1)*temp_y_per + 9*(num_ibs + 1)*temp_z_per
+        offset = (num_gbl_ibs + 1)*temp_x_per + 3*(num_gbl_ibs + 1)*temp_y_per + 9*(num_gbl_ibs + 1)*temp_z_per
         encoded_patch_id = patch_id + offset
 
     end subroutine s_encode_patch_periodicity
@@ -966,7 +962,7 @@ contains
         integer, intent(out), optional :: x_periodicity, y_periodicity, z_periodicity
         integer                        :: offset, remainder, xp, yp, zp, base
 
-        base = num_ibs + 1
+        base = num_gbl_ibs + 1
 
         patch_id = mod(encoded_patch_id - 1, base) + 1
         offset = (encoded_patch_id - patch_id)/base

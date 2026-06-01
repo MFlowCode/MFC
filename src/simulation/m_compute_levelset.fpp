@@ -90,8 +90,8 @@ contains
 
         radius = patch_ib(ib_patch_id)%radius
 
-        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        dist_vec(1) = x_cc(i) - (patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg))
+        dist_vec(2) = y_cc(j) - (patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg))
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
