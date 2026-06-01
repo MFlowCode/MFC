@@ -33,6 +33,7 @@ NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max", 50000)  # patch_ib (Fortran array bound)
 NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
+NSM = _fc("num_stl_models_max", 10)  # stl_models (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -606,6 +607,7 @@ def _load():
 
     # Immersed boundary
     _r("num_ibs", INT, {"ib"})
+    _r("num_stl_models", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})
@@ -857,20 +859,15 @@ def _load():
     # and enforced by the case_validator, not by max_index here.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
-    for a in ["geometry", "moving_ibm", "airfoil_id"]:
+    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("theta", REAL), ("slip", LOG), ("mass", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
     for d in ["x", "y", "z"]:
         _ib_attrs[f"{d}_centroid"] = (REAL, _ib_tags)
         _ib_attrs[f"length_{d}"] = (REAL, _ib_tags)
-    for a, pt in [("model_filepath", STR), ("model_spc", INT), ("model_threshold", REAL)]:
-        _ib_attrs[a] = (pt, _ib_tags)
-    for t in ["translate", "scale", "rotate"]:
-        for j in range(1, 4):
-            _ib_attrs[f"model_{t}({j})"] = (REAL, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"vel({j})"] = (A_REAL, _ib_tags)
         _ib_attrs[f"angular_vel({j})"] = (A_REAL, _ib_tags)
@@ -894,6 +891,22 @@ def _load():
             attrs=_af_attrs,
             tags=_af_tags,
             max_index=NAF,
+        )
+    )
+
+    # stl_models — STL/OBJ model parameters, referenced by patch_ib(i)%model_id
+    _sm_attrs: Dict[str, tuple] = {}
+    _sm_attrs["model_filepath"] = (STR, set())
+    _sm_attrs["model_threshold"] = (REAL, set())
+    for t in ["translate", "scale"]:
+        for j in range(1, 4):
+            _sm_attrs[f"model_{t}({j})"] = (REAL, set())
+    REGISTRY.register_family(
+        IndexedFamily(
+            base_name="stl_models",
+            attrs=_sm_attrs,
+            tags=set(),
+            max_index=NSM,
         )
     )
 
@@ -1157,6 +1170,7 @@ _nv(
 )
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
 _nv(_SIM, "ib_airfoil")
+_nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(
     _SIM,
     "dt",

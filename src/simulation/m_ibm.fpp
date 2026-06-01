@@ -52,7 +52,7 @@ contains
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
         end if
 
-        @:ALLOCATE(models(num_ibs))
+        @:ALLOCATE(models(num_stl_models))
 
         @:ACC_SETUP_SFs(ib_markers)
 

@@ -204,13 +204,21 @@ contains
     impure subroutine s_check_model_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
+        integer             :: mid
+        character(len=10)   :: midStr
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(patch_ib(patch_id)%model_filepath == dflt_char, 'Empty model file path for patch '//trim(iStr))
+        mid = patch_ib(patch_id)%model_id
+        call s_int_to_str(mid, midStr)
 
-        @:PROHIBIT(patch_ib(patch_id)%model_scale(1) <= 0._wp .or. patch_ib(patch_id)%model_scale(2) <= 0._wp &
-                   & .or. patch_ib(patch_id)%model_scale(3) <= 0._wp, 'Negative scale in model IB patch ' // trim(iStr))
+        @:PROHIBIT(mid <= 0 .or. mid > num_stl_models, &
+                   & 'patch_ib('//trim(iStr)//')%model_id='//trim(midStr)//' must be in [1, num_stl_models]')
+
+        @:PROHIBIT(stl_models(mid)%model_filepath == dflt_char, 'Empty model file path for stl_models('//trim(midStr)//')')
+
+        @:PROHIBIT(stl_models(mid)%model_scale(1) <= 0._wp .or. stl_models(mid)%model_scale(2) <= 0._wp &
+                   & .or. stl_models(mid)%model_scale(3) <= 0._wp, 'Negative scale in stl_models(' // trim(midStr) // ')')
 
     end subroutine s_check_model_ib_patch_geometry
 

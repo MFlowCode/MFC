@@ -261,6 +261,8 @@ module m_global_parameters
     type(ib_patch_parameters), dimension(num_ib_patches_max)    :: patch_ib          !< Immersed boundary patch parameters
     type(ib_airfoil_parameters), dimension(num_ib_airfoils_max) :: ib_airfoil        !< Per-airfoil NACA user inputs (namelist)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max)       :: ib_airfoil_grids  !< Per-airfoil computed surface grids
+    type(ib_stl_parameters), dimension(num_stl_models_max)      :: stl_models        !< Per-STL model parameters (namelist)
+    integer                                                     :: num_stl_models    !< Number of STL models
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, ib_airfoil, ib_airfoil_grids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
@@ -690,17 +692,9 @@ contains
             patch_ib(i)%length_y = dflt_real
             patch_ib(i)%length_z = dflt_real
             patch_ib(i)%radius = dflt_real
-            patch_ib(i)%theta = dflt_real
             patch_ib(i)%airfoil_id = 0
+            patch_ib(i)%model_id = 0
             patch_ib(i)%slip = .false.
-
-            ! Proper default values for translating STL models
-            patch_ib(i)%model_scale(:) = 1._wp
-            patch_ib(i)%model_translate(:) = 0._wp
-            patch_ib(i)%model_rotate(:) = 0._wp
-            patch_ib(i)%model_filepath(:) = dflt_char
-            patch_ib(i)%model_spc = num_ray
-            patch_ib(i)%model_threshold = ray_tracing_threshold
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
@@ -717,6 +711,15 @@ contains
             patch_ib(i)%rotation_matrix(2, 2) = 1._wp
             patch_ib(i)%rotation_matrix(3, 3) = 1._wp
             patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
+        end do
+
+        num_stl_models = 0
+
+        do i = 1, num_stl_models_max
+            stl_models(i)%model_filepath(:) = dflt_char
+            stl_models(i)%model_translate(:) = 0._wp
+            stl_models(i)%model_scale(:) = 1._wp
+            stl_models(i)%model_threshold = ray_tracing_threshold
         end do
 
     end subroutine s_assign_default_values_to_user_inputs

@@ -697,7 +697,7 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
         integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
-        integer                            :: spc, encoded_patch_id
+        integer                            :: model_id, encoded_patch_id
         integer                            :: cx, cy
         real(wp)                           :: lx(2), ly(2)
         real(wp), dimension(1:2)           :: bbox_min, bbox_max
@@ -713,8 +713,8 @@ contains
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
-        spc = patch_ib(patch_id)%model_spc
-        threshold = patch_ib(patch_id)%model_threshold
+        model_id = patch_ib(patch_id)%model_id
+        threshold = stl_models(model_id)%model_threshold
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
@@ -725,10 +725,10 @@ contains
         jr = n + gp_layers + 1
 
         ! Local-space bounding box extents (min=1, max=2 in the third index)
-        lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)
-        lx(2) = stl_bounding_boxes(patch_id, 1, 3) + offset(1)
-        ly(1) = stl_bounding_boxes(patch_id, 2, 1) + offset(2)
-        ly(2) = stl_bounding_boxes(patch_id, 2, 3) + offset(2)
+        lx(1) = stl_bounding_boxes(model_id, 1, 1) + offset(1)
+        lx(2) = stl_bounding_boxes(model_id, 1, 3) + offset(1)
+        ly(1) = stl_bounding_boxes(model_id, 2, 1) + offset(2)
+        ly(2) = stl_bounding_boxes(model_id, 2, 3) + offset(2)
 
         bbox_min = 1e12
         bbox_max = -1e12
@@ -747,15 +747,15 @@ contains
         call get_bounding_indices(bbox_min(1), bbox_max(1), x_cc, il, ir)
         call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', copyin='[patch_id, encoded_patch_id, center, inverse_rotation, &
-                            & offset, spc, threshold]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', copyin='[patch_id, model_id, encoded_patch_id, center, &
+                            & inverse_rotation, offset, threshold]', collapse=2)
         do i = il, ir
             do j = jl, jr
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
                 xy_local = xy_local - offset
 
-                eta = f_model_is_inside_flat(gpu_ntrs(patch_id), patch_id, xy_local)
+                eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xy_local)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
                 if (eta > threshold) then
@@ -774,7 +774,7 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
         integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
-        integer                            :: spc, encoded_patch_id
+        integer                            :: model_id, encoded_patch_id
         real(wp)                           :: eta, threshold
         real(wp), dimension(1:3)           :: offset
         real(wp), dimension(1:3)           :: center, xyz_local
@@ -789,8 +789,8 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
-        spc = patch_ib(patch_id)%model_spc
-        threshold = patch_ib(patch_id)%model_threshold
+        model_id = patch_ib(patch_id)%model_id
+        threshold = stl_models(model_id)%model_threshold
         rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
 
         ! encode the periodicity information into the patch_id
@@ -804,12 +804,12 @@ contains
         kr = p + gp_layers + 1
 
         ! Local-space bounding box extents (min=1, max=2 in the third index)
-        lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)
-        lx(2) = stl_bounding_boxes(patch_id, 1, 3) + offset(1)
-        ly(1) = stl_bounding_boxes(patch_id, 2, 1) + offset(2)
-        ly(2) = stl_bounding_boxes(patch_id, 2, 3) + offset(2)
-        lz(1) = stl_bounding_boxes(patch_id, 3, 1) + offset(3)
-        lz(2) = stl_bounding_boxes(patch_id, 3, 3) + offset(3)
+        lx(1) = stl_bounding_boxes(model_id, 1, 1) + offset(1)
+        lx(2) = stl_bounding_boxes(model_id, 1, 3) + offset(1)
+        ly(1) = stl_bounding_boxes(model_id, 2, 1) + offset(2)
+        ly(2) = stl_bounding_boxes(model_id, 2, 3) + offset(2)
+        lz(1) = stl_bounding_boxes(model_id, 3, 1) + offset(3)
+        lz(2) = stl_bounding_boxes(model_id, 3, 3) + offset(3)
 
         bbox_min = 1e12
         bbox_max = -1e12
@@ -833,8 +833,8 @@ contains
         call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
         call get_bounding_indices(bbox_min(3), bbox_max(3), z_cc, kl, kr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, eta]', copyin='[patch_id, encoded_patch_id, center, inverse_rotation, &
-                            & offset, spc, threshold]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, eta]', copyin='[patch_id, model_id, encoded_patch_id, center, &
+                            & inverse_rotation, offset, threshold]', collapse=3)
         do i = il, ir
             do j = jl, jr
                 do k = kl, kr
@@ -842,9 +842,9 @@ contains
                     xyz_local = matmul(inverse_rotation, xyz_local)
                     xyz_local = xyz_local - offset
 
-                    eta = f_model_is_inside_flat(gpu_ntrs(patch_id), patch_id, xyz_local)
+                    eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
 
-                    if (eta > patch_ib(patch_id)%model_threshold) then
+                    if (eta > threshold) then
                         ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do
