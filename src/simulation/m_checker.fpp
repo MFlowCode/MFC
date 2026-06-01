@@ -36,6 +36,8 @@ contains
 
         call s_check_inputs_time_stepping
 
+        call s_check_inputs_eos
+
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
 
     end subroutine s_check_inputs
@@ -93,6 +95,41 @@ contains
         end if
 
     end subroutine s_check_inputs_time_stepping
+
+    !> Checks constraints for EOS selections and EOS/model-equation pairings.
+    impure subroutine s_check_inputs_eos
+
+        integer :: i, num_jwl
+
+        num_jwl = 0
+        do i = 1, num_fluids
+            @:PROHIBIT(fluid_pp(i)%eos /= 1 .and. fluid_pp(i)%eos /= 2, &
+                       & "Unsupported fluid_pp(i)%eos. Use 1 for ideal/stiffened gas or 2 for JWL.")
+            if (fluid_pp(i)%eos == 1) then
+                @:PROHIBIT(fluid_pp(i)%gamma <= 0._wp, "Ideal/stiffened gas EOS requires fluid_pp(i)%gamma > 0.")
+                @:PROHIBIT(fluid_pp(i)%pi_inf < 0._wp, "Ideal/stiffened gas EOS requires fluid_pp(i)%pi_inf >= 0.")
+            else if (fluid_pp(i)%eos == 2) then
+                num_jwl = num_jwl + 1
+                @:PROHIBIT(fluid_pp(i)%jwl_A <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_A > 0.")
+                @:PROHIBIT(fluid_pp(i)%jwl_B < 0._wp, "JWL EOS requires fluid_pp(i)%jwl_B >= 0.")
+                @:PROHIBIT(fluid_pp(i)%jwl_R1 <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_R1 > 0.")
+                @:PROHIBIT(fluid_pp(i)%jwl_R2 <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_R2 > 0.")
+                @:PROHIBIT(fluid_pp(i)%jwl_omega <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_omega > 0.")
+                @:PROHIBIT(fluid_pp(i)%jwl_rho0 <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_rho0 > 0.")
+                @:PROHIBIT(fluid_pp(i)%jwl_air_gamma <= 0._wp, "JWL/air closure requires fluid_pp(i)%jwl_air_gamma > 0.")
+            end if
+        end do
+
+        if (num_jwl > 0) then
+            @:PROHIBIT(num_jwl > 1, "JWL EOS currently supports one JWL fluid per case.")
+            @:PROHIBIT(riemann_solver == 4, "JWL EOS is not supported with the HLLD/MHD flux solver. Use HLL, HLLC, or LF.")
+            @:PROHIBIT(model_eqns == 3 .and. .not. relax, &
+                       & "JWL six-equation cases require relax=T so the JWL pressure-relaxation closure is applied.")
+            @:PROHIBIT(num_fluids > 2, &
+                       & "JWL EOS currently supports at most two fluids; the interface-compression path assumes num_fluids = 2.")
+        end if
+
+    end subroutine s_check_inputs_eos
 
     !> Validate NVIDIA unified virtual memory configuration parameters
     impure subroutine s_check_inputs_nvidia_uvm

@@ -16,6 +16,7 @@ module m_thinc
     use m_derived_types
     use m_global_parameters
     use m_helper
+    use m_variables_conversion, only: jwl_idx
 
 #ifdef MFC_OpenACC
     use openacc
@@ -298,10 +299,30 @@ contains
         integer, intent(in) :: recon_dir
         type(int_bounds_info), intent(in) :: is1_d, is2_d, is3_d
         integer :: j, k, l
+        integer :: cont_j, cont_o, adv_j, adv_o
         real(wp) :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C
         real(wp) :: sgn, moncon, beta_eff
         real(wp) :: nh1, nh2, nh3, d_local, rho1, rho2
         real(wp) :: rho_b, rho_e
+
+        ! For JWL mixed-material cases, compress the JWL material interface
+        ! explicitly rather than assuming fluid 1 is the interface carrier.
+
+        cont_j = eqn_idx%cont%beg
+        cont_o = eqn_idx%cont%end
+        adv_j = eqn_idx%adv%beg
+        adv_o = eqn_idx%adv%end
+        if (jwl_idx > 0 .and. jwl_idx <= num_fluids .and. num_fluids == 2) then
+            cont_j = jwl_idx
+            adv_j = eqn_idx%adv%beg + jwl_idx - 1
+            if (jwl_idx == 1) then
+                cont_o = 2
+                adv_o = eqn_idx%adv%beg + 1
+            else
+                cont_o = 1
+                adv_o = eqn_idx%adv%beg
+            end if
+        end if
 
         #:for REC_DIR, XYZ, CC_PRI,  STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'x_cc', 'j', '{STENCIL_IDX}, k, l', 'is1_d', 'is2_d', 'is3_d'), &
@@ -315,9 +336,9 @@ contains
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
-                            aCL = v_rs_ws(${SF(' - 1')}$, eqn_idx%adv%beg)
-                            aC = v_rs_ws(${SF('')}$, eqn_idx%adv%beg)
-                            aCR = v_rs_ws(${SF(' + 1')}$, eqn_idx%adv%beg)
+                            aCL = v_rs_ws(${SF(' - 1')}$, adv_j)
+                            aC = v_rs_ws(${SF('')}$, adv_j)
+                            aCR = v_rs_ws(${SF(' + 1')}$, adv_j)
 
                             if (aC >= ic_eps .and. aC <= 1._wp - ic_eps) then
                                 if (int_comp == 2 .and. n > 0) then  ! MTHINC
@@ -330,28 +351,28 @@ contains
 
                                     ! Skip if no valid normal was computed
                                     if (nh1*nh1 + nh2*nh2 + nh3*nh3 > 5e-1_wp) then
-                                        rho1 = v_rs_ws(${SF('')}$, eqn_idx%cont%beg)/aC
-                                        rho2 = v_rs_ws(${SF('')}$, eqn_idx%cont%end)/(1._wp - aC)
+                                        rho1 = v_rs_ws(${SF('')}$, cont_j)/aC
+                                        rho2 = v_rs_ws(${SF('')}$, cont_o)/(1._wp - aC)
 
                                         ! Left face
                                         aTHINC = f_mthinc_face_average(nh1, nh2, nh3, d_local, ic_beta, ${REC_DIR}$, -5e-1_wp, &
                                                                        & num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
-                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
-                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vL_rs_vf_x(j, k, l, cont_j) = rho1*aTHINC
+                                        vL_rs_vf_x(j, k, l, cont_o) = rho2*(1._wp - aTHINC)
+                                        vL_rs_vf_x(j, k, l, adv_j) = aTHINC
+                                        vL_rs_vf_x(j, k, l, adv_o) = 1._wp - aTHINC
 
                                         ! Right face
                                         aTHINC = f_mthinc_face_average(nh1, nh2, nh3, d_local, ic_beta, ${REC_DIR}$, 5e-1_wp, &
                                                                        & num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho1*aTHINC
-                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho2*(1._wp - aTHINC)
-                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vR_rs_vf_x(j, k, l, cont_j) = rho1*aTHINC
+                                        vR_rs_vf_x(j, k, l, cont_o) = rho2*(1._wp - aTHINC)
+                                        vR_rs_vf_x(j, k, l, adv_j) = aTHINC
+                                        vR_rs_vf_x(j, k, l, adv_o) = 1._wp - aTHINC
                                     end if
                                 else  ! THINC
                                     moncon = (aCR - aC)*(aC - aCL)
@@ -372,26 +393,26 @@ contains
                                         B = exp(sgn*beta_eff*(2._wp*C - 1._wp))
                                         A = (B/cosh(beta_eff) - 1._wp)/tanh(beta_eff)
 
-                                        rho_b = v_rs_ws(${SF('')}$, eqn_idx%cont%beg)/aC
-                                        rho_e = v_rs_ws(${SF('')}$, eqn_idx%cont%end)/(1._wp - aC)
+                                        rho_b = v_rs_ws(${SF('')}$, cont_j)/aC
+                                        rho_e = v_rs_ws(${SF('')}$, cont_o)/(1._wp - aC)
 
                                         ! Left face
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*A)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
-                                        vL_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
-                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vL_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vL_rs_vf_x(j, k, l, cont_j) = rho_b*aTHINC
+                                        vL_rs_vf_x(j, k, l, cont_o) = rho_e*(1._wp - aTHINC)
+                                        vL_rs_vf_x(j, k, l, adv_j) = aTHINC
+                                        vL_rs_vf_x(j, k, l, adv_o) = 1._wp - aTHINC
 
                                         ! Right face
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*(tanh(beta_eff) + A)/(1._wp + A*tanh(beta_eff)))
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%beg) = rho_b*aTHINC
-                                        vR_rs_vf_x(j, k, l, eqn_idx%cont%end) = rho_e*(1._wp - aTHINC)
-                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%beg) = aTHINC
-                                        vR_rs_vf_x(j, k, l, eqn_idx%adv%end) = 1._wp - aTHINC
+                                        vR_rs_vf_x(j, k, l, cont_j) = rho_b*aTHINC
+                                        vR_rs_vf_x(j, k, l, cont_o) = rho_e*(1._wp - aTHINC)
+                                        vR_rs_vf_x(j, k, l, adv_j) = aTHINC
+                                        vR_rs_vf_x(j, k, l, adv_o) = 1._wp - aTHINC
                                     end if
                                 end if
                             end if

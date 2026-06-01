@@ -69,7 +69,7 @@ params = {
     "avg_state": 2,
     "bc_x%beg": -3,
     "bc_x%end": -3,
-    "bc_y%beg": -1,
+    "bc_y%beg": -3,
     "bc_y%end": -3,
     "ib": "T",
     "num_ibs": 40,

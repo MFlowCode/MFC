@@ -610,22 +610,26 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
     def check_stiffened_eos(self):
-        """Checks constraints on stiffened equation of state fluids parameters"""
+        """Checks constraints on stiffened/ideal and JWL equation-of-state fluid parameters"""
         num_fluids = self.get("num_fluids")
         model_eqns = self.get("model_eqns")
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        relax = self.get("relax", "F") == "T"
 
         if num_fluids is None:
             return
 
         # Allow one extra fluid property slot when using bubbles_euler
         bub_fac = 1 if (bubbles_euler) else 0
+        num_jwl = 0
 
         for i in range(1, num_fluids + 1 + bub_fac):
+            eos = self.get(f"fluid_pp({i})%eos", 1)
             gamma = self.get(f"fluid_pp({i})%gamma")
             pi_inf = self.get(f"fluid_pp({i})%pi_inf")
             cv = self.get(f"fluid_pp({i})%cv")
 
+            self.prohibit(eos not in [1, 2], f"fluid_pp({i})%eos must be 1 (ideal/stiffened gas) or 2 (JWL)")
             # Positivity checks
             if gamma is not None:
                 self.prohibit(gamma <= 0, f"fluid_pp({i})%gamma must be positive")
@@ -638,6 +642,24 @@ class CaseValidator:
             if model_eqns == 1:
                 self.prohibit(gamma is not None, f"model_eqns = 1 does not support fluid_pp({i})%gamma")
                 self.prohibit(pi_inf is not None, f"model_eqns = 1 does not support fluid_pp({i})%pi_inf")
+
+            if eos == 2:
+                num_jwl += 1
+                for suffix in ("jwl_A", "jwl_R1", "jwl_R2", "jwl_omega", "jwl_rho0", "jwl_air_gamma"):
+                    value = self.get(f"fluid_pp({i})%{suffix}")
+                    self.prohibit(value is None, f"JWL EOS requires fluid_pp({i})%{suffix}")
+                    self.prohibit(value is not None and value <= 0, f"JWL EOS requires fluid_pp({i})%{suffix} > 0")
+                value = self.get(f"fluid_pp({i})%jwl_B")
+                self.prohibit(value is None, f"JWL EOS requires fluid_pp({i})%jwl_B")
+                self.prohibit(value is not None and value < 0, f"JWL EOS requires fluid_pp({i})%jwl_B >= 0")
+
+        if num_jwl:
+            self.prohibit(num_jwl > 1, "JWL EOS currently supports one JWL fluid per case")
+            self.prohibit(model_eqns == 3 and not relax, "JWL six-equation cases require relax = T")
+            self.prohibit(
+                num_fluids is not None and num_fluids > 2,
+                "JWL EOS currently supports at most two fluids; the interface-compression path assumes num_fluids = 2",
+            )
 
     def check_surface_tension(self):
         """Checks constraints on surface tension"""
@@ -682,6 +704,8 @@ class CaseValidator:
         low_Mach = self.get("low_Mach", 0)
         cyl_coord = self.get("cyl_coord", "F") == "T"
         viscous = self.get("viscous", "F") == "T"
+        num_fluids = self.get("num_fluids", 0) or 0
+        has_jwl = any(self.get(f"fluid_pp({i})%eos") == 2 for i in range(1, num_fluids + 1))
 
         self.prohibit(riemann_solver is None, "riemann_solver must be specified (1=HLL, 2=HLLC, 4=HLLD, 5=Lax-Friedrichs)")
         if riemann_solver is None:
@@ -689,6 +713,7 @@ class CaseValidator:
 
         self.prohibit(riemann_solver not in [1, 2, 4, 5], "riemann_solver must be 1 (HLL), 2 (HLLC), 4 (HLLD), or 5 (Lax-Friedrichs)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
+        self.prohibit(has_jwl and riemann_solver == 4, "JWL EOS is not supported with the HLLD/MHD flux solver. Use HLL, HLLC, or Lax-Friedrichs.")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
         self.prohibit(avg_state is not None and avg_state not in [1, 2], "avg_state must be 1 or 2")
         self.prohibit(riemann_solver != 5 and wave_speeds is None, "wave_speeds must be set for riemann_solver 1, 2, or 4")

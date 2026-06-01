@@ -11,6 +11,7 @@ module m_pressure_relaxation
 
     use m_derived_types
     use m_global_parameters
+    use m_variables_conversion, only: s_jwl_energy_pr, s_jwl_pcold, s_jwl_sound_speed_squared, jwl_idx
 
     implicit none
 
@@ -73,17 +74,20 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
+        real(wp)                                               :: pres_relax
 
         ! Volume fraction correction
         if (mpp_lim) call s_correct_volume_fractions(q_cons_vf, j, k, l)
 
         ! Pressure equilibration
         if (s_needs_pressure_relaxation(q_cons_vf, j, k, l)) then
-            call s_equilibrate_pressure(q_cons_vf, j, k, l)
+            call s_equilibrate_pressure(q_cons_vf, j, k, l, pres_relax)
+        else
+            call s_cell_average_pressure(q_cons_vf, j, k, l, pres_relax)
         end if
 
         ! Internal energy correction
-        call s_correct_internal_energies(q_cons_vf, j, k, l)
+        call s_correct_internal_energies(q_cons_vf, j, k, l, pres_relax)
 
     end subroutine s_relax_cell_pressure
 
@@ -136,19 +140,144 @@ contains
 
     end subroutine s_correct_volume_fractions
 
+    !> Recover a phase pressure from conserved phase volume, partial density, and internal-energy density.
+    subroutine s_phase_pressure_from_energy(fluid_id, alpha, alpha_rho, alpha_energy, pres)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)   :: fluid_id
+        real(wp), intent(in)  :: alpha, alpha_rho, alpha_energy
+        real(wp), intent(out) :: pres
+        real(wp)              :: rho_phase, pcold, K_jwl
+
+        if (alpha <= sgm_eps .or. alpha_rho <= sgm_eps) then
+            pres = 0._wp
+        else if (eos_idxs(fluid_id) == 2) then
+            rho_phase = max(alpha_rho/alpha, sgm_eps)
+            call s_jwl_pcold(rho_phase, jwl_As(fluid_id), jwl_Bs(fluid_id), jwl_R1s(fluid_id), jwl_R2s(fluid_id), &
+                             & jwl_omegas(fluid_id), jwl_rho0s(fluid_id), pcold)
+            K_jwl = jwl_rho0s(fluid_id)/max(jwl_omegas(fluid_id), sgm_eps)
+            pres = pcold + alpha_energy/max(alpha*K_jwl, sgm_eps)
+            pres = max(pres, 1._wp)
+        else
+            pres = ((alpha_energy - alpha_rho*qvs(fluid_id))/max(alpha, sgm_eps) - pi_infs(fluid_id))/gammas(fluid_id)
+            if (pres <= -(1._wp - 1.e-8_wp)*ps_inf(fluid_id) + 1.e-8_wp) then
+                pres = -(1._wp - 1.e-8_wp)*ps_inf(fluid_id) + 1.e-8_wp
+            end if
+        end if
+
+    end subroutine s_phase_pressure_from_energy
+
+    !> Phase internal-energy density at a common pressure.
+    subroutine s_phase_energy_from_pressure(fluid_id, alpha, alpha_rho, pres, alpha_energy)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)   :: fluid_id
+        real(wp), intent(in)  :: alpha, alpha_rho, pres
+        real(wp), intent(out) :: alpha_energy
+        real(wp)              :: rho_phase, e_phase
+
+        if (alpha <= sgm_eps .or. alpha_rho <= sgm_eps) then
+            alpha_energy = 0._wp
+        else if (eos_idxs(fluid_id) == 2) then
+            rho_phase = max(alpha_rho/alpha, sgm_eps)
+            call s_jwl_energy_pr(rho_phase, pres, 1._wp, 1._wp, jwl_As(fluid_id), jwl_Bs(fluid_id), jwl_R1s(fluid_id), &
+                                 & jwl_R2s(fluid_id), jwl_omegas(fluid_id), jwl_rho0s(fluid_id), jwl_E0s(fluid_id), &
+                                 & jwl_air_e0s(fluid_id), jwl_air_rho0s(fluid_id), jwl_air_gammas(fluid_id), e_phase)
+            alpha_energy = alpha_rho*e_phase
+        else
+            alpha_energy = alpha*(gammas(fluid_id)*pres + pi_infs(fluid_id)) + alpha_rho*qvs(fluid_id)
+        end if
+
+    end subroutine s_phase_energy_from_pressure
+
+    !> Density reached by isentropically moving a phase from p0 to p.
+    subroutine s_phase_density_isentrope(fluid_id, rho_init, pres_init, pres, rho_s, c2_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)   :: fluid_id
+        real(wp), intent(in)  :: rho_init, pres_init, pres
+        real(wp), intent(out) :: rho_s, c2_s
+        integer, parameter    :: JWL_ISENTROPE_STEPS = 8
+        integer               :: step
+        real(wp)              :: dp, p0, p1, r0, k1, k2, k3, k4
+
+        if (eos_idxs(fluid_id) == 2) then
+            rho_s = max(rho_init, sgm_eps)
+            p0 = max(pres_init, 1._wp)
+            dp = (max(pres, 1._wp) - p0)/real(JWL_ISENTROPE_STEPS, wp)
+            do step = 1, JWL_ISENTROPE_STEPS
+                r0 = rho_s
+                p1 = p0 + 5.e-1_wp*dp
+                call s_jwl_sound_speed_squared(max(r0, sgm_eps), max(p0, 1._wp), jwl_As(fluid_id), jwl_Bs(fluid_id), &
+                                               & jwl_R1s(fluid_id), jwl_R2s(fluid_id), jwl_omegas(fluid_id), jwl_rho0s(fluid_id), &
+                                               & c2_s)
+                k1 = 1._wp/max(c2_s, sgm_eps)
+                call s_jwl_sound_speed_squared(max(r0 + 5.e-1_wp*dp*k1, sgm_eps), max(p1, 1._wp), jwl_As(fluid_id), &
+                                               & jwl_Bs(fluid_id), jwl_R1s(fluid_id), jwl_R2s(fluid_id), jwl_omegas(fluid_id), &
+                                               & jwl_rho0s(fluid_id), c2_s)
+                k2 = 1._wp/max(c2_s, sgm_eps)
+                call s_jwl_sound_speed_squared(max(r0 + 5.e-1_wp*dp*k2, sgm_eps), max(p1, 1._wp), jwl_As(fluid_id), &
+                                               & jwl_Bs(fluid_id), jwl_R1s(fluid_id), jwl_R2s(fluid_id), jwl_omegas(fluid_id), &
+                                               & jwl_rho0s(fluid_id), c2_s)
+                k3 = 1._wp/max(c2_s, sgm_eps)
+                call s_jwl_sound_speed_squared(max(r0 + dp*k3, sgm_eps), max(p0 + dp, 1._wp), jwl_As(fluid_id), jwl_Bs(fluid_id), &
+                                               & jwl_R1s(fluid_id), jwl_R2s(fluid_id), jwl_omegas(fluid_id), jwl_rho0s(fluid_id), &
+                                               & c2_s)
+                k4 = 1._wp/max(c2_s, sgm_eps)
+                rho_s = max(r0 + dp*(k1 + 2._wp*k2 + 2._wp*k3 + k4)/6._wp, sgm_eps)
+                p0 = p0 + dp
+            end do
+            call s_jwl_sound_speed_squared(rho_s, max(pres, 1._wp), jwl_As(fluid_id), jwl_Bs(fluid_id), jwl_R1s(fluid_id), &
+                                           & jwl_R2s(fluid_id), jwl_omegas(fluid_id), jwl_rho0s(fluid_id), c2_s)
+        else
+            rho_s = rho_init*((pres + ps_inf(fluid_id))/(pres_init + ps_inf(fluid_id)))**(1._wp/gs_min(fluid_id))
+            c2_s = gs_min(fluid_id)*(pres + ps_inf(fluid_id))/max(rho_s, sgm_eps)
+        end if
+
+    end subroutine s_phase_density_isentrope
+
+    !> Volume-fraction average of current phase pressures, used when a cell is already single-phase.
+    subroutine s_cell_average_pressure(q_cons_vf, j, k, l, pres)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer, intent(in)                                 :: j, k, l
+        real(wp), intent(out)                               :: pres
+        real(wp)                                            :: alpha_i, phase_pres
+        integer                                             :: i
+
+        pres = 0._wp
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+            if (alpha_i > sgm_eps) then
+                call s_phase_pressure_from_energy(i, alpha_i, q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), &
+                                                  & q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l), phase_pres)
+                pres = pres + alpha_i*phase_pres
+            end if
+        end do
+
+    end subroutine s_cell_average_pressure
+
     !> Main pressure equilibration using Newton-Raphson
-    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
+    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l, pres_relaxed)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
+        real(wp), intent(out)                                  :: pres_relaxed
         real(wp)                                               :: pres_relax, f_pres, df_pres
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: pres_K_init, rho_K_s
         #:else
             real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
         #:endif
+        real(wp)           :: alpha_i, alpha_rho_i, alpha_energy_i, rho_i_init, c2_i
         integer, parameter :: MAX_ITER = 50
         ! Pressure relaxation convergence tolerance
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
@@ -158,15 +287,15 @@ contains
         pres_relax = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
-                pres_K_init(i) = (q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l)/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                            & l) - pi_infs(i))/gammas(i)
-                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp)*ps_inf(i) &
-                    & + 1.e-8_wp
+            alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+            alpha_rho_i = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+            alpha_energy_i = q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l)
+            if (alpha_i > sgm_eps) then
+                call s_phase_pressure_from_energy(i, alpha_i, alpha_rho_i, alpha_energy_i, pres_K_init(i))
             else
                 pres_K_init(i) = 0._wp
             end if
-            pres_relax = pres_relax + q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*pres_K_init(i)
+            pres_relax = pres_relax + alpha_i*pres_K_init(i)
         end do
 
         ! Newton-Raphson iteration
@@ -179,8 +308,11 @@ contains
 
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
-                    if (pres_relax <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) &
-                        & + 1.e-8_wp
+                    if (eos_idxs(i) == 2) then
+                        pres_relax = max(pres_relax, 1._wp)
+                    else if (pres_relax <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) then
+                        pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp
+                    end if
                 end do
 
                 ! Newton-Raphson step
@@ -188,13 +320,13 @@ contains
                 df_pres = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
-                    if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
-                        ! Isentropic relation: rho = rho0 * (p/p0)^(1/gamma), Saurel et al. JFM (2009)
-                        rho_K_s(i) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/max(q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, &
-                                & k, l), sgm_eps)*((pres_relax + ps_inf(i))/(pres_K_init(i) + ps_inf(i)))**(1._wp/gs_min(i))
-                        f_pres = f_pres + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
-                        df_pres = df_pres - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
-                                                      & l)/(gs_min(i)*rho_K_s(i)*(pres_relax + ps_inf(i)))
+                    alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+                    alpha_rho_i = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+                    if (alpha_i > sgm_eps) then
+                        rho_i_init = alpha_rho_i/max(alpha_i, sgm_eps)
+                        call s_phase_density_isentrope(i, rho_i_init, pres_K_init(i), pres_relax, rho_K_s(i), c2_i)
+                        f_pres = f_pres + alpha_rho_i/rho_K_s(i)
+                        df_pres = df_pres - alpha_rho_i/(rho_K_s(i)*rho_K_s(i)*max(c2_i, sgm_eps))
                     end if
                 end do
             end if
@@ -207,21 +339,24 @@ contains
                 & l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
         end do
 
+        pres_relaxed = pres_relax
+
     end subroutine s_equilibrate_pressure
 
     !> Correct internal energies using equilibrated pressure
-    subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
+    subroutine s_correct_internal_energies(q_cons_vf, j, k, l, pres_relax)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
+        real(wp), intent(in)                                   :: pres_relax
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_rho, alpha
         #:else
             real(wp), dimension(num_fluids) :: alpha_rho, alpha
         #:endif
-        real(wp)               :: rho, dyn_pres, gamma, pi_inf, pres_relax, sum_alpha
+        real(wp)               :: rho, dyn_pres, gamma, pi_inf, sum_alpha, pres_eff
         real(wp), dimension(2) :: Re
         integer                :: i, q
 
@@ -296,12 +431,21 @@ contains
             dyn_pres = dyn_pres + 5.e-1_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
         end do
 
-        pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+        ! For pure stiffened/ideal-gas mixtures (no JWL fluid), recover the equilibrated pressure from the conserved total
+        ! energy via the exact mixture inversion. This keeps the total energy the master variable (energy-conserving) and
+        ! reproduces the legacy behavior bit-for-bit. JWL mixtures cannot use the stiffened-gas mixture inversion, so they
+        ! rely on the per-phase relaxed pressure computed upstream.
+        if (jwl_idx == 0) then
+            pres_eff = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+        else
+            pres_eff = pres_relax
+        end if
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                      & l)*(gammas(i)*pres_relax + pi_infs(i))
+            call s_phase_energy_from_pressure(i, q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), &
+                                              & q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), pres_eff, &
+                                              & q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l))
         end do
 
     end subroutine s_correct_internal_energies
