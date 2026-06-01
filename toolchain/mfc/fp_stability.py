@@ -98,6 +98,24 @@ _CONTROL_FLOW_RE = re.compile(
 )
 
 
+def _empty_result(name: str, threshold: float) -> dict:
+    """Build a default empty result dict with all fields initialised."""
+    return {
+        "name": name,
+        "passed": False,
+        "max_dev": float("inf"),
+        "threshold": threshold,
+        "float_proxy": None,
+        "vprec": [],
+        "dd_sym_syms": [],
+        "dd_line_locs": [],
+        "cancellation_locs": [],
+        "mca_dev": None,
+        "mca_sigbits": None,
+        "float_max_locs": [],
+    }
+
+
 def _read_source_line(fname: str, lineno: int) -> str:
     """Return the raw source line at lineno (1-based), or '' if unavailable."""
     if os.path.isabs(fname) and os.path.isfile(fname):
@@ -967,20 +985,7 @@ def _run_case(
     cons.print(f"  threshold: {threshold:.0e}")
 
     work_dir = tempfile.mkdtemp(prefix=f"mfc-fps-{name}-")
-    result = {
-        "name": name,
-        "passed": False,
-        "max_dev": float("inf"),
-        "threshold": threshold,
-        "float_proxy": None,
-        "vprec": [],
-        "dd_sym_syms": [],
-        "dd_line_locs": [],
-        "cancellation_locs": [],
-        "mca_dev": None,
-        "mca_sigbits": None,
-        "float_max_locs": [],
-    }
+    result = _empty_result(name, threshold)
     try:
         cons.print("  [dim]running pre_process...[/dim]")
         _write_inp(case["sim"], "simulation", work_dir)
@@ -1319,20 +1324,7 @@ def fp_stability():
             )
         except MFCException as exc:
             cons.print(f"  [bold red]ERROR[/bold red]: {exc}")
-            r = {
-                "name": case["name"],
-                "passed": False,
-                "max_dev": float("inf"),
-                "threshold": case["threshold"],
-                "float_proxy": None,
-                "vprec": [],
-                "dd_sym_syms": [],
-                "dd_line_locs": [],
-                "cancellation_locs": [],
-                "mca_dev": None,
-                "mca_sigbits": None,
-                "float_max_locs": [],
-            }
+            r = _empty_result(case["name"], case["threshold"])
         results.append(r)
 
     elapsed = time.time() - start
