@@ -438,6 +438,7 @@ contains
 
         real(wp)               :: drho_dx, drho_dy, drho_dz  !< Spatial derivatives of the density in the x-, y- and z-directions
         real(wp), dimension(2) :: gm_rho_max                 !< Global (max gradient magnitude, rank) pair for density
+        real(wp)               :: alpha_last                 !< Volume fraction of the fluid not explicitly stored (IGR)
         integer                :: i, j, k, l
 
         do l = -offset_z%beg, p + offset_z%end
@@ -494,11 +495,21 @@ contains
                 do k = -offset_y%beg, n + offset_y%end
                     do j = -offset_x%beg, m + offset_x%end
                         q_sf(j, k, l) = 0._wp
+                        ! Tracks the volume fraction of the fluid not explicitly stored (IGR reconstructs it as 1 - sum)
+                        alpha_last = 1._wp
 
                         do i = 1, eqn_idx%adv%end - eqn_idx%E
                             q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, l)*gm_rho_sf(j, &
                                  & k, l)/gm_rho_max(1)
+                            alpha_last = alpha_last - q_cons_vf(i + eqn_idx%E)%sf(j, k, l)
                         end do
+
+                        ! IGR stores only num_fluids-1 volume fractions; the last fluid's volume fraction is untracked.
+                        ! For a single fluid this is simply 1.0 everywhere. Without this term, the entire single-fluid
+                        ! Schlieren field) is dropped, leaving exp(0) = 1 everywhere. Compute that term below.
+                        if (igr) then
+                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(num_fluids)*alpha_last*gm_rho_sf(j, k, l)/gm_rho_max(1)
+                        end if
                     end do
                 end do
             end do
