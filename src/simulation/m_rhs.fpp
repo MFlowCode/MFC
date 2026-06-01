@@ -1796,8 +1796,7 @@ contains
         end if
 
         if (mpp_lim .and. bubbles_euler) then
-            $:GPU_EXIT_DATA(delete='[alf_sum%sf]')
-            deallocate (alf_sum%sf)
+            @:DEALLOCATE(alf_sum%sf)
         end if
 
         if (.not. igr) then
@@ -1841,6 +1840,26 @@ contains
             end do
 
             @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
+            @:DEALLOCATE(qL_prim)
+            @:DEALLOCATE(qR_prim)
+        end if
+
+        if (alt_soundspeed) then
+            @:DEALLOCATE(blkmod1)
+        end if
+
+        if (qbmm) then
+            do i = 0, 2
+                do j = 0, 2
+                    do l = 1, nb
+                        @:DEALLOCATE(mom_3d(i, j, l)%sf)
+                    end do
+                end do
+            end do
+            do i = 1, nmomsp
+                @:DEALLOCATE(mom_sp(i)%sf)
+            end do
+            @:DEALLOCATE(mom_sp, mom_3d)
         end if
 
     end subroutine s_finalize_rhs_module
