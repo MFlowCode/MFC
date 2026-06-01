@@ -271,6 +271,21 @@ module m_derived_types
         real(wp)                 :: model_threshold  !< Threshold to turn on smoothen STL patch.
     end type ic_patch_parameters
 
+    !> User-input parameters for a NACA 4-digit airfoil (namelist-safe: scalars only)
+    type ib_airfoil_parameters
+        real(wp) :: c = dflt_real  !< chord length
+        real(wp) :: p = dflt_real  !< maximum camber position (fraction of chord)
+        real(wp) :: t = dflt_real  !< maximum thickness (fraction of chord)
+        real(wp) :: m = dflt_real  !< maximum camber (fraction of chord)
+    end type ib_airfoil_parameters
+
+    !> Computed surface grid for a NACA airfoil (simulation-only, not in namelist)
+    type ib_airfoil_grid
+        integer                    :: Np = 0    !< number of surface grid points per surface
+        type(vec3_dt), allocatable :: upper(:)  !< upper surface grid points (1:Np)
+        type(vec3_dt), allocatable :: lower(:)  !< lower surface grid points (1:Np)
+    end type ib_airfoil_grid
+
     type ib_patch_parameters
 
         integer  :: geometry                            !< Type of geometry for the patch
@@ -284,7 +299,7 @@ module m_derived_types
         real(wp), dimension(1:3,1:3) :: rotation_matrix
         !> matrix that converts from fluid reference frame to IB reference frame
         real(wp), dimension(1:3,1:3) :: rotation_matrix_inverse
-        real(wp)                     :: c, p, t, m
+        integer                      :: airfoil_id                    !< index into ib_airfoil(:) for airfoil geometry patches
         real(wp)                     :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
         real(wp)                     :: radius                        !< Dimensions of the patch. radius.
         real(wp)                     :: theta

@@ -21,9 +21,82 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
+        & s_initialize_ib_airfoils
 
 contains
+
+    !> Initialize the NACA surface grids for all airfoil IB patches. Must be called after the grid is established (so dx is valid)
+    !! and before s_apply_ib_patches or s_apply_levelset.
+    subroutine s_initialize_ib_airfoils()
+
+        integer  :: i, j, airfoil_id
+        integer  :: Np, Np1, Np2
+        real(wp) :: ca_in, pa, ma, ta
+        real(wp) :: xc, xa, yc, dycdxc, yt, xu, yu, xl, yl, sin_c, cos_c
+
+        do i = 1, num_ibs
+            if (patch_ib(i)%geometry /= 4 .and. patch_ib(i)%geometry /= 11) cycle
+
+            airfoil_id = patch_ib(i)%airfoil_id
+            ca_in = ib_airfoil(airfoil_id)%c
+            pa = ib_airfoil(airfoil_id)%p
+            ma = ib_airfoil(airfoil_id)%m
+            ta = ib_airfoil(airfoil_id)%t
+
+            Np1 = int((pa*ca_in/dx(0))*20)
+            Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
+            Np = Np1 + Np2 + 1
+            ib_airfoil_grids(airfoil_id)%Np = Np
+            $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%Np]')
+
+            if (.not. allocated(ib_airfoil_grids(airfoil_id)%upper)) then
+                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%upper(1:Np))
+                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%lower(1:Np))
+
+                ib_airfoil_grids(airfoil_id)%upper(1)%x = 0._wp
+                ib_airfoil_grids(airfoil_id)%upper(1)%y = 0._wp
+                ib_airfoil_grids(airfoil_id)%lower(1)%x = 0._wp
+                ib_airfoil_grids(airfoil_id)%lower(1)%y = 0._wp
+
+                do j = 1, Np1 + Np2 - 1
+                    if (j <= Np1) then
+                        xc = j*(pa*ca_in/Np1)
+                        xa = xc/ca_in
+                        yc = (ma/pa**2)*(2*pa*xa - xa**2)
+                        dycdxc = (2*ma/pa**2)*(pa - xa)
+                    else
+                        xc = pa*ca_in + (j - Np1)*((ca_in - pa*ca_in)/Np2)
+                        xa = xc/ca_in
+                        yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
+                        dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
+                    end if
+
+                    yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
+                    sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
+                    cos_c = 1/(1 + dycdxc**2)**0.5_wp
+
+                    xu = (xa - yt*sin_c)*ca_in
+                    yu = (yc + yt*cos_c)*ca_in
+                    xl = (xa + yt*sin_c)*ca_in
+                    yl = (yc - yt*cos_c)*ca_in
+
+                    ib_airfoil_grids(airfoil_id)%upper(j + 1)%x = xu
+                    ib_airfoil_grids(airfoil_id)%upper(j + 1)%y = yu
+                    ib_airfoil_grids(airfoil_id)%lower(j + 1)%x = xl
+                    ib_airfoil_grids(airfoil_id)%lower(j + 1)%y = yl
+                end do
+
+                ib_airfoil_grids(airfoil_id)%upper(Np)%x = ca_in
+                ib_airfoil_grids(airfoil_id)%upper(Np)%y = 0._wp
+                ib_airfoil_grids(airfoil_id)%lower(Np)%x = ca_in
+                ib_airfoil_grids(airfoil_id)%lower(Np)%y = 0._wp
+
+                $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%upper, ib_airfoil_grids(airfoil_id)%lower]')
+            end if
+        end do
+
+    end subroutine s_initialize_ib_airfoils
 
     !> Apply all immersed boundary patch geometries to mark interior cells in the IB marker array
     impure subroutine s_apply_ib_patches(ib_markers)
@@ -134,86 +207,24 @@ contains
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp            !< integers containing the periodicity projection information
-        real(wp)                           :: f, ca_in, pa, ma, ta
-        real(wp)                           :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
+        real(wp)                           :: f, ca_in, pa, ma
+        real(wp)                           :: xa, yc, dycdxc
         integer                            :: i, j, k, il, ir, jl, jr
-        integer                            :: Np1, Np2
+        integer                            :: Np_local, airfoil_id
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xy_local, offset  !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)           :: center            !< x and y coordinates in local IB frame
         real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
+        airfoil_id = patch_ib(patch_id)%airfoil_id
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
-        ca_in = patch_ib(patch_id)%c
-        pa = patch_ib(patch_id)%p
-        ma = patch_ib(patch_id)%m
-        ta = patch_ib(patch_id)%t
+        ca_in = ib_airfoil(airfoil_id)%c
+        pa = ib_airfoil(airfoil_id)%p
+        ma = ib_airfoil(airfoil_id)%m
+        Np_local = ib_airfoil_grids(airfoil_id)%Np
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
-
-        Np1 = int((pa*ca_in/dx(0))*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-        Np = Np1 + Np2 + 1
-        $:GPU_UPDATE(device='[Np]')
-
-        if (.not. allocated(airfoil_grid_u)) then
-            @:ALLOCATE(airfoil_grid_u(1:Np))
-            @:ALLOCATE(airfoil_grid_l(1:Np))
-
-            ! TODO :: The below instantiations are already handled by the loop below
-            airfoil_grid_u(1)%x = 0._wp
-            airfoil_grid_u(1)%y = 0._wp
-
-            airfoil_grid_l(1)%x = 0._wp
-            airfoil_grid_l(1)%y = 0._wp
-
-            do i = 1, Np1 + Np2 - 1
-                ! TODO :: This allocates the upper and lower airfoil arrays, and does not need to be performed each time the IB
-                ! markers are updated. Place this as a separate subroutine.
-                if (i <= Np1) then
-                    xc = i*(pa*ca_in/Np1)
-                    xa = xc/ca_in
-                    yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                    dycdxc = (2*ma/pa**2)*(pa - xa)
-                else
-                    xc = pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
-                    xa = xc/ca_in
-                    yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                    dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-                end if
-
-                yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
-                sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
-                cos_c = 1/(1 + dycdxc**2)**0.5_wp
-
-                xu = xa - yt*sin_c
-                yu = yc + yt*cos_c
-
-                xl = xa + yt*sin_c
-                yl = yc - yt*cos_c
-
-                xu = xu*ca_in
-                yu = yu*ca_in
-
-                xl = xl*ca_in
-                yl = yl*ca_in
-
-                airfoil_grid_u(i + 1)%x = xu
-                airfoil_grid_u(i + 1)%y = yu
-
-                airfoil_grid_l(i + 1)%x = xl
-                airfoil_grid_l(i + 1)%y = yl
-            end do
-
-            airfoil_grid_u(Np)%x = ca_in
-            airfoil_grid_u(Np)%y = 0._wp
-
-            airfoil_grid_l(Np)%x = ca_in
-            airfoil_grid_l(Np)%y = 0._wp
-
-            $:GPU_UPDATE(device='[airfoil_grid_l, airfoil_grid_u]')
-        end if
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
@@ -227,8 +238,9 @@ contains
         call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, ma, &
-                            & ca_in, airfoil_grid_u, airfoil_grid_l]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, f, xa, yc, dycdxc]', copyin='[encoded_patch_id, center, &
+                            & inverse_rotation, offset, ma, pa, ca_in, airfoil_id, Np_local, ib_airfoil_grids(airfoil_id)%upper, &
+                            & ib_airfoil_grids(airfoil_id)%lower]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
@@ -246,32 +258,35 @@ contains
                     end if
                     if (xy_local(2) >= 0._wp) then
                         k = 1
-                        do while (airfoil_grid_u(k)%x < xy_local(1) .and. k <= Np)
+                        do while (ib_airfoil_grids(airfoil_id)%upper(k)%x < xy_local(1) .and. k <= Np_local)
                             k = k + 1
                         end do
-                        if (f_approx_equal(airfoil_grid_u(k)%x, xy_local(1))) then
-                            if (xy_local(2) <= airfoil_grid_u(k)%y) then
+                        if (f_approx_equal(ib_airfoil_grids(airfoil_id)%upper(k)%x, xy_local(1))) then
+                            if (xy_local(2) <= ib_airfoil_grids(airfoil_id)%upper(k)%y) then
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         else
-                            f = (airfoil_grid_u(k)%x - xy_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
-                            if (xy_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
+                            f = (ib_airfoil_grids(airfoil_id)%upper(k)%x - xy_local(1))/(ib_airfoil_grids(airfoil_id)%upper(k)%x &
+                                 & - ib_airfoil_grids(airfoil_id)%upper(k - 1)%x)
+                            if (xy_local(2) <= ((1._wp - f)*ib_airfoil_grids(airfoil_id)%upper(k)%y &
+                                & + f*ib_airfoil_grids(airfoil_id)%upper(k - 1)%y)) then
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         end if
                     else
                         k = 1
-                        do while (airfoil_grid_l(k)%x < xy_local(1))
+                        do while (ib_airfoil_grids(airfoil_id)%lower(k)%x < xy_local(1))
                             k = k + 1
                         end do
-                        if (f_approx_equal(airfoil_grid_l(k)%x, xy_local(1))) then
-                            if (xy_local(2) >= airfoil_grid_l(k)%y) then
+                        if (f_approx_equal(ib_airfoil_grids(airfoil_id)%lower(k)%x, xy_local(1))) then
+                            if (xy_local(2) >= ib_airfoil_grids(airfoil_id)%lower(k)%y) then
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         else
-                            f = (airfoil_grid_l(k)%x - xy_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
-
-                            if (xy_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                            f = (ib_airfoil_grids(airfoil_id)%lower(k)%x - xy_local(1))/(ib_airfoil_grids(airfoil_id)%lower(k)%x &
+                                 & - ib_airfoil_grids(airfoil_id)%lower(k - 1)%x)
+                            if (xy_local(2) >= ((1._wp - f)*ib_airfoil_grids(airfoil_id)%lower(k)%y &
+                                & + f*ib_airfoil_grids(airfoil_id)%lower(k - 1)%y)) then
                                 ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         end if
@@ -286,89 +301,30 @@ contains
     !> Mark cells inside a 3D extruded NACA 4-digit airfoil immersed boundary with finite span
     subroutine s_ib_3D_airfoil(patch_id, ib_markers, xp, yp, zp)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in) :: xp, yp, zp                      !< integers containing the periodicity projection information
-        real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer :: i, j, k, l, il, ir, jl, jr, ll, lr
-        integer :: Np1, Np2
-        integer :: encoded_patch_id
-        real(wp), dimension(1:3) :: xyz_local, center, offset  !< x, y, z coordinates in local IB frame
-        real(wp), dimension(1:3,1:3) :: inverse_rotation
+        integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
+        real(wp)                           :: lz, z_max, z_min, f, ca_in, pa, ma
+        integer                            :: i, j, k, l, il, ir, jl, jr, ll, lr
+        integer                            :: Np_local, airfoil_id
+        integer                            :: encoded_patch_id
+        real(wp), dimension(1:3)           :: xyz_local, center, offset  !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
+        airfoil_id = patch_ib(patch_id)%airfoil_id
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         lz = patch_ib(patch_id)%length_z
-        ca_in = patch_ib(patch_id)%c
-        pa = patch_ib(patch_id)%p
-        ma = patch_ib(patch_id)%m
-        ta = patch_ib(patch_id)%t
+        ca_in = ib_airfoil(airfoil_id)%c
+        pa = ib_airfoil(airfoil_id)%p
+        ma = ib_airfoil(airfoil_id)%m
+        Np_local = ib_airfoil_grids(airfoil_id)%Np
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         z_max = lz/2
         z_min = -lz/2
-
-        Np1 = int((pa*ca_in/dx(0))*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-        Np = Np1 + Np2 + 1
-        $:GPU_UPDATE(device='[Np]')
-
-        if (.not. allocated(airfoil_grid_u)) then
-            @:ALLOCATE(airfoil_grid_u(1:Np))
-            @:ALLOCATE(airfoil_grid_l(1:Np))
-
-            airfoil_grid_u(1)%x = 0._wp
-            airfoil_grid_u(1)%y = 0._wp
-
-            airfoil_grid_l(1)%x = 0._wp
-            airfoil_grid_l(1)%y = 0._wp
-
-            do i = 1, Np1 + Np2 - 1
-                if (i <= Np1) then
-                    xc = i*(pa*ca_in/Np1)
-                    xa = xc/ca_in
-                    yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                    dycdxc = (2*ma/pa**2)*(pa - xa)
-                else
-                    xc = pa*ca_in + (i - Np1)*((ca_in - pa*ca_in)/Np2)
-                    xa = xc/ca_in
-                    yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                    dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-                end if
-
-                yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
-                sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
-                cos_c = 1/(1 + dycdxc**2)**0.5_wp
-
-                xu = xa - yt*sin_c
-                yu = yc + yt*cos_c
-
-                xl = xa + yt*sin_c
-                yl = yc - yt*cos_c
-
-                xu = xu*ca_in
-                yu = yu*ca_in
-
-                xl = xl*ca_in
-                yl = yl*ca_in
-
-                airfoil_grid_u(i + 1)%x = xu
-                airfoil_grid_u(i + 1)%y = yu
-
-                airfoil_grid_l(i + 1)%x = xl
-                airfoil_grid_l(i + 1)%y = yl
-            end do
-
-            airfoil_grid_u(Np)%x = ca_in
-            airfoil_grid_u(Np)%y = 0._wp
-
-            airfoil_grid_l(Np)%x = ca_in
-            airfoil_grid_l(Np)%y = 0._wp
-
-            $:GPU_UPDATE(device='[airfoil_grid_l, airfoil_grid_u]')
-        end if
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
@@ -386,7 +342,8 @@ contains
         call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
 
         $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, &
-                            & ma, ca_in, airfoil_grid_u, airfoil_grid_l, z_min, z_max]', collapse=3)
+                            & ma, pa, ca_in, airfoil_id, Np_local, ib_airfoil_grids(airfoil_id)%upper, &
+                            & ib_airfoil_grids(airfoil_id)%lower, z_min, z_max]', collapse=3)
         do l = ll, lr
             do j = jl, jr
                 do i = il, ir
@@ -399,33 +356,36 @@ contains
                         if (xyz_local(1) >= 0._wp .and. xyz_local(1) <= ca_in) then
                             if (xyz_local(2) >= 0._wp) then
                                 k = 1
-                                do while (airfoil_grid_u(k)%x < xyz_local(1))
+                                do while (ib_airfoil_grids(airfoil_id)%upper(k)%x < xyz_local(1))
                                     k = k + 1
                                 end do
-                                if (f_approx_equal(airfoil_grid_u(k)%x, xyz_local(1))) then
-                                    if (xyz_local(2) <= airfoil_grid_u(k)%y) then
+                                if (f_approx_equal(ib_airfoil_grids(airfoil_id)%upper(k)%x, xyz_local(1))) then
+                                    if (xyz_local(2) <= ib_airfoil_grids(airfoil_id)%upper(k)%y) then
                                         ! IB
                                         ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 else
-                                    f = (airfoil_grid_u(k)%x - xyz_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
-                                    if (xyz_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
+                                    f = (ib_airfoil_grids(airfoil_id)%upper(k)%x - xyz_local(1)) &
+                                         & /(ib_airfoil_grids(airfoil_id)%upper(k)%x - ib_airfoil_grids(airfoil_id)%upper(k - 1)%x)
+                                    if (xyz_local(2) <= ((1._wp - f)*ib_airfoil_grids(airfoil_id)%upper(k)%y &
+                                        & + f*ib_airfoil_grids(airfoil_id)%upper(k - 1)%y)) then
                                         ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 end if
                             else
                                 k = 1
-                                do while (airfoil_grid_l(k)%x < xyz_local(1))
+                                do while (ib_airfoil_grids(airfoil_id)%lower(k)%x < xyz_local(1))
                                     k = k + 1
                                 end do
-                                if (f_approx_equal(airfoil_grid_l(k)%x, xyz_local(1))) then
-                                    if (xyz_local(2) >= airfoil_grid_l(k)%y) then
+                                if (f_approx_equal(ib_airfoil_grids(airfoil_id)%lower(k)%x, xyz_local(1))) then
+                                    if (xyz_local(2) >= ib_airfoil_grids(airfoil_id)%lower(k)%y) then
                                         ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 else
-                                    f = (airfoil_grid_l(k)%x - xyz_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
-
-                                    if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                                    f = (ib_airfoil_grids(airfoil_id)%lower(k)%x - xyz_local(1)) &
+                                         & /(ib_airfoil_grids(airfoil_id)%lower(k)%x - ib_airfoil_grids(airfoil_id)%lower(k - 1)%x)
+                                    if (xyz_local(2) >= ((1._wp - f)*ib_airfoil_grids(airfoil_id)%lower(k)%y &
+                                        & + f*ib_airfoil_grids(airfoil_id)%lower(k - 1)%y)) then
                                         ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 end if

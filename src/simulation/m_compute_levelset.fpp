@@ -30,7 +30,8 @@ contains
         !  3D Patch Geometries
 
         if (p > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[patch_ib(1:num_ibs), Np]')
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', &
+                                & copyin='[patch_ib(1:num_ibs), ib_airfoil, ib_airfoil_grids]')
             do i = 1, num_gps
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
@@ -51,7 +52,8 @@ contains
 
             ! 2D Patch Geometries
         else if (n > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', copyin='[Np, patch_ib(1:num_ibs)]')
+            $:GPU_PARALLEL_LOOP(private='[i, patch_id, patch_geometry]', copy='[gps]', &
+                                & copyin='[patch_ib(1:num_ibs), ib_airfoil, ib_airfoil_grids]')
             do i = 1, num_gps
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
@@ -109,7 +111,7 @@ contains
 
         type(ghost_point), intent(inout) :: gp
         real(wp)                         :: dist, global_dist
-        integer                          :: global_id
+        integer                          :: global_id, airfoil_id, Np_local
         real(wp), dimension(3)           :: dist_vec
         real(wp), dimension(1:3)         :: xy_local, offset      !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)         :: center
@@ -119,6 +121,8 @@ contains
         i = gp%loc(1)
         j = gp%loc(2)
 
+        airfoil_id = patch_ib(ib_patch_id)%airfoil_id
+        Np_local = ib_airfoil_grids(airfoil_id)%Np
         center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
@@ -131,9 +135,9 @@ contains
 
         if (xy_local(2) >= 0._wp) then
             ! finds the location on the airfoil grid with the minimum distance (closest)
-            do k = 1, Np
-                dist_vec(1) = airfoil_grid_u(k)%x - xy_local(1)
-                dist_vec(2) = airfoil_grid_u(k)%y - xy_local(2)
+            do k = 1, Np_local
+                dist_vec(1) = ib_airfoil_grids(airfoil_id)%upper(k)%x - xy_local(1)
+                dist_vec(2) = ib_airfoil_grids(airfoil_id)%upper(k)%y - xy_local(2)
                 dist_vec(3) = 0._wp
                 dist = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -146,14 +150,14 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = airfoil_grid_u(global_id)%x - xy_local(1)
-            dist_vec(2) = airfoil_grid_u(global_id)%y - xy_local(2)
+            dist_vec(1) = ib_airfoil_grids(airfoil_id)%upper(global_id)%x - xy_local(1)
+            dist_vec(2) = ib_airfoil_grids(airfoil_id)%upper(global_id)%y - xy_local(2)
             dist_vec(3) = 0
             dist = global_dist
         else
-            do k = 1, Np
-                dist_vec(1) = airfoil_grid_l(k)%x - xy_local(1)
-                dist_vec(2) = airfoil_grid_l(k)%y - xy_local(2)
+            do k = 1, Np_local
+                dist_vec(1) = ib_airfoil_grids(airfoil_id)%lower(k)%x - xy_local(1)
+                dist_vec(2) = ib_airfoil_grids(airfoil_id)%lower(k)%y - xy_local(2)
                 dist_vec(3) = 0
                 dist = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -166,8 +170,8 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = airfoil_grid_l(global_id)%x - xy_local(1)
-            dist_vec(2) = airfoil_grid_l(global_id)%y - xy_local(2)
+            dist_vec(1) = ib_airfoil_grids(airfoil_id)%lower(global_id)%x - xy_local(1)
+            dist_vec(2) = ib_airfoil_grids(airfoil_id)%lower(global_id)%y - xy_local(2)
             dist_vec(3) = 0._wp
             dist = global_dist
         end if
@@ -188,7 +192,7 @@ contains
 
         type(ghost_point), intent(inout) :: gp
         real(wp)                         :: dist_surf, dist_side, global_dist
-        integer                          :: global_id
+        integer                          :: global_id, airfoil_id, Np_local
         real(wp)                         :: lz, z_max, z_min
         real(wp), dimension(3)           :: dist_vec
         real(wp), dimension(1:3)         :: xyz_local, center, offset, normal  !< x, y, z coordinates in local IB frame
@@ -199,6 +203,8 @@ contains
         j = gp%loc(2)
         l = gp%loc(3)
 
+        airfoil_id = patch_ib(ib_patch_id)%airfoil_id
+        Np_local = ib_airfoil_grids(airfoil_id)%Np
         center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
@@ -215,9 +221,9 @@ contains
         xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
         if (xyz_local(2) >= 0._wp) then
-            do k = 1, Np
-                dist_vec(1) = xyz_local(1) - airfoil_grid_u(k)%x
-                dist_vec(2) = xyz_local(2) - airfoil_grid_u(k)%y
+            do k = 1, Np_local
+                dist_vec(1) = xyz_local(1) - ib_airfoil_grids(airfoil_id)%upper(k)%x
+                dist_vec(2) = xyz_local(2) - ib_airfoil_grids(airfoil_id)%upper(k)%y
                 dist_vec(3) = 0._wp
                 dist_surf = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -230,14 +236,14 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = airfoil_grid_u(global_id)%x - xyz_local(1)
-            dist_vec(2) = airfoil_grid_u(global_id)%y - xyz_local(2)
+            dist_vec(1) = ib_airfoil_grids(airfoil_id)%upper(global_id)%x - xyz_local(1)
+            dist_vec(2) = ib_airfoil_grids(airfoil_id)%upper(global_id)%y - xyz_local(2)
             dist_vec(3) = 0._wp
             dist_surf = global_dist
         else
-            do k = 1, Np
-                dist_vec(1) = airfoil_grid_l(k)%x - xyz_local(1)
-                dist_vec(2) = airfoil_grid_l(k)%y - xyz_local(2)
+            do k = 1, Np_local
+                dist_vec(1) = ib_airfoil_grids(airfoil_id)%lower(k)%x - xyz_local(1)
+                dist_vec(2) = ib_airfoil_grids(airfoil_id)%lower(k)%y - xyz_local(2)
                 dist_vec(3) = 0
                 dist_surf = sqrt(sum(dist_vec**2))
                 if (k == 1) then
@@ -250,8 +256,8 @@ contains
                     end if
                 end if
             end do
-            dist_vec(1) = airfoil_grid_l(global_id)%x - xyz_local(1)
-            dist_vec(2) = airfoil_grid_l(global_id)%y - xyz_local(2)
+            dist_vec(1) = ib_airfoil_grids(airfoil_id)%lower(global_id)%x - xyz_local(1)
+            dist_vec(2) = ib_airfoil_grids(airfoil_id)%lower(global_id)%y - xyz_local(2)
             dist_vec(3) = 0._wp
             dist_surf = global_dist
         end if

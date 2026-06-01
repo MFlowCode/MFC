@@ -32,6 +32,7 @@ NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max", 50000)  # patch_ib (Fortran array bound)
+NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -856,9 +857,9 @@ def _load():
     # and enforced by the case_validator, not by max_index here.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
-    for a in ["geometry", "moving_ibm"]:
+    for a in ["geometry", "moving_ibm", "airfoil_id"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("theta", REAL), ("slip", LOG), ("c", REAL), ("p", REAL), ("t", REAL), ("m", REAL), ("mass", REAL)]:
+    for a, pt in [("radius", REAL), ("theta", REAL), ("slip", LOG), ("mass", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -879,6 +880,20 @@ def _load():
             attrs=_ib_attrs,
             tags=_ib_tags,
             max_index=NIB,
+        )
+    )
+
+    # ib_airfoil — NACA 4-digit airfoil parameters, referenced by patch_ib(i)%airfoil_id
+    _af_tags = {"ib"}
+    _af_attrs: Dict[str, tuple] = {}
+    for a in ["c", "p", "t", "m"]:
+        _af_attrs[a] = (REAL, _af_tags)
+    REGISTRY.register_family(
+        IndexedFamily(
+            base_name="ib_airfoil",
+            attrs=_af_attrs,
+            tags=_af_tags,
+            max_index=NAF,
         )
     )
 
@@ -1141,6 +1156,7 @@ _nv(
     "pi_fac",
 )
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
+_nv(_SIM, "ib_airfoil")
 _nv(
     _SIM,
     "dt",

@@ -258,11 +258,11 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
-    integer                                                  :: Np
+    type(ib_patch_parameters), dimension(num_ib_patches_max)    :: patch_ib          !< Immersed boundary patch parameters
+    type(ib_airfoil_parameters), dimension(num_ib_airfoils_max) :: ib_airfoil        !< Per-airfoil NACA user inputs (namelist)
+    type(ib_airfoil_grid), dimension(num_ib_airfoils_max)       :: ib_airfoil_grids  !< Per-airfoil computed surface grids
 
-    $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
+    $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, ib_airfoil, ib_airfoil_grids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
@@ -673,6 +673,14 @@ contains
             relativity = .false.
         #:endif
 
+        do i = 1, num_ib_airfoils_max
+            ib_airfoil(i)%c = dflt_real
+            ib_airfoil(i)%p = dflt_real
+            ib_airfoil(i)%t = dflt_real
+            ib_airfoil(i)%m = dflt_real
+            ib_airfoil_grids(i)%Np = 0
+        end do
+
         do i = 1, num_ib_patches_max
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
@@ -683,10 +691,7 @@ contains
             patch_ib(i)%length_z = dflt_real
             patch_ib(i)%radius = dflt_real
             patch_ib(i)%theta = dflt_real
-            patch_ib(i)%c = dflt_real
-            patch_ib(i)%t = dflt_real
-            patch_ib(i)%m = dflt_real
-            patch_ib(i)%p = dflt_real
+            patch_ib(i)%airfoil_id = 0
             patch_ib(i)%slip = .false.
 
             ! Proper default values for translating STL models
@@ -1054,7 +1059,6 @@ contains
         #:endif
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
-        Np = 0
 
         if (elasticity) then
             fd_number = max(1, fd_order/2)

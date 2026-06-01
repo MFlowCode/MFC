@@ -107,10 +107,12 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%c <= 0._wp .or. patch_ib(patch_id)%p <= 0._wp &
-                   & .or. patch_ib(patch_id)%t <= 0._wp .or. patch_ib(patch_id)%m <= 0._wp &
-                   & .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid), &
-                   & 'in airfoil IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%airfoil_id <= 0 &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in airfoil IB patch ' // trim(iStr))
 
     end subroutine s_check_airfoil_ib_patch_geometry
 
@@ -122,11 +124,13 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%c <= 0._wp .or. patch_ib(patch_id)%p <= 0._wp &
-                   & .or. patch_ib(patch_id)%t <= 0._wp .or. patch_ib(patch_id)%m <= 0._wp &
-                   & .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%z_centroid) .or. f_is_default(patch_ib(patch_id)%length_z), &
-                   & 'in 3d airfoil IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%airfoil_id <= 0 &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
+                   & .or. f_is_default(patch_ib(patch_id)%length_z), 'in 3d airfoil IB patch ' // trim(iStr))
 
     end subroutine s_check_3d_airfoil_ib_patch_geometry
 

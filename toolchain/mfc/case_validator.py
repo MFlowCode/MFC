@@ -590,6 +590,26 @@ class CaseValidator:
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
+        num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
+        for i in range(1, num_ibs + 1):
+            geometry = self.get(f"patch_ib({i})%geometry", None)
+            airfoil_id = self.get(f"patch_ib({i})%airfoil_id", None)
+            if geometry in (4, 11):
+                self.prohibit(
+                    airfoil_id is None or airfoil_id <= 0,
+                    f"patch_ib({i})%airfoil_id must be set to a positive integer for airfoil geometry ({geometry})",
+                )
+                if airfoil_id is not None:
+                    self.prohibit(
+                        airfoil_id > num_ib_airfoils_max,
+                        f"patch_ib({i})%airfoil_id={airfoil_id} exceeds num_ib_airfoils_max={num_ib_airfoils_max}",
+                    )
+            elif airfoil_id is not None and airfoil_id > 0:
+                self.prohibit(
+                    True,
+                    f"patch_ib({i})%airfoil_id is set but geometry ({geometry}) is not an airfoil (4 or 11)",
+                )
+
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
         num_fluids = self.get("num_fluids")
