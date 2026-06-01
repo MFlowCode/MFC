@@ -1,8 +1,6 @@
-"""
-MFC Parameter Definitions (Compact).
+"""MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
-This replaces the definitions/ directory.
 """
 
 import re
