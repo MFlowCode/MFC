@@ -750,10 +750,28 @@ def _parse_vg_error_locs(log_path: str, error_keyword: str) -> list:
     return locs
 
 
-# A site reported at this bit threshold has lost at least this many significant
-# bits to cancellation — a *severity* floor (Verrou only reports a site when it
-# exceeds the threshold, so a high-threshold pass has no false positives).
-CANCEL_SEVERE_BITS = 26
+# Verrou exposes no per-site bit-count, but --cc-threshold-double is a severity
+# filter: a site is reported only if it lost >= the threshold bits. Sweeping these
+# levels and taking the highest each site survives gives a per-site "bits lost"
+# severity (a lower bound — no false positives). 48 ~ full double mantissa.
+CANCEL_BIT_LEVELS = [10, 20, 30, 40, 48]
+
+
+def _cancellation_severity(level_sites: list) -> dict:
+    """Given [(threshold, [sites])], return {site: highest threshold it survives}
+    = the per-site bits-lost severity (a lower bound)."""
+    sev = {}
+    for level, sites in level_sites:
+        for site in sites:
+            if level > sev.get(site, 0):
+                sev[site] = level
+    return sev
+
+
+def _digits_left(bits_lost: float) -> float:
+    """Approximate trustworthy decimal digits remaining after losing `bits_lost`
+    bits of a double's 53-bit mantissa (~15.95 digits full)."""
+    return max(0.0, (53 - bits_lost) / math.log2(10))
 
 
 def _run_cancellation_check(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, threshold: int = 10) -> list:
@@ -1356,7 +1374,7 @@ def _run_case(
         "dd_line_confirmed": None,
         "dd_line_confirm_dev": None,
         "cancellation_locs": [],
-        "cancellation_severe": set(),
+        "cancellation_bits": {},
         "mca_dev": None,
         "mca_sigbits": None,
         "float_max_locs": [],
@@ -1493,13 +1511,15 @@ def _run_case(
         if run_cancellation:
             cons.print("  [dim]cancellation detection...[/dim]")
             try:
-                locs = _run_cancellation_check(case, verrou_bin, sim_bin, work_dir)
+                # sweep bit thresholds to get per-site severity (bits lost)
+                level_sites = [(level, _run_cancellation_check(case, verrou_bin, sim_bin, work_dir, threshold=level)) for level in CANCEL_BIT_LEVELS]
+                locs = level_sites[0][1]  # lowest threshold = full list
+                bits = _cancellation_severity(level_sites)
                 result["cancellation_locs"] = locs
+                result["cancellation_bits"] = bits
                 if locs:
-                    # severity pass: which sites lose >= CANCEL_SEVERE_BITS bits
-                    severe = set(_run_cancellation_check(case, verrou_bin, sim_bin, work_dir, threshold=CANCEL_SEVERE_BITS))
-                    result["cancellation_severe"] = severe
-                    cons.print(f"  cancellation: {len(locs)} site(s), {len(severe)} severe (>= {CANCEL_SEVERE_BITS} bits lost)")
+                    worst = max(bits.values()) if bits else 0
+                    cons.print(f"  cancellation: {len(locs)} site(s), worst loses ≥ {worst / math.log2(10):.0f} of ~16 digits")
                 else:
                     cons.print("  cancellation: none detected")
                 # cross-reference: label dd_line hotspots that sit on a cancellation site
@@ -1631,6 +1651,40 @@ def _emit_github_summary(results: list, n_samples: int):
         md.append(f"| `{r['name']}` | {status} | {bits} / {MIN_SIG_BITS} | {r['max_dev']:.2e} | {fp} | {sb} |")
     md.append("")
 
+    # Cancellation ORIGINS — where ill-conditioning actually arises, led with the
+    # most severe (most bits lost). The numerically interesting signal; the
+    # sensitivity list further down is dominated by the (benign) time integrator.
+    cases_with_cancel = [r for r in results if r.get("cancellation_locs")]
+    if cases_with_cancel:
+        md.append("### Catastrophic cancellation origins (ranked by digits lost)\n")
+        md.append(
+            "> Subtraction of nearly-equal values loses leading significant digits. A double carries "
+            "~**16 significant digits** (53 bits); each entry shows how many that subtraction throws away "
+            "(worst case, a lower bound). Losing ~8 digits halves your accuracy; losing ~13+ leaves only "
+            "single-precision trust. Site *count* is not severity — one site losing many digits outweighs "
+            "many mild ones.\n"
+        )
+        for r in cases_with_cancel:
+            site_bits = r.get("cancellation_bits") or {}
+            # collapse continuation fragments to one entry per logical statement,
+            # keeping the worst bits-lost seen on that statement
+            stmts = {}  # (basename, stmt_start) -> {where, bits, text}
+            for fname, lineno in r["cancellation_locs"]:
+                stmt_start, _end, stmt_text = _statement_at(fname, lineno)
+                key = (os.path.basename(fname), stmt_start)
+                e = stmts.setdefault(key, {"where": f"{fname}:{stmt_start}", "bits": 0, "text": stmt_text})
+                e["bits"] = max(e["bits"], site_bits.get((fname, lineno), 0))
+            ordered = sorted(stmts.values(), key=lambda e: (-e["bits"], e["where"]))
+            if ordered:
+                w = ordered[0]
+                md.append(f"**`{r['name']}`** — {len(stmts)} statement(s); worst loses ≥ {w['bits'] / math.log2(10):.0f} of ~16 digits\n")
+            for e in ordered[:15]:
+                lost = e["bits"] / math.log2(10)
+                md.append(f"- **≥ {lost:.0f} digits lost** (~{_digits_left(e['bits']):.0f} of 16 left) — `{e['where']}`" + (f" — `{e['text']}`" if e["text"] else ""))
+            if len(ordered) > 15:
+                md.append(f"- _…and {len(ordered) - 15} more statement(s); see fp-stability-logs/_")
+            md.append("")
+
     # VPREC sweep — one column per bit level, ❌ where bits retained < floor
     if any(r["vprec"] for r in results):
         _labels = {52: "52b", 23: "23b", 16: "16b", 10: "10b"}
@@ -1660,11 +1714,12 @@ def _emit_github_summary(results: list, n_samples: int):
     # get re-rounded there. Not a culprit-finder for ill-conditioning.
     cases_with_locs = [r for r in results if r["dd_line_locs"]]
     if cases_with_locs:
-        md.append("### Single-precision sensitivity (dd\\_line)\n")
+        md.append("<details>")
+        md.append("<summary>Single-precision sensitivity (dd_line) — usually the time integrator; expand for details</summary>\n")
         md.append(
             "> Where reduced precision most moves the output — **typically the time integrator / "
-            "final accumulation, which is expected and benign**. This is *not* the same as where "
-            "cancellation originates; see **Catastrophic cancellation sites** below for that.\n"
+            "final accumulation, which is expected and benign**. This is *not* where cancellation "
+            "originates (that's the section above); it shows where precision matters most.\n"
         )
         _confirm_label = {True: "✅ confirmed", False: "⚠️ unconfirmed (suspect-only perturbation did not reproduce)", None: "— not checked"}
         for r in cases_with_locs:
@@ -1695,6 +1750,7 @@ def _emit_github_summary(results: list, n_samples: int):
             if len(r["dd_line_locs"]) > 10:
                 md.append(f"- _…and {len(r['dd_line_locs']) - 10} more hotspot(s); see fp-stability-logs/_")
             md.append("")
+        md.append("</details>\n")
 
     # dd_sym function names (collapsed, since less actionable than dd_line)
     cases_with_syms = [r for r in results if r["dd_sym_syms"]]
@@ -1706,37 +1762,6 @@ def _emit_github_summary(results: list, n_samples: int):
             for sym in r["dd_sym_syms"]:
                 md.append(f"- `{sym}`")
         md.append("\n</details>\n")
-
-    # Cancellation hotspots — the ORIGIN view (where ill-conditioning concentrates).
-    cases_with_cancel = [r for r in results if r.get("cancellation_locs")]
-    if cases_with_cancel:
-        md.append("### Catastrophic cancellation sites\n")
-        md.append(
-            "> Where cancellation actually originates (subtraction of nearly-equal values). "
-            f"**Severity = significant bits lost; severe = ≥ {CANCEL_SEVERE_BITS} bits.** Site *count* is "
-            "not severity — one severe site outweighs many mild ones, so the severe sites are listed "
-            "first. (Severe detection has no false positives but may under-count.)\n"
-        )
-        for r in cases_with_cancel:
-            severe = r.get("cancellation_severe") or set()
-            # collapse continuation fragments to one entry per logical statement,
-            # severe statements first (the ones that matter)
-            stmts = {}  # (basename, stmt_start) -> {where, severe, text}
-            for fname, lineno in sorted(r["cancellation_locs"]):
-                stmt_start, _end, stmt_text = _statement_at(fname, lineno)
-                key = (os.path.basename(fname), stmt_start)
-                entry = stmts.setdefault(key, {"where": f"{fname}:{stmt_start}", "severe": False, "text": stmt_text})
-                if (fname, lineno) in severe:
-                    entry["severe"] = True
-            ordered = sorted(stmts.values(), key=lambda e: (not e["severe"], e["where"]))
-            n_severe_stmt = sum(1 for e in ordered if e["severe"])
-            md.append(f"**`{r['name']}`** — {len(stmts)} statement(s), " f"**{n_severe_stmt} severe (≥ {CANCEL_SEVERE_BITS} bits lost)**\n")
-            for e in ordered[:15]:
-                sev = " **severe**" if e["severe"] else ""
-                md.append(f"- `{e['where']}`{sev}" + (f" — `{e['text']}`" if e["text"] else ""))
-            if len(ordered) > 15:
-                md.append(f"- _…and {len(ordered) - 15} more statement(s); see fp-stability-logs/_")
-            md.append("")
 
     # Float-max overflow sites
     cases_with_fmax = [r for r in results if r.get("float_max_locs")]
@@ -1844,7 +1869,7 @@ def fp_stability():
                 "dd_line_confirmed": None,
                 "dd_line_confirm_dev": None,
                 "cancellation_locs": [],
-                "cancellation_severe": set(),
+                "cancellation_bits": {},
                 "mca_dev": None,
                 "mca_sigbits": None,
                 "float_max_locs": [],

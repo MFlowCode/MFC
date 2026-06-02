@@ -10,6 +10,7 @@ from mfc.fp_stability import (
     MIN_SIG_BITS,
     _build_source_filter,
     _cancellation_by_file,
+    _cancellation_severity,
     _confirm_decision,
     _macro_context_in_lines,
     _mark_cancellation,
@@ -222,6 +223,23 @@ def test_cancellation_by_file_breaks_ties_by_name():
 
 def test_cancellation_by_file_empty():
     assert _cancellation_by_file([]) == []
+
+
+# --- per-site cancellation severity (bits lost), from a threshold sweep ---
+
+
+def test_cancellation_severity_takes_highest_surviving_threshold():
+    level_sites = [
+        (10, [("a.fpp", 1), ("b.fpp", 2)]),
+        (20, [("a.fpp", 1)]),
+        (30, [("a.fpp", 1)]),
+    ]
+    # a.fpp:1 survives to 30 bits; b.fpp:2 only at 10
+    assert _cancellation_severity(level_sites) == {("a.fpp", 1): 30, ("b.fpp", 2): 10}
+
+
+def test_cancellation_severity_empty():
+    assert _cancellation_severity([]) == {}
 
 
 # --- scale-free pass/fail: significant bits retained ---
