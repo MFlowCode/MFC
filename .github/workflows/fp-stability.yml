@@ -68,6 +68,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/verrou
+          # Keep these versions in sync with toolchain/bootstrap/verrou.sh (the builder).
           key: verrou-a58d434-valgrind-3.26.0-${{ runner.os }}
 
       - name: Install system dependencies
@@ -79,26 +80,10 @@ jobs:
 
       - name: Build Verrou
         if: steps.cache-verrou.outputs.cache-hit != 'true'
-        run: |
-          cd /tmp
-          wget -q https://sourceware.org/pub/valgrind/valgrind-3.26.0.tar.bz2
-          tar xf valgrind-3.26.0.tar.bz2
-
-          git clone https://github.com/edf-hpc/verrou.git
-          git -C verrou checkout a58d434
-
-          # Merge Verrou into Valgrind source tree and patch
-          cp -r verrou valgrind-3.26.0/verrou
-          cd valgrind-3.26.0
-          cat verrou/valgrind.*diff | patch -p1
-
-          ./autogen.sh
-          ./configure --enable-only64bit --prefix="$HOME/.local/verrou"
-          make -j"$(nproc)"
-          make install
+        run: bash toolchain/bootstrap/verrou.sh
 
       - name: Verify Verrou
-        run: ~/.local/verrou/bin/valgrind --version
+        run: ~/.local/verrou/bin/valgrind --tool=verrou --version
 
       - name: Build MFC (debug, serial)
         # FFLAGS=-fno-inline prevents gfortran from inlining small functions into
