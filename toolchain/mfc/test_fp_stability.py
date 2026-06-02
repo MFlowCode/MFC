@@ -10,14 +10,13 @@ from mfc.fp_stability_metrics import (
     MIN_SIG_BITS,
     _autodetect_compare,
     _build_source_filter,
-    _cancellation_by_file,
     _cancellation_severity,
     _confirm_decision,
+    _digits_left,
     _macro_context_in_lines,
     _mark_cancellation,
     _rank_locs,
     _sig_bits,
-    _stability_pass,
     _statement_bounds_in_lines,
 )
 
@@ -82,6 +81,16 @@ def test_macro_context_def_body_when_no_inner_loop():
         "#:enddef\n",
     ]
     assert _macro_context_in_lines(lines, 2) == "#:def"
+
+
+def test_macro_context_block_and_call_are_duplicating():
+    assert _macro_context_in_lines(["#:block B\n", "  a = b - c\n", "#:endblock\n"], 2) == "#:block"
+    assert _macro_context_in_lines(["#:call M()\n", "  a = b - c\n", "#:endcall\n"], 2) == "#:call"
+
+
+def test_macro_context_unbalanced_close_is_safe():
+    # a stray #:endfor with an empty stack must not crash or misreport
+    assert _macro_context_in_lines(["#:endfor\n", "  a = b - c\n"], 2) is None
 
 
 # --- #1: building the symbol-correct --source filter from --gen-source output ---
@@ -205,27 +214,6 @@ def test_mark_cancellation_false_for_different_basename():
     assert locs[0]["cancellation"] is False
 
 
-# --- cancellation-origin view: where cancellation concentrates ---
-
-
-def test_cancellation_by_file_counts_and_sorts_by_density():
-    locs = [
-        ("src/simulation/m_weno.fpp", 10),
-        ("m_weno.fpp", 20),
-        ("a/m_riemann_solvers.fpp", 5),
-    ]
-    assert _cancellation_by_file(locs) == [("m_weno.fpp", 2), ("m_riemann_solvers.fpp", 1)]
-
-
-def test_cancellation_by_file_breaks_ties_by_name():
-    locs = [("z.fpp", 1), ("a.fpp", 2)]
-    assert _cancellation_by_file(locs) == [("a.fpp", 1), ("z.fpp", 1)]
-
-
-def test_cancellation_by_file_empty():
-    assert _cancellation_by_file([]) == []
-
-
 # --- per-site cancellation severity (bits lost), from a threshold sweep ---
 
 
@@ -291,15 +279,14 @@ def test_sig_bits_deviation_at_scale_is_unstable():
     assert _sig_bits(1.0, 1.0) <= 0.0
 
 
-def test_stability_pass_uses_global_floor():
-    # well-conditioned: ~46 bits >= floor
-    assert _stability_pass(1e-14, 1.0, MIN_SIG_BITS) is True
-    # catastrophic: deviation at field scale -> fails
-    assert _stability_pass(0.5, 1.0, MIN_SIG_BITS) is False
-
-
 def test_min_sig_bits_is_single_precision_floor():
     assert MIN_SIG_BITS == 24
+
+
+def test_digits_left_full_and_clamped():
+    assert 15.5 < _digits_left(0) < 16.0  # full double ~ 16 sig digits
+    assert _digits_left(53) == 0.0
+    assert _digits_left(60) == 0.0  # clamp: never negative
 
 
 # --- Fortran line-continuation handling (correct-line labeling) ---
@@ -338,3 +325,57 @@ def test_statement_bounds_with_leading_ampersand_continuation():
     lines = ["  beta = x**2 &\n", "       & + eps\n"]
     assert _statement_bounds_in_lines(lines, 1) == (1, 2)
     assert _statement_bounds_in_lines(lines, 2) == (1, 2)
+
+
+# --- report emitters: must survive blank and populated result dicts (CI-only path) ---
+
+
+def _emit_to_tmp(results, tmp_path, monkeypatch):
+    """Run _emit_github_summary into a temp file under the GitHub-Actions env."""
+    from mfc import fp_stability_report as report
+
+    out = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(out))
+    monkeypatch.setenv("GITHUB_ACTIONS", "1")
+    report._emit_github_summary(results, 5)
+    return out.read_text()
+
+
+def test_emit_summary_survives_blank_result(tmp_path, monkeypatch):
+    # the dict produced on the per-case error path must not KeyError the emitter
+    from mfc.fp_stability import _blank_result
+
+    text = _emit_to_tmp([_blank_result("x")], tmp_path, monkeypatch)
+    assert "0 passed, 1 failed" in text
+
+
+def test_emit_summary_populated_result(tmp_path, monkeypatch):
+    from mfc.fp_stability import _blank_result
+
+    r = _blank_result("demo")
+    r.update(
+        passed=False,
+        max_dev=1e-9,
+        sig_bits=30.0,
+        float_proxy=1e-6,
+        vprec=[(52, 1e-14), (23, float("inf"))],  # exercises the "crash" branch
+        dd_line_locs=[{"path": "src/x/m_a.fpp", "start": 5, "end": 5, "macro": "#:for", "share": 0.4, "cancellation": True}],
+        dd_line_confirmed=False,
+        cancellation_locs=[("src/x/m_a.fpp", 5)],
+        cancellation_bits={("src/x/m_a.fpp", 5): 40},
+        float_max_locs=[("m_a.fpp", 9)],
+    )
+    text = _emit_to_tmp([r], tmp_path, monkeypatch)
+    assert "💥 crash" in text and "digits lost" in text
+
+
+def test_emit_annotations_downgrade_unconfirmed(tmp_path, monkeypatch, capsys):
+    from mfc import fp_stability_report as report
+    from mfc.fp_stability import _blank_result
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "1")
+    r = _blank_result("demo")
+    r.update(dd_line_locs=[{"path": "src/x/m_a.fpp", "start": 5, "end": 5, "macro": None, "share": 0.9, "cancellation": False}], dd_line_confirmed=False)
+    report._emit_github_annotations([r])
+    out = capsys.readouterr().out
+    assert "::notice" in out and "::warning" not in out  # unconfirmed -> notice, not warning

@@ -24,13 +24,14 @@ E. verrou_dd_line on failure, after dd_sym (--no-dd-line to skip)
    Each reported line is then *confirmed* by a positive control: --gen-source
    captures the symbol-correct executed lines, those are filtered to the suspect
    set, and a float-mode run with --source restricted to just them must
-   reproduce the instability.  Lines that do not reproduce it are reported as
-   unconfirmed (downgraded from ::warning:: to ::notice::).  Each line is then
-   perturbed alone and ranked by the share of the single-precision deviation it
-   reproduces.  NOTE: this is a *sensitivity* measure — where reduced precision
-   most moves the output — and is typically dominated by the time integrator /
-   final accumulation, NOT by where cancellation originates.  Stage F (and its
-   per-file density) is the cancellation-origin view; the two usually differ.
+   reproduce the instability.  If perturbing the suspect set does not reproduce
+   it, the case's hotspots are reported as unconfirmed (downgraded from
+   ::warning:: to ::notice::) — this is a single set-level verdict, not per line.
+   Each line is then perturbed alone and ranked by the share of the single-
+   precision deviation it reproduces.  NOTE: that share is a *sensitivity*
+   measure — where reduced precision most moves the output — typically dominated
+   by the time integrator / final accumulation, NOT by where cancellation
+   originates.  Stage F is the cancellation-origin view; the two usually differ.
    Hotspots are cross-referenced against the stage-F cancellation sites and
    flagged as instance-ambiguous when the .fpp line sits inside a #:for/#:def
    expansion.
@@ -550,23 +551,27 @@ def _run_case(
         if run_cancellation:
             cons.print("  [dim]cancellation detection...[/dim]")
             try:
-                # sweep bit thresholds to get per-site severity (bits lost)
+                # sweep bit thresholds to get per-site severity (bits lost); each
+                # run returns None if it failed (distinct from [] = ran, found none)
                 level_sites = [(level, _run_cancellation_check(verrou_bin, sim_bin, work_dir, threshold=level)) for level in CANCEL_BIT_LEVELS]
-                locs = level_sites[0][1]  # lowest threshold = full list
-                bits = _cancellation_severity(level_sites)
-                result["cancellation_locs"] = locs
-                result["cancellation_bits"] = bits
-                if locs:
-                    worst = max(bits.values()) if bits else 0
-                    cons.print(f"  cancellation: {len(locs)} site(s), worst loses ≥ {worst / math.log2(10):.0f} of ~16 digits")
+                locs = next((s for lvl, s in level_sites if lvl == CANCEL_BIT_LEVELS[0]), None)
+                if locs is None:
+                    cons.print("  [bold yellow]cancellation: detection run failed (see logs); not reported[/bold yellow]")
                 else:
-                    cons.print("  cancellation: none detected")
-                # cross-reference: label dd_line hotspots that sit on a cancellation site
-                if result["dd_line_locs"] and locs:
-                    _mark_cancellation(result["dd_line_locs"], locs)
-                    n_xref = sum(1 for loc in result["dd_line_locs"] if loc.get("cancellation"))
-                    if n_xref:
-                        cons.print(f"  {n_xref} hotspot(s) coincide with a catastrophic-cancellation site")
+                    bits = _cancellation_severity([(lvl, s) for lvl, s in level_sites if s is not None])
+                    result["cancellation_locs"] = locs
+                    result["cancellation_bits"] = bits
+                    if locs:
+                        worst = max(bits.values()) if bits else 0
+                        cons.print(f"  cancellation: {len(locs)} site(s), worst loses ≥ {worst / math.log2(10):.0f} of ~16 digits")
+                    else:
+                        cons.print("  cancellation: none detected")
+                    # cross-reference: label dd_line hotspots that sit on a cancellation site
+                    if result["dd_line_locs"] and locs:
+                        _mark_cancellation(result["dd_line_locs"], locs)
+                        n_xref = sum(1 for loc in result["dd_line_locs"] if loc.get("cancellation"))
+                        if n_xref:
+                            cons.print(f"  {n_xref} hotspot(s) coincide with a catastrophic-cancellation site")
             except Exception as exc:
                 cons.print(f"  [bold yellow]cancellation check error[/bold yellow]: {exc}")
 
@@ -574,11 +579,14 @@ def _run_case(
         if run_mca:
             cons.print(f"  [dim]MCA significant-bits estimate (N={n_samples})...[/dim]")
             try:
-                mca_dev, mca_sigbits = _run_mca_samples(case, verrou_bin, sim_bin, work_dir, ref_dir, n_samples)
-                result["mca_dev"] = mca_dev
-                result["mca_sigbits"] = mca_sigbits
-                bits_str = f"~{mca_sigbits} sig bits" if mca_sigbits is not None else "n/a"
-                cons.print(f"  MCA: dev={mca_dev:.3e}  ({bits_str})")
+                mca_dev, mca_sigbits, n_ok = _run_mca_samples(case, verrou_bin, sim_bin, work_dir, ref_dir, n_samples)
+                if n_ok == 0:
+                    cons.print(f"  [bold yellow]MCA: no samples completed (0/{n_samples}; see logs)[/bold yellow]")
+                else:
+                    result["mca_dev"] = mca_dev
+                    result["mca_sigbits"] = mca_sigbits
+                    bits_str = f"~{mca_sigbits} sig bits" if mca_sigbits is not None else "n/a"
+                    cons.print(f"  MCA: dev={mca_dev:.3e}  ({bits_str})  [{n_ok}/{n_samples} samples]")
             except Exception as exc:
                 cons.print(f"  [bold yellow]MCA error[/bold yellow]: {exc}")
 
@@ -587,11 +595,14 @@ def _run_case(
             cons.print("  [dim]float-max overflow check...[/dim]")
             try:
                 locs = _run_float_max_check(verrou_bin, sim_bin, work_dir)
-                result["float_max_locs"] = locs
-                if locs:
-                    cons.print(f"  [bold yellow]float-max[/bold yellow]: {len(locs)} overflow site(s)")
+                if locs is None:
+                    cons.print("  [bold yellow]float-max: run failed (see logs); not reported[/bold yellow]")
                 else:
-                    cons.print("  float-max: no overflows")
+                    result["float_max_locs"] = locs
+                    if locs:
+                        cons.print(f"  [bold yellow]float-max[/bold yellow]: {len(locs)} overflow site(s)")
+                    else:
+                        cons.print("  float-max: no overflows")
             except Exception as exc:
                 cons.print(f"  [bold yellow]float-max check error[/bold yellow]: {exc}")
 

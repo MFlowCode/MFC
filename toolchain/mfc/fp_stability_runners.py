@@ -118,9 +118,10 @@ def _run_simulation_verrou(
             shutil.copy2(os.path.join(tmpdir, "D", fn), run_dir)
 
 
-def _run_cancellation_check(verrou_bin: str, sim_bin: str, work_dir: str, threshold: int = 10) -> list:
+def _run_cancellation_check(verrou_bin: str, sim_bin: str, work_dir: str, threshold: int = 10):
     """Run --check-cancellation at the given bit threshold; return [(fname, line)]
-    of MFC cancellation sites (subtractions losing >= `threshold` significant bits)."""
+    of MFC cancellation sites (subtractions losing >= `threshold` significant bits),
+    or None if the run itself failed (distinct from [] = ran and found none)."""
     tag = f"cancellation_{threshold}"
     run_dir = os.path.join(work_dir, tag)
     os.makedirs(run_dir, exist_ok=True)
@@ -132,8 +133,9 @@ def _run_cancellation_check(verrou_bin: str, sim_bin: str, work_dir: str, thresh
     ]
     try:
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="nearest", extra_flags=flags)
-    except MFCException:
-        pass
+    except MFCException as exc:
+        cons.print(f"  [yellow]cancellation run (threshold {threshold}) failed: {exc}[/yellow]")
+        return None
     raw = _parse_cancel_gen(gen_path)
     filtered = [(f, ln) for f, ln in raw if _is_arithmetic_loc(f, ln, ln)]
     skipped = len(raw) - len(filtered)
@@ -150,10 +152,12 @@ def _run_mca_samples(
     ref_dir: str,
     n_mca: int,
 ) -> tuple:
-    """Run N mcaquad samples; return (max_dev, sig_bits_lower_bound)."""
+    """Run N mcaquad samples; return (max_dev, sig_bits_lower_bound, n_ok) where
+    n_ok is how many samples actually completed (0 => no usable measurement)."""
     compare = case["compare"]
     ref_scale = _max_abs_np(ref_dir, compare)
     max_dev = 0.0
+    n_ok = 0
     flags = ["--backend=mcaquad", "--mca-mode=mca"]
     for i in range(n_mca):
         run_dir = os.path.join(work_dir, f"mca_{i:02d}")
@@ -161,16 +165,18 @@ def _run_mca_samples(
         try:
             _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, extra_flags=flags)
             max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
-        except MFCException:
-            pass
+            n_ok += 1
+        except MFCException as exc:
+            cons.print(f"  [dim]MCA sample {i} failed: {exc}[/dim]")
     sig_bits = None
-    if max_dev > 0.0 and ref_scale > 0.0:
+    if n_ok and max_dev > 0.0 and ref_scale > 0.0:
         sig_bits = max(0, int(math.floor(-math.log2(max_dev / ref_scale))))
-    return max_dev, sig_bits
+    return max_dev, sig_bits, n_ok
 
 
-def _run_float_max_check(verrou_bin: str, sim_bin: str, work_dir: str) -> list:
-    """Run with --check-max-float=yes; return [(fname, line)] of overflow sites."""
+def _run_float_max_check(verrou_bin: str, sim_bin: str, work_dir: str):
+    """Run with --check-max-float=yes; return [(fname, line)] of overflow sites,
+    or None if the run failed (distinct from [] = ran and found none)."""
     run_dir = os.path.join(work_dir, "float_max")
     os.makedirs(run_dir, exist_ok=True)
     try:
@@ -182,8 +188,9 @@ def _run_float_max_check(verrou_bin: str, sim_bin: str, work_dir: str) -> list:
             rounding_mode="nearest",
             extra_flags=["--check-max-float=yes"],
         )
-    except MFCException:
-        pass
+    except MFCException as exc:
+        cons.print(f"  [yellow]float-max run failed: {exc}[/yellow]")
+        return None
     return _parse_vg_error_locs(os.path.join(run_dir, "verrou.log"), "Max float")
 
 
@@ -291,8 +298,8 @@ def _write_dd_cmp_py(path: str, compare_files: list, threshold: float):
             if not os.path.exists(ref_p) or not os.path.exists(run_p):
                 print(f"MISSING: {{fname}}")
                 sys.exit(1)
-            ref = np.loadtxt(ref_p)[:, 1]
-            run = np.loadtxt(run_p)[:, 1]
+            ref = np.atleast_2d(np.loadtxt(ref_p))[:, 1]
+            run = np.atleast_2d(np.loadtxt(run_p))[:, 1]
             dev = float(np.max(np.abs(ref - run)))
             max_dev = max(max_dev, dev)
 

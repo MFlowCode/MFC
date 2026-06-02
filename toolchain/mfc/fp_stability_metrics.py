@@ -58,11 +58,6 @@ def _sig_bits(max_dev: float, ref_scale: float) -> float:
     return -math.log2(max_dev / ref_scale)
 
 
-def _stability_pass(max_dev: float, ref_scale: float, floor: float) -> bool:
-    """A case passes when it retains at least `floor` significant bits."""
-    return _sig_bits(max_dev, ref_scale) >= floor
-
-
 # Matches "path/file.f90:123" or "path/file.fpp:123-456" in dd_line rddmin_summary.
 _LOC_RE = re.compile(r"(\S+\.(?:f90|fpp|c|cpp|h|F90))\s*:(\d+)(?:-(\d+))?", re.IGNORECASE)
 
@@ -232,6 +227,14 @@ def _get_source_context(fname: str, lineno: int, context: int = 2) -> str:
     return "\n".join(rows)
 
 
+def _dat_column(path: str):
+    """Load column 1 (the field value) from an MFC .dat file, robust to a
+    single-row file (np.loadtxt returns 1-D then, which [:, 1] would crash on)."""
+    import numpy as np
+
+    return np.atleast_2d(np.loadtxt(path))[:, 1]
+
+
 def _max_diff_np(ref_dir: str, run_dir: str, compare_files: list) -> float:
     import numpy as np
 
@@ -240,9 +243,7 @@ def _max_diff_np(ref_dir: str, run_dir: str, compare_files: list) -> float:
         ref_p, run_p = os.path.join(ref_dir, fname), os.path.join(run_dir, fname)
         if not os.path.exists(ref_p) or not os.path.exists(run_p):
             return float("inf")
-        ref = np.loadtxt(ref_p)[:, 1]
-        run = np.loadtxt(run_p)[:, 1]
-        total = max(total, float(np.max(np.abs(ref - run))))
+        total = max(total, float(np.max(np.abs(_dat_column(ref_p) - _dat_column(run_p)))))
     return total
 
 
@@ -255,8 +256,7 @@ def _max_abs_np(ref_dir: str, compare_files: list) -> float:
         ref_p = os.path.join(ref_dir, fname)
         if not os.path.exists(ref_p):
             continue
-        ref = np.loadtxt(ref_p)[:, 1]
-        total = max(total, float(np.max(np.abs(ref))))
+        total = max(total, float(np.max(np.abs(_dat_column(ref_p)))))
     return total
 
 
@@ -321,7 +321,8 @@ def _parse_vg_error_locs(log_path: str, error_keyword: str) -> list:
 # Verrou exposes no per-site bit-count, but --cc-threshold-double is a severity
 # filter: a site is reported only if it lost >= the threshold bits. Sweeping these
 # levels and taking the highest each site survives gives a per-site "bits lost"
-# severity (a lower bound — no false positives). 48 ~ full double mantissa.
+# severity (a lower bound — no false positives). 48 is near the full 53-bit
+# double mantissa (the top of the sweep), not the mantissa width itself.
 CANCEL_BIT_LEVELS = [10, 20, 30, 40, 48]
 
 
@@ -474,19 +475,3 @@ def _mark_cancellation(dd_line_locs: list, cancellation_locs: list) -> list:
         lines = by_base.get(os.path.basename(loc["path"]), set())
         loc["cancellation"] = any(ln in lines for ln in range(loc["start"], loc["end"] + 1))
     return dd_line_locs
-
-
-def _cancellation_by_file(cancellation_locs: list) -> list:
-    """Aggregate cancellation sites by source file → [(basename, count)] sorted by
-    count (desc), ties by name.
-
-    This is the cancellation-*origin* view (where ill-conditioning concentrates),
-    as opposed to the per-line --source share, which is a *sensitivity* view
-    (where reduced precision most moves the output — typically the time
-    integrator / final accumulation, regardless of where error originates).
-    """
-    counts = {}
-    for fname, _lineno in cancellation_locs:
-        base = os.path.basename(fname)
-        counts[base] = counts.get(base, 0) + 1
-    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
