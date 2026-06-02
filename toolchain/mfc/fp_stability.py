@@ -48,15 +48,6 @@ H. Float-max overflow detection (--no-float-max to skip)
    One run with --check-max-float=yes; reports locations where a
    double→float conversion would overflow to ±Inf.
 
-I. Per-instance disambiguation (--precision-sim-binary PATH; opt-in)
-   A fypp #:for/#:def expansion collapses many generated computations onto one
-   .fpp line, so a macro-ambiguous hotspot cannot be pinned to a single runtime
-   instance.  Given a simulation binary built with `--fp-precision-lines` (markers
-   stripped so each instance is a distinct line, plus .linemap.json sidecars), the
-   most flagrant macro-ambiguous hotspot is disambiguated: each expanded instance
-   is perturbed alone on the precision binary, ranking them to the responsible
-   instance and showing its concrete generated code.
-
 Logs are saved to fp-stability-logs/ and uploaded as CI artifacts.
 On GitHub Actions: a step summary table and ::warning:: file annotations
 are emitted automatically so failing source lines appear in the PR diff.
@@ -95,7 +86,6 @@ from .fp_stability_report import (
     _emit_github_summary,
 )
 from .fp_stability_runners import (
-    _disambiguate_instances,
     _find_binary,
     _find_verrou,
     _run_cancellation_check,
@@ -419,7 +409,6 @@ def _run_case(
     run_cancellation: bool,
     run_mca: bool,
     run_float_max: bool,
-    prec_sim_bin: str = None,
 ) -> dict:
     name = case["name"]
     compare = case["compare"]
@@ -542,24 +531,6 @@ def _run_case(
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_line confirmation error[/bold yellow]: {exc}")
 
-        # --- E3: per-instance disambiguation of the most flagrant macro-ambiguous hotspot ---
-        if prec_sim_bin and result["dd_line_locs"]:
-            macro_loc = next((loc for loc in result["dd_line_locs"] if loc.get("macro")), None)
-            if macro_loc:
-                cons.print(f"  [dim]disambiguating fypp instances of {macro_loc['path']}:{macro_loc['start']} (precision binary)...[/dim]")
-                try:
-                    insts = _disambiguate_instances(case, prec_sim_bin, verrou_bin, work_dir, macro_loc["path"], macro_loc["start"])
-                    macro_loc["instances"] = insts
-                    if insts and insts[0]["dev"] > 0:
-                        win = insts[0]
-                        cons.print(f"  flagrant instance: #{win['instance']} (.f90:{win['physline']}, dev={win['dev']:.3e})  {win['snippet']}")
-                    elif insts:
-                        cons.print(f"  [dim]{len(insts)} instance(s) enumerated; none perturbed measurably (hotspot inert)[/dim]")
-                    else:
-                        cons.print("  [dim]no sidecar instances found for this hotspot[/dim]")
-                except Exception as exc:
-                    cons.print(f"  [bold yellow]instance disambiguation error[/bold yellow]: {exc}")
-
         # --- F: cancellation detection ---
         if run_cancellation:
             cons.print("  [dim]cancellation detection...[/dim]")
@@ -638,9 +609,6 @@ def fp_stability():
     run_cancellation = not ARG("no_cancellation")
     run_mca = not ARG("no_mca")
     run_float_max = not ARG("no_float_max")
-    prec_sim_bin = ARG("precision_sim_binary")
-    if prec_sim_bin and not os.path.isfile(prec_sim_bin):
-        raise MFCException(f"precision simulation binary not found: {prec_sim_bin}")
 
     log_dir = os.path.join(MFC_ROOT_DIR, "fp-stability-logs")
     os.makedirs(log_dir, exist_ok=True)
@@ -650,8 +618,6 @@ def fp_stability():
     cons.print(f"  verrou:      {verrou_bin}")
     cons.print(f"  simulation:  {sim_bin}")
     cons.print(f"  pre_process: {pp_bin}")
-    if prec_sim_bin:
-        cons.print(f"  precision:   {prec_sim_bin}  (per-instance disambiguation)")
     cons.print(f"  samples:     {n_samples}")
     features = []
     if run_float:
@@ -690,7 +656,6 @@ def fp_stability():
                 run_cancellation,
                 run_mca,
                 run_float_max,
-                prec_sim_bin,
             )
         except MFCException as exc:
             cons.print(f"  [bold red]ERROR[/bold red]: {exc}")

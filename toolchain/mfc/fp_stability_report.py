@@ -201,9 +201,6 @@ def _emit_github_summary(results: list, n_samples: int):
                     tags.append(f"_{loc['macro']}-expanded, may represent multiple instances_")
                 suffix = f" — {', '.join(tags)}" if tags else ""
                 md.append(f"- `{where}`{suffix}")
-                for inst in loc.get("instances", [])[:8]:
-                    flag = " ⟵ flagrant" if inst is loc["instances"][0] and inst["dev"] > 0 else ""
-                    md.append(f"  - instance #{inst['instance']} (`.f90:{inst['physline']}`, dev={inst['dev']:.2e}){flag}: `{inst['snippet']}`")
                 snippet = _get_source_context(rel_path, start)
                 if snippet:
                     md.append("  ```fortran")

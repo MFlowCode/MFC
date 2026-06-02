@@ -28,7 +28,6 @@ from .fp_stability_metrics import (
     _parse_rddmin_syms,
     _parse_vg_error_locs,
     _rank_locs,
-    _read_source_line,
 )
 from .printer import cons
 
@@ -477,54 +476,3 @@ def _run_confirmation(case, verrou_bin, sim_bin, work_dir, ref_dir, dd_line_locs
             loc["share_dev"] = _source_perturb_dev(verrou_bin, sim_bin, work_dir, ref_dir, conf_dir, one, compare, f"line{i:02d}") if one else 0.0
     ranked = _rank_locs(dd_line_locs, total=(float_proxy or set_dev))
     return confirmed, set_dev, ranked
-
-
-def _disambiguate_instances(case, prec_sim_bin, verrou_bin, work_dir, hotspot_file, hotspot_line):
-    """Rank the individual fypp-expanded instances of a macro-ambiguous hotspot.
-
-    Uses a precision binary (built with --fp-precision-lines) in which each
-    expanded instance of hotspot_file:hotspot_line compiles to a distinct
-    physical .f90 line.  The sidecar enumerates those physical lines; each is
-    perturbed alone (float mode, vs the precision binary's own nearest-rounding
-    reference) so the dominant instance is identified.
-
-    Returns a list of {instance, physline, dev, snippet} sorted most-flagrant
-    first (empty if no sidecar / no instrumented instances).
-    """
-    from . import fp_precision_lines as fpl
-
-    sidecar_dir = fpl.sidecar_dir_for_binary(prec_sim_bin)
-    sidecar = fpl.load_sidecar(fpl.sidecar_path(sidecar_dir, hotspot_file))
-    instances = fpl.instances_of(sidecar, hotspot_file, hotspot_line)
-    if not instances:
-        return []
-
-    prec_dir = os.path.join(work_dir, "precision")
-    ref_dir = os.path.join(prec_dir, "ref")
-    os.makedirs(ref_dir, exist_ok=True)
-    try:
-        _run_simulation_verrou(verrou_bin, prec_sim_bin, work_dir, ref_dir, rounding_mode="nearest")
-    except MFCException:
-        return []
-    gen_lines = _capture_gen_source(verrou_bin, prec_sim_bin, work_dir, prec_dir, os.path.join(prec_dir, "gen_source.txt"))
-    if gen_lines is None:
-        return []
-
-    f90_file = os.path.join(sidecar_dir, os.path.basename(hotspot_file) + ".f90")
-    compare = case["compare"]
-    results = []
-    for physline, instance in instances:
-        src = _build_source_filter(gen_lines, [(f90_file, physline, physline)])
-        if not src:
-            continue  # this instance performs no instrumented FP op
-        dev = _source_perturb_dev(verrou_bin, prec_sim_bin, work_dir, ref_dir, prec_dir, src, compare, f"inst{instance:02d}")
-        results.append(
-            {
-                "instance": instance,
-                "physline": physline,
-                "dev": dev or 0.0,
-                "snippet": _read_source_line(f90_file, physline).strip(),
-            }
-        )
-    results.sort(key=lambda r: r["dev"], reverse=True)
-    return results
