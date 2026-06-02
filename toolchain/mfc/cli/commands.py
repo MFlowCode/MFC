@@ -919,6 +919,14 @@ FP_STABILITY_COMMAND = Command(
         "  float-max      --check-max-float detection of double→float overflow sites\n"
     ),
     include_common=["mfc_config", "verbose", "debug_log"],
+    positionals=[
+        Positional(
+            name="input",
+            help="Optional case .py to analyze instead of the built-in suite (run as a single serial CPU process under Verrou; must be small/short).",
+            nargs="?",
+            completion=Completion(type=CompletionType.FILES_PY),
+        ),
+    ],
     arguments=[
         Argument(
             name="sim-binary",
@@ -997,7 +1005,8 @@ FP_STABILITY_COMMAND = Command(
         ),
     ],
     examples=[
-        Example("./mfc.sh fp-stability", "Auto-discover binaries and run all cases"),
+        Example("./mfc.sh fp-stability", "Auto-discover binaries and run the built-in suite"),
+        Example("./mfc.sh fp-stability my_case.py", "Analyze your own case (small/short, serial, CPU)"),
         Example(
             "./mfc.sh fp-stability --sim-binary build/install/abc123/bin/simulation",
             "Specify simulation binary explicitly",

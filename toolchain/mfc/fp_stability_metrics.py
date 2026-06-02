@@ -16,6 +16,24 @@ from .printer import cons
 # 52 = full double, 23 = single, 16 = half-ish, 10 = ultra-low.
 VPREC_MANTISSA_BITS = [52, 23, 16, 10]
 
+_OUTPUT_DAT = re.compile(r"^(cons|prim)\.\d+\.\d+\.(\d+)\.dat$")
+
+
+def _autodetect_compare(filenames: list) -> list:
+    """Pick the D/ output files to diff for a user-supplied case: the conserved-
+    variable files at the latest written time step (falling back to primitive
+    files if none are written). Returns [] if the case produced no field output."""
+    by_step = {}
+    for f in filenames:
+        m = _OUTPUT_DAT.match(os.path.basename(f))
+        if m:
+            by_step.setdefault(int(m.group(2)), {"cons": [], "prim": []})[m.group(1)].append(os.path.basename(f))
+    if not by_step:
+        return []
+    last = by_step[max(by_step)]
+    return sorted(last["cons"] or last["prim"])
+
+
 # Stability pass/fail (stage A) is scale-free: a case must retain at least this
 # many significant bits under random rounding (sig_bits = -log2(max_dev/scale)).
 # 24 ~= single precision. One global floor replaces per-case absolute thresholds

@@ -75,6 +75,7 @@ from .common import MFC_ROOT_DIR, MFCException
 from .fp_stability_metrics import (
     CANCEL_BIT_LEVELS,
     MIN_SIG_BITS,
+    _autodetect_compare,
     _cancellation_severity,
     _mark_cancellation,
     _max_abs_np,
@@ -431,6 +432,15 @@ def _run_case(
         cons.print("  [dim]reference run (rounding=nearest)...[/dim]")
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, ref_dir, rounding_mode="nearest")
 
+        # For a user case with no fixed compare list, diff whatever the reference
+        # run actually wrote (conserved vars at the final step).
+        if not compare:
+            compare = _autodetect_compare(os.listdir(ref_dir))
+            case["compare"] = compare
+            if not compare:
+                raise MFCException("case produced no cons.*/prim.* output to compare (check t_step_save/t_step_stop and parallel_io)")
+            cons.print(f"  [dim]comparing: {', '.join(compare)}[/dim]")
+
         # --- A: random-rounding stability samples ---
         # Pass/fail is scale-free: bits retained = -log2(max_dev / field-scale),
         # vs one global floor (no per-case hand-tuned absolute threshold).
@@ -587,6 +597,51 @@ def _run_case(
     return result
 
 
+# Verrou is ~30x slower and the suite runs the simulation many times, so a user
+# case must be a small, short, single-process proxy. Work = cells x time steps;
+# both a huge grid and a long run are rejected (built-in cases are ~1k cell-steps).
+FP_CASE_MAX_CELLS = 100_000
+FP_CASE_MAX_WORK = 200_000  # cells x t_step_stop
+
+
+def _load_user_case(input_path: str) -> dict:
+    """Build a single fp-stability case from a user case .py.
+
+    The case is run as ONE serial CPU process under Verrou (so it must be small
+    and short — a coarsened proxy of a production run, not the real thing); a grid
+    too large to be feasible errors. The output files to compare are auto-detected
+    from the reference run, so 'compare' is left empty here.
+    """
+    from .run import input as run_input  # lazy import: avoids a circular import
+
+    params = run_input.load(input_path, None, {}, do_print=False).params
+    # Force serial .dat I/O: the suite runs the no-MPI binary as one process and
+    # diffs serial cons.*/prim.* files (not the parallel SILO/HDF5 path).
+    params["parallel_io"] = "F"
+    m, n, p = (int(params.get(k, 0) or 0) for k in ("m", "n", "p"))
+    cells = (m + 1) * (n + 1) * (p + 1)
+    t_stop = int(params.get("t_step_stop", 0) or 0)
+    work = cells * max(t_stop, 1)
+    if cells > FP_CASE_MAX_CELLS:
+        raise MFCException(f"case has {cells:,} cells — too large for Verrou (~30x slowdown, run many times). " f"Use a coarsened proxy (<= {FP_CASE_MAX_CELLS:,} cells).")
+    if work > FP_CASE_MAX_WORK:
+        raise MFCException(
+            f"case is ~{work:,} cell-steps ({cells:,} cells x {t_stop} time steps) — too slow under "
+            f"Verrou (~30x, run many times). Reduce m/n/p or t_step_stop (target <= {FP_CASE_MAX_WORK:,} cell-steps)."
+        )
+    stem = os.path.splitext(os.path.basename(input_path))[0]
+    if stem == "case":  # examples/<name>/case.py — the dir name is more telling
+        stem = os.path.basename(os.path.dirname(os.path.abspath(input_path))) or stem
+    return {
+        "name": stem,
+        "description": f"user case {input_path} ({cells} cells, run single-rank on CPU)",
+        "compare": [],  # auto-detected from the reference run's output
+        "ill_cond": "",
+        "pre": params,
+        "sim": params,
+    }
+
+
 def fp_stability():
     verrou_bin = ARG("verrou_binary") or _find_verrou()
     if not verrou_bin or not os.path.isfile(verrou_bin):
@@ -610,6 +665,8 @@ def fp_stability():
     run_mca = not ARG("no_mca")
     run_float_max = not ARG("no_float_max")
 
+    cases_to_run = [_load_user_case(ARG("input"))] if ARG("input") else CASES
+
     log_dir = os.path.join(MFC_ROOT_DIR, "fp-stability-logs")
     os.makedirs(log_dir, exist_ok=True)
 
@@ -618,6 +675,8 @@ def fp_stability():
     cons.print(f"  verrou:      {verrou_bin}")
     cons.print(f"  simulation:  {sim_bin}")
     cons.print(f"  pre_process: {pp_bin}")
+    if ARG("input"):
+        cons.print(f"  case:        {ARG('input')}  (single serial CPU run under Verrou)")
     cons.print(f"  samples:     {n_samples}")
     features = []
     if run_float:
@@ -640,7 +699,7 @@ def fp_stability():
 
     start = time.time()
     results = []
-    for case in CASES:
+    for case in cases_to_run:
         try:
             r = _run_case(
                 case,

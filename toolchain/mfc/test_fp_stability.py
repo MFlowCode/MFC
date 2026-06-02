@@ -8,6 +8,7 @@ label results, so they can run without Verrou or built binaries.
 
 from mfc.fp_stability_metrics import (
     MIN_SIG_BITS,
+    _autodetect_compare,
     _build_source_filter,
     _cancellation_by_file,
     _cancellation_severity,
@@ -240,6 +241,28 @@ def test_cancellation_severity_takes_highest_surviving_threshold():
 
 def test_cancellation_severity_empty():
     assert _cancellation_severity([]) == {}
+
+
+# --- auto-detect which output files to compare (for a user case) ---
+
+
+def test_autodetect_compare_picks_cons_at_latest_step():
+    fns = [
+        "cons.1.00.000000.dat",
+        "cons.1.00.000050.dat",
+        "cons.2.00.000050.dat",
+        "prim.1.00.000050.dat",
+    ]
+    assert _autodetect_compare(fns) == ["cons.1.00.000050.dat", "cons.2.00.000050.dat"]
+
+
+def test_autodetect_compare_falls_back_to_prim_when_no_cons():
+    fns = ["prim.1.00.000010.dat", "prim.3.00.000010.dat"]
+    assert _autodetect_compare(fns) == ["prim.1.00.000010.dat", "prim.3.00.000010.dat"]
+
+
+def test_autodetect_compare_empty_when_no_field_output():
+    assert _autodetect_compare(["indices.dat", "pre_time_data.dat", "foo.txt"]) == []
 
 
 # --- scale-free pass/fail: significant bits retained ---
