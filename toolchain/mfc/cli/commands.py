@@ -141,6 +141,13 @@ BUILD_COMMAND = Command(
             default=False,
             dest="deps_only",
         ),
+        Argument(
+            name="fp-precision-lines",
+            help="(fp-stability) Strip fypp line markers so each expanded instance gets a distinct line; emits sidecars for per-instance attribution.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="fp_precision_lines",
+        ),
     ],
     examples=[
         Example("./mfc.sh build", "Build all default targets (CPU)"),
@@ -936,6 +943,13 @@ FP_STABILITY_COMMAND = Command(
             name="verrou-binary",
             help="Path to a Verrou-enabled valgrind binary. Defaults to $VERROU_HOME/bin/valgrind or $HOME/.local/verrou/bin/valgrind.",
             default=None,
+            metavar="PATH",
+        ),
+        Argument(
+            name="precision-sim-binary",
+            help="Path to a simulation binary built with --fp-precision-lines. When given, macro-ambiguous hotspots are disambiguated to the individual fypp-expanded instance.",
+            default=None,
+            dest="precision_sim_binary",
             metavar="PATH",
         ),
         Argument(

@@ -44,6 +44,15 @@ H. Float-max overflow detection (--no-float-max to skip)
    One run with --check-max-float=yes; reports locations where a
    double→float conversion would overflow to ±Inf.
 
+I. Per-instance disambiguation (--precision-sim-binary PATH; opt-in)
+   A fypp #:for/#:def expansion collapses many generated computations onto one
+   .fpp line, so a macro-ambiguous hotspot cannot be pinned to a single runtime
+   instance.  Given a simulation binary built with `--fp-precision-lines` (markers
+   stripped so each instance is a distinct line, plus .linemap.json sidecars), the
+   most flagrant macro-ambiguous hotspot is disambiguated: each expanded instance
+   is perturbed alone on the precision binary, ranking them to the responsible
+   instance and showing its concrete generated code.
+
 Logs are saved to fp-stability-logs/ and uploaded as CI artifacts.
 On GitHub Actions: a step summary table and ::warning:: file annotations
 are emitted automatically so failing source lines appear in the PR diff.
@@ -1149,6 +1158,67 @@ def _run_confirmation(case, verrou_bin, sim_bin, work_dir, ref_dir, dd_line_locs
     return confirmed, set_dev, ranked
 
 
+def _disambiguate_instances(case, prec_sim_bin, verrou_bin, work_dir, hotspot_file, hotspot_line):
+    """Rank the individual fypp-expanded instances of a macro-ambiguous hotspot.
+
+    Uses a precision binary (built with --fp-precision-lines) in which each
+    expanded instance of hotspot_file:hotspot_line compiles to a distinct
+    physical .f90 line.  The sidecar enumerates those physical lines; each is
+    perturbed alone (float mode, vs the precision binary's own nearest-rounding
+    reference) so the dominant instance is identified.
+
+    Returns a list of {instance, physline, dev, snippet} sorted most-flagrant
+    first (empty if no sidecar / no instrumented instances).
+    """
+    from . import fp_precision_lines as fpl
+
+    sidecar_dir = fpl.sidecar_dir_for_binary(prec_sim_bin)
+    sidecar = fpl.load_sidecar(fpl.sidecar_path(sidecar_dir, hotspot_file))
+    instances = fpl.instances_of(sidecar, hotspot_file, hotspot_line)
+    if not instances:
+        return []
+
+    prec_dir = os.path.join(work_dir, "precision")
+    ref_dir = os.path.join(prec_dir, "ref")
+    os.makedirs(ref_dir, exist_ok=True)
+    gen_path = os.path.join(prec_dir, "gen_source.txt")
+    try:
+        _run_simulation_verrou(verrou_bin, prec_sim_bin, work_dir, ref_dir, rounding_mode="nearest")
+        _run_simulation_verrou(
+            verrou_bin,
+            prec_sim_bin,
+            work_dir,
+            prec_dir,
+            rounding_mode="nearest",
+            extra_flags=[f"--gen-source={gen_path}"],
+        )
+    except MFCException:
+        return []
+    if not os.path.isfile(gen_path):
+        return []
+    with open(gen_path) as fh:
+        gen_lines = fh.readlines()
+
+    f90_file = os.path.join(sidecar_dir, os.path.basename(hotspot_file) + ".f90")
+    compare = case["compare"]
+    results = []
+    for physline, instance in instances:
+        src = _build_source_filter(gen_lines, [(f90_file, physline, physline)])
+        if not src:
+            continue  # this instance performs no instrumented FP op
+        dev = _source_perturb_dev(verrou_bin, prec_sim_bin, work_dir, ref_dir, prec_dir, src, compare, f"inst{instance:02d}")
+        results.append(
+            {
+                "instance": instance,
+                "physline": physline,
+                "dev": dev or 0.0,
+                "snippet": _read_source_line(f90_file, physline).strip(),
+            }
+        )
+    results.sort(key=lambda r: r["dev"], reverse=True)
+    return results
+
+
 def _run_case(
     case: dict,
     verrou_bin: str,
@@ -1163,6 +1233,7 @@ def _run_case(
     run_cancellation: bool,
     run_mca: bool,
     run_float_max: bool,
+    prec_sim_bin: str = None,
 ) -> dict:
     name = case["name"]
     threshold = case["threshold"]
@@ -1293,6 +1364,24 @@ def _run_case(
                     cons.print(f"  most flagrant: {top['path']}:{top['start']} ({top['share'] * 100:.0f}% of float-proxy)")
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_line confirmation error[/bold yellow]: {exc}")
+
+        # --- E3: per-instance disambiguation of the most flagrant macro-ambiguous hotspot ---
+        if prec_sim_bin and result["dd_line_locs"]:
+            macro_loc = next((loc for loc in result["dd_line_locs"] if loc.get("macro")), None)
+            if macro_loc:
+                cons.print(f"  [dim]disambiguating fypp instances of {macro_loc['path']}:{macro_loc['start']} (precision binary)...[/dim]")
+                try:
+                    insts = _disambiguate_instances(case, prec_sim_bin, verrou_bin, work_dir, macro_loc["path"], macro_loc["start"])
+                    macro_loc["instances"] = insts
+                    if insts and insts[0]["dev"] > 0:
+                        win = insts[0]
+                        cons.print(f"  flagrant instance: #{win['instance']} (.f90:{win['physline']}, dev={win['dev']:.3e})  {win['snippet']}")
+                    elif insts:
+                        cons.print(f"  [dim]{len(insts)} instance(s) enumerated; none perturbed measurably (hotspot inert)[/dim]")
+                    else:
+                        cons.print("  [dim]no sidecar instances found for this hotspot[/dim]")
+                except Exception as exc:
+                    cons.print(f"  [bold yellow]instance disambiguation error[/bold yellow]: {exc}")
 
         # --- F: cancellation detection ---
         if run_cancellation:
@@ -1460,6 +1549,9 @@ def _emit_github_summary(results: list, n_samples: int):
                     tags.append(f"_{loc['macro']}-expanded, may represent multiple instances_")
                 suffix = f" — {', '.join(tags)}" if tags else ""
                 md.append(f"- `{where}`{suffix}")
+                for inst in loc.get("instances", [])[:8]:
+                    flag = " ⟵ flagrant" if inst is loc["instances"][0] and inst["dev"] > 0 else ""
+                    md.append(f"  - instance #{inst['instance']} (`.f90:{inst['physline']}`, dev={inst['dev']:.2e}){flag}: `{inst['snippet']}`")
                 snippet = _get_source_context(rel_path, start)
                 if snippet:
                     md.append("  ```fortran")
@@ -1531,6 +1623,9 @@ def fp_stability():
     run_cancellation = not ARG("no_cancellation")
     run_mca = not ARG("no_mca")
     run_float_max = not ARG("no_float_max")
+    prec_sim_bin = ARG("precision_sim_binary")
+    if prec_sim_bin and not os.path.isfile(prec_sim_bin):
+        raise MFCException(f"precision simulation binary not found: {prec_sim_bin}")
 
     log_dir = os.path.join(MFC_ROOT_DIR, "fp-stability-logs")
     os.makedirs(log_dir, exist_ok=True)
@@ -1540,6 +1635,8 @@ def fp_stability():
     cons.print(f"  verrou:      {verrou_bin}")
     cons.print(f"  simulation:  {sim_bin}")
     cons.print(f"  pre_process: {pp_bin}")
+    if prec_sim_bin:
+        cons.print(f"  precision:   {prec_sim_bin}  (per-instance disambiguation)")
     cons.print(f"  samples:     {n_samples}")
     features = []
     if run_float:
@@ -1578,6 +1675,7 @@ def fp_stability():
                 run_cancellation,
                 run_mca,
                 run_float_max,
+                prec_sim_bin,
             )
         except MFCException as exc:
             cons.print(f"  [bold red]ERROR[/bold red]: {exc}")

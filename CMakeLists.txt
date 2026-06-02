@@ -31,6 +31,7 @@ option(MFC_DOCUMENTATION "Build documentation"                               OFF
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
 option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
+option(MFC_FP_PRECISION_LINES "Strip fypp markers for per-instance fp-stability attribution" OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -433,8 +434,24 @@ macro(HANDLE_SOURCES target useCommon)
         cmake_path(GET fpp FILENAME fpp_filename)
         set(f90 "${CMAKE_BINARY_DIR}/fypp/${target}/${fpp_filename}.f90")
 
+        # In a precision-lines build, Fypp writes a marked intermediate that is
+        # then stripped of its line markers (so each expanded instance compiles
+        # to a distinct physical line) before compilation; the strip step emits a
+        # .linemap.json sidecar.  Otherwise Fypp writes ${f90} directly.  Only the
+        # simulation target is analyzed by fp-stability, so pre/post_process are
+        # always built normally.
+        set(_precision_lines OFF)
+        if (MFC_FP_PRECISION_LINES AND "${target}" STREQUAL "simulation")
+            set(_precision_lines ON)
+        endif()
+        if (_precision_lines)
+            set(f90_out "${CMAKE_BINARY_DIR}/fypp/${target}/${fpp_filename}.marked.f90")
+        else()
+            set(f90_out "${f90}")
+        endif()
+
         add_custom_command(
-            OUTPUT   ${f90}
+            OUTPUT   ${f90_out}
             COMMAND  ${FYPP_EXE} -m re
                                  -I "${CMAKE_BINARY_DIR}/include/${target}"
                                  -I "${${target}_DIR}/include"
@@ -450,11 +467,24 @@ macro(HANDLE_SOURCES target useCommon)
 								 --line-length=999
 		 						 --line-numbering-mode=nocontlines
                                  ${FYPP_GCOV_OPTS}
-                                 "${fpp}" "${f90}"
+                                 "${fpp}" "${f90_out}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
             VERBATIM
         )
+
+        if (_precision_lines)
+            add_custom_command(
+                OUTPUT   ${f90}
+                COMMAND  ${Python3_EXECUTABLE}
+                         "${CMAKE_SOURCE_DIR}/toolchain/mfc/fp_precision_lines.py"
+                         "${f90_out}" "${f90}"
+                         "${CMAKE_BINARY_DIR}/fypp/${target}/${fpp_filename}.linemap.json"
+                DEPENDS  "${f90_out};${CMAKE_SOURCE_DIR}/toolchain/mfc/fp_precision_lines.py"
+                COMMENT  "Stripping markers (fp-precision-lines) ${fpp_filename}"
+                VERBATIM
+            )
+        endif()
 
         list(APPEND ${target}_SRCs ${f90})
     endforeach()
