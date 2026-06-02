@@ -691,8 +691,15 @@ exit 0
                     target_compile_options(${a_target} PRIVATE -fopenmp)
                     target_link_options(${a_target} PRIVATE -fopenmp)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -O3 -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription)
-                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS})
+                    if(CMAKE_BUILD_TYPE STREQUAL "Fast")
+                        # Fast dev-iteration: -O1 + -fno-lto eliminates whole-program device LTO.
+                        # (-fopenmp-target-jit is not yet supported by AMD flang as of 23.x.)
+                        target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -O1 -fno-lto -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription)
+                        target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -fno-lto)
+                    else()
+                        target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -O3 -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription)
+                        target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS})
+                    endif()
                 endif()
             endif()
 
@@ -761,9 +768,14 @@ exit 0
 		        find_library(HIP_LIB amdhip64
                     HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
-                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
-                target_include_directories(${a_target} PRIVATE
-                    "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn")
+                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib" REQUIRED)
+                if(EXISTS "$ENV{OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn")
+                    target_include_directories(${a_target} PRIVATE
+                        "$ENV{OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn")
+                else()
+                    target_include_directories(${a_target} PRIVATE
+                        "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn")
+                endif()
                 target_link_libraries(${a_target} PRIVATE
                     ${HIP_LIB} ${HIPFORT_AMDGCN_LIB})
 
