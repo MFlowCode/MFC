@@ -15,37 +15,18 @@ C. VPREC precision sweep (--no-vprec to skip)
    One run per mantissa-bit level [52,23,16,10] with
    --backend=vprec --vprec-mode=full; shows where each case breaks.
 
-D. verrou_dd_sym on failure (--no-dd-sym to skip)
-   Delta-debug bisection isolates the minimal set of *functions* causing
-   instability.
-
-E. verrou_dd_line on failure, after dd_sym (--no-dd-line to skip)
-   Further bisects to exact *source lines* within the responsible functions.
-   Each reported line is then *confirmed* by a positive control: --gen-source
-   captures the symbol-correct executed lines, those are filtered to the suspect
-   set, and a float-mode run with --source restricted to just them must
-   reproduce the instability.  If perturbing the suspect set does not reproduce
-   it, the case's hotspots are reported as unconfirmed (downgraded from
-   ::warning:: to ::notice::) — this is a single set-level verdict, not per line.
-   Each line is then perturbed alone and ranked by the share of the single-
-   precision deviation it reproduces.  NOTE: that share is a *sensitivity*
-   measure — where reduced precision most moves the output — typically dominated
-   by the time integrator / final accumulation, NOT by where cancellation
-   originates.  Stage F is the cancellation-origin view; the two usually differ.
-   Hotspots are cross-referenced against the stage-F cancellation sites and
-   flagged as instance-ambiguous when the .fpp line sits inside a #:for/#:def
-   expansion.
-
-F. Cancellation detection (--no-cancellation to skip)
+D. Cancellation detection (--no-cancellation to skip)
    One run with --check-cancellation=yes; reports MFC source lines that
    produce catastrophic cancellation (subtraction of nearly-equal doubles).
-   Uses --cc-gen-file for structured per-line output.
+   Uses --cc-gen-file for structured per-line output.  A cancellation site whose
+   .fpp line sits inside a #:for/#:def expansion is flagged as instance-ambiguous
+   (the line maps to multiple generated instances).
 
-G. MCA significant-bits estimate (--no-mca to skip)
+E. MCA significant-bits estimate (--no-mca to skip)
    N runs with --backend=mcaquad; max deviation vs nearest-rounding
    reference gives a lower bound on significant bits: s = -log2(dev/scale).
 
-H. Float-max overflow detection (--no-float-max to skip)
+F. Float-max overflow detection (--no-float-max to skip)
    One run with --check-max-float=yes; reports locations where a
    double→float conversion would overflow to ±Inf.
 
@@ -62,7 +43,7 @@ Requires:
 Usage:
   ./mfc.sh fp-stability                       # built-in 1-D suite
   ./mfc.sh fp-stability my_case.py            # your own case (small/short, serial, CPU)
-  ./mfc.sh fp-stability --no-vprec --no-dd-line
+  ./mfc.sh fp-stability --no-vprec --no-cancellation
   ./mfc.sh fp-stability --sim-binary PATH --pre-binary PATH
 
 A user case .py is run as a single serial CPU process under Verrou, so it must be
@@ -84,7 +65,7 @@ from .fp_stability_metrics import (
     MIN_SIG_BITS,
     _autodetect_compare,
     _cancellation_severity,
-    _mark_cancellation,
+    _macro_context,
     _max_abs_np,
     _max_diff_np,
     _sig_bits,
@@ -97,9 +78,6 @@ from .fp_stability_runners import (
     _find_binary,
     _find_verrou,
     _run_cancellation_check,
-    _run_confirmation,
-    _run_dd_line,
-    _run_dd_sym,
     _run_float_max_check,
     _run_float_proxy,
     _run_mca_samples,
@@ -391,12 +369,9 @@ def _blank_result(name: str) -> dict:
         "sig_bits": None,
         "float_proxy": None,
         "vprec": [],
-        "dd_sym_syms": [],
-        "dd_line_locs": [],
-        "dd_line_confirmed": None,
-        "dd_line_confirm_dev": None,
         "cancellation_locs": [],
         "cancellation_bits": {},
+        "cancellation_macro": {},
         "mca_dev": None,
         "mca_sigbits": None,
         "float_max_locs": [],
@@ -409,11 +384,8 @@ def _run_case(
     sim_bin: str,
     pp_bin: str,
     n_samples: int,
-    log_dir: str,
     run_float: bool,
     run_vprec: bool,
-    run_dd_sym: bool,
-    run_dd_line: bool,
     run_cancellation: bool,
     run_mca: bool,
     run_float_max: bool,
@@ -493,62 +465,7 @@ def _run_case(
                     marker = "  [red]FAIL[/red]"
                 cons.print(f"    {bits:2d} bits{label_str}: dev={dev:.3e}{marker}")
 
-        # --- D/E: delta-debug with float mode to find FP hotspots.
-        # dd_run.sh uses --rounding-mode=float (deterministic single-precision),
-        # so each bisection step is consistent and --nruns=1 suffices.  Threshold
-        # = float_proxy/10: the full instrumented set produces ~float_proxy
-        # deviation; excluding the responsible function drops it to near zero;
-        # any subset missing the responsible function gives SAME.
-        # Skip when float_proxy is unavailable or too small to localize.
-        float_proxy = result.get("float_proxy")
-        _DD_FLOAT_MIN = 1e-6
-        dd_threshold = float_proxy / 10.0 if float_proxy and float_proxy >= _DD_FLOAT_MIN else 0.0
-        if dd_threshold > 0 and (run_dd_sym or run_dd_line):
-            cons.print(f"  [dim]dd threshold: {dd_threshold:.1e} (float_proxy={float_proxy:.1e})[/dim]")
-        elif run_dd_sym or run_dd_line:
-            cons.print(f"  [dim]skipping dd: float_proxy={float_proxy} < {_DD_FLOAT_MIN:.0e}[/dim]")
-        if dd_threshold > 0 and run_dd_sym:
-            try:
-                result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=dd_threshold)
-            except Exception as exc:
-                cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
-        if dd_threshold > 0 and run_dd_line:
-            try:
-                result["dd_line_locs"] = _run_dd_line(
-                    case,
-                    verrou_bin,
-                    sim_bin,
-                    work_dir,
-                    log_dir,
-                    threshold=dd_threshold,
-                )
-                macro_n = sum(1 for loc in result["dd_line_locs"] if loc["macro"])
-                if macro_n:
-                    cons.print(f"  [dim]dd_line: {macro_n} hotspot(s) inside fypp-expanded code (instance-ambiguous)[/dim]")
-            except Exception as exc:
-                cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
-
-        # --- E2: confirm dd_line hotspots and rank each by its individual share ---
-        if dd_threshold > 0 and run_dd_line and result["dd_line_locs"]:
-            cons.print("  [dim]confirming + ranking dd_line hotspots (per-line perturbation)...[/dim]")
-            try:
-                confirmed, cdev, ranked = _run_confirmation(case, verrou_bin, sim_bin, work_dir, ref_dir, result["dd_line_locs"], dd_threshold, float_proxy)
-                result["dd_line_locs"] = ranked
-                result["dd_line_confirmed"] = confirmed
-                result["dd_line_confirm_dev"] = cdev
-                if confirmed is True:
-                    cons.print(f"  [bold green]dd_line confirmed[/bold green]: suspect-only dev={cdev:.3e} >= {dd_threshold:.1e}")
-                elif confirmed is False:
-                    cons.print(f"  [bold yellow]dd_line UNCONFIRMED[/bold yellow]: suspect-only dev={cdev:.3e} < {dd_threshold:.1e} (attribution suspect)")
-                top = ranked[0] if ranked else None
-                if top and top.get("share") is not None:
-                    cons.print(f"  highest single-precision sensitivity: {top['path']}:{top['start']} ({top['share'] * 100:.0f}% of float-proxy)")
-                    cons.print("  [dim](sensitivity = where reduced precision most moves the output, often the time")
-                    cons.print("  [dim] integrator; not necessarily where cancellation originates — see cancellation sites)[/dim]")
-            except Exception as exc:
-                cons.print(f"  [bold yellow]dd_line confirmation error[/bold yellow]: {exc}")
-
-        # --- F: cancellation detection ---
+        # --- D: cancellation detection ---
         if run_cancellation:
             cons.print("  [dim]cancellation detection...[/dim]")
             try:
@@ -562,21 +479,22 @@ def _run_case(
                     bits = _cancellation_severity([(lvl, s) for lvl, s in level_sites if s is not None])
                     result["cancellation_locs"] = locs
                     result["cancellation_bits"] = bits
+                    # flag cancellation sites whose .fpp line is inside a #:for/#:def
+                    # expansion: the line maps to multiple generated instances, so the
+                    # report cannot pin it to a unique runtime instance.
+                    result["cancellation_macro"] = {(path, line): macro for (path, line) in locs if (macro := _macro_context(path, line))}
                     if locs:
                         worst = max(bits.values()) if bits else 0
                         cons.print(f"  cancellation: {len(locs)} site(s), worst loses ≥ {worst / math.log2(10):.0f} of ~16 digits")
+                        n_macro = len(result["cancellation_macro"])
+                        if n_macro:
+                            cons.print(f"  [dim]{n_macro} inside fypp expansions — line maps to multiple instances[/dim]")
                     else:
                         cons.print("  cancellation: none detected")
-                    # cross-reference: label dd_line hotspots that sit on a cancellation site
-                    if result["dd_line_locs"] and locs:
-                        _mark_cancellation(result["dd_line_locs"], locs)
-                        n_xref = sum(1 for loc in result["dd_line_locs"] if loc.get("cancellation"))
-                        if n_xref:
-                            cons.print(f"  {n_xref} hotspot(s) coincide with a catastrophic-cancellation site")
             except Exception as exc:
                 cons.print(f"  [bold yellow]cancellation check error[/bold yellow]: {exc}")
 
-        # --- G: MCA significant-bits estimate ---
+        # --- E: MCA significant-bits estimate ---
         if run_mca:
             cons.print(f"  [dim]MCA significant-bits estimate (N={n_samples})...[/dim]")
             try:
@@ -591,7 +509,7 @@ def _run_case(
             except Exception as exc:
                 cons.print(f"  [bold yellow]MCA error[/bold yellow]: {exc}")
 
-        # --- H: float-max overflow detection ---
+        # --- F: float-max overflow detection ---
         if run_float_max:
             cons.print("  [dim]float-max overflow check...[/dim]")
             try:
@@ -691,8 +609,6 @@ def fp_stability():
     n_samples = ARG("samples")
     run_float = not ARG("no_float_proxy")
     run_vprec = not ARG("no_vprec")
-    run_dd_sym = not ARG("no_dd_sym")
-    run_dd_line = not ARG("no_dd_line")
     run_cancellation = not ARG("no_cancellation")
     run_mca = not ARG("no_mca")
     run_float_max = not ARG("no_float_max")
@@ -715,10 +631,6 @@ def fp_stability():
         features.append("float-proxy")
     if run_vprec:
         features.append("vprec-sweep")
-    if run_dd_sym:
-        features.append("dd_sym")
-    if run_dd_line:
-        features.append("dd_line")
     if run_cancellation:
         features.append("cancellation")
     if run_mca:
@@ -739,11 +651,8 @@ def fp_stability():
                 sim_bin,
                 pp_bin,
                 n_samples,
-                log_dir,
                 run_float,
                 run_vprec,
-                run_dd_sym,
-                run_dd_line,
                 run_cancellation,
                 run_mca,
                 run_float_max,
@@ -761,9 +670,6 @@ def fp_stability():
     for r in results:
         mark = "[green]✓[/green]" if r["passed"] else "[red]✗[/red]"
         cons.print(f"  {mark} {r['name']}")
-
-    if n_fail > 0:
-        cons.print(f"\n  dd_sym/dd_line logs in: {log_dir}")
 
     _emit_github_summary(results, n_samples)
     _emit_github_annotations(results)

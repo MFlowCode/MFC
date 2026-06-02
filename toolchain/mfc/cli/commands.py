@@ -916,8 +916,6 @@ FP_STABILITY_COMMAND = Command(
         "Analysis passes (skip with --no-* flags):\n"
         "  float proxy    One run with --rounding-mode=float (single-precision sensitivity)\n"
         "  vprec sweep    Runs at mantissa bits [52, 23, 16, 10] (precision floor curve)\n"
-        "  dd_sym/dd_line verrou_dd bisection to responsible functions/lines, then a\n"
-        "                 --source positive control confirms + ranks them by sensitivity\n"
         "  cancellation   --check-cancellation origins, ranked by significant digits lost\n"
         "  mca-sigbits    Monte Carlo Arithmetic (mcaquad) significant-bits lower bound\n"
         "  float-max      --check-max-float detection of double→float overflow sites\n"
@@ -973,20 +971,6 @@ FP_STABILITY_COMMAND = Command(
             dest="no_vprec",
         ),
         Argument(
-            name="no-dd-sym",
-            help="Skip verrou_dd_sym function-level delta-debug on failure.",
-            action=ArgAction.STORE_TRUE,
-            default=False,
-            dest="no_dd_sym",
-        ),
-        Argument(
-            name="no-dd-line",
-            help="Skip verrou_dd_line source-line delta-debug on failure.",
-            action=ArgAction.STORE_TRUE,
-            default=False,
-            dest="no_dd_line",
-        ),
-        Argument(
             name="no-cancellation",
             help="Skip --check-cancellation catastrophic-cancellation detection.",
             action=ArgAction.STORE_TRUE,
@@ -1016,7 +1000,7 @@ FP_STABILITY_COMMAND = Command(
             "Specify simulation binary explicitly",
         ),
         Example("./mfc.sh fp-stability -N 10", "Run 10 random-rounding samples per case"),
-        Example("./mfc.sh fp-stability --no-vprec --no-dd-line", "Skip VPREC sweep and line debug"),
+        Example("./mfc.sh fp-stability --no-vprec --no-cancellation", "Skip VPREC sweep and cancellation detection"),
         Example("./mfc.sh fp-stability --no-cancellation --no-mca --no-float-max", "Skip new analysis passes"),
     ],
     key_options=[
@@ -1026,8 +1010,6 @@ FP_STABILITY_COMMAND = Command(
         ("-N, --samples N", "Random-rounding samples per case (default: 5)"),
         ("--no-float-proxy", "Skip float-rounding proxy run"),
         ("--no-vprec", "Skip VPREC mantissa-bit sweep"),
-        ("--no-dd-sym", "Skip verrou_dd_sym on failure"),
-        ("--no-dd-line", "Skip verrou_dd_line on failure"),
         ("--no-cancellation", "Skip cancellation detection"),
         ("--no-mca", "Skip MCA significant-bits estimate"),
         ("--no-float-max", "Skip float32 overflow detection"),

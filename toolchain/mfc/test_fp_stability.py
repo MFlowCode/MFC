@@ -1,5 +1,5 @@
-"""Unit tests for the pure helpers behind the FP-stability dd_line confirmation
-pass (#1) and macro-expansion flagging (#2).
+"""Unit tests for the pure helpers behind the FP-stability cancellation pass and
+its fypp macro-expansion flagging.
 
 The Verrou subprocess machinery is exercised by the ./mfc.sh fp-stability CI job;
 here we test only the pure functions that decide what to instrument and how to
@@ -9,15 +9,10 @@ label results, so they can run without Verrou or built binaries.
 from mfc.fp_stability_metrics import (
     MIN_SIG_BITS,
     _autodetect_compare,
-    _build_source_filter,
     _cancellation_severity,
-    _confirm_decision,
     _digits_left,
     _macro_context_in_lines,
-    _mark_cancellation,
-    _rank_locs,
     _sig_bits,
-    _statement_bounds_in_lines,
 )
 
 # --- #2: fypp macro-expansion context detection ---
@@ -91,127 +86,6 @@ def test_macro_context_block_and_call_are_duplicating():
 def test_macro_context_unbalanced_close_is_safe():
     # a stray #:endfor with an empty stack must not crash or misreport
     assert _macro_context_in_lines(["#:endfor\n", "  a = b - c\n"], 2) is None
-
-
-# --- #1: building the symbol-correct --source filter from --gen-source output ---
-
-
-def test_build_source_filter_keeps_matching_file_and_line_with_symbol():
-    gen = [
-        "m_riemann_solvers.fpp\t512\ts_hllc_riemann_solver\n",
-        "m_riemann_solvers.fpp\t999\ts_other\n",
-    ]
-    suspects = [("src/simulation/m_riemann_solvers.fpp", 512, 512)]
-    out = _build_source_filter(gen, suspects)
-    assert out == ["m_riemann_solvers.fpp\t512\ts_hllc_riemann_solver\n"]
-
-
-def test_build_source_filter_matches_inclusive_range():
-    gen = [
-        "m_foo.fpp\t10\tsym\n",
-        "m_foo.fpp\t11\tsym\n",
-        "m_foo.fpp\t12\tsym\n",
-        "m_foo.fpp\t13\tsym\n",
-    ]
-    suspects = [("m_foo.fpp", 11, 12)]
-    out = _build_source_filter(gen, suspects)
-    assert out == ["m_foo.fpp\t11\tsym\n", "m_foo.fpp\t12\tsym\n"]
-
-
-def test_build_source_filter_excludes_other_basenames():
-    gen = ["m_bar.fpp\t5\tsym\n"]
-    suspects = [("m_foo.fpp", 5, 5)]
-    assert _build_source_filter(gen, suspects) == []
-
-
-def test_build_source_filter_matches_on_basename_not_full_path():
-    # gen-source emits a basename; dd_line locs are repo-relative paths.
-    gen = ["m_foo.fpp\t5\tsym\n"]
-    suspects = [("src/common/m_foo.fpp", 5, 5)]
-    assert _build_source_filter(gen, suspects) == ["m_foo.fpp\t5\tsym\n"]
-
-
-def test_build_source_filter_skips_malformed_lines():
-    gen = ["garbage-no-tab\n", "m_foo.fpp\tnotanumber\tsym\n", "m_foo.fpp\t5\tsym\n"]
-    suspects = [("m_foo.fpp", 5, 5)]
-    assert _build_source_filter(gen, suspects) == ["m_foo.fpp\t5\tsym\n"]
-
-
-# --- #1: confirmation decision ---
-
-
-def test_confirm_decision_true_when_suspect_reproduces_deviation():
-    # perturbing only the suspect lines yields >= dd_threshold deviation
-    assert _confirm_decision(suspect_dev=1e-3, dd_threshold=1e-5) is True
-
-
-def test_confirm_decision_false_when_suspect_is_inert():
-    # suspect lines barely move the result -> attribution not reproduced
-    assert _confirm_decision(suspect_dev=1e-9, dd_threshold=1e-5) is False
-
-
-def test_confirm_decision_none_when_measurement_unavailable():
-    assert _confirm_decision(suspect_dev=None, dd_threshold=1e-5) is None
-
-
-# --- Tier 1: per-line confirmation ranking ---
-
-
-def test_rank_locs_sorts_by_share_dev_descending():
-    locs = [
-        {"path": "a.fpp", "start": 1, "end": 1, "share_dev": 0.1},
-        {"path": "b.fpp", "start": 2, "end": 2, "share_dev": 0.9},
-    ]
-    ranked = _rank_locs(locs, total=1.0)
-    assert [loc["path"] for loc in ranked] == ["b.fpp", "a.fpp"]
-
-
-def test_rank_locs_computes_share_as_fraction_of_total():
-    locs = [{"path": "a.fpp", "start": 1, "end": 1, "share_dev": 0.25}]
-    ranked = _rank_locs(locs, total=0.5)
-    assert ranked[0]["share"] == 0.5
-
-
-def test_rank_locs_share_none_when_total_nonpositive():
-    locs = [{"path": "a.fpp", "start": 1, "end": 1, "share_dev": 0.25}]
-    ranked = _rank_locs(locs, total=0.0)
-    assert ranked[0]["share"] is None
-
-
-def test_rank_locs_treats_missing_share_dev_as_zero_and_sorts_last():
-    locs = [
-        {"path": "a.fpp", "start": 1, "end": 1, "share_dev": None},
-        {"path": "b.fpp", "start": 2, "end": 2, "share_dev": 0.3},
-    ]
-    ranked = _rank_locs(locs, total=1.0)
-    assert [loc["path"] for loc in ranked] == ["b.fpp", "a.fpp"]
-
-
-# --- Tier 1b: dd_line x cancellation cross-reference ---
-
-
-def test_mark_cancellation_flags_loc_on_a_cancellation_line():
-    locs = [{"path": "src/common/m_foo.fpp", "start": 10, "end": 12}]
-    _mark_cancellation(locs, [("m_foo.fpp", 11)])
-    assert locs[0]["cancellation"] is True
-
-
-def test_mark_cancellation_false_when_no_site_in_range():
-    locs = [{"path": "src/common/m_foo.fpp", "start": 10, "end": 12}]
-    _mark_cancellation(locs, [("m_foo.fpp", 99)])
-    assert locs[0]["cancellation"] is False
-
-
-def test_mark_cancellation_matches_on_basename_not_full_path():
-    locs = [{"path": "src/common/m_foo.fpp", "start": 5, "end": 5}]
-    _mark_cancellation(locs, [("/abs/build/m_foo.fpp", 5)])
-    assert locs[0]["cancellation"] is True
-
-
-def test_mark_cancellation_false_for_different_basename():
-    locs = [{"path": "m_foo.fpp", "start": 5, "end": 5}]
-    _mark_cancellation(locs, [("m_bar.fpp", 5)])
-    assert locs[0]["cancellation"] is False
 
 
 # --- per-site cancellation severity (bits lost), from a threshold sweep ---
@@ -289,44 +163,6 @@ def test_digits_left_full_and_clamped():
     assert _digits_left(60) == 0.0  # clamp: never negative
 
 
-# --- Fortran line-continuation handling (correct-line labeling) ---
-
-
-def test_statement_bounds_single_line():
-    lines = ["  a = b - c\n"]
-    assert _statement_bounds_in_lines(lines, 1) == (1, 1)
-
-
-def test_statement_bounds_spans_continuation_from_first_line():
-    lines = ["  poly = (s_cb(i+3) - s_cb(i+1)) * &\n", "         (s_cb(i+2) - s_cb(i))\n"]
-    assert _statement_bounds_in_lines(lines, 1) == (1, 2)
-
-
-def test_statement_bounds_from_middle_continuation_line():
-    # a hit on the continuation fragment must resolve to the statement start
-    lines = ["  x = a + &\n", "      b + &\n", "      c\n"]
-    assert _statement_bounds_in_lines(lines, 2) == (1, 3)
-    assert _statement_bounds_in_lines(lines, 3) == (1, 3)
-
-
-def test_statement_bounds_ignores_ampersand_in_trailing_comment_logic():
-    # a real continuation '&' before a trailing comment still continues
-    lines = ["  x = a & ! note\n", "      + b\n"]
-    assert _statement_bounds_in_lines(lines, 1) == (1, 2)
-
-
-def test_statement_bounds_non_continuation_neighbors():
-    lines = ["  x = 1\n", "  y = 2\n", "  z = 3\n"]
-    assert _statement_bounds_in_lines(lines, 2) == (2, 2)
-
-
-def test_statement_bounds_with_leading_ampersand_continuation():
-    # the MFC WENO style: line ends with '&' and the next line *starts* with '&'
-    lines = ["  beta = x**2 &\n", "       & + eps\n"]
-    assert _statement_bounds_in_lines(lines, 1) == (1, 2)
-    assert _statement_bounds_in_lines(lines, 2) == (1, 2)
-
-
 # --- report emitters: must survive blank and populated result dicts (CI-only path) ---
 
 
@@ -359,26 +195,31 @@ def test_emit_summary_populated_result(tmp_path, monkeypatch):
         sig_bits=30.0,
         float_proxy=1e-6,
         vprec=[(52, 1e-14), (23, float("inf"))],  # exercises the "crash" branch
-        dd_line_locs=[{"path": "src/x/m_a.fpp", "start": 5, "end": 5, "macro": "#:for", "share": 0.4, "cancellation": True}],
-        dd_line_confirmed=False,
         cancellation_locs=[("src/x/m_a.fpp", 5)],
         cancellation_bits={("src/x/m_a.fpp", 5): 40},
+        cancellation_macro={("src/x/m_a.fpp", 5): "#:for"},
         float_max_locs=[("m_a.fpp", 9)],
     )
     text = _emit_to_tmp([r], tmp_path, monkeypatch)
     assert "💥 crash" in text and "digits lost" in text
+    assert "may represent multiple instances" in text  # fypp-ambiguous marker
 
 
-def test_emit_annotations_downgrade_unconfirmed(tmp_path, monkeypatch, capsys):
+def test_emit_annotations_cancellation_notes_fypp_ambiguity(tmp_path, monkeypatch, capsys):
     from mfc import fp_stability_report as report
     from mfc.fp_stability import _blank_result
 
     monkeypatch.setenv("GITHUB_ACTIONS", "1")
     r = _blank_result("demo")
-    r.update(dd_line_locs=[{"path": "src/x/m_a.fpp", "start": 5, "end": 5, "macro": None, "share": 0.9, "cancellation": False}], dd_line_confirmed=False)
+    r.update(
+        cancellation_locs=[("src/x/m_a.fpp", 5)],
+        cancellation_bits={("src/x/m_a.fpp", 5): 40},
+        cancellation_macro={("src/x/m_a.fpp", 5): "#:for"},
+    )
     report._emit_github_annotations([r])
     out = capsys.readouterr().out
-    assert "::notice" in out and "::warning" not in out  # unconfirmed -> notice, not warning
+    assert "::notice" in out
+    assert "multiple instances" in out  # fypp-expanded cancellation site flagged
 
 
 # --- Verrou discovery: a bare system valgrind must read as "Verrou absent" ---
@@ -478,27 +319,6 @@ def test_verrou_env_preserves_user_valgrind_lib(tmp_path, monkeypatch):
     monkeypatch.setenv("VALGRIND_LIB", "/user/chosen/lib")
     env = runners._verrou_env(str(tmp_path / "bin" / "valgrind"))
     assert env["VALGRIND_LIB"] == "/user/chosen/lib"  # not clobbered
-
-
-def test_dd_env_prepends_pythonpath_and_inherits_valgrind_lib(tmp_path, monkeypatch):
-    from mfc import fp_stability_runners as runners
-
-    (tmp_path / "libexec" / "valgrind").mkdir(parents=True)
-    monkeypatch.delenv("VALGRIND_LIB", raising=False)
-    monkeypatch.setenv("PYTHONPATH", "/pre/existing")
-    monkeypatch.setattr(runners, "_verrou_pythonpath", lambda _b: "/vg/site-packages/valgrind")
-    env = runners._dd_env(str(tmp_path / "bin" / "valgrind"))
-    assert env["PYTHONPATH"] == "/vg/site-packages/valgrind:/pre/existing"
-    assert env["VALGRIND_LIB"] == str(tmp_path / "libexec" / "valgrind")
-
-
-def test_dd_env_no_leading_colon_when_pythonpath_empty(tmp_path, monkeypatch):
-    from mfc import fp_stability_runners as runners
-
-    monkeypatch.delenv("PYTHONPATH", raising=False)
-    monkeypatch.setattr(runners, "_verrou_pythonpath", lambda _b: "/vg/valgrind")
-    env = runners._dd_env(str(tmp_path / "bin" / "valgrind"))
-    assert env["PYTHONPATH"] == "/vg/valgrind"  # no stray leading ':'
 
 
 # --- auto-install hard-fail guards ---
