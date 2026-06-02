@@ -159,20 +159,34 @@ _CONTROL_FLOW_RE = re.compile(
 )
 
 
+def _resolve_source(fname: str, search_whole_tree: bool = False) -> str:
+    """Resolve a (possibly bare) source filename to an existing path, or '' if not
+    found.  An absolute existing path is used as-is; otherwise the basename is
+    located recursively under src/ (then the whole tree if `search_whole_tree`)."""
+    if os.path.isabs(fname) and os.path.isfile(fname):
+        return fname
+    candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
+    if not candidates and search_whole_tree:
+        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "**", os.path.basename(fname)), recursive=True)
+    return candidates[0] if candidates else ""
+
+
+def _read_source_lines(fname: str, search_whole_tree: bool = False) -> list:
+    """Resolve `fname` and return its lines (with newlines), or [] if unreadable."""
+    path = _resolve_source(fname, search_whole_tree)
+    if not path:
+        return []
+    try:
+        with open(path) as fh:
+            return fh.readlines()
+    except OSError:
+        return []
+
+
 def _read_source_line(fname: str, lineno: int) -> str:
     """Return the raw source line at lineno (1-based), or '' if unavailable."""
-    if os.path.isabs(fname) and os.path.isfile(fname):
-        candidates = [fname]
-    else:
-        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
-    if not candidates:
-        return ""
-    try:
-        with open(candidates[0]) as fh:
-            lines = fh.readlines()
-        return lines[lineno - 1] if 0 < lineno <= len(lines) else ""
-    except OSError:
-        return ""
+    lines = _read_source_lines(fname)
+    return lines[lineno - 1] if 0 < lineno <= len(lines) else ""
 
 
 def _macro_context_in_lines(lines: list, lineno: int) -> str:
@@ -199,16 +213,8 @@ def _macro_context_in_lines(lines: list, lineno: int) -> str:
 
 def _macro_context(fname: str, lineno: int) -> str:
     """File-backed wrapper around _macro_context_in_lines; '' path safe."""
-    if os.path.isabs(fname) and os.path.isfile(fname):
-        candidates = [fname]
-    else:
-        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
-    if not candidates:
-        return None
-    try:
-        with open(candidates[0]) as fh:
-            lines = fh.readlines()
-    except OSError:
+    lines = _read_source_lines(fname)
+    if not lines:
         return None
     return _macro_context_in_lines(lines, lineno)
 
@@ -241,17 +247,7 @@ def _statement_bounds_in_lines(lines: list, lineno: int) -> tuple:
 def _statement_at(fname: str, lineno: int) -> tuple:
     """File-backed (start, end, text) for the logical statement at fname:lineno;
     text is the joined statement. Returns (lineno, lineno, '') if unreadable."""
-    if os.path.isabs(fname) and os.path.isfile(fname):
-        candidates = [fname]
-    else:
-        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
-    if not candidates:
-        return lineno, lineno, ""
-    try:
-        with open(candidates[0]) as fh:
-            lines = fh.readlines()
-    except OSError:
-        return lineno, lineno, ""
+    lines = _read_source_lines(fname)
     if not 0 < lineno <= len(lines):
         return lineno, lineno, ""
     start, end = _statement_bounds_in_lines(lines, lineno)
@@ -283,18 +279,8 @@ def _get_source_context(fname: str, lineno: int, context: int = 2) -> str:
     fname may be a bare basename (e.g. 'm_weno.fpp') or a relative path.
     Searches recursively under MFC_ROOT_DIR/src/ first, then the whole tree.
     """
-    if os.path.isabs(fname) and os.path.isfile(fname):
-        candidates = [fname]
-    else:
-        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
-        if not candidates:
-            candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "**", os.path.basename(fname)), recursive=True)
-    if not candidates:
-        return ""
-    try:
-        with open(candidates[0]) as fh:
-            lines = fh.readlines()
-    except OSError:
+    lines = _read_source_lines(fname, search_whole_tree=True)
+    if not lines:
         return ""
     start = max(0, lineno - context - 1)
     end = min(len(lines), lineno + context)
@@ -589,13 +575,10 @@ def _find_binary(name: str) -> str:
     return max(candidates, key=os.path.getmtime) if candidates else ""
 
 
-def _find_dd_sym(verrou_bin: str) -> str:
-    c = os.path.join(os.path.dirname(verrou_bin), "verrou_dd_sym")
-    return c if os.path.isfile(c) else ""
-
-
-def _find_dd_line(verrou_bin: str) -> str:
-    c = os.path.join(os.path.dirname(verrou_bin), "verrou_dd_line")
+def _find_dd_tool(verrou_bin: str, tool: str) -> str:
+    """Path to a verrou_dd_* tool (e.g. 'verrou_dd_sym') next to the verrou binary,
+    or '' if absent."""
+    c = os.path.join(os.path.dirname(verrou_bin), tool)
     return c if os.path.isfile(c) else ""
 
 
@@ -1152,19 +1135,26 @@ def _run_dd_tool(
     return summary_lines
 
 
-def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str, threshold: float = None) -> list:
-    """Run verrou_dd_sym; return list of responsible symbol names."""
-    dd_bin = _find_dd_sym(verrou_bin)
-    if not dd_bin:
-        cons.print("  [dim]verrou_dd_sym not found; skipping delta-debug[/dim]")
-        return []
-
-    dd_dir = os.path.join(log_dir, case["name"])
+def _setup_dd_run(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, dd_dir: str, threshold: float):
+    """Write dd_run.sh and dd_cmp.py for a verrou_dd_* run into dd_dir; return their
+    paths.  The threshold falls back to _DD_FALLBACK_THRESHOLD when unset."""
     os.makedirs(dd_dir, exist_ok=True)
     dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
     dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
     _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
     _write_dd_cmp_py(dd_cmp_py, case["compare"], threshold if threshold is not None else _DD_FALLBACK_THRESHOLD)
+    return dd_run_sh, dd_cmp_py
+
+
+def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str, threshold: float = None) -> list:
+    """Run verrou_dd_sym; return list of responsible symbol names."""
+    dd_bin = _find_dd_tool(verrou_bin, "verrou_dd_sym")
+    if not dd_bin:
+        cons.print("  [dim]verrou_dd_sym not found; skipping delta-debug[/dim]")
+        return []
+
+    dd_dir = os.path.join(log_dir, case["name"])
+    dd_run_sh, dd_cmp_py = _setup_dd_run(case, verrou_bin, sim_bin, work_dir, dd_dir, threshold)
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_sym.log", "dd.sym", "verrou_dd_sym")
     cons.print(f"  [dim]dd_sym logs: {dd_dir}[/dim]")
     return _parse_rddmin_syms(os.path.join(dd_dir, "dd.sym", "rddmin_summary"))
@@ -1179,18 +1169,13 @@ def _run_dd_line(
     threshold: float = None,
 ) -> list:
     """Run verrou_dd_line; return [{path, start, end, macro}] location dicts."""
-    dd_bin = _find_dd_line(verrou_bin)
+    dd_bin = _find_dd_tool(verrou_bin, "verrou_dd_line")
     if not dd_bin:
         cons.print("  [dim]verrou_dd_line not found; skipping line-level debug[/dim]")
         return []
 
     dd_dir = os.path.join(log_dir, case["name"])
-    os.makedirs(dd_dir, exist_ok=True)
-    dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
-    dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
-    effective_threshold = threshold if threshold is not None else _DD_FALLBACK_THRESHOLD
-    _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
-    _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
+    dd_run_sh, dd_cmp_py = _setup_dd_run(case, verrou_bin, sim_bin, work_dir, dd_dir, threshold)
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_line.log", "dd.line", "verrou_dd_line")
     return _parse_rddmin_locs(os.path.join(dd_dir, "dd.line", "rddmin_summary"))
 
@@ -1217,6 +1202,26 @@ def _source_perturb_dev(verrou_bin, sim_bin, work_dir, ref_dir, conf_dir, src_li
     return _max_diff_np(ref_dir, run_dir, compare)
 
 
+def _capture_gen_source(verrou_bin, sim_bin, work_dir, run_dir, gen_path):
+    """Run nearest-rounding with --gen-source to capture the symbol-correct
+    executed source lines (FILE\\tLINE\\tSYMBOL); return them, or None on failure."""
+    try:
+        _run_simulation_verrou(
+            verrou_bin,
+            sim_bin,
+            work_dir,
+            run_dir,
+            rounding_mode="nearest",
+            extra_flags=[f"--gen-source={gen_path}"],
+        )
+    except MFCException:
+        return None
+    if not os.path.isfile(gen_path):
+        return None
+    with open(gen_path) as fh:
+        return fh.readlines()
+
+
 def _run_confirmation(case, verrou_bin, sim_bin, work_dir, ref_dir, dd_line_locs, dd_threshold, float_proxy):
     """Positive control for dd_line: perturb ONLY the suspect lines and confirm
     the instability reproduces, then rank each line by its individual share.
@@ -1237,22 +1242,9 @@ def _run_confirmation(case, verrou_bin, sim_bin, work_dir, ref_dir, dd_line_locs
         return None, None, dd_line_locs
     conf_dir = os.path.join(work_dir, "confirm")
     os.makedirs(conf_dir, exist_ok=True)
-    gen_path = os.path.join(conf_dir, "gen_source.txt")
-    try:
-        _run_simulation_verrou(
-            verrou_bin,
-            sim_bin,
-            work_dir,
-            conf_dir,
-            rounding_mode="nearest",
-            extra_flags=[f"--gen-source={gen_path}"],
-        )
-    except MFCException:
+    gen_lines = _capture_gen_source(verrou_bin, sim_bin, work_dir, conf_dir, os.path.join(conf_dir, "gen_source.txt"))
+    if gen_lines is None:
         return None, None, dd_line_locs
-    if not os.path.isfile(gen_path):
-        return None, None, dd_line_locs
-    with open(gen_path) as fh:
-        gen_lines = fh.readlines()
     compare = case["compare"]
 
     # whole-set positive control
@@ -1298,23 +1290,13 @@ def _disambiguate_instances(case, prec_sim_bin, verrou_bin, work_dir, hotspot_fi
     prec_dir = os.path.join(work_dir, "precision")
     ref_dir = os.path.join(prec_dir, "ref")
     os.makedirs(ref_dir, exist_ok=True)
-    gen_path = os.path.join(prec_dir, "gen_source.txt")
     try:
         _run_simulation_verrou(verrou_bin, prec_sim_bin, work_dir, ref_dir, rounding_mode="nearest")
-        _run_simulation_verrou(
-            verrou_bin,
-            prec_sim_bin,
-            work_dir,
-            prec_dir,
-            rounding_mode="nearest",
-            extra_flags=[f"--gen-source={gen_path}"],
-        )
     except MFCException:
         return []
-    if not os.path.isfile(gen_path):
+    gen_lines = _capture_gen_source(verrou_bin, prec_sim_bin, work_dir, prec_dir, os.path.join(prec_dir, "gen_source.txt"))
+    if gen_lines is None:
         return []
-    with open(gen_path) as fh:
-        gen_lines = fh.readlines()
 
     f90_file = os.path.join(sidecar_dir, os.path.basename(hotspot_file) + ".f90")
     compare = case["compare"]
@@ -1334,6 +1316,27 @@ def _disambiguate_instances(case, prec_sim_bin, verrou_bin, work_dir, hotspot_fi
         )
     results.sort(key=lambda r: r["dev"], reverse=True)
     return results
+
+
+def _blank_result(name: str) -> dict:
+    """A result dict with every field at its empty/unmeasured default."""
+    return {
+        "name": name,
+        "passed": False,
+        "max_dev": float("inf"),
+        "sig_bits": None,
+        "float_proxy": None,
+        "vprec": [],
+        "dd_sym_syms": [],
+        "dd_line_locs": [],
+        "dd_line_confirmed": None,
+        "dd_line_confirm_dev": None,
+        "cancellation_locs": [],
+        "cancellation_bits": {},
+        "mca_dev": None,
+        "mca_sigbits": None,
+        "float_max_locs": [],
+    }
 
 
 def _run_case(
@@ -1362,23 +1365,7 @@ def _run_case(
     cons.print(f"  pass floor: >= {MIN_SIG_BITS} significant bits retained")
 
     work_dir = tempfile.mkdtemp(prefix=f"mfc-fps-{name}-")
-    result = {
-        "name": name,
-        "passed": False,
-        "max_dev": float("inf"),
-        "sig_bits": None,
-        "float_proxy": None,
-        "vprec": [],
-        "dd_sym_syms": [],
-        "dd_line_locs": [],
-        "dd_line_confirmed": None,
-        "dd_line_confirm_dev": None,
-        "cancellation_locs": [],
-        "cancellation_bits": {},
-        "mca_dev": None,
-        "mca_sigbits": None,
-        "float_max_locs": [],
-    }
+    result = _blank_result(name)
     try:
         cons.print("  [dim]running pre_process...[/dim]")
         _write_inp(case["sim"], "simulation", work_dir)
@@ -1615,6 +1602,14 @@ def _emit_github_annotations(results: list):
             print(f"::notice title=FP cancellation [{r['name']}]::{n_cc - 3} more cancellation site(s) not annotated inline; see the step summary", flush=True)
 
 
+def _more_md(total: int, shown: int, noun: str) -> str:
+    """Markdown bullet noting `total - shown` further items elided from a list,
+    or '' when nothing was truncated."""
+    if total <= shown:
+        return ""
+    return f"- _…and {total - shown} more {noun}; see fp-stability-logs/_"
+
+
 def _emit_github_summary(results: list, n_samples: int):
     """Write a markdown results table to GITHUB_STEP_SUMMARY.
 
@@ -1681,8 +1676,9 @@ def _emit_github_summary(results: list, n_samples: int):
             for e in ordered[:15]:
                 lost = e["bits"] / math.log2(10)
                 md.append(f"- **≥ {lost:.0f} digits lost** (~{_digits_left(e['bits']):.0f} of 16 left) — `{e['where']}`" + (f" — `{e['text']}`" if e["text"] else ""))
-            if len(ordered) > 15:
-                md.append(f"- _…and {len(ordered) - 15} more statement(s); see fp-stability-logs/_")
+            footer = _more_md(len(ordered), 15, "statement(s)")
+            if footer:
+                md.append(footer)
             md.append("")
 
     # VPREC sweep — one column per bit level, ❌ where bits retained < floor
@@ -1747,8 +1743,9 @@ def _emit_github_summary(results: list, n_samples: int):
                     for line in snippet.splitlines():
                         md.append(f"  {line}")
                     md.append("  ```")
-            if len(r["dd_line_locs"]) > 10:
-                md.append(f"- _…and {len(r['dd_line_locs']) - 10} more hotspot(s); see fp-stability-logs/_")
+            footer = _more_md(len(r["dd_line_locs"]), 10, "hotspot(s)")
+            if footer:
+                md.append(footer)
             md.append("")
         md.append("</details>\n")
 
@@ -1771,8 +1768,9 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append(f"**`{r['name']}`** — {len(r['float_max_locs'])} site(s)\n")
             for fname, lineno in r["float_max_locs"][:10]:
                 md.append(f"- `{fname}:{lineno}`")
-            if len(r["float_max_locs"]) > 10:
-                md.append(f"- _…and {len(r['float_max_locs']) - 10} more site(s); see fp-stability-logs/_")
+            footer = _more_md(len(r["float_max_locs"]), 10, "site(s)")
+            if footer:
+                md.append(footer)
             md.append("")
 
     with open(summary_path, "a") as f:
@@ -1857,23 +1855,7 @@ def fp_stability():
             )
         except MFCException as exc:
             cons.print(f"  [bold red]ERROR[/bold red]: {exc}")
-            r = {
-                "name": case["name"],
-                "passed": False,
-                "max_dev": float("inf"),
-                "sig_bits": None,
-                "float_proxy": None,
-                "vprec": [],
-                "dd_sym_syms": [],
-                "dd_line_locs": [],
-                "dd_line_confirmed": None,
-                "dd_line_confirm_dev": None,
-                "cancellation_locs": [],
-                "cancellation_bits": {},
-                "mca_dev": None,
-                "mca_sigbits": None,
-                "float_max_locs": [],
-            }
+            r = _blank_result(case["name"])
         results.append(r)
 
     elapsed = time.time() - start
