@@ -1529,6 +1529,8 @@ contains
     !> Finalize the IBM module
     impure subroutine s_finalize_ibm_module()
 
+        integer :: i
+
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(ib_gbl_idx_lookup)
         do i = 1, num_ib_airfoils_max

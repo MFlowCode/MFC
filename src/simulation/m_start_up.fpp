@@ -819,7 +819,6 @@ contains
         if (bubbles_euler) call s_initialize_bubbles_EE_module()
         if (ib) then
             call s_initialize_ibm_module()
-            call s_initialize_ib_airfoils()
         end if
         if (qbmm) call s_initialize_qbmm_module()
 
@@ -885,6 +884,7 @@ contains
                     call s_generate_particle_beds(particle_bed_ibs)
                 end if
                 call s_instantiate_STL_models()
+                call s_initialize_ib_airfoils()
                 call s_reduce_ib_patch_array(particle_bed_ibs)
                 deallocate (particle_bed_ibs)
             end block

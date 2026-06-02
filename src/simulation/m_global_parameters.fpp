@@ -268,7 +268,6 @@ module m_global_parameters
     type(ib_airfoil_parameters), dimension(num_ib_airfoils_max) :: ib_airfoil  !< Per-airfoil NACA user inputs (namelist)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
     type(ib_stl_parameters), dimension(num_stl_models_max) :: stl_models  !< Per-STL model parameters (namelist)
-    integer :: num_stl_models  !< Number of STL models
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, ib_airfoil, ib_airfoil_grids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
