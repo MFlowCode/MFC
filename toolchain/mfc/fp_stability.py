@@ -661,7 +661,9 @@ def _load_user_case(input_path: str) -> dict:
 def fp_stability():
     verrou_bin = ARG("verrou_binary") or _find_verrou()
     if not verrou_bin or not os.path.isfile(verrou_bin):
-        cons.print("[bold yellow]SKIP[/bold yellow]: verrou not found. Install at $HOME/.local/verrou or set VERROU_HOME.")
+        cons.print("[bold yellow]SKIP[/bold yellow]: Verrou not found (it is a compiled Valgrind tool, not a pip package).")
+        cons.print("  Install it (Linux; ~20 min source build) with:  [bold]bash toolchain/bootstrap/verrou.sh[/bold]")
+        cons.print("  Or point at an existing build with --verrou-binary PATH or $VERROU_HOME.")
         sys.exit(0)
 
     sim_bin = ARG("sim_binary") or _find_binary("simulation")
