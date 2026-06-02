@@ -13,6 +13,7 @@ from mfc.fp_stability import (
     _macro_context_in_lines,
     _mark_cancellation,
     _rank_locs,
+    _statement_bounds_in_lines,
 )
 
 # --- #2: fypp macro-expansion context detection ---
@@ -218,3 +219,41 @@ def test_cancellation_by_file_breaks_ties_by_name():
 
 def test_cancellation_by_file_empty():
     assert _cancellation_by_file([]) == []
+
+
+# --- Fortran line-continuation handling (correct-line labeling) ---
+
+
+def test_statement_bounds_single_line():
+    lines = ["  a = b - c\n"]
+    assert _statement_bounds_in_lines(lines, 1) == (1, 1)
+
+
+def test_statement_bounds_spans_continuation_from_first_line():
+    lines = ["  poly = (s_cb(i+3) - s_cb(i+1)) * &\n", "         (s_cb(i+2) - s_cb(i))\n"]
+    assert _statement_bounds_in_lines(lines, 1) == (1, 2)
+
+
+def test_statement_bounds_from_middle_continuation_line():
+    # a hit on the continuation fragment must resolve to the statement start
+    lines = ["  x = a + &\n", "      b + &\n", "      c\n"]
+    assert _statement_bounds_in_lines(lines, 2) == (1, 3)
+    assert _statement_bounds_in_lines(lines, 3) == (1, 3)
+
+
+def test_statement_bounds_ignores_ampersand_in_trailing_comment_logic():
+    # a real continuation '&' before a trailing comment still continues
+    lines = ["  x = a & ! note\n", "      + b\n"]
+    assert _statement_bounds_in_lines(lines, 1) == (1, 2)
+
+
+def test_statement_bounds_non_continuation_neighbors():
+    lines = ["  x = 1\n", "  y = 2\n", "  z = 3\n"]
+    assert _statement_bounds_in_lines(lines, 2) == (2, 2)
+
+
+def test_statement_bounds_with_leading_ampersand_continuation():
+    # the MFC WENO style: line ends with '&' and the next line *starts* with '&'
+    lines = ["  beta = x**2 &\n", "       & + eps\n"]
+    assert _statement_bounds_in_lines(lines, 1) == (1, 2)
+    assert _statement_bounds_in_lines(lines, 2) == (1, 2)

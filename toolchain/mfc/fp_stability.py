@@ -183,6 +183,53 @@ def _macro_context(fname: str, lineno: int) -> str:
     return _macro_context_in_lines(lines, lineno)
 
 
+def _ends_with_continuation(line: str) -> bool:
+    """True if a free-form Fortran line ends with a continuation '&' (the last
+    non-blank token before any trailing comment)."""
+    code = line.split("!", 1)[0].rstrip()  # drop trailing comment (string-'!' is rare; fine here)
+    return code.endswith("&")
+
+
+def _statement_bounds_in_lines(lines: list, lineno: int) -> tuple:
+    """Return the (start, end) 1-based physical line range of the Fortran logical
+    statement containing lineno, following '&' continuations in both directions.
+
+    A hit reported on a continuation fragment thus resolves to the whole
+    statement, so the labelled location is the full expression rather than a
+    mid-statement piece.
+    """
+    n = len(lines)
+    start = lineno
+    while start > 1 and _ends_with_continuation(lines[start - 2]):
+        start -= 1
+    end = lineno
+    while end < n and _ends_with_continuation(lines[end - 1]):
+        end += 1
+    return start, end
+
+
+def _statement_at(fname: str, lineno: int) -> tuple:
+    """File-backed (start, end, text) for the logical statement at fname:lineno;
+    text is the joined statement. Returns (lineno, lineno, '') if unreadable."""
+    if os.path.isabs(fname) and os.path.isfile(fname):
+        candidates = [fname]
+    else:
+        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
+    if not candidates:
+        return lineno, lineno, ""
+    try:
+        with open(candidates[0]) as fh:
+            lines = fh.readlines()
+    except OSError:
+        return lineno, lineno, ""
+    if not 0 < lineno <= len(lines):
+        return lineno, lineno, ""
+    start, end = _statement_bounds_in_lines(lines, lineno)
+    # join physical lines, dropping the continuation '&' that may lead or trail each
+    text = " ".join(line.strip().strip("&").strip() for line in lines[start - 1 : end])
+    return start, end, text
+
+
 def _is_arithmetic_loc(fname: str, start: int, end: int) -> bool:
     """Return True if any line in [start, end] contains non-trivial arithmetic.
 
@@ -678,14 +725,22 @@ def _parse_vg_error_locs(log_path: str, error_keyword: str) -> list:
     return locs
 
 
-def _run_cancellation_check(case: dict, verrou_bin: str, sim_bin: str, work_dir: str) -> list:
-    """Run with --check-cancellation=yes; return [(fname, line)] of MFC cancellation sites."""
-    run_dir = os.path.join(work_dir, "cancellation")
+# A site reported at this bit threshold has lost at least this many significant
+# bits to cancellation — a *severity* floor (Verrou only reports a site when it
+# exceeds the threshold, so a high-threshold pass has no false positives).
+CANCEL_SEVERE_BITS = 26
+
+
+def _run_cancellation_check(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, threshold: int = 10) -> list:
+    """Run --check-cancellation at the given bit threshold; return [(fname, line)]
+    of MFC cancellation sites (subtractions losing >= `threshold` significant bits)."""
+    tag = f"cancellation_{threshold}"
+    run_dir = os.path.join(work_dir, tag)
     os.makedirs(run_dir, exist_ok=True)
     gen_path = os.path.join(run_dir, "cancel_gen.txt")
     flags = [
         "--check-cancellation=yes",
-        "--cc-threshold-double=10",
+        f"--cc-threshold-double={threshold}",
         f"--cc-gen-file={gen_path}",
     ]
     try:
@@ -695,7 +750,7 @@ def _run_cancellation_check(case: dict, verrou_bin: str, sim_bin: str, work_dir:
     raw = _parse_cancel_gen(gen_path)
     filtered = [(f, ln) for f, ln in raw if _is_arithmetic_loc(f, ln, ln)]
     skipped = len(raw) - len(filtered)
-    if skipped:
+    if skipped and threshold == 10:
         cons.print(f"  [dim]cancellation: filtered {skipped} control-flow boundary site(s)[/dim]")
     return filtered
 
@@ -1277,6 +1332,7 @@ def _run_case(
         "dd_line_confirmed": None,
         "dd_line_confirm_dev": None,
         "cancellation_locs": [],
+        "cancellation_severe": set(),
         "mca_dev": None,
         "mca_sigbits": None,
         "float_max_locs": [],
@@ -1411,7 +1467,10 @@ def _run_case(
                 locs = _run_cancellation_check(case, verrou_bin, sim_bin, work_dir)
                 result["cancellation_locs"] = locs
                 if locs:
-                    cons.print(f"  cancellation: {len(locs)} unique source location(s)")
+                    # severity pass: which sites lose >= CANCEL_SEVERE_BITS bits
+                    severe = set(_run_cancellation_check(case, verrou_bin, sim_bin, work_dir, threshold=CANCEL_SEVERE_BITS))
+                    result["cancellation_severe"] = severe
+                    cons.print(f"  cancellation: {len(locs)} site(s), {len(severe)} severe (>= {CANCEL_SEVERE_BITS} bits lost)")
                 else:
                     cons.print("  cancellation: none detected")
                 # cross-reference: label dd_line hotspots that sit on a cancellation site
@@ -1620,24 +1679,30 @@ def _emit_github_summary(results: list, n_samples: int):
     if cases_with_cancel:
         md.append("### Catastrophic cancellation sites\n")
         md.append(
-            "> Where cancellation actually originates (subtraction of nearly-equal values). This is "
-            "the numerically interesting signal — and it usually differs from the sensitivity leader "
-            "above.\n"
+            "> Where cancellation actually originates (subtraction of nearly-equal values). "
+            f"**Severity = significant bits lost; severe = ≥ {CANCEL_SEVERE_BITS} bits.** Site *count* is "
+            "not severity — one severe site outweighs many mild ones, so the severe sites are listed "
+            "first. (Severe detection has no false positives but may under-count.)\n"
         )
         for r in cases_with_cancel:
-            by_file = _cancellation_by_file(r["cancellation_locs"])
-            density = ", ".join(f"`{f}` ({n})" for f, n in by_file[:6])
-            md.append(f"**`{r['name']}`** — {len(r['cancellation_locs'])} site(s); concentrates in: {density}\n")
-            for fname, lineno in r["cancellation_locs"][:15]:
-                md.append(f"- `{fname}:{lineno}`")
-                snippet = _get_source_context(fname, lineno)
-                if snippet:
-                    md.append("  ```fortran")
-                    for line in snippet.splitlines():
-                        md.append(f"  {line}")
-                    md.append("  ```")
-            if len(r["cancellation_locs"]) > 15:
-                md.append(f"- _…and {len(r['cancellation_locs']) - 15} more site(s); see fp-stability-logs/_")
+            severe = r.get("cancellation_severe") or set()
+            # collapse continuation fragments to one entry per logical statement,
+            # severe statements first (the ones that matter)
+            stmts = {}  # (basename, stmt_start) -> {where, severe, text}
+            for fname, lineno in sorted(r["cancellation_locs"]):
+                stmt_start, _end, stmt_text = _statement_at(fname, lineno)
+                key = (os.path.basename(fname), stmt_start)
+                entry = stmts.setdefault(key, {"where": f"{fname}:{stmt_start}", "severe": False, "text": stmt_text})
+                if (fname, lineno) in severe:
+                    entry["severe"] = True
+            ordered = sorted(stmts.values(), key=lambda e: (not e["severe"], e["where"]))
+            n_severe_stmt = sum(1 for e in ordered if e["severe"])
+            md.append(f"**`{r['name']}`** — {len(stmts)} statement(s), " f"**{n_severe_stmt} severe (≥ {CANCEL_SEVERE_BITS} bits lost)**\n")
+            for e in ordered[:15]:
+                sev = " **severe**" if e["severe"] else ""
+                md.append(f"- `{e['where']}`{sev}" + (f" — `{e['text']}`" if e["text"] else ""))
+            if len(ordered) > 15:
+                md.append(f"- _…and {len(ordered) - 15} more statement(s); see fp-stability-logs/_")
             md.append("")
 
     # Float-max overflow sites
@@ -1746,6 +1811,7 @@ def fp_stability():
                 "dd_line_confirmed": None,
                 "dd_line_confirm_dev": None,
                 "cancellation_locs": [],
+                "cancellation_severe": set(),
                 "mca_dev": None,
                 "mca_sigbits": None,
                 "float_max_locs": [],
