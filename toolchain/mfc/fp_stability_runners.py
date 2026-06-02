@@ -60,6 +60,19 @@ def _verrou_pythonpath(verrou_bin: str) -> str:
     return matches[0] if matches else ""
 
 
+def _verrou_env(verrou_bin: str) -> dict:
+    """os.environ plus VALGRIND_LIB, so a relocated install tree (e.g. a prebuilt
+    artifact extracted to a new prefix) can locate its tool — Valgrind bakes its
+    build prefix into the binary otherwise. Harmless for a source-built tree, where
+    VALGRIND_LIB just equals the compiled-in path. A VALGRIND_LIB already in the
+    environment (user sourced env.sh) is left untouched."""
+    env = os.environ.copy()
+    libdir = os.path.join(os.path.dirname(os.path.dirname(verrou_bin)), "libexec", "valgrind")
+    if "VALGRIND_LIB" not in env and os.path.isdir(libdir):
+        env["VALGRIND_LIB"] = libdir
+    return env
+
+
 def _write_inp(params: dict, target_name: str, work_dir: str) -> None:
     """Write a Fortran namelist .inp file from a Python params dict."""
     from .run import case_dicts
@@ -107,7 +120,7 @@ def _run_simulation_verrou(
         cmd.append(sim_bin)
 
         with open(os.path.join(run_dir, "sim.out"), "w") as f:
-            result = subprocess.run(cmd, cwd=tmpdir, stdout=f, stderr=subprocess.STDOUT, check=False)
+            result = subprocess.run(cmd, cwd=tmpdir, env=_verrou_env(verrou_bin), stdout=f, stderr=subprocess.STDOUT, check=False)
 
         if result.returncode != 0:
             tag = rounding_mode or "vprec"
@@ -312,9 +325,10 @@ def _write_dd_cmp_py(path: str, compare_files: list, threshold: float):
 
 
 def _dd_env(verrou_bin: str) -> dict:
-    """Environment with PYTHONPATH set for verrou_dd_* imports."""
+    """Environment for verrou_dd_*: VALGRIND_LIB (so a relocated tree's inner valgrind
+    calls resolve) plus PYTHONPATH (for the verrou_dd_* imports)."""
     py_pkg = _verrou_pythonpath(verrou_bin)
-    env = os.environ.copy()
+    env = _verrou_env(verrou_bin)
     if py_pkg:
         existing = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = ":".join(filter(None, [py_pkg, existing]))

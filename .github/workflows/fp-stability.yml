@@ -68,7 +68,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/verrou
-          # Keep these versions in sync with toolchain/bootstrap/verrou.sh (the builder).
+          # Keep these versions in sync with toolchain/bootstrap/verrou.sh (the installer).
           key: verrou-a58d434-valgrind-3.26.0-${{ runner.os }}
 
       - name: Install system dependencies
@@ -76,14 +76,18 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y \
             build-essential automake python3 python3-numpy libc6-dbg \
-            cmake gfortran
+            cmake gfortran zstd
 
-      - name: Build Verrou
+      - name: Install Verrou (prebuilt artifact, or source build as fallback)
         if: steps.cache-verrou.outputs.cache-hit != 'true'
         run: bash toolchain/bootstrap/verrou.sh
 
       - name: Verify Verrou
-        run: ~/.local/verrou/bin/valgrind --tool=verrou --version
+        # Source env.sh first: a prebuilt (relocated) tree needs VALGRIND_LIB; a
+        # source build works either way. (fp-stability sets this itself at runtime.)
+        run: |
+          [ -f ~/.local/verrou/env.sh ] && . ~/.local/verrou/env.sh
+          ~/.local/verrou/bin/valgrind --tool=verrou --version
 
       - name: Build MFC (debug, serial)
         # FFLAGS=-fno-inline prevents gfortran from inlining small functions into

@@ -2,12 +2,14 @@
 #
 # Opt-in installer for Verrou (the Valgrind FP-perturbation tool used by
 # `./mfc.sh fp-stability`). Verrou is NOT a Python/pip package — it is a fork of
-# Valgrind that must be compiled from source (~20 min), so this is a deliberate,
-# explicit step rather than something `fp-stability` does silently.
+# Valgrind. By default this downloads a prebuilt, hash-verified artifact (seconds);
+# if none is available for this tag/arch it falls back to a source build (~20 min).
+# Either way it's a deliberate, explicit step, not something fp-stability does silently.
 #
-#   bash toolchain/bootstrap/verrou.sh            # build into $HOME/.local/verrou
+#   bash toolchain/bootstrap/verrou.sh            # install into $HOME/.local/verrou
 #   VERROU_HOME=/path bash toolchain/bootstrap/verrou.sh
-#   bash toolchain/bootstrap/verrou.sh --force    # rebuild even if present
+#   bash toolchain/bootstrap/verrou.sh --force    # reinstall even if present
+#   VERROU_BUILD_FROM_SOURCE=1 bash toolchain/bootstrap/verrou.sh   # skip the prebuilt
 #
 # Versions are pinned to match the fp-stability CI workflow.
 
@@ -15,13 +17,19 @@ set -euo pipefail
 
 VALGRIND_VERSION="3.26.0"
 VERROU_COMMIT="a58d434"
+# Prebuilt artifacts (built once per arch) live in a small companion repo. The tag
+# pins to the (valgrind, verrou) pair above — bump all three together.
+VERROU_DIST_REPO="${VERROU_DIST_REPO:-sbryngelson/verrou-dist}"
+VERROU_DIST_TAG="${VERROU_DIST_TAG:-v1}"
 PREFIX="${VERROU_HOME:-$HOME/.local/verrou}"
 FORCE="${1:-}"
 
 echo "==> Verrou bootstrap (Valgrind ${VALGRIND_VERSION} + edf-hpc/verrou@${VERROU_COMMIT}) -> ${PREFIX}"
 
-# Idempotent: skip if already installed and working.
-if [ "$FORCE" != "--force" ] && [ -x "${PREFIX}/bin/valgrind" ] && "${PREFIX}/bin/valgrind" --tool=verrou --version >/dev/null 2>&1; then
+# Idempotent: skip if already installed and working. Source env.sh first if present
+# (a prebuilt tree needs VALGRIND_LIB to run; a source build works either way).
+if [ "$FORCE" != "--force" ] && [ -x "${PREFIX}/bin/valgrind" ] \
+   && ( [ -f "${PREFIX}/env.sh" ] && . "${PREFIX}/env.sh"; "${PREFIX}/bin/valgrind" --tool=verrou --version >/dev/null 2>&1 ); then
     echo "==> Verrou already installed at ${PREFIX} (use --force to rebuild). Nothing to do."
     exit 0
 fi
@@ -31,9 +39,11 @@ if [ "$(uname -s)" != "Linux" ]; then
     echo "ERROR: Verrou requires Linux (Valgrind does not support modern macOS, incl. Apple Silicon)." >&2
     exit 1
 fi
+arch_tag=""
 case "$(uname -m)" in
-    x86_64) ;;
+    x86_64) arch_tag="x86_64" ;;
     aarch64|arm64)
+        arch_tag="aarch64"
         echo "WARNING: $(uname -m) detected. Valgrind builds here, but Verrou's FP backends are" >&2
         echo "         best-validated on x86_64 — treat results as experimental on this arch." >&2
         ;;
@@ -41,6 +51,59 @@ case "$(uname -m)" in
         echo "WARNING: unrecognised arch $(uname -m); the build may fail. Proceeding anyway." >&2
         ;;
 esac
+
+# Fast path: download a prebuilt, hash-verified artifact and source its relocatable
+# env.sh, instead of building from source. Any failure (no asset for this arch/tag,
+# missing zstd/sha256sum, checksum mismatch, won't run) falls through to the build.
+try_prebuilt() {
+    [ -n "$arch_tag" ] || return 1
+    [ "${VERROU_BUILD_FROM_SOURCE:-}" = "1" ] && return 1
+    command -v sha256sum >/dev/null 2>&1 || return 1
+    tar --zstd --help >/dev/null 2>&1 || command -v zstd >/dev/null 2>&1 || return 1
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || return 1
+
+    local asset base dl
+    asset="verrou-${VERROU_COMMIT}-valgrind-${VALGRIND_VERSION}-linux-${arch_tag}.tar.zst"
+    base="https://github.com/${VERROU_DIST_REPO}/releases/download/${VERROU_DIST_TAG}/${asset}"
+    dl="$(mktemp -d)"
+
+    echo "==> Trying prebuilt ${VERROU_DIST_REPO}@${VERROU_DIST_TAG} (${asset})"
+    _fetch() {  # url dest
+        if command -v curl >/dev/null 2>&1; then curl -fsSL -o "$2" "$1"; else wget -q -O "$2" "$1"; fi
+    }
+    if ! _fetch "$base" "$dl/$asset" || ! _fetch "$base.sha256" "$dl/$asset.sha256"; then
+        echo "==> No prebuilt for this tag/arch — building from source instead."
+        rm -rf "$dl"; return 1
+    fi
+    if ! ( cd "$dl" && sha256sum -c "$asset.sha256" >/dev/null 2>&1 ); then
+        echo "WARNING: prebuilt checksum mismatch — building from source instead." >&2
+        rm -rf "$dl"; return 1
+    fi
+
+    mkdir -p "$PREFIX"
+    if tar --zstd --help >/dev/null 2>&1; then
+        tar -C "$PREFIX" --zstd -xf "$dl/$asset"
+    else
+        zstd -dc "$dl/$asset" | tar -C "$PREFIX" -xf -
+    fi
+    rm -rf "$dl"
+
+    # Valgrind bakes its build prefix into the binary; the artifact's env.sh sets
+    # VALGRIND_LIB relative to the extracted tree so the relocated install works.
+    if ! ( . "${PREFIX}/env.sh" && "${PREFIX}/bin/valgrind" --tool=verrou --version >/dev/null 2>&1 ); then
+        echo "WARNING: prebuilt did not run — building from source instead." >&2
+        return 1
+    fi
+    return 0
+}
+
+if try_prebuilt; then
+    echo "==> Verifying"
+    ( . "${PREFIX}/env.sh" && "${PREFIX}/bin/valgrind" --tool=verrou --version )
+    echo "==> Done (prebuilt). Verrou installed at ${PREFIX}"
+    echo "    Run:  ./mfc.sh fp-stability   (or set VERROU_HOME=${PREFIX} if you used a custom prefix)"
+    exit 0
+fi
 
 # Build dependencies.
 missing=""
