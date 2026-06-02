@@ -59,9 +59,14 @@ Requires:
   - A serial pre_process binary (to generate initial conditions)
 
 Usage:
-  ./mfc.sh fp-stability
+  ./mfc.sh fp-stability                       # built-in 1-D suite
+  ./mfc.sh fp-stability my_case.py            # your own case (small/short, serial, CPU)
   ./mfc.sh fp-stability --no-vprec --no-dd-line
   ./mfc.sh fp-stability --sim-binary PATH --pre-binary PATH
+
+A user case .py is run as a single serial CPU process under Verrou, so it must be
+a small, short proxy (a feasibility guard rejects large grids / long runs); output
+is forced to serial .dat I/O and the files to diff are auto-detected.
 """
 
 import math
