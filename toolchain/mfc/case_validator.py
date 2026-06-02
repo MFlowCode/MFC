@@ -668,6 +668,10 @@ class CaseValidator:
         low_Mach = self.get("low_Mach", 0)
         cyl_coord = self.get("cyl_coord", "F") == "T"
         viscous = self.get("viscous", "F") == "T"
+        igr = self.get("igr", "F") == "T"
+
+        if igr:
+            return
 
         self.prohibit(riemann_solver is None, "riemann_solver must be specified (1=HLL, 2=HLLC, 4=HLLD, 5=Lax-Friedrichs)")
         if riemann_solver is None:
