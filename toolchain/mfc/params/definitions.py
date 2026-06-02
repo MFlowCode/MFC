@@ -31,7 +31,7 @@ NF = _fc("num_fluids_max", 10)  # fluid_pp
 NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
-NIB = _fc("num_ib_patches_max", 50000)  # patch_ib (Fortran array bound)
+NIB = _fc("num_ib_patches_max", 54000)  # patch_ib (Fortran array bound)
 NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
 NSM = _fc("num_stl_models_max", 10)  # stl_models (Fortran array bound)
 NPB = _fc("num_particle_beds_max", 10)  # particle_bed (Fortran array bound)
@@ -1193,7 +1193,7 @@ _nv(
     "pi_fac",
 )
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
-_nv(_SIM, "ib_airfoil")
+_nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(
     _SIM,
