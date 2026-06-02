@@ -4,7 +4,8 @@
 # `./mfc.sh fp-stability`). Verrou is NOT a Python/pip package — it is a fork of
 # Valgrind. By default this downloads a prebuilt, hash-verified artifact (seconds);
 # if none is available for this tag/arch it falls back to a source build (~20 min).
-# Either way it's a deliberate, explicit step, not something fp-stability does silently.
+# fp-stability auto-runs this on first use when Verrou is absent (printing what it
+# does); it is also safe to run by hand. A failed install aborts, never a silent skip.
 #
 #   bash toolchain/bootstrap/verrou.sh            # install into $HOME/.local/verrou
 #   VERROU_HOME=/path bash toolchain/bootstrap/verrou.sh
@@ -80,20 +81,34 @@ try_prebuilt() {
         rm -rf "$dl"; return 1
     fi
 
-    mkdir -p "$PREFIX"
+    # Extract + verify in a staging dir, then swap into $PREFIX atomically. set -e
+    # is suppressed inside a function used as an `if` condition, so check each step
+    # explicitly — otherwise a failed extract would fall through and the source
+    # build would install on top of a half-written tree (or a stale one on --force).
+    local stage="$dl/stage"
+    mkdir -p "$stage"
     if tar --zstd --help >/dev/null 2>&1; then
-        tar -C "$PREFIX" --zstd -xf "$dl/$asset"
+        tar -C "$stage" --zstd -xf "$dl/$asset" || { echo "WARNING: prebuilt extract failed — building from source instead." >&2; rm -rf "$dl"; return 1; }
     else
-        zstd -dc "$dl/$asset" | tar -C "$PREFIX" -xf -
+        zstd -dc "$dl/$asset" | tar -C "$stage" -xf - || { echo "WARNING: prebuilt extract failed — building from source instead." >&2; rm -rf "$dl"; return 1; }
     fi
-    rm -rf "$dl"
 
     # Valgrind bakes its build prefix into the binary; the artifact's env.sh sets
-    # VALGRIND_LIB relative to the extracted tree so the relocated install works.
-    if ! ( . "${PREFIX}/env.sh" && "${PREFIX}/bin/valgrind" --tool=verrou --version >/dev/null 2>&1 ); then
+    # VALGRIND_LIB relative to the tree so the relocated install works. Verify the
+    # staged tree runs before committing it.
+    if ! ( . "${stage}/env.sh" && "${stage}/bin/valgrind" --tool=verrou --version >/dev/null 2>&1 ); then
         echo "WARNING: prebuilt did not run — building from source instead." >&2
-        return 1
+        rm -rf "$dl"; return 1
     fi
+
+    # Commit only now: replace any existing $PREFIX atomically.
+    mkdir -p "$(dirname "$PREFIX")"
+    rm -rf "$PREFIX"
+    if ! mv "$stage" "$PREFIX"; then
+        echo "WARNING: could not install prebuilt to ${PREFIX} — building from source instead." >&2
+        rm -rf "$dl"; return 1
+    fi
+    rm -rf "$dl"
     return 0
 }
 

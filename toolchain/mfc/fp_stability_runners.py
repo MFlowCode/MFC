@@ -32,11 +32,13 @@ from .fp_stability_metrics import (
 from .printer import cons
 
 
-def _has_verrou_tool(valgrind_bin: str) -> bool:
+def _has_verrou_tool(valgrind_bin: str, env: dict = None) -> bool:
     """True if this valgrind actually provides the 'verrou' tool. A plain system
-    valgrind does not — accepting one would only fail later at run time."""
+    valgrind does not — accepting one would only fail later at run time. Pass env
+    (with VALGRIND_LIB) to verify a relocated prebuilt tree, which cannot load its
+    tool without it."""
     try:
-        return subprocess.run([valgrind_bin, "--tool=verrou", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
+        return subprocess.run([valgrind_bin, "--tool=verrou", "--version"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
     except OSError:
         return False
 
@@ -44,7 +46,10 @@ def _has_verrou_tool(valgrind_bin: str) -> bool:
 def _find_verrou() -> str:
     verrou_home = os.environ.get("VERROU_HOME", os.path.join(os.path.expanduser("~"), ".local", "verrou"))
     candidate = os.path.join(verrou_home, "bin", "valgrind")
-    if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+    # Require the $VERROU_HOME tree to actually run the verrou tool (with VALGRIND_LIB
+    # for a relocated prebuilt). A broken/stale/non-Verrou tree there must read as
+    # "absent" so it gets reinstalled, not used until it fails on every run.
+    if os.path.isfile(candidate) and os.access(candidate, os.X_OK) and _has_verrou_tool(candidate, _verrou_env(candidate)):
         return candidate
     # Fall back to a valgrind on PATH only if it is Verrou-enabled; a bare system
     # valgrind must read as "Verrou absent" so it gets installed, not misused.

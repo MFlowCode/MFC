@@ -392,7 +392,25 @@ def test_find_verrou_prefers_verrou_home_candidate(tmp_path, monkeypatch):
     vbin.write_text("#!/bin/sh\n")
     vbin.chmod(0o755)
     monkeypatch.setenv("VERROU_HOME", str(tmp_path))
+    # The candidate must also verify as Verrou-enabled; stub that so the test
+    # exercises precedence, not a real valgrind invocation.
+    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin, _env=None: True)
     assert runners._find_verrou() == str(vbin)
+
+
+def test_find_verrou_rejects_broken_verrou_home_tree(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    # A valgrind exists at $VERROU_HOME but does not actually run the verrou tool
+    # (broken/stale/non-Verrou): it must read as absent, not be returned.
+    vbin = tmp_path / "bin" / "valgrind"
+    vbin.parent.mkdir(parents=True)
+    vbin.write_text("#!/bin/sh\n")
+    vbin.chmod(0o755)
+    monkeypatch.setenv("VERROU_HOME", str(tmp_path))
+    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin, _env=None: False)
+    monkeypatch.setattr(runners.shutil, "which", lambda _name: None)
+    assert runners._find_verrou() == ""
 
 
 def test_find_verrou_rejects_non_verrou_path_valgrind(tmp_path, monkeypatch):
@@ -425,3 +443,83 @@ def test_has_verrou_tool_reflects_exit_code(monkeypatch):
     assert runners._has_verrou_tool("/any/valgrind") is True
     monkeypatch.setattr(runners.subprocess, "run", lambda *a, **k: _R(1))
     assert runners._has_verrou_tool("/any/valgrind") is False
+
+    def _boom(*a, **k):
+        raise OSError("not executable")
+
+    monkeypatch.setattr(runners.subprocess, "run", _boom)
+    assert runners._has_verrou_tool("/stale/valgrind") is False
+
+
+# --- env composition for relocated (prebuilt) Verrou trees ---
+
+
+def test_verrou_env_sets_valgrind_lib_when_libexec_present(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    (tmp_path / "libexec" / "valgrind").mkdir(parents=True)
+    monkeypatch.delenv("VALGRIND_LIB", raising=False)
+    env = runners._verrou_env(str(tmp_path / "bin" / "valgrind"))
+    assert env["VALGRIND_LIB"] == str(tmp_path / "libexec" / "valgrind")
+
+
+def test_verrou_env_omits_valgrind_lib_when_libexec_absent(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    monkeypatch.delenv("VALGRIND_LIB", raising=False)
+    env = runners._verrou_env(str(tmp_path / "bin" / "valgrind"))
+    assert "VALGRIND_LIB" not in env
+
+
+def test_verrou_env_preserves_user_valgrind_lib(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    (tmp_path / "libexec" / "valgrind").mkdir(parents=True)
+    monkeypatch.setenv("VALGRIND_LIB", "/user/chosen/lib")
+    env = runners._verrou_env(str(tmp_path / "bin" / "valgrind"))
+    assert env["VALGRIND_LIB"] == "/user/chosen/lib"  # not clobbered
+
+
+def test_dd_env_prepends_pythonpath_and_inherits_valgrind_lib(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    (tmp_path / "libexec" / "valgrind").mkdir(parents=True)
+    monkeypatch.delenv("VALGRIND_LIB", raising=False)
+    monkeypatch.setenv("PYTHONPATH", "/pre/existing")
+    monkeypatch.setattr(runners, "_verrou_pythonpath", lambda _b: "/vg/site-packages/valgrind")
+    env = runners._dd_env(str(tmp_path / "bin" / "valgrind"))
+    assert env["PYTHONPATH"] == "/vg/site-packages/valgrind:/pre/existing"
+    assert env["VALGRIND_LIB"] == str(tmp_path / "libexec" / "valgrind")
+
+
+def test_dd_env_no_leading_colon_when_pythonpath_empty(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    monkeypatch.setattr(runners, "_verrou_pythonpath", lambda _b: "/vg/valgrind")
+    env = runners._dd_env(str(tmp_path / "bin" / "valgrind"))
+    assert env["PYTHONPATH"] == "/vg/valgrind"  # no stray leading ':'
+
+
+# --- auto-install hard-fail guards ---
+
+
+def test_install_verrou_raises_when_bootstrap_fails(monkeypatch):
+    import pytest
+
+    from mfc import fp_stability as fps
+
+    monkeypatch.setattr(fps.subprocess, "run", lambda *a, **k: type("R", (), {"returncode": 1})())
+    with pytest.raises(fps.MFCException, match="Verrou install failed"):
+        fps._install_verrou()
+
+
+def test_install_verrou_raises_when_no_binary_appears(monkeypatch):
+    import pytest
+
+    from mfc import fp_stability as fps
+
+    monkeypatch.setattr(fps.subprocess, "run", lambda *a, **k: type("R", (), {"returncode": 0})())
+    monkeypatch.setattr(fps, "_find_verrou", lambda: "")
+    with pytest.raises(fps.MFCException, match="no valgrind binary"):
+        fps._install_verrou()
