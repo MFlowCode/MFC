@@ -26,10 +26,13 @@ E. verrou_dd_line on failure, after dd_sym (--no-dd-line to skip)
    reproduce the instability.  Lines that do not reproduce it are reported as
    unconfirmed (downgraded from ::warning:: to ::notice::).  Each line is then
    perturbed alone and ranked by the share of the single-precision deviation it
-   reproduces, so the most flagrant computation is identified rather than a flat
-   list.  Hotspots are additionally cross-referenced against the stage-F
-   cancellation sites (to name the offending subtraction) and flagged as
-   instance-ambiguous when the .fpp line sits inside a #:for/#:def expansion.
+   reproduces.  NOTE: this is a *sensitivity* measure — where reduced precision
+   most moves the output — and is typically dominated by the time integrator /
+   final accumulation, NOT by where cancellation originates.  Stage F (and its
+   per-file density) is the cancellation-origin view; the two usually differ.
+   Hotspots are cross-referenced against the stage-F cancellation sites and
+   flagged as instance-ambiguous when the .fpp line sits inside a #:for/#:def
+   expansion.
 
 F. Cancellation detection (--no-cancellation to skip)
    One run with --check-cancellation=yes; reports MFC source lines that
@@ -1003,6 +1006,22 @@ def _mark_cancellation(dd_line_locs: list, cancellation_locs: list) -> list:
     return dd_line_locs
 
 
+def _cancellation_by_file(cancellation_locs: list) -> list:
+    """Aggregate cancellation sites by source file → [(basename, count)] sorted by
+    count (desc), ties by name.
+
+    This is the cancellation-*origin* view (where ill-conditioning concentrates),
+    as opposed to the per-line --source share, which is a *sensitivity* view
+    (where reduced precision most moves the output — typically the time
+    integrator / final accumulation, regardless of where error originates).
+    """
+    counts = {}
+    for fname, _lineno in cancellation_locs:
+        base = os.path.basename(fname)
+        counts[base] = counts.get(base, 0) + 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
 def _run_dd_tool(
     dd_bin: str,
     dd_dir: str,
@@ -1361,7 +1380,9 @@ def _run_case(
                     cons.print(f"  [bold yellow]dd_line UNCONFIRMED[/bold yellow]: suspect-only dev={cdev:.3e} < {dd_threshold:.1e} (attribution suspect)")
                 top = ranked[0] if ranked else None
                 if top and top.get("share") is not None:
-                    cons.print(f"  most flagrant: {top['path']}:{top['start']} ({top['share'] * 100:.0f}% of float-proxy)")
+                    cons.print(f"  highest single-precision sensitivity: {top['path']}:{top['start']} ({top['share'] * 100:.0f}% of float-proxy)")
+                    cons.print("  [dim](sensitivity = where reduced precision most moves the output, often the time")
+                    cons.print("  [dim] integrator; not necessarily where cancellation originates — see cancellation sites)[/dim]")
             except Exception as exc:
                 cons.print(f"  [bold yellow]dd_line confirmation error[/bold yellow]: {exc}")
 
@@ -1450,7 +1471,7 @@ def _emit_github_annotations(results: list):
     if not os.environ.get("GITHUB_ACTIONS"):
         return
     for r in results:
-        status = "FAIL" if not r["passed"] else "hotspot"
+        status = "FAIL" if not r["passed"] else "sensitivity"
         dev_str = f"max_dev={r['max_dev']:.2e} (threshold {r['threshold']:.0e})"
         unconfirmed = r.get("dd_line_confirmed") is False
 
@@ -1460,9 +1481,9 @@ def _emit_github_annotations(results: list):
                 location += f",endLine={loc['end']}"
             note = dev_str
             if loc.get("share") is not None:
-                note += f" — reproduces {loc['share'] * 100:.0f}% of float-proxy alone"
+                note += f" — single-precision sensitivity: {loc['share'] * 100:.0f}% of float-proxy (where precision matters, not necessarily where cancellation originates)"
             if loc.get("cancellation"):
-                note += " — catastrophic cancellation site"
+                note += " — also a catastrophic cancellation site"
             if loc.get("macro"):
                 note += f" — {loc['macro']}-expanded line, may represent multiple instances"
             if unconfirmed:
@@ -1471,11 +1492,17 @@ def _emit_github_annotations(results: list):
             else:
                 title = f"FP {status} [{r['name']}]"
                 print(f"::warning {location},title={title}::{note}", flush=True)
+        n_dd = len(r.get("dd_line_locs", []))
+        if n_dd > 3:
+            print(f"::notice title=FP hotspots [{r['name']}]::{n_dd - 3} more dd_line hotspot(s) not annotated inline; see the step summary", flush=True)
 
         for fname, lineno in r.get("cancellation_locs", [])[:3]:
             loc = f"file={fname},line={lineno}"
             title = f"FP cancellation [{r['name']}]"
             print(f"::notice {loc},title={title}::catastrophic cancellation site", flush=True)
+        n_cc = len(r.get("cancellation_locs", []))
+        if n_cc > 3:
+            print(f"::notice title=FP cancellation [{r['name']}]::{n_cc - 3} more cancellation site(s) not annotated inline; see the step summary", flush=True)
 
 
 def _emit_github_summary(results: list, n_samples: int):
@@ -1495,6 +1522,12 @@ def _emit_github_summary(results: list, n_samples: int):
     md = []
     md.append("## FP Stability Results\n")
     md.append(f"**{n_pass} passed, {n_fail} failed** — {n_samples} random-rounding samples per case\n")
+    md.append(
+        f"> **Coverage:** {len(results)} one-dimensional case(s) "
+        f"({', '.join(r['name'] for r in results)}). A pass means stable in the code paths these "
+        "cases exercise — not a guarantee for multi-D, viscous, MHD, IGR, or bubble-dynamics paths "
+        "they do not reach.\n"
+    )
 
     # Main results table
     md.append("| Case | Status | max\\_dev | threshold | Float proxy | MCA sig bits |")
@@ -1528,10 +1561,19 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append(f"| `{r['name']}` | {' | '.join(cols)} |")
         md.append("")
 
-    # dd_line hotspot sources — always shown (top 10 per case) with source context
+    # dd_line — single-precision SENSITIVITY (where precision most affects the
+    # output). This is distinct from cancellation origin (reported separately):
+    # the leader is typically the time integrator / final accumulation, because
+    # perturbing the last write moves the output directly while upstream errors
+    # get re-rounded there. Not a culprit-finder for ill-conditioning.
     cases_with_locs = [r for r in results if r["dd_line_locs"]]
     if cases_with_locs:
-        md.append("### Top FP hotspots (dd\\_line)\n")
+        md.append("### Single-precision sensitivity (dd\\_line)\n")
+        md.append(
+            "> Where reduced precision most moves the output — **typically the time integrator / "
+            "final accumulation, which is expected and benign**. This is *not* the same as where "
+            "cancellation originates; see **Catastrophic cancellation sites** below for that.\n"
+        )
         _confirm_label = {True: "✅ confirmed", False: "⚠️ unconfirmed (suspect-only perturbation did not reproduce)", None: "— not checked"}
         for r in cases_with_locs:
             status = "❌ FAIL" if not r["passed"] else "✅ pass"
@@ -1558,6 +1600,8 @@ def _emit_github_summary(results: list, n_samples: int):
                     for line in snippet.splitlines():
                         md.append(f"  {line}")
                     md.append("  ```")
+            if len(r["dd_line_locs"]) > 10:
+                md.append(f"- _…and {len(r['dd_line_locs']) - 10} more hotspot(s); see fp-stability-logs/_")
             md.append("")
 
     # dd_sym function names (collapsed, since less actionable than dd_line)
@@ -1571,12 +1615,19 @@ def _emit_github_summary(results: list, n_samples: int):
                 md.append(f"- `{sym}`")
         md.append("\n</details>\n")
 
-    # Cancellation hotspots
+    # Cancellation hotspots — the ORIGIN view (where ill-conditioning concentrates).
     cases_with_cancel = [r for r in results if r.get("cancellation_locs")]
     if cases_with_cancel:
         md.append("### Catastrophic cancellation sites\n")
+        md.append(
+            "> Where cancellation actually originates (subtraction of nearly-equal values). This is "
+            "the numerically interesting signal — and it usually differs from the sensitivity leader "
+            "above.\n"
+        )
         for r in cases_with_cancel:
-            md.append(f"**`{r['name']}`** — {len(r['cancellation_locs'])} site(s)\n")
+            by_file = _cancellation_by_file(r["cancellation_locs"])
+            density = ", ".join(f"`{f}` ({n})" for f, n in by_file[:6])
+            md.append(f"**`{r['name']}`** — {len(r['cancellation_locs'])} site(s); concentrates in: {density}\n")
             for fname, lineno in r["cancellation_locs"][:15]:
                 md.append(f"- `{fname}:{lineno}`")
                 snippet = _get_source_context(fname, lineno)
@@ -1585,6 +1636,8 @@ def _emit_github_summary(results: list, n_samples: int):
                     for line in snippet.splitlines():
                         md.append(f"  {line}")
                     md.append("  ```")
+            if len(r["cancellation_locs"]) > 15:
+                md.append(f"- _…and {len(r['cancellation_locs']) - 15} more site(s); see fp-stability-logs/_")
             md.append("")
 
     # Float-max overflow sites
@@ -1595,6 +1648,8 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append(f"**`{r['name']}`** — {len(r['float_max_locs'])} site(s)\n")
             for fname, lineno in r["float_max_locs"][:10]:
                 md.append(f"- `{fname}:{lineno}`")
+            if len(r["float_max_locs"]) > 10:
+                md.append(f"- _…and {len(r['float_max_locs']) - 10} more site(s); see fp-stability-logs/_")
             md.append("")
 
     with open(summary_path, "a") as f:

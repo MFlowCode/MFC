@@ -8,6 +8,7 @@ label results, so they can run without Verrou or built binaries.
 
 from mfc.fp_stability import (
     _build_source_filter,
+    _cancellation_by_file,
     _confirm_decision,
     _macro_context_in_lines,
     _mark_cancellation,
@@ -196,3 +197,24 @@ def test_mark_cancellation_false_for_different_basename():
     locs = [{"path": "m_foo.fpp", "start": 5, "end": 5}]
     _mark_cancellation(locs, [("m_bar.fpp", 5)])
     assert locs[0]["cancellation"] is False
+
+
+# --- cancellation-origin view: where cancellation concentrates ---
+
+
+def test_cancellation_by_file_counts_and_sorts_by_density():
+    locs = [
+        ("src/simulation/m_weno.fpp", 10),
+        ("m_weno.fpp", 20),
+        ("a/m_riemann_solvers.fpp", 5),
+    ]
+    assert _cancellation_by_file(locs) == [("m_weno.fpp", 2), ("m_riemann_solvers.fpp", 1)]
+
+
+def test_cancellation_by_file_breaks_ties_by_name():
+    locs = [("z.fpp", 1), ("a.fpp", 2)]
+    assert _cancellation_by_file(locs) == [("a.fpp", 1), ("z.fpp", 1)]
+
+
+def test_cancellation_by_file_empty():
+    assert _cancellation_by_file([]) == []
