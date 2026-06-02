@@ -989,7 +989,7 @@ contains
 
         do stl_id = 1, num_stl_models
             allocate (models(stl_id)%model)
-            print *, " * Reading model: " // trim(stl_models(stl_id)%model_filepath)
+            if (proc_rank == 0) print *, " * Reading model: " // trim(stl_models(stl_id)%model_filepath)
 
             model = f_model_read(stl_models(stl_id)%model_filepath)
             params%scale(:) = stl_models(stl_id)%model_scale(:)
@@ -1002,9 +1002,7 @@ contains
                 params%scale(:) = 1._wp
             end if
 
-            if (proc_rank == 0) then
-                print *, " * Transforming model."
-            end if
+            if (proc_rank == 0) print *, " * Transforming model."
 
             ! Get the model center before transforming the model
             bbox_old = f_create_bbox(model)
@@ -1020,17 +1018,13 @@ contains
             bbox = f_create_bbox(model)
 
             ! Show the number of vertices in the original STL model
-            if (proc_rank == 0) then
-                print *, ' * Number of input model vertices:', 3*model%ntrs
-            end if
+            if (proc_rank == 0) print *, ' * Number of input model vertices:', 3*model%ntrs
 
             ! Need the cells that form the boundary of the flat projection in 2D
             if (p == 0) call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
             ! Show the number of edges and boundary edges in 2D STL models
-            if (proc_rank == 0 .and. p == 0) then
-                print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-            end if
+            if (proc_rank == 0 .and. p == 0) print *, ' * Number of 2D model boundary edges:', boundary_edge_count
 
             if (proc_rank == 0) then
                 write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
