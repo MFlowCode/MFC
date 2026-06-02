@@ -40,9 +40,9 @@ if (MFC_ALL)
 endif()
 
 # Validate CMAKE_BUILD_TYPE to catch typos (CMake is case-sensitive).
-set(_VALID_BUILD_TYPES "Debug" "Release" "RelDebug" "")
+set(_VALID_BUILD_TYPES "Debug" "Release" "RelDebug" "Fast" "")
 if (NOT CMAKE_BUILD_TYPE IN_LIST _VALID_BUILD_TYPES)
-    message(FATAL_ERROR "Unknown CMAKE_BUILD_TYPE '${CMAKE_BUILD_TYPE}'. Valid: Debug, RelDebug, Release")
+    message(FATAL_ERROR "Unknown CMAKE_BUILD_TYPE '${CMAKE_BUILD_TYPE}'. Valid: Debug, RelDebug, Release, Fast")
 endif()
 
 # RelDebug: a lighter debug mode for CI. Compiler-specific blocks below add the
@@ -50,6 +50,13 @@ endif()
 set(CMAKE_C_FLAGS_RELDEBUG       "-g" CACHE STRING "")
 set(CMAKE_CXX_FLAGS_RELDEBUG     "-g" CACHE STRING "")
 set(CMAKE_Fortran_FLAGS_RELDEBUG "-g" CACHE STRING "")
+
+# Fast: fast-iteration dev builds (e.g. GPU print-debugging). Deliberately matches
+# none of the Release-only (IPO, -march=native) or Debug/RelDebug-only (MFC_DEBUG,
+# -gpu=debug) conditional blocks below, so it inherits none of them - just a light -O1.
+set(CMAKE_C_FLAGS_FAST       "-O1" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_FAST     "-O1" CACHE STRING "")
+set(CMAKE_Fortran_FLAGS_FAST "-O1" CACHE STRING "")
 
 if (MFC_SINGLE_PRECISION)
     add_compile_definitions(MFC_SINGLE_PRECISION)
@@ -328,6 +335,14 @@ endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
     add_compile_definitions(MFC_DEBUG)
+endif()
+
+# Fast: light optimization for dev iteration. Like Debug/RelDebug, the real opt
+# flag is injected here (the CMAKE_*_FLAGS_FAST cache vars are placeholders).
+# -O1 keeps compile time low while giving acceptable runtime; no MFC_DEBUG, so
+# device routines stay free of host-only debug aborts and compile without IPO.
+if (CMAKE_BUILD_TYPE STREQUAL "Fast")
+    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1>)
 endif()
 
 

@@ -16,6 +16,7 @@ class MFCConfig:
     gpu: str = gpuConfigOptions.NONE.value
     debug: bool = False
     reldebug: bool = False
+    fast_build: bool = False
     gcov: bool = False
     unified: bool = False
     single: bool = False

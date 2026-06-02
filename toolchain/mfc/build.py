@@ -27,6 +27,53 @@ _NINJA_PROGRESS_RE = re.compile(r"^\[(\d+)/(\d+)\]\s+(.*)$")
 _MAKE_PROGRESS_RE = re.compile(r"^\[\s*(\d+)%\]\s+(.*)$")
 
 
+def _cmake_build_type() -> str:
+    """Map the CLI build-mode flags to a CMAKE_BUILD_TYPE string."""
+    if ARG("debug"):
+        return "Debug"
+    if ARG("reldebug"):
+        return "RelDebug"
+    if ARG("fast_build", False):
+        return "Fast"
+    return "Release"
+
+
+def _apply_fast_build_gpu_arch() -> None:
+    """Under --fast-build on an NVHPC GPU build, restrict device codegen to a
+    single compute capability (the node's GPU), overriding the multi-arch
+    MFC_CUDA_CC that the module files set. CMake reads $ENV{MFC_CUDA_CC}.
+
+    Cray/AMD GPU builds don't use MFC_CUDA_CC (they are already single-arch via
+    craype-accel/--offload-arch), so this only acts when MFC_CUDA_CC is set.
+    Hard-errors if no GPU is detectable and no explicit arch is provided."""
+    if not ARG("fast_build", False) or ARG("gpu") == gpuConfigOptions.NONE.value:
+        return
+    if not os.environ.get("MFC_CUDA_CC"):  # not an NVHPC node; nothing to do
+        return
+
+    override = os.environ.get("MFC_FAST_ARCH")  # escape hatch for login nodes
+    if override:
+        os.environ["MFC_CUDA_CC"] = override
+        return
+
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        caps = [ln.strip().replace(".", "") for ln in result.stdout.splitlines() if ln.strip()]
+    except (OSError, subprocess.SubprocessError):
+        caps = []
+
+    if not caps:
+        raise MFCException("--fast-build: could not detect a local GPU compute capability " "(no GPU visible via nvidia-smi). Run on a GPU node, or set " "MFC_FAST_ARCH=<cc> (e.g. MFC_FAST_ARCH=90).")
+
+    os.environ["MFC_CUDA_CC"] = caps[0]
+
+
 def _run_build_with_progress(command: typing.List[str], target_name: str, streaming: bool = False) -> subprocess.CompletedProcess:
     """
     Run a build command with a progress bar that parses ninja output.
@@ -367,6 +414,10 @@ class MFCTarget:
     def configure(self, case: Case):
         if ARG("debug") and ARG("reldebug"):
             raise MFCException("--debug and --reldebug are mutually exclusive.")
+        if ARG("fast_build", False) and (ARG("debug") or ARG("reldebug")):
+            raise MFCException("--fast-build is mutually exclusive with --debug/--reldebug.")
+
+        _apply_fast_build_gpu_arch()
 
         build_dirpath = self.get_staging_dirpath(case)
         cmake_dirpath = self.get_cmake_dirpath()
@@ -386,9 +437,9 @@ class MFCTarget:
             # build the configured targets. This is mostly useful for debugging.
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html.
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-            # Set build type (Debug, RelDebug, or Release).
+            # Set build type (Debug, RelDebug, Fast, or Release).
             # See: https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html
-            f"-DCMAKE_BUILD_TYPE={'Debug' if ARG('debug') else 'RelDebug' if ARG('reldebug') else 'Release'}",
+            f"-DCMAKE_BUILD_TYPE={_cmake_build_type()}",
             # Used by FIND_PACKAGE (/FindXXX) to search for packages, with the
             # second highest level of priority, still letting users manually
             # specify <PackageName>_ROOT, which has precedence over CMAKE_PREFIX_PATH.
@@ -468,7 +519,7 @@ class MFCTarget:
             "--parallel",
             ARG("jobs"),
             "--config",
-            "Debug" if ARG("debug") else "RelDebug" if ARG("reldebug") else "Release",
+            _cmake_build_type(),
         ]
 
         verbosity = ARG("verbose")
