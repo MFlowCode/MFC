@@ -167,7 +167,7 @@ module m_global_parameters
     type(bounds_info) :: x_domain, y_domain, z_domain
     type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
     integer           :: num_gbl_ibs, num_local_ibs
-    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z]')
+    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z, num_gbl_ibs]')
     $:GPU_DECLARE(create='[down_sample]')
 
     integer, allocatable, dimension(:)            :: proc_coords  !< Processor coordinates in MPI_CART_COMM
