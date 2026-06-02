@@ -78,16 +78,9 @@ jobs:
             build-essential automake python3 python3-numpy libc6-dbg \
             cmake gfortran zstd
 
-      - name: Install Verrou (prebuilt artifact, or source build as fallback)
-        if: steps.cache-verrou.outputs.cache-hit != 'true'
-        run: bash toolchain/bootstrap/verrou.sh
-
-      - name: Verify Verrou
-        # Source env.sh first: a prebuilt (relocated) tree needs VALGRIND_LIB; a
-        # source build works either way. (fp-stability sets this itself at runtime.)
-        run: |
-          [ -f ~/.local/verrou/env.sh ] && . ~/.local/verrou/env.sh
-          ~/.local/verrou/bin/valgrind --tool=verrou --version
+      # Verrou is installed by `fp-stability` itself on first use (downloads the
+      # prebuilt artifact; aborts if that fails). The cache above restores it across
+      # runs so the download only happens on a cache miss.
 
       - name: Build MFC (debug, serial)
         # FFLAGS=-fno-inline prevents gfortran from inlining small functions into

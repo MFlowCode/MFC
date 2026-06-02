@@ -73,6 +73,7 @@ is forced to serial .dat I/O and the files to diff are auto-detected.
 import math
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -658,13 +659,26 @@ def _load_user_case(input_path: str) -> dict:
     }
 
 
+def _install_verrou() -> str:
+    """Verrou is absent: install it via the bootstrap (downloads a pinned, hash-verified
+    prebuilt; source build as fallback) and return the valgrind path. Aborts on failure —
+    fp-stability cannot run without Verrou, so this is a hard error, not a skip."""
+    script = os.path.join(MFC_ROOT_DIR, "toolchain", "bootstrap", "verrou.sh")
+    cons.print("[bold]Verrou not found — installing it (downloads a prebuilt artifact, ~seconds; source build as fallback)...[/bold]")
+    if subprocess.run(["bash", script], check=False).returncode != 0:
+        raise MFCException("Verrou install failed (see output above). Fix the issue and re-run, install manually with `bash toolchain/bootstrap/verrou.sh`, or pass --verrou-binary PATH.")
+    verrou_bin = _find_verrou()
+    if not verrou_bin or not os.path.isfile(verrou_bin):
+        raise MFCException("Verrou install reported success but no valgrind binary was found under $VERROU_HOME.")
+    return verrou_bin
+
+
 def fp_stability():
     verrou_bin = ARG("verrou_binary") or _find_verrou()
     if not verrou_bin or not os.path.isfile(verrou_bin):
-        cons.print("[bold yellow]SKIP[/bold yellow]: Verrou not found (it is a compiled Valgrind tool, not a pip package).")
-        cons.print("  Install it (Linux; ~20 min source build) with:  [bold]bash toolchain/bootstrap/verrou.sh[/bold]")
-        cons.print("  Or point at an existing build with --verrou-binary PATH or $VERROU_HOME.")
-        sys.exit(0)
+        if ARG("verrou_binary"):
+            raise MFCException(f"--verrou-binary {ARG('verrou_binary')!r} not found or not executable.")
+        verrou_bin = _install_verrou()
 
     sim_bin = ARG("sim_binary") or _find_binary("simulation")
     if not sim_bin or not os.path.isfile(sim_bin):

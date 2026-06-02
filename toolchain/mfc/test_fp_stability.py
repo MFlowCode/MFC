@@ -379,3 +379,49 @@ def test_emit_annotations_downgrade_unconfirmed(tmp_path, monkeypatch, capsys):
     report._emit_github_annotations([r])
     out = capsys.readouterr().out
     assert "::notice" in out and "::warning" not in out  # unconfirmed -> notice, not warning
+
+
+# --- Verrou discovery: a bare system valgrind must read as "Verrou absent" ---
+
+
+def test_find_verrou_prefers_verrou_home_candidate(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    vbin = tmp_path / "bin" / "valgrind"
+    vbin.parent.mkdir(parents=True)
+    vbin.write_text("#!/bin/sh\n")
+    vbin.chmod(0o755)
+    monkeypatch.setenv("VERROU_HOME", str(tmp_path))
+    assert runners._find_verrou() == str(vbin)
+
+
+def test_find_verrou_rejects_non_verrou_path_valgrind(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    # VERROU_HOME has no valgrind; a plain valgrind is on PATH but lacks the tool.
+    monkeypatch.setenv("VERROU_HOME", str(tmp_path))
+    monkeypatch.setattr(runners.shutil, "which", lambda _name: "/usr/bin/valgrind")
+    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin: False)
+    assert runners._find_verrou() == ""
+
+
+def test_find_verrou_accepts_verrou_enabled_path_valgrind(tmp_path, monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    monkeypatch.setenv("VERROU_HOME", str(tmp_path))
+    monkeypatch.setattr(runners.shutil, "which", lambda _name: "/opt/verrou/bin/valgrind")
+    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin: True)
+    assert runners._find_verrou() == "/opt/verrou/bin/valgrind"
+
+
+def test_has_verrou_tool_reflects_exit_code(monkeypatch):
+    from mfc import fp_stability_runners as runners
+
+    class _R:
+        def __init__(self, rc):
+            self.returncode = rc
+
+    monkeypatch.setattr(runners.subprocess, "run", lambda *a, **k: _R(0))
+    assert runners._has_verrou_tool("/any/valgrind") is True
+    monkeypatch.setattr(runners.subprocess, "run", lambda *a, **k: _R(1))
+    assert runners._has_verrou_tool("/any/valgrind") is False
