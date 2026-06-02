@@ -6,7 +6,7 @@ here we test only the pure functions that decide what to instrument and how to
 label results, so they can run without Verrou or built binaries.
 """
 
-from mfc.fp_stability import (
+from mfc.fp_stability_metrics import (
     MIN_SIG_BITS,
     _build_source_filter,
     _cancellation_by_file,
