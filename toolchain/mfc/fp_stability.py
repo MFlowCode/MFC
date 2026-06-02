@@ -4,7 +4,8 @@ Floating-point stability test suite using Verrou.
 Features
 --------
 A. Stability suite (always)
-   N random-rounding samples per case, threshold-based PASS/FAIL.
+   N random-rounding samples per case; PASS/FAIL on significant bits retained
+   (scale-free: -log2(max_dev/scale) vs one global floor, no per-case threshold).
 
 B. Float proxy (--no-float-proxy to skip)
    One run with --rounding-mode=float — deterministic proxy for
@@ -91,6 +92,35 @@ from .state import ARG
 # Mantissa-bit levels for the VPREC sweep (C).
 # 52 = full double, 23 = single, 16 = half-ish, 10 = ultra-low.
 VPREC_MANTISSA_BITS = [52, 23, 16, 10]
+
+# Stability pass/fail (stage A) is scale-free: a case must retain at least this
+# many significant bits under random rounding (sig_bits = -log2(max_dev/scale)).
+# 24 ~= single precision. One global floor replaces per-case absolute thresholds
+# (which spanned 6 orders of magnitude purely from field scale + conditioning);
+# normalising by the field scale collapses that, so a single number suffices.
+MIN_SIG_BITS = 24
+
+# Fallback absolute threshold for the dd_sym/dd_line oracle when no float-proxy-
+# derived threshold is supplied (callers always pass one, so this is only a guard).
+_DD_FALLBACK_THRESHOLD = 1e-12
+
+
+def _sig_bits(max_dev: float, ref_scale: float) -> float:
+    """Significant bits retained = -log2(max_dev / ref_scale).
+
+    Scale-free: dividing the deviation by the field's peak magnitude removes the
+    absolute scale, leaving only the conditioning.  Zero deviation (or zero
+    scale) returns 53.0 = full double precision retained.
+    """
+    if not (max_dev > 0) or not (ref_scale > 0):
+        return 53.0
+    return -math.log2(max_dev / ref_scale)
+
+
+def _stability_pass(max_dev: float, ref_scale: float, floor: float) -> bool:
+    """A case passes when it retains at least `floor` significant bits."""
+    return _sig_bits(max_dev, ref_scale) >= floor
+
 
 # Matches "path/file.f90:123" or "path/file.fpp:123-456" in dd_line rddmin_summary.
 _LOC_RE = re.compile(r"(\S+\.(?:f90|fpp|c|cpp|h|F90))\s*:(\d+)(?:-(\d+))?", re.IGNORECASE)
@@ -341,8 +371,9 @@ _BASE_SIM = {
 #   name      - unique identifier used in log paths and console output
 #   description - human-readable summary
 #   compare   - D/ output files compared between reference and perturbed runs
-#   threshold - max L∞ deviation allowed before the case is declared FAIL
 #   ill_cond  - known source of cancellation (empty string = none expected)
+# Pass/fail is scale-free (>= MIN_SIG_BITS significant bits retained), so cases
+# need no per-case deviation threshold regardless of field magnitude.
 #   pre       - parameters for pre_process (generates initial conditions)
 #   sim       - parameters for simulation
 CASES = [
@@ -350,7 +381,6 @@ CASES = [
         "name": "sod_standard",
         "description": "1-D standard Sod, p_L/p_R=10, ideal gas (well-conditioned baseline)",
         "compare": ["cons.1.00.000050.dat", "cons.3.00.000050.dat"],
-        "threshold": 1e-13,
         "ill_cond": "",
         "pre": _merge(
             _BASE_PRE,
@@ -373,7 +403,6 @@ CASES = [
         "name": "sod_strong",
         "description": "1-D Sod, p_L/p_R=100,000, ideal gas",
         "compare": ["cons.1.00.000050.dat", "cons.3.00.000050.dat"],
-        "threshold": 1e-10,
         "ill_cond": "HLLC xi factor: (s_L - vel_L)/(s_L - s_S) cancels near sonic contact",
         "pre": _merge(
             _BASE_PRE,
@@ -396,8 +425,7 @@ CASES = [
         "name": "water_stiffened",
         "description": "1-D water shock, stiffened EOS (pi_inf=4046)",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 1e-8,
-        "ill_cond": "Pressure recovery: p=(E-pi_inf)/gamma loses ~4 digits (pi_inf/p_right~40,000) [threshold loosened until reduced-energy (Etilde) scheme is merged]",
+        "ill_cond": "Pressure recovery: p=(E-pi_inf)/gamma loses ~4 digits (pi_inf/p_right~40,000)",
         "pre": _merge(
             _BASE_PRE,
             _WATER_EOS,
@@ -419,7 +447,6 @@ CASES = [
         "name": "air_water_interface",
         "description": "1-D air/water isobaric contact (two-fluid, pi_inf=4046)",
         "compare": ["cons.1.00.000050.dat", "cons.4.00.000050.dat", "cons.5.00.000050.dat"],
-        "threshold": 1e-10,
         "ill_cond": "Mixed-cell pressure recovery: E-alpha_w*gamma_w*pi_inf cancels when alpha_w<<1",
         "pre": _merge(
             _BASE_PRE,
@@ -460,7 +487,6 @@ CASES = [
         "name": "bubble_rp",
         "description": "1-D bubbly water, pressure step 2:1 driving Rayleigh-Plesset oscillations (nb=1, Keller-Miksis)",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 1e-8,
         "ill_cond": "RP ODE: (p_bub - p_ext) cancels near bubble equilibrium",
         "pre": _merge(
             _BASE_PRE,
@@ -528,8 +554,7 @@ CASES = [
         "name": "low_mach",
         "description": "1-D water shock with low_Mach=1 HLLC correction active",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 2e-7,
-        "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M≈0 (threshold loosened to 2e-7 to absorb MCA sampling variance)",
+        "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M≈0",
         "pre": _merge(
             _BASE_PRE,
             _WATER_EOS,
@@ -1121,7 +1146,7 @@ def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_di
     dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
     dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
     _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
-    _write_dd_cmp_py(dd_cmp_py, case["compare"], threshold if threshold is not None else case["threshold"])
+    _write_dd_cmp_py(dd_cmp_py, case["compare"], threshold if threshold is not None else _DD_FALLBACK_THRESHOLD)
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_sym.log", "dd.sym", "verrou_dd_sym")
     cons.print(f"  [dim]dd_sym logs: {dd_dir}[/dim]")
     return _parse_rddmin_syms(os.path.join(dd_dir, "dd.sym", "rddmin_summary"))
@@ -1145,7 +1170,7 @@ def _run_dd_line(
     os.makedirs(dd_dir, exist_ok=True)
     dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
     dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
-    effective_threshold = threshold if threshold is not None else case["threshold"]
+    effective_threshold = threshold if threshold is not None else _DD_FALLBACK_THRESHOLD
     _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
     _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
     _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_line.log", "dd.line", "verrou_dd_line")
@@ -1310,21 +1335,20 @@ def _run_case(
     prec_sim_bin: str = None,
 ) -> dict:
     name = case["name"]
-    threshold = case["threshold"]
     compare = case["compare"]
 
     cons.print(f"[bold]{name}[/bold]: {case['description']}")
     cons.indent()
     if case["ill_cond"]:
         cons.print(f"  ill-conditioning: {case['ill_cond']}")
-    cons.print(f"  threshold: {threshold:.0e}")
+    cons.print(f"  pass floor: >= {MIN_SIG_BITS} significant bits retained")
 
     work_dir = tempfile.mkdtemp(prefix=f"mfc-fps-{name}-")
     result = {
         "name": name,
         "passed": False,
         "max_dev": float("inf"),
-        "threshold": threshold,
+        "sig_bits": None,
         "float_proxy": None,
         "vprec": [],
         "dd_sym_syms": [],
@@ -1348,6 +1372,9 @@ def _run_case(
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, ref_dir, rounding_mode="nearest")
 
         # --- A: random-rounding stability samples ---
+        # Pass/fail is scale-free: bits retained = -log2(max_dev / field-scale),
+        # vs one global floor (no per-case hand-tuned absolute threshold).
+        ref_scale = _max_abs_np(ref_dir, compare)
         max_dev = 0.0
         cons.print(f"  [dim]random-rounding runs (N={n_samples})...[/dim]")
         for i in range(n_samples):
@@ -1356,11 +1383,13 @@ def _run_case(
             _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="random")
             max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
 
-        passed = max_dev <= threshold
+        sig_bits = _sig_bits(max_dev, ref_scale)
+        passed = sig_bits >= MIN_SIG_BITS
         result["passed"] = passed
         result["max_dev"] = max_dev
+        result["sig_bits"] = sig_bits
         tag = "[bold green]PASS[/bold green]" if passed else "[bold red]FAIL[/bold red]"
-        cons.print(f"  {tag}  max_dev={max_dev:.3e}  threshold={threshold:.0e}")
+        cons.print(f"  {tag}  {sig_bits:.1f} bits retained (floor {MIN_SIG_BITS})  max_dev={max_dev:.3e}")
 
         # --- B: float proxy ---
         if run_float:
@@ -1383,7 +1412,7 @@ def _run_case(
                 marker = ""
                 if dev == float("inf"):
                     marker = "  [red]crashed[/red]"
-                elif dev > threshold:
+                elif _sig_bits(dev, ref_scale) < MIN_SIG_BITS:
                     marker = "  [red]FAIL[/red]"
                 cons.print(f"    {bits:2d} bits{label_str}: dev={dev:.3e}{marker}")
 
@@ -1531,7 +1560,9 @@ def _emit_github_annotations(results: list):
         return
     for r in results:
         status = "FAIL" if not r["passed"] else "sensitivity"
-        dev_str = f"max_dev={r['max_dev']:.2e} (threshold {r['threshold']:.0e})"
+        _sb = r.get("sig_bits")
+        _sb_str = f"{_sb:.0f} bits retained (floor {MIN_SIG_BITS})" if _sb is not None else "n/a"
+        dev_str = f"{_sb_str}, max_dev={r['max_dev']:.2e}"
         unconfirmed = r.get("dd_line_confirmed") is False
 
         for loc in r.get("dd_line_locs", [])[:3]:
@@ -1588,17 +1619,19 @@ def _emit_github_summary(results: list, n_samples: int):
         "they do not reach.\n"
     )
 
-    # Main results table
-    md.append("| Case | Status | max\\_dev | threshold | Float proxy | MCA sig bits |")
-    md.append("|------|:------:|--------:|--------:|--------:|:------:|")
+    # Main results table — pass/fail is scale-free: bits retained vs a single floor
+    md.append(f"_Pass = at least **{MIN_SIG_BITS} significant bits** retained under random rounding (scale-free; no per-case threshold)._\n")
+    md.append("| Case | Status | bits retained | max\\_dev | Float proxy | MCA sig bits |")
+    md.append("|------|:------:|:------:|--------:|--------:|:------:|")
     for r in results:
         status = "✅" if r["passed"] else "❌"
+        bits = f"{r['sig_bits']:.1f}" if r.get("sig_bits") is not None else "—"
         fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "—"
         sb = str(r["mca_sigbits"]) if r.get("mca_sigbits") is not None else "—"
-        md.append(f"| `{r['name']}` | {status} | {r['max_dev']:.2e} | {r['threshold']:.0e} | {fp} | {sb} |")
+        md.append(f"| `{r['name']}` | {status} | {bits} / {MIN_SIG_BITS} | {r['max_dev']:.2e} | {fp} | {sb} |")
     md.append("")
 
-    # VPREC sweep — one column per bit level, ❌ where dev > threshold
+    # VPREC sweep — one column per bit level, ❌ where bits retained < floor
     if any(r["vprec"] for r in results):
         _labels = {52: "52b", 23: "23b", 16: "16b", 10: "10b"}
         header = " | ".join(_labels[b] for b in VPREC_MANTISSA_BITS)
@@ -1803,7 +1836,7 @@ def fp_stability():
                 "name": case["name"],
                 "passed": False,
                 "max_dev": float("inf"),
-                "threshold": case["threshold"],
+                "sig_bits": None,
                 "float_proxy": None,
                 "vprec": [],
                 "dd_sym_syms": [],

@@ -7,12 +7,15 @@ label results, so they can run without Verrou or built binaries.
 """
 
 from mfc.fp_stability import (
+    MIN_SIG_BITS,
     _build_source_filter,
     _cancellation_by_file,
     _confirm_decision,
     _macro_context_in_lines,
     _mark_cancellation,
     _rank_locs,
+    _sig_bits,
+    _stability_pass,
     _statement_bounds_in_lines,
 )
 
@@ -219,6 +222,43 @@ def test_cancellation_by_file_breaks_ties_by_name():
 
 def test_cancellation_by_file_empty():
     assert _cancellation_by_file([]) == []
+
+
+# --- scale-free pass/fail: significant bits retained ---
+
+
+def test_sig_bits_relative_deviation():
+    # max_dev/ref_scale = 1e-14 -> ~46.5 retained bits
+    assert 46 < _sig_bits(1e-14, 1.0) < 47
+
+
+def test_sig_bits_is_scale_free():
+    # same relative deviation -> same bits regardless of absolute magnitude
+    assert abs(_sig_bits(1e-9, 1.0) - _sig_bits(1e-4, 1e5)) < 1e-9
+
+
+def test_sig_bits_zero_deviation_is_full_precision():
+    assert _sig_bits(0.0, 1.0) == 53.0
+
+
+def test_sig_bits_zero_scale_is_safe():
+    assert _sig_bits(1e-12, 0.0) == 53.0
+
+
+def test_sig_bits_deviation_at_scale_is_unstable():
+    # deviation as large as the field -> <= 0 retained bits
+    assert _sig_bits(1.0, 1.0) <= 0.0
+
+
+def test_stability_pass_uses_global_floor():
+    # well-conditioned: ~46 bits >= floor
+    assert _stability_pass(1e-14, 1.0, MIN_SIG_BITS) is True
+    # catastrophic: deviation at field scale -> fails
+    assert _stability_pass(0.5, 1.0, MIN_SIG_BITS) is False
+
+
+def test_min_sig_bits_is_single_precision_floor():
+    assert MIN_SIG_BITS == 24
 
 
 # --- Fortran line-continuation handling (correct-line labeling) ---
