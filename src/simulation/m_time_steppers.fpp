@@ -714,6 +714,7 @@ contains
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s]')
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -759,8 +760,8 @@ contains
                          & 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_UPDATE(device='[patch_ib]')
         call s_update_mib(num_ibs)
 
         call nvtxEndRange

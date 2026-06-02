@@ -895,6 +895,8 @@ contains
     !> Compute a rotation matrix for converting to the rotating frame of the boundary
     subroutine s_update_ib_rotation_matrix(patch_id)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in)          :: patch_id
         real(wp), dimension(3, 3, 3) :: rotation
         real(wp)                     :: angle

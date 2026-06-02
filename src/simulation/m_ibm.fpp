@@ -76,14 +76,17 @@ contains
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+
         ! do all set up for moving immersed boundaries
+        $:GPU_PARALLEL_LOOP(private='[i]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
             end if
             call s_update_ib_rotation_matrix(i)
         end do
-        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        $:END_GPU_PARALLEL_LOOP()
 
         ! allocate some arrays for MPI communication, if required by this simulation
 #ifdef MFC_MPI
@@ -868,13 +871,13 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         ! recalulcate the rotation matrix based upon the new angles
+        $:GPU_PARALLEL_LOOP(private='[i]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 call s_update_ib_rotation_matrix(i)
             end if
         end do
-
-        $:GPU_UPDATE(device='[patch_ib]')
+        $:END_GPU_PARALLEL_LOOP()
 
         ! recompute the new ib_patch locations and broadcast them.
         call nvtxStartRange("APPLY-IB-PATCHES")
@@ -933,7 +936,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, &
                             & cell_volume, local_torque_contribution, dynamic_viscosity, viscous_stress_div, &
                             & viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', &
-                            & copyin='[patch_ib, dynamic_viscosities]', collapse=3)
+                            & copyin='[dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1122,6 +1125,8 @@ contains
     !> Computes the moment of inertia for an immersed boundary
     subroutine s_compute_moment_of_inertia(ib_idx, axis)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         real(wp), dimension(3), intent(in) :: axis  !< the axis about which we compute the moment. Only required in 3D.
         integer, intent(in)                :: ib_idx
         real(wp)                           :: moment, distance_to_axis, cell_volume
@@ -1158,13 +1163,10 @@ contains
 
             ib_marker = patch_ib(ib_idx)%gbl_patch_id
 
-            $:GPU_PARALLEL_LOOP(private='[position, closest_point_along_axis, vector_to_axis, distance_to_axis]', copy='[moment, &
-                                & count]', copyin='[ib_marker, cell_volume, normal_axis]', collapse=3)
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) == ib_marker) then
-                            $:GPU_ATOMIC(atomic='update')
                             count = count + 1  ! increment the count of total cells in the boundary
 
                             ! get the position in local coordinates so that the axis passes through 0, 0, 0
@@ -1182,7 +1184,6 @@ contains
                             distance_to_axis = dot_product(vector_to_axis, vector_to_axis)  ! saves the distance to the axis squared
 
                             ! compute the position component of the moment
-                            $:GPU_ATOMIC(atomic='update')
                             moment = moment + distance_to_axis
                         end if
                     end do

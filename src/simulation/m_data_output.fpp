@@ -889,6 +889,8 @@ contains
 
         integer, intent(in) :: time_step
 
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
         if (parallel_io) then
             call s_write_parallel_ib_data(time_step)
         else
