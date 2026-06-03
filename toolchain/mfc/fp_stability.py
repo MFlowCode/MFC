@@ -639,8 +639,8 @@ def fp_stability():
 
     cons.print(f"[bold]Results[/bold] ({elapsed:.0f}s):  [green]{n_pass} passed[/green]  [red]{n_fail} failed[/red]")
     for r in results:
-        mark = "[green]✓[/green]" if r["passed"] else "[red]✗[/red]"
-        cons.print(f"  {mark} {r['name']}")
+        mark = "[green]PASS[/green]" if r["passed"] else "[red]FAIL[/red]"
+        cons.print(f"  {mark}  {r['name']}")
 
     _emit_github_summary(results, n_samples)
     _emit_github_annotations(results)

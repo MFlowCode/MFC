@@ -83,7 +83,7 @@ def _emit_github_summary(results: list, n_samples: int):
     md.append("| Case | Status | bits retained | max\\_dev | Float proxy |")
     md.append("|------|:------:|:------:|--------:|--------:|")
     for r in results:
-        status = "✅" if r["passed"] else "❌"
+        status = "PASS" if r["passed"] else "FAIL"
         bits = f"{r['sig_bits']:.1f}" if r.get("sig_bits") is not None else "—"
         fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "—"
         md.append(f"| `{r['name']}` | {status} | {bits} / {MIN_SIG_BITS} | {r['max_dev']:.2e} | {fp} |")
@@ -119,7 +119,7 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append("")
 
     # VPREC sweep — one column per mantissa-bit level showing the L∞ deviation at
-    # that reduced precision (💥 crash = run diverged/failed, — = not measured).
+    # that reduced precision ("crash" = run diverged/failed; dash = not measured).
     if any(r["vprec"] for r in results):
         _labels = {52: "52b", 23: "23b", 16: "16b", 10: "10b"}
         header = " | ".join(_labels[b] for b in VPREC_MANTISSA_BITS)
@@ -135,7 +135,7 @@ def _emit_github_summary(results: list, n_samples: int):
                 if d is None:
                     cols.append("—")
                 elif d == float("inf"):
-                    cols.append("💥 crash")
+                    cols.append("crash")
                 else:
                     cols.append(f"{d:.2e}")
             md.append(f"| `{r['name']}` | {' | '.join(cols)} |")
