@@ -312,24 +312,16 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
 | `num_ibs`            | Integer | Number of immersed boundary patches |
+| `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
 | `num_particle_beds`  | Integer | Number of particle bed specifications to generate immersed boundary patches from |
 | `ib_neighborhood_radius` | Integer | Parameter that controls the neighborhood size for IB detection. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
 | `radius`             | Real    | Radius, if applicable, of the applied geometry. |
-| `theta`              | Real    | Angle of attach applied to airfoil IB patches |
-| `c`                  | Real    | NACA airfoil parameters (see below) |
-| `t`                  | Real    | NACA airfoil parameters (see below) |
-| `m`                  | Real    | NACA airfoil parameters (see below) |
-| `p`                  | Real    | NACA airfoil parameters (see below) |
+| `airfoil_id`         | Integer | Index into `ib_airfoil` array for NACA airfoil geometry patches. |
+| `model_id`           | Integer | Index into `stl_models` array for STL/OBJ geometry patches. |
 | `slip`               | Logical | Apply a slip boundary |
-| `model_filepath`     | String  | Path to an STL or OBJ file (not all OBJs are supported).     |
-| `model_scale(i)`     | Real    | Model's (applied) scaling factor for component $i$.          |
-| `model_rotate(i)`    | Real    | Model's (applied) angle of rotation about axis $i$.          |
-| `model_translate(i)` | Real    | Model's $i$-th component of (applied) translation.           |
-| `model_spc`          | Integer | Number of samples per cell when discretizing the model into the grid. |
-| `model_threshold`    | Real    | Ray fraction inside the model patch above which the fraction is set to one.|
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
@@ -339,6 +331,17 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
+
+STL/OBJ model geometry parameters are set on the `stl_models` array (indexed by `model_id`):
+
+| Parameter            | Type    | Description |
+|:---------------------|:--------|:------------|
+| `model_filepath`     | String  | Path to an STL or OBJ file (not all OBJs are supported). |
+| `model_scale(i)`     | Real    | Model's scaling factor for component $i$. |
+| `model_translate(i)` | Real    | Model's $i$-th component of translation. |
+| `model_threshold`    | Real    | Winding number threshold above which a cell is marked as inside the model. |
+
+These parameters should be prepended with `stl_models(k)%` where $k$ is the model index.
 
 #### Parameter Descriptions
 
@@ -351,15 +354,13 @@ Definitions for currently implemented immersed boundary patch types are listed i
 
 - `radius` is the radius to be used for circular patches.
 
-- `theta` allows for the angle of attach of airfoil patches to be changed.
-
-- `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil.
-`m` is the maximum camber, `p` is the location of maximum camber, `c` is the coord length, and `t` is the thickness.
+- `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil (set on the referenced `ib_airfoil` entry).
+`m` is the maximum camber, `p` is the location of maximum camber, `c` is the chord length, and `t` is the thickness.
 Additional details on this specification can be found in [NACA airfoil](https://en.wikipedia.org/wiki/NACA_airfoil).
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- Please see [Patch Parameters](#sec-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
+- For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 
 - `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 

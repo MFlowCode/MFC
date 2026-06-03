@@ -133,6 +133,7 @@ DESCRIPTIONS = {
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "num_ibs": "Number of immersed boundary patches",
+    "num_stl_models": "Number of STL/OBJ model entries in the stl_models array",
     "num_particle_beds": "Number of particle bed specifications to generate immersed boundary patches from",
     "ib_neighborhood_radius": "Neighborhood radius in ranks for IB awareness",
     # Acoustic sources
@@ -345,7 +346,6 @@ PATTERNS = [
     (r"patch_ib\((\d+)\)%length_y", "Y-dimension length for IB patch {0}"),
     (r"patch_ib\((\d+)\)%length_z", "Z-dimension length for IB patch {0}"),
     (r"patch_ib\((\d+)\)%radius", "Radius for IB patch {0}"),
-    (r"patch_ib\((\d+)\)%theta", "Theta angle for IB patch {0}"),
     (r"patch_ib\((\d+)\)%c", "Shape parameter c for IB patch {0}"),
     (r"patch_ib\((\d+)\)%p", "Shape parameter p for IB patch {0}"),
     (r"patch_ib\((\d+)\)%t", "Shape parameter t for IB patch {0}"),
@@ -356,12 +356,11 @@ PATTERNS = [
     (r"patch_ib\((\d+)\)%angles\((\d+)\)", "Orientation angle {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%slip", "Enable slip condition for IB patch {0}"),
     (r"patch_ib\((\d+)\)%moving_ibm", "Enable moving boundary for IB patch {0}"),
-    (r"patch_ib\((\d+)\)%model_filepath", "STL model file path for IB patch {0}"),
-    (r"patch_ib\((\d+)\)%model_spc", "Model spacing for IB patch {0}"),
-    (r"patch_ib\((\d+)\)%model_threshold", "Model threshold for IB patch {0}"),
-    (r"patch_ib\((\d+)\)%model_translate\((\d+)\)", "Model translation component {1} for IB patch {0}"),
-    (r"patch_ib\((\d+)\)%model_scale\((\d+)\)", "Model scale component {1} for IB patch {0}"),
-    (r"patch_ib\((\d+)\)%model_rotate\((\d+)\)", "Model rotation component {1} for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%model_id", "Index into stl_models array for STL/OBJ geometry IB patch {0}"),
+    (r"stl_models\((\d+)\)%model_filepath", "STL model file path for STL model {0}"),
+    (r"stl_models\((\d+)\)%model_threshold", "Inside/outside winding number threshold for STL model {0}"),
+    (r"stl_models\((\d+)\)%model_translate\((\d+)\)", "Translation component {1} for STL model {0}"),
+    (r"stl_models\((\d+)\)%model_scale\((\d+)\)", "Scale component {1} for STL model {0}"),
     # bc patterns
     (r"bc_([xyz])%vel_in\((\d+)\)", "Inlet velocity component {1} at {0}-boundary"),
     (r"bc_([xyz])%vel_out\((\d+)\)", "Outlet velocity component {1} at {0}-boundary"),

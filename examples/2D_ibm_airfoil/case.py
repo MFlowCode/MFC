@@ -90,10 +90,11 @@ print(
             "patch_ib(1)%geometry": 4,
             "patch_ib(1)%x_centroid": 1.0e-03,
             "patch_ib(1)%y_centroid": 3.0e-03,
-            "patch_ib(1)%c": 1.0e-03,
-            "patch_ib(1)%t": 0.15,
-            "patch_ib(1)%p": 0.4,
-            "patch_ib(1)%m": 0.02,
+            "patch_ib(1)%airfoil_id": 1,
+            "ib_airfoil(1)%c": 1.0e-03,
+            "ib_airfoil(1)%t": 0.15,
+            "ib_airfoil(1)%p": 0.4,
+            "ib_airfoil(1)%m": 0.02,
             "patch_ib(1)%angles(3)": -0.5235987756,  # 30 degrees clockwise rotation, in radians
             # Fluids Physical Parameters
             # Use the same stiffness as the air bubble

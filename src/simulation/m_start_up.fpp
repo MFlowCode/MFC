@@ -40,6 +40,7 @@ module m_start_up
 
     use m_nvtx
     use m_ibm
+    use m_ib_patches
     use m_model
     use m_particle_bed
     use m_collisions
@@ -184,15 +185,6 @@ contains
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
-        if (ib) then
-            do i = 1, num_ibs
-                if (patch_ib(i)%c > 0) then
-                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
-                end if
-            end do
-        end if
-
         if (n > 0) then
             file_path = trim(t_step_dir) // '/y_cb.dat'
 
@@ -320,16 +312,6 @@ contains
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
-
-        if (ib) then
-            do i = 1, num_ibs
-                if (patch_ib(i)%c > 0) then
-                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
-                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
-                end if
-            end do
-        end if
 
         if (n > 0) then
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
@@ -835,7 +817,9 @@ contains
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
         if (bubbles_euler) call s_initialize_bubbles_EE_module()
-        if (ib) call s_initialize_ibm_module()
+        if (ib) then
+            call s_initialize_ibm_module()
+        end if
         if (qbmm) call s_initialize_qbmm_module()
 
         if (acoustic_source) then
@@ -900,6 +884,7 @@ contains
                     call s_generate_particle_beds(particle_bed_ibs)
                 end if
                 call s_instantiate_STL_models()
+                call s_initialize_ib_airfoils()
                 call s_reduce_ib_patch_array(particle_bed_ibs)
                 deallocate (particle_bed_ibs)
             end block
