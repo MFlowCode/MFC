@@ -22,11 +22,7 @@ D. Cancellation detection (--no-cancellation to skip)
    .fpp line sits inside a #:for/#:def expansion is flagged as instance-ambiguous
    (the line maps to multiple generated instances).
 
-E. MCA significant-bits estimate (--no-mca to skip)
-   N runs with --backend=mcaquad; max deviation vs nearest-rounding
-   reference gives a lower bound on significant bits: s = -log2(dev/scale).
-
-F. Float-max overflow detection (--no-float-max to skip)
+E. Float-max overflow detection (--no-float-max to skip)
    One run with --check-max-float=yes; reports locations where a
    double→float conversion would overflow to ±Inf.
 
@@ -80,7 +76,6 @@ from .fp_stability_runners import (
     _run_cancellation_check,
     _run_float_max_check,
     _run_float_proxy,
-    _run_mca_samples,
     _run_preprocess,
     _run_simulation_verrou,
     _run_vprec_sweep,
@@ -372,8 +367,6 @@ def _blank_result(name: str) -> dict:
         "cancellation_locs": [],
         "cancellation_bits": {},
         "cancellation_macro": {},
-        "mca_dev": None,
-        "mca_sigbits": None,
         "float_max_locs": [],
     }
 
@@ -387,7 +380,6 @@ def _run_case(
     run_float: bool,
     run_vprec: bool,
     run_cancellation: bool,
-    run_mca: bool,
     run_float_max: bool,
 ) -> dict:
     name = case["name"]
@@ -494,22 +486,7 @@ def _run_case(
             except Exception as exc:
                 cons.print(f"  [bold yellow]cancellation check error[/bold yellow]: {exc}")
 
-        # --- E: MCA significant-bits estimate ---
-        if run_mca:
-            cons.print(f"  [dim]MCA significant-bits estimate (N={n_samples})...[/dim]")
-            try:
-                mca_dev, mca_sigbits, n_ok = _run_mca_samples(case, verrou_bin, sim_bin, work_dir, ref_dir, n_samples)
-                if n_ok == 0:
-                    cons.print(f"  [bold yellow]MCA: no samples completed (0/{n_samples}; see logs)[/bold yellow]")
-                else:
-                    result["mca_dev"] = mca_dev
-                    result["mca_sigbits"] = mca_sigbits
-                    bits_str = f"~{mca_sigbits} sig bits" if mca_sigbits is not None else "n/a"
-                    cons.print(f"  MCA: dev={mca_dev:.3e}  ({bits_str})  [{n_ok}/{n_samples} samples]")
-            except Exception as exc:
-                cons.print(f"  [bold yellow]MCA error[/bold yellow]: {exc}")
-
-        # --- F: float-max overflow detection ---
+        # --- E: float-max overflow detection ---
         if run_float_max:
             cons.print("  [dim]float-max overflow check...[/dim]")
             try:
@@ -610,7 +587,6 @@ def fp_stability():
     run_float = not ARG("no_float_proxy")
     run_vprec = not ARG("no_vprec")
     run_cancellation = not ARG("no_cancellation")
-    run_mca = not ARG("no_mca")
     run_float_max = not ARG("no_float_max")
 
     cases_to_run = [_load_user_case(ARG("input"))] if ARG("input") else CASES
@@ -633,8 +609,6 @@ def fp_stability():
         features.append("vprec-sweep")
     if run_cancellation:
         features.append("cancellation")
-    if run_mca:
-        features.append("mca-sigbits")
     if run_float_max:
         features.append("float-max")
     cons.print(f"  features:    {', '.join(features) if features else 'stability only'}")
@@ -654,7 +628,6 @@ def fp_stability():
                 run_float,
                 run_vprec,
                 run_cancellation,
-                run_mca,
                 run_float_max,
             )
         except MFCException as exc:

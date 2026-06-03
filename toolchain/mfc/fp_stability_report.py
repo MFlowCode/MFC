@@ -80,14 +80,13 @@ def _emit_github_summary(results: list, n_samples: int):
 
     # Main results table — pass/fail is scale-free: bits retained vs a single floor
     md.append(f"_Pass = at least **{MIN_SIG_BITS} significant bits** retained under random rounding (scale-free; no per-case threshold)._\n")
-    md.append("| Case | Status | bits retained | max\\_dev | Float proxy | MCA sig bits |")
-    md.append("|------|:------:|:------:|--------:|--------:|:------:|")
+    md.append("| Case | Status | bits retained | max\\_dev | Float proxy |")
+    md.append("|------|:------:|:------:|--------:|--------:|")
     for r in results:
         status = "✅" if r["passed"] else "❌"
         bits = f"{r['sig_bits']:.1f}" if r.get("sig_bits") is not None else "—"
         fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "—"
-        sb = str(r["mca_sigbits"]) if r.get("mca_sigbits") is not None else "—"
-        md.append(f"| `{r['name']}` | {status} | {bits} / {MIN_SIG_BITS} | {r['max_dev']:.2e} | {fp} | {sb} |")
+        md.append(f"| `{r['name']}` | {status} | {bits} / {MIN_SIG_BITS} | {r['max_dev']:.2e} | {fp} |")
     md.append("")
 
     # Cancellation ORIGINS — where ill-conditioning actually arises, led with the

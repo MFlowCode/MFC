@@ -5,7 +5,6 @@ parsing / metric helpers live in fp_stability_metrics, which this module imports
 """
 
 import glob
-import math
 import os
 import shutil
 import subprocess
@@ -14,7 +13,6 @@ import tempfile
 from .common import MFC_ROOT_DIR, MFCException
 from .fp_stability_metrics import (
     VPREC_MANTISSA_BITS,
-    _max_abs_np,
     _max_diff_np,
     _parse_cancel_gen,
     _parse_vg_error_locs,
@@ -145,36 +143,6 @@ def _run_cancellation_check(verrou_bin: str, sim_bin: str, work_dir: str, thresh
         cons.print(f"  [yellow]cancellation run (threshold {threshold}) failed: {exc}[/yellow]")
         return None
     return _parse_cancel_gen(gen_path)
-
-
-def _run_mca_samples(
-    case: dict,
-    verrou_bin: str,
-    sim_bin: str,
-    work_dir: str,
-    ref_dir: str,
-    n_mca: int,
-) -> tuple:
-    """Run N mcaquad samples; return (max_dev, sig_bits_lower_bound, n_ok) where
-    n_ok is how many samples actually completed (0 => no usable measurement)."""
-    compare = case["compare"]
-    ref_scale = _max_abs_np(ref_dir, compare)
-    max_dev = 0.0
-    n_ok = 0
-    flags = ["--backend=mcaquad", "--mca-mode=mca"]
-    for i in range(n_mca):
-        run_dir = os.path.join(work_dir, f"mca_{i:02d}")
-        os.makedirs(run_dir, exist_ok=True)
-        try:
-            _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, extra_flags=flags)
-            max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
-            n_ok += 1
-        except MFCException as exc:
-            cons.print(f"  [dim]MCA sample {i} failed: {exc}[/dim]")
-    sig_bits = None
-    if n_ok and max_dev > 0.0 and ref_scale > 0.0:
-        sig_bits = max(0, int(math.floor(-math.log2(max_dev / ref_scale))))
-    return max_dev, sig_bits, n_ok
 
 
 def _run_float_max_check(verrou_bin: str, sim_bin: str, work_dir: str):

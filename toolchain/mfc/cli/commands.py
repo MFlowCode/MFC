@@ -917,7 +917,6 @@ FP_STABILITY_COMMAND = Command(
         "  float proxy    One run with --rounding-mode=float (single-precision sensitivity)\n"
         "  vprec sweep    Runs at mantissa bits [52, 23, 16, 10] (precision floor curve)\n"
         "  cancellation   --check-cancellation origins, ranked by significant digits lost\n"
-        "  mca-sigbits    Monte Carlo Arithmetic (mcaquad) significant-bits lower bound\n"
         "  float-max      --check-max-float detection of double→float overflow sites\n"
     ),
     include_common=["mfc_config", "verbose", "debug_log"],
@@ -978,13 +977,6 @@ FP_STABILITY_COMMAND = Command(
             dest="no_cancellation",
         ),
         Argument(
-            name="no-mca",
-            help="Skip Monte Carlo Arithmetic (mcaquad) significant-bits estimate.",
-            action=ArgAction.STORE_TRUE,
-            default=False,
-            dest="no_mca",
-        ),
-        Argument(
             name="no-float-max",
             help="Skip --check-max-float float32 overflow detection.",
             action=ArgAction.STORE_TRUE,
@@ -1001,7 +993,7 @@ FP_STABILITY_COMMAND = Command(
         ),
         Example("./mfc.sh fp-stability -N 10", "Run 10 random-rounding samples per case"),
         Example("./mfc.sh fp-stability --no-vprec --no-cancellation", "Skip VPREC sweep and cancellation detection"),
-        Example("./mfc.sh fp-stability --no-cancellation --no-mca --no-float-max", "Skip new analysis passes"),
+        Example("./mfc.sh fp-stability --no-cancellation --no-float-max", "Skip analysis passes"),
     ],
     key_options=[
         ("--sim-binary PATH", "Serial simulation binary (debug, no-MPI)"),
@@ -1011,7 +1003,6 @@ FP_STABILITY_COMMAND = Command(
         ("--no-float-proxy", "Skip float-rounding proxy run"),
         ("--no-vprec", "Skip VPREC mantissa-bit sweep"),
         ("--no-cancellation", "Skip cancellation detection"),
-        ("--no-mca", "Skip MCA significant-bits estimate"),
         ("--no-float-max", "Skip float32 overflow detection"),
     ],
 )
