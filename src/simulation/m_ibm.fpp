@@ -558,8 +558,7 @@ contains
         if (p == 0) gp_layers_z = 0
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, neighborhood_patch_id, &
-                            & xp, yp, zp]', copyin='[count, count_i, glb_bounds]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', collapse=3)
+                            & xp, yp, zp]', copyin='[count, count_i, glb_bounds]', firstprivate='[gp_layers, gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
