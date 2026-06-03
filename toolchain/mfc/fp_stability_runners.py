@@ -22,7 +22,7 @@ from .printer import cons
 
 def _has_verrou_tool(valgrind_bin: str, env: dict = None) -> bool:
     """True if this valgrind actually provides the 'verrou' tool. A plain system
-    valgrind does not — accepting one would only fail later at run time. Pass env
+    valgrind does not - accepting one would only fail later at run time. Pass env
     (with VALGRIND_LIB) to verify a relocated prebuilt tree, which cannot load its
     tool without it."""
     try:
@@ -57,7 +57,7 @@ def _find_binary(name: str) -> str:
 
 def _verrou_env(verrou_bin: str) -> dict:
     """os.environ plus VALGRIND_LIB, so a relocated install tree (e.g. a prebuilt
-    artifact extracted to a new prefix) can locate its tool — Valgrind bakes its
+    artifact extracted to a new prefix) can locate its tool - Valgrind bakes its
     build prefix into the binary otherwise. Harmless for a source-built tree, where
     VALGRIND_LIB just equals the compiled-in path. A VALGRIND_LIB already in the
     environment (user sourced env.sh) is left untouched."""
@@ -168,7 +168,7 @@ def _run_float_max_check(verrou_bin: str, sim_bin: str, work_dir: str):
 
 
 def _run_float_proxy(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, ref_dir: str) -> float:
-    """One run with --rounding-mode=float; returns L∞ deviation from nearest-ref."""
+    """One run with --rounding-mode=float; returns Linf deviation from nearest-ref."""
     run_dir = os.path.join(work_dir, "float_proxy")
     _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="float")
     return _max_diff_np(ref_dir, run_dir, case["compare"])

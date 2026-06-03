@@ -36,10 +36,10 @@ def _emit_github_annotations(results: list):
             note = "catastrophic cancellation site"
             bits = site_bits.get((fname, lineno))
             if bits:
-                note += f" — loses ≥ {bits / math.log2(10):.0f} of ~16 digits"
+                note += f" - loses >= {bits / math.log2(10):.0f} of ~16 digits"
             macro = macro_sites.get((fname, lineno))
             if macro:
-                note += f" — inside a {macro}-expanded line, may represent multiple instances"
+                note += f" - inside a {macro}-expanded line, may represent multiple instances"
             print(f"::notice {loc},title={title}::{note}", flush=True)
         n_cc = len(r.get("cancellation_locs", []))
         if n_cc > 3:
@@ -51,7 +51,7 @@ def _more_md(total: int, shown: int, noun: str) -> str:
     or '' when nothing was truncated."""
     if total <= shown:
         return ""
-    return f"- …and {total - shown} more {noun}; see `fp-stability-logs/`"
+    return f"- ...and {total - shown} more {noun}; see `fp-stability-logs/`"
 
 
 def _emit_github_summary(results: list, n_samples: int):
@@ -70,26 +70,26 @@ def _emit_github_summary(results: list, n_samples: int):
 
     md = []
     md.append("## FP Stability Results\n")
-    md.append(f"**{n_pass} passed, {n_fail} failed** — {n_samples} random-rounding samples per case\n")
+    md.append(f"**{n_pass} passed, {n_fail} failed** - {n_samples} random-rounding samples per case\n")
     md.append(
         f"> **Coverage:** {len(results)} one-dimensional case(s) "
         f"({', '.join(r['name'] for r in results)}). A pass means stable in the code paths these "
-        "cases exercise — not a guarantee for multi-D, viscous, MHD, IGR, or bubble-dynamics paths "
+        "cases exercise - not a guarantee for multi-D, viscous, MHD, IGR, or bubble-dynamics paths "
         "they do not reach.\n"
     )
 
-    # Main results table — pass/fail is scale-free: bits retained vs a single floor
+    # Main results table - pass/fail is scale-free: bits retained vs a single floor
     md.append(f"_Pass = at least **{MIN_SIG_BITS} significant bits** retained under random rounding (scale-free; no per-case threshold)._\n")
     md.append("| Case | Status | bits retained | max\\_dev | Float proxy |")
     md.append("|------|:------:|:------:|--------:|--------:|")
     for r in results:
         status = "PASS" if r["passed"] else "FAIL"
-        bits = f"{r['sig_bits']:.1f}" if r.get("sig_bits") is not None else "—"
-        fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "—"
+        bits = f"{r['sig_bits']:.1f}" if r.get("sig_bits") is not None else "-"
+        fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "-"
         md.append(f"| `{r['name']}` | {status} | {bits} / {MIN_SIG_BITS} | {r['max_dev']:.2e} | {fp} |")
     md.append("")
 
-    # Cancellation ORIGINS — where ill-conditioning actually arises, led with the
+    # Cancellation ORIGINS - where ill-conditioning actually arises, led with the
     # most severe (most bits lost).
     cases_with_cancel = [r for r in results if r.get("cancellation_locs")]
     if cases_with_cancel:
@@ -98,7 +98,7 @@ def _emit_github_summary(results: list, n_samples: int):
             "> Subtraction of nearly-equal values loses leading significant digits. A double carries "
             "~**16 significant digits** (53 bits); each entry shows how many that subtraction throws away "
             "(worst case, a lower bound). Losing ~8 digits halves your accuracy; losing ~13+ leaves only "
-            "single-precision trust. Site *count* is not severity — one site losing many digits outweighs "
+            "single-precision trust. Site *count* is not severity - one site losing many digits outweighs "
             "many mild ones.\n"
         )
         for r in cases_with_cancel:
@@ -108,17 +108,17 @@ def _emit_github_summary(results: list, n_samples: int):
             ordered = sorted(sites, key=lambda e: (-e["bits"], e["where"]))
             if ordered:
                 w = ordered[0]
-                md.append(f"**`{r['name']}`** — {len(ordered)} site(s); worst loses ≥ {w['bits'] / math.log2(10):.0f} of ~16 digits\n")
+                md.append(f"**`{r['name']}`** - {len(ordered)} site(s); worst loses >= {w['bits'] / math.log2(10):.0f} of ~16 digits\n")
             for e in ordered[:15]:
                 lost = e["bits"] / math.log2(10)
-                ambiguous = f" — _{e['macro']}-expanded, may represent multiple instances_" if e["macro"] else ""
-                md.append(f"- **≥ {lost:.0f} digits lost** (~{_digits_left(e['bits']):.0f} of 16 left) — `{e['where']}`{ambiguous}")
+                ambiguous = f" - _{e['macro']}-expanded, may represent multiple instances_" if e["macro"] else ""
+                md.append(f"- **>= {lost:.0f} digits lost** (~{_digits_left(e['bits']):.0f} of 16 left) - `{e['where']}`{ambiguous}")
             footer = _more_md(len(ordered), 15, "site(s)")
             if footer:
                 md.append(footer)
             md.append("")
 
-    # VPREC sweep — one column per mantissa-bit level showing the L∞ deviation at
+    # VPREC sweep - one column per mantissa-bit level showing the Linf deviation at
     # that reduced precision ("crash" = run diverged/failed; dash = not measured).
     if any(r["vprec"] for r in results):
         _labels = {52: "52b", 23: "23b", 16: "16b", 10: "10b"}
@@ -133,7 +133,7 @@ def _emit_github_summary(results: list, n_samples: int):
             for b in VPREC_MANTISSA_BITS:
                 d = vmap.get(b)
                 if d is None:
-                    cols.append("—")
+                    cols.append("-")
                 elif d == float("inf"):
                     cols.append("crash")
                 else:
@@ -146,7 +146,7 @@ def _emit_github_summary(results: list, n_samples: int):
     if cases_with_fmax:
         md.append("### Float32 overflow sites (check\\_max\\_float)\n")
         for r in cases_with_fmax:
-            md.append(f"**`{r['name']}`** — {len(r['float_max_locs'])} site(s)\n")
+            md.append(f"**`{r['name']}`** - {len(r['float_max_locs'])} site(s)\n")
             for fname, lineno in r["float_max_locs"][:10]:
                 md.append(f"- `{fname}:{lineno}`")
             footer = _more_md(len(r["float_max_locs"]), 10, "site(s)")

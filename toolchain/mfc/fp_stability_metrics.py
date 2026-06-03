@@ -155,7 +155,7 @@ def _max_abs_np(ref_dir: str, compare_files: list) -> float:
 
 
 def _parse_cancel_gen(gen_path: str) -> list:
-    """Parse cc-gen-file TSV (file\\tline\\tsymbol) → sorted unique [(fname, line)] for MFC sources."""
+    """Parse cc-gen-file TSV (file\\tline\\tsymbol) -> sorted unique [(fname, line)] for MFC sources."""
     if not os.path.isfile(gen_path):
         return []
     locs = []
@@ -215,7 +215,7 @@ def _parse_vg_error_locs(log_path: str, error_keyword: str) -> list:
 # Verrou exposes no per-site bit-count, but --cc-threshold-double is a severity
 # filter: a site is reported only if it lost >= the threshold bits. Sweeping these
 # levels and taking the highest each site survives gives a per-site "bits lost"
-# severity (a lower bound — no false positives). 48 is near the full 53-bit
+# severity (a lower bound - no false positives). 48 is near the full 53-bit
 # double mantissa (the top of the sweep), not the mantissa width itself.
 CANCEL_BIT_LEVELS = [10, 20, 30, 40, 48]
 

@@ -899,25 +899,25 @@ FP_STABILITY_COMMAND = Command(
     help="Run floating-point stability tests using Verrou.",
     description=(
         "Runs Verrou random-rounding stability analysis on a built-in suite of small "
-        "1-D cases, or — given a case .py (positional INPUT) — on your own case. Each "
+        "1-D cases, or - given a case .py (positional INPUT) - on your own case. Each "
         "case is run N times under Verrou's random IEEE-754 rounding and compared "
         "against a nearest-rounding reference. PASS/FAIL is scale-free: a case must "
         "retain at least ~24 significant bits (single precision) under random rounding "
         "(no per-case thresholds).\n\n"
         "With a case .py, that case is run as a SINGLE serial CPU process under Verrou "
-        "(~30x slower, and run many times), so it must be a small, short proxy — large "
+        "(~30x slower, and run many times), so it must be a small, short proxy - large "
         "grids or long runs are rejected with guidance; serial .dat I/O is forced. "
         "Example: ./mfc.sh fp-stability my_case.py\n\n"
         "Uses a Verrou-enabled Valgrind at $VERROU_HOME/bin/valgrind (defaults to "
         "$HOME/.local/verrou); if absent it is installed automatically (a pinned, "
-        "hash-verified prebuilt is downloaded, with a source build as fallback) — "
+        "hash-verified prebuilt is downloaded, with a source build as fallback) - "
         "aborts if that install fails. The simulation and pre_process binaries must "
         "be serial (no-MPI, no-GPU) debug builds.\n\n"
         "Analysis passes (skip with --no-* flags):\n"
         "  float proxy    One run with --rounding-mode=float (single-precision sensitivity)\n"
         "  vprec sweep    Runs at mantissa bits [52, 23, 16, 10] (precision floor curve)\n"
         "  cancellation   --check-cancellation origins, ranked by significant digits lost\n"
-        "  float-max      --check-max-float detection of double→float overflow sites\n"
+        "  float-max      --check-max-float detection of double->float overflow sites\n"
     ),
     include_common=["mfc_config", "verbose", "debug_log"],
     positionals=[

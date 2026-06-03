@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Opt-in installer for Verrou (the Valgrind FP-perturbation tool used by
-# `./mfc.sh fp-stability`). Verrou is NOT a Python/pip package — it is a fork of
+# `./mfc.sh fp-stability`). Verrou is NOT a Python/pip package - it is a fork of
 # Valgrind. By default this downloads a prebuilt, hash-verified artifact (seconds);
 # if none is available for this tag/arch it falls back to a source build (~20 min).
 # fp-stability auto-runs this on first use when Verrou is absent (printing what it
@@ -19,7 +19,7 @@ set -euo pipefail
 VALGRIND_VERSION="3.26.0"
 VERROU_COMMIT="a58d434"
 # Prebuilt artifacts (built once per arch) live in a small companion repo. The tag
-# pins to the (valgrind, verrou) pair above — bump all three together.
+# pins to the (valgrind, verrou) pair above - bump all three together.
 VERROU_DIST_REPO="${VERROU_DIST_REPO:-sbryngelson/verrou-dist}"
 VERROU_DIST_TAG="${VERROU_DIST_TAG:-v1}"
 PREFIX="${VERROU_HOME:-$HOME/.local/verrou}"
@@ -46,7 +46,7 @@ case "$(uname -m)" in
     aarch64|arm64)
         arch_tag="aarch64"
         echo "WARNING: $(uname -m) detected. Valgrind builds here, but Verrou's FP backends are" >&2
-        echo "         best-validated on x86_64 — treat results as experimental on this arch." >&2
+        echo "         best-validated on x86_64 - treat results as experimental on this arch." >&2
         ;;
     *)
         echo "WARNING: unrecognised arch $(uname -m); the build may fail. Proceeding anyway." >&2
@@ -73,31 +73,31 @@ try_prebuilt() {
         if command -v curl >/dev/null 2>&1; then curl -fsSL -o "$2" "$1"; else wget -q -O "$2" "$1"; fi
     }
     if ! _fetch "$base" "$dl/$asset" || ! _fetch "$base.sha256" "$dl/$asset.sha256"; then
-        echo "==> No prebuilt for this tag/arch — building from source instead."
+        echo "==> No prebuilt for this tag/arch - building from source instead."
         rm -rf "$dl"; return 1
     fi
     if ! ( cd "$dl" && sha256sum -c "$asset.sha256" >/dev/null 2>&1 ); then
-        echo "WARNING: prebuilt checksum mismatch — building from source instead." >&2
+        echo "WARNING: prebuilt checksum mismatch - building from source instead." >&2
         rm -rf "$dl"; return 1
     fi
 
     # Extract + verify in a staging dir, then swap into $PREFIX atomically. set -e
     # is suppressed inside a function used as an `if` condition, so check each step
-    # explicitly — otherwise a failed extract would fall through and the source
+    # explicitly - otherwise a failed extract would fall through and the source
     # build would install on top of a half-written tree (or a stale one on --force).
     local stage="$dl/stage"
     mkdir -p "$stage"
     if tar --zstd --help >/dev/null 2>&1; then
-        tar -C "$stage" --zstd -xf "$dl/$asset" || { echo "WARNING: prebuilt extract failed — building from source instead." >&2; rm -rf "$dl"; return 1; }
+        tar -C "$stage" --zstd -xf "$dl/$asset" || { echo "WARNING: prebuilt extract failed - building from source instead." >&2; rm -rf "$dl"; return 1; }
     else
-        zstd -dc "$dl/$asset" | tar -C "$stage" -xf - || { echo "WARNING: prebuilt extract failed — building from source instead." >&2; rm -rf "$dl"; return 1; }
+        zstd -dc "$dl/$asset" | tar -C "$stage" -xf - || { echo "WARNING: prebuilt extract failed - building from source instead." >&2; rm -rf "$dl"; return 1; }
     fi
 
     # Valgrind bakes its build prefix into the binary; the artifact's env.sh sets
     # VALGRIND_LIB relative to the tree so the relocated install works. Verify the
     # staged tree runs before committing it.
     if ! ( . "${stage}/env.sh" && "${stage}/bin/valgrind" --tool=verrou --version >/dev/null 2>&1 ); then
-        echo "WARNING: prebuilt did not run — building from source instead." >&2
+        echo "WARNING: prebuilt did not run - building from source instead." >&2
         rm -rf "$dl"; return 1
     fi
 
@@ -105,7 +105,7 @@ try_prebuilt() {
     mkdir -p "$(dirname "$PREFIX")"
     rm -rf "$PREFIX"
     if ! mv "$stage" "$PREFIX"; then
-        echo "WARNING: could not install prebuilt to ${PREFIX} — building from source instead." >&2
+        echo "WARNING: could not install prebuilt to ${PREFIX} - building from source instead." >&2
         rm -rf "$dl"; return 1
     fi
     rm -rf "$dl"

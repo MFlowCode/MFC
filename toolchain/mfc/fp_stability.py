@@ -8,7 +8,7 @@ A. Stability suite (always)
    (scale-free: -log2(max_dev/scale) vs one global floor, no per-case threshold).
 
 B. Float proxy (--no-float-proxy to skip)
-   One run with --rounding-mode=float — deterministic proxy for
+   One run with --rounding-mode=float - deterministic proxy for
    single-precision sensitivity without recompiling.
 
 C. VPREC precision sweep (--no-vprec to skip)
@@ -24,7 +24,7 @@ D. Cancellation detection (--no-cancellation to skip)
 
 E. Float-max overflow detection (--no-float-max to skip)
    One run with --check-max-float=yes; reports locations where a
-   double→float conversion would overflow to ±Inf.
+   double->float conversion would overflow to +/-Inf.
 
 Logs are saved to fp-stability-logs/ and uploaded as CI artifacts.
 On GitHub Actions: a step summary table and ::warning:: file annotations
@@ -334,7 +334,7 @@ CASES = [
         "name": "low_mach",
         "description": "1-D water shock with low_Mach=1 HLLC correction active",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M≈0",
+        "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M~0",
         "pre": _merge(
             _BASE_PRE,
             _WATER_EOS,
@@ -475,10 +475,10 @@ def _run_case(
                     result["cancellation_macro"] = {(path, line): macro for (path, line) in locs if (macro := _macro_context(path, line))}
                     if locs:
                         worst = max(bits.values()) if bits else 0
-                        cons.print(f"  cancellation: {len(locs)} site(s), worst loses ≥ {worst / math.log2(10):.0f} of ~16 digits")
+                        cons.print(f"  cancellation: {len(locs)} site(s), worst loses >= {worst / math.log2(10):.0f} of ~16 digits")
                         n_macro = len(result["cancellation_macro"])
                         if n_macro:
-                            cons.print(f"  [dim]{n_macro} inside fypp expansions — line maps to multiple instances[/dim]")
+                            cons.print(f"  [dim]{n_macro} inside fypp expansions - line maps to multiple instances[/dim]")
                     else:
                         cons.print("  cancellation: none detected")
             except Exception as exc:
@@ -518,7 +518,7 @@ def _load_user_case(input_path: str) -> dict:
     """Build a single fp-stability case from a user case .py.
 
     The case is run as ONE serial CPU process under Verrou (so it must be small
-    and short — a coarsened proxy of a production run, not the real thing); a grid
+    and short - a coarsened proxy of a production run, not the real thing); a grid
     too large to be feasible errors. The output files to compare are auto-detected
     from the reference run, so 'compare' is left empty here.
     """
@@ -533,14 +533,14 @@ def _load_user_case(input_path: str) -> dict:
     t_stop = int(params.get("t_step_stop", 0) or 0)
     work = cells * max(t_stop, 1)
     if cells > FP_CASE_MAX_CELLS:
-        raise MFCException(f"case has {cells:,} cells — too large for Verrou (~30x slowdown, run many times). " f"Use a coarsened proxy (<= {FP_CASE_MAX_CELLS:,} cells).")
+        raise MFCException(f"case has {cells:,} cells - too large for Verrou (~30x slowdown, run many times). " f"Use a coarsened proxy (<= {FP_CASE_MAX_CELLS:,} cells).")
     if work > FP_CASE_MAX_WORK:
         raise MFCException(
-            f"case is ~{work:,} cell-steps ({cells:,} cells x {t_stop} time steps) — too slow under "
+            f"case is ~{work:,} cell-steps ({cells:,} cells x {t_stop} time steps) - too slow under "
             f"Verrou (~30x, run many times). Reduce m/n/p or t_step_stop (target <= {FP_CASE_MAX_WORK:,} cell-steps)."
         )
     stem = os.path.splitext(os.path.basename(input_path))[0]
-    if stem == "case":  # examples/<name>/case.py — the dir name is more telling
+    if stem == "case":  # examples/<name>/case.py - the dir name is more telling
         stem = os.path.basename(os.path.dirname(os.path.abspath(input_path))) or stem
     return {
         "name": stem,
@@ -554,10 +554,10 @@ def _load_user_case(input_path: str) -> dict:
 
 def _install_verrou() -> str:
     """Verrou is absent: install it via the bootstrap (downloads a pinned, hash-verified
-    prebuilt; source build as fallback) and return the valgrind path. Aborts on failure —
+    prebuilt; source build as fallback) and return the valgrind path. Aborts on failure -
     fp-stability cannot run without Verrou, so this is a hard error, not a skip."""
     script = os.path.join(MFC_ROOT_DIR, "toolchain", "bootstrap", "verrou.sh")
-    cons.print("[bold]Verrou not found — installing it (downloads a prebuilt artifact, ~seconds; source build as fallback)...[/bold]")
+    cons.print("[bold]Verrou not found - installing it (downloads a prebuilt artifact, ~seconds; source build as fallback)...[/bold]")
     if subprocess.run(["bash", script], check=False).returncode != 0:
         raise MFCException("Verrou install failed (see output above). Fix the issue and re-run, install manually with `bash toolchain/bootstrap/verrou.sh`, or pass --verrou-binary PATH.")
     verrou_bin = _find_verrou()
