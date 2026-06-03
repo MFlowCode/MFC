@@ -709,7 +709,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - ``[variable's name]_wrt`` activates the output of each specified variable into the database.
 
-- `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component.
+- `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component. It must be specified for every fluid when `schlieren_wrt` is enabled.
 
 - `fd_order` specifies the order of the finite difference scheme used to compute the vorticity from the velocity field and the numerical schlieren from the density field using an integer of 1, 2, and 4.
 `fd_order = 1`, `2`, and `4` correspond to the first, second, and fourth-order finite difference schemes.

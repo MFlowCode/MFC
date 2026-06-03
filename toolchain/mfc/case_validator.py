@@ -1604,14 +1604,24 @@ class CaseValidator:
         n = self.get("n", 0)
         fd_order = self.get("fd_order")
         num_fluids = self.get("num_fluids")
+        model_eqns = self.get("model_eqns")
 
         self.prohibit(n is not None and n == 0 and schlieren_wrt, "schlieren_wrt requires n > 0 (at least 2D)")
         self.prohibit(schlieren_wrt and fd_order is None, "fd_order must be set for schlieren_wrt")
 
+        # The volume-fraction model (model_eqns /= 1) weights the Schlieren field by schlieren_alpha(i) for every fluid; an unset
+        # value stays at the -1e6 sentinel and produces nonsensical output. Under IGR the last fluid's volume fraction is
+        # reconstructed (not stored), so schlieren_alpha must still be set for all num_fluids components, including the single
+        # fluid of a single-fluid IGR case. The gamma/pi_inf model (model_eqns == 1) does not use schlieren_alpha.
         if num_fluids is not None:
             for i in range(1, num_fluids + 1):
                 schlieren_alpha = self.get(f"schlieren_alpha({i})")
-                if schlieren_alpha is not None:
+                if schlieren_alpha is None:
+                    self.prohibit(
+                        schlieren_wrt and model_eqns is not None and model_eqns != 1,
+                        f"schlieren_alpha({i}) must be set for every fluid when schlieren_wrt is enabled (unless model_eqns == 1)",
+                    )
+                else:
                     self.prohibit(schlieren_alpha <= 0, f"schlieren_alpha({i}) must be greater than zero")
                     self.prohibit(not schlieren_wrt, f"schlieren_alpha({i}) should be set only with schlieren_wrt enabled")
 
