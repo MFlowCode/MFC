@@ -465,7 +465,8 @@ contains
         jl = -gp_layers - 1
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
-        corner_distance = sqrt(dot_product(length, length))/2._wp  ! maximum distance any marker can be from the center
+        ! maximum distance any marker can be from the center
+        corner_distance = 0.5_wp*sqrt(patch_ib(patch_id)%length_x**2 + patch_ib(patch_id)%length_y**2)
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
 
@@ -622,6 +623,7 @@ contains
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
+        length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, patch_ib(patch_id)%length_z]
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
