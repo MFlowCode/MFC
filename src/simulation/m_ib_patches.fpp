@@ -456,9 +456,6 @@ contains
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
-        length(1) = patch_ib(patch_id)%length_x
-        length(2) = patch_ib(patch_id)%length_y
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
@@ -473,16 +470,16 @@ contains
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
 
         ! Assign primitive variables if rectangle covers cell and patch has write permission
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, length, inverse_rotation, x_cc, &
-                            & y_cc]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
-                xy_local = matmul(inverse_rotation, xy_local)
+                xy_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xy_local)
 
-                if (-0.5_wp*length(1) <= xy_local(1) .and. 0.5_wp*length(1) >= xy_local(1) .and. -0.5_wp*length(2) <= xy_local(2) &
-                    & .and. 0.5_wp*length(2) >= xy_local(2)) then
+                if (-0.5_wp*patch_ib(patch_id)%length_x <= xy_local(1) .and. 0.5_wp*patch_ib(patch_id)%length_x >= xy_local(1) &
+                    & .and. -0.5_wp*patch_ib(patch_id)%length_y <= xy_local(2) &
+                    & .and. 0.5_wp*patch_ib(patch_id)%length_y >= xy_local(2)) then
                     ! Updating the patch identities bookkeeping variable
                     ib_markers%sf(i, j, 0) = encoded_patch_id
                 end if
@@ -556,19 +553,14 @@ contains
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
         integer                            :: i, j, k, ir, il, jr, jl, kr, kl  !< Generic loop iterators
         integer                            :: encoded_patch_id
-        real(wp), dimension(1:3)           :: xyz_local, center, length  !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3,1:3)       :: inverse_rotation
+        real(wp), dimension(1:3)           :: xyz_local, center  !< x and y coordinates in local IB frame
         real(wp)                           :: corner_distance
 
-        ! Transferring the cuboid's centroid and length information
+        ! Transferring the cuboid's centroid
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
-        length(1) = patch_ib(patch_id)%length_x
-        length(2) = patch_ib(patch_id)%length_y
-        length(3) = patch_ib(patch_id)%length_z
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
@@ -580,7 +572,8 @@ contains
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
-        corner_distance = sqrt(dot_product(length, length))/2._wp  ! maximum distance any marker can be from the center
+        corner_distance = 0.5_wp*sqrt(patch_ib(patch_id)%length_x**2 + patch_ib(patch_id)%length_y**2 &
+                                      & + patch_ib(patch_id)%length_z**2)  ! maximum distance any marker can be from the center
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
@@ -588,17 +581,20 @@ contains
         ! Checking whether the cuboid covers a particular cell in the domain and verifying whether the current patch has permission
         ! to write to to that cell. If both queries check out, the primitive variables of the current patch are assigned to this
         ! cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center, length, inverse_rotation]', &
-                            & collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
                     xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+                    ! rotate the frame into the IB's coordinates
+                    xyz_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xyz_local)
 
-                    if (-0.5*length(1) <= xyz_local(1) .and. 0.5*length(1) >= xyz_local(1) .and. -0.5*length(2) <= xyz_local(2) &
-                        & .and. 0.5*length(2) >= xyz_local(2) .and. -0.5*length(3) <= xyz_local(3) .and. 0.5*length(3) &
-                        & >= xyz_local(3)) then
+                    if (-0.5_wp*patch_ib(patch_id)%length_x <= xyz_local(1) &
+                        & .and. 0.5_wp*patch_ib(patch_id)%length_x >= xyz_local(1) .and. &
+                        & -0.5_wp*patch_ib(patch_id)%length_y <= xyz_local(2) &
+                        & .and. 0.5_wp*patch_ib(patch_id)%length_y >= xyz_local(2) .and. &
+                        & -0.5_wp*patch_ib(patch_id)%length_z <= xyz_local(3) &
+                        & .and. 0.5_wp*patch_ib(patch_id)%length_z >= xyz_local(3)) then
                         ! Updating the patch identities bookkeeping variable
                         ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
@@ -617,21 +613,15 @@ contains
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
         integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
         integer                            :: encoded_patch_id
-        real(wp)                           :: radius
         real(wp), dimension(1:3)           :: xyz_local, center, length  !< x and y coordinates in local IB frame
         real(wp), dimension(1:3,1:3)       :: inverse_rotation
         real(wp)                           :: corner_distance
 
-        ! Transferring the cylindrical patch's centroid, length, radius,
+        ! Transferring the cylindrical patch's centroid
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
-        length(1) = patch_ib(patch_id)%length_x
-        length(2) = patch_ib(patch_id)%length_y
-        length(3) = patch_ib(patch_id)%length_z
-        radius = patch_ib(patch_id)%radius
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
@@ -642,7 +632,7 @@ contains
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
-        corner_distance = sqrt(radius**2 + maxval(length)**2)  ! distance to rim of cylinder
+        corner_distance = sqrt(patch_ib(patch_id)%radius**2 + maxval(length)**2)  ! distance to rim of cylinder
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
         call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
@@ -650,20 +640,23 @@ contains
         ! Checking whether the cylinder covers a particular cell in the domain and verifying whether the current patch has the
         ! permission to write to that cell. If both queries check out, the primitive variables of the current patch are assigned to
         ! this cell.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center, length, radius, &
-                            & inverse_rotation]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[encoded_patch_id, center]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
                     xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
-                    xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+                    ! rotate the frame into the IB's coordinates
+                    xyz_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xyz_local)
 
-                    if (((.not. f_is_default(length(1)) .and. xyz_local(2)**2 + xyz_local(3)**2 <= radius**2 .and. &
-                        & -0.5_wp*length(1) <= xyz_local(1) .and. 0.5_wp*length(1) >= xyz_local(1)) &
-                        & .or. (.not. f_is_default(length(2)) .and. xyz_local(1)**2 + xyz_local(3)**2 <= radius**2 .and. &
-                        & -0.5_wp*length(2) <= xyz_local(2) .and. 0.5_wp*length(2) >= xyz_local(2)) &
-                        & .or. (.not. f_is_default(length(3)) .and. xyz_local(1)**2 + xyz_local(2)**2 <= radius**2 .and. &
-                        & -0.5_wp*length(3) <= xyz_local(3) .and. 0.5_wp*length(3) >= xyz_local(3)))) then
+                    if (((.not. f_is_default(patch_ib(patch_id)%length_x) .and. xyz_local(2)**2 + xyz_local(3) &
+                        & **2 <= patch_ib(patch_id)%radius**2 .and. -0.5_wp*patch_ib(patch_id)%length_x <= xyz_local(1) &
+                        & .and. 0.5_wp*patch_ib(patch_id)%length_x >= xyz_local(1)) &
+                        & .or. (.not. f_is_default(patch_ib(patch_id)%length_y) .and. xyz_local(1)**2 + xyz_local(3) &
+                        & **2 <= patch_ib(patch_id)%radius**2 .and. -0.5_wp*patch_ib(patch_id)%length_y <= xyz_local(2) &
+                        & .and. 0.5_wp*patch_ib(patch_id)%length_y >= xyz_local(2)) &
+                        & .or. (.not. f_is_default(patch_ib(patch_id)%length_z) .and. xyz_local(1)**2 + xyz_local(2) &
+                        & **2 <= patch_ib(patch_id)%radius**2 .and. -0.5_wp*patch_ib(patch_id)%length_z <= xyz_local(3) &
+                        & .and. 0.5_wp*patch_ib(patch_id)%length_z >= xyz_local(3)))) then
                         ! Updating the patch identities bookkeeping variable
                         ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
@@ -683,40 +676,37 @@ contains
         integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xy_local              !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2)           :: ellipse_coeffs        !< a and b in the ellipse coefficients
         real(wp), dimension(1:2)           :: center                !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3,1:3)       :: inverse_rotation
+        real(wp)                           :: bounding_radius
 
-        ! Transferring the ellipse's centroid and length information
+        ! Transferring the ellipse's centroid
 
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
-        ellipse_coeffs(1) = 0.5_wp*patch_ib(patch_id)%length_x
-        ellipse_coeffs(2) = 0.5_wp*patch_ib(patch_id)%length_y
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
 
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
+        bounding_radius = 0.5_wp*max(patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y)
         il = -gp_layers - 1
         jl = -gp_layers - 1
         ir = m + gp_layers + 1
         jr = n + gp_layers + 1
-        call get_bounding_indices(center(1) - maxval(ellipse_coeffs)*2._wp, center(1) + maxval(ellipse_coeffs)*2._wp, x_cc, il, ir)
-        call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y_cc, jl, jr)
+        call get_bounding_indices(center(1) - bounding_radius*2._wp, center(1) + bounding_radius*2._wp, x_cc, il, ir)
+        call get_bounding_indices(center(2) - bounding_radius*2._wp, center(2) + bounding_radius*2._wp, y_cc, jl, jr)
 
         ! Checking whether the ellipse covers a particular cell in the domain
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center, ellipse_coeffs, inverse_rotation, &
-                            & x_cc, y_cc]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local]', copyin='[encoded_patch_id, center]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
-                xy_local = matmul(inverse_rotation, xy_local)
+                xy_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse(:,:), xy_local)
 
                 ! Ellipse condition (x/a)^2 + (y/b)^2 <= 1
-                if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
+                if ((xy_local(1)/(0.5_wp*patch_ib(patch_id)%length_x))**2 + (xy_local(2)/(0.5_wp*patch_ib(patch_id)%length_y)) &
+                    & **2 <= 1._wp) then
                     ! Updating the patch identities bookkeeping variable
                     ib_markers%sf(i, j, 0) = encoded_patch_id
                 end if
