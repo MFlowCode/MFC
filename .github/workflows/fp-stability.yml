@@ -24,8 +24,9 @@ name: FP Stability
 # On FAIL: verrou_dd_sym runs to identify the responsible function symbols.
 # Logs are uploaded as CI artifacts.
 #
-# Verrou (Valgrind 3.26.0 + edf-hpc/verrou@a58d434) is built once and cached.
-# Build takes ~20 min uncached; cached runs restore in ~30 s.
+# Verrou (the pinned Valgrind+Verrou pair; versions live in toolchain/bootstrap/verrou.sh)
+# is installed by fp-stability on first use and cached. The prebuilt download is seconds;
+# a cache miss with no prebuilt falls back to a ~20-min source build.
 
 on:
   push:
@@ -68,8 +69,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/verrou
-          # Keep these versions in sync with toolchain/bootstrap/verrou.sh (the installer).
-          key: verrou-a58d434-valgrind-3.26.0-${{ runner.os }}
+          # Key off the installer's content so any version bump (or other edit) in
+          # verrou.sh auto-busts the cache and forces a fresh install — no hand-synced
+          # version string to drift out of date.
+          key: verrou-${{ hashFiles('toolchain/bootstrap/verrou.sh') }}-${{ runner.os }}
 
       - name: Install system dependencies
         run: |
