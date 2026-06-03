@@ -1189,7 +1189,6 @@ contains
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
 
             ! write the final moment assuming the points are all uniform density
             patch_ib(ib_idx)%moment = moment*patch_ib(ib_idx)%mass/(count*cell_volume)
