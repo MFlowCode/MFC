@@ -104,9 +104,9 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    integer                                                           :: Np
-    type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)                          :: airfoil_grid_u, airfoil_grid_l
+    type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib    !< Immersed boundary patch parameters
+    type(ib_airfoil_parameters), dimension(num_ib_airfoils_max)       :: ib_airfoil  !< Per-airfoil NACA parameters
+    type(ib_stl_parameters), dimension(num_stl_models_max)            :: stl_models  !< Per-STL model parameters (namelist)
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -408,20 +408,9 @@ contains
             patch_ib(i)%length_y = dflt_real
             patch_ib(i)%length_z = dflt_real
             patch_ib(i)%radius = dflt_real
-            patch_ib(i)%theta = dflt_real
-            patch_ib(i)%c = dflt_real
-            patch_ib(i)%t = dflt_real
-            patch_ib(i)%m = dflt_real
-            patch_ib(i)%p = dflt_real
+            patch_ib(i)%airfoil_id = 0
+            patch_ib(i)%model_id = 0
             patch_ib(i)%slip = .false.
-
-            ! Proper default values for translating STL models
-            patch_ib(i)%model_scale(:) = 1._wp
-            patch_ib(i)%model_translate(:) = 0._wp
-            patch_ib(i)%model_rotate(:) = 0._wp
-            patch_ib(i)%model_filepath(:) = dflt_char
-            patch_ib(i)%model_spc = num_ray
-            patch_ib(i)%model_threshold = ray_tracing_threshold
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
@@ -438,6 +427,22 @@ contains
             patch_ib(i)%rotation_matrix(2, 2) = 1._wp
             patch_ib(i)%rotation_matrix(3, 3) = 1._wp
             patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
+        end do
+
+        do i = 1, num_ib_airfoils_max
+            ib_airfoil(i)%c = dflt_real
+            ib_airfoil(i)%p = dflt_real
+            ib_airfoil(i)%t = dflt_real
+            ib_airfoil(i)%m = dflt_real
+        end do
+
+        num_stl_models = 0
+
+        do i = 1, num_stl_models_max
+            stl_models(i)%model_filepath(:) = dflt_char
+            stl_models(i)%model_translate(:) = 0._wp
+            stl_models(i)%model_scale(:) = 1._wp
+            stl_models(i)%model_threshold = ray_tracing_threshold
         end do
 
         chem_params%gamma_method = 1

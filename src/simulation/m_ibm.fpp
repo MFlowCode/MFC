@@ -1515,12 +1515,16 @@ contains
     !> Finalize the IBM module
     impure subroutine s_finalize_ibm_module()
 
+        integer :: i
+
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(ib_gbl_idx_lookup)
-        if (allocated(airfoil_grid_u)) then
-            @:DEALLOCATE(airfoil_grid_u)
-            @:DEALLOCATE(airfoil_grid_l)
-        end if
+        do i = 1, num_ib_airfoils_max
+            if (allocated(ib_airfoil_grids(i)%upper)) then
+                @:DEALLOCATE(ib_airfoil_grids(i)%upper)
+                @:DEALLOCATE(ib_airfoil_grids(i)%lower)
+            end if
+        end do
 
         if (allocated(models)) then
             if (size(models) > 0) then

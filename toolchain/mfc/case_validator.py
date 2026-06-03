@@ -595,6 +595,52 @@ class CaseValidator:
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
+        num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
+        num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
+        num_stl_models = self.get("num_stl_models", 0)
+        self.prohibit(
+            ib and num_stl_models < 0,
+            "num_stl_models must be >= 0",
+        )
+        self.prohibit(
+            ib and num_stl_models > num_stl_models_max,
+            f"num_stl_models must be <= {num_stl_models_max} (num_stl_models_max in m_constants.fpp)",
+        )
+        for i in range(1, num_ibs + 1):
+            geometry = self.get(f"patch_ib({i})%geometry", None)
+            airfoil_id = self.get(f"patch_ib({i})%airfoil_id", None)
+            model_id = self.get(f"patch_ib({i})%model_id", None)
+            if geometry in (4, 11):
+                self.prohibit(
+                    airfoil_id is None or airfoil_id <= 0,
+                    f"patch_ib({i})%airfoil_id must be set to a positive integer for airfoil geometry ({geometry})",
+                )
+                if airfoil_id is not None:
+                    self.prohibit(
+                        airfoil_id > num_ib_airfoils_max,
+                        f"patch_ib({i})%airfoil_id={airfoil_id} exceeds num_ib_airfoils_max={num_ib_airfoils_max}",
+                    )
+            elif airfoil_id is not None and airfoil_id > 0:
+                self.prohibit(
+                    True,
+                    f"patch_ib({i})%airfoil_id is set but geometry ({geometry}) is not an airfoil (4 or 11)",
+                )
+            if geometry in (5, 12):
+                self.prohibit(
+                    model_id is None or model_id <= 0,
+                    f"patch_ib({i})%model_id must be set to a positive integer for STL geometry ({geometry})",
+                )
+                if model_id is not None:
+                    self.prohibit(
+                        model_id > num_stl_models,
+                        f"patch_ib({i})%model_id={model_id} exceeds num_stl_models={num_stl_models}",
+                    )
+            elif model_id is not None and model_id > 0:
+                self.prohibit(
+                    True,
+                    f"patch_ib({i})%model_id is set but geometry ({geometry}) is not an STL model (5 or 12)",
+                )
+
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
         num_fluids = self.get("num_fluids")

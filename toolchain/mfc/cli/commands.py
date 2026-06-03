@@ -898,27 +898,36 @@ FP_STABILITY_COMMAND = Command(
     name="fp-stability",
     help="Run floating-point stability tests using Verrou.",
     description=(
-        "Runs each registered test case N times under Verrou's random IEEE-754 "
-        "rounding mode and compares against a nearest-rounding reference run. "
-        "Reports the max L∞ deviation and PASS/FAIL against per-case thresholds.\n\n"
-        "Requires a Verrou-enabled Valgrind at $VERROU_HOME/bin/valgrind "
-        "(defaults to $HOME/.local/verrou). The simulation and pre_process "
-        "binaries must be serial (no-MPI, no-GPU) debug builds.\n\n"
-        "Test cases:\n"
-        "  sod_standard      1-D standard Sod, p_L/p_R=10 (well-conditioned baseline)\n"
-        "  sod_strong        1-D Sod, p_L/p_R=100,000 — HLLC xi-factor cancellation\n"
-        "  water_stiffened   1-D water shock (pi_inf=4046) — pressure-recovery cancellation\n"
-        "  air_water_interface  1-D air/water contact (two-fluid) — mixed-cell cancellation\n\n"
-        "Additional features (skip with --no-* flags):\n"
+        "Runs Verrou random-rounding stability analysis on a built-in suite of small "
+        "1-D cases, or - given a case .py (positional INPUT) - on your own case. Each "
+        "case is run N times under Verrou's random IEEE-754 rounding and compared "
+        "against a nearest-rounding reference. PASS/FAIL is scale-free: a case must "
+        "retain at least ~24 significant bits (single precision) under random rounding "
+        "(no per-case thresholds).\n\n"
+        "With a case .py, that case is run as a SINGLE serial CPU process under Verrou "
+        "(~30x slower, and run many times), so it must be a small, short proxy - large "
+        "grids or long runs are rejected with guidance; serial .dat I/O is forced. "
+        "Example: ./mfc.sh fp-stability my_case.py\n\n"
+        "Uses a Verrou-enabled Valgrind at $VERROU_HOME/bin/valgrind (defaults to "
+        "$HOME/.local/verrou); if absent it is installed automatically (a pinned, "
+        "hash-verified prebuilt is downloaded, with a source build as fallback) - "
+        "aborts if that install fails. The simulation and pre_process binaries must "
+        "be serial (no-MPI, no-GPU) debug builds.\n\n"
+        "Analysis passes (skip with --no-* flags):\n"
         "  float proxy    One run with --rounding-mode=float (single-precision sensitivity)\n"
         "  vprec sweep    Runs at mantissa bits [52, 23, 16, 10] (precision floor curve)\n"
-        "  dd_sym         verrou_dd_sym bisection to responsible functions (on failure)\n"
-        "  dd_line        verrou_dd_line bisection to responsible source lines (on failure)\n"
-        "  cancellation   --check-cancellation detection of catastrophic cancellation sites\n"
-        "  mca-sigbits    Monte Carlo Arithmetic (mcaquad) significant-bits lower bound\n"
-        "  float-max      --check-max-float detection of double→float overflow sites\n"
+        "  cancellation   --check-cancellation origins, ranked by significant digits lost\n"
+        "  float-max      --check-max-float detection of double->float overflow sites\n"
     ),
     include_common=["mfc_config", "verbose", "debug_log"],
+    positionals=[
+        Positional(
+            name="input",
+            help="Optional case .py to analyze instead of the built-in suite (run as a single serial CPU process under Verrou; must be small/short).",
+            nargs="?",
+            completion=Completion(type=CompletionType.FILES_PY),
+        ),
+    ],
     arguments=[
         Argument(
             name="sim-binary",
@@ -961,32 +970,11 @@ FP_STABILITY_COMMAND = Command(
             dest="no_vprec",
         ),
         Argument(
-            name="no-dd-sym",
-            help="Skip verrou_dd_sym function-level delta-debug on failure.",
-            action=ArgAction.STORE_TRUE,
-            default=False,
-            dest="no_dd_sym",
-        ),
-        Argument(
-            name="no-dd-line",
-            help="Skip verrou_dd_line source-line delta-debug on failure.",
-            action=ArgAction.STORE_TRUE,
-            default=False,
-            dest="no_dd_line",
-        ),
-        Argument(
             name="no-cancellation",
             help="Skip --check-cancellation catastrophic-cancellation detection.",
             action=ArgAction.STORE_TRUE,
             default=False,
             dest="no_cancellation",
-        ),
-        Argument(
-            name="no-mca",
-            help="Skip Monte Carlo Arithmetic (mcaquad) significant-bits estimate.",
-            action=ArgAction.STORE_TRUE,
-            default=False,
-            dest="no_mca",
         ),
         Argument(
             name="no-float-max",
@@ -997,14 +985,15 @@ FP_STABILITY_COMMAND = Command(
         ),
     ],
     examples=[
-        Example("./mfc.sh fp-stability", "Auto-discover binaries and run all cases"),
+        Example("./mfc.sh fp-stability", "Auto-discover binaries and run the built-in suite"),
+        Example("./mfc.sh fp-stability my_case.py", "Analyze your own case (small/short, serial, CPU)"),
         Example(
             "./mfc.sh fp-stability --sim-binary build/install/abc123/bin/simulation",
             "Specify simulation binary explicitly",
         ),
         Example("./mfc.sh fp-stability -N 10", "Run 10 random-rounding samples per case"),
-        Example("./mfc.sh fp-stability --no-vprec --no-dd-line", "Skip VPREC sweep and line debug"),
-        Example("./mfc.sh fp-stability --no-cancellation --no-mca --no-float-max", "Skip new analysis passes"),
+        Example("./mfc.sh fp-stability --no-vprec --no-cancellation", "Skip VPREC sweep and cancellation detection"),
+        Example("./mfc.sh fp-stability --no-cancellation --no-float-max", "Skip analysis passes"),
     ],
     key_options=[
         ("--sim-binary PATH", "Serial simulation binary (debug, no-MPI)"),
@@ -1013,10 +1002,7 @@ FP_STABILITY_COMMAND = Command(
         ("-N, --samples N", "Random-rounding samples per case (default: 5)"),
         ("--no-float-proxy", "Skip float-rounding proxy run"),
         ("--no-vprec", "Skip VPREC mantissa-bit sweep"),
-        ("--no-dd-sym", "Skip verrou_dd_sym on failure"),
-        ("--no-dd-line", "Skip verrou_dd_line on failure"),
         ("--no-cancellation", "Skip cancellation detection"),
-        ("--no-mca", "Skip MCA significant-bits estimate"),
         ("--no-float-max", "Skip float32 overflow detection"),
     ],
 )

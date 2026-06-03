@@ -107,10 +107,12 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%c <= 0._wp .or. patch_ib(patch_id)%p <= 0._wp &
-                   & .or. patch_ib(patch_id)%t <= 0._wp .or. patch_ib(patch_id)%m <= 0._wp &
-                   & .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid), &
-                   & 'in airfoil IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%airfoil_id <= 0 &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in airfoil IB patch ' // trim(iStr))
 
     end subroutine s_check_airfoil_ib_patch_geometry
 
@@ -122,11 +124,13 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%c <= 0._wp .or. patch_ib(patch_id)%p <= 0._wp &
-                   & .or. patch_ib(patch_id)%t <= 0._wp .or. patch_ib(patch_id)%m <= 0._wp &
-                   & .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%z_centroid) .or. f_is_default(patch_ib(patch_id)%length_z), &
-                   & 'in 3d airfoil IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%airfoil_id <= 0 &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
+                   & .or. f_is_default(patch_ib(patch_id)%length_z), 'in 3d airfoil IB patch ' // trim(iStr))
 
     end subroutine s_check_3d_airfoil_ib_patch_geometry
 
@@ -200,13 +204,21 @@ contains
     impure subroutine s_check_model_ib_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
+        integer             :: mid
+        character(len=10)   :: midStr
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(patch_ib(patch_id)%model_filepath == dflt_char, 'Empty model file path for patch '//trim(iStr))
+        mid = patch_ib(patch_id)%model_id
+        call s_int_to_str(mid, midStr)
 
-        @:PROHIBIT(patch_ib(patch_id)%model_scale(1) <= 0._wp .or. patch_ib(patch_id)%model_scale(2) <= 0._wp &
-                   & .or. patch_ib(patch_id)%model_scale(3) <= 0._wp, 'Negative scale in model IB patch ' // trim(iStr))
+        @:PROHIBIT(mid <= 0 .or. mid > num_stl_models, &
+                   & 'patch_ib('//trim(iStr)//')%model_id='//trim(midStr)//' must be in [1, num_stl_models]')
+
+        @:PROHIBIT(stl_models(mid)%model_filepath == dflt_char, 'Empty model file path for stl_models('//trim(midStr)//')')
+
+        @:PROHIBIT(stl_models(mid)%model_scale(1) <= 0._wp .or. stl_models(mid)%model_scale(2) <= 0._wp &
+                   & .or. stl_models(mid)%model_scale(3) <= 0._wp, 'Negative scale in stl_models(' // trim(midStr) // ')')
 
     end subroutine s_check_model_ib_patch_geometry
 
