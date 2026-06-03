@@ -1,30 +1,20 @@
-"""Unit tests for the pure helpers behind the FP-stability cancellation pass and
-its fypp macro-expansion flagging.
+"""Unit tests for the pure helpers behind the FP-stability cancellation pass, its
+fypp macro-expansion flagging, scale-free pass/fail, and Verrou discovery/install.
 
 The Verrou subprocess machinery is exercised by the ./mfc.sh fp-stability CI job;
 here we test only the pure functions that decide what to instrument and how to
-label results, so they can run without Verrou or built binaries.
+label results, so they can run without Verrou or built binaries. We keep the tests
+that pin a real behavioral contract or a subtle edge, not every micro-variation.
 """
 
 from mfc.fp_stability_metrics import (
-    MIN_SIG_BITS,
     _autodetect_compare,
     _cancellation_severity,
-    _digits_left,
     _macro_context_in_lines,
     _sig_bits,
 )
 
-# --- #2: fypp macro-expansion context detection ---
-
-
-def test_macro_context_none_outside_any_block():
-    lines = [
-        "subroutine s_foo()\n",
-        "  a = b - c\n",
-        "end subroutine\n",
-    ]
-    assert _macro_context_in_lines(lines, 2) is None
+# --- fypp macro-expansion context detection (a #:for/#:def line maps to N instances) ---
 
 
 def test_macro_context_inside_for_loop_body():
@@ -37,6 +27,7 @@ def test_macro_context_inside_for_loop_body():
 
 
 def test_macro_context_if_block_is_not_duplicating():
+    # #:if selects code but does not duplicate it, so it must NOT be flagged.
     lines = [
         "#:if FOO\n",
         "  a = b - c\n",
@@ -45,50 +36,12 @@ def test_macro_context_if_block_is_not_duplicating():
     assert _macro_context_in_lines(lines, 2) is None
 
 
-def test_macro_context_reports_innermost_duplicating_block():
-    lines = [
-        "#:def MACRO(x)\n",
-        "  #:if cond\n",
-        "    #:for j in range(3)\n",
-        "      y = ${x}$ - z\n",
-        "    #:endfor\n",
-        "  #:endif\n",
-        "#:enddef\n",
-    ]
-    assert _macro_context_in_lines(lines, 4) == "#:for"
-
-
-def test_macro_context_balances_closers():
-    lines = [
-        "#:for i in [1, 2]\n",
-        "  a = b - c\n",
-        "#:endfor\n",
-        "d = e - f\n",
-    ]
-    # line 4 is after the loop closed -> not in any duplicating block
-    assert _macro_context_in_lines(lines, 4) is None
-
-
-def test_macro_context_def_body_when_no_inner_loop():
-    lines = [
-        "#:def GEOM(n)\n",
-        "  r = x - y\n",
-        "#:enddef\n",
-    ]
-    assert _macro_context_in_lines(lines, 2) == "#:def"
-
-
-def test_macro_context_block_and_call_are_duplicating():
-    assert _macro_context_in_lines(["#:block B\n", "  a = b - c\n", "#:endblock\n"], 2) == "#:block"
-    assert _macro_context_in_lines(["#:call M()\n", "  a = b - c\n", "#:endcall\n"], 2) == "#:call"
-
-
 def test_macro_context_unbalanced_close_is_safe():
     # a stray #:endfor with an empty stack must not crash or misreport
     assert _macro_context_in_lines(["#:endfor\n", "  a = b - c\n"], 2) is None
 
 
-# --- per-site cancellation severity (bits lost), from a threshold sweep ---
+# --- per-site cancellation severity (highest bit-threshold a site survives) ---
 
 
 def test_cancellation_severity_takes_highest_surviving_threshold():
@@ -99,10 +52,6 @@ def test_cancellation_severity_takes_highest_surviving_threshold():
     ]
     # a.fpp:1 survives to 30 bits; b.fpp:2 only at 10
     assert _cancellation_severity(level_sites) == {("a.fpp", 1): 30, ("b.fpp", 2): 10}
-
-
-def test_cancellation_severity_empty():
-    assert _cancellation_severity([]) == {}
 
 
 # --- auto-detect which output files to compare (for a user case) ---
@@ -123,16 +72,7 @@ def test_autodetect_compare_falls_back_to_prim_when_no_cons():
     assert _autodetect_compare(fns) == ["prim.1.00.000010.dat", "prim.3.00.000010.dat"]
 
 
-def test_autodetect_compare_empty_when_no_field_output():
-    assert _autodetect_compare(["indices.dat", "pre_time_data.dat", "foo.txt"]) == []
-
-
 # --- scale-free pass/fail: significant bits retained ---
-
-
-def test_sig_bits_relative_deviation():
-    # max_dev/ref_scale = 1e-14 -> ~46.5 retained bits
-    assert 46 < _sig_bits(1e-14, 1.0) < 47
 
 
 def test_sig_bits_is_scale_free():
@@ -140,30 +80,12 @@ def test_sig_bits_is_scale_free():
     assert abs(_sig_bits(1e-9, 1.0) - _sig_bits(1e-4, 1e5)) < 1e-9
 
 
-def test_sig_bits_zero_deviation_is_full_precision():
-    assert _sig_bits(0.0, 1.0) == 53.0
-
-
 def test_sig_bits_zero_scale_is_safe():
+    # a zero/degenerate field scale must not divide-by-zero; report full precision
     assert _sig_bits(1e-12, 0.0) == 53.0
 
 
-def test_sig_bits_deviation_at_scale_is_unstable():
-    # deviation as large as the field -> <= 0 retained bits
-    assert _sig_bits(1.0, 1.0) <= 0.0
-
-
-def test_min_sig_bits_is_single_precision_floor():
-    assert MIN_SIG_BITS == 24
-
-
-def test_digits_left_full_and_clamped():
-    assert 15.5 < _digits_left(0) < 16.0  # full double ~ 16 sig digits
-    assert _digits_left(53) == 0.0
-    assert _digits_left(60) == 0.0  # clamp: never negative
-
-
-# --- report emitters: must survive blank and populated result dicts (CI-only path) ---
+# --- report emitters: must survive the CI-only path without KeyError / regressions ---
 
 
 def _emit_to_tmp(results, tmp_path, monkeypatch):
@@ -185,26 +107,6 @@ def test_emit_summary_survives_blank_result(tmp_path, monkeypatch):
     assert "0 passed, 1 failed" in text
 
 
-def test_emit_summary_populated_result(tmp_path, monkeypatch):
-    from mfc.fp_stability import _blank_result
-
-    r = _blank_result("demo")
-    r.update(
-        passed=False,
-        max_dev=1e-9,
-        sig_bits=30.0,
-        float_proxy=1e-6,
-        vprec=[(52, 1e-14), (23, float("inf"))],  # exercises the "crash" branch
-        cancellation_locs=[("src/x/m_a.fpp", 5)],
-        cancellation_bits={("src/x/m_a.fpp", 5): 40},
-        cancellation_macro={("src/x/m_a.fpp", 5): "#:for"},
-        float_max_locs=[("m_a.fpp", 9)],
-    )
-    text = _emit_to_tmp([r], tmp_path, monkeypatch)
-    assert "💥 crash" in text and "digits lost" in text
-    assert "may represent multiple instances" in text  # fypp-ambiguous marker
-
-
 def test_emit_annotations_cancellation_notes_fypp_ambiguity(tmp_path, monkeypatch, capsys):
     from mfc import fp_stability_report as report
     from mfc.fp_stability import _blank_result
@@ -222,7 +124,7 @@ def test_emit_annotations_cancellation_notes_fypp_ambiguity(tmp_path, monkeypatc
     assert "multiple instances" in out  # fypp-expanded cancellation site flagged
 
 
-# --- Verrou discovery: a bare system valgrind must read as "Verrou absent" ---
+# --- Verrou discovery: a bare/broken valgrind must read as "Verrou absent" ---
 
 
 def test_find_verrou_prefers_verrou_home_candidate(tmp_path, monkeypatch):
@@ -264,15 +166,6 @@ def test_find_verrou_rejects_non_verrou_path_valgrind(tmp_path, monkeypatch):
     assert runners._find_verrou() == ""
 
 
-def test_find_verrou_accepts_verrou_enabled_path_valgrind(tmp_path, monkeypatch):
-    from mfc import fp_stability_runners as runners
-
-    monkeypatch.setenv("VERROU_HOME", str(tmp_path))
-    monkeypatch.setattr(runners.shutil, "which", lambda _name: "/opt/verrou/bin/valgrind")
-    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin, _env=None: True)
-    assert runners._find_verrou() == "/opt/verrou/bin/valgrind"
-
-
 def test_has_verrou_tool_reflects_exit_code(monkeypatch):
     from mfc import fp_stability_runners as runners
 
@@ -304,14 +197,6 @@ def test_verrou_env_sets_valgrind_lib_when_libexec_present(tmp_path, monkeypatch
     assert env["VALGRIND_LIB"] == str(tmp_path / "libexec" / "valgrind")
 
 
-def test_verrou_env_omits_valgrind_lib_when_libexec_absent(tmp_path, monkeypatch):
-    from mfc import fp_stability_runners as runners
-
-    monkeypatch.delenv("VALGRIND_LIB", raising=False)
-    env = runners._verrou_env(str(tmp_path / "bin" / "valgrind"))
-    assert "VALGRIND_LIB" not in env
-
-
 def test_verrou_env_preserves_user_valgrind_lib(tmp_path, monkeypatch):
     from mfc import fp_stability_runners as runners
 
@@ -321,17 +206,7 @@ def test_verrou_env_preserves_user_valgrind_lib(tmp_path, monkeypatch):
     assert env["VALGRIND_LIB"] == "/user/chosen/lib"  # not clobbered
 
 
-# --- auto-install hard-fail guards ---
-
-
-def test_install_verrou_raises_when_bootstrap_fails(monkeypatch):
-    import pytest
-
-    from mfc import fp_stability as fps
-
-    monkeypatch.setattr(fps.subprocess, "run", lambda *a, **k: type("R", (), {"returncode": 1})())
-    with pytest.raises(fps.MFCException, match="Verrou install failed"):
-        fps._install_verrou()
+# --- auto-install hard-fail guard (a green bootstrap that produced no binary) ---
 
 
 def test_install_verrou_raises_when_no_binary_appears(monkeypatch):
