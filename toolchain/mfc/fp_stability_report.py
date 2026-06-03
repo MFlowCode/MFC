@@ -51,7 +51,7 @@ def _more_md(total: int, shown: int, noun: str) -> str:
     or '' when nothing was truncated."""
     if total <= shown:
         return ""
-    return f"- _…and {total - shown} more {noun}; see fp-stability-logs/_"
+    return f"- …and {total - shown} more {noun}; see `fp-stability-logs/`"
 
 
 def _emit_github_summary(results: list, n_samples: int):
@@ -90,8 +90,7 @@ def _emit_github_summary(results: list, n_samples: int):
     md.append("")
 
     # Cancellation ORIGINS — where ill-conditioning actually arises, led with the
-    # most severe (most bits lost). The numerically interesting signal; the
-    # sensitivity list further down is dominated by the (benign) time integrator.
+    # most severe (most bits lost).
     cases_with_cancel = [r for r in results if r.get("cancellation_locs")]
     if cases_with_cancel:
         md.append("### Catastrophic cancellation origins (ranked by digits lost)\n")
@@ -119,7 +118,8 @@ def _emit_github_summary(results: list, n_samples: int):
                 md.append(footer)
             md.append("")
 
-    # VPREC sweep — one column per bit level, ❌ where bits retained < floor
+    # VPREC sweep — one column per mantissa-bit level showing the L∞ deviation at
+    # that reduced precision (💥 crash = run diverged/failed, — = not measured).
     if any(r["vprec"] for r in results):
         _labels = {52: "52b", 23: "23b", 16: "16b", 10: "10b"}
         header = " | ".join(_labels[b] for b in VPREC_MANTISSA_BITS)

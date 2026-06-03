@@ -260,7 +260,7 @@ def test_find_verrou_rejects_non_verrou_path_valgrind(tmp_path, monkeypatch):
     # VERROU_HOME has no valgrind; a plain valgrind is on PATH but lacks the tool.
     monkeypatch.setenv("VERROU_HOME", str(tmp_path))
     monkeypatch.setattr(runners.shutil, "which", lambda _name: "/usr/bin/valgrind")
-    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin: False)
+    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin, _env=None: False)
     assert runners._find_verrou() == ""
 
 
@@ -269,7 +269,7 @@ def test_find_verrou_accepts_verrou_enabled_path_valgrind(tmp_path, monkeypatch)
 
     monkeypatch.setenv("VERROU_HOME", str(tmp_path))
     monkeypatch.setattr(runners.shutil, "which", lambda _name: "/opt/verrou/bin/valgrind")
-    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin: True)
+    monkeypatch.setattr(runners, "_has_verrou_tool", lambda _bin, _env=None: True)
     assert runners._find_verrou() == "/opt/verrou/bin/valgrind"
 
 

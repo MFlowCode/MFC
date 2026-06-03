@@ -570,7 +570,7 @@ def _install_verrou() -> str:
 
 def fp_stability():
     verrou_bin = ARG("verrou_binary") or _find_verrou()
-    if not verrou_bin or not os.path.isfile(verrou_bin):
+    if not verrou_bin or not (os.path.isfile(verrou_bin) and os.access(verrou_bin, os.X_OK)):
         if ARG("verrou_binary"):
             raise MFCException(f"--verrou-binary {ARG('verrou_binary')!r} not found or not executable.")
         verrou_bin = _install_verrou()

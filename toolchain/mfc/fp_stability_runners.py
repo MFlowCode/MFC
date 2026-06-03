@@ -40,9 +40,11 @@ def _find_verrou() -> str:
     if os.path.isfile(candidate) and os.access(candidate, os.X_OK) and _has_verrou_tool(candidate, _verrou_env(candidate)):
         return candidate
     # Fall back to a valgrind on PATH only if it is Verrou-enabled; a bare system
-    # valgrind must read as "Verrou absent" so it gets installed, not misused.
+    # valgrind must read as "Verrou absent" so it gets installed, not misused. Verify
+    # with VALGRIND_LIB too, so a relocated prebuilt on PATH (env.sh not sourced) isn't
+    # wrongly judged absent.
     path_vg = shutil.which("valgrind")
-    if path_vg and _has_verrou_tool(path_vg):
+    if path_vg and _has_verrou_tool(path_vg, _verrou_env(path_vg)):
         return path_vg
     return ""
 
