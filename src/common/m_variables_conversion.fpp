@@ -1332,6 +1332,11 @@ contains
 #ifdef MFC_DEBUG
         if (disc < 0._wp) then
             print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, B(1), B(2), B(3), h, term, disc
+            ! s_mpi_abort is a host routine and cannot be called from device code
+            ! (this is a GPU routine); on GPU builds, emit the diagnostic print only.
+#ifndef MFC_GPU
+            call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')
+#endif
         end if
 #endif
 

@@ -577,15 +577,20 @@ class CaseValidator:
         ib = self.get("ib", "F") == "T"
         n = self.get("n", 0)
         num_ibs = self.get("num_ibs", 0)
+        num_particle_beds = self.get("num_particle_beds", 0) or 0
 
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
 
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
-        self.prohibit(ib and num_ibs <= 0, "num_ibs must be >= 1 when ib is enabled")
-        num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max", 100000)
+        has_particle_beds = num_particle_beds > 0 and any((self.get(f"particle_bed({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_beds + 1))
+        self.prohibit(
+            ib and num_ibs <= 0 and not has_particle_beds,
+            "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_bed with num_particles > 0)",
+        )
+        num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max_namelist", 50000)
         self.prohibit(
             ib and num_ibs > num_ib_patches_max,
-            f"num_ibs must be <= {num_ib_patches_max} (num_ib_patches_max in m_constants.fpp)",
+            f"num_ibs must be <= {num_ib_patches_max} (num_ib_patches_max_namelist in m_constants.fpp)",
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
@@ -1334,6 +1339,15 @@ class CaseValidator:
         # Fetch global chemistry and diffusion flags
         chemistry = self.get("chemistry", "F") == "T"
         diffusion = self.get("chem_params%diffusion", "F") == "T"
+        num_fluids = self.get("num_fluids")
+
+        # Chemistry assumes a single reacting gas phase: the temperature/pressure
+        # inversion recovers T from the total internal energy via Cantera's ideal-gas
+        # EOS (ignoring pi_inf), and the cons->prim conversion collapses all partial
+        # densities onto the species-summed total density. Both are only correct for
+        # num_fluids = 1; with a second (e.g. stiffened-gas) fluid the state is
+        # inconsistent and the simulation NaNs. See MFlowCode/MFC#1470.
+        self.prohibit(chemistry and num_fluids is not None and num_fluids != 1, "chemistry is only supported for single-component flows (num_fluids = 1)")
 
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
@@ -1555,14 +1569,24 @@ class CaseValidator:
         n = self.get("n", 0)
         fd_order = self.get("fd_order")
         num_fluids = self.get("num_fluids")
+        model_eqns = self.get("model_eqns")
 
         self.prohibit(n is not None and n == 0 and schlieren_wrt, "schlieren_wrt requires n > 0 (at least 2D)")
         self.prohibit(schlieren_wrt and fd_order is None, "fd_order must be set for schlieren_wrt")
 
+        # The volume-fraction model (model_eqns /= 1) weights the Schlieren field by schlieren_alpha(i) for every fluid; an unset
+        # value stays at the -1e6 sentinel and produces nonsensical output. Under IGR the last fluid's volume fraction is
+        # reconstructed (not stored), so schlieren_alpha must still be set for all num_fluids components, including the single
+        # fluid of a single-fluid IGR case. The gamma/pi_inf model (model_eqns == 1) does not use schlieren_alpha.
         if num_fluids is not None:
             for i in range(1, num_fluids + 1):
                 schlieren_alpha = self.get(f"schlieren_alpha({i})")
-                if schlieren_alpha is not None:
+                if schlieren_alpha is None:
+                    self.prohibit(
+                        schlieren_wrt and model_eqns is not None and model_eqns != 1,
+                        f"schlieren_alpha({i}) must be set for every fluid when schlieren_wrt is enabled (unless model_eqns == 1)",
+                    )
+                else:
                     self.prohibit(schlieren_alpha <= 0, f"schlieren_alpha({i}) must be greater than zero")
                     self.prohibit(not schlieren_wrt, f"schlieren_alpha({i}) should be set only with schlieren_wrt enabled")
 

@@ -103,6 +103,8 @@ contains
         proc_rank = 0
 #endif
 
+        $:GPU_UPDATE(device='[num_procs, proc_rank]')
+
     end subroutine s_mpi_initialize
 
     !> Set up MPI I/O data views and variable pointers for parallel file output.

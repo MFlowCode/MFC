@@ -22,8 +22,13 @@ jobs:
       group:  phoenix
       labels: gt
     steps:
+      # persist-credentials: false stops actions/checkout from configuring the
+      # default GITHUB_TOKEN as an http.extraheader, which otherwise OVERRIDES the
+      # token embedded in the push URL below — making the push authenticate as
+      # github-actions[bot] (which cannot bypass the require-PR rule) instead of
+      # the CACHE_PUSH_TOKEN identity.
       - uses: actions/checkout@v4
-        with: { clean: false }
+        with: { clean: false, persist-credentials: false }
       - name: Build + collect coverage map (SLURM)
         run: bash .github/scripts/submit-slurm-job.sh .github/workflows/common/coverage-refresh.sh cpu none phoenix
       - name: Commit refreshed map
@@ -34,10 +39,15 @@ jobs:
             git config user.name  "mfc-bot"
             git config user.email "mfc-bot@users.noreply.github.com"
             git add tests/coverage_map.json.gz
-            git commit -m "test: refresh coverage map [skip ci]"
-            # Push to protected master via CACHE_PUSH_TOKEN (a PAT/App token with
-            # contents:write + branch-protection bypass), mirroring deploy-tap.yml's
-            # x-access-token push. The default GITHUB_TOKEN is rejected by protection.
+            # --no-verify: this bot commit stages only the binary coverage map; it
+            # must not run the repo pre-commit hook (./mfc.sh precheck/spelling),
+            # which is for source changes and aborts the commit on the runner.
+            git commit --no-verify -m "test: refresh coverage map [skip ci]"
+            # Push to master with CACHE_PUSH_TOKEN, a classic PAT from an org-owner
+            # account. GitHub Apps cannot bypass the require-PR ruleset rule for
+            # direct pushes, but a PAT authenticates as the user (OrganizationAdmin),
+            # which IS an honored bypass actor. persist-credentials:false above
+            # ensures this token is actually used for the push.
             git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" HEAD:master
           else
             echo "Coverage map unchanged."

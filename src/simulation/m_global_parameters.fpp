@@ -27,6 +27,7 @@ module m_global_parameters
     integer :: num_procs  !< Number of processors
     ! Computational Domain Parameters
     integer :: proc_rank  !< Rank of the local processor
+    $:GPU_DECLARE(create='[num_procs, proc_rank]')
 
     !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
     type(cell_num_bounds) :: cells_bounds
@@ -167,6 +168,9 @@ module m_global_parameters
     $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
 #endif
     $:GPU_DECLARE(create='[bc]')
+    type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
+    integer           :: num_gbl_ibs, num_local_ibs
+    $:GPU_DECLARE(create='[neighbor_domain_x, neighbor_domain_y, neighbor_domain_z]')
     $:GPU_DECLARE(create='[down_sample]')
 
     integer, allocatable, dimension(:)           :: proc_coords  !< Processor coordinates in MPI_CART_COMM
@@ -265,11 +269,14 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
-    integer                                                  :: Np
+    type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib  !< Immersed boundary patch parameters
+    integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
+    type(particle_bed_parameters), dimension(num_particle_beds_max) :: particle_bed  !< Particle bed specifications
+    integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
+    type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
+    integer :: Np
 
-    $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
+    $:GPU_DECLARE(create='[ib, num_ibs, num_gbl_ibs, num_local_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l, local_ib_patch_ids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
@@ -535,6 +542,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        ib_neighborhood_radius = 1
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
@@ -696,7 +704,24 @@ contains
             relativity = .false.
         #:endif
 
-        do i = 1, num_ib_patches_max
+        num_particle_beds = 0
+        do i = 1, num_particle_beds_max
+            particle_bed(i)%x_centroid = 0._wp
+            particle_bed(i)%y_centroid = 0._wp
+            particle_bed(i)%z_centroid = 0._wp
+            particle_bed(i)%length_x = dflt_real
+            particle_bed(i)%length_y = dflt_real
+            particle_bed(i)%length_z = dflt_real
+            particle_bed(i)%num_particles = 0
+            particle_bed(i)%radius = dflt_real
+            particle_bed(i)%mass = dflt_real
+            particle_bed(i)%min_spacing = 0._wp
+            particle_bed(i)%moving_ibm = 0
+            particle_bed(i)%seed = 0
+        end do
+
+        do i = 1, num_ib_patches_max_namelist
+            patch_ib(i)%gbl_patch_id = i
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp

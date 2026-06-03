@@ -31,7 +31,8 @@ NF = _fc("num_fluids_max", 10)  # fluid_pp
 NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
-NIB = _fc("num_ib_patches_max", 50000)  # patch_ib (Fortran array bound)
+NIB = _fc("num_ib_patches_max_namelist", 50000)  # patch_ib namelist limit (patch_ib grows beyond this for particle beds)
+NPB = _fc("num_particle_beds_max", 10)  # particle_bed (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -348,6 +349,7 @@ CONSTRAINTS = {
     "num_fluids": {"min": 1, "max": NF},
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
+    "ib_neighborhood_radius": {"min": 1},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "num_integrals": {"min": 1},
@@ -605,6 +607,8 @@ def _load():
 
     # Immersed boundary
     _r("num_ibs", INT, {"ib"})
+    _r("num_particle_beds", INT, {"ib"})
+    _r("ib_neighborhood_radius", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})
@@ -858,9 +862,8 @@ def _load():
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
-    # max_index is None so the parameter registry stays compact (no enumeration).
-    # The Fortran-side upper bound (num_ib_patches_max in m_constants.fpp) is parsed
-    # and enforced by the case_validator, not by max_index here.
+    # max_index=NIB enforces the namelist limit (num_ib_patches_max_namelist); particle beds can
+    # grow patch_ib beyond this at runtime, but those entries are never in the namelist.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm"]:
@@ -886,6 +889,27 @@ def _load():
             attrs=_ib_attrs,
             tags=_ib_tags,
             max_index=NIB,
+        )
+    )
+
+    # particle_bed — compact bed specification that expands into individual patch_ib spheres/circles at startup
+    _pb_tags = {"ib"}
+    _pb_attrs: Dict[str, tuple] = {}
+    for _d in ["x", "y", "z"]:
+        _pb_attrs[f"{_d}_centroid"] = (REAL, _pb_tags)
+        _pb_attrs[f"length_{_d}"] = (REAL, _pb_tags)
+    _pb_attrs["num_particles"] = (INT, _pb_tags)
+    _pb_attrs["radius"] = (REAL, _pb_tags)
+    _pb_attrs["mass"] = (REAL, _pb_tags)
+    _pb_attrs["min_spacing"] = (REAL, _pb_tags)
+    _pb_attrs["moving_ibm"] = (INT, _pb_tags)
+    _pb_attrs["seed"] = (INT, _pb_tags)
+    REGISTRY.register_family(
+        IndexedFamily(
+            base_name="particle_bed",
+            attrs=_pb_attrs,
+            tags=_pb_tags,
+            max_index=NPB,
         )
     )
 
@@ -1196,6 +1220,9 @@ _nv(
     "coefficient_of_restitution",
     "collision_time",
     "ib_coefficient_of_friction",
+    "num_particle_beds",
+    "ib_neighborhood_radius",
+    "particle_bed",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
