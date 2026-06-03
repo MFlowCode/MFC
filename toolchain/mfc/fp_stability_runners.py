@@ -94,11 +94,14 @@ def _run_simulation_verrou(
     rounding_mode: str = None,
     extra_flags: list = None,
 ):
-    """Copy ICs into a fresh tmpdir, run simulation under verrou, collect D/ output.
+    """Create run_dir, copy ICs into a fresh tmpdir, run simulation under verrou,
+    and collect its D/ output into run_dir. Owns run_dir creation, so callers need
+    not pre-create it.
 
     rounding_mode is passed as --rounding-mode=<mode> when not None.
     extra_flags are appended before the binary (e.g. --backend=vprec ...).
     """
+    os.makedirs(run_dir, exist_ok=True)  # needed before --log-file / sim.out below
     with tempfile.TemporaryDirectory(prefix="mfc-fps-") as tmpdir:
         for fname in ["simulation.inp", "indices.dat", "pre_time_data.dat", "io_time_data.dat"]:
             src = os.path.join(work_dir, fname)
@@ -121,7 +124,6 @@ def _run_simulation_verrou(
             tag = rounding_mode or "vprec"
             raise MFCException(f"simulation ({tag}) exited {result.returncode}. See {run_dir}/sim.out")
 
-        os.makedirs(run_dir, exist_ok=True)
         for fn in os.listdir(os.path.join(tmpdir, "D")):
             shutil.copy2(os.path.join(tmpdir, "D", fn), run_dir)
 
@@ -132,7 +134,6 @@ def _run_cancellation_check(verrou_bin: str, sim_bin: str, work_dir: str, thresh
     or None if the run itself failed (distinct from [] = ran and found none)."""
     tag = f"cancellation_{threshold}"
     run_dir = os.path.join(work_dir, tag)
-    os.makedirs(run_dir, exist_ok=True)
     gen_path = os.path.join(run_dir, "cancel_gen.txt")
     flags = [
         "--check-cancellation=yes",
@@ -151,7 +152,6 @@ def _run_float_max_check(verrou_bin: str, sim_bin: str, work_dir: str):
     """Run with --check-max-float=yes; return [(fname, line)] of overflow sites,
     or None if the run failed (distinct from [] = ran and found none)."""
     run_dir = os.path.join(work_dir, "float_max")
-    os.makedirs(run_dir, exist_ok=True)
     try:
         _run_simulation_verrou(
             verrou_bin,
@@ -170,7 +170,6 @@ def _run_float_max_check(verrou_bin: str, sim_bin: str, work_dir: str):
 def _run_float_proxy(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, ref_dir: str) -> float:
     """One run with --rounding-mode=float; returns L∞ deviation from nearest-ref."""
     run_dir = os.path.join(work_dir, "float_proxy")
-    os.makedirs(run_dir)
     _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="float")
     return _max_diff_np(ref_dir, run_dir, case["compare"])
 
@@ -180,7 +179,6 @@ def _run_vprec_sweep(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, r
     results = []
     for bits in VPREC_MANTISSA_BITS:
         run_dir = os.path.join(work_dir, f"vprec_{bits}")
-        os.makedirs(run_dir)
         flags = [
             "--backend=vprec",
             "--vprec-mode=full",

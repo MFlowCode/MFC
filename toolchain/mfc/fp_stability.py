@@ -399,7 +399,6 @@ def _run_case(
         _run_preprocess(pp_bin, case["pre"], work_dir)
 
         ref_dir = os.path.join(work_dir, "ref")
-        os.makedirs(ref_dir)
         cons.print("  [dim]reference run (rounding=nearest)...[/dim]")
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, ref_dir, rounding_mode="nearest")
 
@@ -420,7 +419,6 @@ def _run_case(
         cons.print(f"  [dim]random-rounding runs (N={n_samples})...[/dim]")
         for i in range(n_samples):
             run_dir = os.path.join(work_dir, f"run_{i:02d}")
-            os.makedirs(run_dir)
             _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="random")
             max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
 
