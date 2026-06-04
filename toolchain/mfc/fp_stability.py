@@ -45,8 +45,9 @@ Usage:
   ./mfc.sh fp-stability --sim-binary PATH --pre-binary PATH
 
 A user case .py is run as a single serial CPU process under Verrou, so it must be
-a small, short proxy (a feasibility guard rejects large grids / long runs); output
-is forced to serial .dat I/O and the files to diff are auto-detected.
+a small, short proxy (a feasibility guard rejects large grids / long runs; --force
+overrides it, at proportionally long runtimes); output is forced to serial .dat
+I/O and the files to diff are auto-detected.
 """
 
 import math
@@ -564,12 +565,21 @@ def _load_user_case(input_path: str) -> dict:
     cells = (m + 1) * (n + 1) * (p + 1)
     t_stop = int(params.get("t_step_stop", 0) or 0)
     work = cells * max(t_stop, 1)
-    if cells > FP_CASE_MAX_CELLS:
-        raise MFCException(f"case has {cells:,} cells - too large for Verrou (~30x slowdown, run many times). " f"Use a coarsened proxy (<= {FP_CASE_MAX_CELLS:,} cells).")
-    if work > FP_CASE_MAX_WORK:
-        raise MFCException(
-            f"case is ~{work:,} cell-steps ({cells:,} cells x {t_stop} time steps) - too slow under "
-            f"Verrou (~30x, run many times). Reduce m/n/p or t_step_stop (target <= {FP_CASE_MAX_WORK:,} cell-steps)."
+    if not ARG("force"):
+        if cells > FP_CASE_MAX_CELLS:
+            raise MFCException(
+                f"case has {cells:,} cells - too large for Verrou (~30x slowdown, run many times). " f"Use a coarsened proxy (<= {FP_CASE_MAX_CELLS:,} cells), or pass --force to run anyway."
+            )
+        if work > FP_CASE_MAX_WORK:
+            raise MFCException(
+                f"case is ~{work:,} cell-steps ({cells:,} cells x {t_stop} time steps) - too slow under "
+                f"Verrou (~30x, run many times). Reduce m/n/p or t_step_stop (target <= {FP_CASE_MAX_WORK:,} cell-steps), or pass --force to run anyway."
+            )
+    elif cells > FP_CASE_MAX_CELLS or work > FP_CASE_MAX_WORK:
+        cons.print(
+            f"  [bold yellow]--force[/bold yellow]: case is ~{work:,} cell-steps "
+            f"(guard is {FP_CASE_MAX_WORK:,}) - expect roughly {work / FP_CASE_MAX_WORK:.0f}x the usual per-run time, "
+            "for every enabled pass (trim with -N 1 and --no-* flags)."
         )
     stem = os.path.splitext(os.path.basename(input_path))[0]
     if stem == "case":  # examples/<name>/case.py - the dir name is more telling
