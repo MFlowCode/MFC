@@ -54,17 +54,15 @@ def _more_md(total: int, shown: int, noun: str) -> str:
     return f"- ...and {total - shown} more {noun}; see `fp-stability-logs/`"
 
 
-def _emit_github_summary(results: list, n_samples: int):
-    """Write a markdown results table to GITHUB_STEP_SUMMARY.
+def _emit_github_summary(results: list, n_samples: int, log_dir: str = None):
+    """Write the markdown results report.
 
-    Visible directly in the Actions run UI without downloading artifacts.
+    Always written to <log_dir>/summary.md (when log_dir is given), so local runs
+    get the same report CI shows; additionally appended to GITHUB_STEP_SUMMARY when
+    set, where it is visible in the Actions run UI without downloading artifacts.
     Includes: pass/fail, max_dev, float proxy, VPREC sweep (failing levels),
     and catastrophic-cancellation source locations for any failing cases.
     """
-    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not summary_path:
-        return
-
     n_pass = sum(1 for r in results if r["passed"])
     n_fail = len(results) - n_pass
 
@@ -154,5 +152,11 @@ def _emit_github_summary(results: list, n_samples: int):
                 md.append(footer)
             md.append("")
 
-    with open(summary_path, "a") as f:
-        f.write("\n".join(md) + "\n")
+    text = "\n".join(md) + "\n"
+    if log_dir:
+        with open(os.path.join(log_dir, "summary.md"), "w") as f:
+            f.write(text)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with open(summary_path, "a") as f:
+            f.write(text)

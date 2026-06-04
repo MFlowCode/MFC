@@ -26,9 +26,11 @@ E. Float-max overflow detection (--no-float-max to skip)
    One run with --check-max-float=yes; reports locations where a
    double->float conversion would overflow to +/-Inf.
 
-Logs are saved to fp-stability-logs/ and uploaded as CI artifacts.
-On GitHub Actions: a step summary table and ::warning:: file annotations
-are emitted automatically so failing source lines appear in the PR diff.
+Per-case logs (verrou.log, sim.out, pre.log, .inp, cancel_gen.txt) are saved to
+fp-stability-logs/<case>/ and the markdown report to fp-stability-logs/summary.md;
+CI uploads the directory as an artifact. On GitHub Actions, the report is also
+appended to the step summary and file annotations are emitted so failing source
+lines appear in the PR diff.
 
 Requires:
   - Verrou-enabled Valgrind at $VERROU_HOME/bin/valgrind
@@ -371,11 +373,29 @@ def _blank_result(name: str) -> dict:
     }
 
 
+def _preserve_logs(work_dir: str, dest_dir: str) -> None:
+    """Copy a case's small text artifacts (*.log, *.out, *.inp, cancel_gen.txt)
+    from its scratch work_dir into fp-stability-logs/<case>/, mirroring the
+    run-dir layout, before the work_dir is deleted. Field-data .dat files are
+    skipped (they can be large for a user case)."""
+    keep = (".log", ".out", ".inp", ".txt")
+    if os.path.isdir(dest_dir):
+        shutil.rmtree(dest_dir)  # stale logs from a previous invocation
+    for root, _dirs, files in os.walk(work_dir):
+        rel = os.path.relpath(root, work_dir)
+        for fn in files:
+            if fn.endswith(keep):
+                target = os.path.normpath(os.path.join(dest_dir, rel))
+                os.makedirs(target, exist_ok=True)
+                shutil.copy2(os.path.join(root, fn), target)
+
+
 def _run_case(
     case: dict,
     verrou_bin: str,
     sim_bin: str,
     pp_bin: str,
+    log_dir: str,
     n_samples: int,
     run_float: bool,
     run_vprec: bool,
@@ -501,6 +521,7 @@ def _run_case(
                 cons.print(f"  [bold yellow]float-max check error[/bold yellow]: {exc}")
 
     finally:
+        _preserve_logs(work_dir, os.path.join(log_dir, name))
         shutil.rmtree(work_dir, ignore_errors=True)
         cons.unindent()
         cons.print()
@@ -622,6 +643,7 @@ def fp_stability():
                 verrou_bin,
                 sim_bin,
                 pp_bin,
+                log_dir,
                 n_samples,
                 run_float,
                 run_vprec,
@@ -642,7 +664,8 @@ def fp_stability():
         mark = "[green]PASS[/green]" if r["passed"] else "[red]FAIL[/red]"
         cons.print(f"  {mark}  {r['name']}")
 
-    _emit_github_summary(results, n_samples)
+    _emit_github_summary(results, n_samples, log_dir)
     _emit_github_annotations(results)
+    cons.print(f"  report: {os.path.join(log_dir, 'summary.md')}")
 
     sys.exit(0 if n_fail == 0 else 1)

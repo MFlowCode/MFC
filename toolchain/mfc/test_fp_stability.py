@@ -99,6 +99,34 @@ def _emit_to_tmp(results, tmp_path, monkeypatch):
     return out.read_text()
 
 
+def test_emit_summary_writes_local_summary_md_without_ci_env(tmp_path, monkeypatch):
+    # outside GitHub Actions the same report must land in fp-stability-logs/summary.md
+    from mfc import fp_stability_report as report
+    from mfc.fp_stability import _blank_result
+
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    report._emit_github_summary([_blank_result("x")], 5, log_dir=str(tmp_path))
+    assert "0 passed, 1 failed" in (tmp_path / "summary.md").read_text()
+
+
+def test_preserve_logs_keeps_text_artifacts_skips_field_data(tmp_path):
+    # logs/.inp/cancel_gen.txt must survive the work_dir rmtree; bulky .dat must not
+    from mfc.fp_stability import _preserve_logs
+
+    work = tmp_path / "work"
+    (work / "run_00").mkdir(parents=True)
+    (work / "pre.log").write_text("pre")
+    (work / "simulation.inp").write_text("inp")
+    (work / "run_00" / "verrou.log").write_text("v")
+    (work / "run_00" / "cons.1.00.000050.dat").write_text("data")
+    dest = tmp_path / "logs" / "case"
+    _preserve_logs(str(work), str(dest))
+    assert (dest / "pre.log").is_file()
+    assert (dest / "simulation.inp").is_file()
+    assert (dest / "run_00" / "verrou.log").is_file()
+    assert not (dest / "run_00" / "cons.1.00.000050.dat").exists()
+
+
 def test_emit_summary_survives_blank_result(tmp_path, monkeypatch):
     # the dict produced on the per-case error path must not KeyError the emitter
     from mfc.fp_stability import _blank_result
