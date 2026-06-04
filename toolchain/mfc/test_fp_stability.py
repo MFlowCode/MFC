@@ -80,6 +80,20 @@ def test_sig_bits_is_scale_free():
     assert abs(_sig_bits(1e-9, 1.0) - _sig_bits(1e-4, 1e5)) < 1e-9
 
 
+def test_source_snippet_marks_line_with_context(tmp_path):
+    from mfc.fp_stability_metrics import _source_snippet
+
+    f = tmp_path / "m_x.fpp"
+    f.write_text("".join(f"line{i}\n" for i in range(1, 11)))
+    rows = _source_snippet(str(f), 5, context=2).splitlines()
+    assert len(rows) == 5  # lines 3..7
+    assert rows[2].startswith(">") and "line5" in rows[2]
+    assert "line3" in rows[0] and "line7" in rows[-1]
+    # unresolvable file or out-of-range line must degrade to '' (no snippet)
+    assert _source_snippet(str(tmp_path / "nope.fpp"), 5) == ""
+    assert _source_snippet(str(f), 99) == ""
+
+
 def test_sig_bits_zero_scale_is_safe():
     # a zero/degenerate field scale must not divide-by-zero; report full precision
     assert _sig_bits(1e-12, 0.0) == 53.0
@@ -97,6 +111,34 @@ def _emit_to_tmp(results, tmp_path, monkeypatch):
     monkeypatch.setenv("GITHUB_ACTIONS", "1")
     report._emit_github_summary(results, 5)
     return out.read_text()
+
+
+def test_emit_summary_writes_local_summary_md_without_ci_env(tmp_path, monkeypatch):
+    # outside GitHub Actions the same report must land in fp-stability-logs/summary.md
+    from mfc import fp_stability_report as report
+    from mfc.fp_stability import _blank_result
+
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    report._emit_github_summary([_blank_result("x")], 5, log_dir=str(tmp_path))
+    assert "0 passed, 1 failed" in (tmp_path / "summary.md").read_text()
+
+
+def test_preserve_logs_keeps_text_artifacts_skips_field_data(tmp_path):
+    # logs/.inp/cancel_gen.txt must survive the work_dir rmtree; bulky .dat must not
+    from mfc.fp_stability import _preserve_logs
+
+    work = tmp_path / "work"
+    (work / "run_00").mkdir(parents=True)
+    (work / "pre.log").write_text("pre")
+    (work / "simulation.inp").write_text("inp")
+    (work / "run_00" / "verrou.log").write_text("v")
+    (work / "run_00" / "cons.1.00.000050.dat").write_text("data")
+    dest = tmp_path / "logs" / "case"
+    _preserve_logs(str(work), str(dest))
+    assert (dest / "pre.log").is_file()
+    assert (dest / "simulation.inp").is_file()
+    assert (dest / "run_00" / "verrou.log").is_file()
+    assert not (dest / "run_00" / "cons.1.00.000050.dat").exists()
 
 
 def test_emit_summary_survives_blank_result(tmp_path, monkeypatch):

@@ -983,6 +983,12 @@ FP_STABILITY_COMMAND = Command(
             default=False,
             dest="no_float_max",
         ),
+        Argument(
+            name="force",
+            help="Run a user case that exceeds the size feasibility guard anyway. Expect long runtimes: ~30x Verrou slowdown per run, times up to ~12 runs (trim passes with -N 1 and --no-* flags).",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
     ],
     examples=[
         Example("./mfc.sh fp-stability", "Auto-discover binaries and run the built-in suite"),
@@ -994,6 +1000,10 @@ FP_STABILITY_COMMAND = Command(
         Example("./mfc.sh fp-stability -N 10", "Run 10 random-rounding samples per case"),
         Example("./mfc.sh fp-stability --no-vprec --no-cancellation", "Skip VPREC sweep and cancellation detection"),
         Example("./mfc.sh fp-stability --no-cancellation --no-float-max", "Skip analysis passes"),
+        Example(
+            "./mfc.sh fp-stability big_case.py --force -N 1 --no-vprec --no-float-proxy",
+            "Run a case beyond the size guard, trimming passes to keep it tractable",
+        ),
     ],
     key_options=[
         ("--sim-binary PATH", "Serial simulation binary (debug, no-MPI)"),
