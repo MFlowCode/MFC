@@ -38,6 +38,7 @@ contains
             if (i <= num_ibs) then
                 call s_int_to_str(i, iStr)
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. patch_ib("//trim(iStr)//")%geometry must be set.")
+                call s_check_ib_patch_thermal(i)
 
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_ib(i)%geometry == 2) then
@@ -71,6 +72,20 @@ contains
         end do
 
     end subroutine s_check_ib_patches
+
+    impure subroutine s_check_ib_patch_thermal(patch_id)
+
+        integer, intent(in) :: patch_id
+
+        call s_int_to_str(patch_id, iStr)
+
+        if (.not. patch_ib(patch_id)%isothermal) return
+
+        @:PROHIBIT(f_is_default(patch_ib(patch_id)%Twall) .or. patch_ib(patch_id)%Twall <= 0._wp, &
+                   & 'in immersed boundary patch ' // trim(iStr) // ': patch_ib('//trim(iStr)//')%Twall must be set and > 0')
+
+    end subroutine s_check_ib_patch_thermal
+
 
     !> Verify that the geometric parameters of the circle patch have been consistently inputted.
 
@@ -220,7 +235,8 @@ contains
         @:PROHIBIT((.not. f_is_default(patch_ib(patch_id)%x_centroid)) .or. (.not. f_is_default(patch_ib(patch_id)%y_centroid)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%z_centroid)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%length_x)) .or. (.not. f_is_default(patch_ib(patch_id)%length_y)) &
-                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)) .or. (.not. f_is_default(patch_ib(patch_id)%radius)), &
+                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)) .or. (.not. f_is_default(patch_ib(patch_id)%radius))  &
+                   & .or. patch_ib(patch_id)%isothermal .or. (.not. f_is_default(patch_ib(patch_id)%Twall)), &
                    & 'in inactive IB patch ' // trim(iStr))
 
     end subroutine s_check_inactive_ib_patch_geometry

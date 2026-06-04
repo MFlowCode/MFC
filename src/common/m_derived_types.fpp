@@ -289,6 +289,8 @@ module m_derived_types
         real(wp)                     :: radius                        !< Dimensions of the patch. radius.
         real(wp)                     :: theta
         logical                      :: slip
+        logical                      :: isothermal
+        real(wp)                     :: Twall
 
         ! STL or OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath   !< Path the STL file relative to case_dir.

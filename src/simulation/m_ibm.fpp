@@ -248,13 +248,17 @@ contains
                 end do
 
                 if (chemistry) then
-                $:GPU_LOOP(parallelism='[seq]')
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%species%beg, eqn_idx%species%end
                         q_prim_vf(q)%sf(j, k, l) = Ys_IP(q - eqn_idx%species%beg + 1)
                     end do
                 end if
 
-                T_GP = 2.0_wp*600.0_wp - T_IP
+                if (patch_ib(patch_id)%isothermal) then
+                    T_GP = 2.0_wp*patch_ib(patch_id)%Twall - T_IP
+                else
+                    T_GP = T_IP
+                end if
                 call get_mixture_energy_mass(T_GP, Ys_IP, E_GP)
 
                 if (surface_tension) then
@@ -350,9 +354,8 @@ contains
                 end if
 
                 if (chemistry) then
-                 
-                $:GPU_LOOP(parallelism='[seq]')
-                      do q = eqn_idx%species%beg, eqn_idx%species%end
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = eqn_idx%species%beg, eqn_idx%species%end
                         q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(eqn_idx%cont%beg)*Ys_IP(q - eqn_idx%species%beg + 1)
                     end do
                 end if

@@ -527,7 +527,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
-                            & df_dW, iter,stage, t_step]')
+                            & df_dW, iter, stage, t_step]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -699,13 +699,12 @@ contains
                                             & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
 
 #ifdef MFC_SIMULATION
-                     if (.not. (t_step == 0 .and. stage == 1)) then 
-                         if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0  .and. l <= p)   then 
+                    if (.not. (t_step == 0 .and. stage == 1)) then 
+                        if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0  .and. l <= p)   then 
                             if (ghost_points_index%sf(j, k, l) == 1)  then 
                                 pres = pressure_ghost_point%sf(j, k, l) 
-                            !    print *, pres
-                              end if
-                   end if
+                            end if
+                        end if
                     end if
 #endif
 
