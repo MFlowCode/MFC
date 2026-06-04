@@ -496,6 +496,13 @@ def _run_case(
                     if locs:
                         worst = max(bits.values()) if bits else 0
                         cons.print(f"  cancellation: {len(locs)} site(s), worst loses >= {worst / math.log2(10):.0f} of ~16 digits")
+                        ranked = sorted(locs, key=lambda s: (-bits.get(s, 0), s))
+                        for path, line in ranked[:5]:
+                            lost = bits.get((path, line), 0) / math.log2(10)
+                            macro = " [dim](fypp-expanded)[/dim]" if (path, line) in result["cancellation_macro"] else ""
+                            cons.print(f"    >= {lost:.0f} digits lost  {path}:{line}{macro}")
+                        if len(ranked) > 5:
+                            cons.print(f"    [dim]...and {len(ranked) - 5} more; see fp-stability-logs/summary.md[/dim]")
                         n_macro = len(result["cancellation_macro"])
                         if n_macro:
                             cons.print(f"  [dim]{n_macro} inside fypp expansions - line maps to multiple instances[/dim]")
@@ -515,6 +522,10 @@ def _run_case(
                     result["float_max_locs"] = locs
                     if locs:
                         cons.print(f"  [bold yellow]float-max[/bold yellow]: {len(locs)} overflow site(s)")
+                        for path, line in locs[:5]:
+                            cons.print(f"    {path}:{line}")
+                        if len(locs) > 5:
+                            cons.print(f"    [dim]...and {len(locs) - 5} more; see fp-stability-logs/summary.md[/dim]")
                     else:
                         cons.print("  float-max: no overflows")
             except Exception as exc:
