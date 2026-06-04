@@ -207,23 +207,18 @@ contains
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp            !< integers containing the periodicity projection information
-        real(wp)                           :: f, ca_in, pa, ma
-        real(wp)                           :: xa, yc, dycdxc
+        real(wp)                           :: f, ca_in
         integer                            :: i, j, k, il, ir, jl, jr
         integer                            :: Np_local, airfoil_id
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xy_local, offset  !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)           :: center            !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
         airfoil_id = patch_ib(patch_id)%airfoil_id
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         ca_in = ib_airfoil(airfoil_id)%c
-        pa = ib_airfoil(airfoil_id)%p
-        ma = ib_airfoil(airfoil_id)%m
         Np_local = ib_airfoil_grids(airfoil_id)%Np
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         ! encode the periodicity information into the patch_id
@@ -238,24 +233,15 @@ contains
         call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, f, xa, yc, dycdxc]', copyin='[encoded_patch_id, center, &
-                            & inverse_rotation, offset, ma, pa, ca_in, airfoil_id, Np_local, ib_airfoil_grids(airfoil_id)%upper, &
-                            & ib_airfoil_grids(airfoil_id)%lower]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, k, f]', copyin='[encoded_patch_id, center, offset, ca_in, airfoil_id, &
+                            & Np_local, ib_airfoil_grids(airfoil_id)%upper, ib_airfoil_grids(airfoil_id)%lower]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]  ! get coordinate frame centered on IB
-                xy_local = matmul(inverse_rotation, xy_local)  ! rotate the frame into the IB's coordinates
+                xy_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xy_local)  ! rotate the frame into the IB's coordinates
                 xy_local = xy_local - offset  ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(1) >= 0._wp .and. xy_local(1) <= ca_in) then
-                    xa = xy_local(1)/ca_in
-                    if (xa <= pa) then
-                        yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                        dycdxc = (2*ma/pa**2)*(pa - xa)
-                    else
-                        yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                        dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-                    end if
                     if (xy_local(2) >= 0._wp) then
                         k = 1
                         do while (ib_airfoil_grids(airfoil_id)%upper(k)%x < xy_local(1) .and. k <= Np_local)
@@ -304,12 +290,11 @@ contains
         integer, intent(in)                :: patch_id
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
-        real(wp)                           :: lz, z_max, z_min, f, ca_in, pa, ma
+        real(wp)                           :: lz, z_max, z_min, f, ca_in
         integer                            :: i, j, k, l, il, ir, jl, jr, ll, lr
-        integer                            :: Np_local, airfoil_id
+        integer                            :: airfoil_id
         integer                            :: encoded_patch_id
         real(wp), dimension(1:3)           :: xyz_local, center, offset  !< x, y, z coordinates in local IB frame
-        real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
         airfoil_id = patch_ib(patch_id)%airfoil_id
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
@@ -317,10 +302,6 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         lz = patch_ib(patch_id)%length_z
         ca_in = ib_airfoil(airfoil_id)%c
-        pa = ib_airfoil(airfoil_id)%p
-        ma = ib_airfoil(airfoil_id)%m
-        Np_local = ib_airfoil_grids(airfoil_id)%Np
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         z_max = lz/2
@@ -341,15 +322,15 @@ contains
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
         call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, inverse_rotation, offset, &
-                            & ma, pa, ca_in, airfoil_id, Np_local, ib_airfoil_grids(airfoil_id)%upper, &
-                            & ib_airfoil_grids(airfoil_id)%lower, z_min, z_max]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, l, xyz_local, k, f]', copyin='[encoded_patch_id, center, offset, ca_in, airfoil_id, &
+                            & ib_airfoil_grids(airfoil_id)%upper, ib_airfoil_grids(airfoil_id)%lower, z_min, z_max]', collapse=3)
         do l = ll, lr
             do j = jl, jr
                 do i = il, ir
                     ! get coordinate frame centered on IB
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)]
-                    xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
+                    ! rotate the frame into the IB's coordinates
+                    xyz_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xyz_local)
                     xyz_local = xyz_local - offset  ! airfoils are a patch that require a centroid offset
 
                     if (xyz_local(3) >= z_min .and. xyz_local(3) <= z_max) then

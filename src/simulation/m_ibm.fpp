@@ -87,6 +87,7 @@ contains
             call s_update_ib_rotation_matrix(i)
         end do
         $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
         ! allocate some arrays for MPI communication, if required by this simulation
 #ifdef MFC_MPI
