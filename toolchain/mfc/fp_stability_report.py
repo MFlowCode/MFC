@@ -11,7 +11,17 @@ from .fp_stability_metrics import (
     MIN_SIG_BITS,
     VPREC_MANTISSA_BITS,
     _digits_left,
+    _source_snippet,
 )
+
+
+def _snippet_md(fname: str, lineno: int) -> list:
+    """Markdown lines for a source excerpt nested under a list item (2-space
+    indented fenced block), or [] if the source cannot be resolved."""
+    snippet = _source_snippet(fname, lineno)
+    if not snippet:
+        return []
+    return ["", "  ```f90", *("  " + ln for ln in snippet.splitlines()), "  ```", ""]
 
 
 def _emit_github_annotations(results: list):
@@ -54,17 +64,15 @@ def _more_md(total: int, shown: int, noun: str) -> str:
     return f"- ...and {total - shown} more {noun}; see `fp-stability-logs/`"
 
 
-def _emit_github_summary(results: list, n_samples: int):
-    """Write a markdown results table to GITHUB_STEP_SUMMARY.
+def _emit_github_summary(results: list, n_samples: int, log_dir: str = None):
+    """Write the markdown results report.
 
-    Visible directly in the Actions run UI without downloading artifacts.
+    Always written to <log_dir>/summary.md (when log_dir is given), so local runs
+    get the same report CI shows; additionally appended to GITHUB_STEP_SUMMARY when
+    set, where it is visible in the Actions run UI without downloading artifacts.
     Includes: pass/fail, max_dev, float proxy, VPREC sweep (failing levels),
     and catastrophic-cancellation source locations for any failing cases.
     """
-    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not summary_path:
-        return
-
     n_pass = sum(1 for r in results if r["passed"])
     n_fail = len(results) - n_pass
 
@@ -104,7 +112,9 @@ def _emit_github_summary(results: list, n_samples: int):
         for r in cases_with_cancel:
             site_bits = r.get("cancellation_bits") or {}
             macro_sites = r.get("cancellation_macro") or {}
-            sites = [{"where": f"{fname}:{lineno}", "bits": site_bits.get((fname, lineno), 0), "macro": macro_sites.get((fname, lineno))} for fname, lineno in r["cancellation_locs"]]
+            sites = [
+                {"where": f"{fname}:{lineno}", "loc": (fname, lineno), "bits": site_bits.get((fname, lineno), 0), "macro": macro_sites.get((fname, lineno))} for fname, lineno in r["cancellation_locs"]
+            ]
             ordered = sorted(sites, key=lambda e: (-e["bits"], e["where"]))
             if ordered:
                 w = ordered[0]
@@ -113,6 +123,7 @@ def _emit_github_summary(results: list, n_samples: int):
                 lost = e["bits"] / math.log2(10)
                 ambiguous = f" - _{e['macro']}-expanded, may represent multiple instances_" if e["macro"] else ""
                 md.append(f"- **>= {lost:.0f} digits lost** (~{_digits_left(e['bits']):.0f} of 16 left) - `{e['where']}`{ambiguous}")
+                md.extend(_snippet_md(*e["loc"]))
             footer = _more_md(len(ordered), 15, "site(s)")
             if footer:
                 md.append(footer)
@@ -149,10 +160,18 @@ def _emit_github_summary(results: list, n_samples: int):
             md.append(f"**`{r['name']}`** - {len(r['float_max_locs'])} site(s)\n")
             for fname, lineno in r["float_max_locs"][:10]:
                 md.append(f"- `{fname}:{lineno}`")
+                md.extend(_snippet_md(fname, lineno))
             footer = _more_md(len(r["float_max_locs"]), 10, "site(s)")
             if footer:
                 md.append(footer)
             md.append("")
 
-    with open(summary_path, "a") as f:
-        f.write("\n".join(md) + "\n")
+    text = "\n".join(md) + "\n"
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+        with open(os.path.join(log_dir, "summary.md"), "w") as f:
+            f.write(text)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with open(summary_path, "a") as f:
+            f.write(text)
