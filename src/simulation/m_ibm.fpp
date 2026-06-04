@@ -1054,10 +1054,12 @@ contains
         end do
 
         ! apply the summed forces
+        $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
         do i = 1, num_ibs
             patch_ib(i)%force(:) = forces(i,:)
             patch_ib(i)%torque(:) = torques(i,:)
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call nvtxEndRange
 
