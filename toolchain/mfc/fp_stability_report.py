@@ -168,6 +168,7 @@ def _emit_github_summary(results: list, n_samples: int, log_dir: str = None):
 
     text = "\n".join(md) + "\n"
     if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
         with open(os.path.join(log_dir, "summary.md"), "w") as f:
             f.write(text)
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")

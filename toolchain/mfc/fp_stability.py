@@ -533,7 +533,12 @@ def _run_case(
                 cons.print(f"  [bold yellow]float-max check error[/bold yellow]: {exc}")
 
     finally:
-        _preserve_logs(work_dir, os.path.join(log_dir, name))
+        # best-effort, like the rmtree below: a failed log copy must not replace
+        # the case's real outcome (this runs even when the try block is raising)
+        try:
+            _preserve_logs(work_dir, os.path.join(log_dir, name))
+        except OSError as exc:
+            cons.print(f"  [bold yellow]could not preserve logs[/bold yellow]: {exc}")
         shutil.rmtree(work_dir, ignore_errors=True)
         cons.unindent()
         cons.print()
