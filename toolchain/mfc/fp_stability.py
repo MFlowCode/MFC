@@ -4,35 +4,27 @@ Floating-point stability test suite using Verrou.
 Features
 --------
 A. Stability suite (always)
-   N random-rounding samples per case, threshold-based PASS/FAIL.
+   N random-rounding samples per case; PASS/FAIL on significant bits retained
+   (scale-free: -log2(max_dev/scale) vs one global floor, no per-case threshold).
 
 B. Float proxy (--no-float-proxy to skip)
-   One run with --rounding-mode=float — deterministic proxy for
+   One run with --rounding-mode=float - deterministic proxy for
    single-precision sensitivity without recompiling.
 
 C. VPREC precision sweep (--no-vprec to skip)
    One run per mantissa-bit level [52,23,16,10] with
    --backend=vprec --vprec-mode=full; shows where each case breaks.
 
-D. verrou_dd_sym on failure (--no-dd-sym to skip)
-   Delta-debug bisection isolates the minimal set of *functions* causing
-   instability.
-
-E. verrou_dd_line on failure, after dd_sym (--no-dd-line to skip)
-   Further bisects to exact *source lines* within the responsible functions.
-
-F. Cancellation detection (--no-cancellation to skip)
+D. Cancellation detection (--no-cancellation to skip)
    One run with --check-cancellation=yes; reports MFC source lines that
    produce catastrophic cancellation (subtraction of nearly-equal doubles).
-   Uses --cc-gen-file for structured per-line output.
+   Uses --cc-gen-file for structured per-line output.  A cancellation site whose
+   .fpp line sits inside a #:for/#:def expansion is flagged as instance-ambiguous
+   (the line maps to multiple generated instances).
 
-G. MCA significant-bits estimate (--no-mca to skip)
-   N runs with --backend=mcaquad; max deviation vs nearest-rounding
-   reference gives a lower bound on significant bits: s = -log2(dev/scale).
-
-H. Float-max overflow detection (--no-float-max to skip)
+E. Float-max overflow detection (--no-float-max to skip)
    One run with --check-max-float=yes; reports locations where a
-   double→float conversion would overflow to ±Inf.
+   double->float conversion would overflow to +/-Inf.
 
 Logs are saved to fp-stability-logs/ and uploaded as CI artifacts.
 On GitHub Actions: a step summary table and ::warning:: file annotations
@@ -45,118 +37,52 @@ Requires:
   - A serial pre_process binary (to generate initial conditions)
 
 Usage:
-  ./mfc.sh fp-stability
-  ./mfc.sh fp-stability --no-vprec --no-dd-line
+  ./mfc.sh fp-stability                       # built-in 1-D suite
+  ./mfc.sh fp-stability my_case.py            # your own case (small/short, serial, CPU)
+  ./mfc.sh fp-stability --no-vprec --no-cancellation
   ./mfc.sh fp-stability --sim-binary PATH --pre-binary PATH
+
+A user case .py is run as a single serial CPU process under Verrou, so it must be
+a small, short proxy (a feasibility guard rejects large grids / long runs); output
+is forced to serial .dat I/O and the files to diff are auto-detected.
 """
 
-import glob
 import math
 import os
-import re
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
-import textwrap
 import time
 
 from .common import MFC_ROOT_DIR, MFCException
+from .fp_stability_metrics import (
+    CANCEL_BIT_LEVELS,
+    MIN_SIG_BITS,
+    _autodetect_compare,
+    _cancellation_severity,
+    _macro_context,
+    _max_abs_np,
+    _max_diff_np,
+    _sig_bits,
+)
+from .fp_stability_report import (
+    _emit_github_annotations,
+    _emit_github_summary,
+)
+from .fp_stability_runners import (
+    _find_binary,
+    _find_verrou,
+    _run_cancellation_check,
+    _run_float_max_check,
+    _run_float_proxy,
+    _run_preprocess,
+    _run_simulation_verrou,
+    _run_vprec_sweep,
+    _write_inp,
+)
 from .printer import cons
 from .state import ARG
-
-# Mantissa-bit levels for the VPREC sweep (C).
-# 52 = full double, 23 = single, 16 = half-ish, 10 = ultra-low.
-VPREC_MANTISSA_BITS = [52, 23, 16, 10]
-
-# Matches "path/file.f90:123" or "path/file.fpp:123-456" in dd_line rddmin_summary.
-_LOC_RE = re.compile(r"(\S+\.(?:f90|fpp|c|cpp|h|F90))\s*:(\d+)(?:-(\d+))?", re.IGNORECASE)
-
-# Files to exclude from cancellation / float-max reports (runtime loaders, XALT).
-_EXTERNAL_SRCS = ("xalt", "dl-init", "ld-linux", "libc.so", "libm.so")
-
-# Matches the first "at" frame in a Valgrind stack trace: "(file.fpp:LINE)".
-_VGFRAME_RE = re.compile(r"\(([^):]+\.(?:fpp|f90|F90|c|cpp))\s*:(\d+)\)")
-
-# Lines that are clearly control-flow delimiters rather than arithmetic.
-# dd_line sometimes reports these when the responsible arithmetic is on the
-# preceding line but shares DWARF debug info with the delimiter (e.g. loop
-# boundaries in #:for-expanded code, or inlined functions at call sites).
-_CONTROL_FLOW_RE = re.compile(
-    r"^\s*("
-    r"end\s+(do|if|select|where|forall|subroutine|function|module|program|block)\b"
-    r"|do\s+\w+\s*=\s*[\w,\s]+"  # naked do-loop header (no arithmetic)
-    r"|else(\s+if\s*\(.*\)\s*then)?\s*$"  # else / else if (...) then
-    r"|(recursive\s+|pure\s+|elemental\s+)*subroutine\s+\w+"  # subroutine declaration
-    r"|\$:END_GPU\w+"  # fypp GPU macro closers
-    r"|#:end\w*"  # fypp directive closers (#:endfor, #:enddef, etc.)
-    r"|\s*!\s*$"  # comment-only lines
-    r"|\s*$"  # blank lines
-    r")",
-    re.IGNORECASE,
-)
-
-
-def _read_source_line(fname: str, lineno: int) -> str:
-    """Return the raw source line at lineno (1-based), or '' if unavailable."""
-    if os.path.isabs(fname) and os.path.isfile(fname):
-        candidates = [fname]
-    else:
-        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
-    if not candidates:
-        return ""
-    try:
-        with open(candidates[0]) as fh:
-            lines = fh.readlines()
-        return lines[lineno - 1] if 0 < lineno <= len(lines) else ""
-    except OSError:
-        return ""
-
-
-def _is_arithmetic_loc(fname: str, start: int, end: int) -> bool:
-    """Return True if any line in [start, end] contains non-trivial arithmetic.
-
-    Filters out loop delimiters and fypp directive lines that dd_line sometimes
-    reports when the responsible arithmetic shares DWARF info with its enclosing
-    control-flow boundary (inlining, #:for template expansion, etc.).
-    Returns True (keep) when uncertain so we never silently drop real hotspots.
-    """
-    for lineno in range(start, end + 1):
-        line = _read_source_line(fname, lineno)
-        if not line:
-            return True  # can't read — keep to be safe
-        if not _CONTROL_FLOW_RE.match(line):
-            return True
-    return False
-
-
-def _get_source_context(fname: str, lineno: int, context: int = 2) -> str:
-    """Return a annotated source snippet around lineno, or '' if file not found.
-
-    fname may be a bare basename (e.g. 'm_weno.fpp') or a relative path.
-    Searches recursively under MFC_ROOT_DIR/src/ first, then the whole tree.
-    """
-    if os.path.isabs(fname) and os.path.isfile(fname):
-        candidates = [fname]
-    else:
-        candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "src", "**", os.path.basename(fname)), recursive=True)
-        if not candidates:
-            candidates = glob.glob(os.path.join(MFC_ROOT_DIR, "**", os.path.basename(fname)), recursive=True)
-    if not candidates:
-        return ""
-    try:
-        with open(candidates[0]) as fh:
-            lines = fh.readlines()
-    except OSError:
-        return ""
-    start = max(0, lineno - context - 1)
-    end = min(len(lines), lineno + context)
-    rows = []
-    for i, line in enumerate(lines[start:end], start=start + 1):
-        marker = ">" if i == lineno else " "
-        rows.append(f"{marker}{i:5d} | {line.rstrip()}")
-    return "\n".join(rows)
 
 
 def _merge(*dicts):
@@ -225,8 +151,9 @@ _BASE_SIM = {
 #   name      - unique identifier used in log paths and console output
 #   description - human-readable summary
 #   compare   - D/ output files compared between reference and perturbed runs
-#   threshold - max L∞ deviation allowed before the case is declared FAIL
 #   ill_cond  - known source of cancellation (empty string = none expected)
+# Pass/fail is scale-free (>= MIN_SIG_BITS significant bits retained), so cases
+# need no per-case deviation threshold regardless of field magnitude.
 #   pre       - parameters for pre_process (generates initial conditions)
 #   sim       - parameters for simulation
 CASES = [
@@ -234,7 +161,6 @@ CASES = [
         "name": "sod_standard",
         "description": "1-D standard Sod, p_L/p_R=10, ideal gas (well-conditioned baseline)",
         "compare": ["cons.1.00.000050.dat", "cons.3.00.000050.dat"],
-        "threshold": 1e-13,
         "ill_cond": "",
         "pre": _merge(
             _BASE_PRE,
@@ -257,7 +183,6 @@ CASES = [
         "name": "sod_strong",
         "description": "1-D Sod, p_L/p_R=100,000, ideal gas",
         "compare": ["cons.1.00.000050.dat", "cons.3.00.000050.dat"],
-        "threshold": 1e-10,
         "ill_cond": "HLLC xi factor: (s_L - vel_L)/(s_L - s_S) cancels near sonic contact",
         "pre": _merge(
             _BASE_PRE,
@@ -280,8 +205,7 @@ CASES = [
         "name": "water_stiffened",
         "description": "1-D water shock, stiffened EOS (pi_inf=4046)",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 1e-8,
-        "ill_cond": "Pressure recovery: p=(E-pi_inf)/gamma loses ~4 digits (pi_inf/p_right~40,000) [threshold loosened until reduced-energy (Etilde) scheme is merged]",
+        "ill_cond": "Pressure recovery: p=(E-pi_inf)/gamma loses ~4 digits (pi_inf/p_right~40,000)",
         "pre": _merge(
             _BASE_PRE,
             _WATER_EOS,
@@ -303,7 +227,6 @@ CASES = [
         "name": "air_water_interface",
         "description": "1-D air/water isobaric contact (two-fluid, pi_inf=4046)",
         "compare": ["cons.1.00.000050.dat", "cons.4.00.000050.dat", "cons.5.00.000050.dat"],
-        "threshold": 1e-10,
         "ill_cond": "Mixed-cell pressure recovery: E-alpha_w*gamma_w*pi_inf cancels when alpha_w<<1",
         "pre": _merge(
             _BASE_PRE,
@@ -344,7 +267,6 @@ CASES = [
         "name": "bubble_rp",
         "description": "1-D bubbly water, pressure step 2:1 driving Rayleigh-Plesset oscillations (nb=1, Keller-Miksis)",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 1e-8,
         "ill_cond": "RP ODE: (p_bub - p_ext) cancels near bubble equilibrium",
         "pre": _merge(
             _BASE_PRE,
@@ -412,8 +334,7 @@ CASES = [
         "name": "low_mach",
         "description": "1-D water shock with low_Mach=1 HLLC correction active",
         "compare": ["cons.1.00.000050.dat", "prim.3.00.000050.dat"],
-        "threshold": 2e-7,
-        "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M≈0 (threshold loosened to 2e-7 to absorb MCA sampling variance)",
+        "ill_cond": "low_Mach correction: velocity perturbation ~u/c cancels severely at M~0",
         "pre": _merge(
             _BASE_PRE,
             _WATER_EOS,
@@ -434,511 +355,20 @@ CASES = [
 ]
 
 
-def _find_verrou() -> str:
-    verrou_home = os.environ.get("VERROU_HOME", os.path.join(os.path.expanduser("~"), ".local", "verrou"))
-    candidate = os.path.join(verrou_home, "bin", "valgrind")
-    if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-        return candidate
-    return shutil.which("valgrind") or ""
-
-
-def _find_binary(name: str) -> str:
-    install_dir = os.path.join(MFC_ROOT_DIR, "build", "install")
-    candidates = glob.glob(os.path.join(install_dir, "*", "bin", name))
-    return max(candidates, key=os.path.getmtime) if candidates else ""
-
-
-def _find_dd_sym(verrou_bin: str) -> str:
-    c = os.path.join(os.path.dirname(verrou_bin), "verrou_dd_sym")
-    return c if os.path.isfile(c) else ""
-
-
-def _find_dd_line(verrou_bin: str) -> str:
-    c = os.path.join(os.path.dirname(verrou_bin), "verrou_dd_line")
-    return c if os.path.isfile(c) else ""
-
-
-def _verrou_pythonpath(verrou_bin: str) -> str:
-    """Path that must be on PYTHONPATH for verrou_dd_* imports (valgrind/ subdir)."""
-    verrou_home = os.path.dirname(os.path.dirname(verrou_bin))
-    matches = glob.glob(os.path.join(verrou_home, "lib", "python*", "site-packages", "valgrind"))
-    return matches[0] if matches else ""
-
-
-def _write_inp(params: dict, target_name: str, work_dir: str) -> None:
-    """Write a Fortran namelist .inp file from a Python params dict."""
-    from .run import case_dicts
-
-    master_keys = case_dicts.get_input_dict_keys(target_name)
-    lines = [f"{k} = {v}" for k, v in params.items() if k in master_keys]
-    with open(os.path.join(work_dir, f"{target_name}.inp"), "w") as fh:
-        fh.write("&user_inputs\n" + "\n".join(lines) + "\n&end/\n")
-
-
-def _run_preprocess(pp_bin: str, pre_params: dict, work_dir: str):
-    _write_inp(pre_params, "pre_process", work_dir)
-    with open(os.path.join(work_dir, "pre.log"), "w") as f:
-        result = subprocess.run([pp_bin], cwd=work_dir, stdout=f, stderr=subprocess.STDOUT, check=False)
-    if result.returncode != 0:
-        raise MFCException(f"pre_process failed (rc={result.returncode}). See {work_dir}/pre.log")
-
-
-def _run_simulation_verrou(
-    verrou_bin: str,
-    sim_bin: str,
-    work_dir: str,
-    run_dir: str,
-    rounding_mode: str = None,
-    extra_flags: list = None,
-):
-    """Copy ICs into a fresh tmpdir, run simulation under verrou, collect D/ output.
-
-    rounding_mode is passed as --rounding-mode=<mode> when not None.
-    extra_flags are appended before the binary (e.g. --backend=vprec ...).
-    """
-    with tempfile.TemporaryDirectory(prefix="mfc-fps-") as tmpdir:
-        for fname in ["simulation.inp", "indices.dat", "pre_time_data.dat", "io_time_data.dat"]:
-            src = os.path.join(work_dir, fname)
-            if os.path.exists(src):
-                shutil.copy2(src, tmpdir)
-        shutil.copytree(os.path.join(work_dir, "p_all"), os.path.join(tmpdir, "p_all"))
-        os.makedirs(os.path.join(tmpdir, "D"))
-
-        log_path = os.path.join(run_dir, "verrou.log")
-        cmd = [verrou_bin, "--tool=verrou", "--error-limit=no", f"--log-file={log_path}"]
-        if rounding_mode:
-            cmd.append(f"--rounding-mode={rounding_mode}")
-        cmd.extend(extra_flags or [])
-        cmd.append(sim_bin)
-
-        with open(os.path.join(run_dir, "sim.out"), "w") as f:
-            result = subprocess.run(cmd, cwd=tmpdir, stdout=f, stderr=subprocess.STDOUT, check=False)
-
-        if result.returncode != 0:
-            tag = rounding_mode or "vprec"
-            raise MFCException(f"simulation ({tag}) exited {result.returncode}. See {run_dir}/sim.out")
-
-        os.makedirs(run_dir, exist_ok=True)
-        for fn in os.listdir(os.path.join(tmpdir, "D")):
-            shutil.copy2(os.path.join(tmpdir, "D", fn), run_dir)
-
-
-def _max_diff_np(ref_dir: str, run_dir: str, compare_files: list) -> float:
-    import numpy as np
-
-    total = 0.0
-    for fname in compare_files:
-        ref_p, run_p = os.path.join(ref_dir, fname), os.path.join(run_dir, fname)
-        if not os.path.exists(ref_p) or not os.path.exists(run_p):
-            return float("inf")
-        ref = np.loadtxt(ref_p)[:, 1]
-        run = np.loadtxt(run_p)[:, 1]
-        total = max(total, float(np.max(np.abs(ref - run))))
-    return total
-
-
-def _max_abs_np(ref_dir: str, compare_files: list) -> float:
-    """Return the maximum absolute value across all reference output files."""
-    import numpy as np
-
-    total = 0.0
-    for fname in compare_files:
-        ref_p = os.path.join(ref_dir, fname)
-        if not os.path.exists(ref_p):
-            continue
-        ref = np.loadtxt(ref_p)[:, 1]
-        total = max(total, float(np.max(np.abs(ref))))
-    return total
-
-
-def _parse_cancel_gen(gen_path: str) -> list:
-    """Parse cc-gen-file TSV (file\\tline\\tsymbol) → sorted unique [(fname, line)] for MFC sources."""
-    if not os.path.isfile(gen_path):
-        return []
-    locs = []
-    seen = set()
-    with open(gen_path) as fh:
-        for raw in fh:
-            parts = raw.rstrip("\n").split("\t")
-            if len(parts) < 2:
-                continue
-            fname = parts[0].strip()
-            if any(ext in fname for ext in _EXTERNAL_SRCS):
-                continue
-            if not fname.endswith((".fpp", ".f90", ".F90", ".c", ".cpp")):
-                continue
-            try:
-                lineno = int(parts[1].strip())
-            except ValueError:
-                continue
-            key = (fname, lineno)
-            if key not in seen:
-                seen.add(key)
-                locs.append(key)
-    return locs
-
-
-def _parse_vg_error_locs(log_path: str, error_keyword: str) -> list:
-    """Extract first MFC-source frame from each Valgrind error matching error_keyword."""
-    if not os.path.isfile(log_path):
-        return []
-    locs = []
-    seen = set()
-    in_error = False
-    with open(log_path) as fh:
-        for raw in fh:
-            line = re.sub(r"^==\d+== ?", "", raw)
-            if error_keyword in line:
-                in_error = True
-                continue
-            if in_error:
-                if "   at " in line or "   by " in line:
-                    m = _VGFRAME_RE.search(line)
-                    if m:
-                        fname = m.group(1)
-                        if any(ext in fname for ext in _EXTERNAL_SRCS):
-                            continue
-                        lineno = int(m.group(2))
-                        key = (fname, lineno)
-                        if key not in seen:
-                            seen.add(key)
-                            locs.append(key)
-                        in_error = False
-                elif line.strip() == "":
-                    in_error = False
-    return locs
-
-
-def _run_cancellation_check(case: dict, verrou_bin: str, sim_bin: str, work_dir: str) -> list:
-    """Run with --check-cancellation=yes; return [(fname, line)] of MFC cancellation sites."""
-    run_dir = os.path.join(work_dir, "cancellation")
-    os.makedirs(run_dir, exist_ok=True)
-    gen_path = os.path.join(run_dir, "cancel_gen.txt")
-    flags = [
-        "--check-cancellation=yes",
-        "--cc-threshold-double=10",
-        f"--cc-gen-file={gen_path}",
-    ]
-    try:
-        _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="nearest", extra_flags=flags)
-    except MFCException:
-        pass
-    raw = _parse_cancel_gen(gen_path)
-    filtered = [(f, ln) for f, ln in raw if _is_arithmetic_loc(f, ln, ln)]
-    skipped = len(raw) - len(filtered)
-    if skipped:
-        cons.print(f"  [dim]cancellation: filtered {skipped} control-flow boundary site(s)[/dim]")
-    return filtered
-
-
-def _run_mca_samples(
-    case: dict,
-    verrou_bin: str,
-    sim_bin: str,
-    work_dir: str,
-    ref_dir: str,
-    n_mca: int,
-) -> tuple:
-    """Run N mcaquad samples; return (max_dev, sig_bits_lower_bound)."""
-    compare = case["compare"]
-    ref_scale = _max_abs_np(ref_dir, compare)
-    max_dev = 0.0
-    flags = ["--backend=mcaquad", "--mca-mode=mca"]
-    for i in range(n_mca):
-        run_dir = os.path.join(work_dir, f"mca_{i:02d}")
-        os.makedirs(run_dir, exist_ok=True)
-        try:
-            _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, extra_flags=flags)
-            max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
-        except MFCException:
-            pass
-    sig_bits = None
-    if max_dev > 0.0 and ref_scale > 0.0:
-        sig_bits = max(0, int(math.floor(-math.log2(max_dev / ref_scale))))
-    return max_dev, sig_bits
-
-
-def _run_float_max_check(case: dict, verrou_bin: str, sim_bin: str, work_dir: str) -> list:
-    """Run with --check-max-float=yes; return [(fname, line)] of overflow sites."""
-    run_dir = os.path.join(work_dir, "float_max")
-    os.makedirs(run_dir, exist_ok=True)
-    try:
-        _run_simulation_verrou(
-            verrou_bin,
-            sim_bin,
-            work_dir,
-            run_dir,
-            rounding_mode="nearest",
-            extra_flags=["--check-max-float=yes"],
-        )
-    except MFCException:
-        pass
-    return _parse_vg_error_locs(os.path.join(run_dir, "verrou.log"), "Max float")
-
-
-def _run_float_proxy(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, ref_dir: str) -> float:
-    """One run with --rounding-mode=float; returns L∞ deviation from nearest-ref."""
-    run_dir = os.path.join(work_dir, "float_proxy")
-    os.makedirs(run_dir)
-    _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="float")
-    return _max_diff_np(ref_dir, run_dir, case["compare"])
-
-
-def _run_vprec_sweep(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, ref_dir: str) -> list:
-    """Run at each mantissa-bit level. Returns [(bits, dev), ...]."""
-    results = []
-    for bits in VPREC_MANTISSA_BITS:
-        run_dir = os.path.join(work_dir, f"vprec_{bits}")
-        os.makedirs(run_dir)
-        flags = [
-            "--backend=vprec",
-            "--vprec-mode=full",
-            f"--vprec-precision-binary64={bits}",
-            "--vprec-range-binary64=11",
-        ]
-        try:
-            _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, extra_flags=flags)
-            dev = _max_diff_np(ref_dir, run_dir, case["compare"])
-        except MFCException:
-            dev = float("inf")
-        results.append((bits, dev))
-    return results
-
-
-def _write_dd_run_sh(path: str, verrou_bin: str, sim_bin: str, ic_dir: str):
-    """Generate dd_run.sh for verrou_dd_sym / verrou_dd_line.
-
-    verrou_dd_* calls: dd_run.sh RUNDIR and injects function/line exclusion via
-    VERROU_EXCLUDE / VERROU_SOURCE environment variables.  For test runs, we use
-    --rounding-mode=float (deterministic, same deviation every call, --nruns=1 suffices).
-    For the reference run, verrou_dd_sym sets VERROU_ROUNDING_MODE=nearest in the
-    environment — we honour that so the reference is a stable nearest-rounding baseline
-    to compare against.  CLI --rounding-mode would override the env var and break the
-    reference, so we pass the mode via ${VERROU_ROUNDING_MODE:-float} instead.
-    """
-    content = textwrap.dedent(f"""\
-        #!/usr/bin/env bash
-        # Generated by mfc.sh fp-stability — do not edit by hand.
-        VERROU_BIN={verrou_bin!r}
-        SIM_BIN={sim_bin!r}
-        IC_DIR={ic_dir!r}
-
-        RUNDIR="$1"
-        TMPDIR_RUN=$(mktemp -d)
-        trap 'rm -rf "$TMPDIR_RUN"' EXIT
-
-        cp -r "$IC_DIR/p_all" "$TMPDIR_RUN/p_all"
-        cp "$IC_DIR/simulation.inp" "$TMPDIR_RUN/simulation.inp"
-        for fname in indices.dat pre_time_data.dat io_time_data.dat; do
-            [ -f "$IC_DIR/$fname" ] && cp "$IC_DIR/$fname" "$TMPDIR_RUN/"
-        done
-        mkdir -p "$TMPDIR_RUN/D"
-
-        # verrou_dd_sym sets VERROU_ROUNDING_MODE=nearest for its reference run and
-        # leaves it unset for test runs.  Defaulting to float gives deterministic
-        # test steps while letting the reference use nearest-rounding.
-        ROUND="${{VERROU_ROUNDING_MODE:-float}}"
-
-        # verrou_dd_sym injects VERROU_EXCLUDE (symbols to exclude from perturbation).
-        # verrou_dd_line injects VERROU_SOURCE (source lines to restrict perturbation to).
-        # Forward them as valgrind flags when set.
-        EXTRA=""
-        [ -n "${{VERROU_EXCLUDE:-}}" ] && EXTRA="$EXTRA --exclude=$VERROU_EXCLUDE"
-        [ -n "${{VERROU_SOURCE:-}}" ]  && EXTRA="$EXTRA --source=$VERROU_SOURCE"
-
-        cd "$TMPDIR_RUN"
-        "$VERROU_BIN" --tool=verrou --error-limit=no --rounding-mode="$ROUND" $EXTRA "$SIM_BIN"
-        rc=$?
-
-        [ -d "$TMPDIR_RUN/D" ] && cp -a "$TMPDIR_RUN/D/." "$RUNDIR/"
-        exit $rc
-    """)
-    with open(path, "w") as f:
-        f.write(content)
-    os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-
-def _write_dd_cmp_py(path: str, compare_files: list, threshold: float):
-    """Generate dd_cmp.py for verrou_dd_sym / verrou_dd_line.
-
-    verrou_dd_* calls: dd_cmp.py REF_DIR RUN_DIR
-    Exits 0 (stable) or 1 (unstable) based on threshold.
-    """
-    content = textwrap.dedent(f"""\
-        #!/usr/bin/env python3
-        # Generated by mfc.sh fp-stability — do not edit by hand.
-        import sys, os, numpy as np
-
-        COMPARE_FILES = {compare_files!r}
-        THRESHOLD = {threshold!r}
-
-        ref_dir, run_dir = sys.argv[1], sys.argv[2]
-        max_dev = 0.0
-        for fname in COMPARE_FILES:
-            ref_p = os.path.join(ref_dir, fname)
-            run_p = os.path.join(run_dir, fname)
-            if not os.path.exists(ref_p) or not os.path.exists(run_p):
-                print(f"MISSING: {{fname}}")
-                sys.exit(1)
-            ref = np.loadtxt(ref_p)[:, 1]
-            run = np.loadtxt(run_p)[:, 1]
-            dev = float(np.max(np.abs(ref - run)))
-            max_dev = max(max_dev, dev)
-
-        print(f"max_dev={{max_dev:.3e}}  threshold={{THRESHOLD:.0e}}")
-        sys.exit(0 if max_dev <= THRESHOLD else 1)
-    """)
-    with open(path, "w") as f:
-        f.write(content)
-    os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-
-def _dd_env(verrou_bin: str) -> dict:
-    """Environment with PYTHONPATH set for verrou_dd_* imports."""
-    py_pkg = _verrou_pythonpath(verrou_bin)
-    env = os.environ.copy()
-    if py_pkg:
-        existing = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = ":".join(filter(None, [py_pkg, existing]))
-    return env
-
-
-def _parse_rddmin_locs(summary_path: str) -> list:
-    """Extract [(rel_path, start_line, end_line)] from a dd_line rddmin_summary.
-
-    Filters out locations whose source lines are pure control-flow delimiters
-    (loop boundaries, fypp directive closers, blank/comment lines).  These can
-    appear when the responsible arithmetic shares DWARF debug info with an
-    enclosing boundary due to inlining or #:for template expansion.
-    """
-    if not os.path.isfile(summary_path):
-        return []
-    locs = []
-    skipped = []
-    with open(summary_path) as fh:
-        for line in fh:
-            m = _LOC_RE.search(line)
-            if not m:
-                continue
-            path = m.group(1)
-            start = int(m.group(2))
-            end = int(m.group(3)) if m.group(3) else start
-            try:
-                rel = os.path.relpath(path, MFC_ROOT_DIR)
-                if rel.startswith(".."):
-                    rel = path
-            except ValueError:
-                rel = path
-            rel = rel.replace("\\", "/")
-            if _is_arithmetic_loc(path, start, end):
-                locs.append((rel, start, end))
-            else:
-                skipped.append((rel, start, end))
-    for rel, start, end in skipped:
-        loc = f"{rel}:{start}" if start == end else f"{rel}:{start}-{end}"
-        cons.print(f"  [dim]dd_line: skipped control-flow boundary {loc}[/dim]")
-    return locs
-
-
-def _parse_rddmin_syms(summary_path: str) -> list:
-    """Extract symbol/function names from a dd_sym rddmin_summary.
-
-    rddmin_summary format:
-      ddmin0:\\tFail Ratio: ...\\tFail indexes: ...
-      \\t<funcname>\\t<binary_path>
-      ddmin1:\\t...
-      \\t<funcname>\\t<binary_path>
-
-    Lines starting with 'ddmin' are metadata; function names are on the
-    indented (tab-prefixed) lines as the first tab-delimited field.
-    """
-    if not os.path.isfile(summary_path):
-        return []
-    syms = []
-    with open(summary_path) as fh:
-        for ln in fh:
-            stripped = ln.strip()
-            if not stripped or stripped.startswith("ddmin"):
-                continue
-            sym = stripped.split("\t")[0].strip()
-            if sym:
-                syms.append(sym)
-    return syms
-
-
-def _run_dd_tool(
-    dd_bin: str,
-    dd_dir: str,
-    dd_run_sh: str,
-    dd_cmp_py: str,
-    env: dict,
-    log_name: str,
-    summary_subdir: str,
-    label: str,
-) -> list:
-    """Generic runner for verrou_dd_sym / verrou_dd_line. Returns raw summary lines."""
-    log_file = os.path.join(dd_dir, log_name)
-    cmd = [dd_bin, "--nruns=1", "--rddmin=d", "--reference-rounding=nearest", dd_run_sh, dd_cmp_py]
-    cons.print(f"  [dim]running {label} (--nruns=1 float-mode --rddmin=d)...[/dim]")
-    with open(log_file, "w") as f:
-        result = subprocess.run(cmd, cwd=dd_dir, env=env, stdout=f, stderr=subprocess.STDOUT, check=False)
-    summary_path = os.path.join(dd_dir, summary_subdir, "rddmin_summary")
-    summary_lines = []
-    if result.returncode == 0:
-        if os.path.isfile(summary_path):
-            with open(summary_path) as f:
-                summary_lines = f.readlines()
-            cons.print(f"  [bold yellow]{label} result[/bold yellow]:")
-            for line in summary_lines:
-                cons.print(f"    {line.rstrip()}")
-        else:
-            cons.print(f"  [dim]{label} done; see {log_file}[/dim]")
-    else:
-        cons.print(f"  [bold yellow]{label} exited {result.returncode}[/bold yellow] (see {log_file})")
-    return summary_lines
-
-
-def _run_dd_sym(case: dict, verrou_bin: str, sim_bin: str, work_dir: str, log_dir: str, threshold: float = None) -> list:
-    """Run verrou_dd_sym; return list of responsible symbol names."""
-    dd_bin = _find_dd_sym(verrou_bin)
-    if not dd_bin:
-        cons.print("  [dim]verrou_dd_sym not found; skipping delta-debug[/dim]")
-        return []
-
-    dd_dir = os.path.join(log_dir, case["name"])
-    os.makedirs(dd_dir, exist_ok=True)
-    dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
-    dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
-    _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
-    _write_dd_cmp_py(dd_cmp_py, case["compare"], threshold if threshold is not None else case["threshold"])
-    _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_sym.log", "dd.sym", "verrou_dd_sym")
-    cons.print(f"  [dim]dd_sym logs: {dd_dir}[/dim]")
-    return _parse_rddmin_syms(os.path.join(dd_dir, "dd.sym", "rddmin_summary"))
-
-
-def _run_dd_line(
-    case: dict,
-    verrou_bin: str,
-    sim_bin: str,
-    work_dir: str,
-    log_dir: str,
-    threshold: float = None,
-) -> list:
-    """Run verrou_dd_line; return list of (rel_path, start_line, end_line) tuples."""
-    dd_bin = _find_dd_line(verrou_bin)
-    if not dd_bin:
-        cons.print("  [dim]verrou_dd_line not found; skipping line-level debug[/dim]")
-        return []
-
-    dd_dir = os.path.join(log_dir, case["name"])
-    os.makedirs(dd_dir, exist_ok=True)
-    dd_run_sh = os.path.join(dd_dir, "dd_run.sh")
-    dd_cmp_py = os.path.join(dd_dir, "dd_cmp.py")
-    effective_threshold = threshold if threshold is not None else case["threshold"]
-    _write_dd_run_sh(dd_run_sh, verrou_bin, sim_bin, work_dir)
-    _write_dd_cmp_py(dd_cmp_py, case["compare"], effective_threshold)
-    _run_dd_tool(dd_bin, dd_dir, dd_run_sh, dd_cmp_py, _dd_env(verrou_bin), "dd_line.log", "dd.line", "verrou_dd_line")
-    return _parse_rddmin_locs(os.path.join(dd_dir, "dd.line", "rddmin_summary"))
+def _blank_result(name: str) -> dict:
+    """A result dict with every field at its empty/unmeasured default."""
+    return {
+        "name": name,
+        "passed": False,
+        "max_dev": float("inf"),
+        "sig_bits": None,
+        "float_proxy": None,
+        "vprec": [],
+        "cancellation_locs": [],
+        "cancellation_bits": {},
+        "cancellation_macro": {},
+        "float_max_locs": [],
+    }
 
 
 def _run_case(
@@ -947,64 +377,58 @@ def _run_case(
     sim_bin: str,
     pp_bin: str,
     n_samples: int,
-    log_dir: str,
     run_float: bool,
     run_vprec: bool,
-    run_dd_sym: bool,
-    run_dd_line: bool,
     run_cancellation: bool,
-    run_mca: bool,
     run_float_max: bool,
 ) -> dict:
     name = case["name"]
-    threshold = case["threshold"]
     compare = case["compare"]
 
     cons.print(f"[bold]{name}[/bold]: {case['description']}")
     cons.indent()
     if case["ill_cond"]:
         cons.print(f"  ill-conditioning: {case['ill_cond']}")
-    cons.print(f"  threshold: {threshold:.0e}")
+    cons.print(f"  pass floor: >= {MIN_SIG_BITS} significant bits retained")
 
     work_dir = tempfile.mkdtemp(prefix=f"mfc-fps-{name}-")
-    result = {
-        "name": name,
-        "passed": False,
-        "max_dev": float("inf"),
-        "threshold": threshold,
-        "float_proxy": None,
-        "vprec": [],
-        "dd_sym_syms": [],
-        "dd_line_locs": [],
-        "cancellation_locs": [],
-        "mca_dev": None,
-        "mca_sigbits": None,
-        "float_max_locs": [],
-    }
+    result = _blank_result(name)
     try:
         cons.print("  [dim]running pre_process...[/dim]")
         _write_inp(case["sim"], "simulation", work_dir)
         _run_preprocess(pp_bin, case["pre"], work_dir)
 
         ref_dir = os.path.join(work_dir, "ref")
-        os.makedirs(ref_dir)
         cons.print("  [dim]reference run (rounding=nearest)...[/dim]")
         _run_simulation_verrou(verrou_bin, sim_bin, work_dir, ref_dir, rounding_mode="nearest")
 
+        # For a user case with no fixed compare list, diff whatever the reference
+        # run actually wrote (conserved vars at the final step).
+        if not compare:
+            compare = _autodetect_compare(os.listdir(ref_dir))
+            case["compare"] = compare
+            if not compare:
+                raise MFCException("case produced no cons.*/prim.* output to compare (check t_step_save/t_step_stop and parallel_io)")
+            cons.print(f"  [dim]comparing: {', '.join(compare)}[/dim]")
+
         # --- A: random-rounding stability samples ---
+        # Pass/fail is scale-free: bits retained = -log2(max_dev / field-scale),
+        # vs one global floor (no per-case hand-tuned absolute threshold).
+        ref_scale = _max_abs_np(ref_dir, compare)
         max_dev = 0.0
         cons.print(f"  [dim]random-rounding runs (N={n_samples})...[/dim]")
         for i in range(n_samples):
             run_dir = os.path.join(work_dir, f"run_{i:02d}")
-            os.makedirs(run_dir)
             _run_simulation_verrou(verrou_bin, sim_bin, work_dir, run_dir, rounding_mode="random")
             max_dev = max(max_dev, _max_diff_np(ref_dir, run_dir, compare))
 
-        passed = max_dev <= threshold
+        sig_bits = _sig_bits(max_dev, ref_scale)
+        passed = sig_bits >= MIN_SIG_BITS
         result["passed"] = passed
         result["max_dev"] = max_dev
+        result["sig_bits"] = sig_bits
         tag = "[bold green]PASS[/bold green]" if passed else "[bold red]FAIL[/bold red]"
-        cons.print(f"  {tag}  max_dev={max_dev:.3e}  threshold={threshold:.0e}")
+        cons.print(f"  {tag}  {sig_bits:.1f} bits retained (floor {MIN_SIG_BITS})  max_dev={max_dev:.3e}")
 
         # --- B: float proxy ---
         if run_float:
@@ -1027,77 +451,52 @@ def _run_case(
                 marker = ""
                 if dev == float("inf"):
                     marker = "  [red]crashed[/red]"
-                elif dev > threshold:
+                elif _sig_bits(dev, ref_scale) < MIN_SIG_BITS:
                     marker = "  [red]FAIL[/red]"
                 cons.print(f"    {bits:2d} bits{label_str}: dev={dev:.3e}{marker}")
 
-        # --- D/E: delta-debug with float mode to find FP hotspots.
-        # dd_run.sh uses --rounding-mode=float (deterministic single-precision),
-        # so each bisection step is consistent and --nruns=1 suffices.  Threshold
-        # = float_proxy/10: the full instrumented set produces ~float_proxy
-        # deviation; excluding the responsible function drops it to near zero;
-        # any subset missing the responsible function gives SAME.
-        # Skip when float_proxy is unavailable or too small to localize.
-        float_proxy = result.get("float_proxy")
-        _DD_FLOAT_MIN = 1e-6
-        dd_threshold = float_proxy / 10.0 if float_proxy and float_proxy >= _DD_FLOAT_MIN else 0.0
-        if dd_threshold > 0 and (run_dd_sym or run_dd_line):
-            cons.print(f"  [dim]dd threshold: {dd_threshold:.1e} (float_proxy={float_proxy:.1e})[/dim]")
-        elif run_dd_sym or run_dd_line:
-            cons.print(f"  [dim]skipping dd: float_proxy={float_proxy} < {_DD_FLOAT_MIN:.0e}[/dim]")
-        if dd_threshold > 0 and run_dd_sym:
-            try:
-                result["dd_sym_syms"] = _run_dd_sym(case, verrou_bin, sim_bin, work_dir, log_dir, threshold=dd_threshold)
-            except Exception as exc:
-                cons.print(f"  [bold yellow]dd_sym error[/bold yellow]: {exc}")
-        if dd_threshold > 0 and run_dd_line:
-            try:
-                result["dd_line_locs"] = _run_dd_line(
-                    case,
-                    verrou_bin,
-                    sim_bin,
-                    work_dir,
-                    log_dir,
-                    threshold=dd_threshold,
-                )
-            except Exception as exc:
-                cons.print(f"  [bold yellow]dd_line error[/bold yellow]: {exc}")
-
-        # --- F: cancellation detection ---
+        # --- D: cancellation detection ---
         if run_cancellation:
             cons.print("  [dim]cancellation detection...[/dim]")
             try:
-                locs = _run_cancellation_check(case, verrou_bin, sim_bin, work_dir)
-                result["cancellation_locs"] = locs
-                if locs:
-                    cons.print(f"  cancellation: {len(locs)} unique source location(s)")
+                # sweep bit thresholds to get per-site severity (bits lost); each
+                # run returns None if it failed (distinct from [] = ran, found none)
+                level_sites = [(level, _run_cancellation_check(verrou_bin, sim_bin, work_dir, threshold=level)) for level in CANCEL_BIT_LEVELS]
+                locs = next((s for lvl, s in level_sites if lvl == CANCEL_BIT_LEVELS[0]), None)
+                if locs is None:
+                    cons.print("  [bold yellow]cancellation: detection run failed (see logs); not reported[/bold yellow]")
                 else:
-                    cons.print("  cancellation: none detected")
+                    bits = _cancellation_severity([(lvl, s) for lvl, s in level_sites if s is not None])
+                    result["cancellation_locs"] = locs
+                    result["cancellation_bits"] = bits
+                    # flag cancellation sites whose .fpp line is inside a #:for/#:def
+                    # expansion: the line maps to multiple generated instances, so the
+                    # report cannot pin it to a unique runtime instance.
+                    result["cancellation_macro"] = {(path, line): macro for (path, line) in locs if (macro := _macro_context(path, line))}
+                    if locs:
+                        worst = max(bits.values()) if bits else 0
+                        cons.print(f"  cancellation: {len(locs)} site(s), worst loses >= {worst / math.log2(10):.0f} of ~16 digits")
+                        n_macro = len(result["cancellation_macro"])
+                        if n_macro:
+                            cons.print(f"  [dim]{n_macro} inside fypp expansions - line maps to multiple instances[/dim]")
+                    else:
+                        cons.print("  cancellation: none detected")
             except Exception as exc:
                 cons.print(f"  [bold yellow]cancellation check error[/bold yellow]: {exc}")
 
-        # --- G: MCA significant-bits estimate ---
-        if run_mca:
-            cons.print(f"  [dim]MCA significant-bits estimate (N={n_samples})...[/dim]")
-            try:
-                mca_dev, mca_sigbits = _run_mca_samples(case, verrou_bin, sim_bin, work_dir, ref_dir, n_samples)
-                result["mca_dev"] = mca_dev
-                result["mca_sigbits"] = mca_sigbits
-                bits_str = f"~{mca_sigbits} sig bits" if mca_sigbits is not None else "n/a"
-                cons.print(f"  MCA: dev={mca_dev:.3e}  ({bits_str})")
-            except Exception as exc:
-                cons.print(f"  [bold yellow]MCA error[/bold yellow]: {exc}")
-
-        # --- H: float-max overflow detection ---
+        # --- E: float-max overflow detection ---
         if run_float_max:
             cons.print("  [dim]float-max overflow check...[/dim]")
             try:
-                locs = _run_float_max_check(case, verrou_bin, sim_bin, work_dir)
-                result["float_max_locs"] = locs
-                if locs:
-                    cons.print(f"  [bold yellow]float-max[/bold yellow]: {len(locs)} overflow site(s)")
+                locs = _run_float_max_check(verrou_bin, sim_bin, work_dir)
+                if locs is None:
+                    cons.print("  [bold yellow]float-max: run failed (see logs); not reported[/bold yellow]")
                 else:
-                    cons.print("  float-max: no overflows")
+                    result["float_max_locs"] = locs
+                    if locs:
+                        cons.print(f"  [bold yellow]float-max[/bold yellow]: {len(locs)} overflow site(s)")
+                    else:
+                        cons.print("  float-max: no overflows")
             except Exception as exc:
                 cons.print(f"  [bold yellow]float-max check error[/bold yellow]: {exc}")
 
@@ -1108,150 +507,71 @@ def _run_case(
     return result
 
 
-def _emit_github_annotations(results: list):
-    """Emit GitHub annotations for FP hotspots.
+# Verrou is ~30x slower and the suite runs the simulation many times, so a user
+# case must be a small, short, single-process proxy. Work = cells x time steps;
+# both a huge grid and a long run are rejected (built-in cases are ~1k cell-steps).
+FP_CASE_MAX_CELLS = 100_000
+FP_CASE_MAX_WORK = 200_000  # cells x t_step_stop
 
-    Only runs inside GitHub Actions (GITHUB_ACTIONS env var set). Annotations
-    appear inline on the responsible source lines in the PR diff view.
 
-    Up to 3 dd_line locations are emitted as ::warning:: per case (minimal
-    responsible lines from delta-debug).  Up to 3 cancellation sites per case
-    are emitted as ::notice:: so the diff also highlights subtraction-
-    cancellation hotspots identified by --check-cancellation.
+def _load_user_case(input_path: str) -> dict:
+    """Build a single fp-stability case from a user case .py.
+
+    The case is run as ONE serial CPU process under Verrou (so it must be small
+    and short - a coarsened proxy of a production run, not the real thing); a grid
+    too large to be feasible errors. The output files to compare are auto-detected
+    from the reference run, so 'compare' is left empty here.
     """
-    if not os.environ.get("GITHUB_ACTIONS"):
-        return
-    for r in results:
-        status = "FAIL" if not r["passed"] else "hotspot"
-        dev_str = f"max_dev={r['max_dev']:.2e} (threshold {r['threshold']:.0e})"
+    from .run import input as run_input  # lazy import: avoids a circular import
 
-        for rel_path, start, end in r.get("dd_line_locs", [])[:3]:
-            loc = f"file={rel_path},line={start}"
-            if end != start:
-                loc += f",endLine={end}"
-            title = f"FP {status} [{r['name']}]"
-            print(f"::warning {loc},title={title}::{dev_str}", flush=True)
+    params = run_input.load(input_path, None, {}, do_print=False).params
+    # Force serial .dat I/O: the suite runs the no-MPI binary as one process and
+    # diffs serial cons.*/prim.* files (not the parallel SILO/HDF5 path).
+    params["parallel_io"] = "F"
+    m, n, p = (int(params.get(k, 0) or 0) for k in ("m", "n", "p"))
+    cells = (m + 1) * (n + 1) * (p + 1)
+    t_stop = int(params.get("t_step_stop", 0) or 0)
+    work = cells * max(t_stop, 1)
+    if cells > FP_CASE_MAX_CELLS:
+        raise MFCException(f"case has {cells:,} cells - too large for Verrou (~30x slowdown, run many times). " f"Use a coarsened proxy (<= {FP_CASE_MAX_CELLS:,} cells).")
+    if work > FP_CASE_MAX_WORK:
+        raise MFCException(
+            f"case is ~{work:,} cell-steps ({cells:,} cells x {t_stop} time steps) - too slow under "
+            f"Verrou (~30x, run many times). Reduce m/n/p or t_step_stop (target <= {FP_CASE_MAX_WORK:,} cell-steps)."
+        )
+    stem = os.path.splitext(os.path.basename(input_path))[0]
+    if stem == "case":  # examples/<name>/case.py - the dir name is more telling
+        stem = os.path.basename(os.path.dirname(os.path.abspath(input_path))) or stem
+    return {
+        "name": stem,
+        "description": f"user case {input_path} ({cells} cells, run single-rank on CPU)",
+        "compare": [],  # auto-detected from the reference run's output
+        "ill_cond": "",
+        "pre": params,
+        "sim": params,
+    }
 
-        for fname, lineno in r.get("cancellation_locs", [])[:3]:
-            loc = f"file={fname},line={lineno}"
-            title = f"FP cancellation [{r['name']}]"
-            print(f"::notice {loc},title={title}::catastrophic cancellation site", flush=True)
 
-
-def _emit_github_summary(results: list, n_samples: int):
-    """Write a markdown results table to GITHUB_STEP_SUMMARY.
-
-    Visible directly in the Actions run UI without downloading artifacts.
-    Includes: pass/fail, max_dev, float proxy, VPREC sweep (failing levels),
-    and dd_line source locations for any failing cases.
-    """
-    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not summary_path:
-        return
-
-    n_pass = sum(1 for r in results if r["passed"])
-    n_fail = len(results) - n_pass
-
-    md = []
-    md.append("## FP Stability Results\n")
-    md.append(f"**{n_pass} passed, {n_fail} failed** — {n_samples} random-rounding samples per case\n")
-
-    # Main results table
-    md.append("| Case | Status | max\\_dev | threshold | Float proxy | MCA sig bits |")
-    md.append("|------|:------:|--------:|--------:|--------:|:------:|")
-    for r in results:
-        status = "✅" if r["passed"] else "❌"
-        fp = f"{r['float_proxy']:.2e}" if r["float_proxy"] is not None else "—"
-        sb = str(r["mca_sigbits"]) if r.get("mca_sigbits") is not None else "—"
-        md.append(f"| `{r['name']}` | {status} | {r['max_dev']:.2e} | {r['threshold']:.0e} | {fp} | {sb} |")
-    md.append("")
-
-    # VPREC sweep — one column per bit level, ❌ where dev > threshold
-    if any(r["vprec"] for r in results):
-        _labels = {52: "52b", 23: "23b", 16: "16b", 10: "10b"}
-        header = " | ".join(_labels[b] for b in VPREC_MANTISSA_BITS)
-        sep = " | ".join(":---:" for _ in VPREC_MANTISSA_BITS)
-        md.append("### VPREC precision sweep\n")
-        md.append(f"| Case | {header} |")
-        md.append(f"|------|{sep}|")
-        for r in results:
-            vmap = {b: d for b, d in r["vprec"]}
-            cols = []
-            for b in VPREC_MANTISSA_BITS:
-                d = vmap.get(b)
-                if d is None:
-                    cols.append("—")
-                elif d == float("inf"):
-                    cols.append("💥 crash")
-                else:
-                    cols.append(f"{d:.2e}")
-            md.append(f"| `{r['name']}` | {' | '.join(cols)} |")
-        md.append("")
-
-    # dd_line hotspot sources — always shown (top 10 per case) with source context
-    cases_with_locs = [r for r in results if r["dd_line_locs"]]
-    if cases_with_locs:
-        md.append("### Top FP hotspots (dd\\_line)\n")
-        for r in cases_with_locs:
-            status = "❌ FAIL" if not r["passed"] else "✅ pass"
-            md.append(f"**`{r['name']}`** ({status})\n")
-            for rel_path, start, end in r["dd_line_locs"][:10]:
-                loc = f"{rel_path}:{start}" if start == end else f"{rel_path}:{start}-{end}"
-                md.append(f"- `{loc}`")
-                snippet = _get_source_context(rel_path, start)
-                if snippet:
-                    md.append("  ```fortran")
-                    for line in snippet.splitlines():
-                        md.append(f"  {line}")
-                    md.append("  ```")
-            md.append("")
-
-    # dd_sym function names (collapsed, since less actionable than dd_line)
-    cases_with_syms = [r for r in results if r["dd_sym_syms"]]
-    if cases_with_syms:
-        md.append("<details>")
-        md.append("<summary>Responsible functions (dd_sym)</summary>\n")
-        for r in cases_with_syms:
-            md.append(f"\n**`{r['name']}`**\n")
-            for sym in r["dd_sym_syms"]:
-                md.append(f"- `{sym}`")
-        md.append("\n</details>\n")
-
-    # Cancellation hotspots
-    cases_with_cancel = [r for r in results if r.get("cancellation_locs")]
-    if cases_with_cancel:
-        md.append("### Catastrophic cancellation sites\n")
-        for r in cases_with_cancel:
-            md.append(f"**`{r['name']}`** — {len(r['cancellation_locs'])} site(s)\n")
-            for fname, lineno in r["cancellation_locs"][:15]:
-                md.append(f"- `{fname}:{lineno}`")
-                snippet = _get_source_context(fname, lineno)
-                if snippet:
-                    md.append("  ```fortran")
-                    for line in snippet.splitlines():
-                        md.append(f"  {line}")
-                    md.append("  ```")
-            md.append("")
-
-    # Float-max overflow sites
-    cases_with_fmax = [r for r in results if r.get("float_max_locs")]
-    if cases_with_fmax:
-        md.append("### Float32 overflow sites (check\\_max\\_float)\n")
-        for r in cases_with_fmax:
-            md.append(f"**`{r['name']}`** — {len(r['float_max_locs'])} site(s)\n")
-            for fname, lineno in r["float_max_locs"][:10]:
-                md.append(f"- `{fname}:{lineno}`")
-            md.append("")
-
-    with open(summary_path, "a") as f:
-        f.write("\n".join(md) + "\n")
+def _install_verrou() -> str:
+    """Verrou is absent: install it via the bootstrap (downloads a pinned, hash-verified
+    prebuilt; source build as fallback) and return the valgrind path. Aborts on failure -
+    fp-stability cannot run without Verrou, so this is a hard error, not a skip."""
+    script = os.path.join(MFC_ROOT_DIR, "toolchain", "bootstrap", "verrou.sh")
+    cons.print("[bold]Verrou not found - installing it (downloads a prebuilt artifact, ~seconds; source build as fallback)...[/bold]")
+    if subprocess.run(["bash", script], check=False).returncode != 0:
+        raise MFCException("Verrou install failed (see output above). Fix the issue and re-run, install manually with `bash toolchain/bootstrap/verrou.sh`, or pass --verrou-binary PATH.")
+    verrou_bin = _find_verrou()
+    if not verrou_bin or not os.path.isfile(verrou_bin):
+        raise MFCException("Verrou install reported success but no valgrind binary was found under $VERROU_HOME.")
+    return verrou_bin
 
 
 def fp_stability():
     verrou_bin = ARG("verrou_binary") or _find_verrou()
-    if not verrou_bin or not os.path.isfile(verrou_bin):
-        cons.print("[bold yellow]SKIP[/bold yellow]: verrou not found. Install at $HOME/.local/verrou or set VERROU_HOME.")
-        sys.exit(0)
+    if not verrou_bin or not (os.path.isfile(verrou_bin) and os.access(verrou_bin, os.X_OK)):
+        if ARG("verrou_binary"):
+            raise MFCException(f"--verrou-binary {ARG('verrou_binary')!r} not found or not executable.")
+        verrou_bin = _install_verrou()
 
     sim_bin = ARG("sim_binary") or _find_binary("simulation")
     if not sim_bin or not os.path.isfile(sim_bin):
@@ -1264,11 +584,10 @@ def fp_stability():
     n_samples = ARG("samples")
     run_float = not ARG("no_float_proxy")
     run_vprec = not ARG("no_vprec")
-    run_dd_sym = not ARG("no_dd_sym")
-    run_dd_line = not ARG("no_dd_line")
     run_cancellation = not ARG("no_cancellation")
-    run_mca = not ARG("no_mca")
     run_float_max = not ARG("no_float_max")
+
+    cases_to_run = [_load_user_case(ARG("input"))] if ARG("input") else CASES
 
     log_dir = os.path.join(MFC_ROOT_DIR, "fp-stability-logs")
     os.makedirs(log_dir, exist_ok=True)
@@ -1278,20 +597,16 @@ def fp_stability():
     cons.print(f"  verrou:      {verrou_bin}")
     cons.print(f"  simulation:  {sim_bin}")
     cons.print(f"  pre_process: {pp_bin}")
+    if ARG("input"):
+        cons.print(f"  case:        {ARG('input')}  (single serial CPU run under Verrou)")
     cons.print(f"  samples:     {n_samples}")
     features = []
     if run_float:
         features.append("float-proxy")
     if run_vprec:
         features.append("vprec-sweep")
-    if run_dd_sym:
-        features.append("dd_sym")
-    if run_dd_line:
-        features.append("dd_line")
     if run_cancellation:
         features.append("cancellation")
-    if run_mca:
-        features.append("mca-sigbits")
     if run_float_max:
         features.append("float-max")
     cons.print(f"  features:    {', '.join(features) if features else 'stability only'}")
@@ -1300,7 +615,7 @@ def fp_stability():
 
     start = time.time()
     results = []
-    for case in CASES:
+    for case in cases_to_run:
         try:
             r = _run_case(
                 case,
@@ -1308,31 +623,14 @@ def fp_stability():
                 sim_bin,
                 pp_bin,
                 n_samples,
-                log_dir,
                 run_float,
                 run_vprec,
-                run_dd_sym,
-                run_dd_line,
                 run_cancellation,
-                run_mca,
                 run_float_max,
             )
         except MFCException as exc:
             cons.print(f"  [bold red]ERROR[/bold red]: {exc}")
-            r = {
-                "name": case["name"],
-                "passed": False,
-                "max_dev": float("inf"),
-                "threshold": case["threshold"],
-                "float_proxy": None,
-                "vprec": [],
-                "dd_sym_syms": [],
-                "dd_line_locs": [],
-                "cancellation_locs": [],
-                "mca_dev": None,
-                "mca_sigbits": None,
-                "float_max_locs": [],
-            }
+            r = _blank_result(case["name"])
         results.append(r)
 
     elapsed = time.time() - start
@@ -1341,11 +639,8 @@ def fp_stability():
 
     cons.print(f"[bold]Results[/bold] ({elapsed:.0f}s):  [green]{n_pass} passed[/green]  [red]{n_fail} failed[/red]")
     for r in results:
-        mark = "[green]✓[/green]" if r["passed"] else "[red]✗[/red]"
-        cons.print(f"  {mark} {r['name']}")
-
-    if n_fail > 0:
-        cons.print(f"\n  dd_sym/dd_line logs in: {log_dir}")
+        mark = "[green]PASS[/green]" if r["passed"] else "[red]FAIL[/red]"
+        cons.print(f"  {mark}  {r['name']}")
 
     _emit_github_summary(results, n_samples)
     _emit_github_annotations(results)

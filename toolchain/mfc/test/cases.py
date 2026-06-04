@@ -915,10 +915,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         common_mods = {
             "t_step_stop": Nt,
             "t_step_save": Nt,
-            "patch_ib(1)%model_scale(1)": 5.0,
-            "patch_ib(1)%model_scale(2)": 5.0,
-            "patch_ib(1)%model_scale(3)": 5.0,
-            "patch_ib(1)%model_threshold": 0.5,
+            "num_stl_models": 1,
+            "patch_ib(1)%model_id": 1,
+            "stl_models(1)%model_scale(1)": 5.0,
+            "stl_models(1)%model_scale(2)": 5.0,
+            "stl_models(1)%model_scale(3)": 5.0,
+            "stl_models(1)%model_threshold": 0.5,
         }
 
         for ndim in range(2, 4):

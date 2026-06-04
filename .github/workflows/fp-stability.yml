@@ -24,8 +24,9 @@ name: FP Stability
 # On FAIL: verrou_dd_sym runs to identify the responsible function symbols.
 # Logs are uploaded as CI artifacts.
 #
-# Verrou (Valgrind 3.26.0 + edf-hpc/verrou@a58d434) is built once and cached.
-# Build takes ~20 min uncached; cached runs restore in ~30 s.
+# Verrou (the pinned Valgrind+Verrou pair; versions live in toolchain/bootstrap/verrou.sh)
+# is installed by fp-stability on first use and cached. The prebuilt download is seconds;
+# a cache miss with no prebuilt falls back to a ~20-min source build.
 
 on:
   push:
@@ -68,37 +69,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/verrou
-          key: verrou-a58d434-valgrind-3.26.0-${{ runner.os }}
+          # Key off the installer's content so any version bump (or other edit) in
+          # verrou.sh auto-busts the cache and forces a fresh install — no hand-synced
+          # version string to drift out of date.
+          key: verrou-${{ hashFiles('toolchain/bootstrap/verrou.sh') }}-${{ runner.os }}
 
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
             build-essential automake python3 python3-numpy libc6-dbg \
-            cmake gfortran
+            cmake gfortran zstd
 
-      - name: Build Verrou
-        if: steps.cache-verrou.outputs.cache-hit != 'true'
-        run: |
-          cd /tmp
-          wget -q https://sourceware.org/pub/valgrind/valgrind-3.26.0.tar.bz2
-          tar xf valgrind-3.26.0.tar.bz2
-
-          git clone https://github.com/edf-hpc/verrou.git
-          git -C verrou checkout a58d434
-
-          # Merge Verrou into Valgrind source tree and patch
-          cp -r verrou valgrind-3.26.0/verrou
-          cd valgrind-3.26.0
-          cat verrou/valgrind.*diff | patch -p1
-
-          ./autogen.sh
-          ./configure --enable-only64bit --prefix="$HOME/.local/verrou"
-          make -j"$(nproc)"
-          make install
-
-      - name: Verify Verrou
-        run: ~/.local/verrou/bin/valgrind --version
+      # Verrou is installed by `fp-stability` itself on first use (downloads the
+      # prebuilt artifact; aborts if that fails). The cache above restores it across
+      # runs so the download only happens on a cache miss.
 
       - name: Build MFC (debug, serial)
         # FFLAGS=-fno-inline prevents gfortran from inlining small functions into

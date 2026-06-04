@@ -269,6 +269,29 @@ module m_derived_types
         real(wp)                 :: model_threshold  !< Threshold to turn on smoothen STL patch.
     end type ic_patch_parameters
 
+    !> User-input parameters for a NACA 4-digit airfoil (namelist-safe: scalars only)
+    type ib_airfoil_parameters
+        real(wp) :: c = dflt_real  !< chord length
+        real(wp) :: p = dflt_real  !< maximum camber position (fraction of chord)
+        real(wp) :: t = dflt_real  !< maximum thickness (fraction of chord)
+        real(wp) :: m = dflt_real  !< maximum camber (fraction of chord)
+    end type ib_airfoil_parameters
+
+    !> Computed surface grid for a NACA airfoil (simulation-only, not in namelist)
+    type ib_airfoil_grid
+        integer                    :: Np = 0    !< number of surface grid points per surface
+        type(vec3_dt), allocatable :: upper(:)  !< upper surface grid points (1:Np)
+        type(vec3_dt), allocatable :: lower(:)  !< lower surface grid points (1:Np)
+    end type ib_airfoil_grid
+
+    !> User-input parameters for an STL/OBJ immersed boundary model (namelist-safe: scalars + fixed arrays)
+    type ib_stl_parameters
+        character(LEN=pathlen_max) :: model_filepath   !< Path to the STL file relative to case_dir.
+        real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
+        real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
+        real(wp)                   :: model_threshold  !< Threshold to turn on smooth STL patch.
+    end type ib_stl_parameters
+
     type ib_patch_parameters
         integer  :: geometry                            !< Type of geometry for the patch
         integer  :: gbl_patch_id
@@ -283,20 +306,11 @@ module m_derived_types
         real(wp), dimension(1:3,1:3) :: rotation_matrix
         !> matrix that converts from fluid reference frame to IB reference frame
         real(wp), dimension(1:3,1:3) :: rotation_matrix_inverse
-        real(wp)                     :: c, p, t, m
-        real(wp)                     :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
-        real(wp)                     :: radius                        !< Dimensions of the patch. radius.
-        real(wp)                     :: theta
-        logical                      :: slip
-
-        ! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath   !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
-        !> Angle to rotate the STL object along each cartesian coordinate axis, in radians.
-        real(wp), dimension(1:3) :: model_rotate
-        integer :: model_spc  !< Number of samples per cell to use when discretizing the STL object.
-        real(wp) :: model_threshold  !< Threshold to turn on smoothen STL patch. Patch conditions for moving imersed boundaries
+        integer :: airfoil_id  !< index into ib_airfoil(:) for airfoil geometry patches
+        integer :: model_id  !< index into stl_models(:) for STL/OBJ geometry patches
+        real(wp) :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
+        real(wp) :: radius  !< Dimensions of the patch. radius.
+        logical :: slip
         integer :: moving_ibm  !< 0 for no moving, 1 for moving, 2 for moving on forced path
         real(wp) :: mass, moment  !< mass and moment of inertia of object used to compute forces in 2-way coupling
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB

@@ -88,7 +88,8 @@ class TestRegistryJsonSchema(unittest.TestCase):
         valid_names = [
             "patch_ib(1)%geometry",
             "patch_ib(99)%vel(1)",
-            "patch_ib(5)%model_translate(2)",
+            "patch_ib(5)%model_id",
+            "stl_models(1)%model_translate(2)",
             "patch_ib(1000)%radius",
         ]
         for name in valid_names:
