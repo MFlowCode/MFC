@@ -80,6 +80,20 @@ def test_sig_bits_is_scale_free():
     assert abs(_sig_bits(1e-9, 1.0) - _sig_bits(1e-4, 1e5)) < 1e-9
 
 
+def test_source_snippet_marks_line_with_context(tmp_path):
+    from mfc.fp_stability_metrics import _source_snippet
+
+    f = tmp_path / "m_x.fpp"
+    f.write_text("".join(f"line{i}\n" for i in range(1, 11)))
+    rows = _source_snippet(str(f), 5, context=2).splitlines()
+    assert len(rows) == 5  # lines 3..7
+    assert rows[2].startswith(">") and "line5" in rows[2]
+    assert "line3" in rows[0] and "line7" in rows[-1]
+    # unresolvable file or out-of-range line must degrade to '' (no snippet)
+    assert _source_snippet(str(tmp_path / "nope.fpp"), 5) == ""
+    assert _source_snippet(str(f), 99) == ""
+
+
 def test_sig_bits_zero_scale_is_safe():
     # a zero/degenerate field scale must not divide-by-zero; report full precision
     assert _sig_bits(1e-12, 0.0) == 53.0

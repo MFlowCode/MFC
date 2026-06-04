@@ -11,7 +11,17 @@ from .fp_stability_metrics import (
     MIN_SIG_BITS,
     VPREC_MANTISSA_BITS,
     _digits_left,
+    _source_snippet,
 )
+
+
+def _snippet_md(fname: str, lineno: int) -> list:
+    """Markdown lines for a source excerpt nested under a list item (2-space
+    indented fenced block), or [] if the source cannot be resolved."""
+    snippet = _source_snippet(fname, lineno)
+    if not snippet:
+        return []
+    return ["", "  ```f90", *("  " + ln for ln in snippet.splitlines()), "  ```", ""]
 
 
 def _emit_github_annotations(results: list):
@@ -102,7 +112,9 @@ def _emit_github_summary(results: list, n_samples: int, log_dir: str = None):
         for r in cases_with_cancel:
             site_bits = r.get("cancellation_bits") or {}
             macro_sites = r.get("cancellation_macro") or {}
-            sites = [{"where": f"{fname}:{lineno}", "bits": site_bits.get((fname, lineno), 0), "macro": macro_sites.get((fname, lineno))} for fname, lineno in r["cancellation_locs"]]
+            sites = [
+                {"where": f"{fname}:{lineno}", "loc": (fname, lineno), "bits": site_bits.get((fname, lineno), 0), "macro": macro_sites.get((fname, lineno))} for fname, lineno in r["cancellation_locs"]
+            ]
             ordered = sorted(sites, key=lambda e: (-e["bits"], e["where"]))
             if ordered:
                 w = ordered[0]
@@ -111,6 +123,7 @@ def _emit_github_summary(results: list, n_samples: int, log_dir: str = None):
                 lost = e["bits"] / math.log2(10)
                 ambiguous = f" - _{e['macro']}-expanded, may represent multiple instances_" if e["macro"] else ""
                 md.append(f"- **>= {lost:.0f} digits lost** (~{_digits_left(e['bits']):.0f} of 16 left) - `{e['where']}`{ambiguous}")
+                md.extend(_snippet_md(*e["loc"]))
             footer = _more_md(len(ordered), 15, "site(s)")
             if footer:
                 md.append(footer)
@@ -147,6 +160,7 @@ def _emit_github_summary(results: list, n_samples: int, log_dir: str = None):
             md.append(f"**`{r['name']}`** - {len(r['float_max_locs'])} site(s)\n")
             for fname, lineno in r["float_max_locs"][:10]:
                 md.append(f"- `{fname}:{lineno}`")
+                md.extend(_snippet_md(fname, lineno))
             footer = _more_md(len(r["float_max_locs"]), 10, "site(s)")
             if footer:
                 md.append(footer)

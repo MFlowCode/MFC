@@ -113,6 +113,18 @@ def _macro_context_in_lines(lines: list, lineno: int) -> str:
     return None
 
 
+def _source_snippet(fname: str, lineno: int, context: int = 3) -> str:
+    """Return a line-numbered source excerpt around `lineno` (1-based), the marked
+    line prefixed with '>', or '' if the file cannot be resolved or the line is
+    out of range. Used to show the offending code inline in reports."""
+    lines = _read_source_lines(fname)
+    if not lines or not 1 <= lineno <= len(lines):
+        return ""
+    beg = max(1, lineno - context)
+    end = min(len(lines), lineno + context)
+    return "\n".join(f"{'>' if i == lineno else ' '}{i:5d} | {lines[i - 1].rstrip()}" for i in range(beg, end + 1))
+
+
 def _macro_context(fname: str, lineno: int) -> str:
     """File-backed wrapper around _macro_context_in_lines; '' path safe."""
     lines = _read_source_lines(fname)
