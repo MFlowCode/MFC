@@ -595,6 +595,17 @@ class CaseValidator:
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
+        for i in range(1, num_particle_clouds + 1):
+            packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            self.prohibit(
+                packing_method is None,
+                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling)",
+            )
+            self.prohibit(
+                packing_method is not None and packing_method not in [1],
+                f"particle_cloud({i})%packing_method must be 1 (rejection sampling is the only supported method)",
+            )
+
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
         num_stl_models = self.get("num_stl_models", 0)
