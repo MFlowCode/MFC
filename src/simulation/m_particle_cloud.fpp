@@ -19,9 +19,7 @@ module m_particle_cloud
 
 contains
 
-    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Uses a spatial
-    !! hash grid (cell size = min_dist) so each candidate requires only 3^dim distance checks on average instead of O(n). The
-    !! placement is fully deterministic given the per-bed seed, so all ranks produce an identical result without MPI.
+    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array.
     impure subroutine s_generate_particle_clouds(particle_cloud_ibs)
 
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
@@ -56,6 +54,7 @@ contains
 
     end subroutine s_generate_particle_clouds
 
+    !> Generates a random distributions of particles in a box with a minimum spacing
     subroutine s_particle_cloud_random_box(cloud_idx, ib_idx, particle_cloud_ibs)
 
         integer, intent(in)                                    :: cloud_idx
