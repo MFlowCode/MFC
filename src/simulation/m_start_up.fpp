@@ -42,7 +42,7 @@ module m_start_up
     use m_ibm
     use m_ib_patches
     use m_model
-    use m_particle_bed
+    use m_particle_cloud
     use m_collisions
     use m_compile_specific
     use m_checker_common
@@ -872,21 +872,21 @@ contains
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             block
-                type(ib_patch_parameters), allocatable :: particle_bed_ibs(:)
+                type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
 
                 if (cfl_dt .and. n_start > 0) then
                     call s_read_ib_restart_data(n_start)
-                    allocate (particle_bed_ibs(0))
+                    allocate (particle_cloud_ibs(0))
                 else if (t_step_start > 0) then
                     call s_read_ib_restart_data(t_step_start)
-                    allocate (particle_bed_ibs(0))
+                    allocate (particle_cloud_ibs(0))
                 else
-                    call s_generate_particle_beds(particle_bed_ibs)
+                    call s_generate_particle_clouds(particle_cloud_ibs)
                 end if
                 call s_instantiate_STL_models()
                 call s_initialize_ib_airfoils()
-                call s_reduce_ib_patch_array(particle_bed_ibs)
-                deallocate (particle_bed_ibs)
+                call s_reduce_ib_patch_array(particle_cloud_ibs)
+                deallocate (particle_cloud_ibs)
             end block
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
@@ -1158,20 +1158,20 @@ contains
 
     end subroutine s_read_ib_restart_data
 
-    !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_bed_ibs (CPU-only, exact size)
-    !! and reduces to only the patches in or near the local computational domain. patch_ib is never reallocated; the local subset is
-    !! written in-place from the front. particle_bed_ibs is owned by the caller and freed there after this returns.
-    subroutine s_reduce_ib_patch_array(particle_bed_ibs)
+    !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_cloud_ibs (CPU-only, exact
+    !! size) and reduces to only the patches in or near the local computational domain. patch_ib is never reallocated; the local
+    !! subset is written in-place from the front. particle_cloud_ibs is owned by the caller and freed there after this returns.
+    subroutine s_reduce_ib_patch_array(particle_cloud_ibs)
 
-        type(ib_patch_parameters), intent(in), dimension(:) :: particle_bed_ibs
+        type(ib_patch_parameters), intent(in), dimension(:) :: particle_cloud_ibs
         real(wp), dimension(3)                              :: centroid
         integer                                             :: i
         integer                                             :: num_namelist_ibs, num_bed_ibs
 
         num_namelist_ibs = num_ibs
         num_bed_ibs = 0
-        do i = 1, num_particle_beds
-            num_bed_ibs = num_bed_ibs + particle_bed(i)%num_particles
+        do i = 1, num_particle_clouds
+            num_bed_ibs = num_bed_ibs + particle_cloud(i)%num_particles
         end do
 
         ! Check for moving IBs across both namelist and particle bed patches.
@@ -1184,7 +1184,7 @@ contains
         end do
         if (.not. moving_immersed_boundary_flag) then
             do i = 1, num_bed_ibs
-                if (particle_bed_ibs(i)%moving_ibm /= 0) then
+                if (particle_cloud_ibs(i)%moving_ibm /= 0) then
                     moving_immersed_boundary_flag = .true.
                     exit
                 end if
@@ -1202,7 +1202,7 @@ contains
             @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
                        & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
             do i = 1, num_bed_ibs
-                patch_ib(num_namelist_ibs + i) = particle_bed_ibs(i)
+                patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
                 patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
             end do
             num_ibs = num_gbl_ibs
@@ -1228,13 +1228,13 @@ contains
                 end if
             end do
             do i = 1, num_bed_ibs
-                centroid = [particle_bed_ibs(i)%x_centroid, particle_bed_ibs(i)%y_centroid, 0._wp]
-                if (num_dims == 3) centroid(3) = particle_bed_ibs(i)%z_centroid
+                centroid = [particle_cloud_ibs(i)%x_centroid, particle_cloud_ibs(i)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = particle_cloud_ibs(i)%z_centroid
                 if (f_neighborhood_ranks_own_location(centroid)) then
                     num_ibs = num_ibs + 1
                     @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
                                & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-                    patch_ib(num_ibs) = particle_bed_ibs(i)
+                    patch_ib(num_ibs) = particle_cloud_ibs(i)
                     patch_ib(num_ibs)%gbl_patch_id = num_namelist_ibs + i
                     if (f_local_rank_owns_location(centroid)) then
                         num_local_ibs = num_local_ibs + 1
@@ -1250,7 +1250,7 @@ contains
         @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
                    & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
         do i = 1, num_bed_ibs
-            patch_ib(num_namelist_ibs + i) = particle_bed_ibs(i)
+            patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
             patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
         end do
         num_ibs = num_gbl_ibs
