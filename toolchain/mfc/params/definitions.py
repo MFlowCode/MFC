@@ -34,7 +34,7 @@ NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max", 54000)  # patch_ib (Fortran array bound)
 NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
 NSM = _fc("num_stl_models_max", 10)  # stl_models (Fortran array bound)
-NPB = _fc("num_particle_beds_max", 10)  # particle_bed (Fortran array bound)
+NPB = _fc("num_particle_clouds_max", 10)  # particle_cloud (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -610,7 +610,7 @@ def _load():
     # Immersed boundary
     _r("num_ibs", INT, {"ib"})
     _r("num_stl_models", INT, {"ib"})
-    _r("num_particle_beds", INT, {"ib"})
+    _r("num_particle_clouds", INT, {"ib"})
     _r("ib_neighborhood_radius", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
@@ -913,7 +913,7 @@ def _load():
         )
     )
 
-    # particle_bed — compact bed specification that expands into individual patch_ib spheres/circles at startup
+    # particle_cloud — compact bed specification that expands into individual patch_ib spheres/circles at startup
     _pb_tags = {"ib"}
     _pb_attrs: Dict[str, tuple] = {}
     for _d in ["x", "y", "z"]:
@@ -925,9 +925,10 @@ def _load():
     _pb_attrs["min_spacing"] = (REAL, _pb_tags)
     _pb_attrs["moving_ibm"] = (INT, _pb_tags)
     _pb_attrs["seed"] = (INT, _pb_tags)
+    _pb_attrs["packing_method"] = (INT, _pb_tags)
     REGISTRY.register_family(
         IndexedFamily(
-            base_name="particle_bed",
+            base_name="particle_cloud",
             attrs=_pb_attrs,
             tags=_pb_tags,
             max_index=NPB,
@@ -1251,9 +1252,9 @@ _nv(
     "coefficient_of_restitution",
     "collision_time",
     "ib_coefficient_of_friction",
-    "num_particle_beds",
+    "num_particle_clouds",
     "ib_neighborhood_radius",
-    "particle_bed",
+    "particle_cloud",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",

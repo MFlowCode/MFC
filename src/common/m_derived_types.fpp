@@ -320,7 +320,7 @@ module m_derived_types
         real(wp), dimension(1:3) :: step_angular_vel  !< velocity array used to store intermediate steps in the time_stepper module
     end type ib_patch_parameters
 
-    type particle_bed_parameters
+    type particle_cloud_parameters
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Center of the particle bed region
         real(wp) :: length_x, length_y, length_z  !< Dimensions of the particle bed region
         integer  :: num_particles  !< Number of particles to generate
@@ -329,7 +329,8 @@ module m_derived_types
         real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
-    end type particle_bed_parameters
+        integer  :: packing_method  !< Packing algorithm: 1=rejection sampling
+    end type particle_cloud_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.

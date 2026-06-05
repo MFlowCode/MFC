@@ -1,11 +1,11 @@
 !>
-!! @file m_particle_bed.fpp
-!! @brief Generates particle beds: converts particle_bed specifications into
-!!        individual sphere/circle particle_bed_ibs entries before reduction.
+!! @file m_particle_cloud.fpp
+!! @brief Generates particle beds: converts particle_cloud specifications into
+!!        individual sphere/circle particle_cloud_ibs entries before reduction.
 
-!> @brief Generates particle beds by converting particle_bed patch specifications into individual immersed boundary patches before
+!> @brief Generates particle beds by converting particle_cloud patch specifications into individual immersed boundary patches before
 !! domain reduction. Each rank runs the same deterministic placement so no MPI broadcast of particle positions is needed.
-module m_particle_bed
+module m_particle_cloud
 
     use m_global_parameters
     use m_constants
@@ -15,16 +15,16 @@ module m_particle_bed
 
     private
 
-    public :: s_generate_particle_beds
+    public :: s_generate_particle_clouds
 
 contains
 
-    !> Generate all particle beds and fill particle_bed_ibs. Called on all ranks before s_reduce_ib_patch_array. Uses a spatial hash
-    !! grid (cell size = min_dist) so each candidate requires only 3^dim distance checks on average instead of O(n). The placement
-    !! is fully deterministic given the per-bed seed, so all ranks produce an identical result without MPI.
-    impure subroutine s_generate_particle_beds(particle_bed_ibs)
+    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Uses a spatial
+    !! hash grid (cell size = min_dist) so each candidate requires only 3^dim distance checks on average instead of O(n). The
+    !! placement is fully deterministic given the per-bed seed, so all ranks produce an identical result without MPI.
+    impure subroutine s_generate_particle_clouds(particle_cloud_ibs)
 
-        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_bed_ibs
+        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
         integer                                                           :: b, ib_idx, geom
         integer                                                           :: n_placed, n_total_placed, n_total_particles
         integer(8)                                                        :: n_attempts, max_attempts
@@ -41,32 +41,32 @@ contains
         integer              :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
         integer, allocatable :: hash_head(:), chain_next(:)
 
-        if (num_particle_beds == 0) then
-            allocate (particle_bed_ibs(0))
+        if (num_particle_clouds == 0) then
+            allocate (particle_cloud_ibs(0))
             return
         end if
 
         call cpu_time(t_start)
         n_total_placed = 0
 
-        ! Pre-count total particles across all beds so particle_bed_ibs can be allocated exactly once.
+        ! Pre-count total particles across all beds so particle_cloud_ibs can be allocated exactly once.
         n_total_particles = 0
-        do b = 1, num_particle_beds
-            n_total_particles = n_total_particles + particle_bed(b)%num_particles
+        do b = 1, num_particle_clouds
+            n_total_particles = n_total_particles + particle_cloud(b)%num_particles
         end do
-        allocate (particle_bed_ibs(n_total_particles))
+        allocate (particle_cloud_ibs(n_total_particles))
 
-        ib_idx = 0  ! index into particle_bed_ibs
+        ib_idx = 0  ! index into particle_cloud_ibs
 
-        do b = 1, num_particle_beds
-            xmin = particle_bed(b)%x_centroid - 0.5_wp*particle_bed(b)%length_x
-            xmax = particle_bed(b)%x_centroid + 0.5_wp*particle_bed(b)%length_x
-            ymin = particle_bed(b)%y_centroid - 0.5_wp*particle_bed(b)%length_y
-            ymax = particle_bed(b)%y_centroid + 0.5_wp*particle_bed(b)%length_y
-            zmin = particle_bed(b)%z_centroid - 0.5_wp*particle_bed(b)%length_z
-            zmax = particle_bed(b)%z_centroid + 0.5_wp*particle_bed(b)%length_z
+        do b = 1, num_particle_clouds
+            xmin = particle_cloud(b)%x_centroid - 0.5_wp*particle_cloud(b)%length_x
+            xmax = particle_cloud(b)%x_centroid + 0.5_wp*particle_cloud(b)%length_x
+            ymin = particle_cloud(b)%y_centroid - 0.5_wp*particle_cloud(b)%length_y
+            ymax = particle_cloud(b)%y_centroid + 0.5_wp*particle_cloud(b)%length_y
+            zmin = particle_cloud(b)%z_centroid - 0.5_wp*particle_cloud(b)%length_z
+            zmax = particle_cloud(b)%z_centroid + 0.5_wp*particle_cloud(b)%length_z
 
-            min_dist = 2._wp*particle_bed(b)%radius + particle_bed(b)%min_spacing
+            min_dist = 2._wp*particle_cloud(b)%radius + particle_cloud(b)%min_spacing
 
             if (p == 0) then
                 geom = 2  ! circle for 2D
@@ -78,29 +78,29 @@ contains
                 dz_hi = 1
             end if
 
-            max_attempts = int(particle_bed(b)%num_particles, 8)*1000_8
+            max_attempts = int(particle_cloud(b)%num_particles, 8)*1000_8
             n_placed = 0
             n_attempts = 0
-            seed = particle_bed(b)%seed
+            seed = particle_cloud(b)%seed
             if (seed == 0) seed = 1 + b*1013904223
 
-            allocate (placed(3, particle_bed(b)%num_particles))
+            allocate (placed(3, particle_cloud(b)%num_particles))
 
             ! Hash table: 4x overprovisioned for ~25% load factor, minimum 16 buckets. chain_next(i) links placed particle i to the
             ! previous occupant of its bucket.
-            hash_size = max(16, 4*particle_bed(b)%num_particles)
+            hash_size = max(16, 4*particle_cloud(b)%num_particles)
             allocate (hash_head(hash_size))
-            allocate (chain_next(particle_bed(b)%num_particles))
+            allocate (chain_next(particle_cloud(b)%num_particles))
             hash_head = -1
             chain_next = -1
 
-            do while (n_placed < particle_bed(b)%num_particles .and. n_attempts < max_attempts)
+            do while (n_placed < particle_cloud(b)%num_particles .and. n_attempts < max_attempts)
                 n_attempts = n_attempts + 1
 
                 rx = xmin + f_xorshift(seed)*(xmax - xmin)
                 ry = ymin + f_xorshift(seed)*(ymax - ymin)
                 if (p == 0) then
-                    rz = particle_bed(b)%z_centroid
+                    rz = particle_cloud(b)%z_centroid
                 else
                     rz = zmin + f_xorshift(seed)*(zmax - zmin)
                 end if
@@ -149,38 +149,38 @@ contains
 
                     ib_idx = ib_idx + 1
 
-                    ! gbl_patch_id is relative within particle_bed_ibs here; s_reduce_ib_patch_array adjusts to global indexing.
-                    particle_bed_ibs(ib_idx)%gbl_patch_id = ib_idx
-                    particle_bed_ibs(ib_idx)%geometry = geom
-                    particle_bed_ibs(ib_idx)%x_centroid = rx
-                    particle_bed_ibs(ib_idx)%y_centroid = ry
-                    particle_bed_ibs(ib_idx)%z_centroid = rz
-                    particle_bed_ibs(ib_idx)%step_x_centroid = rx
-                    particle_bed_ibs(ib_idx)%step_y_centroid = ry
-                    particle_bed_ibs(ib_idx)%step_z_centroid = rz
-                    particle_bed_ibs(ib_idx)%angles(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%step_angles(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%vel(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%step_vel(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%angular_vel(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%step_angular_vel(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%force(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%torque(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%centroid_offset(:) = 0._wp
-                    particle_bed_ibs(ib_idx)%rotation_matrix = 0._wp
-                    particle_bed_ibs(ib_idx)%rotation_matrix(1, 1) = 1._wp
-                    particle_bed_ibs(ib_idx)%rotation_matrix(2, 2) = 1._wp
-                    particle_bed_ibs(ib_idx)%rotation_matrix(3, 3) = 1._wp
-                    particle_bed_ibs(ib_idx)%rotation_matrix_inverse = particle_bed_ibs(ib_idx)%rotation_matrix
-                    particle_bed_ibs(ib_idx)%radius = particle_bed(b)%radius
-                    particle_bed_ibs(ib_idx)%mass = particle_bed(b)%mass
-                    particle_bed_ibs(ib_idx)%moment = dflt_real
-                    particle_bed_ibs(ib_idx)%moving_ibm = particle_bed(b)%moving_ibm
-                    particle_bed_ibs(ib_idx)%slip = .false.
+                    ! gbl_patch_id is relative within particle_cloud_ibs here; s_reduce_ib_patch_array adjusts to global indexing.
+                    particle_cloud_ibs(ib_idx)%gbl_patch_id = ib_idx
+                    particle_cloud_ibs(ib_idx)%geometry = geom
+                    particle_cloud_ibs(ib_idx)%x_centroid = rx
+                    particle_cloud_ibs(ib_idx)%y_centroid = ry
+                    particle_cloud_ibs(ib_idx)%z_centroid = rz
+                    particle_cloud_ibs(ib_idx)%step_x_centroid = rx
+                    particle_cloud_ibs(ib_idx)%step_y_centroid = ry
+                    particle_cloud_ibs(ib_idx)%step_z_centroid = rz
+                    particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%step_angles(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%vel(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%step_vel(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%angular_vel(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%step_angular_vel(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%force(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%torque(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%centroid_offset(:) = 0._wp
+                    particle_cloud_ibs(ib_idx)%rotation_matrix = 0._wp
+                    particle_cloud_ibs(ib_idx)%rotation_matrix(1, 1) = 1._wp
+                    particle_cloud_ibs(ib_idx)%rotation_matrix(2, 2) = 1._wp
+                    particle_cloud_ibs(ib_idx)%rotation_matrix(3, 3) = 1._wp
+                    particle_cloud_ibs(ib_idx)%rotation_matrix_inverse = particle_cloud_ibs(ib_idx)%rotation_matrix
+                    particle_cloud_ibs(ib_idx)%radius = particle_cloud(b)%radius
+                    particle_cloud_ibs(ib_idx)%mass = particle_cloud(b)%mass
+                    particle_cloud_ibs(ib_idx)%moment = dflt_real
+                    particle_cloud_ibs(ib_idx)%moving_ibm = particle_cloud(b)%moving_ibm
+                    particle_cloud_ibs(ib_idx)%slip = .false.
                 end if
             end do
 
-            if (n_placed < particle_bed(b)%num_particles) then
+            if (n_placed < particle_cloud(b)%num_particles) then
                 call s_mpi_abort("Error :: Failed to place all particles in particle bed")
             end if
 
@@ -192,7 +192,7 @@ contains
         if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', n_total_placed, ' particles in ', t_end - t_start, &
             & ' seconds.'
 
-    end subroutine s_generate_particle_beds
+    end subroutine s_generate_particle_clouds
 
     !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).
     function f_xorshift(seed) result(rval)
@@ -221,4 +221,4 @@ contains
 
     end function f_bin_hash
 
-end module m_particle_bed
+end module m_particle_cloud

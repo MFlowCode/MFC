@@ -313,7 +313,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | ---:                 | :----:  | :---                |
 | `num_ibs`            | Integer | Number of immersed boundary patches |
 | `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
-| `num_particle_beds`  | Integer | Number of particle bed specifications to generate immersed boundary patches from |
+| `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
 | `ib_neighborhood_radius` | Integer | Parameter that controls the neighborhood size for IB detection. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
