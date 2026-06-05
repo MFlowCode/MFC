@@ -391,7 +391,6 @@ contains
         real(wp)                           :: corner_distance       !< Equation of state parameters
         real(wp), dimension(1:3)           :: xy_local              !< x and y coordinates in local IB frame
         real(wp), dimension(1:2)           :: length, center        !< x and y coordinates in local IB frame
-        real(wp), dimension(1:3,1:3)       :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
 
