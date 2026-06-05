@@ -929,10 +929,6 @@ contains
 
             if (proc_rank == 0) then
                 file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string)
-                call my_inquire(file_loc, dir_check)
-                if (dir_check .neqv. .true.) then
-                    call s_create_directory(trim(file_loc))
-                end if
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
