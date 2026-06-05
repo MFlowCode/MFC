@@ -1114,47 +1114,83 @@ contains
         integer, intent(in)                  :: t_step
         character(len=path_len + 2*name_len) :: file_loc
         integer                              :: i, ios, file_unit, ierr
+        integer                              :: r, nlocal, gbl_id
         integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
         logical                              :: file_exist
+        character(len=10)                    :: t_step_string
 
-        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
-        file_loc = trim(case_dir) // trim(file_loc)
+        if (file_per_process) then
+            call s_int_to_str(t_step, t_step_string)
 
-        if (proc_rank == 0) then
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (.not. file_exist) then
-                call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+            do r = 0, num_procs - 1
+                write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', r, '.dat'
+                file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
+
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+                if (.not. file_exist) call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
+
+                read (file_unit, iostat=ios) nlocal
+                if (ios /= 0) call s_mpi_abort('Error reading IB state file header: ' // trim(file_loc))
+
+                do i = 1, nlocal
+                    read (file_unit, iostat=ios) gbl_id
+                    if (ios /= 0) call s_mpi_abort('Error reading IB patch ID: ' // trim(file_loc))
+                    read (file_unit, iostat=ios) ib_buf
+                    if (ios /= 0) call s_mpi_abort('Error reading IB state data: ' // trim(file_loc))
+
+                    patch_ib(gbl_id)%vel = ib_buf(8:10)
+                    patch_ib(gbl_id)%angular_vel = ib_buf(11:13)
+                    patch_ib(gbl_id)%angles = ib_buf(14:16)
+                    patch_ib(gbl_id)%x_centroid = ib_buf(17)
+                    patch_ib(gbl_id)%y_centroid = ib_buf(18)
+                    patch_ib(gbl_id)%z_centroid = ib_buf(19)
+                end do
+
+                close (file_unit)
+            end do
+        else
+            write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+            file_loc = trim(case_dir) // trim(file_loc)
+
+            if (proc_rank == 0) then
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+                if (.not. file_exist) then
+                    call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+                end if
+
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
+
+                do i = 1, num_ibs
+                    read (file_unit, iostat=ios) ib_buf
+                    if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
+
+                    patch_ib(i)%vel = ib_buf(8:10)
+                    patch_ib(i)%angular_vel = ib_buf(11:13)
+                    patch_ib(i)%angles = ib_buf(14:16)
+                    patch_ib(i)%x_centroid = ib_buf(17)
+                    patch_ib(i)%y_centroid = ib_buf(18)
+                    patch_ib(i)%z_centroid = ib_buf(19)
+                end do
+
+                close (file_unit)
             end if
 
-            open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
-            if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
-
-            do i = 1, num_ibs
-                read (file_unit, iostat=ios) ib_buf
-                if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
-
-                patch_ib(i)%vel = ib_buf(8:10)
-                patch_ib(i)%angular_vel = ib_buf(11:13)
-                patch_ib(i)%angles = ib_buf(14:16)
-                patch_ib(i)%x_centroid = ib_buf(17)
-                patch_ib(i)%y_centroid = ib_buf(18)
-                patch_ib(i)%z_centroid = ib_buf(19)
-            end do
-
-            close (file_unit)
-        end if
-
 #ifdef MFC_MPI
-        do i = 1, num_ibs
-            call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        end do
+            do i = 1, num_ibs
+                call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            end do
 #endif
+        end if
 
     end subroutine s_read_ib_restart_data
 
