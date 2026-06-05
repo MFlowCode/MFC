@@ -271,7 +271,7 @@ module m_global_parameters
     !> @{
     type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib  !< Immersed boundary patch parameters
     integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
-    type(particle_bed_parameters), dimension(num_particle_beds_max) :: particle_bed  !< Particle bed specifications
+    type(particle_cloud_parameters), dimension(num_particle_clouds_max) :: particle_cloud  !< Particle bed specifications
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(ib_airfoil_parameters), dimension(num_ib_airfoils_max) :: ib_airfoil  !< Per-airfoil NACA user inputs (namelist)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
@@ -713,20 +713,21 @@ contains
             ib_airfoil_grids(i)%Np = 0
         end do
 
-        num_particle_beds = 0
-        do i = 1, num_particle_beds_max
-            particle_bed(i)%x_centroid = 0._wp
-            particle_bed(i)%y_centroid = 0._wp
-            particle_bed(i)%z_centroid = 0._wp
-            particle_bed(i)%length_x = dflt_real
-            particle_bed(i)%length_y = dflt_real
-            particle_bed(i)%length_z = dflt_real
-            particle_bed(i)%num_particles = 0
-            particle_bed(i)%radius = dflt_real
-            particle_bed(i)%mass = dflt_real
-            particle_bed(i)%min_spacing = 0._wp
-            particle_bed(i)%moving_ibm = 0
-            particle_bed(i)%seed = 0
+        num_particle_clouds = 0
+        do i = 1, num_particle_clouds_max
+            particle_cloud(i)%x_centroid = 0._wp
+            particle_cloud(i)%y_centroid = 0._wp
+            particle_cloud(i)%z_centroid = 0._wp
+            particle_cloud(i)%length_x = dflt_real
+            particle_cloud(i)%length_y = dflt_real
+            particle_cloud(i)%length_z = dflt_real
+            particle_cloud(i)%num_particles = 0
+            particle_cloud(i)%radius = dflt_real
+            particle_cloud(i)%mass = dflt_real
+            particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%moving_ibm = 0
+            particle_cloud(i)%seed = 0
+            particle_cloud(i)%packing_method = dflt_int
         end do
 
         do i = 1, num_ib_patches_max_namelist

@@ -747,6 +747,10 @@ contains
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
+
+            if (ib) then
+                call s_write_parallel_ib_data(t_step)
+            end if
         else
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers)
@@ -883,6 +887,8 @@ contains
 
         integer, intent(in) :: time_step
 
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
         if (parallel_io) then
             call s_write_parallel_ib_data(time_step)
         else
@@ -902,52 +908,95 @@ contains
         integer(kind=MPI_OFFSET_KIND)        :: WP_MOK
         integer                              :: ifile, ierr
         integer, dimension(MPI_STATUS_SIZE)  :: status
-        logical                              :: file_exist
+        logical                              :: file_exist, dir_check
         integer                              :: i, ib_idx
         integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+        integer                              :: file_unit
+        character(len=10)                    :: t_step_string
 
         ! Partition IBs across ranks round-robin style
         integer :: ib_start, ib_end, nibs_per_rank, remainder
 
         WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
 
-        if (proc_rank == 0) then
-            call s_create_directory(trim(case_dir) // '/restart_data')
+        if (file_per_process) then
+            call s_int_to_str(t_step, t_step_string)
+
+            if (proc_rank == 0) then
+                file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string)
+                call s_create_directory(trim(file_loc))
+            end if
+            call s_mpi_barrier()
+            call DelayFileAccess(proc_rank)
+
+            write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', proc_rank, '.dat'
+            file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
+
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist) then
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace')
+            else
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='new')
+            end if
+
+            write (file_unit) num_local_ibs
+            do i = 1, num_local_ibs
+                ib_idx = local_ib_patch_ids(i)
+                ib_buf(1) = mytime
+                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
+                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
+                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
+                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
+                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
+                ib_buf(17) = patch_ib(ib_idx)%x_centroid
+                ib_buf(18) = patch_ib(ib_idx)%y_centroid
+                ib_buf(19) = patch_ib(ib_idx)%z_centroid
+                ib_buf(20) = patch_ib(ib_idx)%radius
+
+                write (file_unit) patch_ib(ib_idx)%gbl_patch_id
+                write (file_unit) ib_buf
+            end do
+
+            close (file_unit)
+        else
+            if (proc_rank == 0) then
+                call s_create_directory(trim(case_dir) // '/restart_data')
+            end if
+            call s_mpi_barrier()
+
+            write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+            file_loc = trim(case_dir) // trim(file_loc)
+
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call s_mpi_barrier()
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+
+            do i = 1, num_local_ibs
+                ib_idx = local_ib_patch_ids(i)
+                ib_buf(1) = mytime
+                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
+                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
+                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
+                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
+                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
+                ib_buf(17) = patch_ib(ib_idx)%x_centroid
+                ib_buf(18) = patch_ib(ib_idx)%y_centroid
+                ib_buf(19) = patch_ib(ib_idx)%z_centroid
+                ib_buf(20) = patch_ib(ib_idx)%radius
+
+                ! Global IB index determines position in file
+                disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+
+                call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
+            end do
+
+            call MPI_FILE_CLOSE(ifile, ierr)
         end if
-        call s_mpi_barrier()
-
-        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
-        file_loc = trim(case_dir) // trim(file_loc)
-
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (file_exist .and. proc_rank == 0) then
-            call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-        end if
-        call s_mpi_barrier()
-
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
-
-        do i = 1, num_local_ibs
-            ib_idx = local_ib_patch_ids(i)
-            ib_buf(1) = mytime
-            ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
-            ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
-            ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
-            ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-            ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
-            ib_buf(17) = patch_ib(ib_idx)%x_centroid
-            ib_buf(18) = patch_ib(ib_idx)%y_centroid
-            ib_buf(19) = patch_ib(ib_idx)%z_centroid
-            ib_buf(20) = patch_ib(ib_idx)%radius
-
-            ! Global IB index (i) determines position in file
-            disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
-
-            call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
-        end do
-
-        call MPI_FILE_CLOSE(ifile, ierr)
 #endif
 
     end subroutine s_write_parallel_ib_state

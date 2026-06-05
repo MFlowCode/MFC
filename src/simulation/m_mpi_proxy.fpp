@@ -120,7 +120,7 @@ contains
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'num_source', 'relax_model', 'num_ibs', 'num_particle_beds', 'n_start',    &
+            & 'num_source', 'relax_model', 'num_ibs', 'num_particle_clouds', 'n_start',    &
             & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters', &
             & 'adap_dt_max_iters', 'collision_model', 'ib_neighborhood_radius', &
             & 'int_comp' ]
@@ -270,14 +270,15 @@ contains
             #:endfor
         end do
 
-        do i = 1, num_particle_beds
+        do i = 1, num_particle_clouds
             #:for VAR in ['x_centroid', 'y_centroid', 'z_centroid', 'length_x', 'length_y', 'length_z', &
                 & 'radius', 'mass', 'min_spacing']
-                call MPI_BCAST(particle_bed(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(particle_cloud(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-            call MPI_BCAST(particle_bed(i)%num_particles, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(particle_bed(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(particle_bed(i)%seed, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%num_particles, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%seed, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%packing_method, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
         do j = 1, num_probes_max

@@ -1372,6 +1372,8 @@ contains
         integer, dimension(num_procs)                   :: meshtypes
         integer                                         :: i, ios, file_unit
         integer                                         :: ierr, nBodies
+        integer                                         :: r, nlocal, gbl_id
+        character(len=10)                               :: t_step_string
         real(wp), dimension(:), allocatable             :: px, py, pz
         real(wp), dimension(:), allocatable             :: force_x, force_y, force_z
         real(wp), dimension(:), allocatable             :: torque_x, torque_y, torque_z
@@ -1381,15 +1383,6 @@ contains
         real(wp), dimension(:), allocatable             :: ib_diameter
 
         if (proc_rank == 0) then
-            ! Build path to per-timestep IB state file
-            write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
-            file_loc = trim(case_dir) // trim(file_loc)
-
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (.not. file_exist) then
-                call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
-            end if
-
             nBodies = num_ibs
 
             if (nBodies > 0) then
@@ -1402,16 +1395,51 @@ contains
                 allocate (angle_x(nBodies), angle_y(nBodies), angle_z(nBodies))
                 allocate (ib_diameter(nBodies))
 
-                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
-                if (ios /= 0) call s_mpi_abort('Cannot open IB state file: ' // trim(file_loc))
+                if (file_per_process) then
+                    call s_int_to_str(t_step, t_step_string)
+                    ib_data = 0._wp
+                    do r = 0, num_procs - 1
+                        write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', r, '.dat'
+                        file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
 
-                do i = 1, nBodies
-                    read (file_unit, iostat=ios) ib_buf
-                    if (ios /= 0) call s_mpi_abort('Error reading IB state file')
-                    ib_data(i,:) = ib_buf(:)
-                end do
+                        inquire (FILE=trim(file_loc), EXIST=file_exist)
+                        if (.not. file_exist) call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
 
-                close (file_unit)
+                        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                        if (ios /= 0) call s_mpi_abort('Cannot open IB state file: ' // trim(file_loc))
+
+                        read (file_unit, iostat=ios) nlocal
+                        if (ios /= 0) call s_mpi_abort('Error reading IB state file header: ' // trim(file_loc))
+
+                        do i = 1, nlocal
+                            read (file_unit, iostat=ios) gbl_id
+                            if (ios /= 0) call s_mpi_abort('Error reading IB patch ID: ' // trim(file_loc))
+                            read (file_unit, iostat=ios) ib_buf
+                            if (ios /= 0) call s_mpi_abort('Error reading IB state data: ' // trim(file_loc))
+                            ib_data(gbl_id,:) = ib_buf(:)
+                        end do
+
+                        close (file_unit)
+                    end do
+                else
+                    ! Build path to per-timestep IB state file
+                    write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+                    file_loc = trim(case_dir) // trim(file_loc)
+
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    if (.not. file_exist) call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
+
+                    open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                    if (ios /= 0) call s_mpi_abort('Cannot open IB state file: ' // trim(file_loc))
+
+                    do i = 1, nBodies
+                        read (file_unit, iostat=ios) ib_buf
+                        if (ios /= 0) call s_mpi_abort('Error reading IB state file')
+                        ib_data(i,:) = ib_buf(:)
+                    end do
+
+                    close (file_unit)
+                end if
 
                 do i = 1, nBodies
                     force_x(i) = ib_data(i, 2); force_y(i) = ib_data(i, 3); force_z(i) = ib_data(i, 4)
