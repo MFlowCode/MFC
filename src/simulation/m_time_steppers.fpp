@@ -44,11 +44,7 @@ module m_time_steppers
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
 
-    !> Cell-average RHS for left/right-cell hat variables (Hypo HLLD only)
-    type(scalar_field), allocatable, dimension(:) :: rhs_hatL_vf, rhs_hatR_vf
-
-    $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_hatL_vf, rhs_hatR_vf, q_prim_ts1, q_prim_ts2, rhs_mv, &
-                  & rhs_pb, max_dt, rk_coef, stor, bc_type]')
+    $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, max_dt, rk_coef, stor, bc_type]')
 
     !> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
@@ -134,8 +130,8 @@ contains
         pool_dims(4) = sys_size
         pool_starts(4) = 1
 #ifdef MFC_MIXED_PRECISION
-        pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end - idwbuff(3) &
-                         & %beg + 1)*sys_size
+        pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end &
+                         & - idwbuff(3)%beg + 1)*sys_size
         call hipCheck(hipMalloc_(cptr_device, pool_size*2_8))
         call c_f_pointer(cptr_device, q_cons_ts_pool_device, shape=pool_dims)
         q_cons_ts_pool_device(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_device
@@ -393,20 +389,6 @@ contains
             end do
         end if
 
-        if (hypo_nc_dual_pass) then
-            @:ALLOCATE(rhs_hatL_vf(1:sys_size))
-            @:ALLOCATE(rhs_hatR_vf(1:sys_size))
-            @:PREFER_GPU(rhs_hatL_vf)
-            @:PREFER_GPU(rhs_hatR_vf)
-
-            do i = 1, sys_size
-                @:ALLOCATE(rhs_hatL_vf(i)%sf(0:m, 0:n, 0:p))
-                @:ALLOCATE(rhs_hatR_vf(i)%sf(0:m, 0:n, 0:p))
-                @:ACC_SETUP_SFs(rhs_hatL_vf(i))
-                @:ACC_SETUP_SFs(rhs_hatR_vf(i))
-            end do
-        end if
-
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_open_run_time_information_file()
@@ -484,26 +466,8 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
-            if (hypo_nc_dual_pass) then
-                call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
-                                   & rhs_mv, t_step, time_avg, s, .true.)
-                call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
-                                   & rhs_mv, t_step, time_avg, s, .false.)
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            else
-                call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                                   & t_step, time_avg, s, .false.)
-            end if
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
+                               & t_step, time_avg, s)
 
             if (s == 1) then
                 if (run_time_info) then
@@ -784,8 +748,8 @@ contains
                              & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
                     call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                     ! update the moment of inertia to be based on the direction of the angular momentum
-                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i) &
-                             & %moment  ! convert back to angular velocity with the new moment of inertia
+                    ! convert back to angular velocity with the new moment of inertia
+                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment
                 end if
 
                 ! Update the angle of the IB
@@ -998,15 +962,6 @@ contains
         end do
 
         @:DEALLOCATE(rhs_vf)
-
-        if (hypo_nc_dual_pass) then
-            do i = 1, sys_size
-                @:DEALLOCATE(rhs_hatL_vf(i)%sf)
-                @:DEALLOCATE(rhs_hatR_vf(i)%sf)
-            end do
-            @:DEALLOCATE(rhs_hatL_vf)
-            @:DEALLOCATE(rhs_hatR_vf)
-        end if
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

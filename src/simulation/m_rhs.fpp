@@ -113,6 +113,12 @@ module m_rhs
     $:GPU_DECLARE(create='[qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf]')
     $:GPU_DECLARE(create='[dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf]')
 
+    !> @name Partial right-hand sides of the two anchored passes of dual-pass HLLD
+    !> @{
+    type(scalar_field), allocatable, dimension(:) :: rhs_hatL_vf, rhs_hatR_vf
+    !> @}
+    $:GPU_DECLARE(create='[rhs_hatL_vf, rhs_hatR_vf]')
+
 contains
 
     !> Initialize the RHS module
@@ -538,6 +544,20 @@ contains
                        & 0:n, 0:p))
         end if
 
+        if (hypo_nc_dual_pass) then
+            @:ALLOCATE(rhs_hatL_vf(1:sys_size))
+            @:ALLOCATE(rhs_hatR_vf(1:sys_size))
+            @:PREFER_GPU(rhs_hatL_vf)
+            @:PREFER_GPU(rhs_hatR_vf)
+
+            do i = 1, sys_size
+                @:ALLOCATE(rhs_hatL_vf(i)%sf(0:m, 0:n, 0:p))
+                @:ALLOCATE(rhs_hatR_vf(i)%sf(0:m, 0:n, 0:p))
+                @:ACC_SETUP_SFs(rhs_hatL_vf(i))
+                @:ACC_SETUP_SFs(rhs_hatR_vf(i))
+            end do
+        end if
+
         call s_initialize_pressure_relaxation_module
 
     end subroutine s_initialize_rhs_module
@@ -545,7 +565,7 @@ contains
     !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
 
-        & time_avg, stage, is_hat_L)
+        & time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
         type(scalar_field), intent(inout)                                                          :: q_T_sf
@@ -561,28 +581,17 @@ contains
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
-        logical, intent(in) :: is_hat_L
         real(wp) :: t_start, t_finish
         integer :: id
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
-        logical :: is_first_pass          !< first (or only) RHS pass of this RK stage
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
-
-        ! Dual-pass HLLD (hypo_nc_dual_pass) evaluates the RHS twice per RK stage on the same
-        ! input state: an anchored-left (hat_L) then an anchored-right (hat_R) pass. Only the
-        ! Riemann solve and the one-sided flux assembly differ between the passes; the
-        ! primitive conversion, halo exchange, and face reconstruction are identical, so they
-        ! run only in the first pass and the second pass reuses the module-stored results
-        ! (q_prim_qp, qL/qR_rs*_vf, dq*).
-
-        is_first_pass = is_hat_L .or. .not. hypo_nc_dual_pass
 
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
 
-        if ((.not. igr .or. dummy) .and. is_first_pass) then
+        if (.not. igr .or. dummy) then
             ! Association/Population of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
             do i = 1, sys_size
@@ -625,7 +634,7 @@ contains
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
             call nvtxEndRange
         end if
-        if ((.not. igr .or. dummy) .and. is_first_pass) then
+        if (.not. igr .or. dummy) then
             call nvtxStartRange("RHS-CONVERT")
             call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
             call nvtxEndRange
@@ -636,7 +645,7 @@ contains
         end if
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity .and. is_first_pass) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
         call nvtxEndRange
 
         if (cfl_dt) then
@@ -645,10 +654,10 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (qbmm .and. is_first_pass) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, &
-            & idwbuff(1), idwbuff(2), idwbuff(3))
+        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
+            & idwbuff(2), idwbuff(3))
 
-        if (((viscous .and. .not. igr) .or. dummy) .and. is_first_pass) then
+        if ((viscous .and. .not. igr) .or. dummy) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, &
                                & qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, &
@@ -656,132 +665,146 @@ contains
             call nvtxEndRange
         end if
 
-        if (surface_tension .and. is_first_pass) then
+        if (surface_tension) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
             call s_get_capillary(q_prim_qp%vf, bc_type)
             call nvtxEndRange
         end if
 
-        if (int_comp == 2 .and. n > 0 .and. is_first_pass) then
+        if (int_comp == 2 .and. n > 0) then
             call nvtxStartRange("RHS-COMPRESSION-NORMALS")
             call s_compute_mthinc_normals(q_prim_qp%vf)
             call nvtxEndRange
         end if
 
-        do id = 1, num_dims
-            if (igr .or. dummy) then
-                if (id == 1) then
-                    $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
-                    do l = -1, p + 1
-                        do k = -1, n + 1
-                            do j = -1, m + 1
-                                do i = 1, sys_size
-                                    rhs_vf(i)%sf(j, k, l) = 0._stp
+        if (.not. hypo_nc_dual_pass) then
+            do id = 1, num_dims
+                if (igr .or. dummy) then
+                    if (id == 1) then
+                        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
+                        do l = -1, p + 1
+                            do k = -1, n + 1
+                                do j = -1, m + 1
+                                    do i = 1, sys_size
+                                        rhs_vf(i)%sf(j, k, l) = 0._stp
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
 
-                call nvtxStartRange("IGR_RIEMANN")
-                call s_igr_riemann_solver(q_cons_vf, rhs_vf, id)
-                call nvtxEndRange
-
-                if (id == 1) then
-                    call nvtxStartRange("IGR_Jacobi")
-                    call s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
+                    call nvtxStartRange("IGR_RIEMANN")
+                    call s_igr_riemann_solver(q_cons_vf, rhs_vf, id)
                     call nvtxEndRange
 
-                    call nvtxStartRange("IGR_SIGMA")
-                    call s_igr_sigma_x(q_cons_vf, rhs_vf)
-                    call nvtxEndRange
+                    if (id == 1) then
+                        call nvtxStartRange("IGR_Jacobi")
+                        call s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
+                        call nvtxEndRange
+
+                        call nvtxStartRange("IGR_SIGMA")
+                        call s_igr_sigma_x(q_cons_vf, rhs_vf)
+                        call nvtxEndRange
+                    end if
                 end if
-            end if
-            if ((.not. igr) .or. dummy) then
-                if (is_first_pass) call s_reconstruct_riemann_states(id)
+                if ((.not. igr) .or. dummy) then
+                    call s_reconstruct_riemann_states(id)
 
-                ! Configuring Coordinate Direction Indexes
-                if (id == 1) then
-                    irx%beg = -1; iry%beg = 0; irz%beg = 0
-                else if (id == 2) then
-                    irx%beg = 0; iry%beg = -1; irz%beg = 0
-                else
-                    irx%beg = 0; iry%beg = 0; irz%beg = -1
-                end if
-                irx%end = m; iry%end = n; irz%end = p
+                    call s_compute_directional_rhs(id, rhs_vf, .false.)
 
-                ! Computing Riemann Solver Flux and Source Flux
-                call nvtxStartRange("RHS-RIEMANN-SOLVER")
-                call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, &
-                                      & dqR_prim_dz_n(id)%vf, qR_prim(id)%vf, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                      & dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, &
-                                      & q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, flux_gsrc_n(id)%vf, id, irx, iry, irz, &
-                                      & is_hat_L)
-                call nvtxEndRange
+                    ! RHS additions for hypoelasticity
+                    if (hypo_nc_finite_diff) then
+                        call nvtxStartRange("RHS-HYPOELASTICITY-FD-PER-SWEEP")
+                        call s_compute_hypoelastic_rhs_finite_diff_per_sweep(id, q_prim_qp%vf, rhs_vf)
+                        call nvtxEndRange
+                    end if
 
-                if (use_nc_iface_vel) then
-                    call s_finalize_nc_iface_vel(nc_iface_vel_n(id)%vf, id)
-                end if
+                    ! RHS for diffusion
+                    if (chemistry .and. chem_params%diffusion) then
+                        call nvtxStartRange("RHS-CHEM-DIFFUSION")
+                        call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
+                        call nvtxEndRange
+                    end if
 
-                ! Additional physics and source terms RHS addition for advection source
-                call nvtxStartRange("RHS-ADVECTION-SRC")
-                call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id), is_hat_L)
-                call nvtxEndRange
+                    ! Viscous stress contribution to RHS
+                    if (viscous .or. surface_tension .or. chem_params%diffusion) then
+                        call nvtxStartRange("RHS-ADD-PHYSICS")
+                        call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                                              & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
+                        call nvtxEndRange
+                    end if
 
-                ! RHS additions for hypoelasticity
-                if (hypo_nc_finite_diff) then
-                    call nvtxStartRange("RHS-HYPOELASTICITY-FD-PER-SWEEP")
-                    call s_compute_hypoelastic_rhs_finite_diff_per_sweep(id, q_prim_qp%vf, rhs_vf)
-                    call nvtxEndRange
-                end if
+                    ! Bubble dynamics source terms
+                    if (bubbles_euler) then
+                        call nvtxStartRange("RHS-BUBBLES-COMPUTE")
+                        call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
+                        call nvtxEndRange
+                    end if
 
-                ! RHS for diffusion
-                if (chemistry .and. chem_params%diffusion) then
-                    call nvtxStartRange("RHS-CHEM-DIFFUSION")
-                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
-                    call nvtxEndRange
-                end if
+                    ! RHS additions for qbmm bubbles
+                    if (qbmm) then
+                        call nvtxStartRange("RHS-QBMM")
+                        call s_compute_qbmm_rhs(id, q_cons_qp%vf, q_prim_qp%vf, rhs_vf, flux_n(id)%vf, pb_in, rhs_pb)
+                        call nvtxEndRange
+                    end if
+                    ! END: Additional physics and source terms
 
-                ! Viscous stress contribution to RHS
-                if (viscous .or. surface_tension .or. chem_params%diffusion) then
-                    call nvtxStartRange("RHS-ADD-PHYSICS")
-                    call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
-                                                          & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
-                    call nvtxEndRange
-                end if
-
-                ! Bubble dynamics source terms
-                if (bubbles_euler) then
-                    call nvtxStartRange("RHS-BUBBLES-COMPUTE")
-                    call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
-                    call nvtxEndRange
-                end if
-
-                ! RHS additions for qbmm bubbles
-                if (qbmm) then
-                    call nvtxStartRange("RHS-QBMM")
-                    call s_compute_qbmm_rhs(id, q_cons_qp%vf, q_prim_qp%vf, rhs_vf, flux_n(id)%vf, pb_in, rhs_pb)
-                    call nvtxEndRange
-                end if
-                ! END: Additional physics and source terms
-
-                if (hyper_cleaning) then
-                    $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(eqn_idx%psi)%sf(j, k, l) = rhs_vf(eqn_idx%psi)%sf(j, k, l) - q_prim_vf(eqn_idx%psi)%sf(j, &
-                                       & k, l)/hyper_cleaning_tau
+                    if (hyper_cleaning) then
+                        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    rhs_vf(eqn_idx%psi)%sf(j, k, l) = rhs_vf(eqn_idx%psi)%sf(j, k, &
+                                           & l) - q_prim_vf(eqn_idx%psi)%sf(j, k, l)/hyper_cleaning_tau
+                                end do
                             end do
                         end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
 
-                ! END: Additional physics and source terms
+                    ! END: Additional physics and source terms
+                end if
+            end do
+        else
+            ! Dual-pass HLLD: the first (hat_L) pass reconstructs the Riemann states and the
+            ! second (hat_R) pass re-solves the anchored Riemann problem on the same faces;
+            ! the full RHS is the sum of the two anchored partial RHS's. The axisymmetric
+            ! geometric source is applied per pass at half weight so the sum carries the
+            ! symmetric average of the hat_L/hat_R face velocities.
+            do id = 1, num_dims
+                call s_reconstruct_riemann_states(id)
+                call s_compute_directional_rhs(id, rhs_hatL_vf, .true.)
+            end do
+            if (grid_geometry == 2) then
+                call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
+                call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_hatL_vf, nc_iface_vel_n(1)%vf, &
+                    & nc_iface_vel_n(2)%vf, 0.5_wp)
+                call nvtxEndRange
             end if
-        end do
+
+            do id = 1, num_dims
+                call s_compute_directional_rhs(id, rhs_hatR_vf, .false.)
+            end do
+            if (grid_geometry == 2) then
+                call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
+                call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_hatR_vf, nc_iface_vel_n(1)%vf, &
+                    & nc_iface_vel_n(2)%vf, 0.5_wp)
+                call nvtxEndRange
+            end if
+
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
         ! END: Dimensional Splitting Loop
 
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
@@ -790,15 +813,6 @@ contains
             call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, nc_iface_vel_n)
             call nvtxEndRange
         end if
-        if (hypo_nc_dual_pass .and. grid_geometry == 2) then
-            ! Apply in both passes at half weight so the sum (hat_L + hat_R) gives the full contribution with a symmetric average of
-            ! face velocities.
-            call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
-            call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_vf, nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf, &
-                & 0.5_wp)
-            call nvtxEndRange
-        end if
-
         if (ib) then
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
             do l = 0, p
@@ -818,9 +832,7 @@ contains
         ! Additional Physics and Source Terms Additions for acoustic_source
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
-            if (.not. hypo_nc_dual_pass .or. is_hat_L) then
-                call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
-            end if
+            call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
             call nvtxEndRange
         end if
 
@@ -1009,6 +1021,45 @@ contains
         call nvtxEndRange
 
     end subroutine s_reconstruct_riemann_states
+
+    !> Computes one sweep direction's contribution to the RHS: the Riemann solve on the reconstructed cell-boundary states followed
+    !! by the advection source term. For dual-pass HLLD, is_hat_L selects the anchor cell of the pass (hat_L: the cell left of each
+    !! face, hat_R: right) and the advection source applies the corresponding one-sided flux difference into rhs_vf.
+    subroutine s_compute_directional_rhs(id, rhs_vf, is_hat_L)
+
+        integer, intent(in)                                    :: id
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        logical, intent(in)                                    :: is_hat_L
+
+        ! Configuring Coordinate Direction Indexes
+
+        if (id == 1) then
+            irx%beg = -1; iry%beg = 0; irz%beg = 0
+        else if (id == 2) then
+            irx%beg = 0; iry%beg = -1; irz%beg = 0
+        else
+            irx%beg = 0; iry%beg = 0; irz%beg = -1
+        end if
+        irx%end = m; iry%end = n; irz%end = p
+
+        ! Computing Riemann Solver Flux and Source Flux
+        call nvtxStartRange("RHS-RIEMANN-SOLVER")
+        call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
+                              & qR_prim(id)%vf, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
+                              & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
+                              & flux_gsrc_n(id)%vf, id, irx, iry, irz, is_hat_L)
+        call nvtxEndRange
+
+        if (use_nc_iface_vel) then
+            call s_finalize_nc_iface_vel(nc_iface_vel_n(id)%vf, id)
+        end if
+
+        ! Additional physics and source terms RHS addition for advection source
+        call nvtxStartRange("RHS-ADVECTION-SRC")
+        call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id), is_hat_L)
+        call nvtxEndRange
+
+    end subroutine s_compute_directional_rhs
 
     !> Accumulate advection source contributions from a given coordinate direction into the RHS
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, is_hat_L)
@@ -2210,6 +2261,15 @@ contains
                 @:DEALLOCATE(nc_iface_vel_n(i)%vf)
             end do
             @:DEALLOCATE(nc_iface_vel_n)
+        end if
+
+        if (hypo_nc_dual_pass) then
+            do i = 1, sys_size
+                @:DEALLOCATE(rhs_hatL_vf(i)%sf)
+                @:DEALLOCATE(rhs_hatR_vf(i)%sf)
+            end do
+            @:DEALLOCATE(rhs_hatL_vf)
+            @:DEALLOCATE(rhs_hatR_vf)
         end if
 
     end subroutine s_finalize_rhs_module
