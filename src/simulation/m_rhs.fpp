@@ -565,14 +565,24 @@ contains
         real(wp) :: t_start, t_finish
         integer :: id
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
+        logical :: is_first_pass          !< first (or only) RHS pass of this RK stage
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
+
+        ! Dual-pass HLLD (hypo_nc_dual_pass) evaluates the RHS twice per RK stage on the same
+        ! input state: an anchored-left (hat_L) then an anchored-right (hat_R) pass. Only the
+        ! Riemann solve and the one-sided flux assembly differ between the passes; the
+        ! primitive conversion, halo exchange, and face reconstruction are identical, so they
+        ! run only in the first pass and the second pass reuses the module-stored results
+        ! (q_prim_qp, qL/qR_rs*_vf, dq*).
+
+        is_first_pass = is_hat_L .or. .not. hypo_nc_dual_pass
 
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
 
-        if (.not. igr .or. dummy) then
+        if ((.not. igr .or. dummy) .and. is_first_pass) then
             ! Association/Population of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
             do i = 1, sys_size
@@ -615,7 +625,7 @@ contains
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
             call nvtxEndRange
         end if
-        if (.not. igr .or. dummy) then
+        if ((.not. igr .or. dummy) .and. is_first_pass) then
             call nvtxStartRange("RHS-CONVERT")
             call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
             call nvtxEndRange
@@ -626,7 +636,7 @@ contains
         end if
 
         call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
+        if (hyperelasticity .and. is_first_pass) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
         call nvtxEndRange
 
         if (cfl_dt) then
@@ -635,10 +645,10 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
-            & idwbuff(2), idwbuff(3))
+        if (qbmm .and. is_first_pass) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, &
+            & idwbuff(1), idwbuff(2), idwbuff(3))
 
-        if ((viscous .and. .not. igr) .or. dummy) then
+        if (((viscous .and. .not. igr) .or. dummy) .and. is_first_pass) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, &
                                & qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, &
@@ -646,13 +656,13 @@ contains
             call nvtxEndRange
         end if
 
-        if (surface_tension) then
+        if (surface_tension .and. is_first_pass) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
             call s_get_capillary(q_prim_qp%vf, bc_type)
             call nvtxEndRange
         end if
 
-        if (int_comp == 2 .and. n > 0) then
+        if (int_comp == 2 .and. n > 0 .and. is_first_pass) then
             call nvtxStartRange("RHS-COMPRESSION-NORMALS")
             call s_compute_mthinc_normals(q_prim_qp%vf)
             call nvtxEndRange
@@ -689,127 +699,7 @@ contains
                 end if
             end if
             if ((.not. igr) .or. dummy) then
-                ! Reconstructing Primitive/Conservative Variables
-                call nvtxStartRange("RHS-RECONSTRUCTION")
-
-                ! Per-component density reconstruction: divide alpha_rho_K by alpha_K
-                ! before reconstruction so the limiter acts on rho_K (smooth at contacts)
-                ! instead of alpha_rho_K (jumps with alpha at contacts).
-                if (recon_comp_rho .and. num_fluids > 1) then
-                    do l = eqn_idx%cont%beg, eqn_idx%cont%end
-                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
-                        do k = idwbuff(3)%beg, idwbuff(3)%end
-                            do j = idwbuff(2)%beg, idwbuff(2)%end
-                                do i = idwbuff(1)%beg, idwbuff(1)%end
-                                    q_prim_qp%vf(l)%sf(i, j, k) = q_prim_qp%vf(l)%sf(i, j, &
-                                                 & k)/max(q_prim_qp%vf(eqn_idx%adv%beg + l - eqn_idx%cont%beg)%sf(i, j, k), &
-                                                 & verysmall)
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end do
-                end if
-
-                if (.not. surface_tension) then
-                    if (all(Re_size == 0) .or. int_comp > 0) then
-                        ! Reconstruct densitiess
-                        iv%beg = 1; iv%end = sys_size
-                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(1:sys_size), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-                    else
-                        iv%beg = 1; iv%end = eqn_idx%cont%end
-                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-
-                        iv%beg = eqn_idx%E; iv%end = sys_size
-                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-                    end if
-                else
-                    if (all(Re_size == 0)) then
-                        iv%beg = 1; iv%end = eqn_idx%E - 1
-                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-
-                        iv%beg = eqn_idx%E; iv%end = eqn_idx%E
-                        call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(eqn_idx%E), qL_rsx_vf, qL_rsy_vf, &
-                            & qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-
-                        iv%beg = eqn_idx%E + 1; iv%end = sys_size
-                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-                    else
-                        iv%beg = 1; iv%end = eqn_idx%cont%end
-                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-
-                        iv%beg = eqn_idx%E; iv%end = eqn_idx%E
-                        call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(eqn_idx%E), qL_rsx_vf, qL_rsy_vf, &
-                            & qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-
-                        iv%beg = eqn_idx%E + 1; iv%end = sys_size
-                        call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                                                & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
-                    end if
-                end if
-
-                ! Per-component density reconstruction: restore q_prim and convert
-                ! reconstructed face rho_K back to alpha_rho_K = alpha_K * rho_K
-                if (recon_comp_rho .and. num_fluids > 1) then
-                    ! Restore q_prim_qp: multiply cont slots back by alpha
-                    do l = eqn_idx%cont%beg, eqn_idx%cont%end
-                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
-                        do k = idwbuff(3)%beg, idwbuff(3)%end
-                            do j = idwbuff(2)%beg, idwbuff(2)%end
-                                do i = idwbuff(1)%beg, idwbuff(1)%end
-                                    q_prim_qp%vf(l)%sf(i, j, k) = q_prim_qp%vf(l)%sf(i, j, &
-                                                 & k)*q_prim_qp%vf(eqn_idx%adv%beg + l - eqn_idx%cont%beg)%sf(i, j, k)
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end do
-                    ! Convert reconstructed face values: rho_K_face * alpha_K_face -> alpha_rho_K_face
-                    #:for XYZ in ['x', 'y', 'z']
-                        do l = eqn_idx%cont%beg, eqn_idx%cont%end
-                            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
-                            do k = idwbuff(3)%beg, idwbuff(3)%end
-                                do j = idwbuff(2)%beg, idwbuff(2)%end
-                                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                                        qL_rs${XYZ}$_vf(i, j, k, l) = qL_rs${XYZ}$_vf(i, j, k, l)*qL_rs${XYZ}$_vf(i, j, k, &
-                                                        & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
-                                        qR_rs${XYZ}$_vf(i, j, k, l) = qR_rs${XYZ}$_vf(i, j, k, l)*qR_rs${XYZ}$_vf(i, j, k, &
-                                                        & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
-                                    end do
-                                end do
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        end do
-                    #:endfor
-                end if
-
-                ! Reconstruct viscous derivatives for viscosity
-                if (weno_Re_flux) then
-                    iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
-                    call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dx_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                        & dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), &
-                        & dqR_prim_dx_n(id)%vf(iv%beg:iv%end), idwbuff(1), idwbuff(2), idwbuff(3))
-                    if (n > 0) then
-                        call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dy_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                            & dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, id, &
-                            & dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), idwbuff(1), idwbuff(2), &
-                            & idwbuff(3))
-                        if (p > 0) then
-                            call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dz_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                                & dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, id, &
-                                & dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), idwbuff(1), &
-                                & idwbuff(2), idwbuff(3))
-                        end if
-                    end if
-                end if
-
-                call nvtxEndRange
+                if (is_first_pass) call s_reconstruct_riemann_states(id)
 
                 ! Configuring Coordinate Direction Indexes
                 if (id == 1) then
@@ -991,6 +881,134 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_rhs
+
+    !> Reconstructs the left/right Riemann states (cell-boundary values) for one sweep direction into the module face buffers
+    !! (qL/qR_rs*_vf and, for WENO-reconstructed viscous fluxes, dqL/dqR_rs*_vf). Depends only on q_prim_qp, so for dual-pass HLLD
+    !! it runs once per RK stage (first pass) and the second pass reuses the buffers.
+    subroutine s_reconstruct_riemann_states(id)
+
+        integer, intent(in) :: id
+        integer             :: i, j, k, l  !< Generic loop iterators
+
+        call nvtxStartRange("RHS-RECONSTRUCTION")
+
+        ! Per-component density reconstruction: divide alpha_rho_K by alpha_K
+        ! before reconstruction so the limiter acts on rho_K (smooth at contacts)
+        ! instead of alpha_rho_K (jumps with alpha at contacts).
+        if (recon_comp_rho .and. num_fluids > 1) then
+            do l = eqn_idx%cont%beg, eqn_idx%cont%end
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            q_prim_qp%vf(l)%sf(i, j, k) = q_prim_qp%vf(l)%sf(i, j, &
+                                         & k)/max(q_prim_qp%vf(eqn_idx%adv%beg + l - eqn_idx%cont%beg)%sf(i, j, k), verysmall)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
+        end if
+
+        if (.not. surface_tension) then
+            if (all(Re_size == 0) .or. int_comp > 0) then
+                ! Reconstruct densitiess
+                iv%beg = 1; iv%end = sys_size
+                call s_reconstruct_cell_boundary_values(q_prim_qp%vf(1:sys_size), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, &
+                                                        & qR_rsy_vf, qR_rsz_vf, id)
+            else
+                iv%beg = 1; iv%end = eqn_idx%cont%end
+                call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, &
+                                                        & qR_rsy_vf, qR_rsz_vf, id)
+
+                iv%beg = eqn_idx%E; iv%end = sys_size
+                call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, &
+                                                        & qR_rsy_vf, qR_rsz_vf, id)
+            end if
+        else
+            if (all(Re_size == 0)) then
+                iv%beg = 1; iv%end = eqn_idx%E - 1
+                call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, &
+                                                        & qR_rsy_vf, qR_rsz_vf, id)
+
+                iv%beg = eqn_idx%E; iv%end = eqn_idx%E
+                call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(eqn_idx%E), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
+
+                iv%beg = eqn_idx%E + 1; iv%end = sys_size
+                call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, &
+                                                        & qR_rsy_vf, qR_rsz_vf, id)
+            else
+                iv%beg = 1; iv%end = eqn_idx%cont%end
+                call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, &
+                                                        & qR_rsy_vf, qR_rsz_vf, id)
+
+                iv%beg = eqn_idx%E; iv%end = eqn_idx%E
+                call s_reconstruct_cell_boundary_values_first_order(q_prim_qp%vf(eqn_idx%E), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
+
+                iv%beg = eqn_idx%E + 1; iv%end = sys_size
+                call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, &
+                                                        & qR_rsy_vf, qR_rsz_vf, id)
+            end if
+        end if
+
+        ! Per-component density reconstruction: restore q_prim and convert
+        ! reconstructed face rho_K back to alpha_rho_K = alpha_K * rho_K
+        if (recon_comp_rho .and. num_fluids > 1) then
+            ! Restore q_prim_qp: multiply cont slots back by alpha
+            do l = eqn_idx%cont%beg, eqn_idx%cont%end
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            q_prim_qp%vf(l)%sf(i, j, k) = q_prim_qp%vf(l)%sf(i, j, &
+                                         & k)*q_prim_qp%vf(eqn_idx%adv%beg + l - eqn_idx%cont%beg)%sf(i, j, k)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
+            ! Convert reconstructed face values: rho_K_face * alpha_K_face -> alpha_rho_K_face
+            #:for XYZ in ['x', 'y', 'z']
+                do l = eqn_idx%cont%beg, eqn_idx%cont%end
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
+                    do k = idwbuff(3)%beg, idwbuff(3)%end
+                        do j = idwbuff(2)%beg, idwbuff(2)%end
+                            do i = idwbuff(1)%beg, idwbuff(1)%end
+                                qL_rs${XYZ}$_vf(i, j, k, l) = qL_rs${XYZ}$_vf(i, j, k, l)*qL_rs${XYZ}$_vf(i, j, k, &
+                                                & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
+                                qR_rs${XYZ}$_vf(i, j, k, l) = qR_rs${XYZ}$_vf(i, j, k, l)*qR_rs${XYZ}$_vf(i, j, k, &
+                                                & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end do
+            #:endfor
+        end if
+
+        ! Reconstruct viscous derivatives for viscosity
+        if (weno_Re_flux) then
+            iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
+            call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dx_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, dqL_rsy_vf, &
+                & dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), &
+                & dqR_prim_dx_n(id)%vf(iv%beg:iv%end), idwbuff(1), idwbuff(2), idwbuff(3))
+            if (n > 0) then
+                call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dy_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, dqL_rsy_vf, &
+                    & dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                    & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), idwbuff(1), idwbuff(2), idwbuff(3))
+                if (p > 0) then
+                    call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dz_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
+                        & dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), &
+                        & dqR_prim_dz_n(id)%vf(iv%beg:iv%end), idwbuff(1), idwbuff(2), idwbuff(3))
+                end if
+            end if
+        end if
+
+        call nvtxEndRange
+
+    end subroutine s_reconstruct_riemann_states
 
     !> Accumulate advection source contributions from a given coordinate direction into the RHS
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, is_hat_L)
