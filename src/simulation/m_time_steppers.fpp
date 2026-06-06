@@ -222,6 +222,7 @@ contains
         ! Allocating the cell-average primitive variables
         @:ALLOCATE(q_prim_vf(1:sys_size))
 
+        ! TODO: first igr divergence point. igr does not allocate q_prim_vf
         if (.not. igr) then
             do i = 1, eqn_idx%adv%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
@@ -376,6 +377,7 @@ contains
         @:ALLOCATE(rhs_vf(1:sys_size))
         @:PREFER_GPU(rhs_vf)
 
+        ! TODO: second igr divergence point
         if (igr) then
             do i = 1, sys_size
                 @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
@@ -471,6 +473,9 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
+                    ! TODO: igr divergence point, minor
+                    ! igr does not allocate q_prim_vf so q_cons_ts(1)%vf is passed
+                    ! Integration goal: allocate q_prim_vf for igr so both use the same branch
                     if (igr) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                     end if
@@ -500,6 +505,11 @@ contains
                             if (s == 1 .and. nstage > 1) then
                                 q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
+                            ! TODO: igr divergence point, major
+                            ! igr branch does not multiply rhs_vf by dt in the rk update
+                            ! the igr branch in s_compute_rhs (from m_rhs) fills rhs_vf
+                            ! after already scaling it by dt through subroutines in m_igr
+                            ! e.g. s_igr_sigma_x
                             if (igr) then
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
                                           & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
@@ -638,6 +648,7 @@ contains
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
 
+        ! TODO: igr divergence
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
@@ -903,6 +914,7 @@ contains
             @:DEALLOCATE(q_prim_ts1, q_prim_ts2)
         end if
 
+        ! TODO: igr divergence point, q_prim_vf(i)%sf not allocated for igr
         if (.not. igr) then
             ! Deallocating the cell-average primitive variables
             do i = 1, eqn_idx%adv%end
