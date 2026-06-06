@@ -391,6 +391,7 @@ contains
         real(wp), dimension(1:2)           :: length, center        !< x and y coordinates in local IB frame
 
         ! Transferring the rectangle's centroid and length information
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
 
@@ -495,6 +496,7 @@ contains
         real(wp)                           :: corner_distance
 
         ! Transferring the cuboid's centroid
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
@@ -555,6 +557,7 @@ contains
         real(wp)                           :: corner_distance
 
         ! Transferring the cylindrical patch's centroid
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
@@ -617,6 +620,7 @@ contains
         real(wp)                           :: bounding_radius
 
         ! Transferring the ellipse's centroid
+
         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
 
