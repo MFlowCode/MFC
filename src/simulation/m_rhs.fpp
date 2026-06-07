@@ -789,28 +789,30 @@ contains
                 end if
             end do
         else
-            ! Dual-pass HLLD: the first (hat_L) pass reconstructs the Riemann states and the second (hat_R) pass re-solves the
-            ! anchored Riemann problem on the same faces; the full RHS is the sum of the two anchored partial RHS's. The
-            ! axisymmetric geometric source is applied per pass at half weight so the sum carries the symmetric average of the
-            ! hat_L/hat_R face velocities.
+            ! Fused dual-pass HLLD: per direction, the Riemann states are reconstructed once and ONE fused solve computes both
+            ! anchored flux sets (hat_L into flux_n/nc_iface_vel_n through the solver's own finalize; hat_R into the flux_hatR_rs*
+            ! buffers). The hat_L partial RHS is assembled first; the hat_R set is then finalized into the same (already consumed)
+            ! flux field arrays and assembled. The full RHS is the sum of the two anchored partial RHS's; the axisymmetric geometric
+            ! source is applied per pass at half weight so the sum carries the symmetric average of the hat_L/hat_R face velocities.
             do id = 1, num_dims
                 call s_reconstruct_riemann_states(id)
                 call s_compute_directional_rhs(id, rhs_hatL_vf, .true.)
+                call nvtxStartRange("RHS-RIEMANN-FINALIZE-HATR")
+                call s_finalize_riemann_solver_hatR(flux_n(id)%vf, flux_gsrc_n(id)%vf, id)
+                if (use_nc_iface_vel) then
+                    call s_finalize_nc_iface_vel_hatR(nc_iface_vel_hatR_n(id)%vf, id)
+                end if
+                call nvtxEndRange
+                call nvtxStartRange("RHS-ADVECTION-SRC")
+                call s_compute_advection_source_term(id, rhs_hatR_vf, q_cons_qp, q_prim_qp, flux_src_n(id), .false.)
+                call nvtxEndRange
             end do
             if (grid_geometry == 2) then
                 call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
                 call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_hatL_vf, nc_iface_vel_n(1)%vf, &
                     & nc_iface_vel_n(2)%vf, 0.5_wp)
-                call nvtxEndRange
-            end if
-
-            do id = 1, num_dims
-                call s_compute_directional_rhs(id, rhs_hatR_vf, .false.)
-            end do
-            if (grid_geometry == 2) then
-                call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
-                call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_hatR_vf, nc_iface_vel_n(1)%vf, &
-                    & nc_iface_vel_n(2)%vf, 0.5_wp)
+                call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_hatR_vf, nc_iface_vel_hatR_n(1)%vf, &
+                    & nc_iface_vel_hatR_n(2)%vf, 0.5_wp)
                 call nvtxEndRange
             end if
 
@@ -1047,8 +1049,9 @@ contains
     end subroutine s_reconstruct_riemann_states
 
     !> Computes one sweep direction's contribution to the RHS: the Riemann solve on the reconstructed cell-boundary states followed
-    !! by the advection source term. For dual-pass HLLD, is_hat_L selects the anchor cell of the pass (hat_L: the cell left of each
-    !! face, hat_R: right) and the advection source applies the corresponding one-sided flux difference into rhs_vf.
+    !! by the advection source term. For dual-pass HLLD the fused solve computes BOTH anchored flux sets in one call; this routine
+    !! assembles the hat_L (is_hat_L=.true.) partial RHS, and the caller finalizes + assembles the hat_R set afterwards. is_hat_L
+    !! selects which one-sided flux difference the advection source applies into rhs_vf.
     subroutine s_compute_directional_rhs(id, rhs_vf, is_hat_L)
 
         integer, intent(in)                                    :: id
@@ -1071,7 +1074,7 @@ contains
         call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
                               & qR_prim(id)%vf, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
                               & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
-                              & flux_gsrc_n(id)%vf, id, irx, iry, irz, is_hat_L)
+                              & flux_gsrc_n(id)%vf, id, irx, iry, irz)
         call nvtxEndRange
 
         if (use_nc_iface_vel) then
