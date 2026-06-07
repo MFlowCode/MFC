@@ -83,6 +83,11 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: nc_iface_vel_n
     $:GPU_DECLARE(create='[nc_iface_vel_n]')
 
+    !> hat_R-pass interface velocities for fused dual-pass HLLD: the axisymmetric geometric source consumes both passes' face
+    !! velocities after the direction loop, so the hat_R values need their own field set (hat_L uses nc_iface_vel_n).
+    type(vector_field), allocatable, dimension(:) :: nc_iface_vel_hatR_n
+    $:GPU_DECLARE(create='[nc_iface_vel_hatR_n]')
+
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[qL_prim, qR_prim]')
@@ -536,6 +541,23 @@ contains
                 @:ACC_SETUP_VFs(nc_iface_vel_n(1), nc_iface_vel_n(2), nc_iface_vel_n(3))
             else
                 @:ACC_SETUP_VFs(nc_iface_vel_n(1))
+            end if
+            if (hypo_nc_dual_pass) then
+                @:ALLOCATE(nc_iface_vel_hatR_n(1:num_dims))
+                do i = 1, num_dims
+                    @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(1:num_dims))
+                    do l = 1, num_dims
+                        @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(l)%sf( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                    end do
+                end do
+                if (num_dims == 2) then
+                    @:ACC_SETUP_VFs(nc_iface_vel_hatR_n(1), nc_iface_vel_hatR_n(2))
+                else if (num_dims == 3) then
+                    @:ACC_SETUP_VFs(nc_iface_vel_hatR_n(1), nc_iface_vel_hatR_n(2), nc_iface_vel_hatR_n(3))
+                else
+                    @:ACC_SETUP_VFs(nc_iface_vel_hatR_n(1))
+                end if
             end if
         end if
 
@@ -2263,6 +2285,15 @@ contains
                 @:DEALLOCATE(nc_iface_vel_n(i)%vf)
             end do
             @:DEALLOCATE(nc_iface_vel_n)
+            if (hypo_nc_dual_pass) then
+                do i = 1, num_dims
+                    do l = 1, num_dims
+                        @:DEALLOCATE(nc_iface_vel_hatR_n(i)%vf(l)%sf)
+                    end do
+                    @:DEALLOCATE(nc_iface_vel_hatR_n(i)%vf)
+                end do
+                @:DEALLOCATE(nc_iface_vel_hatR_n)
+            end if
         end if
 
         if (hypo_nc_dual_pass) then

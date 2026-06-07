@@ -56,6 +56,26 @@ module m_riemann_solvers
     $:GPU_DECLARE(create='[nc_iface_vel_rsx_vf, nc_iface_vel_rsy_vf, nc_iface_vel_rsz_vf]')
     !> @}
 
+    !> Dual-pass HLLD second flux set: the hat_R-anchored fluxes (and, for axisymmetric runs, the hat_R interface velocities)
+    !! written by the same fused solve that fills flux_rs* / nc_iface_vel_rs* with the hat_L-anchored values. Allocated only when
+    !! hypo_nc_dual_pass.
+    !> @{
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_hatR_rsx_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_hatR_rsy_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_hatR_rsz_vf
+    $:GPU_DECLARE(create='[flux_hatR_rsx_vf, flux_hatR_rsy_vf, flux_hatR_rsz_vf]')
+
+    real(wp), allocatable, dimension(:,:,:,:) :: nc_iface_vel_hatR_rsx_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: nc_iface_vel_hatR_rsy_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: nc_iface_vel_hatR_rsz_vf
+    $:GPU_DECLARE(create='[nc_iface_vel_hatR_rsx_vf, nc_iface_vel_hatR_rsy_vf, nc_iface_vel_hatR_rsz_vf]')
+
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_hatR_rsx_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_hatR_rsy_vf
+    real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_hatR_rsz_vf
+    $:GPU_DECLARE(create='[flux_gsrc_hatR_rsx_vf, flux_gsrc_hatR_rsy_vf, flux_gsrc_hatR_rsz_vf]')
+    !> @}
+
     ! Cell-boundary velocity from Riemann solution; used for source flux
 
     real(wp), allocatable, dimension(:,:,:,:) :: vel_src_rsx_vf
@@ -244,7 +264,8 @@ contains
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
                                     & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, xi_P]', copyin='[norm_dir]')
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, &
+                                        & xi_P]', copyin='[norm_dir]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -4945,6 +4966,16 @@ contains
             @:ALLOCATE(nc_iface_vel_rsx_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:num_dims))
         end if
 
+        if (hypo_nc_dual_pass) then
+            @:ALLOCATE(flux_hatR_rsx_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+            if (use_nc_iface_vel) then
+                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:num_dims))
+            end if
+            if (cyl_coord) then
+                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+            end if
+        end if
+
         if (n == 0) return
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
@@ -4967,6 +4998,16 @@ contains
             @:ALLOCATE(nc_iface_vel_rsy_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:num_dims))
         end if
 
+        if (hypo_nc_dual_pass) then
+            @:ALLOCATE(flux_hatR_rsy_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+            if (use_nc_iface_vel) then
+                @:ALLOCATE(nc_iface_vel_hatR_rsy_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:num_dims))
+            end if
+            if (cyl_coord) then
+                @:ALLOCATE(flux_gsrc_hatR_rsy_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+            end if
+        end if
+
         if (p == 0) return
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
@@ -4987,6 +5028,16 @@ contains
 
         if (use_nc_iface_vel) then
             @:ALLOCATE(nc_iface_vel_rsz_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:num_dims))
+        end if
+
+        if (hypo_nc_dual_pass) then
+            @:ALLOCATE(flux_hatR_rsz_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+            if (use_nc_iface_vel) then
+                @:ALLOCATE(nc_iface_vel_hatR_rsz_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:num_dims))
+            end if
+            if (cyl_coord) then
+                @:ALLOCATE(flux_gsrc_hatR_rsz_vf(is1%beg:is1%end, is2%beg:is2%end, is3%beg:is3%end, 1:sys_size))
+            end if
         end if
 
     end subroutine s_initialize_riemann_solvers_module
@@ -6054,6 +6105,15 @@ contains
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsx_vf)
         end if
+        if (hypo_nc_dual_pass) then
+            @:DEALLOCATE(flux_hatR_rsx_vf)
+            if (use_nc_iface_vel) then
+                @:DEALLOCATE(nc_iface_vel_hatR_rsx_vf)
+            end if
+            if (cyl_coord) then
+                @:DEALLOCATE(flux_gsrc_hatR_rsx_vf)
+            end if
+        end if
 
         if (n == 0) return
 
@@ -6070,6 +6130,15 @@ contains
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsy_vf)
         end if
+        if (hypo_nc_dual_pass) then
+            @:DEALLOCATE(flux_hatR_rsy_vf)
+            if (use_nc_iface_vel) then
+                @:DEALLOCATE(nc_iface_vel_hatR_rsy_vf)
+            end if
+            if (cyl_coord) then
+                @:DEALLOCATE(flux_gsrc_hatR_rsy_vf)
+            end if
+        end if
 
         if (p == 0) return
 
@@ -6085,6 +6154,15 @@ contains
         end if
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsz_vf)
+        end if
+        if (hypo_nc_dual_pass) then
+            @:DEALLOCATE(flux_hatR_rsz_vf)
+            if (use_nc_iface_vel) then
+                @:DEALLOCATE(nc_iface_vel_hatR_rsz_vf)
+            end if
+            if (cyl_coord) then
+                @:DEALLOCATE(flux_gsrc_hatR_rsz_vf)
+            end if
         end if
 
     end subroutine s_finalize_riemann_solvers_module
