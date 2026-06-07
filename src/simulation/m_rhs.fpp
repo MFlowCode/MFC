@@ -767,11 +767,10 @@ contains
                 end if
             end do
         else
-            ! Dual-pass HLLD: the first (hat_L) pass reconstructs the Riemann states and the
-            ! second (hat_R) pass re-solves the anchored Riemann problem on the same faces;
-            ! the full RHS is the sum of the two anchored partial RHS's. The axisymmetric
-            ! geometric source is applied per pass at half weight so the sum carries the
-            ! symmetric average of the hat_L/hat_R face velocities.
+            ! Dual-pass HLLD: the first (hat_L) pass reconstructs the Riemann states and the second (hat_R) pass re-solves the
+            ! anchored Riemann problem on the same faces; the full RHS is the sum of the two anchored partial RHS's. The
+            ! axisymmetric geometric source is applied per pass at half weight so the sum carries the symmetric average of the
+            ! hat_L/hat_R face velocities.
             do id = 1, num_dims
                 call s_reconstruct_riemann_states(id)
                 call s_compute_directional_rhs(id, rhs_hatL_vf, .true.)
@@ -904,9 +903,8 @@ contains
 
         call nvtxStartRange("RHS-RECONSTRUCTION")
 
-        ! Per-component density reconstruction: divide alpha_rho_K by alpha_K
-        ! before reconstruction so the limiter acts on rho_K (smooth at contacts)
-        ! instead of alpha_rho_K (jumps with alpha at contacts).
+        ! Per-component density reconstruction: divide alpha_rho_K by alpha_K before reconstruction so the limiter acts on rho_K
+        ! (smooth at contacts) instead of alpha_rho_K (jumps with alpha at contacts).
         if (recon_comp_rho .and. num_fluids > 1) then
             do l = eqn_idx%cont%beg, eqn_idx%cont%end
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
@@ -965,8 +963,8 @@ contains
             end if
         end if
 
-        ! Per-component density reconstruction: restore q_prim and convert
-        ! reconstructed face rho_K back to alpha_rho_K = alpha_K * rho_K
+        ! Per-component density reconstruction: restore q_prim and convert reconstructed face rho_K back to alpha_rho_K = alpha_K *
+        ! rho_K
         if (recon_comp_rho .and. num_fluids > 1) then
             ! Restore q_prim_qp: multiply cont slots back by alpha
             do l = eqn_idx%cont%beg, eqn_idx%cont%end
@@ -981,22 +979,26 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end do
-            ! Convert reconstructed face values: rho_K_face * alpha_K_face -> alpha_rho_K_face
-            #:for XYZ in ['x', 'y', 'z']
-                do l = eqn_idx%cont%beg, eqn_idx%cont%end
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
-                    do k = idwbuff(3)%beg, idwbuff(3)%end
-                        do j = idwbuff(2)%beg, idwbuff(2)%end
-                            do i = idwbuff(1)%beg, idwbuff(1)%end
-                                qL_rs${XYZ}$_vf(i, j, k, l) = qL_rs${XYZ}$_vf(i, j, k, l)*qL_rs${XYZ}$_vf(i, j, k, &
-                                                & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
-                                qR_rs${XYZ}$_vf(i, j, k, l) = qR_rs${XYZ}$_vf(i, j, k, l)*qR_rs${XYZ}$_vf(i, j, k, &
-                                                & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
+            ! Convert reconstructed face values for THIS sweep direction only: rho_K_face * alpha_K_face -> alpha_rho_K_face.
+            ! Converting the other direction buffers here would re-multiply faces already converted by an earlier sweep
+            ! (alpha^2*rho), which the dual-pass hat_R re-solve still reads from the cached buffers.
+            #:for ii, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (id == ${ii}$) then
+                    do l = eqn_idx%cont%beg, eqn_idx%cont%end
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
+                        do k = idwbuff(3)%beg, idwbuff(3)%end
+                            do j = idwbuff(2)%beg, idwbuff(2)%end
+                                do i = idwbuff(1)%beg, idwbuff(1)%end
+                                    qL_rs${XYZ}$_vf(i, j, k, l) = qL_rs${XYZ}$_vf(i, j, k, l)*qL_rs${XYZ}$_vf(i, j, k, &
+                                                    & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
+                                    qR_rs${XYZ}$_vf(i, j, k, l) = qR_rs${XYZ}$_vf(i, j, k, l)*qR_rs${XYZ}$_vf(i, j, k, &
+                                                    & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
+                                end do
                             end do
                         end do
+                        $:END_GPU_PARALLEL_LOOP()
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end do
+                end if
             #:endfor
         end if
 
