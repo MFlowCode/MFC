@@ -312,22 +312,16 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
 | `num_ibs`            | Integer | Number of immersed boundary patches |
+| `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
+| `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
+| `ib_neighborhood_radius` | Integer | Parameter that controls the neighborhood size for IB detection. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
 | `radius`             | Real    | Radius, if applicable, of the applied geometry. |
-| `theta`              | Real    | Angle of attach applied to airfoil IB patches |
-| `c`                  | Real    | NACA airfoil parameters (see below) |
-| `t`                  | Real    | NACA airfoil parameters (see below) |
-| `m`                  | Real    | NACA airfoil parameters (see below) |
-| `p`                  | Real    | NACA airfoil parameters (see below) |
+| `airfoil_id`         | Integer | Index into `ib_airfoil` array for NACA airfoil geometry patches. |
+| `model_id`           | Integer | Index into `stl_models` array for STL/OBJ geometry patches. |
 | `slip`               | Logical | Apply a slip boundary |
-| `model_filepath`     | String  | Path to an STL or OBJ file (not all OBJs are supported).     |
-| `model_scale(i)`     | Real    | Model's (applied) scaling factor for component $i$.          |
-| `model_rotate(i)`    | Real    | Model's (applied) angle of rotation about axis $i$.          |
-| `model_translate(i)` | Real    | Model's $i$-th component of (applied) translation.           |
-| `model_spc`          | Integer | Number of samples per cell when discretizing the model into the grid. |
-| `model_threshold`    | Real    | Ray fraction inside the model patch above which the fraction is set to one.|
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
@@ -337,6 +331,17 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
+
+STL/OBJ model geometry parameters are set on the `stl_models` array (indexed by `model_id`):
+
+| Parameter            | Type    | Description |
+|:---------------------|:--------|:------------|
+| `model_filepath`     | String  | Path to an STL or OBJ file (not all OBJs are supported). |
+| `model_scale(i)`     | Real    | Model's scaling factor for component $i$. |
+| `model_translate(i)` | Real    | Model's $i$-th component of translation. |
+| `model_threshold`    | Real    | Winding number threshold above which a cell is marked as inside the model. |
+
+These parameters should be prepended with `stl_models(k)%` where $k$ is the model index.
 
 #### Parameter Descriptions
 
@@ -349,15 +354,13 @@ Definitions for currently implemented immersed boundary patch types are listed i
 
 - `radius` is the radius to be used for circular patches.
 
-- `theta` allows for the angle of attach of airfoil patches to be changed.
-
-- `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil.
-`m` is the maximum camber, `p` is the location of maximum camber, `c` is the coord length, and `t` is the thickness.
+- `c`, `t`, `p`, and `m` specify the parameters for a NACA airfoil (set on the referenced `ib_airfoil` entry).
+`m` is the maximum camber, `p` is the location of maximum camber, `c` is the chord length, and `t` is the thickness.
 Additional details on this specification can be found in [NACA airfoil](https://en.wikipedia.org/wiki/NACA_airfoil).
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- Please see [Patch Parameters](#sec-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
+- For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 
 - `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 
@@ -372,6 +375,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring gonstant used to apply collision forces.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
+
+- `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IB's up to 1 ranks away. This parameter is required to strong-scale a case when IB's eventually grow to be larger than one full processor domain wide.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
@@ -446,8 +451,8 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `muscl_order`              | Integer | MUSCL order [1,2] |
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
 | `muscl_eps`                | Real    | MUSCL limiter slope-product threshold (default: hard-coded thresholds; set to 0 for textbook behavior) |
+| `int_comp`                 | Integer | Interface Compression [0] Off [1] THINC [2] MTHINC (default 0) |
 | `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
-| `int_comp`                 | Logical | THINC Interface Compression |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
 | `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
@@ -547,7 +552,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 When not set (default), the threshold is 1e-9 for minmod/MC, and 1e-6 for others.
 Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate whenever both slopes have the same sign.
 
-- `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
+- `int_comp` activates interface compression using [1] THINC or [2] MTHINC (default off) used in variable reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
@@ -643,7 +648,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `alpha_wrt(i)`          | Logical | Add the volume fraction of fluid $i$ to the database	|
 | `gamma_wrt`             | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
-| `ib_state_wrt`          | Logical | Write IB state and loads to a datafile at each time step |
+| `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
 | `c_wrt`                 | Logical | Add the sound speed to the database	 |
@@ -704,14 +709,14 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - ``[variable's name]_wrt`` activates the output of each specified variable into the database.
 
-- `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component.
+- `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component. It must be specified for every fluid when `schlieren_wrt` is enabled.
 
 - `fd_order` specifies the order of the finite difference scheme used to compute the vorticity from the velocity field and the numerical schlieren from the density field using an integer of 1, 2, and 4.
 `fd_order = 1`, `2`, and `4` correspond to the first, second, and fourth-order finite difference schemes.
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-- `ib_state_wrt` activates the output of data specified by patch_ib(i)%force(:) (and torque, vel, angular_vel, angles, [x,y,z]_centroid) into a single binary datafile for all IBs at all timesteps. During post_processing, this file is converted into separate time histories for each IB.
+- `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files.
 
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.

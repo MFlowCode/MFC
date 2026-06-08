@@ -1,0 +1,190 @@
+This file was created on 2026-05-13 07:35:59.310410.
+
+mfc.sh:
+
+    Invocation: test --generate --only BA186DDF -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        9c2a820a102dc19231f6782d1e4141dc2c482f72 on HEAD (clean)
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on k004-004.hpcfund
+    
+        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
+        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /work1/spencerbryngelson/sbryngelson/local-aware-ibm/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
+        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
+        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on k004-004.hpcfund
+    
+        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
+        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /work1/spencerbryngelson/sbryngelson/local-aware-ibm/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
+        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
+        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on k004-004.hpcfund
+    
+        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
+        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /work1/spencerbryngelson/sbryngelson/local-aware-ibm/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
+        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
+        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on k004-004.hpcfund
+    
+        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
+        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /work1/spencerbryngelson/sbryngelson/local-aware-ibm/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
+        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
+        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From lscpu
+    Architecture:                         x86_64
+    CPU op-mode(s):                       32-bit, 64-bit
+    Address sizes:                        48 bits physical, 48 bits virtual
+    Byte Order:                           Little Endian
+    CPU(s):                               128
+    On-line CPU(s) list:                  0-127
+    Vendor ID:                            AuthenticAMD
+    Model name:                           AMD EPYC 7763 64-Core Processor
+    CPU family:                           25
+    Model:                                1
+    Thread(s) per core:                   1
+    Core(s) per socket:                   64
+    Socket(s):                            2
+    Stepping:                             1
+    Frequency boost:                      enabled
+    CPU max MHz:                          3529.0520
+    CPU min MHz:                          1500.0000
+    BogoMIPS:                             4891.26
+    Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap
+    Virtualization:                       AMD-V
+    L1d cache:                            4 MiB (128 instances)
+    L1i cache:                            4 MiB (128 instances)
+    L2 cache:                             64 MiB (128 instances)
+    L3 cache:                             512 MiB (16 instances)
+    NUMA node(s):                         2
+    NUMA node0 CPU(s):                    0-63
+    NUMA node1 CPU(s):                    64-127
+    Vulnerability Gather data sampling:   Not affected
+    Vulnerability Itlb multihit:          Not affected
+    Vulnerability L1tf:                   Not affected
+    Vulnerability Mds:                    Not affected
+    Vulnerability Meltdown:               Not affected
+    Vulnerability Mmio stale data:        Not affected
+    Vulnerability Reg file data sampling: Not affected
+    Vulnerability Retbleed:               Not affected
+    Vulnerability Spec rstack overflow:   Mitigation; Safe RET
+    Vulnerability Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl
+    Vulnerability Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+    Vulnerability Spectre v2:             Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+    Vulnerability Srbds:                  Not affected
+    Vulnerability Tsx async abort:        Not affected
+

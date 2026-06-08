@@ -21,7 +21,7 @@ print(
             "t_step_save": 100,
             # Simulation Algorithm Parameters
             "num_patches": 2,
-            "model_eqns": 3,
+            "model_eqns": 2,
             "alt_soundspeed": "F",
             "num_fluids": 2,
             "mpp_lim": "T",
@@ -30,7 +30,7 @@ print(
             "recon_type": 2,
             "muscl_order": 2,
             "muscl_lim": 2,
-            "int_comp": "T",
+            "int_comp": 1,
             "null_weights": "F",
             "riemann_solver": 2,
             "wave_speeds": 1,

@@ -15,6 +15,7 @@ module m_start_up
     use m_variables_conversion
     use m_weno
     use m_muscl
+    use m_thinc
     use m_riemann_solvers
     use m_cbc
     use m_boundary_common
@@ -39,6 +40,10 @@ module m_start_up
 
     use m_nvtx
     use m_ibm
+    use m_ib_patches
+    use m_model
+    use m_particle_cloud
+    use m_collisions
     use m_compile_specific
     use m_checker_common
     use m_checker
@@ -81,39 +86,7 @@ contains
 
         character(len=1000) :: line
 
-        namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, mpp_lim, time_stepper, weno_eps, muscl_eps, &
-            rdma_mpi, teno_CT, mp_weno, weno_avg, &
-            riemann_solver, low_Mach, wave_speeds, avg_state, &
-            bc_x, bc_y, bc_z, &
-            x_a, y_a, z_a, x_b, y_b, z_b, &
-            x_domain, y_domain, z_domain, &
-            hypoelasticity, &
-            ib, num_ibs, patch_ib, &
-            collision_model, coefficient_of_restitution, collision_time, &
-            ib_coefficient_of_friction, ib_state_wrt, &
-            fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
-            fd_order, probe, num_probes, t_step_old, &
-            alt_soundspeed, mixture_err, weno_Re_flux, &
-            null_weights, precision, parallel_io, cyl_coord, &
-            rhoref, pref, bubbles_euler, bubble_model, &
-            R0ref, chem_params, &
-        #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
-            num_fluids, mhd, relativity, igr_order, viscous, &
-            igr_iter_solver, igr, igr_pres_lim, &
-            recon_type, muscl_order, muscl_lim, &
-        #:endif
-        Ca, Web, Re_inv, acoustic_source, acoustic, num_source, polytropic, thermal, integral, integral_wrt, num_integrals, &
-            & polydisperse, poly_sigma, qbmm, relax, relax_model, palpha_eps, ptgalpha_eps, file_per_process, sigma, pi_fac, &
-            & adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, bf_x, bf_y, bf_z, k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, g_x, &
-            & g_y, g_z, n_start, t_save, t_stop, cfl_adap_dt, cfl_const_dt, cfl_target, surface_tension, bubbles_lagrange, &
-            & lag_params, hyperelasticity, R0ref, num_bc_patches, Bx0, cont_damage, tau_star, cont_damage_s, alpha_bar, &
-            & hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, alf_factor, num_igr_iters, num_igr_warm_start_iters, &
-            & int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, &
-            & synthetic_turbulence, synth_seed, synth_n_shells, num_turbulent_sources, synth_U_inf, synth_n_waves_per_shell, &
-            & synth_k_shell, synth_amp_shell, turb_pos, synth_L
+        #:include 'generated_namelist.fpp'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
 
@@ -176,7 +149,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the starting time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
-        logical :: file_exist
+        logical :: file_exist                               !< Logical used to check the existence of the input file
         integer :: i, r
 
         if (cfl_dt) then
@@ -211,15 +184,6 @@ contains
 
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
-
-        if (ib) then
-            do i = 1, num_ibs
-                if (patch_ib(i)%c > 0) then
-                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
-                end if
-            end do
-        end if
 
         if (n > 0) then
             file_path = trim(t_step_dir) // '/y_cb.dat'
@@ -348,16 +312,6 @@ contains
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
-
-        if (ib) then
-            do i = 1, num_ibs
-                if (patch_ib(i)%c > 0) then
-                    Np = int((patch_ib(i)%p*patch_ib(i)%c/dx(0))*20) + int(((patch_ib(i)%c - patch_ib(i)%p*patch_ib(i)%c)/dx(0)) &
-                             & *20) + 1
-                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
-                end if
-            end do
-        end if
 
         if (n > 0) then
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
@@ -682,7 +636,6 @@ contains
 
     !> Collect per-process wall-clock times and write aggregate performance metrics to file
     impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, &
-
         & file_exists)
 
         real(wp), intent(inout)               :: time_avg, time_final
@@ -864,7 +817,9 @@ contains
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
         if (bubbles_euler) call s_initialize_bubbles_EE_module()
-        if (ib) call s_initialize_ibm_module()
+        if (ib) then
+            call s_initialize_ibm_module()
+        end if
         if (qbmm) call s_initialize_qbmm_module()
 
         if (acoustic_source) then
@@ -916,11 +871,23 @@ contains
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            if (cfl_dt .and. n_start > 0) then
-                call s_read_ib_restart_data(n_start)
-            else if (t_step_start > 0) then
-                call s_read_ib_restart_data(t_step_start)
-            end if
+            block
+                type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
+
+                if (cfl_dt .and. n_start > 0) then
+                    call s_read_ib_restart_data(n_start)
+                    allocate (particle_cloud_ibs(0))
+                else if (t_step_start > 0) then
+                    call s_read_ib_restart_data(t_step_start)
+                    allocate (particle_cloud_ibs(0))
+                else
+                    call s_generate_particle_clouds(particle_cloud_ibs)
+                end if
+                call s_instantiate_STL_models()
+                call s_initialize_ib_airfoils()
+                call s_reduce_ib_patch_array(particle_cloud_ibs)
+                deallocate (particle_cloud_ibs)
+            end block
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
                 call s_write_ib_data_file(0)
@@ -935,10 +902,10 @@ contains
 
         ! Computation of parameters, allocation of memory, association of pointers, and/or execution of any other tasks that are
         ! needed to properly configure the modules. The preparations below DO DEPEND on the grid being complete.
-        if (igr .or. dummy) then
+        if (igr) then
             call s_initialize_igr_module()
         end if
-        if (.not. igr .or. dummy) then
+        if (.not. igr) then
             if (recon_type == WENO_TYPE) then
                 call s_initialize_weno_module()
             else if (recon_type == MUSCL_TYPE) then
@@ -947,7 +914,7 @@ contains
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
-
+        if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
@@ -1096,14 +1063,6 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[igr, nb, igr_order]')
         #:endif
-        #:if USING_AMD
-            block
-                use m_thermochem, only: molecular_weights
-                use m_chemistry, only: molecular_weights_nonparameter
-                molecular_weights_nonparameter(:) = molecular_weights(:)
-                $:GPU_UPDATE(device='[molecular_weights_nonparameter]')
-            end block
-        #:endif
 
     end subroutine s_initialize_gpu_vars
 
@@ -1127,6 +1086,7 @@ contains
                 call s_finalize_muscl_module()
             end if
         end if
+        if (int_comp > 0) call s_finalize_thinc_module()
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
@@ -1154,48 +1114,392 @@ contains
         integer, intent(in)                  :: t_step
         character(len=path_len + 2*name_len) :: file_loc
         integer                              :: i, ios, file_unit, ierr
+        integer                              :: r, nlocal, gbl_id
         integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
         logical                              :: file_exist
+        character(len=10)                    :: t_step_string
 
-        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
-        file_loc = trim(case_dir) // trim(file_loc)
+        if (file_per_process) then
+            call s_int_to_str(t_step, t_step_string)
 
-        if (proc_rank == 0) then
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (.not. file_exist) then
-                call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+            do r = 0, num_procs - 1
+                write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', r, '.dat'
+                file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
+
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+                if (.not. file_exist) call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
+
+                read (file_unit, iostat=ios) nlocal
+                if (ios /= 0) call s_mpi_abort('Error reading IB state file header: ' // trim(file_loc))
+
+                do i = 1, nlocal
+                    read (file_unit, iostat=ios) gbl_id
+                    if (ios /= 0) call s_mpi_abort('Error reading IB patch ID: ' // trim(file_loc))
+                    read (file_unit, iostat=ios) ib_buf
+                    if (ios /= 0) call s_mpi_abort('Error reading IB state data: ' // trim(file_loc))
+
+                    patch_ib(gbl_id)%vel = ib_buf(8:10)
+                    patch_ib(gbl_id)%angular_vel = ib_buf(11:13)
+                    patch_ib(gbl_id)%angles = ib_buf(14:16)
+                    patch_ib(gbl_id)%x_centroid = ib_buf(17)
+                    patch_ib(gbl_id)%y_centroid = ib_buf(18)
+                    patch_ib(gbl_id)%z_centroid = ib_buf(19)
+                end do
+
+                close (file_unit)
+            end do
+        else
+            write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+            file_loc = trim(case_dir) // trim(file_loc)
+
+            if (proc_rank == 0) then
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+                if (.not. file_exist) then
+                    call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
+                end if
+
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
+                if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
+
+                do i = 1, num_ibs
+                    read (file_unit, iostat=ios) ib_buf
+                    if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
+
+                    patch_ib(i)%vel = ib_buf(8:10)
+                    patch_ib(i)%angular_vel = ib_buf(11:13)
+                    patch_ib(i)%angles = ib_buf(14:16)
+                    patch_ib(i)%x_centroid = ib_buf(17)
+                    patch_ib(i)%y_centroid = ib_buf(18)
+                    patch_ib(i)%z_centroid = ib_buf(19)
+                end do
+
+                close (file_unit)
             end if
 
-            open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
-            if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
-
+#ifdef MFC_MPI
             do i = 1, num_ibs
-                read (file_unit, iostat=ios) ib_buf
-                if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
-
-                patch_ib(i)%vel = ib_buf(8:10)
-                patch_ib(i)%angular_vel = ib_buf(11:13)
-                patch_ib(i)%angles = ib_buf(14:16)
-                patch_ib(i)%x_centroid = ib_buf(17)
-                patch_ib(i)%y_centroid = ib_buf(18)
-                patch_ib(i)%z_centroid = ib_buf(19)
+                call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             end do
-
-            close (file_unit)
+#endif
         end if
 
+    end subroutine s_read_ib_restart_data
+
+    !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_cloud_ibs (CPU-only, exact
+    !! size) and reduces to only the patches in or near the local computational domain. patch_ib is never reallocated; the local
+    !! subset is written in-place from the front. particle_cloud_ibs is owned by the caller and freed there after this returns.
+    subroutine s_reduce_ib_patch_array(particle_cloud_ibs)
+
+        type(ib_patch_parameters), intent(in), dimension(:) :: particle_cloud_ibs
+        real(wp), dimension(3)                              :: centroid
+        integer                                             :: i
+        integer                                             :: num_namelist_ibs, num_bed_ibs
+
+        num_namelist_ibs = num_ibs
+        num_bed_ibs = 0
+        do i = 1, num_particle_clouds
+            num_bed_ibs = num_bed_ibs + particle_cloud(i)%num_particles
+        end do
+
+        ! Check for moving IBs across both namelist and particle bed patches.
+        moving_immersed_boundary_flag = .false.
+        do i = 1, num_namelist_ibs
+            if (patch_ib(i)%moving_ibm /= 0) then
+                moving_immersed_boundary_flag = .true.
+                exit
+            end if
+        end do
+        if (.not. moving_immersed_boundary_flag) then
+            do i = 1, num_bed_ibs
+                if (particle_cloud_ibs(i)%moving_ibm /= 0) then
+                    moving_immersed_boundary_flag = .true.
+                    exit
+                end if
+            end do
+        end if
+
+        call get_neighbor_bounds()
+        call s_compute_ib_neighbor_ranks()
+
+        num_gbl_ibs = num_namelist_ibs + num_bed_ibs
+
 #ifdef MFC_MPI
-        do i = 1, num_ibs
-            call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        if (num_procs == 1) then
+            ! single-rank: all patches are local; append particle bed entries directly into patch_ib.
+            @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
+                       & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+            do i = 1, num_bed_ibs
+                patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
+                patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
+            end do
+            num_ibs = num_gbl_ibs
+            num_local_ibs = num_gbl_ibs
+            do i = 1, num_gbl_ibs
+                local_ib_patch_ids(i) = i
+            end do
+        else
+            ! multi-rank: compact namelist patches in-place (write_idx <= read_idx, no aliasing), then append local particle beds.
+            num_ibs = 0
+            num_local_ibs = 0
+            do i = 1, num_namelist_ibs
+                centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
+                if (f_neighborhood_ranks_own_location(centroid)) then
+                    num_ibs = num_ibs + 1
+                    patch_ib(num_ibs) = patch_ib(i)
+                    patch_ib(num_ibs)%gbl_patch_id = i
+                    if (f_local_rank_owns_location(centroid)) then
+                        num_local_ibs = num_local_ibs + 1
+                        local_ib_patch_ids(num_local_ibs) = num_ibs
+                    end if
+                end if
+            end do
+            do i = 1, num_bed_ibs
+                centroid = [particle_cloud_ibs(i)%x_centroid, particle_cloud_ibs(i)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = particle_cloud_ibs(i)%z_centroid
+                if (f_neighborhood_ranks_own_location(centroid)) then
+                    num_ibs = num_ibs + 1
+                    @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
+                               & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                    patch_ib(num_ibs) = particle_cloud_ibs(i)
+                    patch_ib(num_ibs)%gbl_patch_id = num_namelist_ibs + i
+                    if (f_local_rank_owns_location(centroid)) then
+                        num_local_ibs = num_local_ibs + 1
+                        local_ib_patch_ids(num_local_ibs) = num_ibs
+                    end if
+                end if
+            end do
+            @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
+                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
+        end if
+#else
+        ! no-MPI: all patches are local; append particle bed entries directly into patch_ib.
+        @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
+                   & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+        do i = 1, num_bed_ibs
+            patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
+            patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
+        end do
+        num_ibs = num_gbl_ibs
+        num_local_ibs = num_gbl_ibs
+        do i = 1, num_gbl_ibs
+            local_ib_patch_ids(i) = i
         end do
 #endif
 
-    end subroutine s_read_ib_restart_data
+        @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
+
+    end subroutine s_reduce_ib_patch_array
+
+    !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all neighbor domains. Uses two rounds of MPI_SENDRECV cascades - face
+    !! neighbors are known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2.
+    subroutine s_compute_ib_neighbor_ranks()
+
+        integer                :: ax, k, nbr_idx, nreqs, sx, sy, sz, dx, dy, dz
+        integer, allocatable   :: send_table(:,:,:), recv_tables(:,:,:,:)
+        integer, dimension(52) :: requests
+
+#ifdef MFC_MPI
+        integer               :: ierr
+        integer, dimension(4) :: buf4, rbuf4
+        integer, dimension(2) :: buf2, rbuf2
+
+        ax = ib_neighborhood_radius
+
+        if (allocated(ib_neighbor_ranks)) deallocate (ib_neighbor_ranks)
+        allocate (ib_neighbor_ranks(-ax:ax,-ax:ax,-ax:ax))
+        ib_neighbor_ranks = MPI_PROC_NULL
+        ib_neighbor_ranks(0, 0, 0) = proc_rank
+
+        ! Fill radius-1 entries: face neighbors are known from domain decomposition
+        ib_neighbor_ranks(-1, 0, 0) = bc_x%beg
+        ib_neighbor_ranks(+1, 0, 0) = bc_x%end
+        if (num_dims >= 2) then
+            ib_neighbor_ranks(0, -1, 0) = bc_y%beg
+            ib_neighbor_ranks(0, +1, 0) = bc_y%end
+        end if
+        if (num_dims == 3) then
+            ib_neighbor_ranks(0, 0, -1) = bc_z%beg
+            ib_neighbor_ranks(0, 0, +1) = bc_z%end
+        end if
+
+        if (num_dims >= 2) then
+            ! Round 1a: exchange y/z face ranks with +/-x face neighbors -> xy and xz edge ranks
+            buf4 = [bc_y%beg, bc_y%end, bc_z%beg, bc_z%end]
+
+            ! Send to -x, receive from +x -> edges (+1,+/-1,0) and (+1,0,+/-1)
+            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 310, rbuf4, 4, MPI_INTEGER, &
+                              & merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 310, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_x%end >= 0) then
+                ib_neighbor_ranks(+1, -1, 0) = rbuf4(1)
+                ib_neighbor_ranks(+1, +1, 0) = rbuf4(2)
+                ib_neighbor_ranks(+1, 0, -1) = rbuf4(3)
+                ib_neighbor_ranks(+1, 0, +1) = rbuf4(4)
+            end if
+
+            call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 311, rbuf4, 4, MPI_INTEGER, &
+                              & merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 311, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_x%beg >= 0) then
+                ib_neighbor_ranks(-1, -1, 0) = rbuf4(1)
+                ib_neighbor_ranks(-1, +1, 0) = rbuf4(2)
+                ib_neighbor_ranks(-1, 0, -1) = rbuf4(3)
+                ib_neighbor_ranks(-1, 0, +1) = rbuf4(4)
+            end if
+        end if
+
+        if (num_dims == 3) then
+            ! Round 1b: exchange z face ranks with +/-y face neighbors -> yz edge ranks
+            buf2 = [bc_z%beg, bc_z%end]
+
+            call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(bc_y%beg, MPI_PROC_NULL, bc_y%beg >= 0), 312, rbuf2, 2, MPI_INTEGER, &
+                              & merge(bc_y%end, MPI_PROC_NULL, bc_y%end >= 0), 312, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_y%end >= 0) then
+                ib_neighbor_ranks(0, +1, -1) = rbuf2(1)
+                ib_neighbor_ranks(0, +1, +1) = rbuf2(2)
+            end if
+
+            call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(bc_y%end, MPI_PROC_NULL, bc_y%end >= 0), 313, rbuf2, 2, MPI_INTEGER, &
+                              & merge(bc_y%beg, MPI_PROC_NULL, bc_y%beg >= 0), 313, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            if (bc_y%beg >= 0) then
+                ib_neighbor_ranks(0, -1, -1) = rbuf2(1)
+                ib_neighbor_ranks(0, -1, +1) = rbuf2(2)
+            end if
+
+            ! Round 2: exchange z face ranks with xy-diagonal edge neighbors -> corner ranks. Each of the 4 xy diagonals gives 2
+            ! corners (the +/-z variants). Pattern: send buf2 to mirror diagonal, receive from this diagonal -> that edge's z face
+            ! ranks.
+            #:for DX, DY, MDX, MDY, TAG in [(1,1,-1,-1,320), (1,-1,-1,1,321), (-1,1,1,-1,322), (-1,-1,1,1,323)]
+                call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(ib_neighbor_ranks(${MDX}$, ${MDY}$, 0), MPI_PROC_NULL, &
+                                  & ib_neighbor_ranks(${MDX}$, ${MDY}$, 0) >= 0), ${TAG}$, rbuf2, 2, MPI_INTEGER, &
+                                  & merge(ib_neighbor_ranks(${DX}$, ${DY}$, 0), MPI_PROC_NULL, ib_neighbor_ranks(${DX}$, ${DY}$, &
+                                  & 0) >= 0), ${TAG}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                if (ib_neighbor_ranks(${DX}$, ${DY}$, 0) >= 0) then
+                    ib_neighbor_ranks(${DX}$, ${DY}$, -1) = rbuf2(1)
+                    ib_neighbor_ranks(${DX}$, ${DY}$, +1) = rbuf2(2)
+                end if
+            #:endfor
+        end if
+
+        ! For radius > 1: extend the table by iterative 26-neighbor full-table exchanges. In each round, every rank broadcasts its
+        ! current table to all 26 immediate neighbors. Their entry at offset (dx,dy,dz) from them = our entry at
+        ! (dx+sx,dy+sy,dz+sz). One extension round fills the entire next shell, so ax-1 rounds suffice.
+        if (ax > 1) then
+            allocate (send_table(-ax:ax,-ax:ax,-ax:ax))
+            allocate (recv_tables(-ax:ax,-ax:ax,-ax:ax,1:26))
+
+            do k = 2, ax
+                send_table = ib_neighbor_ranks
+
+                nreqs = 0
+                nbr_idx = 0
+                do sz = -1, 1
+                    do sy = -1, 1
+                        do sx = -1, 1
+                            if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
+                            nbr_idx = nbr_idx + 1
+                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            nreqs = nreqs + 1
+                            call MPI_IRECV(recv_tables(:,:,:,nbr_idx), (2*ax + 1)**3, MPI_INTEGER, ib_neighbor_ranks(sx, sy, sz), &
+                                           & 400, MPI_COMM_WORLD, requests(nreqs), ierr)
+                        end do
+                    end do
+                end do
+
+                do sz = -1, 1
+                    do sy = -1, 1
+                        do sx = -1, 1
+                            if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
+                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            nreqs = nreqs + 1
+                            call MPI_ISEND(send_table, (2*ax + 1)**3, MPI_INTEGER, ib_neighbor_ranks(sx, sy, sz), 400, &
+                                           & MPI_COMM_WORLD, requests(nreqs), ierr)
+                        end do
+                    end do
+                end do
+
+                call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
+
+                nbr_idx = 0
+                do sz = -1, 1
+                    do sy = -1, 1
+                        do sx = -1, 1
+                            if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
+                            nbr_idx = nbr_idx + 1
+                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            do dz = -ax, ax
+                                do dy = -ax, ax
+                                    do dx = -ax, ax
+                                        if (recv_tables(dx, dy, dz, nbr_idx) == MPI_PROC_NULL) cycle
+                                        if (dx + sx < -ax .or. dx + sx > ax) cycle
+                                        if (dy + sy < -ax .or. dy + sy > ax) cycle
+                                        if (dz + sz < -ax .or. dz + sz > ax) cycle
+                                        if (ib_neighbor_ranks(dx + sx, dy + sy, dz + sz) /= MPI_PROC_NULL) cycle
+                                        ib_neighbor_ranks(dx + sx, dy + sy, dz + sz) = recv_tables(dx, dy, dz, nbr_idx)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+
+            deallocate (send_table, recv_tables)
+        end if
+#endif
+
+    end subroutine s_compute_ib_neighbor_ranks
+
+    subroutine get_neighbor_bounds()
+
+        real(wp) :: beg_val, end_val, recv_val
+        integer  :: k, send_neighbor, recv_neighbor, ierr
+
+        ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
+
+        neighbor_domain_x%beg = -huge(0._wp)
+        neighbor_domain_x%end = huge(0._wp)
+        neighbor_domain_y%beg = -huge(0._wp)
+        neighbor_domain_y%end = huge(0._wp)
+        neighbor_domain_z%beg = -huge(0._wp)
+        neighbor_domain_z%end = huge(0._wp)
+
+#ifdef MFC_MPI
+        ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =
+        ! left edge of the rank k hops to the left; end_val = right edge of the rank k hops to the right.
+        #:for X, ID, TAG, DIM in [('x', 1, 100, 'm'), ('y', 2, 102, 'n'), ('z', 3, 104, 'p')]
+            if (num_dims >= ${ID}$) then
+                beg_val = ${X}$_cb(-1)
+                end_val = ${X}$_cb(${DIM}$)
+                do k = 1, ib_neighborhood_radius
+                    send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+                    recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
+                    recv_val = -huge(0._wp)
+                    call MPI_SENDRECV(beg_val, 1, mpi_p, send_neighbor, ${TAG}$, recv_val, 1, mpi_p, recv_neighbor, ${TAG}$, &
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    beg_val = recv_val
+
+                    send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
+                    recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+                    recv_val = huge(0._wp)
+                    call MPI_SENDRECV(end_val, 1, mpi_p, send_neighbor, ${TAG + 1}$, recv_val, 1, mpi_p, recv_neighbor, &
+                                      & ${TAG + 1}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end_val = recv_val
+                end do
+                neighbor_domain_${X}$%beg = beg_val
+                neighbor_domain_${X}$%end = end_val
+            end if
+        #:endfor
+#endif
+
+    end subroutine get_neighbor_bounds
 
 end module m_start_up

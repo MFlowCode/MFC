@@ -38,6 +38,10 @@ contains
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
 
+        if (num_particle_clouds > 0) then
+            call s_check_inputs_particle_clouds
+        end if
+
     end subroutine s_check_inputs
 
     !> Checks constraints on compiler options
@@ -80,6 +84,8 @@ contains
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
                    & "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
                    & // trim(numStr))
+        @:PROHIBIT(muscl_order == 1 .and. int_comp > 0, &
+                   & "int_comp requires muscl_order >= 2 (muscl_order=1 leaves the reconstruction workspace uninitialised)")
 
     end subroutine s_check_inputs_muscl
 
@@ -103,5 +109,22 @@ contains
 #endif
 
     end subroutine s_check_inputs_nvidia_uvm
+
+    !> Checks that each active particle cloud has a valid packing_method specified
+    impure subroutine s_check_inputs_particle_clouds
+
+        integer          :: i
+        character(len=5) :: idxStr
+
+        do i = 1, num_particle_clouds
+            call s_int_to_str(i, idxStr)
+            @:PROHIBIT(particle_cloud(i)%packing_method == dflt_int, &
+                       & "particle_cloud("//trim(idxStr)//")%packing_method must be specified (1 = rejection sampling)")
+            @:PROHIBIT(particle_cloud(i)%packing_method /= 1, &
+                       & "particle_cloud("//trim(idxStr) &
+                       & //")%packing_method must be 1 (rejection sampling is the only supported method)")
+        end do
+
+    end subroutine s_check_inputs_particle_clouds
 
 end module m_checker

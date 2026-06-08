@@ -461,6 +461,39 @@ macro(HANDLE_SOURCES target useCommon)
 endmacro()
 
 
+# Generate Fortran parameter namelist/decl includes into the per-target build
+# include directories before HANDLE_SOURCES globs them for Fypp.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(_mfc_gen_stamp "${CMAKE_BINARY_DIR}/mfc_params_gen.stamp")
+file(GLOB_RECURSE _mfc_gen_inputs
+    "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/*.py"
+)
+set(_mfc_needs_regen FALSE)
+if(NOT EXISTS "${_mfc_gen_stamp}")
+    set(_mfc_needs_regen TRUE)
+else()
+    foreach(_input IN LISTS _mfc_gen_inputs)
+        if("${_input}" IS_NEWER_THAN "${_mfc_gen_stamp}")
+            set(_mfc_needs_regen TRUE)
+            break()
+        endif()
+    endforeach()
+endif()
+if(_mfc_needs_regen)
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/generators/cmake_gen.py"
+                "${CMAKE_BINARY_DIR}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        RESULT_VARIABLE _mfc_gen_result
+        ERROR_VARIABLE  _mfc_gen_error
+    )
+    if(NOT _mfc_gen_result EQUAL 0)
+        message(FATAL_ERROR "Fortran param generation failed:\n${_mfc_gen_error}")
+    endif()
+    file(TOUCH "${_mfc_gen_stamp}")
+endif()
+
 HANDLE_SOURCES(pre_process ON)
 HANDLE_SOURCES(simulation ON)
 HANDLE_SOURCES(post_process ON)
@@ -563,10 +596,11 @@ exit 0
             find_package(MPI COMPONENTS Fortran REQUIRED)
 	    
             target_compile_definitions(${a_target} PRIVATE MFC_MPI)
-            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND
+               DEFINED ENV{CRAY_MPICH_INC} AND NOT "$ENV{CRAY_MPICH_INC}" STREQUAL "")
                 target_compile_options(${a_target} PRIVATE "$ENV{CRAY_MPICH_INC}")
                 target_link_libraries(${a_target} PRIVATE $ENV{CRAY_MPICH_LIB})
-            else() 
+            else()
                 target_link_libraries(${a_target} PRIVATE MPI::MPI_Fortran)
             endif()
         endif()
@@ -587,10 +621,16 @@ exit 0
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
-                else() 
+                    if(DEFINED ENV{CRAY_HIPFORT_LIB} AND NOT "$ENV{CRAY_HIPFORT_LIB}" STREQUAL "")
+                        target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
+                    else()
+                        find_library(HIPFFT_LIB hipfft
+                            HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                        target_link_libraries(${a_target} PRIVATE ${HIPFFT_LIB})
+                    endif()
+                else()
                     find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
-                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)                    
+                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)
                 endif()
             else()
                 find_package(FFTW REQUIRED)
@@ -636,8 +676,8 @@ exit 0
                     target_compile_options(${a_target} PRIVATE -fopenmp)
                     target_link_options(${a_target} PRIVATE -fopenmp)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -fopenmp-target-fast -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription)
-                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a)
+                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -O3 -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription)
+                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS})
                 endif()
             endif()
 
@@ -703,8 +743,15 @@ exit 0
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-                find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
-                target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
+		        find_library(HIP_LIB amdhip64
+                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
+                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                target_include_directories(${a_target} PRIVATE
+                    "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn")
+                target_link_libraries(${a_target} PRIVATE
+                    ${HIP_LIB} ${HIPFORT_AMDGCN_LIB})
+
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
@@ -734,6 +781,11 @@ if (MFC_PRE_PROCESS)
                      MPI)
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         target_compile_options(pre_process PRIVATE -hfp0)
+        # CCE 19.0.0 IPA ICE: bring_routine_resident SIGSEGV in optcg during
+        # ipa_processing. Nondeterministic — any file can become the crash site
+        # via cross-file inlining. Safe to disable IPA for the whole target
+        # (CPU-only, no GPU device-call requirements). See PR #1286.
+        target_compile_options(pre_process PRIVATE -Oipa0)
     endif()
 endif()
 
@@ -741,19 +793,27 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 IPA workaround: disable interprocedural analysis for files
-    # that trigger compiler crashes during IPA:
-    #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
-    #   m_phase_change: bring_routine_resident SIGSEGV
-    # Not applied to Cray+OpenMP because thermochem uses !DIR$ INLINEALWAYS,
-    # which requires IPA to inline device calls. On OpenACC the pyrometheus
-    # patch emits !$acc routine seq instead (no IPA needed). See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND NOT MFC_OpenMP)
-        set_source_files_properties(
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
-            "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
-            PROPERTIES COMPILE_OPTIONS "-Oipa0"
-        )
+    # CCE 19.0.0 optcg ICE: IPA inlining triggers two distinct crashes:
+    #   m_bubbles_EL:  castIsValid assertion (InstCombine/foldIntegerTypedPHI)
+    #   m_phase_change, m_mpi_common, m_start_up: bring_routine_resident SIGSEGV
+    # GPU builds: apply -Oipa0 per-file to known crash sites. Whole-target
+    # -Oipa0 is not safe for GPU builds — it breaks cross-file !$acc routine /
+    # !DIR$ INLINEALWAYS device-call registration, causing runtime aborts.
+    # CPU builds: disable IPA for the whole target (safe — no GPU requirements,
+    # and the crash is nondeterministic so any file can become the crash site).
+    # See PR #1286.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        if (MFC_OpenACC OR MFC_OpenMP)
+            set_source_files_properties(
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_mpi_common.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_start_up.fpp.f90"
+                PROPERTIES COMPILE_OPTIONS "-Oipa0"
+            )
+        else()
+            target_compile_options(simulation PRIVATE -Oipa0)
+        endif()
     endif()
 endif()
 
@@ -764,6 +824,12 @@ if (MFC_POST_PROCESS)
 
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)
+
+    # flang-23/LLD defaults to PIE; SILO and LAPACK static libs on Frontier are
+    # non-PIC, producing R_X86_64_32 relocations that LLD rejects in PIE mode.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+        target_link_options(post_process PRIVATE -no-pie)
+    endif()
 endif()
 
 if (MFC_SYSCHECK)

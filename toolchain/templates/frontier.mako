@@ -69,7 +69,10 @@ ulimit -s unlimited
             % if gpu_enabled:
                 --gpus-per-task 1 --gpu-bind closest                 \
             % endif
-            ${profiler} "${target.get_install_binpath(case)}")
+            % if target.name == 'simulation':
+                ${profiler} \
+            % endif
+            "${target.get_install_binpath(case)}")
         % else:
             ${profiler} "/mnt/bb/$USER/${target.name}")
         % endif

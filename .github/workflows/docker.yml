@@ -3,11 +3,17 @@ name: Containerization
 on:
   release:
     types: [published]
+  schedule:
+    - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       tag:
         description: 'tag to containerize'
-        required: true
+        required: false
+
+permissions:
+  contents: read
+  packages: write
 
 concurrency:
   group: Containerization
@@ -18,9 +24,10 @@ jobs:
     strategy:
       matrix:
         config:
-            - { name: 'cpu', runner: 'ubuntu-22.04',         base_image: 'ubuntu:22.04' }
-            - { name: 'gpu', runner: 'ubuntu-22.04',         base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda_multi-ubuntu22.04' }
-            - { name: 'gpu', runner: 'ubuntu-22.04-arm',     base_image: 'nvcr.io/nvidia/nvhpc:23.11-devel-cuda_multi-ubuntu22.04' }
+            - { name: 'cpu',  tag: 'cpu',       runner: 'ubuntu-22.04',     base_image: 'ubuntu:22.04' }
+            - { name: 'cpu',  tag: 'cpu',       runner: 'ubuntu-22.04-arm', base_image: 'ubuntu:22.04' }
+            - { name: 'gpu',  tag: 'gpu-nvidia', runner: 'ubuntu-22.04',     base_image: 'nvcr.io/nvidia/nvhpc:24.5-devel-cuda_multi-ubuntu22.04', compiler_arch: 'Linux_x86_64' }
+            - { name: 'gpu',  tag: 'gpu-nvidia', runner: 'ubuntu-22.04-arm', base_image: 'nvcr.io/nvidia/nvhpc:24.5-devel-cuda_multi-ubuntu22.04', compiler_arch: 'Linux_aarch64' }
     runs-on: ${{ matrix.config.runner }}
     outputs:
       tag: ${{ steps.clone.outputs.tag }}
@@ -36,25 +43,37 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      - name: Login
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Clone
         id: clone
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            BRANCH="master"
+            TAG="nightly"
+          else
+            BRANCH="${{ github.event.inputs.tag || github.ref_name }}"
+            TAG=$(echo "$BRANCH" | tr '/' '-')
+          fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "TAG=$TAG" >> $GITHUB_ENV
-          git clone --branch "$TAG" --depth 1 ${{ github.server_url }}/${{ github.repository }}.git mfc
+          OWNER="${{ github.repository_owner }}"
+          echo "GH_REGISTRY=ghcr.io/${OWNER,,}/mfc" >> $GITHUB_ENV
+          git clone --branch "$BRANCH" --depth 1 ${{ github.server_url }}/${{ github.repository }}.git mfc
 
       - name: Stage
         run: |
@@ -71,16 +90,13 @@ jobs:
           cp -r mfc/.git /mnt/share/.git
           cp mfc/.github/Dockerfile /mnt/share/
           cp mfc/.github/.dockerignore /mnt/share/
-          docker buildx create --name mfcbuilder --driver docker-container --use
 
       - name: Build and push image (cpu)
         if: ${{ matrix.config.name == 'cpu' }}
         uses: docker/build-push-action@v6
         with:
-          builder: mfcbuilder
           context: /mnt/share
           file: /mnt/share/Dockerfile
-          platforms: linux/amd64,linux/arm64
           build-args: |
             BASE_IMAGE=${{ matrix.config.base_image }}
             TARGET=${{ matrix.config.name }}
@@ -89,7 +105,11 @@ jobs:
             FC_COMPILER=${{ 'gfortran' }}
             COMPILER_PATH=${{ '/usr/bin' }}
             COMPILER_LD_LIBRARY_PATH=${{ '/usr/lib' }}
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.tag }}-${{ matrix.config.runner }}
+            ${{ env.GH_REGISTRY }}:${{ env.TAG }}-${{ matrix.config.tag }}-${{ matrix.config.runner }}
           push: true
 
       - name: Build and push image (gpu)
@@ -105,28 +125,62 @@ jobs:
             CC_COMPILER=${{ 'nvc' }}
             CXX_COMPILER=${{ 'nvc++' }}
             FC_COMPILER=${{ 'nvfortran' }}
-            COMPILER_PATH=${{ '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin' }}
-            COMPILER_LD_LIBRARY_PATH=${{ '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib' }}
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner}}
+            COMPILER_PATH=/opt/nvidia/hpc_sdk/${{ matrix.config.compiler_arch }}/compilers/bin
+            COMPILER_LD_LIBRARY_PATH=/opt/nvidia/hpc_sdk/${{ matrix.config.compiler_arch }}/compilers/lib
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.tag }}-${{ matrix.config.runner }}
+            ${{ env.GH_REGISTRY }}:${{ env.TAG }}-${{ matrix.config.tag }}-${{ matrix.config.runner }}
           push: true
 
   manifests:
     runs-on: ubuntu-latest
     needs: Container
+    environment:
+      name: containers
+      url: https://hub.docker.com/r/sbryngelson/mfc
     steps:
-      - name: Login
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set GHCR registry (lowercase)
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          echo "GH_REGISTRY=ghcr.io/${OWNER,,}/mfc" >> $GITHUB_ENV
+
       - name: Create and Push Manifest Lists
         env:
           TAG: ${{ needs.Container.outputs.tag }}
-          REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
+          DH: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
         run: |
-          docker buildx imagetools create -t $REGISTRY:latest-cpu $REGISTRY:$TAG-cpu
-          docker manifest create $REGISTRY:$TAG-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
-          docker manifest create $REGISTRY:latest-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
-          docker manifest push $REGISTRY:$TAG-gpu
-          docker manifest push $REGISTRY:latest-gpu
+          GH="${{ env.GH_REGISTRY }}"
+          for R in "$DH" "$GH"; do
+            docker buildx imagetools create -t $R:$TAG-cpu        $R:$TAG-cpu-ubuntu-22.04 $R:$TAG-cpu-ubuntu-22.04-arm
+            docker buildx imagetools create -t $R:$TAG-gpu-nvidia $R:$TAG-gpu-nvidia-ubuntu-22.04 $R:$TAG-gpu-nvidia-ubuntu-22.04-arm
+          done
+
+      - name: Update latest tags
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ needs.Container.outputs.tag }}
+          DH: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
+        run: |
+          GH="${{ env.GH_REGISTRY }}"
+          for R in "$DH" "$GH"; do
+            docker buildx imagetools create -t $R:latest-cpu        $R:$TAG-cpu-ubuntu-22.04 $R:$TAG-cpu-ubuntu-22.04-arm
+            docker buildx imagetools create -t $R:latest-gpu-nvidia $R:$TAG-gpu-nvidia-ubuntu-22.04 $R:$TAG-gpu-nvidia-ubuntu-22.04-arm
+          done

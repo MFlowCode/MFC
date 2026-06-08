@@ -967,12 +967,11 @@ contains
     subroutine s_instantiate_STL_models()
 
         ! Variables for IBM+STL
-        real(wp)                                :: normals(1:3)                                !< Boundary normal buffer
         integer                                 :: boundary_vertex_count, boundary_edge_count  !< Boundary vertex
         real(wp), allocatable, dimension(:,:,:) :: boundary_v                                  !< Boundary vertex buffer
         real(wp)                                :: dx_local, dy_local, dz_local                !< Levelset distance buffer
         integer                                 :: i, j, k                                     !< Generic loop iterators
-        integer                                 :: patch_id
+        integer                                 :: stl_id
         type(t_bbox)                            :: bbox, bbox_old
         type(t_model)                           :: model
         type(ic_model_parameters)               :: params
@@ -983,111 +982,107 @@ contains
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
-        allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
+        if (num_stl_models == 0) return
 
-        do patch_id = 1, num_ibs
-            if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
-                allocate (models(patch_id)%model)
-                print *, " * Reading model: " // trim(patch_ib(patch_id)%model_filepath)
+        allocate (stl_bounding_boxes(num_stl_models,1:3,1:3))
+        @:ALLOCATE(models(num_stl_models))
 
-                model = f_model_read(patch_ib(patch_id)%model_filepath)
-                params%scale(:) = patch_ib(patch_id)%model_scale(:)
-                params%translate(:) = patch_ib(patch_id)%model_translate(:)
-                params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
-                params%spc = patch_ib(patch_id)%model_spc
-                params%threshold = patch_ib(patch_id)%model_threshold
+        do stl_id = 1, num_stl_models
+            allocate (models(stl_id)%model)
+            if (proc_rank == 0) print *, " * Reading model: " // trim(stl_models(stl_id)%model_filepath)
 
-                if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
-                    params%scale(:) = 1._wp
+            model = f_model_read(stl_models(stl_id)%model_filepath)
+            params%scale(:) = stl_models(stl_id)%model_scale(:)
+            params%translate(:) = stl_models(stl_id)%model_translate(:)
+            params%rotate(:) = 0._wp
+            params%spc = num_ray
+            params%threshold = stl_models(stl_id)%model_threshold
+
+            if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
+                params%scale(:) = 1._wp
+            end if
+
+            if (proc_rank == 0) print *, " * Transforming model."
+
+            ! Get the model center before transforming the model
+            bbox_old = f_create_bbox(model)
+            model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
+
+            ! Compute the transform matrices for vertices and normals
+            transform = f_create_transform_matrix(params, model_center)
+            transform_n = f_create_transform_matrix(params)
+
+            call s_transform_model(model, transform, transform_n)
+
+            ! Recreate the bounding box after transformation
+            bbox = f_create_bbox(model)
+
+            ! Show the number of vertices in the original STL model
+            if (proc_rank == 0) print *, ' * Number of input model vertices:', 3*model%ntrs
+
+            ! Need the cells that form the boundary of the flat projection in 2D
+            if (p == 0) call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+
+            ! Show the number of edges and boundary edges in 2D STL models
+            if (proc_rank == 0 .and. p == 0) print *, ' * Number of 2D model boundary edges:', boundary_edge_count
+
+            if (proc_rank == 0) then
+                write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
+                write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
+                write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
+
+                grid_mm(1,:) = (/minval(x_cc(0:m)) - 0.5_wp*dx_local, maxval(x_cc(0:m)) + 0.5_wp*dx_local/)
+                grid_mm(2,:) = (/minval(y_cc(0:n)) - 0.5_wp*dy_local, maxval(y_cc(0:n)) + 0.5_wp*dy_local/)
+
+                if (p > 0) then
+                    grid_mm(3,:) = (/minval(z_cc(0:p)) - 0.5_wp*dz_local, maxval(z_cc(0:p)) + 0.5_wp*dz_local/)
+                else
+                    grid_mm(3,:) = (/0._wp, 0._wp/)
                 end if
 
-                if (proc_rank == 0) then
-                    print *, " * Transforming model."
-                end if
+                write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
+                write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2._wp
+                write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
+            end if
+            if (proc_rank == 0) print *, " * Transforming model."
 
-                ! Get the model center before transforming the model
-                bbox_old = f_create_bbox(model)
-                model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
+            stl_bounding_boxes(stl_id, 1,1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
+            stl_bounding_boxes(stl_id, 2,1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
+            stl_bounding_boxes(stl_id, 3,1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
 
-                ! Compute the transform matrices for vertices and normals
-                transform = f_create_transform_matrix(params, model_center)
-                transform_n = f_create_transform_matrix(params)
-
-                call s_transform_model(model, transform, transform_n)
-
-                ! Recreate the bounding box after transformation
-                bbox = f_create_bbox(model)
-
-                ! Show the number of vertices in the original STL model
-                if (proc_rank == 0) then
-                    print *, ' * Number of input model vertices:', 3*model%ntrs
-                end if
-
-                ! Need the cells that form the boundary of the flat projection in 2D
-                if (p == 0) call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
-
-                ! Show the number of edges and boundary edges in 2D STL models
-                if (proc_rank == 0 .and. p == 0) then
-                    print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-                end if
-
-                if (proc_rank == 0) then
-                    write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
-                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
-                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
-
-                    grid_mm(1,:) = (/minval(x_cc(0:m)) - 0.5_wp*dx_local, maxval(x_cc(0:m)) + 0.5_wp*dx_local/)
-                    grid_mm(2,:) = (/minval(y_cc(0:n)) - 0.5_wp*dy_local, maxval(y_cc(0:n)) + 0.5_wp*dy_local/)
-
-                    if (p > 0) then
-                        grid_mm(3,:) = (/minval(z_cc(0:p)) - 0.5_wp*dz_local, maxval(z_cc(0:p)) + 0.5_wp*dz_local/)
-                    else
-                        grid_mm(3,:) = (/0._wp, 0._wp/)
-                    end if
-
-                    write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
-                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2._wp
-                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
-                end if
-
-                stl_bounding_boxes(patch_id, 1,1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
-                stl_bounding_boxes(patch_id, 2,1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
-                stl_bounding_boxes(patch_id, 3,1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
-
-                models(patch_id)%model = model
-                if (p == 0) then
-                    models(patch_id)%boundary_v = boundary_v
-                    models(patch_id)%boundary_edge_count = boundary_edge_count
-                end if
+            models(stl_id)%model = model
+            if (p == 0) then
+                models(stl_id)%boundary_v = boundary_v
+                models(stl_id)%boundary_edge_count = boundary_edge_count
             end if
         end do
 
         ! Pack and upload flat arrays for GPU (AFTER the loop)
         block
-            integer :: pid, max_ntrs
+            integer :: mid, max_ntrs
             integer :: max_bv1, max_bv2, max_bv3
 
             max_ntrs = 0
             max_bv1 = 0; max_bv2 = 0; max_bv3 = 0
 
-            do pid = 1, num_ibs
-                if (allocated(models(pid)%model)) then
-                    call s_pack_model_for_gpu(models(pid))
-                    max_ntrs = max(max_ntrs, models(pid)%ntrs)
+            do mid = 1, num_stl_models
+                if (allocated(models(mid)%model)) then
+                    call s_pack_model_for_gpu(models(mid))
+                    max_ntrs = max(max_ntrs, models(mid)%ntrs)
                 end if
-                if (allocated(models(pid)%boundary_v)) then
-                    max_bv1 = max(max_bv1, size(models(pid)%boundary_v, 1))
-                    max_bv2 = max(max_bv2, size(models(pid)%boundary_v, 2))
-                    max_bv3 = max(max_bv3, size(models(pid)%boundary_v, 3))
+                if (allocated(models(mid)%boundary_v)) then
+                    max_bv1 = max(max_bv1, size(models(mid)%boundary_v, 1))
+                    max_bv2 = max(max_bv2, size(models(mid)%boundary_v, 2))
+                    max_bv3 = max(max_bv3, size(models(mid)%boundary_v, 3))
                 end if
             end do
 
             if (max_ntrs > 0) then
-                @:ALLOCATE(gpu_ntrs(1:num_ibs))
-                @:ALLOCATE(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_ibs))
-                @:ALLOCATE(gpu_trs_n(1:3, 1:max_ntrs, 1:num_ibs))
-                @:ALLOCATE(gpu_boundary_edge_count(1:num_ibs))
-                @:ALLOCATE(gpu_total_vertices(1:num_ibs))
+                @:ALLOCATE(gpu_ntrs(1:num_stl_models))
+                @:ALLOCATE(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_stl_models))
+                @:ALLOCATE(gpu_trs_n(1:3, 1:max_ntrs, 1:num_stl_models))
+                @:ALLOCATE(gpu_boundary_edge_count(1:num_stl_models))
+                @:ALLOCATE(gpu_total_vertices(1:num_stl_models))
 
                 gpu_ntrs = 0
                 gpu_trs_v = 0._wp
@@ -1096,21 +1091,21 @@ contains
                 gpu_total_vertices = 0
 
                 if (max_bv1 > 0) then
-                    @:ALLOCATE(gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_ibs))
+                    @:ALLOCATE(gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_stl_models))
                     gpu_boundary_v = 0._wp
                 end if
 
-                do pid = 1, num_ibs
-                    if (allocated(models(pid)%model)) then
-                        gpu_ntrs(pid) = models(pid)%ntrs
-                        gpu_trs_v(:,:,1:models(pid)%ntrs,pid) = models(pid)%trs_v
-                        gpu_trs_n(:,1:models(pid)%ntrs,pid) = models(pid)%trs_n
-                        gpu_boundary_edge_count(pid) = models(pid)%boundary_edge_count
-                        gpu_total_vertices(pid) = models(pid)%total_vertices
+                do mid = 1, num_stl_models
+                    if (allocated(models(mid)%model)) then
+                        gpu_ntrs(mid) = models(mid)%ntrs
+                        gpu_trs_v(:,:,1:models(mid)%ntrs,mid) = models(mid)%trs_v
+                        gpu_trs_n(:,1:models(mid)%ntrs,mid) = models(mid)%trs_n
+                        gpu_boundary_edge_count(mid) = models(mid)%boundary_edge_count
+                        gpu_total_vertices(mid) = models(mid)%total_vertices
                     end if
-                    if (allocated(models(pid)%boundary_v) .and. p == 0) then
-                        gpu_boundary_v(1:size(models(pid)%boundary_v, 1),1:size(models(pid)%boundary_v, 2), &
-                                       & 1:size(models(pid)%boundary_v, 3),pid) = models(pid)%boundary_v
+                    if (allocated(models(mid)%boundary_v) .and. p == 0) then
+                        gpu_boundary_v(1:size(models(mid)%boundary_v, 1),1:size(models(mid)%boundary_v, 2), &
+                                       & 1:size(models(mid)%boundary_v, 3),mid) = models(mid)%boundary_v
                     end if
                 end do
 

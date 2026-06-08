@@ -7,7 +7,8 @@
             "m_weno",
             "m_riemann_solvers",
             "m_muscl",
-            "m_variables_conversion"
+            "m_variables_conversion",
+            "m_thinc"
         ]
     },
     {
@@ -37,6 +38,7 @@
             "m_compute_cbc",
             "m_boundary_common",
             "m_ibm",
+            "m_particle_cloud",
             "m_igr",
             "m_ib_patches",
             "m_compute_levelset"

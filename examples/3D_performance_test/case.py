@@ -6,7 +6,7 @@ print(
     json.dumps(
         {
             # Logistics
-            "run_time_info": "T",
+            "run_time_info": "F",
             # Computational Domain Parameters
             "x_domain%beg": 0.0e00,
             "x_domain%end": 4.0e-03 / 1.0e-03,

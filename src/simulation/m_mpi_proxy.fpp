@@ -74,9 +74,10 @@ contains
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', &
             & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end',  'fd_order',     &
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
+            & 'num_source', 'relax_model', 'num_ibs', 'num_particle_clouds', 'n_start',    &
             & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters', &
-            & 'adap_dt_max_iters', 'collision_model' ]
+            & 'adap_dt_max_iters', 'collision_model', 'ib_neighborhood_radius', &
+            & 'int_comp' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -94,7 +95,7 @@ contains
             & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out', &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',       &
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
-            & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt', &
+            & 'hyperelasticity', 'down_sample', 'fft_wrt', &
             & 'hyper_cleaning', 'ib_state_wrt', 'synthetic_turbulence']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
@@ -193,17 +194,43 @@ contains
 
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
-                & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip', 'mass', &
-                & 'model_threshold']
+                & 'x_centroid', 'y_centroid', 'z_centroid', 'slip', 'mass']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-            #:for VAR in ['vel', 'angular_vel', 'angles', 'model_translate', 'model_scale']
+            #:for VAR in ['vel', 'angular_vel', 'angles']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%airfoil_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        end do
+
+        do i = 1, num_ib_airfoils_max
+            #:for VAR in ['c', 'p', 't', 'm']
+                call MPI_BCAST(ib_airfoil(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end do
+
+        call MPI_BCAST(num_stl_models, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        do i = 1, num_stl_models_max
+            call MPI_BCAST(stl_models(i)%model_filepath, len(stl_models(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(stl_models(i)%model_threshold, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:for VAR in ['model_translate', 'model_scale']
+                call MPI_BCAST(stl_models(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end do
+
+        do i = 1, num_particle_clouds
+            #:for VAR in ['x_centroid', 'y_centroid', 'z_centroid', 'length_x', 'length_y', 'length_z', &
+                & 'radius', 'mass', 'min_spacing']
+                call MPI_BCAST(particle_cloud(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+            call MPI_BCAST(particle_cloud(i)%num_particles, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%seed, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%packing_method, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
         do j = 1, num_probes_max
@@ -261,7 +288,6 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
-
         call MPI_BCAST(phi_rn, num_freq, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 

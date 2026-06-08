@@ -111,63 +111,27 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--only filter matched zero test cases. Specified: {ARG('only')}. Check that UUIDs/names are valid.")
 
-    # --only-changes: filter based on file-level gcov coverage
-    if ARG("only_changes"):
-        from .coverage import (
-            filter_tests_by_coverage,
-            get_changed_files,
-            load_coverage_cache,
-            should_run_all_tests,
-        )
+    # Convergence cases are slow (multiple resolutions × MPI ranks). Skip
+    # unless the user explicitly opted in via --only "Convergence" or a
+    # specific convergence UUID. A label like --only "2D" must not
+    # accidentally pull in "Convergence -> 2D -> ..." cases.
+    if not ARG("list"):
 
-        cache = load_coverage_cache(common.MFC_ROOT_DIR)
-        if cache is None:
-            cons.print("[yellow]Coverage cache missing or stale.[/yellow]")
-            cons.print("[yellow]Run: ./mfc.sh build --gcov -j 8 && ./mfc.sh test --build-coverage-cache --gcov -j 8[/yellow]")
-            cons.print("[yellow]Falling back to full test suite.[/yellow]")
-        else:
-            changed_files = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"))
+        def is_uuid(term):
+            return len(term) == 8 and all(c in "0123456789abcdefABCDEF" for c in term)
 
-            if changed_files is None:
-                cons.print("[yellow]git diff failed — falling back to full test suite.[/yellow]")
-            elif should_run_all_tests(changed_files):
-                cons.print()
-                cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                cons.print("-" * 50)
-                cons.print("[yellow]Infrastructure or macro file changed — running full test suite.[/yellow]")
-                cons.print("-" * 50)
-            else:
-                changed_fpp = {f for f in changed_files if f.endswith(".fpp")}
-                changed_f90 = {f for f in changed_files if f.startswith("src/") and (f.endswith(".f90") or f.endswith(".f"))}
-                if changed_f90:
-                    cons.print()
-                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                    cons.print("-" * 50)
-                    cons.print("[yellow].f90/.f source changed — running full test suite.[/yellow]")
-                    for f in sorted(changed_f90):
-                        cons.print(f"  [yellow]*[/yellow] {f}")
-                    cons.print("-" * 50)
-                elif not changed_fpp:
-                    cons.print()
-                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                    cons.print("-" * 50)
-                    cons.print("[green]No Fortran source changes detected — skipping all tests.[/green]")
-                    cons.print("-" * 50)
-                    cons.print()
-                    skipped_cases += cases
-                    cases = []
-                else:
-                    cons.print()
-                    cons.print("[bold cyan]Coverage Change Analysis[/bold cyan]")
-                    cons.print("-" * 50)
-                    for fpp_file in sorted(changed_fpp):
-                        cons.print(f"  [green]*[/green] {fpp_file}")
+        only_terms = ARG("only")
+        only_labels = [t for t in only_terms if not is_uuid(t)]
+        only_uuids = [t for t in only_terms if is_uuid(t)]
 
-                    cases, new_skipped = filter_tests_by_coverage(cases, cache, changed_files)
-                    skipped_cases += new_skipped
-                    cons.print(f"\n[bold]Tests to run: {len(cases)} / {len(cases) + len(new_skipped)}[/bold]")
-                    cons.print("-" * 50)
-                    cons.print()
+        convergence_uuids = {c.get_uuid() for c in cases if getattr(c, "kind", "golden") == "convergence"}
+        user_wants_convergence = "Convergence" in only_labels or any(u in convergence_uuids for u in only_uuids)
+
+        if not user_wants_convergence:
+            convergence_cases = [c for c in cases if getattr(c, "kind", "golden") == "convergence"]
+            for c in convergence_cases:
+                cases.remove(c)
+                skipped_cases.append(c)
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -214,6 +178,25 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
+    if ARG("only_changes") or ARG("select_enforce"):
+        import datetime
+
+        from .. import common
+        from .coverage import COVERAGE_MAP_PATH, format_summary, get_changed_files, load_map, select_tests
+
+        entries, meta = load_map(COVERAGE_MAP_PATH)
+        if entries is None:
+            cons.print("[yellow]Coverage selection: map missing/corrupt — running full suite.[/yellow]")
+        else:
+            changed = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"), explicit=ARG("changed_files"))
+            to_run, to_skip, reason = select_tests(cases, entries, changed)
+            cons.print(format_summary(ran=len(to_run), total=len(cases), reason=reason, meta=meta, now=datetime.datetime.now(datetime.timezone.utc).isoformat()))
+            if ARG("select_enforce"):
+                skipped_cases += to_skip
+                cases = to_run
+            else:
+                cons.print("[dim](shadow mode: running full suite; pass --select-enforce to actually skip)[/dim]")
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 
@@ -244,22 +227,28 @@ def test():
 
         return
 
-    if ARG("build_coverage_cache"):
-        from .coverage import build_coverage_cache
+    if ARG("build_coverage_map"):
+        from .coverage_build import build_coverage_map
 
-        all_cases = [b.to_case() for b in cases]
+        # Convergence tests are order-of-accuracy checks driven by convergence.py,
+        # which fills in grid resolution and patch geometry per refinement level at
+        # runtime. Their base params are skeletons (m=n=p=0, no geometry) that cannot
+        # run standalone, so the direct-invocation collector cannot map them. Exclude
+        # them: absent from the map, select_tests conservatively always-runs them
+        # (rung 5), which is the desired behavior for convergence checks anyway.
+        convergence = [b for b in cases if getattr(b, "kind", "golden") == "convergence"]
+        coverage_cases = [b for b in cases if getattr(b, "kind", "golden") != "convergence"]
+        if convergence:
+            cons.print(f"[yellow]Excluding {len(convergence)} convergence tests from the coverage map (always-run by design).[/yellow]")
 
-        # Build all unique slugs (Chemistry, case-optimization, etc.) so every
-        # test has a pre-built binary available for direct execution in Phase 2.
-        codes = [PRE_PROCESS, SIMULATION, POST_PROCESS]
-        unique_builds = set()
-        for case, code in itertools.product(all_cases, codes):
+        all_cases = [b.to_case() for b in coverage_cases]
+        unique = set()
+        for case, code in itertools.product(all_cases, [PRE_PROCESS, SIMULATION, POST_PROCESS]):
             slug = code.get_slug(case.to_input_file())
-            if slug not in unique_builds:
+            if slug not in unique:
                 build(code, case.to_input_file())
-                unique_builds.add(slug)
-
-        build_coverage_cache(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
+                unique.add(slug)
+        build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
         return
 
     cases, skipped_cases = __filter(cases)
@@ -435,9 +424,39 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
         raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
 
+def _handle_convergence_case(case: TestCase, start_time: float):
+    """Dispatch convergence/order-of-accuracy cases through convergence.py."""
+    from .convergence import run_case
+
+    if ARG("dry_run"):
+        trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
+        cons.print(f"  (dry-run)     {trace_display:50s}   SKIP    [magenta]{case.get_uuid()}[/magenta]")
+        return
+
+    passed, output = run_case(case.convergence_spec)
+
+    log_dir = os.path.join(common.MFC_TEST_DIR, case.get_uuid())
+    common.create_directory(log_dir)
+    common.file_write(os.path.join(log_dir, "convergence.log"), output)
+
+    duration = time.time() - start_time
+    global current_test_number  # noqa: PLW0603
+    current_test_number += 1
+    progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
+    trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
+    cons.print(f"  {progress_str}    {trace_display:50s}  {duration:6.2f}    [magenta]{case.get_uuid()}[/magenta]")
+
+    if not passed:
+        raise MFCException(f"Test {case}: convergence rate check failed (see {log_dir}/convergence.log)")
+
+
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     global current_test_number  # noqa: PLW0603
     start_time = time.time()
+
+    if getattr(case, "kind", "golden") == "convergence":
+        _handle_convergence_case(case, start_time)
+        return
 
     # Set timeout using threading.Timer (works in worker threads)
     # Note: we intentionally do not use signal.alarm() here because signals

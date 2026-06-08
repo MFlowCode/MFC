@@ -49,7 +49,7 @@ print(
     json.dumps(
         {
             # Logistics
-            "run_time_info": "T",
+            "run_time_info": "F",
             # Computational Domain Parameters
             "x_domain%beg": -math.pi * L,
             "x_domain%end": math.pi * L,
@@ -69,6 +69,7 @@ print(
             "num_patches": 1,
             "model_eqns": 2,
             "num_fluids": 1,
+            "riemann_solver": 5,
             "time_stepper": 3,
             "bc_x%beg": -1,
             "bc_x%end": -1,

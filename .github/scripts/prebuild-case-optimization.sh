@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Pre-builds all benchmark cases with --case-optimization.
-# No GPU hardware needed — compilation only.
+# Pre-builds all benchmark cases with --case-optimization using --dry-run so
+# binaries are cached before the GPU run job. No simulation is executed.
 # Can run in two modes:
 #   1. Direct (Frontier login nodes): pass cluster/device/interface as args
-#   2. Inside SLURM (Phoenix): uses $job_device/$job_interface from submit-slurm-job.sh
+#   2. Inside SLURM (Phoenix/frontier_amd): uses $job_device/$job_interface
 # Usage: bash prebuild-case-optimization.sh [<cluster> <device> <interface>]
 
 set -e
@@ -22,14 +22,18 @@ case "$cluster" in
     *) echo "ERROR: Unknown cluster '$cluster'"; exit 1 ;;
 esac
 
-source .github/scripts/clean-build.sh
-clean_build
+# Phoenix starts fresh (no prior dep build); other clusters pre-build deps via
+# build.sh first, so we must preserve them and only clean MFC target staging.
+if [ "$cluster" = "phoenix" ]; then
+    source .github/scripts/clean-build.sh
+    clean_build
+else
+    find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+fi
 
 . ./mfc.sh load -c "$flag" -m g
 
-# Set GPU build flags from interface — this is always a GPU build.
-# Don't use gpu-opts.sh since $job_device may be "cpu" when submitted
-# to a CPU SLURM partition (no GPU hardware needed for compilation).
 case "$job_interface" in
     acc) gpu_opts="--gpu acc" ;;
     omp) gpu_opts="--gpu mp" ;;
@@ -38,5 +42,5 @@ esac
 
 for case in benchmarks/*/case.py; do
     echo "=== Pre-building: $case ==="
-    ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
+    ./mfc.sh run "$case" --case-optimization $gpu_opts -j 8 --dry-run
 done
