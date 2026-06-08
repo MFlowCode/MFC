@@ -4,7 +4,9 @@
 - Grid dimensions: `m`, `n`, `p` (cells in x, y, z). 1D: n=p=0. 2D: p=0.
 - Interior domain: `0:m`, `0:n`, `0:p`
 - Buffer/ghost region: `-buff_size:m+buff_size` (similar for n, p in multi-D)
-- `buff_size` depends on WENO order and features (typically `2*weno_polyn + 2`)
+- `buff_size` is **not** a single formula: it's set per reconstruction scheme (WENO/MUSCL/IGR) in
+  `s_configure_coordinate_bounds` (`m_helper_basic.fpp`) and floored higher for Lagrange bubbles and IB.
+  Read that routine for the current value rather than assuming one.
 - Domain bounds: `idwint(1:3)` (interior `0:m`), `idwbuff(1:3)` (with ghost cells)
 - Cell-center coords: `x_cc(-buff_size:m+buff_size)`, `y_cc(...)`, `z_cc(...)`
 - Cell-boundary coords: `x_cb(-1-buff_size:m+buff_size)`
@@ -38,8 +40,8 @@
 - Boundary condition symmetry requirements must be maintained
 
 ## Compiler-Specific Issues
-- CI-gated compilers (must always pass): gfortran, nvfortran, Cray ftn, and Intel ifx
-- AMD flang is additionally supported for `--gpu mp` builds but not in the CI matrix
+- See the compiler-backend matrix in `.claude/rules/gpu-and-mpi.md` for which compilers
+  are CI-gated and which backends each supports.
 - Each compiler has different strictness levels and warning behavior
 - Fypp macros must expand correctly for both GPU and CPU builds
 
@@ -54,12 +56,8 @@
 - Do not regenerate ALL golden files unless you understand every output change
 
 ## PR Checklist
-Before submitting a PR:
-- [ ] `./mfc.sh format -j 8` (auto-format)
-- [ ] `./mfc.sh precheck -j 8` (5 CI lint checks)
-- [ ] `./mfc.sh build -j 8` (compiles)
-- [ ] `./mfc.sh test --only <relevant> -j 8` (tests pass)
-- [ ] If adding parameters: all 4 locations updated
+The base loop (format → precheck → build → test → one logical commit) is the
+Development Workflow Contract in `CLAUDE.md`. Beyond it, watch for:
+- [ ] If adding parameters: definitions.py (_r + _nv) updated; cmake reconfigured; case_validator.py if constraints
 - [ ] If modifying `src/common/`: all three targets tested
-- [ ] If changing output: golden files regenerated for affected tests
-- [ ] One logical change per commit
+- [ ] If changing output: golden files regenerated for affected tests (`./mfc.sh test --generate --only <tests>`)

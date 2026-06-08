@@ -552,7 +552,6 @@ contains
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
-                    ! compute ib forces for fixed immersed boundaries if requested for output
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -564,10 +563,11 @@ contains
             end if
         end do
 
-        !
         if (ib) then
-            if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
-            if (ib_state_wrt .and. (.not. moving_immersed_boundary_flag)) then
+            if (moving_immersed_boundary_flag) then
+                call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
+                call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
+            else if (ib_state_wrt) then
                 call s_compute_ib_forces(q_prim_vf, fluid_pp)
             end if
         end if
@@ -708,11 +708,11 @@ contains
 
         integer, intent(in) :: s
         integer             :: i
-        logical             :: forces_computed
+        integer             :: gbl_id  ! used for analytic ib patch motion
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
-        forces_computed = .false.
+        if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         do i = 1, num_ibs
             if (s == 1) then
@@ -726,11 +726,6 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm == 2 .and. .not. forces_computed) then
-                call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                forces_computed = .true.
-            end if
-
             if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
@@ -748,7 +743,6 @@ contains
                              & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
                     call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                     ! update the moment of inertia to be based on the direction of the angular momentum
-                    ! convert back to angular velocity with the new moment of inertia
                     patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment
                 end if
 

@@ -2,21 +2,23 @@
 
 Summarize your changes and the motivation behind them.
 
-Fixes #(issue)
+Closes #(issue number).
 
-### Type of change
+### Type of change (delete unused ones)
 
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Refactor
-- [ ] Documentation
-- [ ] Other: _describe_
+- Bug fix
+- New feature
+- Refactor
+- Documentation
+- Other (describe)
 
 ## Testing
 
 How did you test your changes?
 
 ## Checklist
+
+__Check these like this `[x]` to indicate which of the below applies.__
 
 - [ ] I added or updated tests for new behavior
 - [ ] I updated documentation if user-facing behavior changed
@@ -33,10 +35,6 @@ See the [developer guide](https://mflowcode.github.io/documentation/contributing
 
 ## AI code reviews
 
-Reviews are not triggered automatically. To request a review, comment on the PR:
-- `@coderabbitai review` — incremental review (new changes only)
-- `@coderabbitai full review` — full review from scratch
-- `/review` — Qodo review
-- `/improve` — Qodo code suggestions
+Reviews are not retriggered automatically. To request a review, comment on the PR:
 - `@claude full review` — Claude full review (also triggers on PR open/reopen/ready)
-- Add label `claude-full-review` — Claude full review via label
+- Or add label `claude-full-review` — Claude full review via label
