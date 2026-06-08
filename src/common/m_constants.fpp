@@ -31,7 +31,7 @@ module m_constants
     !> Fixed capacity of patch_ib (namelist patches + local particle bed subset after reduction)
     integer, parameter  :: num_ib_patches_max_namelist = 54000
     integer, parameter  :: num_local_ibs_max = 2000            !< Maximum number of immersed boundary patches (patch_ib)
-    integer, parameter  :: num_particle_beds_max = 10          !< Maximum number of particle bed patch specifications
+    integer, parameter  :: num_particle_clouds_max = 10        !< Maximum number of particle bed patch specifications
     integer, parameter  :: num_bc_patches_max = 10             !< Maximum number of boundary condition patches
     integer, parameter  :: max_2d_fourier_modes = 10           !< Max Fourier mode index for 2D modal patch (geometry 13)
     integer, parameter  :: max_sph_harm_degree = 5             !< Max degree L for 3D spherical harmonic patch (geometry 14)

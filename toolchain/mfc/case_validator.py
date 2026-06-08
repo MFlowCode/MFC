@@ -583,15 +583,15 @@ class CaseValidator:
         ib = self.get("ib", "F") == "T"
         n = self.get("n", 0)
         num_ibs = self.get("num_ibs", 0)
-        num_particle_beds = self.get("num_particle_beds", 0) or 0
+        num_particle_clouds = self.get("num_particle_clouds", 0) or 0
 
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
 
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
-        has_particle_beds = num_particle_beds > 0 and any((self.get(f"particle_bed({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_beds + 1))
+        has_particle_clouds = num_particle_clouds > 0 and any((self.get(f"particle_cloud({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_clouds + 1))
         self.prohibit(
-            ib and num_ibs <= 0 and not has_particle_beds,
-            "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_bed with num_particles > 0)",
+            ib and num_ibs <= 0 and not has_particle_clouds,
+            "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_cloud with num_particles > 0)",
         )
         num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max_namelist", 50000)
         self.prohibit(
@@ -600,6 +600,17 @@ class CaseValidator:
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
+
+        for i in range(1, num_particle_clouds + 1):
+            packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            self.prohibit(
+                packing_method is None,
+                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling)",
+            )
+            self.prohibit(
+                packing_method is not None and packing_method not in [1],
+                f"particle_cloud({i})%packing_method must be 1 (rejection sampling is the only supported method)",
+            )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
