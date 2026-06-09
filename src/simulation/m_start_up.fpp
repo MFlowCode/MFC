@@ -620,6 +620,7 @@ contains
         end if
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
+        $:GPU_UPDATE(device='[mytime]')
         if (any(time_stepper == (/1, 2, 3/))) then
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if

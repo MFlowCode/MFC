@@ -1383,6 +1383,10 @@ contains
                 local_ib_idx_old(i) = patch_ib(local_ib_patch_ids(i))%gbl_patch_id
             end do
 
+            ! Sync GPU-updated fields (angles, angular_vel, centroids) to host before
+            ! compaction and MPI packing, which read from host memory.
+            $:GPU_UPDATE(host='[patch_ib]')
+
             ! delete any particles that no longer need to be tracked and coalesce the array
             output_idx = 0
             local_output_idx = 0

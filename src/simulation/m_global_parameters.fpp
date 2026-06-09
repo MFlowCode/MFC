@@ -58,7 +58,7 @@ module m_global_parameters
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p]')
+    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, mytime, m, n, p]')
 
     $:GPU_DECLARE(create='[cfl_target]')
 
