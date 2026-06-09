@@ -116,7 +116,7 @@ contains
 
         if (grid_geometry == 3) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-                & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
+                & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
                 & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
@@ -4088,13 +4088,14 @@ contains
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
 
-        & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
+        & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_dims), intent(in)    :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dx_vf, dvelR_dx_vf
         type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dy_vf, dvelR_dy_vf
         type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dz_vf, dvelR_dz_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
@@ -4124,12 +4125,17 @@ contains
         real(wp) :: r_eff  !< Effective radius at interface for cylindrical terms.
         real(wp) :: div_v_term_const  !< Common term \f$-(2/3)(\nabla \cdot \mathbf{v}) / \text{Re}_s\f$ for shear stress diagonal.
         real(wp) :: divergence_cyl  !< Full divergence \f$\nabla \cdot \mathbf{v}\f$ in cylindrical coordinates.
-        integer  :: j, k, l  !< Loop iterators for \f$x, y, z\f$ grid directions.
-        integer  :: i_vel  !< Loop iterator for velocity components.
-        integer  :: idx_rp(3)  !< Indices \f$(j,k,l)\f$ of 'right' point for averaging.
+        integer :: j, k, l  !< Loop iterators for \f$x, y, z\f$ grid directions.
+        integer :: i_vel  !< Loop iterator for velocity components.
+        integer :: idx_rp(3)  !< Indices \f$(j,k,l)\f$ of 'right' point for averaging.
+        real(wp) :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
+        real(wp), dimension(2) :: Re_nn
+        real(wp), dimension(num_fluids) :: alpha_avg
+        integer :: fl
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
-                            & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const]')
+                            & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const, &
+                            & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
@@ -4159,21 +4165,60 @@ contains
                         end if
                     end do
 
+                    ! Non-Newtonian effective shear rate from grid-direction strain components.
+                    ! NOTE: curvature corrections to gamma_dot (e.g. hoop strain) are not included
+                    ! here - a documented first-version limitation. The Reynolds override and the
+                    ! Newtonian path below are exact.
+                    if (any_non_newtonian) then
+                        D_xx = avg_dvdx_int(1); D_yy = 0._wp; D_zz = 0._wp
+                        D_xy = 0._wp; D_xz = 0._wp; D_yz = 0._wp
+                        if (num_dims > 1) then
+                            D_yy = avg_dvdy_int(2)
+                            D_xy = 0.5_wp*(avg_dvdy_int(1) + avg_dvdx_int(2))
+                        end if
+                        if (num_dims > 2) then
+                            D_zz = avg_dvdz_int(3)
+                            D_xz = 0.5_wp*(avg_dvdz_int(1) + avg_dvdx_int(3))
+                            D_yz = 0.5_wp*(avg_dvdz_int(2) + avg_dvdy_int(3))
+                        end if
+                        gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                        do fl = 1, num_fluids
+                            alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, &
+                                      & l) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
+                        end do
+                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
+                    end if
+
                     ! Get Re numbers and interface velocity for viscous work
                     select case (norm_dir)
                     case (1)  ! x-face (axial face in z_cyl direction)
-                        Re_s = Re_avg_rsx_vf(j, k, l, 1)
-                        Re_b = Re_avg_rsx_vf(j, k, l, 2)
+                        if (any_non_newtonian) then
+                            Re_s = Re_nn(1)
+                            Re_b = Re_nn(2)
+                        else
+                            Re_s = Re_avg_rsx_vf(j, k, l, 1)
+                            Re_b = Re_avg_rsx_vf(j, k, l, 2)
+                        end if
                         vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     case (2)  ! y-face (radial face in r_cyl direction)
-                        Re_s = Re_avg_rsx_vf(j, k, l, 1)
-                        Re_b = Re_avg_rsx_vf(j, k, l, 2)
+                        if (any_non_newtonian) then
+                            Re_s = Re_nn(1)
+                            Re_b = Re_nn(2)
+                        else
+                            Re_s = Re_avg_rsx_vf(j, k, l, 1)
+                            Re_b = Re_avg_rsx_vf(j, k, l, 2)
+                        end if
                         vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cb(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
-                        Re_s = Re_avg_rsx_vf(j, k, l, 1)
-                        Re_b = Re_avg_rsx_vf(j, k, l, 2)
+                        if (any_non_newtonian) then
+                            Re_s = Re_nn(1)
+                            Re_b = Re_nn(2)
+                        else
+                            Re_s = Re_avg_rsx_vf(j, k, l, 1)
+                            Re_b = Re_avg_rsx_vf(j, k, l, 2)
+                        end if
                         vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     end select

@@ -4,6 +4,39 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+#! Fill Re_visc(1:2) at a cylindrical-axis cell. Non-Newtonian path uses a
+#! Herschel-Bulkley mixture inv-Re from the local strain rate; Newtonian path is
+#! the original alpha-weighted harmonic average. Component-3 strain terms are
+#! gated for compile validity (num_dims <= 2) and runtime safety (p > 0).
+#:def compute_axis_inv_re()
+    if (any_non_newtonian) then
+        gamma_dot_c = f_compute_shear_rate_from_components(grad_x_vf(1)%sf(j, k, l), grad_y_vf(2)%sf(j, k, l), 0._wp, &
+            & 0.5_wp*(grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l)), 0._wp, 0._wp)
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+            if (p > 0) then
+                gamma_dot_c = f_compute_shear_rate_from_components(grad_x_vf(1)%sf(j, k, l), grad_y_vf(2)%sf(j, k, l), &
+                    & grad_z_vf(3)%sf(j, k, l), 0.5_wp*(grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l)), &
+                    & 0.5_wp*(grad_z_vf(1)%sf(j, k, l) + grad_x_vf(3)%sf(j, k, l)), 0.5_wp*(grad_z_vf(2)%sf(j, k, &
+                    & l) + grad_y_vf(3)%sf(j, k, l)))
+            end if
+        #:endif
+        call s_compute_mixture_inv_re(alpha_visc, gamma_dot_c, Res_viscous, Re_visc)
+    else
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, 2
+            Re_visc(i) = dflt_real
+
+            if (Re_size(i) > 0) Re_visc(i) = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do q = 1, Re_size(i)
+                Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
+            end do
+
+            Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
+        end do
+    end if
+#:enddef
+
 !> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
 
@@ -14,6 +47,7 @@ module m_viscous
     use m_helper
     use m_finite_differences
     use m_constants, only: model_eqns_5eq
+    use m_hb_function
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
         & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
@@ -53,6 +87,7 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(wp), dimension(2) :: Re_visc
+        real(wp) :: gamma_dot_c                                        !< Effective shear rate for non-Newtonian mixture inv-Re.
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
@@ -84,7 +119,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -148,18 +183,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
@@ -187,7 +211,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -251,18 +275,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
@@ -284,7 +297,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -348,18 +361,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
@@ -384,7 +386,7 @@ contains
 
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -448,18 +450,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
