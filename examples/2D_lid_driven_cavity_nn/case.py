@@ -6,12 +6,10 @@ unit square cavity with a moving lid at y_end (bc_y%ve1 = 0.5). The
 Papanastasiou-regularized Herschel-Bulkley model (tau0=0, so pure power-law)
 is used with viscosity clamped to [mu_min, mu_max].
 
-This case is a qualitative demonstration of HB non-Newtonian viscosity in MFC
-and is based on the shear-thinning lid-driven cavity of:
-
-  Li, Z.-Y., Fang, M., Zhang, X., & Wu, Y.-L. (2015). Coupling lattice
-  Boltzmann model for simulation of thermal flows on standard lattices.
-  Phys. Rev. E, 85, 016710.
+This case is a qualitative demonstration of HB non-Newtonian viscosity in MFC:
+there is no closed-form analytic solution, and the expected outcome is the
+shear-thinning trend (vortex center shifted toward the moving lid, with
+stronger near-wall velocity gradients relative to the Newtonian case).
 
 The grid (m=n=99) is intentionally coarse for a quick smoke-run.  For
 production validation use m=n=499 or finer with a longer t_step_stop.

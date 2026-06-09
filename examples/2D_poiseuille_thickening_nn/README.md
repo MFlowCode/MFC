@@ -28,8 +28,7 @@ For `n > 1` the maximum physical viscosity is at the **wall** (highest shear rat
 `mu_wall = K^(1/n) * (rho*g*H)^((n-1)/n) = 0.0232`. `mu_max = 0.035 ~ 1.5*mu_wall` sits
 just above that maximum, so the clamp **never activates** (the analytic profile stays
 exact everywhere) while keeping the explicit viscous timestep large — the timestep
-scales as `1/mu_max`, so the previous `mu_max = 10` was the source of a catastrophically
-small `dt`.
+scales as `1/mu_max`, so set `mu_max` just above the physical maximum viscosity.
 
 ## Governing physics and analytic solution
 

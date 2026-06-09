@@ -32,11 +32,10 @@ Parameters (nondimensional MFC units):
     mu_min = 1e-6, mu_max = 0.3  (caps the plug viscosity, which diverges as the shear
           rate -> 0 in the plug; mu_max = 0.3 is ~6x the wall effective viscosity, so
           the plug is effectively rigid. The explicit viscous timestep dt ~ dy^2
-          rho/mu_max is the binding cost: the previous mu_max = 1.0 (the Bingham scale)
-          drove dt to ~3e-6 and also relaxed to steady state too slowly to finish in
-          minutes; mu_max = 0.3 gives dt ~ 1e-5 and a faster transient while still
-          resolving a clear plug. A much smaller mu_max lets the near-plug region
-          shear too freely and shrinks the plug.)
+          rho/mu_max is the binding cost — dt scales as 1/mu_max, so set mu_max just
+          above the physical maximum needed: a larger value shrinks dt and slows the
+          transient, while a much smaller mu_max lets the near-plug region shear too
+          freely and shrinks the plug.)
     pres = 10 -> sound speed ~3.74; u_plug ~ 4e-3 => Mach ~1e-3 (low Mach)
     grid: m = 24 (x, periodic; >= 24 for a 2-rank y-split WENO5 decomposition),
           n = 63 (y resolution of plug + sheared layer), L_x = L_y = 0.2

@@ -186,6 +186,9 @@ PHYSICS_DOCS = {
             "Requires viscous=T, model_eqns 2 or 3, riemann_solver 1 (HLL) or 2 (HLLC), "
             "and K, nn, mu_max to be set. "
             "When tau0 > 0, hb_m (Papanastasiou regularization) must also be set. "
+            "K, nn, mu_max must be positive; mu_min and hb_m must be positive when set; tau0 must be non-negative. "
+            "Re(2) and mu_bulk (bulk viscosity) are rejected for non-Newtonian fluids, "
+            "and HB parameters are rejected on fluids without non_newtonian=T. "
             "Incompatible with igr."
         ),
         "references": ["Papanastasiou87"],

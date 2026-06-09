@@ -27,9 +27,8 @@ periodic in `x`. Grid `m = 24` (x), `n = 63` (y).
 
 The plug viscosity diverges as the shear rate `-> 0`, so the clamp `mu_max` sets the
 plug rigidity. `mu_max = 0.3` (~6x the wall effective viscosity) keeps a clear plug
-while keeping the explicit viscous timestep `dt ~ dy^2 rho/mu_max` tractable: the
-Bingham-scale `mu_max = 1.0` drove `dt` to ~3e-6 (ETA ~20 min) *and* relaxed to steady
-state too slowly to finish in minutes.
+while keeping the explicit viscous timestep `dt ~ dy^2 rho/mu_max` tractable: `dt`
+scales as `1/mu_max`, so set `mu_max` just above the physical maximum required.
 
 ## Governing physics and analytic solution
 
