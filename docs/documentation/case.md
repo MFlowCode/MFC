@@ -1112,7 +1112,7 @@ This boundary condition can be used for fixed-temperature (isothermal) walls at 
 | `fluid_pp(i)%%hb_m`               | Real    | Papanastasiou regularization parameter \f$m\f$; required when `tau0 > 0`. |
 | `fluid_pp(i)%%mu_min`             | Real    | Lower viscosity clamp \f$\mu_{\min}\f$.                              |
 | `fluid_pp(i)%%mu_max`             | Real    | Upper viscosity clamp \f$\mu_{\max}\f$ (required).                  |
-| `fluid_pp(i)%%mu_bulk`            | Real    | Optional bulk viscosity (constant, not shear-rate dependent).        |
+| `fluid_pp(i)%%mu_bulk`            | Real    | Reserved; non-Newtonian bulk viscosity is not yet supported (setting it is rejected by the validator). |
 
 The effective dynamic viscosity is computed from the Papanastasiou-regularized Herschel-Bulkley model:
 

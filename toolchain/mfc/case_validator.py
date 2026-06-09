@@ -992,6 +992,10 @@ class CaseValidator:
                 riemann_solver is not None and riemann_solver not in (1, 2),
                 f"fluid_pp({i})%non_newtonian requires riemann_solver 1 (HLL) or 2 (HLLC)",
             )
+            self.prohibit(
+                self.get(f"fluid_pp({i})%mu_bulk") is not None,
+                f"fluid_pp({i})%mu_bulk (non-Newtonian bulk viscosity) is not yet supported",
+            )
 
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""
