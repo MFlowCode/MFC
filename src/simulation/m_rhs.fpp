@@ -14,6 +14,7 @@ module m_rhs
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -211,7 +212,7 @@ contains
                     @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
 
-                    if (riemann_solver == 1 .or. riemann_solver == 4) then
+                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
@@ -239,7 +240,7 @@ contains
                 @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
 
                 if (i == 1) then
-                    if (riemann_solver /= 1) then
+                    if (riemann_solver /= riemann_solver_hll) then
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(eqn_idx%adv%beg)%sf
                             $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
@@ -1113,7 +1114,7 @@ contains
 
             select case (current_idir)
             case (1)  ! x-direction
-                use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
+                use_standard_riemann = (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld)
                 if (use_standard_riemann) then
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1181,7 +1182,7 @@ contains
                 end if
             case (2)
                 ! y-direction: loops q_idx (x), k_idx (y), l_idx (z); sf(q_idx, k_idx, l_idx); dy(k_idx); Kterm(q_idx,k_idx,l_idx)
-                use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
+                use_standard_riemann = (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld)
                 if (use_standard_riemann) then
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1258,9 +1259,9 @@ contains
             case (3)
                 ! z-direction: loops l_idx (x), q_idx (y), k_idx (z); sf(l_idx, q_idx, k_idx); dz(k_idx); Kterm(l_idx,q_idx,k_idx)
                 if (grid_geometry == 3) then
-                    use_standard_riemann = (riemann_solver == 1)
+                    use_standard_riemann = (riemann_solver == riemann_solver_hll)
                 else
-                    use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
+                    use_standard_riemann = (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld)
                 end if
 
                 if (use_standard_riemann) then
@@ -1822,7 +1823,7 @@ contains
                         @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
                     end if
 
-                    if (riemann_solver == 1 .or. riemann_solver == 4) then
+                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do

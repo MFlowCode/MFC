@@ -15,6 +15,7 @@ module m_riemann_solvers
     use m_mpi_proxy
     use m_variables_conversion
     use m_bubbles
+    use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_hlld, riemann_solver_lax_friedrichs
     use m_bubbles_EE
     use m_surface_tension
     use m_helper_basic
@@ -4480,7 +4481,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                     do l = is3%beg, is3%end
@@ -4530,7 +4531,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                     do j = is1%beg, is1%end
@@ -4566,7 +4567,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                     do l = is3%beg, is3%end

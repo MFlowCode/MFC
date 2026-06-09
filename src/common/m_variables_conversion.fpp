@@ -13,6 +13,7 @@ module m_variables_conversion
     use m_mpi_proxy
     use m_helper_basic
     use m_helper
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
@@ -1145,7 +1146,7 @@ contains
                         end do
                     end if
 
-                    if (riemann_solver == 1 .or. riemann_solver == 4) then
+                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
                             FK_vf(j, k, l, i) = 0._wp

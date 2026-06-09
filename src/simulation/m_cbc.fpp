@@ -12,6 +12,7 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
+    use m_constants, only: riemann_solver_hll
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
         & get_mole_fractions, get_species_specific_heats_r
@@ -884,7 +885,7 @@ contains
                                                 & + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
                         end if
 
-                        if (riemann_solver == 1) then
+                        if (riemann_solver == riemann_solver_hll) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i) = 0._wp
@@ -998,7 +999,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1072,7 +1073,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1146,7 +1147,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1211,7 +1212,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1261,7 +1262,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1312,7 +1313,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
