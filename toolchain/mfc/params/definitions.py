@@ -617,6 +617,7 @@ def _load():
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
     _r("ib_coefficient_of_friction", REAL, {"ib"})
+    _r("many_ib_patch_parallelism", LOG, {"ib"})
 
     # Probes
     for n in ["num_probes", "num_integrals"]:
@@ -1254,6 +1255,7 @@ _nv(
     "ib_coefficient_of_friction",
     "num_particle_clouds",
     "ib_neighborhood_radius",
+    "many_ib_patch_parallelism",
     "particle_cloud",
     "tau_star",
     "cont_damage_s",

@@ -19,6 +19,7 @@ module m_ibm
     use m_ib_patches
     use m_viscous
     use m_model
+    use m_patch_geometries
     use m_collisions
 
     implicit none

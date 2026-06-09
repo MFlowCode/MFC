@@ -37,6 +37,7 @@ contains
         call s_check_inputs_time_stepping
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
+        @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
