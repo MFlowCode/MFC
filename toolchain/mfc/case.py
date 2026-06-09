@@ -41,6 +41,27 @@ class Case:
 
     def __init__(self, params: dict) -> None:
         self.params = copy.deepcopy(params)
+        for key, val in self.params.items():
+            self.params[key] = self.__normalize_named_value(key, val)
+
+    @staticmethod
+    def __normalize_named_value(key: str, val):
+        """Convert a named enumerated value (e.g. "hllc") to its integer code."""
+        from .params.errors import constraint_error
+        from .params.registry import REGISTRY
+
+        if not isinstance(val, str) or common.is_number(val):
+            return val
+        param_def = REGISTRY.get_param_def(key)
+        if param_def is None or not param_def.constraints:
+            return val
+        names = param_def.constraints.get("names")
+        if not names:
+            return val
+        if val in names:
+            return names[val]
+        shown = ", ".join(f"{v} ({n})" for n, v in sorted(names.items(), key=lambda kv: kv[1]))
+        raise common.MFCException(constraint_error(key, "choices", shown, val))
 
     def get_parameters(self) -> dict:
         return self.params
@@ -422,4 +443,4 @@ gbl_id = patch_ib(i)%gbl_patch_id
         return self.params[key]
 
     def __setitem__(self, key: str, val: str):
-        self.params[key] = val
+        self.params[key] = self.__normalize_named_value(key, val)

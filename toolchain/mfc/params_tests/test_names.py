@@ -40,3 +40,46 @@ def test_invalid_names_rejected():
         _validate_constraint("x", {"choices": [1, 2], "names": ["a", "b"]})
     with pytest.raises(ValueError):
         _validate_constraint("x", {"choices": [1, 2], "names": {1: "a", 2: "b"}})
+
+
+def test_case_normalizes_named_values():
+    from mfc.case import Case
+
+    case = Case({"riemann_solver": "hllc", "model_eqns": "5eq", "time_stepper": 3, "dt": 1e-5})
+    assert case.params["riemann_solver"] == 2
+    assert case.params["model_eqns"] == 2
+    assert case.params["time_stepper"] == 3
+
+
+def test_case_leaves_numeric_strings_and_unnamed_params_alone():
+    from mfc.case import Case
+
+    case = Case({"riemann_solver": "2", "viscous": "T"})
+    assert case.params["riemann_solver"] == "2"
+    assert case.params["viscous"] == "T"
+
+
+def test_case_rejects_unknown_name_listing_valid_ones():
+    import pytest
+
+    from mfc.case import Case
+    from mfc.common import MFCException
+
+    with pytest.raises(MFCException, match="hllc"):
+        Case({"riemann_solver": "hlcc"})
+
+
+def test_setitem_normalizes_named_values():
+    from mfc.case import Case
+
+    case = Case({})
+    case["riemann_solver"] = "hllc"
+    assert case.params["riemann_solver"] == 2
+
+
+def test_choices_error_mentions_names():
+    from mfc.params.registry import REGISTRY
+
+    errs = REGISTRY.get_param_def("riemann_solver").validate_value(3)
+    assert len(errs) == 1
+    assert "hllc" in errs[0]
