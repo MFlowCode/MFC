@@ -4063,8 +4063,9 @@ contains
         ! HLLD speeds and intermediate state variables:
         real(wp)                :: S_L, S_R, s_M, S_Lstar, S_Rstar
         real(wp)                :: pTot_L, pTot_R, rhoL_star, rhoR_star
-        real(wp), dimension(14) :: U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR
-        real(wp), dimension(14) :: F_L, F_R, F_starL, F_starR, F_hlld
+        real(wp), dimension(14) :: U_L, U_R
+        real(wp), dimension(14) :: F_L, F_R, F_hlld
+        real(wp), dimension(14) :: us, uss  ! selected-side U_star / U_starstar (diet: replaces the 6 star/F-star fan arrays)
         real(wp), dimension(14) :: F_HLL  ! for ADC blending
         real(wp), dimension(14) :: U_HLL  ! for ADC axisym geometric flux
         real(wp)                :: rho_HLL, u_n_HLL_cons, tau_nn_HLL
@@ -4125,7 +4126,7 @@ contains
         real(wp), parameter :: ADC_power = 1.0_wp
         real(wp)            :: alpha_L_sum, alpha_R_sum
         logical             :: degenerate
-        integer             :: i, j, k, l, ipass
+        integer             :: i, j, k, l, ipass, zone
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
             & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
@@ -4138,7 +4139,7 @@ contains
                 ! Anchor-cell index pattern: the fused kernel reads both anchors (hat_L: cell j, hat_R: cell j+1) directly from
                 ! q_prim_vf with the sweep-permuted indices the deleted q_hat fill kernel used.
                 #:set HATIDX = {1: 'j + ipass - 1, k, l', 2: 'k, j + ipass - 1, l', 3: 'l, k, j + ipass - 1'}[NORM_DIR]
-                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,U_starL,U_starR,U_starstarL,U_starstarR,F_L,F_R,F_starL,F_starR,F_hlld,F_HLL,U_HLL,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
+                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us,uss,zone,F_HLL,U_HLL,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
                 #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
@@ -4618,135 +4619,154 @@ contains
                                     alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - C_hat_2*(S_M - u_n_L))/(S_L - S_M)
                                     alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - C_hat_2*(S_M - u_n_R))/(S_R - S_M)
 
-                                    ! Compute U
-
-                                    if (p > 0 .and. .not. cyl_coord) then
-                                        ! 3D Cartesian: 14-state
-                                        U_starL(1) = U_L(1)*fac_L
-                                        U_starL(2) = U_L(2)*fac_L
-                                        U_starL(3) = rhoL_star*S_M
-                                        U_starL(4) = rhoL_star*u_t_L
-                                        U_starL(5) = rhoL_star*u_t2_L
-                                        U_starL(6) = E_L_star
-                                        U_starL(7) = alpha1_L_star
-                                        U_starL(8) = alpha2_L_star
-                                        U_starL(9) = rhoL_star*tau_nn_L_star
-                                        U_starL(10) = rhoL_star*tau_nt_L
-                                        U_starL(11) = rhoL_star*tau_nt2_L
-                                        U_starL(12) = rhoL_star*tau_tt_L_star
-                                        U_starL(13) = rhoL_star*tau_t2t2_L_star
-                                        U_starL(14) = rhoL_star*tau_t1t2_L_star
-
-                                        U_starR(1) = U_R(1)*fac_R
-                                        U_starR(2) = U_R(2)*fac_R
-                                        U_starR(3) = rhoR_star*S_M
-                                        U_starR(4) = rhoR_star*u_t_R
-                                        U_starR(5) = rhoR_star*u_t2_R
-                                        U_starR(6) = E_R_star
-                                        U_starR(7) = alpha1_R_star
-                                        U_starR(8) = alpha2_R_star
-                                        U_starR(9) = rhoR_star*tau_nn_R_star
-                                        U_starR(10) = rhoR_star*tau_nt_R
-                                        U_starR(11) = rhoR_star*tau_nt2_R
-                                        U_starR(12) = rhoR_star*tau_tt_R_star
-                                        U_starR(13) = rhoR_star*tau_t2t2_R_star
-                                        U_starR(14) = rhoR_star*tau_t1t2_R_star
-
-                                        U_starstarL(1) = U_L(1)*fac_L
-                                        U_starstarL(2) = U_L(2)*fac_L
-                                        U_starstarL(3) = rhoL_star*S_M
-                                        U_starstarL(4) = rhoL_star*u_t_star
-                                        U_starstarL(5) = rhoL_star*u_t2_star
-                                        U_starstarL(6) = E_L_starstar
-                                        U_starstarL(7) = alpha1_L_star
-                                        U_starstarL(8) = alpha2_L_star
-                                        U_starstarL(9) = rhoL_star*tau_nn_L_star
-                                        U_starstarL(10) = rhoL_star*tau_nt_star
-                                        U_starstarL(11) = rhoL_star*tau_nt2_star
-                                        U_starstarL(12) = rhoL_star*tau_tt_L_starstar
-                                        U_starstarL(13) = rhoL_star*tau_t2t2_L_starstar
-                                        U_starstarL(14) = rhoL_star*tau_t1t2_L_starstar
-
-                                        U_starstarR(1) = U_R(1)*fac_R
-                                        U_starstarR(2) = U_R(2)*fac_R
-                                        U_starstarR(3) = rhoR_star*S_M
-                                        U_starstarR(4) = rhoR_star*u_t_star
-                                        U_starstarR(5) = rhoR_star*u_t2_star
-                                        U_starstarR(6) = E_R_starstar
-                                        U_starstarR(7) = alpha1_R_star
-                                        U_starstarR(8) = alpha2_R_star
-                                        U_starstarR(9) = rhoR_star*tau_nn_R_star
-                                        U_starstarR(10) = rhoR_star*tau_nt_star
-                                        U_starstarR(11) = rhoR_star*tau_nt2_star
-                                        U_starstarR(12) = rhoR_star*tau_tt_R_starstar
-                                        U_starstarR(13) = rhoR_star*tau_t2t2_R_starstar
-                                        U_starstarR(14) = rhoR_star*tau_t1t2_R_starstar
-                                    else
-                                        ! 2D/axisym: 11-state (unchanged)
-                                        U_starL(1) = U_L(1)*fac_L
-                                        U_starL(2) = U_L(2)*fac_L
-                                        U_starL(3) = rhoL_star*S_M
-                                        U_starL(4) = rhoL_star*u_t_L
-                                        U_starL(5) = E_L_star
-                                        U_starL(6) = alpha1_L_star
-                                        U_starL(7) = alpha2_L_star
-                                        U_starL(8) = rhoL_star*tau_nn_L_star
-                                        U_starL(9) = rhoL_star*tau_nt_L
-                                        U_starL(10) = rhoL_star*tau_tt_L_star
-                                        U_starL(11) = rhoL_star*tau_qq_L_star
-
-                                        U_starR(1) = U_R(1)*fac_R
-                                        U_starR(2) = U_R(2)*fac_R
-                                        U_starR(3) = rhoR_star*S_M
-                                        U_starR(4) = rhoR_star*u_t_R
-                                        U_starR(5) = E_R_star
-                                        U_starR(6) = alpha1_R_star
-                                        U_starR(7) = alpha2_R_star
-                                        U_starR(8) = rhoR_star*tau_nn_R_star
-                                        U_starR(9) = rhoR_star*tau_nt_R
-                                        U_starR(10) = rhoR_star*tau_tt_R_star
-                                        U_starR(11) = rhoR_star*tau_qq_R_star
-
-                                        U_starstarL(1) = U_L(1)*fac_L
-                                        U_starstarL(2) = U_L(2)*fac_L
-                                        U_starstarL(3) = rhoL_star*S_M
-                                        U_starstarL(4) = rhoL_star*u_t_star
-                                        U_starstarL(5) = E_L_starstar
-                                        U_starstarL(6) = alpha1_L_star
-                                        U_starstarL(7) = alpha2_L_star
-                                        U_starstarL(8) = rhoL_star*tau_nn_L_star
-                                        U_starstarL(9) = rhoL_star*tau_nt_star
-                                        U_starstarL(10) = rhoL_star*tau_tt_L_starstar
-                                        U_starstarL(11) = rhoL_star*tau_qq_L_star
-
-                                        U_starstarR(1) = U_R(1)*fac_R
-                                        U_starstarR(2) = U_R(2)*fac_R
-                                        U_starstarR(3) = rhoR_star*S_M
-                                        U_starstarR(4) = rhoR_star*u_t_star
-                                        U_starstarR(5) = E_R_starstar
-                                        U_starstarR(6) = alpha1_R_star
-                                        U_starstarR(7) = alpha2_R_star
-                                        U_starstarR(8) = rhoR_star*tau_nn_R_star
-                                        U_starstarR(9) = rhoR_star*tau_nt_star
-                                        U_starstarR(10) = rhoR_star*tau_tt_R_starstar
-                                        U_starstarR(11) = rhoR_star*tau_qq_R_star
-                                    end if
-
-                                    ! Compute F and select F_HLLD
-
-                                    F_starL(1:ncomp) = F_L(1:ncomp) + S_L*(U_starL(1:ncomp) - U_L(1:ncomp))
-                                    F_starR(1:ncomp) = F_R(1:ncomp) + S_R*(U_starR(1:ncomp) - U_R(1:ncomp))
+                                    ! HLLD flux, register-diet form: pick the wave-fan zone once (it is
+                                    ! component-independent), then materialize only the SELECTED side's star state
+                                    ! (us = U_star, uss = U_starstar) and assemble F_hlld below. Replaces the former
+                                    ! U_star{L,R} / U_starstar{L,R} / F_star{L,R} fan arrays; operation order preserved
+                                    ! so the flux is -O0 bit-identical. Do NOT re-expand into per-region temp arrays
+                                    ! without re-checking GPU register spill and the -O0 exactness gate.
 
                                     if (0.0_wp <= S_L) then
-                                        F_hlld(1:ncomp) = F_L(1:ncomp)
+                                        zone = 0
                                     else if (0.0_wp <= S_Lstar) then
-                                        F_hlld(1:ncomp) = F_starL(1:ncomp)
+                                        zone = 1
                                     else if (0.0_wp <= s_M) then
-                                        F_hlld(1:ncomp) = F_starL(1:ncomp) + S_Lstar*(U_starstarL(1:ncomp) - U_starL(1:ncomp))
+                                        zone = 2
                                     else if (0.0_wp <= S_Rstar) then
-                                        F_hlld(1:ncomp) = F_starR(1:ncomp) + S_Rstar*(U_starstarR(1:ncomp) - U_starR(1:ncomp))
+                                        zone = 3
                                     else if (0.0_wp <= S_R) then
-                                        F_hlld(1:ncomp) = F_starR(1:ncomp)
+                                        zone = 4
+                                    else
+                                        zone = 5
+                                    end if
+
+                                    if (zone == 1 .or. zone == 2) then
+                                        ! Left side: us = U_starL, uss = U_starstarL
+                                        if (p > 0 .and. .not. cyl_coord) then
+                                            us(1) = U_L(1)*fac_L
+                                            us(2) = U_L(2)*fac_L
+                                            us(3) = rhoL_star*S_M
+                                            us(4) = rhoL_star*u_t_L
+                                            us(5) = rhoL_star*u_t2_L
+                                            us(6) = E_L_star
+                                            us(7) = alpha1_L_star
+                                            us(8) = alpha2_L_star
+                                            us(9) = rhoL_star*tau_nn_L_star
+                                            us(10) = rhoL_star*tau_nt_L
+                                            us(11) = rhoL_star*tau_nt2_L
+                                            us(12) = rhoL_star*tau_tt_L_star
+                                            us(13) = rhoL_star*tau_t2t2_L_star
+                                            us(14) = rhoL_star*tau_t1t2_L_star
+                                            uss(1) = us(1)
+                                            uss(2) = us(2)
+                                            uss(3) = us(3)
+                                            uss(4) = rhoL_star*u_t_star
+                                            uss(5) = rhoL_star*u_t2_star
+                                            uss(6) = E_L_starstar
+                                            uss(7) = us(7)
+                                            uss(8) = us(8)
+                                            uss(9) = us(9)
+                                            uss(10) = rhoL_star*tau_nt_star
+                                            uss(11) = rhoL_star*tau_nt2_star
+                                            uss(12) = rhoL_star*tau_tt_L_starstar
+                                            uss(13) = rhoL_star*tau_t2t2_L_starstar
+                                            uss(14) = rhoL_star*tau_t1t2_L_starstar
+                                        else
+                                            us(1) = U_L(1)*fac_L
+                                            us(2) = U_L(2)*fac_L
+                                            us(3) = rhoL_star*S_M
+                                            us(4) = rhoL_star*u_t_L
+                                            us(5) = E_L_star
+                                            us(6) = alpha1_L_star
+                                            us(7) = alpha2_L_star
+                                            us(8) = rhoL_star*tau_nn_L_star
+                                            us(9) = rhoL_star*tau_nt_L
+                                            us(10) = rhoL_star*tau_tt_L_star
+                                            us(11) = rhoL_star*tau_qq_L_star
+                                            uss(1) = us(1)
+                                            uss(2) = us(2)
+                                            uss(3) = us(3)
+                                            uss(4) = rhoL_star*u_t_star
+                                            uss(5) = E_L_starstar
+                                            uss(6) = us(6)
+                                            uss(7) = us(7)
+                                            uss(8) = us(8)
+                                            uss(9) = rhoL_star*tau_nt_star
+                                            uss(10) = rhoL_star*tau_tt_L_starstar
+                                            uss(11) = us(11)
+                                        end if
+                                    else if (zone == 3 .or. zone == 4) then
+                                        ! Right side: us = U_starR, uss = U_starstarR
+                                        if (p > 0 .and. .not. cyl_coord) then
+                                            us(1) = U_R(1)*fac_R
+                                            us(2) = U_R(2)*fac_R
+                                            us(3) = rhoR_star*S_M
+                                            us(4) = rhoR_star*u_t_R
+                                            us(5) = rhoR_star*u_t2_R
+                                            us(6) = E_R_star
+                                            us(7) = alpha1_R_star
+                                            us(8) = alpha2_R_star
+                                            us(9) = rhoR_star*tau_nn_R_star
+                                            us(10) = rhoR_star*tau_nt_R
+                                            us(11) = rhoR_star*tau_nt2_R
+                                            us(12) = rhoR_star*tau_tt_R_star
+                                            us(13) = rhoR_star*tau_t2t2_R_star
+                                            us(14) = rhoR_star*tau_t1t2_R_star
+                                            uss(1) = us(1)
+                                            uss(2) = us(2)
+                                            uss(3) = us(3)
+                                            uss(4) = rhoR_star*u_t_star
+                                            uss(5) = rhoR_star*u_t2_star
+                                            uss(6) = E_R_starstar
+                                            uss(7) = us(7)
+                                            uss(8) = us(8)
+                                            uss(9) = us(9)
+                                            uss(10) = rhoR_star*tau_nt_star
+                                            uss(11) = rhoR_star*tau_nt2_star
+                                            uss(12) = rhoR_star*tau_tt_R_starstar
+                                            uss(13) = rhoR_star*tau_t2t2_R_starstar
+                                            uss(14) = rhoR_star*tau_t1t2_R_starstar
+                                        else
+                                            us(1) = U_R(1)*fac_R
+                                            us(2) = U_R(2)*fac_R
+                                            us(3) = rhoR_star*S_M
+                                            us(4) = rhoR_star*u_t_R
+                                            us(5) = E_R_star
+                                            us(6) = alpha1_R_star
+                                            us(7) = alpha2_R_star
+                                            us(8) = rhoR_star*tau_nn_R_star
+                                            us(9) = rhoR_star*tau_nt_R
+                                            us(10) = rhoR_star*tau_tt_R_star
+                                            us(11) = rhoR_star*tau_qq_R_star
+                                            uss(1) = us(1)
+                                            uss(2) = us(2)
+                                            uss(3) = us(3)
+                                            uss(4) = rhoR_star*u_t_star
+                                            uss(5) = E_R_starstar
+                                            uss(6) = us(6)
+                                            uss(7) = us(7)
+                                            uss(8) = us(8)
+                                            uss(9) = rhoR_star*tau_nt_star
+                                            uss(10) = rhoR_star*tau_tt_R_starstar
+                                            uss(11) = us(11)
+                                        end if
+                                    end if
+
+                                    ! Assemble F_hlld for the selected zone. The old F_starL/R are folded in:
+                                    ! zone 2 evaluates F_L + S_L*(us - U_L) first (= old F_starL) then adds
+                                    ! S_Lstar*(uss - us); left-associative order matches the materialized form.
+                                    if (zone == 0) then
+                                        F_hlld(1:ncomp) = F_L(1:ncomp)
+                                    else if (zone == 1) then
+                                        F_hlld(1:ncomp) = F_L(1:ncomp) + S_L*(us(1:ncomp) - U_L(1:ncomp))
+                                    else if (zone == 2) then
+                                        F_hlld(1:ncomp) = F_L(1:ncomp) + S_L*(us(1:ncomp) - U_L(1:ncomp)) + S_Lstar*(uss(1:ncomp) &
+                                               & - us(1:ncomp))
+                                    else if (zone == 3) then
+                                        F_hlld(1:ncomp) = F_R(1:ncomp) + S_R*(us(1:ncomp) - U_R(1:ncomp)) + S_Rstar*(uss(1:ncomp) &
+                                               & - us(1:ncomp))
+                                    else if (zone == 4) then
+                                        F_hlld(1:ncomp) = F_R(1:ncomp) + S_R*(us(1:ncomp) - U_R(1:ncomp))
                                     else
                                         F_hlld(1:ncomp) = F_R(1:ncomp)
                                     end if
