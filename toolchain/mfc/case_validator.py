@@ -188,7 +188,7 @@ PHYSICS_DOCS = {
             "When tau0 > 0, hb_m (Papanastasiou regularization) must also be set. "
             "Incompatible with igr."
         ),
-        "references": ["Bryngelson21"],
+        "references": ["Papanastasiou87"],
         "docs_section": "sec-non-newtonian",
     },
     # Acoustic Sources

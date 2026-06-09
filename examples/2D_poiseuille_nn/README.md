@@ -44,7 +44,7 @@ pointwise correctness test and holds regardless of the cap.
 
 Relative L2 error vs. the analytic power-law profile: **0.68%** (2-rank run, steady
 state confirmed). The local momentum balance holds to ~0.1% across the channel, and
-the profile bluntness (mean/peak ~0.706) matches the `n = 0.7` theory.
+the profile bluntness (mean/peak = **0.706**) matches the `n = 0.7` theory `(n+1)/(2n+1) = 0.708`.
 
 ## References
 

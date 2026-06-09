@@ -3,8 +3,9 @@
 Qualitative demonstration of MFC's Herschel-Bulkley non-Newtonian viscosity in a
 recirculating flow. A shear-thinning fluid fills a unit square cavity driven by a
 moving top lid. Unlike the Poiseuille examples, **this case has no closed-form
-analytic solution** — it is a qualitative benchmark against the lattice-Boltzmann
-results of Li et al. (2015).
+analytic solution** — it is a qualitative demonstration of the expected
+shear-thinning trend (a blunter primary vortex and reduced near-wall velocity
+gradients relative to the Newtonian case).
 
 ## Regime and parameters
 
@@ -32,7 +33,7 @@ stays comparatively viscous.
 **What to look for** (qualitative, no analytic match): a primary recirculating
 vortex whose center, relative to a Newtonian cavity at the same Reynolds number, is
 shifted toward the moving lid, with stronger near-wall velocity gradients — the
-shear-thinning trend reported by Li et al. (2015). Do not expect a quantitative
+expected shear-thinning trend. Do not expect a quantitative
 error; the committed grid (`m = n = 99`) is intentionally coarse. For quantitative
 comparison use `m = n = 499` or finer with a longer `t_step_stop`.
 
@@ -45,6 +46,4 @@ no `compare_analytic.py` for this qualitative case.
 
 ## References
 
-- Li, Z.-Y., Fang, M., Zhang, X., & Wu, Y.-L. (2015). Coupling lattice Boltzmann
-  model for simulation of thermal flows on standard lattices. *Phys. Rev. E* 85, 016710.
 - Papanastasiou, T. C. (1987). Flows of materials with yield. *J. Rheol.* 31, 385.
