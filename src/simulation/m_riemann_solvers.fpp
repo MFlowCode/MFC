@@ -4172,15 +4172,19 @@ contains
                     if (any_non_newtonian) then
                         D_xx = avg_dvdx_int(1); D_yy = 0._wp; D_zz = 0._wp
                         D_xy = 0._wp; D_xz = 0._wp; D_yz = 0._wp
-                        if (num_dims > 1) then
-                            D_yy = avg_dvdy_int(2)
-                            D_xy = 0.5_wp*(avg_dvdy_int(1) + avg_dvdx_int(2))
-                        end if
-                        if (num_dims > 2) then
-                            D_zz = avg_dvdz_int(3)
-                            D_xz = 0.5_wp*(avg_dvdz_int(1) + avg_dvdx_int(3))
-                            D_yz = 0.5_wp*(avg_dvdz_int(2) + avg_dvdy_int(3))
-                        end if
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                            if (num_dims > 1) then
+                                D_yy = avg_dvdy_int(2)
+                                D_xy = 0.5_wp*(avg_dvdy_int(1) + avg_dvdx_int(2))
+                            end if
+                        #:endif
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                            if (num_dims > 2) then
+                                D_zz = avg_dvdz_int(3)
+                                D_xz = 0.5_wp*(avg_dvdz_int(1) + avg_dvdx_int(3))
+                                D_yz = 0.5_wp*(avg_dvdz_int(2) + avg_dvdy_int(3))
+                            end if
+                        #:endif
                         gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
                         do fl = 1, num_fluids
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, &
@@ -4377,15 +4381,19 @@ contains
                     if (any_non_newtonian) then
                         D_xx = vel_grad_avg(1, 1); D_yy = 0._wp; D_zz = 0._wp
                         D_xy = 0._wp; D_xz = 0._wp; D_yz = 0._wp
-                        if (num_dims > 1) then
-                            D_yy = vel_grad_avg(2, 2)
-                            D_xy = 0.5_wp*(vel_grad_avg(1, 2) + vel_grad_avg(2, 1))
-                        end if
-                        if (num_dims > 2) then
-                            D_zz = vel_grad_avg(3, 3)
-                            D_xz = 0.5_wp*(vel_grad_avg(1, 3) + vel_grad_avg(3, 1))
-                            D_yz = 0.5_wp*(vel_grad_avg(2, 3) + vel_grad_avg(3, 2))
-                        end if
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                            if (num_dims > 1) then
+                                D_yy = vel_grad_avg(2, 2)
+                                D_xy = 0.5_wp*(vel_grad_avg(1, 2) + vel_grad_avg(2, 1))
+                            end if
+                        #:endif
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                            if (num_dims > 2) then
+                                D_zz = vel_grad_avg(3, 3)
+                                D_xz = 0.5_wp*(vel_grad_avg(1, 3) + vel_grad_avg(3, 1))
+                                D_yz = 0.5_wp*(vel_grad_avg(2, 3) + vel_grad_avg(3, 2))
+                            end if
+                        #:endif
                         gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
                         do fl = 1, num_fluids
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, &

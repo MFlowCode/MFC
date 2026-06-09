@@ -54,15 +54,15 @@ contains
 
     end function f_compute_shear_rate_from_components
 
-    !> Mixture inverse Reynolds (= 1/mu_mix) per direction (1=shear, 2=bulk) at one state. Reproduces the legacy Newtonian
-    !! arithmetic exactly when any_non_newtonian is .false.
+    !> Mixture inverse Reynolds (= 1/mu_mix) per direction (1=shear, 2=bulk) at one state. Newtonian fluids accumulate the legacy
+    !! per-fluid alpha/Res term; non-Newtonian fluids use the Herschel-Bulkley viscosity at the given shear rate.
     pure subroutine s_compute_mixture_inv_re(alpha, shear_rate, Res, Re_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(:), intent(in)   :: alpha
+        real(wp), dimension(*), intent(in)   :: alpha
         real(wp), intent(in)                 :: shear_rate
-        real(wp), dimension(:,:), intent(in) :: Res
+        real(wp), dimension(2,*), intent(in) :: Res
         real(wp), dimension(2), intent(out)  :: Re_out
         integer                              :: i, q, fl
         real(wp)                             :: mu_q

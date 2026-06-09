@@ -1134,7 +1134,7 @@ Special cases:
 Usage notes:
 
 - Requires `viscous = T`. `fluid_pp(i)%%Re(1)` must be set (use `1.0/K` to register the fluid as viscous; the HB model overrides \f$\mu_{\rm eff}\f$ cell-by-cell).
-- `mu_max` is required; `mu_min` defaults to zero if omitted.
+- `mu_max` is required; `mu_min` is inactive if omitted (no lower clamp applied).
 - Supported only with `riemann_solver = 1` (HLL) or `riemann_solver = 2` (HLLC).
 - All HB parameters are non-dimensional (scaled by \f$\rho_{\rm ref} U_{\rm ref} L_{\rm ref}\f$), so \f$1/\mu_{\rm eff}\f$ equals the local effective Reynolds number.
 - For cylindrical geometry (`cyl_coord = T`) the shear rate uses the grid-direction strain components; curvature corrections to \f$\dot\gamma\f$ are not yet included.

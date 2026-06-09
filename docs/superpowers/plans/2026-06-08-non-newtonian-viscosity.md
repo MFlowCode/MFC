@@ -411,9 +411,94 @@ git commit -m "feat(nn): add any_non_newtonian flag and GPU HB parameter arrays"
 
 ---
 
-## Phase 2: Core Cartesian Riemann substitution (first real physics)
+## DESIGN CORRECTION (2026-06-08): Riemann injection point
 
-### Task 6: Substitute mixture inv-Re in the Riemann solvers
+During Task 6 it was found that HLL (`riemann_solver=1`) and HLLC (`=2`) do NOT apply
+viscosity at the per-fluid `Re_L`/`Re_R` sites. They store a harmonic-mean `Re_avg_rsx_vf`
+and assemble the actual viscous stress in the SHARED routine
+`s_compute_cartesian_viscous_source_flux` (m_riemann_solvers.fpp:4257), which already builds
+the interface strain tensor `vel_grad_avg` with correct PHYSICAL indexing (`idx_right_phys`)
+and reads `Re_avg_rsx_vf`. That shared routine is the correct, low-risk injection point.
+
+**Decision (user-approved): non-Newtonian supports HLL + HLLC only.** LF (`=5`) and HLLD
+(`=4`) are guarded off (`non_newtonian` requires `riemann_solver in {1,2}`), added in Task 11.
+
+The Re_L/Re_R sites (320, 1004, 1438, 2899) are LEFT UNCHANGED. Tasks 6 and 8 below are
+superseded by the corrected versions in this section.
+
+### Task 6 (CORRECTED): Inject shear-dependent viscosity in the shared Cartesian flux routine
+
+**Files:** Modify `src/simulation/m_riemann_solvers.fpp` only.
+
+Thread `q_prim_vf` (full `dimension(sys_size)`) into the viscous-flux dispatcher and the
+Cartesian routine so it can read per-fluid `alpha` at the interface:
+
+1. `use m_hb_function` at module top.
+2. `s_compute_viscous_source_flux` (line 102): add `q_prim_vf` as an argument
+   (`type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf`); pass it on to
+   `s_compute_cartesian_viscous_source_flux`. (Leave the cylindrical call as-is; Task 8
+   extends it.)
+3. `s_compute_cartesian_viscous_source_flux` (line 4257): add `q_prim_vf` argument.
+4. Both call sites (HLL ~778, HLLC ~3273): pass `q_prim_vf` (the full field — it is in
+   scope at both; the solver receives it).
+5. Inside the loop of `s_compute_cartesian_viscous_source_flux`, AFTER `vel_grad_avg` is
+   built (line 4320) and BEFORE the `norm_dir` Re_shear/Re_bulk assignment (4328+), add:
+
+```fortran
+                    if (any_non_newtonian) then
+                        D_xx = vel_grad_avg(1, 1); D_yy = 0._wp; D_zz = 0._wp
+                        D_xy = 0._wp; D_xz = 0._wp; D_yz = 0._wp
+                        if (num_dims > 1) then
+                            D_yy = vel_grad_avg(2, 2)
+                            D_xy = 0.5_wp*(vel_grad_avg(1, 2) + vel_grad_avg(2, 1))
+                        end if
+                        if (num_dims > 2) then
+                            D_zz = vel_grad_avg(3, 3)
+                            D_xz = 0.5_wp*(vel_grad_avg(1, 3) + vel_grad_avg(3, 1))
+                            D_yz = 0.5_wp*(vel_grad_avg(2, 3) + vel_grad_avg(3, 2))
+                        end if
+                        gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                        do fl = 1, num_fluids
+                            alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, l_loop) + &
+                                                    q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_right_phys(1), &
+                                                    idx_right_phys(2), idx_right_phys(3)))
+                        end do
+                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
+                    end if
+```
+
+   The `vel_grad_avg(2,2)` etc. reads are guarded because `vel_grad_avg` is
+   `dimension(num_dims,num_dims)` in the normal build (out-of-bounds in 1D otherwise).
+
+6. Replace EACH of the three `norm_dir` Re_shear/Re_bulk assignment blocks (4328-4346) so
+   non-Newtonian uses the freshly computed mixture:
+
+```fortran
+                    if (any_non_newtonian) then
+                        Re_shear = Re_nn(1)
+                        Re_bulk = Re_nn(2)
+                    else
+                        Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
+                        Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                    end if
+```
+   (The `vel_src_at_interface` assignment in each norm_dir branch is unchanged.)
+
+7. Declarations in `s_compute_cartesian_viscous_source_flux`: add
+   `real(wp) :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz`,
+   `real(wp), dimension(2) :: Re_nn`, `real(wp), dimension(num_fluids) :: alpha_avg`,
+   `integer :: fl`. Add all of these to the `$:GPU_PARALLEL_LOOP(... private='[...]')` list.
+
+8. Build (`-t simulation`), then the Newtonian invariance gate
+   (`--only Viscous`, all pass, zero golden changes), then format + commit
+   `feat(nn): shear-dependent viscosity in shared Cartesian viscous flux (HLL/HLLC)`.
+
+Newtonian invariance holds by construction: when `any_non_newtonian=.false.`, the new block
+is skipped and `Re_shear/Re_bulk = Re_avg_rsx_vf` exactly as before.
+
+---
+
+### Task 6 (ORIGINAL — SUPERSEDED, do not implement): Substitute mixture inv-Re in the Riemann solvers
 
 **Files:**
 - Modify: `src/simulation/m_riemann_solvers.fpp` — 4 sites matching `alpha_L(Re_idx(i, q))/Res_gs(i, q)` (HLL, HLLC, HLLD and variants; find them with the grep below). Add `use m_hb_function` at module top.
