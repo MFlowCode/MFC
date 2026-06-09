@@ -304,6 +304,7 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%qvp", "Heat of formation prime for patch {0}"),
     (r"patch_icpp\((\d+)\)%hcid", "Hard-coded patch ID for patch {0}"),
     (r"patch_icpp\((\d+)\)%model_spc", "Model spacing for patch {0}"),
+    (r"patch_icpp\((\d+)\)%model_id", "Index into  stl_models array for STL/OBJ geometry patch {0}"),
     (r"patch_icpp\((\d+)\)%non_axis_sym", "Non-axisymmetric parameter for patch {0}"),
     (r"patch_icpp\((\d+)\)%r0", "Initial bubble radius for patch {0}"),
     (r"patch_icpp\((\d+)\)%v0", "Initial bubble velocity for patch {0}"),

@@ -185,11 +185,6 @@ module m_derived_types
         real(wp), dimension(1:3)     :: n  !< Normal vector
     end type t_triangle
 
-    type :: t_ray
-        real(wp), dimension(1:3) :: o  !< Origin
-        real(wp), dimension(1:3) :: d  !< Direction
-    end type t_ray
-
     type :: t_bbox
         real(wp), dimension(1:3) :: min  !< Minimum coordinates
         real(wp), dimension(1:3) :: max  !< Maximum coordinates
@@ -267,6 +262,7 @@ module m_derived_types
         real(wp), dimension(1:3) :: model_rotate
         integer                  :: model_spc        !< Number of samples per cell to use when discretizing the STL object.
         real(wp)                 :: model_threshold  !< Threshold to turn on smoothen STL patch.
+        integer                  :: model_id         !< index into stl_models(:) for STL/OBJ geometry patches
     end type ic_patch_parameters
 
     !> User-input parameters for a NACA 4-digit airfoil (namelist-safe: scalars only)

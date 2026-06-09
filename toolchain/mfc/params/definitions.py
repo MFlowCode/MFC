@@ -766,7 +766,7 @@ def _load():
     # patch_icpp (10 patches)
     for i in range(1, NP + 1):
         px = f"patch_icpp({i})%"
-        for a in ["geometry", "smooth_patch_id", "hcid", "model_spc"]:
+        for a in ["geometry", "smooth_patch_id", "hcid", "model_id", "model_spc"]:
             _r(f"{px}{a}", INT)
         for a in ["smoothen", "alter_patch"] if i >= 2 else ["smoothen"]:
             _r(f"{px}{a}", LOG)
