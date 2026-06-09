@@ -644,6 +644,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                     cases.append(define_case_d(stack, "nn=0.5", {"fluid_pp(1)%nn": 0.5}))
                     cases.append(define_case_d(stack, "nn=1.5", {"fluid_pp(1)%nn": 1.5}))
+                    cases.append(define_case_d(stack, "tau0=0.001", {"fluid_pp(1)%nn": 0.5, "fluid_pp(1)%tau0": 1.0e-3, "fluid_pp(1)%hb_m": 1.0e3}))
                     stack.pop()
 
             if num_fluids == 2:
@@ -666,6 +667,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     stack.pop()
 
                 stack.pop()
+
+                if len(dimInfo[0]) == 2:
+                    # Mixed non-Newtonian (fluid 1) / Newtonian (fluid 2) case
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "Non-Newtonian",
+                            {
+                                "dt": 1e-11,
+                                "patch_icpp(1)%vel(1)": 1.0,
+                                "viscous": "T",
+                                "riemann_solver": 2,
+                                "model_eqns": 2,
+                                "fluid_pp(1)%Re(1)": 1.0e4,
+                                "fluid_pp(1)%non_newtonian": "T",
+                                "fluid_pp(1)%tau0": 0.0,
+                                "fluid_pp(1)%K": 1e-4,
+                                "fluid_pp(1)%nn": 0.5,
+                                "fluid_pp(1)%mu_max": 0.1,
+                                "fluid_pp(1)%mu_min": 1e-6,
+                                "fluid_pp(1)%hb_m": 1000.0,
+                                "fluid_pp(2)%Re(1)": 1.0e4,
+                            },
+                        )
+                    )
+
                 stack.pop()
 
             stack.pop()
