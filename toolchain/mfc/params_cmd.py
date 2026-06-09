@@ -304,8 +304,6 @@ def _show_families(registry, limit):
 
 def _search_params(registry, query, type_filter, limit, describe=False, search_descriptions=True):
     """Search for parameters matching a query."""
-    from .params.descriptions import get_description
-
     query_lower = query.lower()
     matches = []
     desc_matches = set()  # Track which params matched via description
@@ -315,9 +313,7 @@ def _search_params(registry, query, type_filter, limit, describe=False, search_d
         desc_match = False
 
         if search_descriptions and not name_match:
-            # Also search in description
-            desc = get_description(name)
-            if desc and query_lower in desc.lower():
+            if param.description and query_lower in param.description.lower():
                 desc_match = True
                 desc_matches.add(name)
 
@@ -352,7 +348,7 @@ def _search_params(registry, query, type_filter, limit, describe=False, search_d
 
 def _show_collapsed_results(collapsed, describe=False):
     """Show collapsed search results."""
-    from .params.descriptions import get_description, get_pattern_description
+    from .params.descriptions import get_pattern_description
 
     # Check if any items have index ranges to show
     has_ranges = any(len(item) == 4 and item[2] > 1 for item in collapsed)
@@ -365,11 +361,10 @@ def _show_collapsed_results(collapsed, describe=False):
             count = item[2]
             range_str = item[3] if len(item) == 4 else ""
 
-            # Get description - use pattern description for indexed params
             if "(N)" in name or "(M)" in name:
                 desc = get_pattern_description(name)
             else:
-                desc = get_description(name)
+                desc = param.description
 
             cons.print(f"  [cyan]{name}[/cyan]")
             cons.print(f"    Type: {param.param_type.name}")

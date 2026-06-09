@@ -33,32 +33,39 @@ def __validate_job_options() -> None:
             raise MFCException(f"RUN: {ARG('email')} is not a valid e-mail address.")
 
 
+_PROFILERS = [
+    ("ncu", "ncu", "[bold green]NVIDIA Nsight Compute[/bold green]", lambda: ["ncu", "--nvtx", "--mode=launch-and-attach", "--cache-control=none", "--clock-control=none"] + ARG("ncu")),
+    ("nsys", "nsys", "[bold green]NVIDIA Nsight Systems[/bold green]", lambda: ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")),
+    ("rcu", "rocprof-compute", "[bold red]ROCM rocprof-compute[/bold red]", lambda: ["rocprof-compute", "profile", "-n", ARG("name").replace("-", "_").replace(".", "_")] + ARG("rcu") + ["--"]),
+    ("rsys", "rocprof", "[bold red]ROCM rocprof-systems[/bold red]", lambda: ["rocprof"] + ARG("rsys")),
+]
+
+
 def __profiler_prepend() -> typing.List[str]:
-    if ARG("ncu") is not None:
-        if not does_command_exist("ncu"):
-            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
-
-        return ["ncu", "--nvtx", "--mode=launch-and-attach", "--cache-control=none", "--clock-control=none"] + ARG("ncu")
-
-    if ARG("nsys") is not None:
-        if not does_command_exist("nsys"):
-            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Systems[/bold green] (nsys).")
-
-        return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
-
-    if ARG("rcu") is not None:
-        if not does_command_exist("rocprof-compute"):
-            raise MFCException("Failed to locate [bold red]ROCM rocprof-compute[/bold red] (rocprof-compute).")
-
-        return ["rocprof-compute", "profile", "-n", ARG("name").replace("-", "_").replace(".", "_")] + ARG("rcu") + ["--"]
-
-    if ARG("rsys") is not None:
-        if not does_command_exist("rocprof"):
-            raise MFCException("Failed to locate [bold red]ROCM rocprof-systems[/bold red] (rocprof-systems).")
-
-        return ["rocprof"] + ARG("rsys")
-
+    for arg, cmd, label, build_args in _PROFILERS:
+        if ARG(arg) is not None:
+            if not does_command_exist(cmd):
+                raise MFCException(f"Failed to locate {label} ({cmd}).")
+            return build_args()
     return []
+
+
+def __rsys_profiler_str() -> str:
+    if not does_command_exist("rocprof"):
+        raise MFCException("Failed to locate [bold red]ROCM rocprof-systems[/bold red] (rocprof-systems).")
+
+    # Write a wrapper script so $SLURM_PROCID is expanded inside each srun task
+    # rather than by the calling shell (which would give every rank rank 0's value).
+    extra = shlex.join(ARG("rsys")) if ARG("rsys") else ""
+    wrapper_path = os.path.abspath(os.path.join(os.path.dirname(ARG("input")), "rocprof_wrapper.sh"))
+    wrapper_lines = [
+        "#!/bin/bash",
+        "RANK=${SLURM_PROCID:-${FLUX_TASK_RANK:-${OMPI_COMM_WORLD_RANK:-0}}}",
+        f'exec rocprof -o "rocprof_rank_${{RANK}}.csv" {extra} "$@"',
+    ]
+    file_write(wrapper_path, "\n".join(wrapper_lines) + "\n")
+    os.chmod(wrapper_path, 0o755)
+    return wrapper_path
 
 
 def get_baked_templates() -> dict:
@@ -111,7 +118,7 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         MFC_ROOT_DIR=MFC_ROOT_DIR,
         SIMULATION=SIMULATION,
         qsystem=queues.get_system(),
-        profiler=shlex.join(__profiler_prepend()),
+        profiler=__rsys_profiler_str() if ARG("rsys") is not None else shlex.join(__profiler_prepend()),
         gpu_enabled=gpu_enabled,
         gpu_acc=gpu_acc,
         gpu_mp=gpu_mp,

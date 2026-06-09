@@ -1,65 +1,68 @@
 # Common Pitfalls
 
-## Array Bounds & Ghost Cells
-- Grid dimensions: `m`, `n`, `p` (cells in x, y, z). 1D: n=p=0. 2D: p=0.
-- Interior domain: `0:m`, `0:n`, `0:p`
-- Buffer/ghost region: `-buff_size:m+buff_size` (similar for n, p in multi-D)
-- `buff_size` depends on WENO order and features (typically `2*weno_polyn + 2`)
-- Domain bounds: `idwint(1:3)` (interior `0:m`), `idwbuff(1:3)` (with ghost cells)
-- Cell-center coords: `x_cc(-buff_size:m+buff_size)`, `y_cc(...)`, `z_cc(...)`
-- Cell-boundary coords: `x_cb(-1-buff_size:m+buff_size)`
-- Riemann solver indexing: left state at `j`, right state at `j+1`
-- Off-by-one errors in ghost cell regions are a common source of bugs
+Traps that live in no other doc, collected because their failure modes are silent —
+wrong answers and wrong indices, not error messages. General development pitfalls are
+covered in `docs/documentation/contributing.md`.
 
-## Field Variable Indexing
-- Conserved variables: `q_cons_vf(1:sys_size)`. Primitive: `q_prim_vf(1:sys_size)`.
-- All equation indices live in the unified `eqn_idx` struct (`eqn_idx_info` type in `m_derived_types.fpp`).
-  Index ranges depend on `model_eqns` and enabled features (set in `m_global_parameters.fpp`):
-  - `eqn_idx%cont` — continuity range (partial densities, one per fluid)
-  - `eqn_idx%mom` — momentum range
-  - `eqn_idx%E` — total energy (scalar)
-  - `eqn_idx%adv` — volume fractions (advection equations)
-  - `eqn_idx%bub`, `eqn_idx%stress`, `eqn_idx%xi`, `eqn_idx%species`, `eqn_idx%B` — optional
-  - `eqn_idx%gamma`, `eqn_idx%pi_inf`, `eqn_idx%alf`, `eqn_idx%int_en` — additional scalars/ranges
-- Use `eqn_idx%cont%beg`/`eqn_idx%cont%end`, `eqn_idx%mom%beg`/`eqn_idx%mom%end`, etc. (old `contxb`/`contxe`, `momxb`/`momxe` shorthands are gone)
-- `sys_size` = total number of conserved variables (computed at startup)
-- Changing `model_eqns` or enabling features changes ALL index positions
+## Indexing and Ghost Cells
 
-## Blast Radius
-- `src/common/` is shared by ALL three executables (pre_process, simulation, post_process)
-- Any change to common/ requires testing all three targets
-- Public subroutine signature changes affect all callers across all targets
-- Parameter default changes affect all existing case files
+- Grid dimensions `m`, `n`, `p` (cells in x, y, z); 1D: n=p=0, 2D: p=0. Interior `0:m`;
+  ghost region `-buff_size:m+buff_size`; bounds structs `idwint(1:3)` (interior) and
+  `idwbuff(1:3)` (with ghosts); cell boundaries `x_cb(-1-buff_size:m+buff_size)`.
+- `buff_size` is **not** a single formula: it's set per reconstruction scheme in
+  `s_configure_coordinate_bounds` (`m_helper_basic.fpp`) and floored higher for Lagrange
+  bubbles and IB. Read that routine for the current value rather than assuming one.
+- Riemann solvers: left state at `j`, right state at `j+1`.
+- All equation indices live in the `eqn_idx` struct (`eqn_idx_info` in
+  `m_derived_types.fpp`, populated in `m_global_parameters.fpp`): `%cont`, `%mom`, `%E`,
+  `%adv`, plus optional ranges (`%bub`, `%stress`, `%species`, `%B`, ...). The old
+  `contxb`/`momxb` shorthands are gone. Index positions depend on `model_eqns` and
+  enabled features — changing either moves ALL indices; never hard-code one.
 
-## Physics Consistency
-- Pressure formula MUST match `model_eqns` setting
-- Model-specific conservative ↔ primitive conversion paths exist
-- Volume fractions must sum to 1.0
-- Boundary condition symmetry requirements must be maintained
+## GPU
 
-## Compiler-Specific Issues
-- CI-gated compilers (must always pass): gfortran, nvfortran, Cray ftn, and Intel ifx
-- AMD flang is additionally supported for `--gpu mp` builds but not in the CI matrix
-- Each compiler has different strictness levels and warning behavior
-- Fypp macros must expand correctly for both GPU and CPU builds
+- WARNING: do NOT wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops — `GPU_LOOP` emits
+  empty directives on Cray and AMD, causing silent serial execution. Spatial loops always
+  use `GPU_PARALLEL_LOOP`/`END_GPU_PARALLEL_LOOP`. Macro API:
+  `docs/documentation/gpuParallelization.md`; signatures:
+  `src/common/include/parallel_macros.fpp`. Never call the `ACC_*`/`OMP_*`
+  implementation layers directly.
+- Only `src/simulation/` is GPU-accelerated. Backends: OpenACC (nvfortran primary, Cray)
+  and OpenMP offload (Cray primary, AMD flang, nvfortran). The CPU-only build must always
+  work — every `#ifdef` needs a path for all configurations (CPU, ACC, OMP, with/without
+  MPI). Gates: `MFC_GPU`, `MFC_OpenACC`, `MFC_OpenMP`, `MFC_MPI`, `MFC_DEBUG`,
+  `MFC_SINGLE_PRECISION`/`MFC_MIXED_PRECISION`, `MFC_PRE_PROCESS`/`MFC_SIMULATION`/
+  `MFC_POST_PROCESS`, and compiler macros (`_CRAYFTN`, `__PGI`, ...).
+- `@:ACC_SETUP_VFs(...)`/`@:ACC_SETUP_SFs(...)` GPU pointer setup compiles only under
+  Cray. Around MPI: `GPU_UPDATE(host=...)` before send, `GPU_UPDATE(device=...)` after
+  receive.
 
-## Test System
-- Tests are generated **programmatically** in `toolchain/mfc/test/cases.py`, not standalone files
-- Each test is a parameter modification on top of `BASE_CFG` defaults
-- Test UUID = CRC32 hash of the test's trace string; `./mfc.sh test -l` lists all
-- To add a test: modify `cases.py` using `CaseGeneratorStack` push/pop pattern
-- Golden files: `tests/<UUID>/golden.txt` — tolerance-based comparison, not exact match
-- If your change intentionally modifies output, regenerate golden files:
-  `./mfc.sh test --generate --only <affected_tests> -j 8`
-- Do not regenerate ALL golden files unless you understand every output change
+## Parameters
 
-## PR Checklist
-Before submitting a PR:
-- [ ] `./mfc.sh format -j 8` (auto-format)
-- [ ] `./mfc.sh precheck -j 8` (5 CI lint checks)
-- [ ] `./mfc.sh build -j 8` (compiles)
-- [ ] `./mfc.sh test --only <relevant> -j 8` (tests pass)
-- [ ] If adding parameters: all 4 locations updated
-- [ ] If modifying `src/common/`: all three targets tested
-- [ ] If changing output: golden files regenerated for affected tests
-- [ ] One logical change per commit
+- Adding one: `_r()` definition + `_nv()` `NAMELIST_VARS` registration in
+  `toolchain/mfc/params/definitions.py`; `case_validator.py` only if physics-constrained
+  (with a `PHYSICS_DOCS` entry). Fortran declarations and namelist bindings are
+  auto-generated at CMake configure time — re-run cmake (or `./mfc.sh build`) after editing.
+- Still manual: array variables and derived-type members (declare in
+  `src/*/m_global_parameters.fpp` / the relevant type), and case-optimization parameters
+  (`CASE_OPT_PARAMS` + the `#:else` block in `src/simulation/m_global_parameters.fpp`).
+  Gotcha: under `--case-optimization` those are baked into the binary and dropped from
+  the namelist, so changing one needs a *rebuild*, not a case edit.
+- Runtime checks (`@:PROHIBIT`) go where they run: shared →
+  `src/common/m_checker_common.fpp`; simulation-only → `src/simulation/m_checker.fpp`;
+  pre/post-only → `src/{pre,post}_process/m_checker.fpp` (their `s_check_inputs` are
+  currently empty — that IS the right place, not m_checker_common).
+- Analytic ICs are compiled into the binary (syntax error = build failure, not runtime).
+  Each IC variable maps to an `eqn_idx%…` expression in `QPVF_IDX_VARS`
+  (`toolchain/mfc/case.py`); a new patch-settable conserved variable means updating that
+  map AND the Fortran `eqn_idx` builder to agree — a mismatch is a silent wrong index.
+  Variables available in expressions: `docs/documentation/case.md`.
+
+## Tests
+
+- Tests are generated programmatically in `toolchain/mfc/test/cases.py` (parameter
+  modifications on `BASE_CFG` via the `CaseGeneratorStack` push/pop pattern); test UUID =
+  CRC32 of the trace string; `./mfc.sh test -l` lists all.
+- Golden files are tolerance-compared. Regenerate only the affected tests
+  (`./mfc.sh test --generate --only <tests>`) — an unexplained golden-file diff is a bug
+  report, not noise to be regenerated away.

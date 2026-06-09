@@ -6,159 +6,134 @@ toolchain for building/running/testing, and supports GPU acceleration via OpenAC
 OpenMP target offload. It must compile with gfortran, nvfortran, Cray ftn, and Intel ifx (CI-gated).
 AMD flang is additionally supported for OpenMP target offload GPU builds.
 
+## How to Work Here
+
+You are editing this repository as a conservative maintainer. Three facts shape everything:
+
+1. **Four compilers, one truth.** Every line must compile and behave identically under four
+   CI-gated compilers and three GPU configurations. Code that is merely clever on one is
+   broken on another. Prefer the established idiom over the elegant one.
+2. **Failures here are silent.** The worst bugs in a CFD code are not crashes — they are
+   answers that are subtly wrong: a wrong index, a serial loop that should be parallel, a
+   precision mix. Golden-file regression tests are the safety net, and incidental edits are
+   how regressions slip past them.
+3. **Trust the toolchain.** `./mfc.sh` already solves environments, module loading,
+   dependencies, and build configuration; the lint (`./mfc.sh precheck`) encodes the
+   project's forbidden patterns. When unsure of a flag or rule, ask the tooling
+   (`--help`, precheck) rather than guessing.
+
+**Primary rule: make the smallest correct change. Prefer deleting code to adding code.**
+
+Diff discipline:
+- Every changed line should trace to the request. Keep changes localized.
+- Do not rewrite, reformat, or rename unrelated code.
+- Do not add new files, dependencies, or net-positive LOC without clear justification.
+
+Do not add bloat:
+- abstractions for one call site, or defensive code for hypothetical future callers
+- validation layers around trusted internal data — constraint checks belong in
+  `case_validator.py` and the `m_checker*.fpp` files, not scattered through the solver
+- optional parameters or config knobs for behavior with one correct value
+- broad try/except blocks in toolchain Python
+- comments explaining obvious code; compatibility shims unless explicitly requested
+
+Tests: add one only when it protects real behavior — it would fail before your change and
+covers behavior a real case depends on. Prefer one targeted case over many broad ones.
+
+Before editing, state: the smallest viable fix, what changes, what deliberately does not
+change, and whether a test is needed. After editing, report: files changed, net LOC, and
+anything that could still be deleted or simplified. If a patch exceeds roughly 100 net new
+lines, stop and justify before continuing.
+
+For general behavioral guidance (simplicity, surfacing assumptions, verifiable success
+criteria), invoke the `karpathy-guidelines` skill.
+
 ## Commands
 
-Prefer using `./mfc.sh` as the entry point for building, running, testing, formatting,
-and linting. It handles virtual environments, module loading, dependency bootstrapping,
-and build configuration. Avoid invoking CMake, Python toolchain scripts, or Fortran
-compilers directly unless you have a specific reason.
-
-All commands run from the repo root via `./mfc.sh`.
+All commands run from the repo root via `./mfc.sh`; avoid invoking CMake, Python toolchain
+scripts, or Fortran compilers directly. Run `./mfc.sh <command> --help` for flags
+(`-j N` = parallel jobs).
 
 ```bash
-# Building
-./mfc.sh build -j 8                        # Build all 3 targets (pre_process, simulation, post_process)
-./mfc.sh build -t simulation -j 8          # Build only simulation
-./mfc.sh build --gpu acc -j 8              # Build with OpenACC GPU support
-./mfc.sh build --gpu mp -j 8              # Build with OpenMP target offload GPU support
-./mfc.sh build --debug -j 8                # Debug build
-./mfc.sh build -i case.py --case-optimization -j 8  # Case-optimized build (10x speedup)
-
-# Running
-./mfc.sh run case.py -n 4                  # Run case with 4 MPI ranks
-./mfc.sh run case.py --no-build            # Run without rebuilding
-./mfc.sh run case.py -e batch -N 2 -n 4 -c phoenix -a ACCOUNT  # Batch submit on Phoenix
-
-# Testing
-./mfc.sh test -j 8                         # Run full test suite (560+ tests)
-./mfc.sh test --only 1D -j 8              # Only 1D tests
-./mfc.sh test --only 2D Bubbles -j 8      # Only 2D bubble tests
-./mfc.sh test --only <UUID> -j 8          # Run one specific test by UUID
-./mfc.sh test -l                           # List all tests with UUIDs and traces
-./mfc.sh test -% 10 -j 8                  # Run 10% random sample
-./mfc.sh test --generate --only <feature>  # Regenerate golden files after intentional output change
-
-# Verification (pre-commit CI checks)
-./mfc.sh precheck -j 8                     # Run all 6 lint checks (same as CI gate)
-./mfc.sh format -j 8                       # Auto-format Fortran (.fpp/.f90) + Python
-./mfc.sh lint                              # Ruff lint + Python unit tests
-./mfc.sh spelling                          # Spell check
-
-# Module loading (HPC clusters only — must use `source`)
-source ./mfc.sh load -c p -m g             # Load Phoenix GPU modules
-source ./mfc.sh load -c f -m g             # Load Frontier GPU modules
-source ./mfc.sh load -c p -m c             # Load Phoenix CPU modules
-
-# Other
-./mfc.sh validate case.py                  # Validate case file without running
-./mfc.sh params <query>                    # Search 3,400 case parameters
-./mfc.sh clean                             # Remove build artifacts
-./mfc.sh new <name>                        # Create new case from template
+./mfc.sh build -j 8                 # all 3 targets; -t <target>, --gpu acc|mp, --debug
+./mfc.sh run case.py -n 4           # run with 4 MPI ranks; -e batch for clusters
+./mfc.sh test -j 8                  # full suite; --only <filter>, -l to list,
+                                    #   --generate to refresh golden files after an intended output change
+./mfc.sh format -j 8                # auto-format Fortran + Python
+./mfc.sh precheck -j 8              # all CI lint checks — run before every commit
+./mfc.sh validate case.py           # validate a case without running
+./mfc.sh params <query>             # search case parameters
 ```
 
-## System Identification and Module Loading
-
-MFC targets HPC clusters. Before building on a cluster, load the correct modules
-via `source ./mfc.sh load -c <slug> -m <mode>`.
-
-To identify the current system, check multiple signals — hostname alone is not always
-sufficient (compute nodes may differ from login nodes):
-
-```bash
-hostname                    # e.g., login-phoenix-gnr-2.pace.gatech.edu
-echo $LMOD_SYSHOST          # e.g., "phoenix" (most reliable when set)
-echo $CRAY_LD_LIBRARY_PATH  # Non-empty → Cray system (Frontier, Carpenter Cray)
-echo $MODULESHOME           # Confirms module system is available
-```
-
-Supported systems and their slugs (full list in `toolchain/modules`):
-
-| Slug | System | GPU Backend | Example |
-|------|--------|-------------|---------|
-| `p` | GT Phoenix | OpenACC (nvfortran) | `source ./mfc.sh load -c p -m g` |
-| `f` | OLCF Frontier | OpenACC/OpenMP (Cray ftn) | `source ./mfc.sh load -c f -m g` |
-| `tuo` | LLNL Tuolumne | OpenMP (Cray ftn) | `source ./mfc.sh load -c tuo -m g` |
-| `d` | NCSA Delta | OpenACC (nvfortran) | `source ./mfc.sh load -c d -m g` |
-| `b` | PSC Bridges2 | OpenACC (nvfortran) | `source ./mfc.sh load -c b -m g` |
-| `cc` | DoD Carpenter (Cray) | CPU only | `source ./mfc.sh load -c cc -m c` |
-| `c` | DoD Carpenter (GNU) | CPU only | `source ./mfc.sh load -c c -m c` |
-| `o` | Brown Oscar | OpenACC (nvfortran) | `source ./mfc.sh load -c o -m g` |
-| `h` | UF HiPerGator | OpenACC (nvfortran) | `source ./mfc.sh load -c h -m g` |
-
-The `-m` flag selects mode: `g`/`gpu` for GPU builds, `c`/`cpu` for CPU-only.
-Batch job templates for `./mfc.sh run -e batch -c <system>` are in `toolchain/templates/`.
-
-IMPORTANT: `source` (or `.`) is required for `load` — it sets environment variables
-in the current shell. Using `./mfc.sh load` without `source` will error.
+On HPC clusters, load modules before building: `source ./mfc.sh load -c <slug> -m <g|c>`
+(the `source` is required). Slugs and per-system GPU backends: `toolchain/modules`; batch
+templates: `toolchain/templates/`. Identify the system via `$LMOD_SYSHOST`, then a
+non-empty `$CRAY_LD_LIBRARY_PATH` (→ Cray), then `hostname`.
 
 ## Development Workflow Contract
 
-IMPORTANT: Follow this loop for ALL code changes. Do not skip steps.
+For ALL code changes: read the relevant code first, plan multi-file changes before
+implementing, then **format → precheck → build → test → commit**, in that order, with one
+logical change per commit.
 
-1. **Read first** — Read and understand relevant code before modifying it.
-2. **Plan** — For multi-file changes, outline your approach before implementing.
-3. **Implement** — Make small, focused changes. One logical change per commit.
-4. **Format** — Run `./mfc.sh format -j 8` to auto-format.
-5. **Verify** — Run `./mfc.sh precheck -j 8` (same 6 checks as CI lint gate).
-6. **Build** — Run `./mfc.sh build -j 8` to verify compilation.
-7. **Test** — Run relevant tests: `./mfc.sh test --only <feature> -j 8`.
-   For changes to `src/common/`, test ALL three targets: `./mfc.sh test -j 8`.
-8. **Commit** — Only after steps 4-7 pass. Do not commit untested code.
-
-YOU MUST run `./mfc.sh precheck` before any commit. This is enforced by pre-commit hooks.
-YOU MUST run tests relevant to your changes before claiming work is done.
-NEVER commit code that does not compile or fails tests.
-NEVER use heredocs for git commit messages. Use simple `git commit -m "message"` instead.
+- YOU MUST run `./mfc.sh precheck` before any commit (pre-commit hooks enforce this).
+- YOU MUST run the tests relevant to your change before claiming work is done.
+  Changes to `src/common/` are shared by all three executables — test all three.
+- NEVER commit code that does not compile or fails tests.
+- NEVER use heredocs for git commit messages. Use simple `git commit -m "message"`.
 
 ## Architecture
 
 ```
-src/
-  common/         # Shared code (used by ALL three executables — wide blast radius)
-  pre_process/    # Grid generation and initial conditions
-  simulation/     # CFD solver (GPU-accelerated via OpenACC / OpenMP target offload)
-  post_process/   # Data output and visualization
-toolchain/        # Python CLI, build system, testing, parameter management
-  mfc/params/definitions.py   # ~3,400 parameter definitions (source of truth)
-  mfc/case_validator.py       # Physics constraint validation
-  mfc/test/                   # Test runner and case generation
-examples/         # Example simulation cases (case.py files)
-tests/            # 560+ regression test golden files
+src/common/       # shared by ALL three executables — wide blast radius
+src/pre_process/  # grid generation and initial conditions
+src/simulation/   # CFD solver (the only GPU-accelerated target)
+src/post_process/ # data output and visualization
+toolchain/        # Python CLI; params/definitions.py is the parameter source of truth
+examples/         # example cases (case.py); tests/ holds regression golden files
 ```
 
 Source files are `.fpp` (Fortran + Fypp macros), preprocessed to `.f90` by CMake.
 
 ## Critical Rules
 
-NEVER use raw OpenACC/OpenMP pragmas (`!$acc`, `!$omp`). Use `GPU_*` Fypp macros instead.
-  Raw `#ifdef`/`#ifndef` preprocessor guards for feature/compiler/library gating ARE normal.
-NEVER use double-precision intrinsics: `dsqrt`, `dexp`, `dlog`, `dble`, `dabs`, `real(8)`, `real(4)`.
-  Use generic intrinsics (`sqrt`, `exp`, `log`) and precision types (`wp`, `stp`).
-NEVER use `d` exponent literals (`1.0d0`). Use `1.0_wp` instead.
-NEVER use `stop` or `error stop`. Use `call s_mpi_abort()` or `@:PROHIBIT()`/`@:ASSERT()`.
-NEVER use `goto`, `COMMON` blocks, or global `save` variables.
+The exhaustive forbidden-pattern list is `toolchain/mfc/lint_source.py` (enforced by
+precheck and CI). The rules to internalize — they exist because MFC must behave
+identically across compilers, precisions, and GPU backends:
 
-Every `@:ALLOCATE(...)` MUST have a matching `@:DEALLOCATE(...)`.
-Every new parameter MUST be added in at least 3 places (4 if it has constraints):
-  1. `toolchain/mfc/params/definitions.py` (parameter definition)
-  2. Fortran variable declaration in `src/*/m_global_parameters.fpp`
-  3. Fortran namelist in `src/*/m_start_up.fpp` (namelist binding)
-  4. `toolchain/mfc/case_validator.py` (only if parameter has physics constraints)
+- GPU directives only via `GPU_*` Fypp macros — NEVER raw `!$acc`/`!$omp` pragmas.
+  (Raw `#ifdef`/`#ifndef` guards for feature/compiler/library gating ARE normal.)
+- Precision only via `wp`/`stp` kinds and generic intrinsics — NEVER `dsqrt`/`dble`/
+  `real(8)` or `d` exponent literals. Write `sqrt`, `1.0_wp`, `real(..., wp)`.
+- Abort only via `call s_mpi_abort()` or `@:PROHIBIT()`/`@:ASSERT()` — NEVER `stop`/`error stop`.
+- NEVER `goto`, `COMMON` blocks, or global `save` variables.
+- Every `@:ALLOCATE(...)` MUST have a matching `@:DEALLOCATE(...)`.
+- New parameters are defined in `toolchain/mfc/params/definitions.py` (plus
+  `case_validator.py` if physics-constrained); Fortran declarations and namelist bindings
+  are auto-generated. Exceptions: `.claude/rules/common-pitfalls.md`.
 
-Changes to `src/common/` affect ALL three executables. Test comprehensively.
+## Naming and Style
 
-## Naming Conventions
+Modules `m_<feature>` with `s_initialize_/s_finalize_<feature>_module` pairs; public
+subroutines `s_<verb>_<noun>`, functions `f_<verb>_<noun>`; 2-space indent, lowercase
+keywords, explicit `intent` on all arguments; constants get descriptive names, not
+ALL_CAPS. Full hard/soft rule tables: `docs/documentation/contributing.md`.
 
-- Modules: `m_<feature>` (e.g., `m_bubbles`)
-- Public subroutines: `s_<verb>_<noun>` (e.g., `s_compute_pressure`)
-- Public functions: `f_<verb>_<noun>`
-- 2-space indentation, lowercase keywords, explicit `intent` on all arguments
+## Precision
 
-## Precision System
+`wp` = working precision (computation); `stp` = storage precision (field arrays and I/O).
+Both double by default; `--single` → both single; `--mixed` → wp=double, stp=half — so
+wp/stp mixing is a silent precision bug, not a style issue. `scalar_field%sf` and all new
+field arrays use `stp`. MPI types must match: `mpi_p` ↔ `wp`, `mpi_io_p` ↔ `stp`.
 
-- `wp` = working precision (computation). `stp` = storage precision (field data arrays and I/O).
-- Default: both double. Single mode: both single. Mixed: wp=double, stp=half.
-- MPI types must match: `mpi_p` ↔ `wp`, `mpi_io_p` ↔ `stp`.
+## Where Things Are Documented
+
+`docs/documentation/` is freshness-checked by precheck (`lint_docs.py`) — prefer pointing
+there over restating it. Most relevant: `contributing.md` (standards, architecture,
+general pitfalls), `gpuParallelization.md` (GPU macro API), `testing.md` (test system),
+`case.md` (case parameters, analytic ICs). MFC-specific traps with silent failure modes
+live in `.claude/rules/common-pitfalls.md` — read it before touching indexing, GPU loops,
+parameters, or tests.
 
 ## Code Review Priorities
 
