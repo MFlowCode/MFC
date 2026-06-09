@@ -18,7 +18,7 @@ module m_hb_function
 contains
 
     !> Papanastasiou-regularized Herschel-Bulkley viscosity.
-    pure function f_compute_hb_viscosity(tau0, K_val, nn_val, mu_min_val, mu_max_val, shear_rate, hb_m_val) result(mu)
+    function f_compute_hb_viscosity(tau0, K_val, nn_val, mu_min_val, mu_max_val, shear_rate, hb_m_val) result(mu)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -43,7 +43,7 @@ contains
     end function f_compute_hb_viscosity
 
     !> Shear rate gamma_dot = sqrt(2 D_ij D_ij). Absent dims pass 0.
-    pure function f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz) result(shear_rate)
+    function f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz) result(shear_rate)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -55,8 +55,9 @@ contains
     end function f_compute_shear_rate_from_components
 
     !> Mixture inverse Reynolds (= 1/mu_mix) per direction (1=shear, 2=bulk) at one state. Newtonian fluids accumulate the legacy
-    !! per-fluid alpha/Res term; non-Newtonian fluids use the Herschel-Bulkley viscosity at the given shear rate.
-    pure subroutine s_compute_mixture_inv_re(alpha, shear_rate, Res, Re_out)
+    !! per-fluid alpha/Res term. For non-Newtonian fluids only the shear direction (i==1) uses the Herschel-Bulkley viscosity at the
+    !! given shear rate; the bulk direction (i==2) contributes zero, since non-Newtonian bulk viscosity is not supported.
+    subroutine s_compute_mixture_inv_re(alpha, shear_rate, Res, Re_out)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
