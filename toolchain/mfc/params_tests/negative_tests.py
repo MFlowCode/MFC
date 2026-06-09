@@ -265,6 +265,75 @@ def generate_constraint_tests() -> List[ConstraintTest]:
         ]
     )
 
+    # check_non_newtonian constraints
+    # A valid-except-for-the-violation non-Newtonian fluid case.
+    nn_case = {
+        **BASE_CASE,
+        "viscous": "T",
+        "riemann_solver": 2,
+        "wave_speeds": 1,
+        "avg_state": 2,
+        "fluid_pp(1)%Re(1)": 50.0,
+        "fluid_pp(1)%non_newtonian": "T",
+        "fluid_pp(1)%K": 2e-2,
+        "fluid_pp(1)%nn": 0.7,
+        "fluid_pp(1)%mu_min": 1e-6,
+        "fluid_pp(1)%mu_max": 10.0,
+    }
+    tests.extend(
+        [
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="non_newtonian requires viscous = T",
+                condition="non_newtonian and not viscous",
+                test_params={**nn_case, "viscous": "F", "fluid_pp(1)%Re(1)": None},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="tau0 > 0 requires hb_m to be set",
+                condition="non_newtonian and tau0 > 0 and hb_m is None",
+                test_params={**nn_case, "fluid_pp(1)%tau0": 0.1},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="mu_max must exceed mu_min",
+                condition="non_newtonian and mu_max <= mu_min",
+                test_params={**nn_case, "fluid_pp(1)%mu_min": 10.0, "fluid_pp(1)%mu_max": 1.0},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="mu_bulk is not yet supported",
+                condition="non_newtonian and mu_bulk is set",
+                test_params={**nn_case, "fluid_pp(1)%mu_bulk": 1.0},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="Re(2) is not supported for non-Newtonian fluids",
+                condition="non_newtonian and Re(2) is set",
+                test_params={**nn_case, "fluid_pp(1)%Re(2)": 50.0},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="mu_max must be positive",
+                condition="non_newtonian and mu_max <= 0",
+                test_params={**nn_case, "fluid_pp(1)%mu_min": None, "fluid_pp(1)%mu_max": -1.0},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="non_newtonian requires riemann_solver 1 or 2",
+                condition="non_newtonian and riemann_solver not in (1, 2)",
+                test_params={**nn_case, "riemann_solver": 5, "wave_speeds": None, "avg_state": None},
+            ),
+        ]
+    )
+
     return tests
 
 
