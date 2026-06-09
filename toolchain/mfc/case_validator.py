@@ -960,8 +960,9 @@ class CaseValidator:
     def check_non_newtonian(self):
         """Checks constraints on non-Newtonian (Herschel-Bulkley) parameters (simulation)"""
         num_fluids = self.get("num_fluids")
+        # If num_fluids is not set, check at least fluid 1 (for model_eqns=1)
         if num_fluids is None:
-            return
+            num_fluids = 1
 
         viscous = self.get("viscous", "F") == "T"
         igr = self.get("igr", "F") == "T"
@@ -970,6 +971,11 @@ class CaseValidator:
 
         for i in range(1, num_fluids + 1):
             if self.get(f"fluid_pp({i})%non_newtonian", "F") != "T":
+                for hb_param in ["K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"]:
+                    self.prohibit(
+                        self.get(f"fluid_pp({i})%{hb_param}") is not None,
+                        f"fluid_pp({i})%{hb_param} is set, but fluid_pp({i})%non_newtonian is not enabled",
+                    )
                 continue
 
             self.prohibit(not viscous, f"fluid_pp({i})%non_newtonian requires viscous = T")

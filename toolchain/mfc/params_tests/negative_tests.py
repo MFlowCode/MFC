@@ -329,7 +329,21 @@ def generate_constraint_tests() -> List[ConstraintTest]:
                 line_number=0,
                 message="non_newtonian requires riemann_solver 1 or 2",
                 condition="non_newtonian and riemann_solver not in (1, 2)",
-                test_params={**nn_case, "riemann_solver": 5, "wave_speeds": None, "avg_state": None},
+                test_params={**nn_case, "riemann_solver": 5},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="K is set, but non_newtonian is not enabled",
+                condition="HB parameter set and non_newtonian not enabled",
+                test_params={**BASE_CASE, "fluid_pp(1)%K": 2e-2},
+            ),
+            ConstraintTest(
+                method="check_non_newtonian",
+                line_number=0,
+                message="non_newtonian requires model_eqns 2 or 3",
+                condition="non_newtonian and model_eqns == 1 with num_fluids omitted",
+                test_params={**nn_case, "model_eqns": 1, "num_fluids": None},
             ),
         ]
     )
