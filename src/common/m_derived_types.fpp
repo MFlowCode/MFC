@@ -200,7 +200,6 @@ module m_derived_types
         type(t_model), allocatable              :: model                !< STL/OBJ geometry model
         real(wp), allocatable, dimension(:,:,:) :: boundary_v           !< Boundary vertices
         integer                                 :: boundary_edge_count  !< Number of boundary edges
-        integer                                 :: total_vertices       !< Total vertex count
 
         ! GPU-friendly flattened arrays
         integer                                 :: ntrs   !< Copy of model%ntrs

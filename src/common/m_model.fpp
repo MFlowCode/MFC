@@ -18,7 +18,7 @@ module m_model
     private
 
     public :: f_model_read, s_model_write, s_model_free, models, gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, &
-        & gpu_boundary_edge_count, gpu_total_vertices, stl_bounding_boxes
+        & gpu_boundary_edge_count, stl_bounding_boxes
 
     ! Subroutines for STL immersed boundaries
     public :: s_check_boundary, s_register_edge, f_model_is_inside_flat, s_distance_normals_3D, s_distance_normals_2D, &
@@ -34,9 +34,8 @@ module m_model
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_boundary_v
     integer, allocatable                      :: gpu_boundary_edge_count(:)
-    integer, allocatable                      :: gpu_total_vertices(:)
     real(wp), allocatable                     :: stl_bounding_boxes(:,:,:)
-    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count, gpu_total_vertices]')
+    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count]')
 
 contains
 
@@ -976,13 +975,11 @@ contains
                 @:ALLOCATE(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_stl_models))
                 @:ALLOCATE(gpu_trs_n(1:3, 1:max_ntrs, 1:num_stl_models))
                 @:ALLOCATE(gpu_boundary_edge_count(1:num_stl_models))
-                @:ALLOCATE(gpu_total_vertices(1:num_stl_models))
 
                 gpu_ntrs = 0
                 gpu_trs_v = 0._wp
                 gpu_trs_n = 0._wp
                 gpu_boundary_edge_count = 0
-                gpu_total_vertices = 0
 
                 if (max_bv1 > 0) then
                     @:ALLOCATE(gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_stl_models))
@@ -995,7 +992,6 @@ contains
                         gpu_trs_v(:,:,1:models(mid)%ntrs,mid) = models(mid)%trs_v
                         gpu_trs_n(:,1:models(mid)%ntrs,mid) = models(mid)%trs_n
                         gpu_boundary_edge_count(mid) = models(mid)%boundary_edge_count
-                        gpu_total_vertices(mid) = models(mid)%total_vertices
                     end if
                     if (allocated(models(mid)%boundary_v) .and. p == 0) then
                         gpu_boundary_v(1:size(models(mid)%boundary_v, 1),1:size(models(mid)%boundary_v, 2), &
@@ -1003,7 +999,7 @@ contains
                     end if
                 end do
 
-                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
+                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count]')
                 if (allocated(gpu_boundary_v)) then
                     $:GPU_UPDATE(device='[gpu_boundary_v]')
                 end if
