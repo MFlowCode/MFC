@@ -54,20 +54,14 @@ contains
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_icpp(i)%geometry == 1) then
                     call s_check_line_segment_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 2) then
+                else if (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i)%geometry == 10) then
                     call s_check_circle_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 3) then
+                else if (patch_icpp(i)%geometry == 3 .or. patch_icpp(i)%geometry == 9) then
                     call s_check_rectangle_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == 4) then
                     call s_check_line_sweep_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == 5) then
                     call s_check_ellipse_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 8) then
-                    call s_check_sphere_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 9) then
-                    call s_check_cuboid_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 10) then
-                    call s_check_cylinder_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == 11) then
                     call s_check_plane_sweep_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == 12) then
@@ -147,27 +141,54 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0, "Circle patch "//trim(iStr)//": n must be zero")
-        @:PROHIBIT(p > 0, "Circle patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Circle patch "//trim(iStr)//": radius must be greater than zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Circle patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Circle patch "//trim(iStr)//": y_centroid must be set")
+        ! Core checks for all (Circle, Sphere, Cylinder)
+        @:PROHIBIT(n == 0, "Circle patch "//trim(iStr)//": n must be greater than zero")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), &
+                   & "Circle/Sphere/Cylinder patch "//trim(iStr)//": x_centroid must be set")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), &
+                   & "Circle/Sphere/Cylinder patch "//trim(iStr)//": y_centroid must be set")
+        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, &
+                   & "Circle/Sphere/Cylinder patch "//trim(iStr)//": radius must be greater than zero")
+
+        ! 3D-specific checks (Spheres and Cylinders)
+        if (p > 0) then
+            @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), &
+                       & "3D Sphere/Cylinder patch "//trim(iStr)//": z_centroid must be set")
+
+            ! If any extrusion length is set, it's a Cylinder. Verify exactly ONE length axis is defined.
+            if ((.not. f_is_default(patch_icpp(patch_id)%length_x)) .or. (.not. f_is_default(patch_icpp(patch_id)%length_y)) &
+                & .or. (.not. f_is_default(patch_icpp(patch_id)%length_z))) then
+                ! Check 1: Exactly ONE axis must be provided (prevents double-axis degenerate shapes)
+                @:PROHIBIT(count([.not. f_is_default(patch_icpp(patch_id)%length_x), &
+                           & .not. f_is_default(patch_icpp(patch_id)%length_y), &
+                           & .not. f_is_default(patch_icpp(patch_id)%length_z)]) /= 1, &
+                           & 'in cylinder patch ' // trim(iStr) // ': exactly one length must be provided')
+
+                ! Check 2: That single provided axis MUST be a positive number
+                @:PROHIBIT(count([patch_icpp(patch_id)%length_x > 0._wp, patch_icpp(patch_id)%length_y > 0._wp, &
+                           & patch_icpp(patch_id)%length_z > 0._wp]) /= 1, &
+                           & 'in cylinder patch ' // trim(iStr) // ': provided length must be positive')
+            end if
+        end if
 
     end subroutine s_check_circle_patch_geometry
 
-    !> Check the rectangle patch input
+    !> Verify that the geometric parameters of the rectangle patch have been consistently inputted.
     impure subroutine s_check_rectangle_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0, "Rectangle patch "//trim(iStr)//": n must be greater than zero")
-        @:PROHIBIT(p > 0, "Rectangle patch "//trim(iStr)//": p must be zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Rectangle patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Rectangle patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "Rectangle patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Rectangle patch "//trim(iStr)//": length_y must be greater than zero")
+        @:PROHIBIT(n == 0 .or. f_is_default(patch_icpp(patch_id)%x_centroid) .or. f_is_default(patch_icpp(patch_id)%y_centroid) &
+                   & .or. patch_icpp(patch_id)%length_x <= 0._wp .or. patch_icpp(patch_id)%length_y <= 0._wp, &
+                   & 'in rectangle/cuboid patch ' // trim(iStr))
+
+        ! If the simulation is 3D, also mandate Z lengths and centroids
+        if (p > 0) then
+            @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid) .or. patch_icpp(patch_id)%length_z <= 0._wp, &
+                       & 'in 3D cuboid patch ' // trim(iStr))
+        end if
 
     end subroutine s_check_rectangle_patch_geometry
 
@@ -179,7 +200,9 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(n == 0, "Line sweep patch "//trim(iStr)//": n must be greater than zero")
-        @:PROHIBIT(p > 0, "Line sweep patch "//trim(iStr)//": p must be zero")
+        if (p > 0) then
+            @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), 'in 3D swept plane patch ' // trim(iStr))
+        end if
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Line sweep patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Line sweep patch "//trim(iStr)//": y_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%normal(1)), "Line sweep patch "//trim(iStr)//": normal(1) must be set")
@@ -228,21 +251,6 @@ contains
 
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry
 
-    !> Check the model patch input
-    impure subroutine s_check_sphere_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(p == 0, "Sphere patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Sphere patch "//trim(iStr)//": radius must be greater than zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Sphere patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Sphere patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Sphere patch "//trim(iStr)//": z_centroid must be set")
-
-    end subroutine s_check_sphere_patch_geometry
-
     !> Validate geometry parameters for a 2D modal (Fourier) patch
     impure subroutine s_check_2d_modal_patch_geometry(patch_id)
 
@@ -276,52 +284,6 @@ contains
                    & "Spherical harmonic patch " // trim(iStr) // ": z_centroid must be set")
 
     end subroutine s_check_3d_spherical_harmonic_patch_geometry
-
-    !> Check the model patch input
-    impure subroutine s_check_cuboid_patch_geometry(patch_id)
-
-        ! Patch identifier
-        integer, intent(in) :: patch_id
-
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(p == 0, "Cuboid patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Cuboid patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Cuboid patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Cuboid patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, "Cuboid patch "//trim(iStr)//": length_x must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_y <= 0._wp, "Cuboid patch "//trim(iStr)//": length_y must be greater than zero")
-        @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0._wp, "Cuboid patch "//trim(iStr)//": length_z must be greater than zero")
-
-    end subroutine s_check_cuboid_patch_geometry
-
-    !> Check the model patch input
-    impure subroutine s_check_cylinder_patch_geometry(patch_id)
-
-        ! Patch identifier
-        integer, intent(in) :: patch_id
-
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(p == 0, "Cylinder patch "//trim(iStr)//": p must be greater than zero")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Cylinder patch "//trim(iStr)//": x_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Cylinder patch "//trim(iStr)//": y_centroid must be set")
-        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Cylinder patch "//trim(iStr)//": z_centroid must be set")
-        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Cylinder patch "//trim(iStr)//": radius must be greater than zero")
-
-        ! Check if exactly one length is defined
-        @:PROHIBIT(count([patch_icpp(patch_id)%length_x > 0._wp, patch_icpp(patch_id)%length_y > 0._wp, &
-                   & patch_icpp(patch_id)%length_z > 0._wp]) /= 1, &
-                   & "Cylinder patch " // trim(iStr) &
-                   & // ": Exactly one of length_x, length_y, or length_z must be defined and positive")
-
-        ! Ensure the defined length is positive
-        @:PROHIBIT((.not. f_is_default(patch_icpp(patch_id)%length_x) .and. patch_icpp(patch_id)%length_x <= 0._wp) &
-                   & .or. (.not. f_is_default(patch_icpp(patch_id)%length_y) .and. patch_icpp(patch_id)%length_y <= 0._wp) &
-                   & .or. (.not. f_is_default(patch_icpp(patch_id)%length_z) .and. patch_icpp(patch_id)%length_z <= 0._wp), &
-                   & "Cylinder patch " // trim(iStr) // ": The defined length_{} must be greater than zero")
-
-    end subroutine s_check_cylinder_patch_geometry
 
     !> Check the model patch input
     impure subroutine s_check_plane_sweep_patch_geometry(patch_id)

@@ -60,17 +60,19 @@ contains
 
                 !> ICPP Patches
                 !> @{
-                ! Spherical patch
-                if (patch_icpp(i)%geometry == 8) then
-                    call s_icpp_sphere(i, patch_id_fp, q_prim_vf)
-                    ! Cuboidal patch
-                else if (patch_icpp(i)%geometry == 9) then
+                ! Spherical / Cylindrical patch (Unified IDs 2, 8, 10)
+                if (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i)%geometry == 10) then
+                    ! If any extrusion length is set, it is a cylinder. Otherwise, it is a sphere.
+                    if (patch_icpp(i)%length_x > 0._wp .or. patch_icpp(i)%length_y > 0._wp .or. patch_icpp(i)%length_z > 0._wp) then
+                        call s_icpp_cylinder(i, patch_id_fp, q_prim_vf)
+                    else
+                        call s_icpp_sphere(i, patch_id_fp, q_prim_vf)
+                    end if
+                    ! Cuboidal patch (Unified IDs 3, 9)
+                else if (patch_icpp(i)%geometry == 3 .or. patch_icpp(i)%geometry == 9) then
                     call s_icpp_cuboid(i, patch_id_fp, q_prim_vf)
-                    ! Cylindrical patch
-                else if (patch_icpp(i)%geometry == 10) then
-                    call s_icpp_cylinder(i, patch_id_fp, q_prim_vf)
-                    ! Swept plane patch
-                else if (patch_icpp(i)%geometry == 11) then
+                    ! Swept plane patch (Unified IDs 4, 11)
+                else if (patch_icpp(i)%geometry == 4 .or. patch_icpp(i)%geometry == 11) then
                     call s_icpp_sweep_plane(i, patch_id_fp, q_prim_vf)
                     ! Ellipsoidal patch
                 else if (patch_icpp(i)%geometry == 12) then
@@ -97,14 +99,14 @@ contains
 
                 !> ICPP Patches
                 !> @{
-                ! Circular patch
-                if (patch_icpp(i)%geometry == 2) then
+                ! Circular patch (Unified IDs 2, 8, 10)
+                if (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i)%geometry == 10) then
                     call s_icpp_circle(i, patch_id_fp, q_prim_vf)
-                    ! Rectangular patch
-                else if (patch_icpp(i)%geometry == 3) then
+                    ! Rectangular patch (Unified IDs 3, 9)
+                else if (patch_icpp(i)%geometry == 3 .or. patch_icpp(i)%geometry == 9) then
                     call s_icpp_rectangle(i, patch_id_fp, q_prim_vf)
-                    ! Swept line patch
-                else if (patch_icpp(i)%geometry == 4) then
+                    ! Swept line patch (Unified IDs 4, 11)
+                else if (patch_icpp(i)%geometry == 4 .or. patch_icpp(i)%geometry == 11) then
                     call s_icpp_sweep_line(i, patch_id_fp, q_prim_vf)
                     ! Elliptical patch
                 else if (patch_icpp(i)%geometry == 5) then

@@ -40,20 +40,12 @@ contains
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. patch_ib("//trim(iStr)//")%geometry must be set.")
 
                 ! Constraints on the geometric initial condition patch parameters
-                if (patch_ib(i)%geometry == 2) then
+                if (patch_ib(i)%geometry == 2 .or. patch_ib(i)%geometry == 8 .or. patch_ib(i)%geometry == 10) then
                     call s_check_circle_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 3) then
+                else if (patch_ib(i)%geometry == 3 .or. patch_ib(i)%geometry == 9) then
                     call s_check_rectangle_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 8) then
-                    call s_check_sphere_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 9) then
-                    call s_check_cuboid_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 4) then
+                else if (patch_ib(i)%geometry == 4 .or. patch_ib(i)%geometry == 11) then
                     call s_check_airfoil_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 11) then
-                    call s_check_3d_airfoil_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 10) then
-                    call s_check_cylinder_ib_patch_geometry(i)
                 else if (patch_ib(i)%geometry == 5 .or. patch_ib(i)%geometry == 12) then
                     call s_check_model_ib_patch_geometry(i)
                 else if (patch_ib(i)%geometry == 6) then
@@ -80,8 +72,29 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%radius <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in circle IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. patch_ib(patch_id)%radius <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
+                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in circle/cylinder/sphere IB patch ' // trim(iStr))
+
+        ! Additional checks strictly for 3D shapes (Spheres and Cylinders)
+        if (p > 0) then
+            ! Both Spheres and Cylinder require Z centroid
+            @:PROHIBIT(f_is_default(patch_ib(patch_id)%z_centroid), 'in 3D sphere/cylinder IB patch ' //trim(iStr))
+
+            ! If any length is defined, it is a Cylinder. Ensure exactly ONE length axis is defined.
+            if ((.not. f_is_default(patch_ib(patch_id)%length_x)) .or. (.not. f_is_default(patch_ib(patch_id)%length_y)) &
+                & .or. (.not. f_is_default(patch_ib(patch_id)%length_z))) then
+                ! Check 1: Exactly ONE axis must be provided (prevents double-axis degenerate shapes)
+                @:PROHIBIT(count([.not. f_is_default(patch_ib(patch_id)%length_x), &
+                           & .not. f_is_default(patch_ib(patch_id)%length_y), &
+                           & .not. f_is_default(patch_ib(patch_id)%length_z)]) /= 1, &
+                           & 'in cylinder IB patch ' // trim(iStr) // ': exactly one length must be provided')
+
+                ! Check 2: That single provided axis MUST be a positive number
+                @:PROHIBIT(count([patch_ib(patch_id)%length_x > 0._wp, patch_ib(patch_id)%length_y > 0._wp, &
+                           & patch_ib(patch_id)%length_z > 0._wp]) /= 1, &
+                           & 'in cylinder IB patch ' // trim(iStr) // ': provided length must be positive')
+            end if
+        end if
 
     end subroutine s_check_circle_ib_patch_geometry
 
@@ -107,32 +120,21 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%airfoil_id <= 0 &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
+        @:PROHIBIT(n == 0 .or. patch_ib(patch_id)%airfoil_id <= 0 .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
                    & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in airfoil IB patch ' // trim(iStr))
 
+        ! Additional checks strictly for 3D airfoils
+        if (p > 0) then
+            @:PROHIBIT(f_is_default(patch_ib(patch_id)%z_centroid) .or. f_is_default(patch_ib(patch_id)%length_z), &
+                       & 'in 3D airfoil IB patch ' // trim(iStr))
+        end if
+
     end subroutine s_check_airfoil_ib_patch_geometry
 
     !> Verify that the geometric parameters of the 3D airfoil patch have been consistently inputted.
-
-    impure subroutine s_check_3d_airfoil_ib_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%airfoil_id <= 0 &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%length_z), 'in 3d airfoil IB patch ' // trim(iStr))
-
-    end subroutine s_check_3d_airfoil_ib_patch_geometry
 
     !> Verify that the geometric parameters of the rectangle patch have been consistently inputted.
 
@@ -142,62 +144,17 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. patch_ib(patch_id)%length_x <= 0._wp &
-                   & .or. patch_ib(patch_id)%length_y <= 0._wp, 'in rectangle IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid) &
+                   & .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp, &
+                   & 'in rectangle/cuboid IB patch ' // trim(iStr))
+
+        ! If the simulation is 3D, also mandate Z lengths and centroids
+        if (p > 0) then
+            @:PROHIBIT(f_is_default(patch_ib(patch_id)%z_centroid) .or. patch_ib(patch_id)%length_z <= 0._wp, &
+                       & 'in 3D cuboid IB patch ' // trim(iStr))
+        end if
 
     end subroutine s_check_rectangle_ib_patch_geometry
-
-    !> Verify that the geometric parameters of the sphere patch have been consistently inputted.
-
-    impure subroutine s_check_sphere_ib_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(n == 0 .or. p == 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
-                   & .or. patch_ib(patch_id)%radius <= 0._wp, 'in sphere IB patch ' // trim(iStr))
-
-    end subroutine s_check_sphere_ib_patch_geometry
-
-    !> Verify that the geometric parameters of the cuboid patch have been consistently inputted.
-
-    impure subroutine s_check_cuboid_ib_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(n == 0 .or. p == 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
-                   & .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp &
-                   & .or. patch_ib(patch_id)%length_z <= 0._wp, 'in cuboid IB patch ' // trim(iStr))
-
-    end subroutine s_check_cuboid_ib_patch_geometry
-
-    !> Verify that the geometric parameters of the cylinder patch have been consistently inputted.
-
-    impure subroutine s_check_cylinder_ib_patch_geometry(patch_id)
-
-        integer, intent(in) :: patch_id
-
-        call s_int_to_str(patch_id, iStr)
-
-        @:PROHIBIT(p == 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%z_centroid) .or. (patch_ib(patch_id)%length_x <= 0._wp &
-                   & .and. patch_ib(patch_id)%length_y <= 0._wp .and. patch_ib(patch_id)%length_z <= 0._wp) &
-                   & .or. patch_ib(patch_id)%radius <= 0._wp, 'in cylinder IB patch ' // trim(iStr))
-
-        @:PROHIBIT((patch_ib(patch_id)%length_x > 0._wp .and. ((.not. f_is_default(patch_ib(patch_id)%length_y)) &
-                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)))) .or. (patch_ib(patch_id)%length_y > 0._wp &
-                   & .and. ((.not. f_is_default(patch_ib(patch_id)%length_x)) &
-                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)))) .or. (patch_ib(patch_id)%length_z > 0._wp &
-                   & .and. ((.not. f_is_default(patch_ib(patch_id)%length_x)) &
-                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_y)))), 'in cylinder IB patch ' // trim(iStr))
-
-    end subroutine s_check_cylinder_ib_patch_geometry
 
     !> Verify that the geometric parameters of the model patch have been consistently inputted.
 
