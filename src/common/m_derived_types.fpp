@@ -254,15 +254,8 @@ module m_derived_types
         real(wp) :: cf_val  !< Color function value
         real(wp) :: Y(1:num_species)  !< Species mass fractions
 
-        ! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath   !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
-        !> Angle to rotate the STL object along each cartesian coordinate axis, in radians.
-        real(wp), dimension(1:3) :: model_rotate
-        integer                  :: model_spc        !< Number of samples per cell to use when discretizing the STL object.
-        real(wp)                 :: model_threshold  !< Threshold to turn on smoothen STL patch.
-        integer                  :: model_id         !< index into stl_models(:) for STL/OBJ geometry patches
+        ! STL/OBJ model patch: index into the shared stl_models(:) table
+        integer :: model_id  !< index into stl_models(:) for STL/OBJ geometry patches
     end type ic_patch_parameters
 
     !> User-input parameters for a NACA 4-digit airfoil (namelist-safe: scalars only)

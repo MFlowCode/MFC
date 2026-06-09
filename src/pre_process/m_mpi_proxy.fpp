@@ -90,7 +90,7 @@ contains
                 & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &
                 & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
                 & 'pres', 'gamma', 'pi_inf', 'hcid', 'cv', 'qv', 'qvp',        &
-                & 'model_threshold', 'cf_val', 'Bx', 'By', 'Bz']
+                & 'cf_val', 'Bx', 'By', 'Bz']
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -98,10 +98,7 @@ contains
                 call MPI_BCAST(patch_icpp(i)%a(${VAR}$), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            call MPI_BCAST(patch_icpp(i)%model_filepath, len(patch_icpp(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-
-            #:for VAR in [ 'model_translate', 'model_scale', 'model_rotate', &
-                'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha', &
+            #:for VAR in [ 'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha', &
                 'fourier_cos', 'fourier_sin' ]
                 call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
@@ -111,7 +108,6 @@ contains
             call MPI_BCAST(patch_icpp(i)%modal_r_min, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%modal_use_exp_form, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
-            call MPI_BCAST(patch_icpp(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_icpp(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             if (chemistry) then

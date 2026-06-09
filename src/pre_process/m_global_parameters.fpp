@@ -243,12 +243,7 @@ contains
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model_scale(:) = 1._wp
-            patch_icpp(i)%model_translate(:) = 0._wp
-            patch_icpp(i)%model_filepath(:) = dflt_char
-            patch_icpp(i)%model_spc = num_ray
             patch_icpp(i)%model_id = 0
-            patch_icpp(i)%model_threshold = ray_tracing_threshold
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real
