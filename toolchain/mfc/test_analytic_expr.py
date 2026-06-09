@@ -1,5 +1,8 @@
 """Tests for AST-based analytic expression translation."""
 
+import math
+import re
+
 import pytest
 
 IC_MAP = {
@@ -87,3 +90,57 @@ def test_exponent_literal_gets_wp_suffix():
 
     assert fortranize_expr("1e20", IC_MAP) == "1e+20_wp"
     assert fortranize_expr("1e20 * x", IC_MAP).replace(" ", "") == "1e+20_wp*x_cc(i)"
+
+
+# Corpus-equivalence gate: AST translator vs legacy regex substitution
+# Harvested 2026-06-09 from examples/*/case.py with:
+#   grep -rhoE '"patch_icpp\([0-9]+\)%(alpha_rho|vel|pres|alpha|tau_e|Y|cf_val|Bx|By|Bz)(\([0-9]+\))?"\s*:\s*"[^"]+"' examples/*/case.py | sort -u
+#   grep -rhoE '"patch_ib\([0-9]+\)%(vel|angular_vel)\([0-9]+\)"\s*:\s*"[^"]+"' examples/*/case.py | sort -u
+# Excluded: pure-number values (e.g. "0"), T/F booleans, file paths, and enum
+# strings (e.g. "hllc", "weno", "5eq"); no patch_ib analytic expressions found.
+
+
+def _legacy_fortranize(expr, var_map):
+    def rhs_replace(match):
+        return var_map.get(match.group(), {"e": f"{math.e}"}.get(match.group(), match.group()))
+
+    return re.sub(r"[a-zA-Z]+", rhs_replace, expr)
+
+
+CORPUS = [
+    # harvested 2026-06-09 from examples/*/case.py (see plan Task 2 Step 1)
+    "0.5 + 0.2 * sin(2.0 * pi * x / lx)",
+    "0.5 - 0.5*sin(2*pi*x)",
+    "0.5 + 0.5*sin(2*pi*x)",
+    "0.5 - 0.2 * sin(2.0 * pi * x / lx)",
+    "1.0 + 0.2 * sin(2.0 * pi * (x / lx + y / ly + z / lz))",
+    "1.0 + 0.2 * sin(2.0 * pi * (x / lx + y / ly))",
+    "1.0 + 0.2 * sin(2.0 * pi * x / lx)",
+    "1 + 0.1*sin(20*x*pi)",
+    "1 + 0.2*sin(5*x)",
+]
+
+
+def test_corpus_equivalence_with_legacy():
+    from mfc.analytic_expr import fortranize_expr
+
+    var_map = {  # representative IC map, patch 1
+        "x": "x_cc(i)",
+        "y": "y_cc(j)",
+        "z": "z_cc(k)",
+        "xc": "patch_icpp(1)%x_centroid",
+        "yc": "patch_icpp(1)%y_centroid",
+        "zc": "patch_icpp(1)%z_centroid",
+        "lx": "patch_icpp(1)%length_x",
+        "ly": "patch_icpp(1)%length_y",
+        "lz": "patch_icpp(1)%length_z",
+        "r": "patch_icpp(1)%radius",
+        "eps": "patch_icpp(1)%epsilon",
+        "beta": "patch_icpp(1)%beta",
+        "tau_e": "patch_icpp(1)%tau_e",
+        "radii": "patch_icpp(1)%radii",
+    }
+    for expr in CORPUS:
+        new = fortranize_expr(expr, var_map).replace(" ", "")
+        old = _legacy_fortranize(expr, var_map).replace(" ", "")
+        assert new == old, f"divergence for {expr!r}:\n  legacy: {old}\n  ast:    {new}"
