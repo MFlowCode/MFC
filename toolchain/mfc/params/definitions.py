@@ -173,7 +173,7 @@ def _lookup_hint(name):
 # Schema Validation for Constraints and Dependencies
 # Uses rapidfuzz for "did you mean?" suggestions when typos are detected
 
-_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels"}
+_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels", "names"}
 _VALID_DEPENDENCY_KEYS = {"when_true", "when_set", "when_value"}
 _VALID_CONDITION_KEYS = {"requires", "recommends", "requires_value"}
 
@@ -203,6 +203,19 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
             for key in constraint["value_labels"]:
                 if key not in constraint["choices"]:
                     raise ValueError(f"value_labels key {key!r} for '{param_name}' not in choices {constraint['choices']}")
+    if "names" in constraint:
+        names = constraint["names"]
+        if not isinstance(names, dict):
+            raise ValueError(f"Constraint 'names' for '{param_name}' must be a dict")
+        for name, value in names.items():
+            if not isinstance(name, str) or not re.match(r"^[a-z0-9][a-z0-9_]*$", name):
+                raise ValueError(f"names key {name!r} for '{param_name}' must be a lowercase identifier")
+            if not isinstance(value, int):
+                raise ValueError(f"names value for '{param_name}'/{name!r} must be an int")
+        if len(set(names.values())) != len(names):
+            raise ValueError(f"names for '{param_name}' map two names to the same value")
+        if "choices" in constraint and set(names.values()) != set(constraint["choices"]):
+            raise ValueError(f"names for '{param_name}' must cover exactly its choices {constraint['choices']}")
 
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
@@ -283,55 +296,67 @@ CONSTRAINTS = {
     "recon_type": {
         "choices": [1, 2],
         "value_labels": {1: "WENO", 2: "MUSCL"},
+        "names": {"weno": 1, "muscl": 2},
     },
     "muscl_order": {
         "choices": [1, 2],
         "value_labels": {1: "1st order", 2: "2nd order"},
+        "names": {"first_order": 1, "second_order": 2},
     },
     "muscl_lim": {
         "choices": [0, 1, 2, 3, 4, 5],
         "value_labels": {0: "unlimited", 1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
+        "names": {"unlimited": 0, "minmod": 1, "mc": 2, "van_albada": 3, "van_leer": 4, "superbee": 5},
     },
     "int_comp": {
         "choices": [0, 1, 2],
         "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
+        "names": {"off": 0, "thinc": 1, "mthinc": 2},
     },
     # Time stepping
     "time_stepper": {
         "choices": [1, 2, 3],
         "value_labels": {1: "RK1 (Forward Euler)", 2: "RK2", 3: "RK3 (SSP)"},
+        "names": {"rk1": 1, "rk2": 2, "rk3": 3},
     },
     # Riemann solver
     "riemann_solver": {
         "choices": [1, 2, 4, 5],
         "value_labels": {1: "HLL", 2: "HLLC", 4: "HLLD", 5: "Lax-Friedrichs"},
+        "names": {"hll": 1, "hllc": 2, "hlld": 4, "lax_friedrichs": 5},
     },
     "wave_speeds": {
         "choices": [1, 2],
         "value_labels": {1: "direct", 2: "pressure"},
+        "names": {"direct": 1, "pressure": 2},
     },
     "avg_state": {
         "choices": [1, 2],
         "value_labels": {1: "Roe", 2: "arithmetic"},
+        "names": {"roe": 1, "arithmetic": 2},
     },
     # Model equations
     "model_eqns": {
         "choices": [1, 2, 3, 4],
         "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
+        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3, "4eq": 4},
     },
     # Bubbles
     "bubble_model": {
         "choices": [1, 2, 3],
         "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+        "names": {"gilmore": 1, "keller_miksis": 2, "rayleigh_plesset": 3},
     },
     # Output
     "format": {
         "choices": [1, 2],
         "value_labels": {1: "Silo", 2: "binary"},
+        "names": {"silo": 1, "binary": 2},
     },
     "precision": {
         "choices": [1, 2],
         "value_labels": {1: "single", 2: "double"},
+        "names": {"single": 1, "double": 2},
     },
     # Time stepping (must be positive)
     "dt": {"min": 0},
