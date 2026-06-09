@@ -80,8 +80,8 @@ contains
                         mu_q = f_compute_hb_viscosity(hb_tau0(fl), hb_K(fl), hb_nn(fl), hb_mu_min(fl), hb_mu_max(fl), shear_rate, &
                                                       & hb_m_arr(fl))
                     else
+                        ! Non-Newtonian bulk viscosity is not supported (validator rejects mu_bulk and Re(2) for NN fluids)
                         mu_q = 0._wp
-                        if (hb_mu_bulk(fl) > dflt_real) mu_q = hb_mu_bulk(fl)
                     end if
                     Re_out(i) = alpha(fl)*mu_q + Re_out(i)
                 else

@@ -4189,6 +4189,8 @@ contains
                         do fl = 1, num_fluids
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, &
                                       & l) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
+                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
+                            alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
                         end do
                         call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if
@@ -4399,6 +4401,8 @@ contains
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, &
                                       & l_loop) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_right_phys(1), idx_right_phys(2), &
                                       & idx_right_phys(3)))
+                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
+                            alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
                         end do
                         call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if
