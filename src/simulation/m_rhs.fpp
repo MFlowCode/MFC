@@ -126,6 +126,7 @@ contains
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
 
+        ! TODO: igr divergence point igr does not allocates scalar fields for q_cons_qp/q_prim_qp
         if (.not. igr) then
             do l = 1, sys_size
                 @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
@@ -149,6 +150,7 @@ contains
             end do
         end if
 
+        ! TODO: igr divergence point
         if (.not. igr) then
             @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
@@ -183,6 +185,9 @@ contains
             $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(eqn_idx%psi)%sf]')
         end if
 
+        ! TODO: igr divergence point, target for s_lf_riemann_solver refactor
+        ! must be allocated for s_lf_riemann_solver
+        ! getting rid of the if statement completely
         if (.not. igr) then
             @:ALLOCATE(flux_n(1:num_dims))
             @:ALLOCATE(flux_src_n(1:num_dims))
@@ -256,6 +261,11 @@ contains
             end do
         end if
 
+        ! TODO: igr divergence point, target for s_lf_riemann_solver refactor
+        ! some allocations are needed to call s_lf_riemann_solver
+        ! moving necessary allocations outside the (.not. igr) block temporarily
+        ! some remaining allocations inside the if .not. igr block become necessary
+        ! for the viscous path in s_lf_riemann_solver, will modify later
         if ((.not. igr)) then
             @:ALLOCATE(dq_prim_dx_qp(1:1))
             @:ALLOCATE(dq_prim_dy_qp(1:1))
@@ -489,6 +499,7 @@ contains
 
         call cpu_time(t_start)
 
+        ! TODO: igr divergence point igr does not copy q_cons_vf into q_cons_qp but keeps using q_cons_vf instead
         if (.not. igr) then
             ! Association/Population of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
@@ -527,6 +538,10 @@ contains
             end if
         end if
 
+        ! TODO: igr divergence point, major
+        ! igr does not call s_convert_conservative_to_primitive_variables
+        ! at this point neither q_cons_qp nor q_prim_qp is populated for igr
+        ! igr fills ghost cells in q_cons_vf
         if (igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
@@ -555,6 +570,7 @@ contains
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
 
+        ! TODO: igr divergence point igr handles viscosity in m_igr
         if ((viscous .and. .not. igr)) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, dqR_prim_dx_n, &
@@ -576,6 +592,9 @@ contains
         end if
 
         ! Loop over coordinate directions for dimensional splitting
+        ! TODO: igr divergence point
+        ! currently, igr rhs_vf contains extra padding, uses it own s_igr_riemann_solver,
+        ! s_igr_iterative_solve, and s_igr_sigma_x logic
         do id = 1, num_dims
             if (igr) then
                 if (id == 1) then
@@ -833,6 +852,7 @@ contains
         ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+            ! TODO: igr divergence point no probing option for igr in the normal path
             if (.not. igr) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
                 do i = 1, sys_size
@@ -1704,6 +1724,7 @@ contains
 
         call s_finalize_pressure_relaxation_module
 
+        ! TODO: igr divergence point, mirroring initialization
         if (.not. igr) then
             do j = eqn_idx%cont%beg, eqn_idx%cont%end
                 if (relativity) then
@@ -1727,6 +1748,7 @@ contains
 
         @:DEALLOCATE(q_cons_qp%vf, q_prim_qp%vf)
 
+        ! TODO: igr divergence point change only if these arrays are allocated for igr
         if (.not. igr) then
             @:DEALLOCATE(qL_rsx_vf, qR_rsx_vf)
 
@@ -1798,6 +1820,7 @@ contains
             deallocate (alf_sum%sf)
         end if
 
+        ! TODO: igr divergence point if flux arrays are allocated for igr then they need to be deallocated here
         if (.not. igr) then
             do i = num_dims, 1, -1
                 if (i /= 1) then
