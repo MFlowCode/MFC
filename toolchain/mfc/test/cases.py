@@ -928,6 +928,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
         cases.append(define_case_f("3D -> ICPP -> STL", "examples/3D_icpp_stl_cube/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
+        cases.append(define_case_f("2D -> ICPP -> STL", "examples/2D_icpp_stl_circle/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
 
     ibm_stl()
 

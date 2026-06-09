@@ -1297,7 +1297,7 @@ contains
             end if
 
             if (in_box) then
-                eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, point)
+                eta = f_model_is_inside(gpu_ntrs(model_id), model_id, point)
             else
                 eta = 0._wp
             end if

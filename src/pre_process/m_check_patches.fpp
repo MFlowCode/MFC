@@ -533,11 +533,12 @@ contains
         character(len=10)   :: midStr
         logical             :: file_exists
 
+        call s_int_to_str(patch_id, iStr)
         mid = patch_icpp(patch_id)%model_id
         call s_int_to_str(mid, midStr)
 
         @:PROHIBIT(mid <= 0 .or. mid > num_stl_models, &
-                   & "patch_icpp(" // trim(iStr) // ")%model_id=" // trim(midStr) // "must be in [1, num_stl_models]")
+                   & "patch_icpp(" // trim(iStr) // ")%model_id=" // trim(midStr) // " must be in [1, num_stl_models]")
 
         @:PROHIBIT(stl_models(mid)%model_filepath == dflt_char, "Empty model file path for stl_models(" // trim(midStr) // ")")
 

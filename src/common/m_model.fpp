@@ -21,7 +21,7 @@ module m_model
         & gpu_boundary_edge_count, stl_bounding_boxes
 
     ! Subroutines for STL immersed boundaries
-    public :: s_check_boundary, s_register_edge, f_model_is_inside_flat, s_distance_normals_3D, s_distance_normals_2D, &
+    public :: s_check_boundary, s_register_edge, f_model_is_inside, s_distance_normals_3D, s_distance_normals_2D, &
         & s_pack_model_for_gpu
 
 #ifndef MFC_POST_PROCESS
@@ -465,7 +465,7 @@ contains
     !! each boundary edge. Returns ~1.0 inside, ~0.0 outside. Unlike ray casting, this is robust to small triangles/edges and vertex
     !! winding order.
     !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
-    function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
+    function f_model_is_inside(ntrs, pid, point) result(fraction)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -523,7 +523,7 @@ contains
             fraction = fraction/(2.0_wp*acos(-1.0_wp))
         end if
 
-    end function f_model_is_inside_flat
+    end function f_model_is_inside
 
     !> Check and label edges shared by two or more triangle facets of the 2D STL model.
     subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
