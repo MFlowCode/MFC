@@ -1799,6 +1799,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
+                # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
+                # by a large mu_max: even on the downsized grid the step count to reach t_stop
+                # is too large for the CI smoke suite. The faster NN examples remain tested.
+                "2D_poiseuille_nn",
+                "2D_bingham_poiseuille_nn",
             ]
             if path in casesToSkip:
                 continue
