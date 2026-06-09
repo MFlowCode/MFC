@@ -529,7 +529,8 @@ def _r(name, ptype, tags=None, desc=None, hint=None, math=None, str_len=None, st
     constraint = CONSTRAINTS.get(name)
     if constraint and "value_labels" in constraint:
         labels = constraint["value_labels"]
-        suffix = ", ".join(f"{v}={labels[v]}" for v in sorted(labels))
+        by_value = {v: n for n, v in constraint.get("names", {}).items()}
+        suffix = ", ".join(f"{v} ('{by_value[v]}')={labels[v]}" if v in by_value else f"{v}={labels[v]}" for v in sorted(labels))
         desc = f"{desc} ({suffix})".strip()
     REGISTRY.register(
         ParamDef(

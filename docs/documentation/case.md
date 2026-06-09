@@ -98,6 +98,11 @@ There are multiple sets of parameters that must be specified in the python input
 Items 8, 9, 10, 11 and 12 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, phase change, artificial Mach number respectively.
 Definition of the parameters is described in the following subsections.
 
+Enumerated parameters accept named values as well as integer codes: `"riemann_solver": "hllc"`
+is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's table entry
+(e.g. `1` (`hll`), `2` (`hllc`)). Existing case files can be rewritten to named syntax with
+`./mfc.sh validate case.py --migrate`.
+
 ### 1. Runtime {#sec-runtime}
 
 | Parameter        | Type           | Description                               |

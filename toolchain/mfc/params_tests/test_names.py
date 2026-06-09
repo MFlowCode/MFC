@@ -83,3 +83,13 @@ def test_choices_error_mentions_names():
     errs = REGISTRY.get_param_def("riemann_solver").validate_value(3)
     assert len(errs) == 1
     assert "hllc" in errs[0]
+
+
+def test_docs_constraints_show_names():
+    from mfc.params.generators.docs_gen import _format_constraints
+    from mfc.params.registry import REGISTRY
+
+    s = _format_constraints(REGISTRY.get_param_def("riemann_solver"))
+    assert "hllc" in s
+    assert "`hllc`" in s  # name is rendered in backtick syntax, not just bare
+    assert "HLLC" in s

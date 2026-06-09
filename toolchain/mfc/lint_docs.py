@@ -67,6 +67,9 @@ CASE_MD_SKIP = {
     # Hardcoded Fortran constants (not case-file params)
     "init_dir",
     "zeros_default",
+    # Enumerated value names used as prose examples (not parameter names)
+    "hll",
+    "hllc",
 }
 
 # Docs to check for parameter references, with per-file skip sets
