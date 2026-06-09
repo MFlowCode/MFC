@@ -321,7 +321,6 @@ contains
 
         ! Pre-compute advection offset on CPU (mytime has no GPU declaration)
         adv_offset = synth_U_inf*mytime
-        if (proc_rank == 1) print *, "params ", synth_U_inf, mytime
 
         do turb_idx = 1, num_turbulent_sources
             $:GPU_PARALLEL_LOOP(private='[j, k, l, n_mode, pos_x, pos_y, pos_z, gauss_env, G_norm, f_scale, a_m, phase_arg, &

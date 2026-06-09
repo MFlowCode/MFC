@@ -538,9 +538,9 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
+            $:GPU_UPDATE(device='[mytime]')
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
-            if (proc_rank == 1) print *, "synthetic_turbulence", synthetic_turbulence
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
                 & 3)*dt/rk_coef(s, 4))
 
@@ -589,10 +589,6 @@ contains
         else
             wall_time_avg = 0._wp
         end if
-
-        ! DEBUG
-        $:GPU_UPDATE(host='[patch_ib]')
-        print *, "Current Rotation Angles: ", patch_ib(1)%angles
 
     end subroutine s_tvd_rk
 
@@ -749,8 +745,6 @@ contains
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        if (proc_rank == 1) print *, "Propagating boundary ", s
-
         $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s]')
         do i = 1, num_ibs
             if (s == 1) then
@@ -770,7 +764,6 @@ contains
                          & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
 
                 if (patch_ib(i)%moving_ibm == 1) then
-                    if (proc_rank == 1) print *,  "Right before analytical update", mytime, patch_ib(1)%angular_vel(1)
                     ! plug in analytic velocities for 1-way coupling, if it exists
                     @:mib_analytical()
                 else if (patch_ib(i)%moving_ibm == 2) then  ! if we are using two-way coupling, apply force and torque

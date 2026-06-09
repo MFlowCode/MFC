@@ -58,7 +58,7 @@ module m_global_parameters
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, mytime, m, n, p]')
+    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p]')
 
     $:GPU_DECLARE(create='[cfl_target]')
 
@@ -361,7 +361,7 @@ module m_global_parameters
     type(pres_field), allocatable, dimension(:) :: pb_ts
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
-    $:GPU_DECLARE(create='[pb_ts, mv_ts]')
+    $:GPU_DECLARE(create='[mytime, pb_ts, mv_ts]')
 
     !> @name lagrangian subgrid bubble parameters
     !> @{!
