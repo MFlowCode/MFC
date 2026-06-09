@@ -20,6 +20,7 @@ module m_riemann_solvers
     use m_bubbles_EE
     use m_surface_tension
     use m_helper_basic
+    use m_hb_function
     use m_chemistry
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
         & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass
@@ -103,12 +104,13 @@ contains
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
 
-        & dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
+        & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
              & dvelR_dy_vf, dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
@@ -117,7 +119,7 @@ contains
                 & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
-                & dvelR_dz_vf, flux_src_vf, norm_dir)
+                & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
         end if
 
     end subroutine s_compute_viscous_source_flux
@@ -784,8 +786,8 @@ contains
                                                    & qR_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, norm_dir, ix, &
-                                                   & iy, iz)
+                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
+                                                   & norm_dir, ix, iy, iz)
             else
                 call s_compute_viscous_source_flux(q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqL_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
@@ -794,8 +796,8 @@ contains
                                                    & q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, norm_dir, ix, &
-                                                   & iy, iz)
+                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
+                                                   & norm_dir, ix, iy, iz)
             end if
         end if
 
@@ -3279,8 +3281,8 @@ contains
                                                    & qR_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, norm_dir, ix, &
-                                                   & iy, iz)
+                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
+                                                   & norm_dir, ix, iy, iz)
             else
                 call s_compute_viscous_source_flux(q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqL_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
@@ -3289,8 +3291,8 @@ contains
                                                    & q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, norm_dir, ix, &
-                                                   & iy, iz)
+                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
+                                                   & norm_dir, ix, iy, iz)
             end if
         end if
 
@@ -4258,13 +4260,14 @@ contains
     !> Compute Cartesian viscous source flux contributions for momentum and energy
     subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
 
-        & dvelR_dz_vf, flux_src_vf, norm_dir)
+        & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
 
         ! Arguments
         type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dx_vf, dvelR_dx_vf
         type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dy_vf, dvelR_dy_vf
         type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dz_vf, dvelR_dz_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         integer, intent(in)                                    :: norm_dir
 
         ! Local variables
@@ -4280,18 +4283,23 @@ contains
             real(wp), dimension(num_dims, num_dims) :: current_tau_bulk  !< Current bulk stress tensor.
             real(wp), dimension(num_dims)           :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
         #:endif
-        integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
-        real(wp)              :: Re_shear        !< Interface shear Reynolds number.
-        real(wp)              :: Re_bulk         !< Interface bulk Reynolds number.
-        integer               :: j_loop          !< Physical x-index loop iterator.
-        integer               :: k_loop          !< Physical y-index loop iterator.
-        integer               :: l_loop          !< Physical z-index loop iterator.
-        integer               :: i_dim           !< Generic dimension/component iterator.
-        integer               :: vel_comp_idx    !< Velocity component iterator (1=u, 2=v, 3=w).
-        real(wp)              :: divergence_v    !< Velocity divergence at interface.
+        integer, dimension(3)           :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+        real(wp)                        :: Re_shear        !< Interface shear Reynolds number.
+        real(wp)                        :: Re_bulk         !< Interface bulk Reynolds number.
+        integer                         :: j_loop          !< Physical x-index loop iterator.
+        integer                         :: k_loop          !< Physical y-index loop iterator.
+        integer                         :: l_loop          !< Physical z-index loop iterator.
+        integer                         :: i_dim           !< Generic dimension/component iterator.
+        integer                         :: vel_comp_idx    !< Velocity component iterator (1=u, 2=v, 3=w).
+        real(wp)                        :: divergence_v    !< Velocity divergence at interface.
+        real(wp)                        :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
+        real(wp), dimension(2)          :: Re_nn
+        real(wp), dimension(num_fluids) :: alpha_avg
+        integer                         :: fl
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
-                            & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx]')
+                            & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx, gamma_dot, D_xx, D_yy, &
+                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
         do l_loop = isz%beg, isz%end
             do k_loop = isy%beg, isy%end
                 do j_loop = isx%beg, isx%end
@@ -4321,6 +4329,27 @@ contains
                         end if
                     end do
 
+                    if (any_non_newtonian) then
+                        D_xx = vel_grad_avg(1, 1); D_yy = 0._wp; D_zz = 0._wp
+                        D_xy = 0._wp; D_xz = 0._wp; D_yz = 0._wp
+                        if (num_dims > 1) then
+                            D_yy = vel_grad_avg(2, 2)
+                            D_xy = 0.5_wp*(vel_grad_avg(1, 2) + vel_grad_avg(2, 1))
+                        end if
+                        if (num_dims > 2) then
+                            D_zz = vel_grad_avg(3, 3)
+                            D_xz = 0.5_wp*(vel_grad_avg(1, 3) + vel_grad_avg(3, 1))
+                            D_yz = 0.5_wp*(vel_grad_avg(2, 3) + vel_grad_avg(3, 2))
+                        end if
+                        gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                        do fl = 1, num_fluids
+                            alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, &
+                                      & l_loop) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_right_phys(1), idx_right_phys(2), &
+                                      & idx_right_phys(3)))
+                        end do
+                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
+                    end if
+
                     divergence_v = 0.0_wp
                     do i_dim = 1, num_dims
                         divergence_v = divergence_v + vel_grad_avg(i_dim, i_dim)
@@ -4328,20 +4357,35 @@ contains
 
                     vel_src_at_interface = 0.0_wp
                     if (norm_dir == 1) then
-                        Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
-                        Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        if (any_non_newtonian) then
+                            Re_shear = Re_nn(1)
+                            Re_bulk = Re_nn(2)
+                        else
+                            Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
+                            Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        end if
                         do i_dim = 1, num_dims
                             vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
                         end do
                     else if (norm_dir == 2) then
-                        Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
-                        Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        if (any_non_newtonian) then
+                            Re_shear = Re_nn(1)
+                            Re_bulk = Re_nn(2)
+                        else
+                            Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
+                            Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        end if
                         do i_dim = 1, num_dims
                             vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
                         end do
                     else
-                        Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
-                        Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        if (any_non_newtonian) then
+                            Re_shear = Re_nn(1)
+                            Re_bulk = Re_nn(2)
+                        else
+                            Re_shear = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 1)
+                            Re_bulk = Re_avg_rsx_vf(j_loop, k_loop, l_loop, 2)
+                        end if
                         do i_dim = 1, num_dims
                             vel_src_at_interface(i_dim) = vel_src_rsx_vf(j_loop, k_loop, l_loop, i_dim)
                         end do
