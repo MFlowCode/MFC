@@ -13,6 +13,7 @@ module m_viscous
     use m_muscl
     use m_helper
     use m_finite_differences
+    use m_constants, only: model_eqns_5eq
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
         & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
@@ -102,14 +103,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)
@@ -205,14 +206,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)
@@ -302,14 +303,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)
@@ -402,14 +403,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)

@@ -14,6 +14,7 @@ module m_global_parameters
     use m_derived_types
     use m_helper_basic
     use m_thermochem, only: num_species, species_names
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
 
     implicit none
 
@@ -368,7 +369,7 @@ contains
         if (n == 0) m_root = m_glb
 
         ! Gamma/Pi_inf Model
-        if (model_eqns == 1) then
+        if (model_eqns == model_eqns_gamma_law) then
             ! Setting number of fluids
             num_fluids = 1
 
@@ -386,7 +387,7 @@ contains
             sys_size = eqn_idx%adv%end
 
             ! Volume Fraction Model (5-equation model)
-        else if (model_eqns == 2) then
+        else if (model_eqns == model_eqns_5eq) then
             ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
             ! of spatial dimensions and the volume fraction model
             eqn_idx%cont%beg = 1
@@ -485,7 +486,7 @@ contains
             end if
 
             ! Volume Fraction Model (6-equation model)
-        else if (model_eqns == 3) then
+        else if (model_eqns == model_eqns_6eq) then
             ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
             ! of spatial dimensions and the volume fraction model
             eqn_idx%cont%beg = 1
@@ -499,7 +500,7 @@ contains
             eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
             sys_size = eqn_idx%int_en%end
             eqn_idx%alf = 1  ! dummy, cannot actually have a void fraction
-        else if (model_eqns == 4) then
+        else if (model_eqns == model_eqns_4eq) then
             eqn_idx%cont%beg = 1  ! one continuity equation
             eqn_idx%cont%end = 1  ! num_fluids
             eqn_idx%mom%beg = eqn_idx%cont%end + 1  ! one momentum equation in each
@@ -552,7 +553,7 @@ contains
             end if
         end if
 
-        if (model_eqns == 2 .or. model_eqns == 3) then
+        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
             if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
                 eqn_idx%stress%beg = sys_size + 1

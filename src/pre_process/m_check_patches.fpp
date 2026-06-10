@@ -22,6 +22,7 @@ module m_check_patches
     use m_compile_specific
     use m_helper_basic
     use m_helper
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq
 
     implicit none
 
@@ -472,15 +473,15 @@ contains
         @:PROHIBIT(p > 0 .and. f_is_default(patch_icpp(patch_id)%vel(3)), "Patch "//trim(iStr)//": vel(3) must be set when p > 0")
         @:PROHIBIT(mhd .and. (f_is_default(patch_icpp(patch_id)%vel(2)) .or. f_is_default(patch_icpp(patch_id)%vel(3))), &
                    & "Patch " // trim(iStr) // ": All velocities (vel(1:3)) must be set when mhd = true")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%rho <= 0._wp, &
+        @:PROHIBIT(model_eqns == model_eqns_gamma_law .and. patch_icpp(patch_id)%rho <= 0._wp, &
                    & "Patch " // trim(iStr) // ": rho must be greater than zero when model_eqns = 1")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%gamma <= 0._wp, &
+        @:PROHIBIT(model_eqns == model_eqns_gamma_law .and. patch_icpp(patch_id)%gamma <= 0._wp, &
                    & "Patch " // trim(iStr) // ": gamma must be greater than zero when model_eqns = 1")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%pi_inf < 0._wp, &
+        @:PROHIBIT(model_eqns == model_eqns_gamma_law .and. patch_icpp(patch_id)%pi_inf < 0._wp, &
                    & "Patch " // trim(iStr) // ": pi_inf must be greater than or equal to zero when model_eqns = 1")
         @:PROHIBIT(patch_icpp(patch_id)%geometry == 5 .and. patch_icpp(patch_id)%pi_inf > 0, &
                    & "Patch " // trim(iStr) // ": pi_inf must be less than or equal to zero when geometry = 5")
-        @:PROHIBIT(model_eqns == 2 .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
+        @:PROHIBIT(model_eqns == model_eqns_5eq .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
                    & "Patch " // trim(iStr) &
                    & // ": alpha_rho(1:num_fluids) must be greater than or equal to zero when model_eqns = 2")
 
@@ -493,7 +494,7 @@ contains
         @:PROHIBIT(mhd .and. n > 0 .and. .not. is_set_B(1), "Bx must be set in 2D/3D MHD simulations")
         @:PROHIBIT(mhd .and. .not. (is_set_B(2) .and. is_set_B(3)), "By and Bz must be set in all MHD simulations")
 
-        if (model_eqns == 2 .and. num_fluids < num_fluids_max) then
+        if (model_eqns == model_eqns_5eq .and. num_fluids < num_fluids_max) then
             @:PROHIBIT(.not. f_all_default(patch_icpp(patch_id)%alpha_rho(num_fluids + 1:)), &
                        & "Patch " // trim(iStr) // ": alpha_rho(i) must not be set for i > num_fluids")
             @:PROHIBIT(.not. f_all_default(patch_icpp(patch_id)%alpha(num_fluids + 1:)), &

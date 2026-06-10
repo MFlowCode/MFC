@@ -159,14 +159,37 @@ def test_check_target_raises_on_bad_target():
         generate_decls_fpp("bad")
 
 
-def test_get_generated_files_returns_six():
+def test_get_generated_files_returns_nine():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/build"))
-    assert len(files) == 6
+    assert len(files) == 9
     paths = [str(p) for p, _ in files]
     assert any("pre_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_decls.fpp" in p for p in paths)
     assert any("post_process/generated_namelist.fpp" in p for p in paths)
+
+
+def test_generate_constants_fpp_content():
+    from mfc.params.generators.fortran_gen import generate_constants_fpp
+
+    out = generate_constants_fpp()
+    assert "AUTO-GENERATED" in out
+    assert "integer, parameter :: riemann_solver_hllc = 2" in out
+    assert "integer, parameter :: model_eqns_5eq = 2" in out
+    assert "integer, parameter :: time_stepper_rk3 = 3" in out
+    # Deterministic: two calls produce identical output
+    assert out == generate_constants_fpp()
+
+
+def test_get_generated_files_includes_constants():
+    from pathlib import Path
+
+    from mfc.params.generators.fortran_gen import get_generated_files
+
+    files = get_generated_files(Path("/tmp/x"))
+    names = {p.name for p, _ in files}
+    assert names == {"generated_namelist.fpp", "generated_decls.fpp", "generated_constants.fpp"}
+    assert len(files) == 9
