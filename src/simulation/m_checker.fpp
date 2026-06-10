@@ -42,6 +42,10 @@ contains
             call s_check_inputs_particle_clouds
         end if
 
+        if (synthetic_turbulence) then
+            call s_check_inputs_synthetic_turbulence
+        end if
+
     end subroutine s_check_inputs
 
     !> Checks constraints on compiler options
@@ -126,5 +130,27 @@ contains
         end do
 
     end subroutine s_check_inputs_particle_clouds
+
+    !> Checks that each active synthetic-turbulence forcing zone has a fully specified position and a positive size in every active
+    !! dimension
+    impure subroutine s_check_inputs_synthetic_turbulence
+
+        integer          :: i, d
+        character(len=5) :: idxStr
+
+        @:PROHIBIT(num_turbulent_sources <= 0, "num_turbulent_sources must be > 0 when synthetic_turbulence is enabled")
+
+        do i = 1, num_turbulent_sources
+            call s_int_to_str(i, idxStr)
+            do d = 1, num_dims
+                @:PROHIBIT(f_is_default(turb_pos(i, d)), &
+                           & "turb_pos("//trim(idxStr) &
+                           & //",:) must be specified for all num_dims when synthetic_turbulence is enabled")
+                @:PROHIBIT(f_is_default(synth_L(i, d)) .or. synth_L(i, d) <= 0._wp, &
+                           & "synth_L("//trim(idxStr)//",:) must be positive for all num_dims when synthetic_turbulence is enabled")
+            end do
+        end do
+
+    end subroutine s_check_inputs_synthetic_turbulence
 
 end module m_checker
