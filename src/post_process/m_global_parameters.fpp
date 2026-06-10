@@ -14,7 +14,8 @@ module m_global_parameters
     use m_derived_types
     use m_helper_basic
     use m_thermochem, only: num_species, species_names
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo, precision_single
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo, precision_single, &
+        & recon_type_weno
 
     implicit none
 
@@ -186,7 +187,7 @@ contains
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
-        recon_type = WENO_TYPE
+        recon_type = recon_type_weno
         weno_order = dflt_int
         muscl_order = dflt_int
         mixture_err = .false.

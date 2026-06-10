@@ -350,7 +350,7 @@ contains
 
         ! Computing CBC1 Coefficients
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (cbc_dir_in == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
+            if (cbc_dir_in == ${CBC_DIR}$ .and. recon_type == recon_type_weno) then
                 if (weno_order == 1) then
                     fd_coef_${XYZ}$ (:,cbc_loc_in) = 0._wp
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
@@ -524,7 +524,7 @@ contains
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
+            if (cbc_dir == ${CBC_DIR}$ .and. recon_type == recon_type_weno) then
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &

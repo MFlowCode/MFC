@@ -161,7 +161,7 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
-        recon_type = WENO_TYPE
+        recon_type = recon_type_weno
         weno_order = dflt_int
         igr = .false.
         igr_order = dflt_int

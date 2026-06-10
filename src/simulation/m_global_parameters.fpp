@@ -505,7 +505,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
-            recon_type = WENO_TYPE
+            recon_type = recon_type_weno
             weno_order = dflt_int
             muscl_order = dflt_int
             muscl_lim = dflt_int
