@@ -307,31 +307,27 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i, j  !< Generic loop iterator
-        ! Logistics
 
-        case_dir = '.'
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
+        ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
+        ! IB flags, parallel I/O flags, fft_wrt)
+
+        call s_assign_common_defaults
+        call s_update_cell_bounds(cells_bounds, m, n, p)
+
+        ! Logistics (sim-specific)
         run_time_info = .false.
         t_step_old = dflt_int
 
-        ! Computational domain parameters
-        m = dflt_int; n = 0; p = 0
-        call s_update_cell_bounds(cells_bounds, m, n, p)
-
-        cyl_coord = .false.
-
+        ! Computational domain parameters (sim-specific)
         dt = dflt_real
-
-        cfl_adap_dt = .false.
-        cfl_const_dt = .false.
         cfl_dt = .false.
         cfl_target = dflt_real
 
-        t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
         t_step_print = 1
 
-        n_start = dflt_int
         t_stop = dflt_real
         t_save = dflt_real
 
@@ -340,8 +336,7 @@ contains
         nv_uvm_igr_temps_on_gpu = 3  ! => jac, jac_rhs, and jac_old on GPU (default)
         nv_uvm_pref_gpu = .false.
 
-        ! Simulation algorithm parameters
-        model_eqns = dflt_int
+        ! Simulation algorithm parameters (sim-specific)
         mpp_lim = .false.
         time_stepper = dflt_int
         muscl_eps = dflt_real
@@ -357,29 +352,17 @@ contains
         alt_soundspeed = .false.
         null_weights = .false.
         mixture_err = .false.
-        parallel_io = .false.
-        file_per_process = .false.
         precision = 2
-        down_sample = .false.
-        relax = .false.
-        relax_model = dflt_int
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
-        hypoelasticity = .false.
-        hyperelasticity = .false.
         int_comp = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
-        elasticity = .false.
         hyper_model = dflt_int
-        b_size = dflt_int
-        tensor_size = dflt_int
         rdma_mpi = .false.
         shear_stress = .false.
         bulk_stress = .false.
         any_non_newtonian = .false.
-        cont_damage = .false.
-        hyper_cleaning = .false.
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
@@ -389,7 +372,6 @@ contains
             wenoz = .false.
             teno = .false.
             wenoz_q = dflt_real
-            igr = .false.
             igr_order = dflt_int
             igr_pres_lim = .false.
             viscous = .false.
@@ -404,22 +386,11 @@ contains
         num_bc_patches = 0
         bc_io = .false.
 
-        bc_x%beg = dflt_int; bc_x%end = dflt_int
-        bc_y%beg = dflt_int; bc_y%end = dflt_int
-        bc_z%beg = dflt_int; bc_z%end = dflt_int
-
-        #:for DIM in ['x', 'y', 'z']
-            #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0._wp
-                bc_${DIM}$%ve${DIR}$ = 0._wp
-            #:endfor
-        #:endfor
-
         x_domain%beg = dflt_real; x_domain%end = dflt_real
         y_domain%beg = dflt_real; y_domain%end = dflt_real
         z_domain%beg = dflt_real; z_domain%end = dflt_real
 
-        ! Fluids physical parameters
+        ! Fluids physical parameters (sim-specific; Re(:) and G=0._wp differ from post)
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
@@ -438,7 +409,8 @@ contains
             fluid_pp(i)%mu_bulk = dflt_real
         end do
 
-        ! Subgrid bubble parameters
+        ! Subgrid bubble parameters (bub_pp struct + scalar companions; scalar companions are
+        ! per-target manual declarations not in m_global_parameters_common scope)
         bub_pp%R0ref = dflt_real; R0ref = dflt_real
         bub_pp%p0ref = dflt_real; p0ref = dflt_real
         bub_pp%rho0ref = dflt_real; rho0ref = dflt_real
@@ -460,13 +432,7 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
-        ! Tait EOS
-        rhoref = dflt_real
-        pref = dflt_real
-
-        ! Immersed Boundaries
-        ib = .false.
-        num_ibs = dflt_int
+        ! Immersed Boundaries (sim-specific extras)
         ib_neighborhood_radius = 1
         collision_model = 0
         coefficient_of_restitution = dflt_real
@@ -474,21 +440,14 @@ contains
         ib_coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
 
-        ! Bubble modeling
-        bubbles_euler = .false.
+        ! Bubble modeling (sim-specific)
         bubble_model = 1
         polytropic = .true.
-        polydisperse = .false.
         thermal = dflt_int
-        R0ref = dflt_real
 
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
-            recon_type = recon_type_weno
-            weno_order = dflt_int
-            muscl_order = dflt_int
             muscl_lim = dflt_int
-            num_fluids = dflt_int
         #:endif
 
         adv_n = .false.
@@ -498,22 +457,14 @@ contains
 
         pi_fac = 1._wp
 
-        ! User inputs for qbmm for simulation code
-        qbmm = .false.
-
         Eu = dflt_real
         Ca = dflt_real
         Re_inv = dflt_real
         Web = dflt_real
-        poly_sigma = dflt_real
 
         ! Acoustic source
         acoustic_source = .false.
         num_source = dflt_int
-
-        ! Surface tension
-        sigma = dflt_real
-        surface_tension = .false.
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
@@ -523,8 +474,6 @@ contains
                 ${param}$_${dir}$ = dflt_real
             #:endfor
         #:endfor
-
-        fft_wrt = .false.
 
         do j = 1, num_probes_max
             acoustic(j)%pulse = dflt_int
@@ -583,15 +532,7 @@ contains
             bc_${dir}$%grcbc_vel_out = .false.
         #:endfor
 
-        #:for dir in {'x', 'y', 'z'}
-            bc_${dir}$%isothermal_in = .false.
-            bc_${dir}$%isothermal_out = .false.
-            bc_${dir}$%Twall_in = dflt_real
-            bc_${dir}$%Twall_out = dflt_real
-        #:endfor
-
         ! Lagrangian subgrid bubble model
-        bubbles_lagrange = .false.
         lag_params%solver_approach = dflt_int
         lag_params%cluster_type = dflt_int
         lag_params%pressure_corrector = .false.
@@ -610,15 +551,9 @@ contains
         cont_damage_s = dflt_real
         alpha_bar = dflt_real
 
-        ! MHD
-        Bx0 = dflt_real
+        ! MHD (sim-specific extras beyond common Bx0)
         hyper_cleaning_speed = dflt_real
         hyper_cleaning_tau = dflt_real
-
-        #:if not MFC_CASE_OPTIMIZATION
-            mhd = .false.
-            relativity = .false.
-        #:endif
 
         do i = 1, num_ib_airfoils_max
             ib_airfoil(i)%c = dflt_real

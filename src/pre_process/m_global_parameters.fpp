@@ -93,26 +93,21 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i  !< Generic loop operator
-        ! Logistics
 
-        case_dir = '.'
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
+        ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
+        ! IB flags, parallel I/O flags, fft_wrt)
+
+        call s_assign_common_defaults
+        call s_update_cell_bounds(cells_bounds, m, n, p)
+
+        ! Logistics (pre-specific)
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
-        t_step_start = dflt_int
-
-        cfl_adap_dt = .false.
-        cfl_const_dt = .false.
         cfl_dt = .false.
-        n_start = dflt_int
 
-        ! Computational domain parameters
-        m = dflt_int; n = 0; p = 0
-
-        call s_update_cell_bounds(cells_bounds, m, n, p)
-
-        cyl_coord = .false.
-
+        ! Computational domain parameters (pre-specific)
         x_domain%beg = dflt_real
         x_domain%end = dflt_real
         y_domain%beg = dflt_real
@@ -137,55 +132,14 @@ contains
         z_a = dflt_real
         z_b = dflt_real
 
-        ! Simulation algorithm parameters
-        model_eqns = dflt_int
-        relax = .false.
-        relax_model = dflt_int
+        ! Simulation algorithm parameters (pre-specific)
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
-        num_fluids = dflt_int
-        recon_type = recon_type_weno
-        weno_order = dflt_int
-        igr = .false.
         igr_order = dflt_int
-        muscl_order = dflt_int
-
-        hypoelasticity = .false.
-        hyperelasticity = .false.
-        elasticity = .false.
         pre_stress = .false.
-        b_size = dflt_int
-        tensor_size = dflt_int
-        cont_damage = .false.
-        hyper_cleaning = .false.
 
-        mhd = .false.
-        relativity = .false.
-
-        bc_x%beg = dflt_int; bc_x%end = dflt_int
-        bc_y%beg = dflt_int; bc_y%end = dflt_int
-        bc_z%beg = dflt_int; bc_z%end = dflt_int
-
-        #:for DIM in ['x', 'y', 'z']
-            #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0._wp
-                bc_${DIM}$%ve${DIR}$ = 0._wp
-            #:endfor
-        #:endfor
-
-        #:for dir in {'x', 'y', 'z'}
-            bc_${dir}$%isothermal_in = .false.
-            bc_${dir}$%isothermal_out = .false.
-            bc_${dir}$%Twall_in = dflt_real
-            bc_${dir}$%Twall_out = dflt_real
-        #:endfor
-
-        parallel_io = .false.
-        file_per_process = .false.
         precision = 2
-        down_sample = .false.
         viscous = .false.
-        bubbles_lagrange = .false.
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
@@ -199,8 +153,6 @@ contains
         fluid_rho = dflt_real
         elliptic_smoothing_iters = dflt_int
         elliptic_smoothing = .false.
-
-        fft_wrt = .false.
 
         simplex_perturb = .false.
         simplex_params%perturb_vel(:) = .false.
@@ -291,29 +243,16 @@ contains
             patch_bc(i)%radius = dflt_real
         end do
 
-        ! Tait EOS
-        rhoref = dflt_real
-        pref = dflt_real
-
-        ! Bubble modeling
-        bubbles_euler = .false.
+        ! Bubble modeling (pre-specific)
         polytropic = .true.
-        polydisperse = .false.
-
         thermal = dflt_int
-        R0ref = dflt_real
         nb = dflt_int
 
         Eu = dflt_real
         Ca = dflt_real
         Re_inv = dflt_real
         Web = dflt_real
-        poly_sigma = dflt_real
-        surface_tension = .false.
 
-        adv_n = .false.
-
-        qbmm = .false.
         nmom = 1
         sigR = dflt_real
         sigV = dflt_real
@@ -327,13 +266,7 @@ contains
         Pe_c = dflt_real
         Tw = dflt_real
 
-        ! surface tension modeling
-        sigma = dflt_real
         pi_fac = 1._wp
-
-        ! Immersed Boundaries
-        ib = .false.
-        num_ibs = dflt_int
 
         do i = 1, num_ib_patches_max_namelist
             patch_ib(i)%geometry = dflt_int
@@ -401,8 +334,6 @@ contains
             fluid_pp(i)%mu_max = dflt_real
             fluid_pp(i)%mu_bulk = dflt_real
         end do
-
-        Bx0 = dflt_real
 
         ! Subgrid bubble parameters
         bub_pp%R0ref = dflt_real; R0ref = dflt_real

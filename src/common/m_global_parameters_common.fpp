@@ -16,7 +16,7 @@ module m_global_parameters_common
     use m_derived_types
     use m_thermochem, only: num_species
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, &
-        & recon_type_muscl, name_len
+        & recon_type_muscl, name_len, dflt_int, dflt_real
 
     implicit none
 
@@ -338,5 +338,100 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_common
+
+    !> Assign default values to the user-input parameters that are shared across all three executables (pre_process, simulation,
+    !! post_process). Per-target defaults (bc_io, cfl_dt, precision, nb, chem_params, bub_pp scalar companions, fluid_pp loop, patch
+    !! arrays, output flags) remain in the per-target s_assign_default_values_to_user_inputs routines, which call this subroutine
+    !! first, then call s_update_cell_bounds(cells_bounds, m, n, p) (cells_bounds is per-target), then apply their own assignments.
+    impure subroutine s_assign_common_defaults
+
+        ! Logistics
+        case_dir = '.'
+
+        ! Computational domain parameters (m/n/p set here; caller must call s_update_cell_bounds after)
+        m = dflt_int; n = 0; p = 0
+
+        cyl_coord = .false.
+
+        ! CFL adaptive time-stepping flags
+        cfl_adap_dt = .false.
+        cfl_const_dt = .false.
+
+        ! Time-stepping bookkeeping
+        n_start = dflt_int
+        t_step_start = dflt_int
+
+        ! Simulation algorithm
+        model_eqns = dflt_int
+        relax = .false.
+        relax_model = dflt_int
+        hypoelasticity = .false.
+        hyperelasticity = .false.
+        elasticity = .false.
+        b_size = dflt_int
+        tensor_size = dflt_int
+        cont_damage = .false.
+        hyper_cleaning = .false.
+
+        ! Boundary conditions
+        bc_x%beg = dflt_int; bc_x%end = dflt_int
+        bc_y%beg = dflt_int; bc_y%end = dflt_int
+        bc_z%beg = dflt_int; bc_z%end = dflt_int
+
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                bc_${DIM}$%vb${DIR}$ = 0._wp
+                bc_${DIM}$%ve${DIR}$ = 0._wp
+            #:endfor
+        #:endfor
+
+        #:for dir in {'x', 'y', 'z'}
+            bc_${dir}$%isothermal_in = .false.
+            bc_${dir}$%isothermal_out = .false.
+            bc_${dir}$%Twall_in = dflt_real
+            bc_${dir}$%Twall_out = dflt_real
+        #:endfor
+
+        ! Case-optimization params: under case-opt these are compile-time constants in sim (skip assignment); in pre/post
+        ! MFC_CASE_OPTIMIZATION is always False so the block always executes there.
+        #:if not MFC_CASE_OPTIMIZATION
+            recon_type = recon_type_weno
+            weno_order = dflt_int
+            muscl_order = dflt_int
+            num_fluids = dflt_int
+            igr = .false.
+            mhd = .false.
+            relativity = .false.
+        #:endif
+
+        ! Tait EOS
+        rhoref = dflt_real
+        pref = dflt_real
+
+        ! Bubble modeling flags and parameters
+        R0ref = dflt_real
+        bubbles_euler = .false.
+        polydisperse = .false.
+        poly_sigma = dflt_real
+        qbmm = .false.
+        surface_tension = .false.
+        adv_n = .false.
+        sigma = dflt_real
+        bubbles_lagrange = .false.
+
+        ! Immersed boundaries
+        ib = .false.
+        num_ibs = dflt_int
+
+        ! MHD (background field)
+        Bx0 = dflt_real
+
+        ! Output and I/O options
+        parallel_io = .false.
+        file_per_process = .false.
+        down_sample = .false.
+        fft_wrt = .false.
+
+    end subroutine s_assign_common_defaults
 
 end module m_global_parameters_common

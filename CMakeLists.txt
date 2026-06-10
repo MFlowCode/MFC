@@ -502,17 +502,22 @@ set(_mfc_gen_files_pre_process
     "${_mfc_gen_inc}/pre_process/generated_namelist.fpp"
     "${_mfc_gen_inc}/pre_process/generated_decls.fpp"
     "${_mfc_gen_inc}/pre_process/generated_constants.fpp"
+    "${_mfc_gen_inc}/pre_process/generated_bcast.fpp"
+    "${_mfc_gen_inc}/pre_process/generated_case_opt_decls.fpp"
 )
 set(_mfc_gen_files_simulation
     "${_mfc_gen_inc}/simulation/generated_namelist.fpp"
     "${_mfc_gen_inc}/simulation/generated_decls.fpp"
     "${_mfc_gen_inc}/simulation/generated_constants.fpp"
+    "${_mfc_gen_inc}/simulation/generated_bcast.fpp"
     "${_mfc_gen_inc}/simulation/generated_case_opt_decls.fpp"
 )
 set(_mfc_gen_files_post_process
     "${_mfc_gen_inc}/post_process/generated_namelist.fpp"
     "${_mfc_gen_inc}/post_process/generated_decls.fpp"
     "${_mfc_gen_inc}/post_process/generated_constants.fpp"
+    "${_mfc_gen_inc}/post_process/generated_bcast.fpp"
+    "${_mfc_gen_inc}/post_process/generated_case_opt_decls.fpp"
 )
 set(_mfc_gen_files_syscheck)
 set(_mfc_all_gen_files

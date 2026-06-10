@@ -243,21 +243,6 @@ _POST_BCAST_EXCLUDE = frozenset({"avg_state", "cfl_target", "igr_order", "num_bc
 
 # TYPED_DECLS entries kept entirely in the manual residue: their member-broadcast structure
 # is irregular (non-uniform subsets, size() arrays, nested loops, complex guards).
-_MANUAL_TYPED_DECLS = frozenset(
-    {
-        "patch_icpp",  # complex array members (alter_patch, sph_har_coeff, size() members)
-        "patch_bc",  # kept manual in pre (generated separately would diverge)
-        "patch_ib",  # per-target member subsets differ (pre: size(); sim: count=3; slip absent in sim)
-        "ib_airfoil",  # grouped array members (ib_airfoil attrs are all plain scalars but kept manual)
-        "stl_models",  # grouped array members (model_translate/scale emitted as count=3, not per-index)
-        "particle_cloud",  # sim-only runtime loop; kept manual alongside patch_ib
-        "simplex_params",  # nested i×j loops
-        "acoustic",  # complex combined loop with probe/integral in existing code
-        "probe",  # combined with acoustic/integral
-        "integral",  # combined with acoustic/probe
-    }
-)
-
 
 def _mpi_type_for(ptype: ParamType) -> str:
     """Return the Fortran MPI type constant for a ParamType."""
@@ -383,7 +368,7 @@ def _emit_lag_params(lines: List[str]) -> None:
 def _emit_chem_params(lines: List[str]) -> None:
     """Emit the chem_params member broadcast block (sim-only, under chemistry guard).
 
-    All chem_params members in the registry are broadcast.
+    Broadcasts the registry's LOG and INT chem_params members (the only kinds registered today; extend the type split if REAL members appear).
     """
     chem_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("chem_params%"))
     chem_log = [m for m in chem_members if REGISTRY.all_params[f"chem_params%{m}"].param_type == ParamType.LOG]

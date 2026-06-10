@@ -144,76 +144,36 @@ contains
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i  !< Generic loop iterator
-        ! Logistics
 
-        case_dir = '.'
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
+        ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
+        ! IB flags, parallel I/O flags, fft_wrt)
 
-        ! Computational domain parameters
-        m = dflt_int; n = 0; p = 0
+        call s_assign_common_defaults
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
+        ! Computational domain parameters (post-specific)
         m_root = dflt_int
-        cyl_coord = .false.
 
-        t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
 
-        cfl_adap_dt = .false.
-        cfl_const_dt = .false.
         cfl_dt = .false.
         cfl_target = dflt_real
         t_save = dflt_real
-        n_start = dflt_int
         t_stop = dflt_real
 
-        ! Simulation algorithm parameters
-        model_eqns = dflt_int
-        num_fluids = dflt_int
-        recon_type = recon_type_weno
-        weno_order = dflt_int
-        muscl_order = dflt_int
+        ! Simulation algorithm parameters (post-specific)
         mixture_err = .false.
         alt_soundspeed = .false.
-        relax = .false.
-        relax_model = dflt_int
 
-        mhd = .false.
-        relativity = .false.
-
-        hypoelasticity = .false.
-        hyperelasticity = .false.
-        elasticity = .false.
-        b_size = dflt_int
-        tensor_size = dflt_int
-        cont_damage = .false.
-        hyper_cleaning = .false.
-        igr = .false.
-
-        bc_x%beg = dflt_int; bc_x%end = dflt_int
-        bc_y%beg = dflt_int; bc_y%end = dflt_int
-        bc_z%beg = dflt_int; bc_z%end = dflt_int
         bc_io = .false.
         num_bc_patches = dflt_int
-
-        #:for DIM in ['x', 'y', 'z']
-            #:for DIR in [1, 2, 3]
-                bc_${DIM}$%vb${DIR}$ = 0._wp
-                bc_${DIM}$%ve${DIR}$ = 0._wp
-            #:endfor
-        #:endfor
-
-        #:for dir in {'x', 'y', 'z'}
-            bc_${dir}$%isothermal_in = .false.
-            bc_${dir}$%isothermal_out = .false.
-            bc_${dir}$%Twall_in = dflt_real
-            bc_${dir}$%Twall_out = dflt_real
-        #:endfor
 
         chem_params%gamma_method = 1
         chem_params%transport_model = 1
 
-        ! Fluids physical parameters
+        ! Fluids physical parameters (post-specific; G = dflt_real differs from pre/sim)
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
@@ -231,7 +191,8 @@ contains
             fluid_pp(i)%mu_bulk = dflt_real
         end do
 
-        ! Subgrid bubble parameters
+        ! Subgrid bubble parameters (bub_pp struct + scalar companions; bub_pp%R0ref is set in common
+        ! via R0ref; the scalar companions are per-target manual declarations)
         bub_pp%R0ref = dflt_real; R0ref = dflt_real
         bub_pp%p0ref = dflt_real; p0ref = dflt_real
         bub_pp%rho0ref = dflt_real; rho0ref = dflt_real
@@ -253,11 +214,10 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
-        ! Formatted database file(s) structure parameters
+        ! Formatted database file(s) structure parameters (post-specific)
         format = dflt_int
 
         precision = dflt_int
-        down_sample = .false.
 
         alpha_rho_wrt = .false.
         alpha_rho_e_wrt = .false.
@@ -268,10 +228,7 @@ contains
         chem_wrt_T = .false.
         flux_lim = dflt_int
         flux_wrt = .false.
-        parallel_io = .false.
-        file_per_process = .false.
         E_wrt = .false.
-        fft_wrt = .false.
         pres_wrt = .false.
         alpha_wrt = .false.
         gamma_wrt = .false.
@@ -287,7 +244,6 @@ contains
         schlieren_wrt = .false.
         sim_data = .false.
         cf_wrt = .false.
-        ib = .false.
         ib_state_wrt = .false.
         lag_txt_wrt = .false.
         lag_header = .true.
@@ -313,29 +269,11 @@ contains
         fd_order = dflt_int
         avg_state = dflt_int
 
-        ! Tait EOS
-        rhoref = dflt_real
-        pref = dflt_real
-
-        ! Bubble modeling
-        bubbles_euler = .false.
-        qbmm = .false.
-        R0ref = dflt_real
+        ! Bubble modeling (post-specific)
         nb = dflt_int
-        polydisperse = .false.
-        poly_sigma = dflt_real
         sigR = dflt_real
-        sigma = dflt_real
-        surface_tension = .false.
-        adv_n = .false.
 
-        ! Lagrangian bubbles modeling
-        bubbles_lagrange = .false.
-
-        ! IBM
-        num_ibs = dflt_int
-
-        ! Output partial domain
+        ! Output partial domain (post-specific)
         output_partial_domain = .false.
         x_output%beg = dflt_real
         x_output%end = dflt_real
@@ -343,9 +281,6 @@ contains
         y_output%end = dflt_real
         z_output%beg = dflt_real
         z_output%end = dflt_real
-
-        ! MHD
-        Bx0 = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 
