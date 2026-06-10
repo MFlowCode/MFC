@@ -51,6 +51,7 @@ def test_scientific_notation_is_safe():
     # Legacy regex corrupted the 'e' in 2e-3 inside larger expressions.
     from mfc.analytic_expr import fortranize_expr
 
+    # 2e-3 constant-folds to 0.002 (no exponent in repr), unlike 1e20 below which keeps e-form and gains _wp.
     out = fortranize_expr("1.0 + 2e-3*x", IC_MAP)
     assert out.replace(" ", "") == "1.0+0.002*x_cc(i)"
 
@@ -93,6 +94,7 @@ def test_exponent_literal_gets_wp_suffix():
 
 
 # Corpus-equivalence gate: AST translator vs legacy regex substitution
+# NOTE: intrinsics (sin, cos, ...) and pi must NOT be var_map keys, or the legacy reference's pass-through behavior diverges and the gate silently degrades.
 # Harvested 2026-06-09 from examples/*/case.py with:
 #   grep -rhoE '"patch_icpp\([0-9]+\)%(alpha_rho|vel|pres|alpha|tau_e|Y|cf_val|Bx|By|Bz)(\([0-9]+\))?"\s*:\s*"[^"]+"' examples/*/case.py | sort -u
 #   grep -rhoE '"patch_ib\([0-9]+\)%(vel|angular_vel)\([0-9]+\)"\s*:\s*"[^"]+"' examples/*/case.py | sort -u

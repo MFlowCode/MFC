@@ -8,6 +8,7 @@ import re
 import fastjsonschema
 
 from . import common
+from .analytic_expr import AnalyticExprError, fortranize_expr
 from .printer import cons
 from .run import case_dicts
 from .state import ARG
@@ -206,30 +207,25 @@ class Case:
             if ptype not in DATA["ptypes"]:
                 raise common.MFCException(f"Patch #{pid} of type {ptype} cannot be analytically defined.")
 
-            # function that defines how we will replace variable names with
-            # values from the case file
-            def rhs_replace(match):
-                return {
-                    "x": "x_cc(i)",
-                    "y": "y_cc(j)",
-                    "z": "z_cc(k)",
-                    "xc": f"patch_icpp({pid})%x_centroid",
-                    "yc": f"patch_icpp({pid})%y_centroid",
-                    "zc": f"patch_icpp({pid})%z_centroid",
-                    "lx": f"patch_icpp({pid})%length_x",
-                    "ly": f"patch_icpp({pid})%length_y",
-                    "lz": f"patch_icpp({pid})%length_z",
-                    "r": f"patch_icpp({pid})%radius",
-                    "eps": f"patch_icpp({pid})%epsilon",
-                    "beta": f"patch_icpp({pid})%beta",
-                    "tau_e": f"patch_icpp({pid})%tau_e",
-                    "radii": f"patch_icpp({pid})%radii",
-                    "e": f"{math.e}",
-                }.get(match.group(), match.group())
+            var_map = {
+                "x": "x_cc(i)",
+                "y": "y_cc(j)",
+                "z": "z_cc(k)",
+                "xc": f"patch_icpp({pid})%x_centroid",
+                "yc": f"patch_icpp({pid})%y_centroid",
+                "zc": f"patch_icpp({pid})%z_centroid",
+                "lx": f"patch_icpp({pid})%length_x",
+                "ly": f"patch_icpp({pid})%length_y",
+                "lz": f"patch_icpp({pid})%length_z",
+                "r": f"patch_icpp({pid})%radius",
+                "eps": f"patch_icpp({pid})%epsilon",
+                "beta": f"patch_icpp({pid})%beta",
+                "tau_e": f"patch_icpp({pid})%tau_e",
+                "radii": f"patch_icpp({pid})%radii",
+            }
 
             lines = []
-            # perform the replacement of strings for each analytic function
-            # to generate some fortran string representing the code passed in
+            # translate each analytic expression to Fortran and emit an assignment
             for attribute, expr in items:
                 if print:
                     cons.print(f"* Codegen: {attribute} = {expr}")
@@ -242,7 +238,10 @@ class Case:
                     qpvf_idx = f"{qpvf_idx} + {idx}"
 
                 lhs = f"q_prim_vf({qpvf_idx})%sf({DATA['sf_idx']})"
-                rhs = re.sub(r"[a-zA-Z]+", rhs_replace, expr)
+                try:
+                    rhs = fortranize_expr(expr, var_map)
+                except AnalyticExprError as err:
+                    raise common.MFCException(f"{attribute}: {err}") from err
 
                 lines.append(f"        {lhs} = {rhs}")
 
@@ -288,27 +287,25 @@ class Case:
         # for each analytical patch that is required to be added, generate
         # the string that contains that function.
         for pid, items in ib_patches.items():
-            # function that defines how we will replace variable names with
-            # values from the case file
-            def rhs_replace(match):
-                return {
-                    "x": "x_cc(i)",
-                    "y": "y_cc(j)",
-                    "z": "z_cc(k)",
-                    "t": "mytime",
-                    "r": f"patch_ib({pid})%radius",
-                    "e": f"{math.e}",
-                }.get(match.group(), match.group())
+            var_map = {
+                "x": "x_cc(i)",
+                "y": "y_cc(j)",
+                "z": "z_cc(k)",
+                "t": "mytime",
+                "r": f"patch_ib({pid})%radius",
+            }
 
             lines = []
-            # perform the replacement of strings for each analytic function
-            # to generate some fortran string representing the code passed in
+            # translate each analytic expression to Fortran and emit an assignment
             for attribute, expr in items:
                 if print:
                     cons.print(f"* Codegen: {attribute} = {expr}")
 
                 lhs = attribute
-                rhs = re.sub(r"[a-zA-Z]+", rhs_replace, expr)
+                try:
+                    rhs = fortranize_expr(expr, var_map)
+                except AnalyticExprError as err:
+                    raise common.MFCException(f"{attribute}: {err}") from err
 
                 lines.append(f"        {lhs} = {rhs}")
 
