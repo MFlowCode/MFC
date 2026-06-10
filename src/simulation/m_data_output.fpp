@@ -183,16 +183,29 @@ contains
         real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
+        integer                :: fl       !< Fluid loop iterator
 
         ! Computing Stability Criteria at Current Time-step
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+
+                    if (any_non_newtonian) then
+                        Re(1) = 0._wp
+                        do fl = 1, num_fluids
+                            if (is_non_newtonian(fl)) then
+                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                            else
+                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                            end if
+                        end do
+                        Re(1) = 1._wp/max(Re(1), sgm_eps)
+                    end if
 
                     if (viscous) then
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
