@@ -117,13 +117,13 @@ module m_global_parameters
         logical  :: viscous
     #:endif
 
-    logical  :: hypo_nc_finite_diff
-    logical  :: hypo_nc_interface
-    logical  :: hypo_nc_dual_pass
-    logical  :: adv_src_alpha_iface     !< flux_src exports per-fluid interface alpha
-    logical  :: adv_src_vel_iface       !< flux_src exports shared face-normal interface velocity
-    logical  :: adv_src_none            !< flux_src exports no NC advection quantity
-    logical  :: use_nc_iface_vel        !< nc_iface_vel exports interface velocities needed outside flux_src
+    logical :: hypo_nc_finite_diff
+    logical :: hypo_nc_interface
+    logical :: hypo_nc_dual_pass
+    logical :: adv_src_alpha_iface  !< flux_src exports per-fluid interface alpha
+    logical :: adv_src_vel_iface    !< flux_src exports shared face-normal interface velocity
+    logical :: adv_src_none         !< flux_src exports no NC advection quantity
+    logical :: use_nc_iface_vel     !< nc_iface_vel exports interface velocities needed outside flux_src
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer                :: hyper_model                  !< hyperelasticity solver algorithm
     logical                :: elasticity                   !< elasticity modeling, true for hyper or hypo

@@ -997,10 +997,8 @@ contains
                 do k = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(2)%beg, idwbuff(2)%end
                         do i = idwbuff(1)%beg, idwbuff(1)%end
-                            qL_rsx_vf(i, j, k, l) = qL_rsx_vf(i, j, k, l)*qL_rsx_vf(i, j, k, &
-                                          & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
-                            qR_rsx_vf(i, j, k, l) = qR_rsx_vf(i, j, k, l)*qR_rsx_vf(i, j, k, &
-                                          & eqn_idx%adv%beg + l - eqn_idx%cont%beg)
+                            qL_rsx_vf(i, j, k, l) = qL_rsx_vf(i, j, k, l)*qL_rsx_vf(i, j, k, eqn_idx%adv%beg + l - eqn_idx%cont%beg)
+                            qR_rsx_vf(i, j, k, l) = qR_rsx_vf(i, j, k, l)*qR_rsx_vf(i, j, k, eqn_idx%adv%beg + l - eqn_idx%cont%beg)
                         end do
                     end do
                 end do
@@ -1011,17 +1009,16 @@ contains
         ! Reconstruct viscous derivatives for viscosity
         if (weno_Re_flux) then
             iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
-            call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dx_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                & dqR_rsx_vf, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), idwbuff(1), &
-                & idwbuff(2), idwbuff(3))
+            call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dx_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, dqR_rsx_vf, id, &
+                & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), idwbuff(1), idwbuff(2), idwbuff(3))
             if (n > 0) then
-                call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dy_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                    & dqR_rsx_vf, id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), &
-                    & idwbuff(1), idwbuff(2), idwbuff(3))
+                call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dy_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, dqR_rsx_vf, &
+                    & id, dqL_prim_dy_n(id)%vf(iv%beg:iv%end), dqR_prim_dy_n(id)%vf(iv%beg:iv%end), idwbuff(1), idwbuff(2), &
+                    & idwbuff(3))
                 if (p > 0) then
                     call s_reconstruct_cell_boundary_values_visc_deriv(dq_prim_dz_qp(1)%vf(iv%beg:iv%end), dqL_rsx_vf, &
-                        & dqR_rsx_vf, id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), &
-                        & idwbuff(1), idwbuff(2), idwbuff(3))
+                        & dqR_rsx_vf, id, dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end), idwbuff(1), &
+                        & idwbuff(2), idwbuff(3))
                 end if
             end if
         end if
@@ -1053,10 +1050,9 @@ contains
 
         ! Computing Riemann Solver Flux and Source Flux
         call nvtxStartRange("RHS-RIEMANN-SOLVER")
-        call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
-                              & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
-                              & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
-                              & flux_gsrc_n(id)%vf, id, irx, iry, irz)
+        call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, qR_prim(id)%vf, &
+                              & qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, &
+                              & q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, flux_gsrc_n(id)%vf, id, irx, iry, irz)
         call nvtxEndRange
 
         if (use_nc_iface_vel) then

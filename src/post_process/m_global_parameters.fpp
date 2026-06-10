@@ -76,11 +76,11 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    integer            :: sys_size                     !< Number of unknowns in the system of equations
-    logical            :: hypo_energy_guard            !< guard elastic energy when G near zero (not namelist-exposed in post_process)
-    logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
-    integer            :: b_size                       !< Number of components in the b tensor
-    integer            :: tensor_size                  !< Number of components in the nonsymmetric tensor
+    integer            :: sys_size  !< Number of unknowns in the system of equations
+    logical            :: hypo_energy_guard  !< guard elastic energy when G near zero (not namelist-exposed in post_process)
+    logical            :: elasticity  !< elasticity modeling, true for hyper or hypo
+    integer            :: b_size  !< Number of components in the b tensor
+    integer            :: tensor_size  !< Number of components in the nonsymmetric tensor
     logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
     !> @}
 

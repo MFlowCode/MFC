@@ -107,10 +107,9 @@ contains
         if (hypo_nc_dual_pass) then
             ! Fused dual-pass: one call computes BOTH anchored flux sets (hat_L -> flux_vf via the regular finalize; hat_R into
             ! flux_hatR_rs*, finalized separately via s_finalize_riemann_solver_hatR between the two RHS assemblies).
-            call s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-                                            & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                            & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
-                                            & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+            call s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
+                                            & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
+                                            & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
             return
         end if
@@ -244,8 +243,7 @@ contains
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
                                     & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, &
-                                        & xi_P]', copyin='[norm_dir]')
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, xi_P]', copyin='[norm_dir]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -708,8 +706,8 @@ contains
                                         nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_R(dir_idx(i))
                                     else
                                         nc_iface_vel_rsx_vf(${SF('')}$, &
-                                                            & dir_idx(i)) = (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i))) &
-                                                            & /(s_R - s_L)
+                                                            & dir_idx(i)) = (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i)))/(s_R &
+                                                            & - s_L)
                                     end if
                                 end do
                             end if
@@ -752,8 +750,7 @@ contains
                                     flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_R(dir_idx(1))
                                 else
                                     flux_src_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%adv%beg) = (s_R*vel_L(dir_idx(1)) - s_L*vel_R(dir_idx(1))) &
-                                                    & /(s_R - s_L)
+                                                    & eqn_idx%adv%beg) = (s_R*vel_L(dir_idx(1)) - s_L*vel_R(dir_idx(1)))/(s_R - s_L)
                                 end if
                             end if
 
@@ -3301,29 +3298,28 @@ contains
 
                                 if (hypoelasticity) then
                                     flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%cont%end + dir_idx(1)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
-                                                & *vel_L(dir_idx(1)) + s_M*(xi_L*s_S - vel_L(dir_idx(1)))) + pres_tot_L) &
+                                                & eqn_idx%cont%end + dir_idx(1)) = xi_M*(rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(1) &
+                                                & ) + s_M*(xi_L*s_S - vel_L(dir_idx(1)))) + pres_tot_L) &
                                                 & + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) + s_P*(xi_R*s_S &
                                                 & - vel_R(dir_idx(1)))) + pres_tot_R) + (s_M/s_L)*(s_P/s_R)*pcorr
                                     if (n > 0) then
                                         flux_rsx_vf(${SF('')}$, &
                                                     & eqn_idx%cont%end + dir_idx(2)) = xi_M*(rho_L*(vel_L(dir_idx(1))*u_t_L &
-                                                    & + s_M*(xi_L*u_t_star - u_t_L)) - tau_nt_L) &
-                                                    & + xi_P*(rho_R*(vel_R(dir_idx(1))*u_t_R + s_P*(xi_R*u_t_star - u_t_R)) &
-                                                    & - tau_nt_R)
+                                                    & + s_M*(xi_L*u_t_star - u_t_L)) - tau_nt_L) + xi_P*(rho_R*(vel_R(dir_idx(1)) &
+                                                    & *u_t_R + s_P*(xi_R*u_t_star - u_t_R)) - tau_nt_R)
                                     end if
                                     if (p > 0) then
                                         flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%cont%end + dir_idx(3)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
-                                                    & *u_t2_L + s_M*(xi_L*u_t2_star - u_t2_L)) - tau_nt2_L) &
-                                                    & + xi_P*(rho_R*(vel_R(dir_idx(1))*u_t2_R + s_P*(xi_R*u_t2_star &
-                                                    & - u_t2_R)) - tau_nt2_R)
+                                                    & eqn_idx%cont%end + dir_idx(3)) = xi_M*(rho_L*(vel_L(dir_idx(1))*u_t2_L &
+                                                    & + s_M*(xi_L*u_t2_star - u_t2_L)) - tau_nt2_L) &
+                                                    & + xi_P*(rho_R*(vel_R(dir_idx(1))*u_t2_R + s_P*(xi_R*u_t2_star - u_t2_R)) &
+                                                    & - tau_nt2_R)
                                     end if
 
                                     flux_rsx_vf(${SF('')}$, &
                                                 & eqn_idx%E) = xi_M*((E_L + pres_tot_L)*vel_L(dir_idx(1)) - u_t_L*tau_nt_L &
-                                                & - u_t2_L*tau_nt2_L + s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1))) &
-                                                & *(rho_L*s_S + pres_tot_L/(s_L - vel_L(dir_idx(1)))) + (u_t_L*tau_nt_L &
+                                                & - u_t2_L*tau_nt2_L + s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))*(rho_L*s_S &
+                                                & + pres_tot_L/(s_L - vel_L(dir_idx(1)))) + (u_t_L*tau_nt_L &
                                                 & - u_t_star*tau_nt_star)/(s_L - vel_L(dir_idx(1))) + (u_t2_L*tau_nt2_L &
                                                 & - u_t2_star*tau_nt2_star)/(s_L - vel_L(dir_idx(1)))) - E_L)) + xi_P*((E_R &
                                                 & + pres_tot_R)*vel_R(dir_idx(1)) - u_t_R*tau_nt_R - u_t2_R*tau_nt2_R &
@@ -3334,74 +3330,70 @@ contains
 
                                     if (n == 0) then
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%beg) = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) &
-                                                          & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) &
-                                                          & + s_P*(xi_R - 1._wp))
+                                                    & eqn_idx%stress%beg) = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L &
+                                                    & - 1._wp)) + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                     else if (p == 0) then
                                         if (dir_idx(1) == 1) then
                                             flux_rsx_vf(${SF('')}$, &
-                                                              & eqn_idx%stress%beg) = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) &
-                                                              & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) &
-                                                              & + s_P*(xi_R - 1._wp))
+                                                        & eqn_idx%stress%beg) = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) &
+                                                        & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) &
+                                                        & + s_P*(xi_R - 1._wp))
                                             flux_rsx_vf(${SF('')}$, &
-                                                              & eqn_idx%stress%beg + 1) = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L &
-                                                              & + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
-                                                              & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R &
-                                                              & + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
+                                                        & eqn_idx%stress%beg + 1) = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L &
+                                                        & + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
+                                                        & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star &
+                                                        & - rho_R*tau_nt_R))
                                             flux_rsx_vf(${SF('')}$, &
-                                                              & eqn_idx%stress%beg + 2) = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) &
-                                                              & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) &
-                                                              & + s_P*(xi_R - 1._wp))
+                                                        & eqn_idx%stress%beg + 2) = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) &
+                                                        & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) &
+                                                        & + s_P*(xi_R - 1._wp))
                                         else
                                             flux_rsx_vf(${SF('')}$, &
-                                                              & eqn_idx%stress%beg + 2) = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) &
-                                                              & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) &
-                                                              & + s_P*(xi_R - 1._wp))
+                                                        & eqn_idx%stress%beg + 2) = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) &
+                                                        & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) &
+                                                        & + s_P*(xi_R - 1._wp))
                                             flux_rsx_vf(${SF('')}$, &
-                                                              & eqn_idx%stress%beg + 1) = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L &
-                                                              & + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
-                                                              & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R &
-                                                              & + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
+                                                        & eqn_idx%stress%beg + 1) = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L &
+                                                        & + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
+                                                        & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star &
+                                                        & - rho_R*tau_nt_R))
                                             flux_rsx_vf(${SF('')}$, &
-                                                              & eqn_idx%stress%beg) = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) &
-                                                              & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) &
-                                                              & + s_P*(xi_R - 1._wp))
+                                                        & eqn_idx%stress%beg) = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) &
+                                                        & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) &
+                                                        & + s_P*(xi_R - 1._wp))
                                         end if
                                     else
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%beg - 1 + stress_perm(1)) &
-                                                          & = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                          & + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                    & eqn_idx%stress%beg - 1 + stress_perm(1)) &
+                                                    & = xi_M*rho_L*tau_nn_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                    & + xi_P*rho_R*tau_nn_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%beg - 1 + stress_perm(2)) &
-                                                          & = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt_L &
-                                                          & + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
-                                                          & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R &
-                                                          & + s_P*(rho_R*xi_R*tau_nt_star - rho_R*tau_nt_R))
+                                                    & eqn_idx%stress%beg - 1 + stress_perm(2)) = xi_M*(rho_L*vel_L(dir_idx(1)) &
+                                                    & *tau_nt_L + s_M*(rho_L*xi_L*tau_nt_star - rho_L*tau_nt_L)) &
+                                                    & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt_R + s_P*(rho_R*xi_R*tau_nt_star &
+                                                    & - rho_R*tau_nt_R))
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%beg - 1 + stress_perm(4)) &
-                                                          & = xi_M*(rho_L*vel_L(dir_idx(1))*tau_nt2_L &
-                                                          & + s_M*(rho_L*xi_L*tau_nt2_star - rho_L*tau_nt2_L)) &
-                                                          & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt2_R &
-                                                          & + s_P*(rho_R*xi_R*tau_nt2_star - rho_R*tau_nt2_R))
+                                                    & eqn_idx%stress%beg - 1 + stress_perm(4)) = xi_M*(rho_L*vel_L(dir_idx(1)) &
+                                                    & *tau_nt2_L + s_M*(rho_L*xi_L*tau_nt2_star - rho_L*tau_nt2_L)) &
+                                                    & + xi_P*(rho_R*vel_R(dir_idx(1))*tau_nt2_R + s_P*(rho_R*xi_R*tau_nt2_star &
+                                                    & - rho_R*tau_nt2_R))
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%beg - 1 + stress_perm(3)) &
-                                                          & = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                          & + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                    & eqn_idx%stress%beg - 1 + stress_perm(3)) &
+                                                    & = xi_M*rho_L*tau_tt_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                    & + xi_P*rho_R*tau_tt_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%beg - 1 + stress_perm(6)) &
-                                                          & = xi_M*rho_L*tau_t2t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                          & + xi_P*rho_R*tau_t2t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                    & eqn_idx%stress%beg - 1 + stress_perm(6)) &
+                                                    & = xi_M*rho_L*tau_t2t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                    & + xi_P*rho_R*tau_t2t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%beg - 1 + stress_perm(5)) &
-                                                          & = xi_M*rho_L*tau_t1t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
-                                                          & + xi_P*rho_R*tau_t1t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
+                                                    & eqn_idx%stress%beg - 1 + stress_perm(5)) &
+                                                    & = xi_M*rho_L*tau_t1t2_L*(vel_L(dir_idx(1)) + s_M*(xi_L - 1._wp)) &
+                                                    & + xi_P*rho_R*tau_t1t2_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                     end if
                                     if (cyl_coord) then
                                         flux_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%stress%end) = xi_M*rho_L*tau_qq_L*(vel_L(dir_idx(1)) &
-                                                          & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_qq_R*(vel_R(dir_idx(1)) &
-                                                          & + s_P*(xi_R - 1._wp))
+                                                    & eqn_idx%stress%end) = xi_M*rho_L*tau_qq_L*(vel_L(dir_idx(1)) + s_M*(xi_L &
+                                                    & - 1._wp)) + xi_P*rho_R*tau_qq_R*(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                     end if
 
                                     if (s_L >= 0._wp) then
@@ -3422,22 +3414,21 @@ contains
                                         flux_rsx_vf(${SF('')}$, &
                                                     & eqn_idx%cont%end + dir_idx(i)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
                                                     & *vel_L(dir_idx(i)) + s_M*(dir_flg(dir_idx(i))*s_L + (1._wp &
-                                                    & - dir_flg(dir_idx(i)))*vel_L(dir_idx(i)))*xi_L_m1) &
-                                                    & + dir_flg(dir_idx(i))*(pres_L)) + xi_P*(rho_R*(vel_R(dir_idx(1)) &
-                                                    & *vel_R(dir_idx(i)) + s_P*(dir_flg(dir_idx(i))*s_R + (1._wp &
-                                                    & - dir_flg(dir_idx(i)))*vel_R(dir_idx(i)))*xi_R_m1) &
-                                                    & + dir_flg(dir_idx(i))*(pres_R)) + (s_M/s_L)*(s_P/s_R) &
-                                                    & *dir_flg(dir_idx(i))*pcorr
+                                                    & - dir_flg(dir_idx(i)))*vel_L(dir_idx(i)))*xi_L_m1) + dir_flg(dir_idx(i)) &
+                                                    & *(pres_L)) + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(i)) &
+                                                    & + s_P*(dir_flg(dir_idx(i))*s_R + (1._wp - dir_flg(dir_idx(i))) &
+                                                    & *vel_R(dir_idx(i)))*xi_R_m1) + dir_flg(dir_idx(i))*(pres_R)) + (s_M/s_L) &
+                                                    & *(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
                                     end do
 
                                     ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
                                     ! xi*(E+expr)-E = E*xi_m1 + xi*expr avoids E*(xi-1) cancellation
                                     flux_rsx_vf(${SF('')}$, &
                                                 & eqn_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(E_L*xi_L_m1 &
-                                                & + xi_L*(s_S - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1)))))) &
-                                                & + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(E_R*xi_R_m1 + xi_R*(s_S &
-                                                & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))) + (s_M/s_L) &
-                                                & *(s_P/s_R)*pcorr*s_S
+                                                & + xi_L*(s_S - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) &
+                                                & ) + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(E_R*xi_R_m1 + xi_R*(s_S &
+                                                & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))) &
+                                                & + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                     if (elasticity) then
                                         flux_ene_e = 0._wp
@@ -3449,9 +3440,10 @@ contains
                                                         & - xi_P*tau_e_R(dir_idx_tau(i))
                                             ! ENERGY ELASTIC FLUX.
                                             flux_ene_e = flux_ene_e - xi_M*(vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) &
-                                                                            & + s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i)) &
-                                                                            & /(s_L - vel_L(i)))))) - xi_P*(vel_R(dir_idx(i)) &
-                                                                            & *tau_e_R(dir_idx_tau(i)) + s_P*(xi_R*((s_S - vel_R(i)) &
+                                                                            & + s_M*(xi_L*((s_S - vel_L(i)) &
+                                                                            & *(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) &
+                                                                            & - xi_P*(vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) &
+                                                                            & + s_P*(xi_R*((s_S - vel_R(i)) &
                                                                             & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                         end do
                                         flux_rsx_vf(${SF('')}$, eqn_idx%E) = flux_rsx_vf(${SF('')}$, eqn_idx%E) + flux_ene_e
@@ -3649,8 +3641,8 @@ contains
                                         else
                                             p_face = pres_tot_star + tau_nn_R; tau_qq_face = tau_qq_R
                                         end if
-                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = flux_rsx_vf(j, k, &
-                                                               & l, eqn_idx%cont%end + dir_idx(1)) - p_face + tau_qq_face
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = flux_rsx_vf(j, k, l, &
+                                                         & eqn_idx%cont%end + dir_idx(1)) - p_face + tau_qq_face
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                             flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
@@ -3990,13 +3982,11 @@ contains
     end subroutine s_hlld_riemann_solver
 
     !> HLLD Riemann solver resolves all 5 waves for the hypoelastic equations: 1 entropy wave, 2 shear stress waves, 2 fast waves.
-    subroutine s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-                                          & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                          & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
-                                          & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+    subroutine s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
+                                          & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
+                                          & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
-
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
 
@@ -4087,9 +4077,8 @@ contains
         logical             :: degenerate
         integer             :: i, j, k, l, ipass, zone
 
-        call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, &
-            & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, &
-            & dqR_prim_dz_vf, norm_dir, ix, iy, iz)
+        call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
+            & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
 
