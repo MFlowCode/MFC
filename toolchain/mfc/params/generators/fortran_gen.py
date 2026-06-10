@@ -318,15 +318,16 @@ def _emit_bcast_group(lines: List[str], vars_list: List[str], mpi_type: str) -> 
 def _emit_fluid_pp(lines: List[str], target: str) -> None:
     """Emit the fluid_pp(i) member-loop broadcast block.
 
-    Members broadcast: the 13 REAL members (EOS core plus the Herschel-Bulkley
-    non-Newtonian set) and the LOGICAL non_newtonian flag, matching the manual
-    lists this generator replaces. Sim additionally: Re(1) with count=2.
+    Members broadcast: all REAL registry members of fluid_pp (gamma, pi_inf, G, cv, qv,
+    qvp) derived from physical_parameters.  Sim additionally: Re(1) with count=2.
+    mul0/ss/pv/gamma_v/M_v/mu_v/k_v/cp_v/D_v were removed from the Fortran type by
+    upstream #1085/#1093 and are no longer registered.
     """
-    fp_real_members = ["gamma", "pi_inf", "G", "cv", "qv", "qvp", "K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"]
+    # Walk the registry for fluid_pp REAL members (Re handled separately; exclude).
+    fp_real_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("fluid_pp(1)%") and not k.startswith("fluid_pp(1)%Re("))
     lines.append("        do i = 1, num_fluids_max")
     for mem in fp_real_members:
         lines.append(f"            call MPI_BCAST(fluid_pp(i)%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
-    lines.append("            call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
     if target == "sim":
         lines.append("            call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end do")
@@ -347,14 +348,13 @@ def _emit_bub_pp(lines: List[str]) -> None:
 def _emit_lag_params(lines: List[str]) -> None:
     """Emit the lag_params member broadcast block (sim-only, under bubbles_lagrange guard).
 
-    Subset of lag_params members that are actually broadcast: the fields that appear in the
-    existing simulation m_mpi_proxy.fpp lag_params block.  The registry has additional
-    members (T0, Thost, c0, rho0, x0) that are not broadcast (rank-0-only).
+    All registered lag_params members are broadcast.  T0/Thost/c0/rho0/x0 were removed
+    from the Fortran type by upstream #1085/#1093 and are no longer in the registry.
     """
-    # Hardcoded broadcast subset — matches the existing sim m_mpi_proxy exactly.
-    lag_log = ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]
-    lag_int = ["cluster_type", "nBubs_glb", "smooth_type", "solver_approach"]
-    lag_real = ["charwidth", "epsilonb", "valmaxvoid"]
+    # Walk the registry for lag_params members, split by type.
+    lag_log = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type == ParamType.LOG)
+    lag_int = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
+    lag_real = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in _REAL_TYPES)
     lines.append("        if (bubbles_lagrange) then")
     for mem in sorted(lag_log):
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
