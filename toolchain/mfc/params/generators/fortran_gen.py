@@ -235,7 +235,11 @@ def generate_case_opt_decls_fpp() -> str:
 _STRUCT_ROOTS = frozenset({"bc_x", "bc_y", "bc_z", "x_domain", "y_domain", "z_domain", "x_output", "y_output", "z_output"})
 
 # Variables excluded from broadcast generation (derived post-broadcast or non-namelist).
-_BCAST_EXCLUDE = frozenset({"muscl_eps"})
+# muscl_eps was previously excluded here on the assumption that it was derived
+# post-broadcast, but the derivation only fires under f_is_default(muscl_eps),
+# and default values are assigned on rank 0 only.  Every multi-rank MUSCL run
+# therefore had rank-divergent muscl_eps.  Removed from exclusion to fix the bug.
+_BCAST_EXCLUDE: frozenset = frozenset()
 
 # Post-process scalars that are namelist-bound but consumed on rank 0 only (reading/init).
 # Broadcasting them would be harmless but changes the existing call set, which we preserve.
@@ -318,16 +322,19 @@ def _emit_bcast_group(lines: List[str], vars_list: List[str], mpi_type: str) -> 
 def _emit_fluid_pp(lines: List[str], target: str) -> None:
     """Emit the fluid_pp(i) member-loop broadcast block.
 
-    Members broadcast: all REAL registry members of fluid_pp (gamma, pi_inf, G, cv, qv,
-    qvp) derived from physical_parameters.  Sim additionally: Re(1) with count=2.
+    Walks the registry for every fluid_pp member, emitting the MPI datatype that
+    matches each member's registered ParamType (the Herschel-Bulkley merge added
+    a LOGICAL member, so the datatype must come from the registry, not be assumed
+    REAL).  Sim additionally broadcasts Re(1) with count=2 (kept sim-only to
+    preserve the historical call set; pre/post never consumed Re).
     mul0/ss/pv/gamma_v/M_v/mu_v/k_v/cp_v/D_v were removed from the Fortran type by
     upstream #1085/#1093 and are no longer registered.
     """
-    # Walk the registry for fluid_pp REAL members (Re handled separately; exclude).
-    fp_real_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("fluid_pp(1)%") and not k.startswith("fluid_pp(1)%Re("))
+    fp_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("fluid_pp(1)%") and not k.startswith("fluid_pp(1)%Re("))
     lines.append("        do i = 1, num_fluids_max")
-    for mem in fp_real_members:
-        lines.append(f"            call MPI_BCAST(fluid_pp(i)%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    for mem in fp_members:
+        ptype = REGISTRY.all_params[f"fluid_pp(1)%{mem}"].param_type
+        lines.append(f"            call MPI_BCAST(fluid_pp(i)%{mem}, 1, {_mpi_type_for(ptype)}, 0, MPI_COMM_WORLD, ierr)")
     if target == "sim":
         lines.append("            call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end do")
