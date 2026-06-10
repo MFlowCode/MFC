@@ -4066,8 +4066,8 @@ contains
         real(wp), dimension(14) :: U_L, U_R
         real(wp), dimension(14) :: F_L, F_R, F_hlld
         real(wp), dimension(14) :: us, uss  ! selected-side U_star / U_starstar (diet: replaces the 6 star/F-star fan arrays)
-        real(wp), dimension(14) :: F_HLL  ! for ADC blending
-        real(wp), dimension(14) :: U_HLL  ! for ADC axisym geometric flux
+        real(wp)                :: F_HLL_c  ! per-component HLL flux for ADC blending (diet: replaces the F_HLL array)
+        real(wp)                :: U_HLL_c  ! per-component HLL state for the ADC axisym trace (diet: replaces the U_HLL array)
         real(wp)                :: rho_HLL, u_n_HLL_cons, tau_nn_HLL
         real(wp)                :: u_n_HLL_trace, u_t_HLL_trace
         real(wp)                :: p_face_HLL, tau_qq_face_HLL
@@ -4139,7 +4139,7 @@ contains
                 ! Anchor-cell index pattern: the fused kernel reads both anchors (hat_L: cell j, hat_R: cell j+1) directly from
                 ! q_prim_vf with the sweep-permuted indices the deleted q_hat fill kernel used.
                 #:set HATIDX = {1: 'j + ipass - 1, k, l', 2: 'k, j + ipass - 1, l', 3: 'l, k, j + ipass - 1'}[NORM_DIR]
-                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us,uss,zone,F_HLL,U_HLL,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
+                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us,uss,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
                 #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
@@ -4774,14 +4774,10 @@ contains
                                     ! ADC blending (HLLD / HLL)
 
                                     if (riemann_hypo_ADC) then
-                                        F_HLL(1:ncomp) = F_hlld(1:ncomp)
-                                        if (S_L < 0._wp .and. S_R > 0._wp) then
-                                            do i = 1, ncomp
-                                                F_HLL(i) = (S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i)))/(S_R - S_L &
-                                                      & + verysmall)
-                                            end do
-                                        end if
-
+                                        ! Register-diet form: the HLL flux enters per component as the scalar F_HLL_c
+                                        ! instead of a materialized F_HLL array; outside the subsonic fan F_HLL equals
+                                        ! F_hlld and the identity blend is kept explicitly so the arithmetic (including
+                                        ! signed-zero behavior) matches the array form bit-for-bit.
                                         if (cyl_coord) then
                                             if (0._wp <= S_L) then
                                                 u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L
@@ -4792,21 +4788,38 @@ contains
                                             else
                                                 u_n_HLL_trace = (S_R*u_n_L - S_L*u_n_R)/(S_R - S_L + verysmall)
                                                 u_t_HLL_trace = (S_R*u_t_L - S_L*u_t_R)/(S_R - S_L + verysmall)
-                                                do i = 1, ncomp
-                                                    U_HLL(i) = (S_R*U_R(i) - S_L*U_L(i) - (F_R(i) - F_L(i)))/(S_R - S_L + verysmall)
-                                                end do
-                                                rho_HLL = U_HLL(1) + U_HLL(2)
-                                                u_n_HLL_cons = U_HLL(3)/(rho_HLL + verysmall)
-                                                tau_nn_HLL = U_HLL(8)/(rho_HLL + verysmall)
-                                                tau_qq_face_HLL = U_HLL(11)/(rho_HLL + verysmall)
-                                                p_face_HLL = F_HLL(3) - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
+                                                ! Only HLL-state components 1, 2, 3, 8 and 11 feed the axisym trace
+                                                U_HLL_c = (S_R*U_R(1) - S_L*U_L(1) - (F_R(1) - F_L(1)))/(S_R - S_L + verysmall)
+                                                rho_HLL = U_HLL_c
+                                                U_HLL_c = (S_R*U_R(2) - S_L*U_L(2) - (F_R(2) - F_L(2)))/(S_R - S_L + verysmall)
+                                                rho_HLL = rho_HLL + U_HLL_c
+                                                U_HLL_c = (S_R*U_R(3) - S_L*U_L(3) - (F_R(3) - F_L(3)))/(S_R - S_L + verysmall)
+                                                u_n_HLL_cons = U_HLL_c/(rho_HLL + verysmall)
+                                                U_HLL_c = (S_R*U_R(8) - S_L*U_L(8) - (F_R(8) - F_L(8)))/(S_R - S_L + verysmall)
+                                                tau_nn_HLL = U_HLL_c/(rho_HLL + verysmall)
+                                                U_HLL_c = (S_R*U_R(11) - S_L*U_L(11) - (F_R(11) - F_L(11)))/(S_R - S_L + verysmall)
+                                                tau_qq_face_HLL = U_HLL_c/(rho_HLL + verysmall)
+                                                ! This branch implies S_L < 0 < S_R, so component 3 of F_HLL is the
+                                                ! interior HLL flux
+                                                F_HLL_c = (S_R*F_L(3) - S_L*F_R(3) + S_L*S_R*(U_R(3) - U_L(3)))/(S_R - S_L &
+                                                           & + verysmall)
+                                                p_face_HLL = F_HLL_c - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
                                             end if
                                         end if
 
                                         ! phi is anchor-independent: computed once in the shared section above
-                                        do i = 1, ncomp
-                                            F_hlld(i) = F_HLL(i) + phi*(F_hlld(i) - F_HLL(i))
-                                        end do
+                                        if (S_L < 0._wp .and. S_R > 0._wp) then
+                                            do i = 1, ncomp
+                                                F_HLL_c = (S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i)))/(S_R - S_L &
+                                                           & + verysmall)
+                                                F_hlld(i) = F_HLL_c + phi*(F_hlld(i) - F_HLL_c)
+                                            end do
+                                        else
+                                            do i = 1, ncomp
+                                                F_HLL_c = F_hlld(i)
+                                                F_hlld(i) = F_HLL_c + phi*(F_hlld(i) - F_HLL_c)
+                                            end do
+                                        end if
                                     end if
                                 end if
 
