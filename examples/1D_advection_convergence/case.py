@@ -39,13 +39,13 @@ dt = T_end / Nt  # snap to land exactly on T_end
 
 if args.muscl:
     scheme_params = {
-        "recon_type": 2,
-        "muscl_order": 2,
+        "recon_type": "muscl",
+        "muscl_order": "second_order",
         "muscl_lim": args.muscl_lim,
     }
 else:
     scheme_params = {
-        "recon_type": 1,
+        "recon_type": "weno",
         "weno_order": args.order,
         "weno_eps": 1.0e-16,
         "weno_Re_flux": "F",
@@ -69,19 +69,19 @@ print(
             "t_step_stop": Nt,
             "t_step_save": Nt,
             "num_patches": 1,
-            "model_eqns": 2,
+            "model_eqns": "5eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
             "mpp_lim": "F",
             "mixture_err": "F",
-            "time_stepper": 3,
-            "riemann_solver": 2,
-            "wave_speeds": 1,
-            "avg_state": 2,
+            "time_stepper": "rk3",
+            "riemann_solver": "hllc",
+            "wave_speeds": "direct",
+            "avg_state": "arithmetic",
             "bc_x%beg": -1,
             "bc_x%end": -1,
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "parallel_io": "F",
             "patch_icpp(1)%geometry": 1,

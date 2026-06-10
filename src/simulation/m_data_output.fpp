@@ -19,6 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
+    use m_constants, only: model_eqns_5eq, model_eqns_4eq
 
     implicit none
 
@@ -393,7 +394,7 @@ contains
         end if
 
         if (n == 0 .and. p == 0) then
-            if (model_eqns == 2 .and. (.not. igr)) then
+            if (model_eqns == model_eqns_5eq .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -1217,7 +1218,7 @@ contains
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                     end if
 
-                    if (model_eqns == 4) then
+                    if (model_eqns == model_eqns_4eq) then
                         lit_gamma = gammas(1)
                     else if (elasticity) then
                         tau_e(1) = q_cons_vf(eqn_idx%stress%end)%sf(j - 2, k, l)/rho
@@ -1321,7 +1322,7 @@ contains
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                         end if
 
-                        if (model_eqns == 4) then
+                        if (model_eqns == model_eqns_4eq) then
                             lit_gamma = gs_min(1)
                         else if (elasticity) then
                             do s = 1, 3

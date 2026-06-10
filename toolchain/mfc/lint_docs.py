@@ -67,6 +67,30 @@ CASE_MD_SKIP = {
     # Hardcoded Fortran constants (not case-file params)
     "init_dir",
     "zeros_default",
+    # Enumerated value names used as prose examples (not parameter names)
+    "hll",
+    "hllc",
+    # Analytic expression language: Fortran intrinsics and module name (not case params)
+    "m_constants",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "sinh",
+    "cosh",
+    "tanh",
+    "exp",
+    "log",
+    "log10",
+    "sqrt",
+    "abs",
+    "min",
+    "max",
+    "mod",
+    "sign",
 }
 
 # Docs to check for parameter references, with per-file skip sets

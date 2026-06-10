@@ -14,6 +14,7 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
     ! $:USE_GPU_MODULE()
 
     implicit none
@@ -809,7 +810,7 @@ contains
         Re_size_max = 0
 
         ! Gamma/Pi_inf Model
-        if (model_eqns == 1) then
+        if (model_eqns == model_eqns_gamma_law) then
             ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
             ! of spatial dimensions and the gamma/pi_inf model
             eqn_idx%cont%beg = 1
@@ -827,7 +828,7 @@ contains
         else
             ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
             ! of spatial dimensions and the volume fraction model
-            if (model_eqns == 2) then
+            if (model_eqns == model_eqns_5eq) then
                 eqn_idx%cont%beg = 1
                 eqn_idx%cont%end = num_fluids
                 eqn_idx%mom%beg = eqn_idx%cont%end + 1
@@ -918,7 +919,7 @@ contains
                     end if
                     sys_size = eqn_idx%B%end
                 end if
-            else if (model_eqns == 3) then
+            else if (model_eqns == model_eqns_6eq) then
                 eqn_idx%cont%beg = 1
                 eqn_idx%cont%end = num_fluids
                 eqn_idx%mom%beg = eqn_idx%cont%end + 1
@@ -930,7 +931,7 @@ contains
                 eqn_idx%int_en%beg = eqn_idx%adv%end + 1
                 eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
                 sys_size = eqn_idx%int_en%end
-            else if (model_eqns == 4) then
+            else if (model_eqns == model_eqns_4eq) then
                 eqn_idx%cont%beg = 1  ! one continuity equation
                 eqn_idx%cont%end = 1  ! num_fluids
                 eqn_idx%mom%beg = eqn_idx%cont%end + 1  ! one momentum equation in each direction
@@ -1004,7 +1005,7 @@ contains
             end if
         end if
 
-        if (model_eqns == 2 .or. model_eqns == 3) then
+        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
             if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
                 eqn_idx%stress%beg = sys_size + 1

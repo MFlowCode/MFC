@@ -51,6 +51,7 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
     implicit none
 
@@ -620,7 +621,7 @@ contains
         end if
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-        if (any(time_stepper == (/1, 2, 3/))) then
+        if (any(time_stepper == (/time_stepper_rk1, time_stepper_rk2, time_stepper_rk3/))) then
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
@@ -710,7 +711,7 @@ contains
 
         stor = 1
 
-        if (time_stepper /= 1) then
+        if (time_stepper /= time_stepper_rk1) then
             $:GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -869,7 +870,7 @@ contains
 
         call s_populate_grid_variables_buffers()
 
-        if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
+        if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             block
                 type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
