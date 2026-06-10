@@ -12,6 +12,7 @@
 !> @brief Constructs initial condition patch geometries (lines, circles, rectangles, spheres, etc.) on the grid
 module m_icpp_patches
 
+    use m_patch_geometries
     use m_model  ! Subroutine(s) related to STL files
     use m_derived_types  ! Definitions of the derived types
     use m_global_parameters
@@ -316,8 +317,8 @@ contains
                                & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                 end if
 
-                if (((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2 <= radius**2 &
-                    & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
+                if ((f_is_inside_cylinder(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, radius, &
+                    & 0._wp) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
                     & 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
@@ -490,8 +491,8 @@ contains
                                & + 0.5_wp
                 end if
 
-                if ((((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2 <= 1._wp &
-                    & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
+                if ((f_is_inside_ellipse(x_cc(i) - x_centroid, y_cc(j) - y_centroid, [2._wp*a, 2._wp*b, &
+                    & 0._wp]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
                     & 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
@@ -622,8 +623,7 @@ contains
         ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
-                if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. y_boundary%beg <= y_cc(j) &
-                    & .and. y_boundary%end >= y_cc(j)) then
+                if (f_is_inside_cuboid(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, [length_x, length_y, 0._wp])) then
                     if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
@@ -753,8 +753,8 @@ contains
         ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
-                if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. y_boundary%beg <= y_cc(j) &
-                    & .and. y_boundary%end >= y_cc(j) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
+                if (f_is_inside_cuboid(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, [length_x, length_y, &
+                    & 0._wp]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
@@ -1003,8 +1003,8 @@ contains
                                    & - radius))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2 <= radius**2) &
-                        & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
+                    if ((f_is_inside_sphere(x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, &
+                        & radius) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -1069,8 +1069,8 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. y_boundary%beg <= cart_y &
-                        & .and. y_boundary%end >= cart_y .and. z_boundary%beg <= cart_z .and. z_boundary%end >= cart_z) then
+                    if (f_is_inside_cuboid(x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, [length_x, length_y, &
+                        & length_z])) then
                         if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -1160,12 +1160,13 @@ contains
                         end if
                     end if
 
-                    if (((.not. f_is_default(length_x) .and. (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2 <= radius**2 &
-                        & .and. x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i)) .or. (.not. f_is_default(length_y) &
-                        & .and. (x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2 <= radius**2 .and. y_boundary%beg <= cart_y &
-                        & .and. y_boundary%end >= cart_y) .or. (.not. f_is_default(length_z) .and. (x_cc(i) - x_centroid)**2 &
-                        & + (cart_y - y_centroid)**2 <= radius**2 .and. z_boundary%beg <= cart_z .and. z_boundary%end >= cart_z) &
-                        & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
+                    if (((.not. f_is_default(length_x) .and. f_is_inside_cylinder(cart_y - y_centroid, cart_z - z_centroid, &
+                        & x_cc(i) - x_centroid, radius, &
+                        & length_x)) .or. (.not. f_is_default(length_y) .and. f_is_inside_cylinder(x_cc(i) - x_centroid, &
+                        & cart_z - z_centroid, cart_y - y_centroid, radius, &
+                        & length_y)) .or. (.not. f_is_default(length_z) .and. f_is_inside_cylinder(x_cc(i) - x_centroid, &
+                        & cart_y - y_centroid, cart_z - z_centroid, radius, &
+                        & length_z)) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
