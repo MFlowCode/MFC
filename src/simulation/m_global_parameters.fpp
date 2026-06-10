@@ -14,7 +14,7 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, recon_type_muscl
     ! $:USE_GPU_MODULE()
 
     implicit none
@@ -777,14 +777,14 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
-            if (recon_type == WENO_TYPE) then
+            if (recon_type == recon_type_weno) then
                 weno_polyn = (weno_order - 1)/2
                 if (teno) then
                     weno_num_stencils = weno_order - 3
                 else
                     weno_num_stencils = weno_polyn
                 end if
-            else if (recon_type == MUSCL_TYPE) then
+            else if (recon_type == recon_type_muscl) then
                 muscl_polyn = muscl_order
             end if
             $:GPU_UPDATE(device='[weno_polyn, muscl_polyn]')

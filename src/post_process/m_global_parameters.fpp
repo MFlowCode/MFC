@@ -14,7 +14,7 @@ module m_global_parameters
     use m_derived_types
     use m_helper_basic
     use m_thermochem, only: num_species, species_names
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo, precision_single
 
     implicit none
 
@@ -668,7 +668,7 @@ contains
         ! Size of the ghost zone layer is non-zero only when post-processing the raw simulation data of a parallel multidimensional
         ! computation in the Silo-HDF5 format. If this is the case, one must also verify whether the raw simulation data is 2D or
         ! 3D. In the 2D case, size of the z-coordinate direction ghost zone layer must be zeroed out.
-        if (num_procs == 1 .or. format /= 1) then
+        if (num_procs == 1 .or. format /= format_silo) then
             offset_x%beg = 0
             offset_x%end = 0
             offset_y%beg = 0
@@ -733,7 +733,7 @@ contains
             allocate (x_root_cb(-1:m_root))
             allocate (x_root_cc(0:m_root))
 
-            if (precision == 1) then
+            if (precision == precision_single) then
                 allocate (x_root_cc_s(0:m_root))
             end if
         end if

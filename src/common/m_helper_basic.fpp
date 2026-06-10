@@ -9,6 +9,7 @@ module m_helper_basic
 
     use m_derived_types
     use m_precision_select
+    use m_constants, only: recon_type_weno, recon_type_muscl
 
     implicit none
 
@@ -125,13 +126,13 @@ contains
 
         if (igr) then
             buff_size = (igr_order - 1)/2 + 2
-        else if (recon_type == WENO_TYPE) then
+        else if (recon_type == recon_type_weno) then
             if (viscous) then
                 buff_size = 2*weno_polyn + 2
             else
                 buff_size = weno_polyn + 2
             end if
-        else if (recon_type == MUSCL_TYPE) then
+        else if (recon_type == recon_type_muscl) then
             buff_size = muscl_polyn + 2
         end if
 

@@ -14,7 +14,7 @@ module m_variables_conversion
     use m_helper_basic
     use m_helper
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, &
-        & model_eqns_4eq
+        & model_eqns_4eq, avg_state_roe
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
@@ -1267,7 +1267,7 @@ contains
         integer               :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
-            if (avg_state == 1 .and. abs(c_c) > verysmall) then
+            if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
                 c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)

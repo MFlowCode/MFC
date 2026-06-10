@@ -16,6 +16,7 @@ module m_thinc
     use m_derived_types
     use m_global_parameters
     use m_helper
+    use m_constants, only: int_comp_mthinc
 
 #ifdef MFC_OpenACC
     use openacc
@@ -194,7 +195,7 @@ contains
 
     subroutine s_initialize_thinc_module()
 
-        if (int_comp == 2) then
+        if (int_comp == int_comp_mthinc) then
             @:ALLOCATE(mthinc_nhat(1:3, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
             @:ALLOCATE(mthinc_d(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -320,7 +321,7 @@ contains
                             aCR = v_rs_ws(${SF(' + 1')}$, eqn_idx%adv%beg)
 
                             if (aC >= ic_eps .and. aC <= 1._wp - ic_eps) then
-                                if (int_comp == 2 .and. n > 0) then  ! MTHINC
+                                if (int_comp == int_comp_mthinc .and. n > 0) then  ! MTHINC
                                     ! Map reshaped (j,k,l) to physical (ix,iy,iz)
 
                                     nh1 = mthinc_nhat(1, j, k, l)
@@ -406,7 +407,7 @@ contains
 
     subroutine s_finalize_thinc_module()
 
-        if (int_comp == 2) then
+        if (int_comp == int_comp_mthinc) then
             @:DEALLOCATE(mthinc_nhat)
             @:DEALLOCATE(mthinc_d)
         end if

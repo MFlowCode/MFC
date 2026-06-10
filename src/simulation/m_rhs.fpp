@@ -14,7 +14,7 @@ module m_rhs
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
-    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -570,7 +570,7 @@ contains
             call nvtxEndRange
         end if
 
-        if (int_comp == 2 .and. n > 0) then
+        if (int_comp == int_comp_mthinc .and. n > 0) then
             call nvtxStartRange("RHS-COMPRESSION-NORMALS")
             call s_compute_mthinc_normals(q_prim_qp%vf)
             call nvtxEndRange

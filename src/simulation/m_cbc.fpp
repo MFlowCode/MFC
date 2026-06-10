@@ -12,7 +12,7 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
-    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law
+    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
         & get_mole_fractions, get_species_specific_heats_r
@@ -189,12 +189,12 @@ contains
         ! Allocating the cell-width distribution in the s-direction
         @:ALLOCATE(ds(0:buff_size))
 
-        if (recon_type == WENO_TYPE) then
+        if (recon_type == recon_type_weno) then
             idx1%beg = 0
             idx1%end = weno_polyn - 1
             idx2%beg = 0
             idx2%end = weno_order - 3
-        else if (recon_type == MUSCL_TYPE) then
+        else if (recon_type == recon_type_muscl) then
             idx1%beg = 0
             idx1%end = muscl_polyn
             idx2%beg = 0
