@@ -269,7 +269,7 @@ contains
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     $:GPU_PARALLEL_LOOP(private='[xp, yp, i, il, ir, j, jl, jr, xyz_local, length, radius, &
-                                        & bounding_box_corner_distance, patch_id, airfoil_id, model_id, encoded_patch_id, center, eta]')
+                                        & patch_id, airfoil_id, model_id, encoded_patch_id, center, eta]')
                     do patch_id = 1, num_ibs
                         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
                         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
