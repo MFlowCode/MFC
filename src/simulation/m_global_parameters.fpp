@@ -14,12 +14,12 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, recon_type_muscl
+    ! Shared state: generated_decls, generated_case_opt_decls, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity,
+    ! shear_*
+    use m_global_parameters_common
     ! $:USE_GPU_MODULE()
 
     implicit none
-
-    #:include 'generated_decls.fpp'
 
     real(wp) :: wall_time = 0
     real(wp) :: wall_time_avg = 0
@@ -64,15 +64,13 @@ module m_global_parameters
     $:GPU_DECLARE(create='[cfl_target]')
 
     logical :: cfl_dt
-    ! Simulation Algorithm Parameters
-    #:include 'generated_case_opt_decls.fpp'
+    ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
 
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
-    integer                :: hyper_model                  !< hyperelasticity solver algorithm
-    logical                :: elasticity                   !< elasticity modeling, true for hyper or hypo
-    logical, parameter     :: chemistry = .${chemistry}$.  !< Chemistry modeling
-    logical                :: shear_stress                 !< Shear stresses
-    logical                :: bulk_stress                  !< Bulk stresses
+    integer :: hyper_model  !< hyperelasticity solver algorithm
+    ! elasticity, chemistry: in m_global_parameters_common
+    logical                :: shear_stress  !< Shear stresses
+    logical                :: bulk_stress   !< Bulk stresses
     logical                :: bodyForces
     real(wp), dimension(3) :: accel_bf
     $:GPU_DECLARE(create='[accel_bf]')
@@ -136,16 +134,8 @@ module m_global_parameters
     integer                 :: mpi_info_int
     !> @}
 
-    !> @name Annotations of the structure of the state and flux vectors in terms of the size and the configuration of the system of
-    !! equations to which they belong
-    !> @{
-    integer             :: sys_size     !< Number of unknowns in system of eqns.
-    type(eqn_idx_info)  :: eqn_idx      !< All conserved-variable equation index ranges and scalars.
-    type(qbmm_idx_info) :: qbmm_idx     !< QBMM moment index mappings (allocatable; GPU-managed separately).
-    integer             :: b_size       !< Number of elements in the symmetric b tensor, plus one
-    integer             :: tensor_size  !< Number of elements in the full tensor plus one
-    !> @}
-    $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
+    ! sys_size, eqn_idx, b_size, tensor_size: in m_global_parameters_common (GPU_DECLARE there too)
+    type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings (allocatable; GPU-managed separately).
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With INTerior".
     type(int_bounds_info) :: idwint(1:3)
@@ -198,11 +188,7 @@ module m_global_parameters
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
     $:GPU_DECLARE(create='[buff_size]')
 
-    integer                  :: shear_num              !< Number of shear stress components
-    integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
-    integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
-    $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
+    ! shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices: in m_global_parameters_common
 
     ! END: Simulation Algorithm Parameters
 
@@ -746,168 +732,79 @@ contains
         Re_size = 0
         Re_size_max = 0
 
-        ! Gamma/Pi_inf Model
-        if (model_eqns == model_eqns_gamma_law) then
-            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
-            ! of spatial dimensions and the gamma/pi_inf model
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = eqn_idx%cont%beg
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
-            eqn_idx%adv%beg = eqn_idx%E + 1
-            eqn_idx%adv%end = eqn_idx%adv%beg + 1
-            eqn_idx%gamma = eqn_idx%adv%beg
-            eqn_idx%pi_inf = eqn_idx%adv%end
-            sys_size = eqn_idx%adv%end
+        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
+        call s_initialize_eqn_idx(nmom)
 
-            ! Volume Fraction Model
-        else
-            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
-            ! of spatial dimensions and the volume fraction model
-            if (model_eqns == model_eqns_5eq) then
-                eqn_idx%cont%beg = 1
-                eqn_idx%cont%end = num_fluids
-                eqn_idx%mom%beg = eqn_idx%cont%end + 1
-                eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-                eqn_idx%E = eqn_idx%mom%end + 1
+        ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
+        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
+            if (hypoelasticity .or. hyperelasticity) then
+                $:GPU_UPDATE(device='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
+            end if
+        end if
 
-                if (igr) then
-                    ! IGR: volume fractions after energy (N-1 for N fluids; skipped when num_fluids=1)
-                    eqn_idx%adv%beg = eqn_idx%E + 1  ! Alpha for fluid 1
-                    eqn_idx%adv%end = eqn_idx%E + num_fluids - 1
-                else
-                    ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann
-                    ! tracks a total of (N) volume fractions for N fluids, hence the lack of "-1" in eqn_idx%adv%end
-                    eqn_idx%adv%beg = eqn_idx%E + 1
-                    eqn_idx%adv%end = eqn_idx%E + num_fluids
-                end if
-
-                sys_size = eqn_idx%adv%end
-
-                if (bubbles_euler) then
-                    eqn_idx%alf = eqn_idx%adv%end
-                else
-                    eqn_idx%alf = 1
-                end if
-
-                if (bubbles_euler) then
-                    eqn_idx%bub%beg = sys_size + 1
-                    if (qbmm) then
-                        nmomsp = 4  ! number of special moments
-                        if (nnode == 4) then
-                            ! nmom = 6 : It is already a parameter
-                            nmomtot = nmom*nb
-                        end if
-                        eqn_idx%bub%end = eqn_idx%adv%end + nb*nmom
-                    else
-                        if (.not. polytropic) then
-                            eqn_idx%bub%end = sys_size + 4*nb
-                        else
-                            eqn_idx%bub%end = sys_size + 2*nb
-                        end if
-                    end if
-                    sys_size = eqn_idx%bub%end
-
-                    if (adv_n) then
-                        eqn_idx%n = eqn_idx%bub%end + 1
-                        sys_size = eqn_idx%n
-                    end if
-
-                    @:ALLOCATE(qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-                    @:ALLOCATE(qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-
-                    gam = bub_pp%gam_g
-
-                    if (qbmm) then
-                        @:ALLOCATE(qbmm_idx%moms(nb, nmom))
-                        do i = 1, nb
-                            do j = 1, nmom
-                                qbmm_idx%moms(i, j) = eqn_idx%bub%beg + (j - 1) + (i - 1)*nmom
-                            end do
-                            qbmm_idx%rs(i) = qbmm_idx%moms(i, 2)
-                            qbmm_idx%vs(i) = qbmm_idx%moms(i, 3)
-                        end do
-                    else
-                        do i = 1, nb
-                            if (.not. polytropic) then
-                                fac = 4
-                            else
-                                fac = 2
-                            end if
-
-                            qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                            qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                            if (.not. polytropic) then
-                                qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                                qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                            end if
-                        end do
-                    end if
-                end if
-
-                if (mhd) then
-                    eqn_idx%B%beg = sys_size + 1
-                    if (n == 0) then
-                        eqn_idx%B%end = sys_size + 2  ! 1D: By, Bz
-                    else
-                        eqn_idx%B%end = sys_size + 3  ! 2D/3D: Bx, By, Bz
-                    end if
-                    sys_size = eqn_idx%B%end
-                end if
-            else if (model_eqns == model_eqns_6eq) then
-                eqn_idx%cont%beg = 1
-                eqn_idx%cont%end = num_fluids
-                eqn_idx%mom%beg = eqn_idx%cont%end + 1
-                eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-                eqn_idx%E = eqn_idx%mom%end + 1
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids
-                eqn_idx%alf = eqn_idx%adv%end
-                eqn_idx%int_en%beg = eqn_idx%adv%end + 1
-                eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
-                sys_size = eqn_idx%int_en%end
-            else if (model_eqns == model_eqns_4eq) then
-                eqn_idx%cont%beg = 1  ! one continuity equation
-                eqn_idx%cont%end = 1  ! num_fluids
-                eqn_idx%mom%beg = eqn_idx%cont%end + 1  ! one momentum equation in each direction
-                eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-                eqn_idx%E = eqn_idx%mom%end + 1  ! one energy equation
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%adv%beg  ! one volume advection equation
-                eqn_idx%alf = eqn_idx%adv%end
-                sys_size = eqn_idx%adv%end
-
-                if (bubbles_euler) then
-                    eqn_idx%bub%beg = sys_size + 1
-                    eqn_idx%bub%end = sys_size + 2*nb
-                    if (.not. polytropic) then
-                        eqn_idx%bub%end = sys_size + 4*nb
-                    end if
-                    sys_size = eqn_idx%bub%end
-
-                    @:ALLOCATE(qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-                    @:ALLOCATE(qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-
-                    do i = 1, nb
-                        if (polytropic) then
-                            fac = 2
-                        else
-                            fac = 4
-                        end if
-
-                        qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                        qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                        if (.not. polytropic) then
-                            qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                            qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                        end if
-                    end do
-                end if
+        ! Per-target (sim): nmomsp/nmomtot for qbmm, qbmm_idx alloc/fill, gam, Re_idx
+        if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
+            if (qbmm) then
+                nmomsp = 4  ! number of special moments
+                if (nnode == 4) nmomtot = nmom*nb
             end if
 
+            @:ALLOCATE(qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+            @:ALLOCATE(qbmm_idx%ps(nb), qbmm_idx%ms(nb))
+
+            gam = bub_pp%gam_g
+
+            if (qbmm) then
+                @:ALLOCATE(qbmm_idx%moms(nb, nmom))
+                do i = 1, nb
+                    do j = 1, nmom
+                        qbmm_idx%moms(i, j) = eqn_idx%bub%beg + (j - 1) + (i - 1)*nmom
+                    end do
+                    qbmm_idx%rs(i) = qbmm_idx%moms(i, 2)
+                    qbmm_idx%vs(i) = qbmm_idx%moms(i, 3)
+                end do
+            else
+                do i = 1, nb
+                    if (.not. polytropic) then
+                        fac = 4
+                    else
+                        fac = 2
+                    end if
+
+                    qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
+                    qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
+
+                    if (.not. polytropic) then
+                        qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
+                        qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
+                    end if
+                end do
+            end if
+        end if
+
+        if (model_eqns == model_eqns_4eq .and. bubbles_euler) then
+            @:ALLOCATE(qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+            @:ALLOCATE(qbmm_idx%ps(nb), qbmm_idx%ms(nb))
+
+            do i = 1, nb
+                if (polytropic) then
+                    fac = 2
+                else
+                    fac = 4
+                end if
+
+                qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
+                qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
+
+                if (.not. polytropic) then
+                    qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
+                    qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
+                end if
+            end do
+        end if
+
+        ! sim-only: Re_idx (non-gamma-law models only)
+        if (model_eqns /= model_eqns_gamma_law) then
             ! Count fluids with non-negligible viscous effects (Re > 0)
             do i = 1, num_fluids
                 if (fluid_pp(i)%Re(1) > 0) Re_size(1) = Re_size(1) + 1
@@ -921,8 +818,7 @@ contains
 
             $:GPU_UPDATE(device='[Re_size, Re_size_max, shear_stress, bulk_stress]')
 
-            ! Bookkeeping the indexes of any viscous fluids and any pairs of fluids whose interface will support effects of surface
-            ! tension
+            ! Bookkeeping the indexes of any viscous fluids
             if (viscous) then
                 @:ALLOCATE(Re_idx(1:2, 1:Re_size_max))
 
@@ -965,71 +861,6 @@ contains
             end if
         end do
         $:GPU_UPDATE(device='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
-
-        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
-            if (hypoelasticity .or. hyperelasticity) then
-                elasticity = .true.
-                eqn_idx%stress%beg = sys_size + 1
-                eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
-                if (cyl_coord) eqn_idx%stress%end = eqn_idx%stress%end + 1
-                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
-                sys_size = eqn_idx%stress%end
-
-                ! shear stress index is 2 for 2D and 2,4,5 for 3D
-                if (num_dims == 1) then
-                    shear_num = 0
-                else if (num_dims == 2) then
-                    shear_num = 1
-                    shear_indices(1) = eqn_idx%stress%beg - 1 + 2
-                    shear_BC_flip_num = 1
-                    shear_BC_flip_indices(1:2,1) = shear_indices(1)
-                    ! Both x-dir and y-dir: flip tau_xy only
-                else if (num_dims == 3) then
-                    shear_num = 3
-                    shear_indices(1:3) = eqn_idx%stress%beg - 1 + (/2, 4, 5/)
-                    shear_BC_flip_num = 2
-                    shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
-                    shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
-                    shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
-                    ! x-dir: flip tau_xy and tau_xz y-dir: flip tau_xy and tau_yz z-dir: flip tau_xz and tau_yz
-                end if
-                $:GPU_UPDATE(device='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
-            end if
-
-            if (hyperelasticity) then
-                ! number of entries in the symmetric btensor plus the jacobian
-                b_size = (num_dims*(num_dims + 1))/2 + 1
-                ! storing the jacobian in the last entry
-                tensor_size = num_dims**2 + 1
-                eqn_idx%xi%beg = sys_size + 1
-                eqn_idx%xi%end = sys_size + num_dims
-                ! adding three more equations for the \xi field and the elastic energy
-                sys_size = eqn_idx%xi%end + 1
-            end if
-
-            if (surface_tension) then
-                eqn_idx%c = sys_size + 1
-                sys_size = eqn_idx%c
-            end if
-
-            if (cont_damage) then
-                eqn_idx%damage = sys_size + 1
-                sys_size = eqn_idx%damage
-            end if
-
-            if (hyper_cleaning) then
-                eqn_idx%psi = sys_size + 1
-                sys_size = eqn_idx%psi
-            end if
-        end if
-
-        ! END: Volume Fraction Model
-
-        if (chemistry) then
-            eqn_idx%species%beg = sys_size + 1
-            eqn_idx%species%end = sys_size + num_species
-            sys_size = eqn_idx%species%end
-        end if
 
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))

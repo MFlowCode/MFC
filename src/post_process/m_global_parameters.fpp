@@ -13,13 +13,12 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
-    use m_thermochem, only: num_species, species_names
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo, precision_single, &
-        & recon_type_weno
+    use m_thermochem, only: species_names
+    use m_constants, only: format_silo, precision_single
+    ! Shared state: generated_decls, num_dims, num_vels, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*
+    use m_global_parameters_common
 
     implicit none
-
-    #:include 'generated_decls.fpp'
 
     !> @name Logistics
     !> @{
@@ -48,8 +47,7 @@ module m_global_parameters
     integer :: m_glb, n_glb, p_glb
     !> @}
 
-    integer :: num_dims  !< Number of spatial dimensions
-    integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
+    ! num_dims, num_vels: in m_global_parameters_common
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
@@ -77,16 +75,11 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    integer            :: sys_size                     !< Number of unknowns in the system of equations
-    logical            :: elasticity                   !< elasticity modeling, true for hyper or hypo
-    integer            :: b_size                       !< Number of components in the b tensor
-    integer            :: tensor_size                  !< Number of components in the nonsymmetric tensor
-    logical, parameter :: chemistry = .${chemistry}$.  !< Chemistry modeling
+    ! sys_size, elasticity, b_size, tensor_size, chemistry, eqn_idx: in m_global_parameters_common
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
-    type(eqn_idx_info)  :: eqn_idx   !< All conserved-variable equation index ranges and scalars.
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings.
     integer             :: beta_idx  !< Index of lagrange bubbles beta
     !> @}
@@ -102,12 +95,9 @@ module m_global_parameters
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
 
-    integer                            :: shear_num  !< Number of shear stress components
-    integer, dimension(3)              :: shear_indices  !< Indices of the stress components that represent shear stress
-    integer                            :: shear_BC_flip_num  !< Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2)           :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    ! shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices: in m_global_parameters_common
     integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:) :: start_idx  !< Starting cell-center index of local processor in global grid
+    integer, allocatable, dimension(:) :: start_idx    !< Starting cell-center index of local processor in global grid
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
@@ -375,161 +365,51 @@ contains
 
         if (n == 0) m_root = m_glb
 
-        ! Gamma/Pi_inf Model
-        if (model_eqns == model_eqns_gamma_law) then
-            ! Setting number of fluids
-            num_fluids = 1
+        ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
+        if (model_eqns == model_eqns_gamma_law) num_fluids = 1
 
-            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
-            ! of spatial dimensions and the gamma/pi_inf model
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = eqn_idx%cont%beg
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
-            eqn_idx%adv%beg = eqn_idx%E + 1
-            eqn_idx%adv%end = eqn_idx%adv%beg + 1
-            eqn_idx%gamma = eqn_idx%adv%beg
-            eqn_idx%pi_inf = eqn_idx%adv%end
-            sys_size = eqn_idx%adv%end
+        ! post_process sets nmom to 6 for qbmm before the shared eqn_idx setup
+        if (qbmm) nmom = 6
 
-            ! Volume Fraction Model (5-equation model)
-        else if (model_eqns == model_eqns_5eq) then
-            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
-            ! of spatial dimensions and the volume fraction model
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = num_fluids
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
+        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
+        call s_initialize_eqn_idx(nmom)
 
-            if (igr) then
-                ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of (N-1)
-                ! volume fractions for N fluids, hence the "-1" in eqn_idx%adv%end. If num_fluids = 1 then eqn_idx%adv%end <
-                ! eqn_idx%adv%beg, which skips all loops over the volume fractions since there is no volume fraction to track
-                eqn_idx%adv%beg = eqn_idx%E + 1  ! Alpha for fluid 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids - 1
-            else
-                ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann tracks
-                ! a total of (N) volume fractions for N fluids, hence the lack of "-1" in eqn_idx%adv%end
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids
-            end if
+        ! post-only: 6eq alf is a dummy (no void fraction in 6eq)
+        if (model_eqns == model_eqns_6eq) eqn_idx%alf = 1
 
-            sys_size = eqn_idx%adv%end
+        ! post-only: set default indices for disabled fields (used by post-processing consumers)
+        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
+            if (.not. cont_damage) eqn_idx%damage = dflt_int
+            if (.not. hyper_cleaning) eqn_idx%psi = dflt_int
+        end if
 
-            if (bubbles_euler) then
-                eqn_idx%alf = eqn_idx%adv%end
-            else
-                eqn_idx%alf = 1
-            end if
+        ! post-only: species defaults when chemistry is off
+        if (.not. chemistry) then
+            eqn_idx%species%beg = 1
+            eqn_idx%species%end = 1
+        end if
+
+        ! Per-target (post_process): beta_idx for bubbles_lagrange (5eq only, after main eqn_idx setup)
+        if (model_eqns == model_eqns_5eq .and. bubbles_lagrange) then
+            beta_idx = sys_size + 1
+            sys_size = beta_idx
+        end if
+
+        ! Per-target (post_process): qbmm_idx allocations and fills
+        if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
+            allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+            allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
 
             if (qbmm) then
-                nmom = 6
-            end if
-
-            if (bubbles_euler) then
-                eqn_idx%bub%beg = sys_size + 1
-                if (qbmm) then
-                    eqn_idx%bub%end = eqn_idx%adv%end + nb*nmom
-                else
-                    if (.not. polytropic) then
-                        eqn_idx%bub%end = sys_size + 4*nb
-                    else
-                        eqn_idx%bub%end = sys_size + 2*nb
-                    end if
-                end if
-                sys_size = eqn_idx%bub%end
-
-                if (adv_n) then
-                    eqn_idx%n = eqn_idx%bub%end + 1
-                    sys_size = eqn_idx%n
-                end if
-
-                allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-                allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-
-                if (qbmm) then
-                    allocate (qbmm_idx%moms(nb, nmom))
-                    do i = 1, nb
-                        do j = 1, nmom
-                            qbmm_idx%moms(i, j) = eqn_idx%bub%beg + (j - 1) + (i - 1)*nmom
-                        end do
-                        qbmm_idx%rs(i) = qbmm_idx%moms(i, 2)
-                        qbmm_idx%vs(i) = qbmm_idx%moms(i, 3)
+                allocate (qbmm_idx%moms(nb, nmom))
+                do i = 1, nb
+                    do j = 1, nmom
+                        qbmm_idx%moms(i, j) = eqn_idx%bub%beg + (j - 1) + (i - 1)*nmom
                     end do
-                else
-                    do i = 1, nb
-                        if (polytropic .neqv. .true.) then
-                            fac = 4
-                        else
-                            fac = 2
-                        end if
-
-                        qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                        qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                        if (polytropic .neqv. .true.) then
-                            qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                            qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                        end if
-                    end do
-                end if
-            end if
-
-            if (bubbles_lagrange) then
-                beta_idx = sys_size + 1
-                sys_size = beta_idx
-            end if
-
-            if (mhd) then
-                eqn_idx%B%beg = sys_size + 1
-                if (n == 0) then
-                    eqn_idx%B%end = sys_size + 2  ! 1D: By, Bz
-                else
-                    eqn_idx%B%end = sys_size + 3  ! 2D/3D: Bx, By, Bz
-                end if
-                sys_size = eqn_idx%B%end
-            end if
-
-            ! Volume Fraction Model (6-equation model)
-        else if (model_eqns == model_eqns_6eq) then
-            ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
-            ! of spatial dimensions and the volume fraction model
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = num_fluids
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
-            eqn_idx%adv%beg = eqn_idx%E + 1
-            eqn_idx%adv%end = eqn_idx%E + num_fluids
-            eqn_idx%int_en%beg = eqn_idx%adv%end + 1
-            eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
-            sys_size = eqn_idx%int_en%end
-            eqn_idx%alf = 1  ! dummy, cannot actually have a void fraction
-        else if (model_eqns == model_eqns_4eq) then
-            eqn_idx%cont%beg = 1  ! one continuity equation
-            eqn_idx%cont%end = 1  ! num_fluids
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1  ! one momentum equation in each
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1  ! one energy equation
-            eqn_idx%adv%beg = eqn_idx%E + 1
-            eqn_idx%adv%end = eqn_idx%adv%beg  ! one volume advection equation
-            eqn_idx%alf = eqn_idx%adv%end
-            sys_size = eqn_idx%alf  ! eqn_idx%adv%end
-
-            if (bubbles_euler) then
-                eqn_idx%bub%beg = sys_size + 1
-                eqn_idx%bub%end = sys_size + 2*nb
-                if (polytropic .neqv. .true.) then
-                    eqn_idx%bub%end = sys_size + 4*nb
-                end if
-                sys_size = eqn_idx%bub%end
-
-                allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-                allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-                allocate (weight(nb), R0(nb))
-
+                    qbmm_idx%rs(i) = qbmm_idx%moms(i, 2)
+                    qbmm_idx%vs(i) = qbmm_idx%moms(i, 3)
+                end do
+            else
                 do i = 1, nb
                     if (polytropic .neqv. .true.) then
                         fac = 4
@@ -545,87 +425,41 @@ contains
                         qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                     end if
                 end do
-
-                if (nb == 1) then
-                    weight(:) = 1._wp
-                    R0(:) = 1._wp
-                else if (nb < 1) then
-                    stop 'Invalid value of nb'
-                end if
-
-                if (polytropic) then
-                    rhoref = 1._wp
-                    pref = 1._wp
-                end if
             end if
         end if
 
-        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
-            if (hypoelasticity .or. hyperelasticity) then
-                elasticity = .true.
-                eqn_idx%stress%beg = sys_size + 1
-                eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
-                if (cyl_coord) eqn_idx%stress%end = eqn_idx%stress%end + 1
-                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
-                sys_size = eqn_idx%stress%end
+        if (model_eqns == model_eqns_4eq .and. bubbles_euler) then
+            allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
+            allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
+            allocate (weight(nb), R0(nb))
 
-                ! shear stress index is 2 for 2D and 2,4,5 for 3D
-                if (num_dims == 1) then
-                    shear_num = 0
-                else if (num_dims == 2) then
-                    shear_num = 1
-                    shear_indices(1) = eqn_idx%stress%beg - 1 + 2
-                    shear_BC_flip_num = 1
-                    shear_BC_flip_indices(1:2,1) = shear_indices(1)
-                    ! Both x-dir and y-dir: flip tau_xy only
-                else if (num_dims == 3) then
-                    shear_num = 3
-                    shear_indices(1:3) = eqn_idx%stress%beg - 1 + (/2, 4, 5/)
-                    shear_BC_flip_num = 2
-                    shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
-                    shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
-                    shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
-                    ! x-dir: flip tau_xy and tau_xz y-dir: flip tau_xy and tau_yz z-dir: flip tau_xz and tau_yz
+            do i = 1, nb
+                if (polytropic .neqv. .true.) then
+                    fac = 4
+                else
+                    fac = 2
                 end if
+
+                qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
+                qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
+
+                if (polytropic .neqv. .true.) then
+                    qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
+                    qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
+                end if
+            end do
+
+            if (nb == 1) then
+                weight(:) = 1._wp
+                R0(:) = 1._wp
+            else if (nb < 1) then
+                stop 'Invalid value of nb'
             end if
 
-            if (hyperelasticity) then
-                eqn_idx%xi%beg = sys_size + 1
-                eqn_idx%xi%end = sys_size + num_dims
-                ! adding three more equations for the \xi field and the elastic energy
-                sys_size = eqn_idx%xi%end + 1
-                ! number of entries in the symmetric btensor plus the jacobian
-                b_size = (num_dims*(num_dims + 1))/2 + 1
-                tensor_size = num_dims**2 + 1
+            if (polytropic) then
+                rhoref = 1._wp
+                pref = 1._wp
             end if
-
-            if (surface_tension) then
-                eqn_idx%c = sys_size + 1
-                sys_size = eqn_idx%c
-            end if
-
-            if (cont_damage) then
-                eqn_idx%damage = sys_size + 1
-                sys_size = eqn_idx%damage
-            else
-                eqn_idx%damage = dflt_int
-            end if
-
-            if (hyper_cleaning) then
-                eqn_idx%psi = sys_size + 1
-                sys_size = eqn_idx%psi
-            else
-                eqn_idx%psi = dflt_int
-            end if
-        end if
-
-        if (chemistry) then
-            eqn_idx%species%beg = sys_size + 1
-            eqn_idx%species%end = sys_size + num_species
-            sys_size = eqn_idx%species%end
-        else
-            eqn_idx%species%beg = 1
-            eqn_idx%species%end = 1
         end if
 
         if (output_partial_domain) then

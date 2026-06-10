@@ -59,6 +59,7 @@
         "modules": [
             "m_derived_types",
             "m_global_parameters",
+            "m_global_parameters_common",
             "m_mpi_common",
             "m_mpi_proxy",
             "m_constants",

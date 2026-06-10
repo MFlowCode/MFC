@@ -1,0 +1,267 @@
+!>
+!! @file
+!! @brief Contains module m_global_parameters_common
+
+#:include 'case.fpp'
+#:include 'macros.fpp'
+
+!> @brief Shared global parameters and equation-index setup for all three executables. Each per-target m_global_parameters uses this
+!! module (default-public, so all symbols re-export to downstream consumers via two-hop use-association).
+module m_global_parameters_common
+
+#ifdef MFC_MPI
+    use mpi
+#endif
+
+    use m_derived_types
+    use m_helper_basic
+    use m_thermochem, only: num_species
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, &
+        & recon_type_muscl, nnode
+
+    implicit none
+
+    ! All namelist-bound scalar and array declarations (per-target, auto-generated at CMake configure time)
+    #:include 'generated_decls.fpp'
+
+    ! Case-optimization declarations: parameters (under MFC_CASE_OPTIMIZATION) or plain variables for
+    ! num_dims, num_vels, weno_polyn, muscl_polyn, weno_num_stencils, wenojs, igr, etc.
+#ifdef MFC_SIMULATION
+    #:include 'generated_case_opt_decls.fpp'
+#endif
+
+    ! For pre_process and post_process: num_dims and num_vels are declared manually here
+    ! (sim gets them from generated_case_opt_decls.fpp above)
+#ifndef MFC_SIMULATION
+    integer :: num_dims  !< Number of spatial dimensions
+    integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
+#endif
+
+    ! For pre_process: weno_polyn and muscl_polyn are declared manually here
+    ! (sim gets them from generated_case_opt_decls.fpp; post does not use them)
+#ifdef MFC_PRE_PROCESS
+    integer :: weno_polyn   !< Degree of the WENO polynomials
+    integer :: muscl_polyn  !< Degree of the MUSCL polynomials
+#endif
+
+    !> @name Annotations of the structure of the state and flux vectors in terms of the size and configuration of the system of
+    !! equations
+    !> @{
+    integer            :: sys_size     !< Number of unknowns in system of equations
+    type(eqn_idx_info) :: eqn_idx      !< All conserved-variable equation index ranges and scalars
+    integer            :: b_size       !< Number of elements in the symmetric b tensor, plus one
+    integer            :: tensor_size  !< Number of elements in the full tensor plus one
+    !> @}
+
+    !> @name Chemistry modeling (Fypp compile-time constant; same value in all targets)
+    !> @{
+    logical, parameter :: chemistry = .${chemistry}$.
+    !> @}
+
+    !> @name Elasticity and shear stress state (identical across all three executables)
+    !> @{
+    logical                  :: elasticity             !< elasticity modeling, true for hyper or hypo
+    integer                  :: shear_num              !< Number of shear stress components
+    integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
+    integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    !> @}
+
+#ifdef MFC_SIMULATION
+    $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
+#endif
+
+contains
+
+    !> Initialize equation-index state (eqn_idx, sys_size, b_size, tensor_size) from the namelist parameters. This is the shared
+    !! skeleton: it covers the model_eqns dispatch, all eqn_idx field assignments, and the elasticity/surface-tension/chemistry
+    !! extensions.
+    !!
+    !! @param nmom_in  Number of carried moments per R0 location (per-target: pre/post pass an
+    !!   integer variable; sim passes its integer parameter nmom = 6).  Used only in the 5eq
+    !!   qbmm bubble-index calculation (eqn_idx%bub%end = eqn_idx%adv%end + nb*nmom_in).
+    !!
+    !! Per-target callers are responsible for the following after this call:
+    !!   - qbmm_idx allocations and fills (diverge between pre vs sim/post)
+    !!   - sim-only: gam = bub_pp%gam_g, nmomsp/nmomtot, Re_idx allocation, GPU_UPDATE calls
+    !!   - post-only: beta_idx increment (bubbles_lagrange path), offset/grid allocations
+    impure subroutine s_initialize_eqn_idx(nmom_in)
+
+        integer, intent(in) :: nmom_in
+
+        ! Gamma/Pi_inf Model
+
+        if (model_eqns == model_eqns_gamma_law) then
+            ! Annotating structure of the state and flux vectors belonging to the system of
+            ! equations defined by the selected number of spatial dimensions and the gamma/pi_inf model
+            eqn_idx%cont%beg = 1
+            eqn_idx%cont%end = eqn_idx%cont%beg
+            eqn_idx%mom%beg = eqn_idx%cont%end + 1
+            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
+            eqn_idx%E = eqn_idx%mom%end + 1
+            eqn_idx%adv%beg = eqn_idx%E + 1
+            eqn_idx%adv%end = eqn_idx%adv%beg + 1
+            eqn_idx%gamma = eqn_idx%adv%beg
+            eqn_idx%pi_inf = eqn_idx%adv%end
+            sys_size = eqn_idx%adv%end
+
+            ! Volume Fraction Model (5-equation model)
+        else if (model_eqns == model_eqns_5eq) then
+            ! Annotating structure of the state and flux vectors belonging to the system of
+            ! equations defined by the selected number of spatial dimensions and the volume fraction model
+            eqn_idx%cont%beg = 1
+            eqn_idx%cont%end = num_fluids
+            eqn_idx%mom%beg = eqn_idx%cont%end + 1
+            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
+            eqn_idx%E = eqn_idx%mom%end + 1
+
+            if (igr) then
+                ! IGR: volume fractions after energy (N-1 for N fluids; skipped when num_fluids=1)
+                eqn_idx%adv%beg = eqn_idx%E + 1
+                eqn_idx%adv%end = eqn_idx%E + num_fluids - 1
+            else
+                ! WENO/MUSCL + Riemann tracks a total of (N) volume fractions for N fluids
+                eqn_idx%adv%beg = eqn_idx%E + 1
+                eqn_idx%adv%end = eqn_idx%E + num_fluids
+            end if
+
+            sys_size = eqn_idx%adv%end
+
+            if (bubbles_euler) then
+                eqn_idx%alf = eqn_idx%adv%end
+            else
+                eqn_idx%alf = 1
+            end if
+
+            if (bubbles_euler) then
+                eqn_idx%bub%beg = sys_size + 1
+                if (qbmm) then
+                    eqn_idx%bub%end = eqn_idx%adv%end + nb*nmom_in
+                else
+                    if (.not. polytropic) then
+                        eqn_idx%bub%end = sys_size + 4*nb
+                    else
+                        eqn_idx%bub%end = sys_size + 2*nb
+                    end if
+                end if
+                sys_size = eqn_idx%bub%end
+
+                if (adv_n) then
+                    eqn_idx%n = eqn_idx%bub%end + 1
+                    sys_size = eqn_idx%n
+                end if
+            end if
+
+            if (mhd) then
+                eqn_idx%B%beg = sys_size + 1
+                if (n == 0) then
+                    eqn_idx%B%end = sys_size + 2  ! 1D: By, Bz
+                else
+                    eqn_idx%B%end = sys_size + 3  ! 2D/3D: Bx, By, Bz
+                end if
+                sys_size = eqn_idx%B%end
+            end if
+
+            ! Volume Fraction Model (6-equation model)
+        else if (model_eqns == model_eqns_6eq) then
+            ! Annotating structure of the state and flux vectors belonging to the system of
+            ! equations defined by the selected number of spatial dimensions and the volume fraction model
+            eqn_idx%cont%beg = 1
+            eqn_idx%cont%end = num_fluids
+            eqn_idx%mom%beg = eqn_idx%cont%end + 1
+            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
+            eqn_idx%E = eqn_idx%mom%end + 1
+            eqn_idx%adv%beg = eqn_idx%E + 1
+            eqn_idx%adv%end = eqn_idx%E + num_fluids
+#ifdef MFC_SIMULATION
+            eqn_idx%alf = eqn_idx%adv%end
+#endif
+            eqn_idx%int_en%beg = eqn_idx%adv%end + 1
+            eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
+            sys_size = eqn_idx%int_en%end
+        else if (model_eqns == model_eqns_4eq) then
+            ! 4-equation model with subgrid bubbles
+            eqn_idx%cont%beg = 1
+            eqn_idx%cont%end = 1
+            eqn_idx%mom%beg = eqn_idx%cont%end + 1
+            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
+            eqn_idx%E = eqn_idx%mom%end + 1
+            eqn_idx%adv%beg = eqn_idx%E + 1
+            eqn_idx%adv%end = eqn_idx%adv%beg
+            eqn_idx%alf = eqn_idx%adv%end
+            sys_size = eqn_idx%adv%end
+
+            if (bubbles_euler) then
+                eqn_idx%bub%beg = sys_size + 1
+                eqn_idx%bub%end = sys_size + 2*nb
+                if (.not. polytropic) then
+                    eqn_idx%bub%end = sys_size + 4*nb
+                end if
+                sys_size = eqn_idx%bub%end
+            end if
+        end if
+
+        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
+                eqn_idx%stress%beg = sys_size + 1
+                eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
+                if (cyl_coord) eqn_idx%stress%end = eqn_idx%stress%end + 1
+                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
+                sys_size = eqn_idx%stress%end
+
+                ! shear stress index is 2 for 2D and 2,4,5 for 3D
+                if (num_dims == 1) then
+                    shear_num = 0
+                else if (num_dims == 2) then
+                    shear_num = 1
+                    shear_indices(1) = eqn_idx%stress%beg - 1 + 2
+                    shear_BC_flip_num = 1
+                    shear_BC_flip_indices(1:2,1) = shear_indices(1)
+                    ! Both x-dir and y-dir: flip tau_xy only
+                else if (num_dims == 3) then
+                    shear_num = 3
+                    shear_indices(1:3) = eqn_idx%stress%beg - 1 + (/2, 4, 5/)
+                    shear_BC_flip_num = 2
+                    shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
+                    shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
+                    shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
+                    ! x-dir: flip tau_xy and tau_xz; y-dir: flip tau_xy and tau_yz; z-dir: flip tau_xz and tau_yz
+                end if
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric b tensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                eqn_idx%xi%beg = sys_size + 1
+                eqn_idx%xi%end = sys_size + num_dims
+                ! adding equations for the xi field and the elastic energy
+                sys_size = eqn_idx%xi%end + 1
+            end if
+
+            if (surface_tension) then
+                eqn_idx%c = sys_size + 1
+                sys_size = eqn_idx%c
+            end if
+
+            if (cont_damage) then
+                eqn_idx%damage = sys_size + 1
+                sys_size = eqn_idx%damage
+            end if
+
+            if (hyper_cleaning) then
+                eqn_idx%psi = sys_size + 1
+                sys_size = eqn_idx%psi
+            end if
+        end if
+
+        if (chemistry) then
+            eqn_idx%species%beg = sys_size + 1
+            eqn_idx%species%end = sys_size + num_species
+            sys_size = eqn_idx%species%end
+        end if
+
+    end subroutine s_initialize_eqn_idx
+
+end module m_global_parameters_common
