@@ -223,8 +223,10 @@ Some parameters, as described above, can be defined by analytical functions in t
 
 where `alpha_rho` is defined with the `1 + 0.1*sin(20*x*pi)` function.
 
-The expressions are interpreted as Fortran code, in the execution context and scope of the function that defines the patch.
-Additionally, the following variables are made available as shorthand:
+Expressions use **Python syntax** and are parsed at case load time.
+Syntax errors and unknown variable or function names are immediate, named errors — they are reported before any Fortran is compiled, with a message identifying the offending expression and listing the available names.
+
+The following variables are available in IC patch expressions:
 
 | Shorthand | Expands To               | Shorthand | Expands To                | Shorthand | Expands To               |
 | --------- | ------------------------ | --------- | ------------------------- | --------- | ------------------------ |
@@ -232,15 +234,23 @@ Additionally, the following variables are made available as shorthand:
 | `y`       | `y_cc(j)`                | `ly`      | The patch's `length_y`    | `yc`      | The patch's `y_centroid` |
 | `z`       | `z_cc(k)`                | `lz`      | The patch's `length_z`    | `zc`      | The patch's `z_centroid` |
 | `eps`     | The patch's `epsilon`    | `beta`    | The patch's `beta`        | `radii`   | The patch's `radii`      |
-| `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi` and `e` | \f$\pi\f$ and \f$e\f$ |
+| `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi`      | \f$\pi\f$ (Fortran constant from `m_constants`) |
 
 where $(i,j,k)$ are the grid-indices of the current cell in each coordinate direction.
+
+The allowed functions are the standard Fortran intrinsics:
+`sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`,
+`sinh`, `cosh`, `tanh`, `exp`, `log`, `log10`, `sqrt`,
+`abs`, `min`, `max`, `mod`, `sign`.
+
+**Euler's number:** bare `e` is **not** a variable.
+Write `exp(1.0)` or a numeric literal instead (e.g. `2.718281828`).
 
 In the example above, the following code is generated:
 
 ```f90
 if (patch_id == 2) then
-    q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
+    q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 1 + 0.1 * sin(20 * x_cc(i) * pi)
 end if
 ```
 
@@ -369,9 +379,13 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 
-- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
+- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
 
-- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
+- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
+
+  Moving-IB analytic expressions use the same Python syntax and error-reporting as IC patch expressions (see the "Analytical Definition of Primitive Variables" section above).
+  Available variables: `x` (`x_cc(i)`), `y` (`y_cc(j)`), `z` (`z_cc(k)`), `t` (current simulation time), and `r` (the IB patch radius).
+  The same intrinsic functions and `pi` constant apply; bare `e` is not available.
 
 - `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inellastic collisions while 1 is for perfectly ellastic collisions.
 
