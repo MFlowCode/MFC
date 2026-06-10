@@ -443,7 +443,8 @@ contains
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
 
         ! Pre-process sets nmom to 6 for qbmm before the shared eqn_idx setup
-        if (qbmm .and. nnode == 4) nmom = 6
+        ! (guards match the original site: 5-equation bubbles with 4-node qbmm)
+        if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. qbmm .and. nnode == 4) nmom = 6
 
         ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom)

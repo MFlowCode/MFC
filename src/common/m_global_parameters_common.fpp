@@ -14,10 +14,9 @@ module m_global_parameters_common
 #endif
 
     use m_derived_types
-    use m_helper_basic
     use m_thermochem, only: num_species
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, &
-        & recon_type_muscl, nnode, name_len
+        & recon_type_muscl, name_len
 
     implicit none
 
@@ -26,9 +25,7 @@ module m_global_parameters_common
 
     ! Case-optimization declarations: parameters (under MFC_CASE_OPTIMIZATION) or plain variables for
     ! num_dims, num_vels, weno_polyn, muscl_polyn, weno_num_stencils, wenojs, igr, etc.
-#ifdef MFC_SIMULATION
     #:include 'generated_case_opt_decls.fpp'
-#endif
 
     ! For pre_process and post_process: num_dims and num_vels are declared manually here
     ! (sim gets them from generated_case_opt_decls.fpp above)
@@ -69,6 +66,7 @@ module m_global_parameters_common
 
 #ifdef MFC_SIMULATION
     $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
+    $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 #endif
 
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)

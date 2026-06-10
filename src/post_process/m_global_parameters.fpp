@@ -362,7 +362,8 @@ contains
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
 
         ! post_process sets nmom to 6 for qbmm before the shared eqn_idx setup
-        if (qbmm) nmom = 6
+        ! (guard matches the original site: inside the 5-equation branch)
+        if (model_eqns == model_eqns_5eq .and. qbmm) nmom = 6
 
         ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom)

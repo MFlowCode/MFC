@@ -249,7 +249,9 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
 
     Paths match the cmake include directory structure:
       build_dir/include/{full_target}/generated_{namelist,decls,constants}.fpp
-    The simulation target also gets generated_case_opt_decls.fpp.
+    Every target gets generated_case_opt_decls.fpp: real content for simulation,
+    a header-only stub for the others (Fypp resolves #:include at parse time, so
+    the file must exist for every target even inside a dead conditional).
     """
     result = []
     for short, full in TARGETS:
@@ -257,6 +259,8 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
-    sim_inc = build_dir / "include" / "simulation"
-    result.append((sim_inc / "generated_case_opt_decls.fpp", generate_case_opt_decls_fpp()))
+    for short, full in TARGETS:
+        inc = build_dir / "include" / full
+        content = generate_case_opt_decls_fpp() if short == "sim" else _HEADER + "! (no case-optimization declarations for this target)\n"
+        result.append((inc / "generated_case_opt_decls.fpp", content))
     return result
