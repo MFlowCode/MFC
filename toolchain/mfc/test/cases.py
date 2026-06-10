@@ -1852,6 +1852,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # is too large for the CI smoke suite. The faster NN examples remain tested.
                 "2D_poiseuille_nn",
                 "2D_bingham_poiseuille_nn",
+                # The CI grid cap (~25x25) thins this case's immersed-boundary wall slabs
+                # to ~2 cells, an under-resolved IB whose body-forced dead-fluid dynamics
+                # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
+                # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
+                "2D_ibm_poiseuille_nn",
             ]
             if path in casesToSkip:
                 continue
