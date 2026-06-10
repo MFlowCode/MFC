@@ -766,13 +766,13 @@ def _load():
     # patch_icpp (10 patches)
     for i in range(1, NP + 1):
         px = f"patch_icpp({i})%"
-        for a in ["geometry", "smooth_patch_id", "hcid", "model_spc"]:
+        for a in ["geometry", "smooth_patch_id", "hcid", "model_id"]:
             _r(f"{px}{a}", INT)
         for a in ["smoothen", "alter_patch"] if i >= 2 else ["smoothen"]:
             _r(f"{px}{a}", LOG)
         for a, sym in [("rho", r"\f$\rho\f$"), ("gamma", r"\f$\gamma\f$"), ("pi_inf", r"\f$\pi_\infty\f$"), ("cv", r"\f$c_v\f$"), ("qv", r"\f$q_v\f$"), ("qvp", r"\f$q'_v\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        for a in ["radius", "radii", "epsilon", "beta", "normal", "alpha_rho", "non_axis_sym", "smooth_coeff", "vel", "alpha", "model_threshold"]:
+        for a in ["radius", "radii", "epsilon", "beta", "normal", "alpha_rho", "non_axis_sym", "smooth_coeff", "vel", "alpha"]:
             _r(f"{px}{a}", REAL)
         # Bubble fields
         for a in ["r0", "v0", "p0", "m0"]:
@@ -787,10 +787,6 @@ def _load():
         # Chemistry species
         for j in range(1, 101):
             _r(f"{px}Y({j})", A_REAL, {"chemistry"})
-        _r(f"{px}model_filepath", STR)
-        for t in ["translate", "scale", "rotate"]:
-            for j in range(1, 4):
-                _r(f"{px}model_{t}({j})", REAL)
         for d in ["x", "y", "z"]:
             _r(f"{px}{d}_centroid", REAL)
             _r(f"{px}length_{d}", REAL)

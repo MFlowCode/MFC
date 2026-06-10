@@ -525,16 +525,27 @@ contains
 
     end subroutine s_check_inactive_patch_primitive_variables
 
-    !> Verify that the model file referenced by the given patch exists on disk.
+    !> Verify that an STL/OBJ model patch (geometry 21) references a valid stl_models entry whose model file exists on disk.
     impure subroutine s_check_model_geometry(patch_id)
 
         integer, intent(in) :: patch_id
+        integer             :: mid
+        character(len=10)   :: midStr
         logical             :: file_exists
 
-        inquire (file=patch_icpp(patch_id)%model_filepath, exist=file_exists)
+        call s_int_to_str(patch_id, iStr)
+        mid = patch_icpp(patch_id)%model_id
+        call s_int_to_str(mid, midStr)
+
+        @:PROHIBIT(mid <= 0 .or. mid > num_stl_models, &
+                   & "patch_icpp(" // trim(iStr) // ")%model_id=" // trim(midStr) // " must be in [1, num_stl_models]")
+
+        @:PROHIBIT(stl_models(mid)%model_filepath == dflt_char, "Empty model file path for stl_models(" // trim(midStr) // ")")
+
+        inquire (file=stl_models(mid)%model_filepath, exist=file_exists)
 
         @:PROHIBIT(.not. file_exists, &
-                   & "Model file " // trim(patch_icpp(patch_id)%model_filepath) // " requested by patch " // trim(iStr) &
+                   & "Model file " // trim(stl_models(mid)%model_filepath) // " requested by patch " // trim(iStr) &
                    & // " does not exist")
 
     end subroutine s_check_model_geometry
