@@ -290,7 +290,10 @@ Still manual (not auto-generated):
 - `TYPE` member definitions inside derived types in `src/common/m_derived_types.fpp`
 - Default-value assignments in `s_assign_default_values_to_user_inputs`
 - Multi-variable declaration lines (`bc_x/y/z`, `x/y/z_domain`, `x/y/z_output`)
-- MPI broadcast lists in `src/*/m_mpi_proxy.fpp`
+- MPI broadcast residue in `src/*/m_mpi_proxy.fpp` (computed/non-namelist variables such
+  as `m_glb`/`n_glb`/`p_glb`, `cfl_dt`, `bc_io`, and complex struct-member array loops;
+  namelist-registry scalars are broadcast via the auto-generated `generated_bcast.fpp`
+  include)
 - `CASE_OPT_EXTRA_LINES` in `toolchain/mfc/params/generators/fortran_gen.py` for case-optimization constants
 
 After editing any generator or table, force regen by reconfiguring (`./mfc.sh build`) —

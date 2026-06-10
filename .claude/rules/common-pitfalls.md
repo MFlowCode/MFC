@@ -48,15 +48,28 @@ covered in `docs/documentation/contributing.md`.
   `CASE_OPT_EXTRA_LINES` literal in `toolchain/mfc/params/generators/fortran_gen.py` (covers `num_dims`,
   `num_vels`, `weno_polyn`, `muscl_polyn`, `weno_num_stencils`, `wenojs`);
   multi-variable declaration lines (`bc_x/y/z`, `x/y/z_domain`, `x/y/z_output`, post's
-  `G`); and MPI broadcast lists in `m_mpi_proxy`. Everything else — scalar declarations,
-  plain arrays (`FORTRAN_ARRAY_DIMS` table in `definitions.py`), derived-type namelist
-  declarations including `GPU_DECLARE` lines and Doxygen descs (`TYPED_DECLS` table in
-  `definitions.py`), and the simulation case-optimization declaration block — is
-  auto-generated at CMake configure time.
+  `G`); and the MPI broadcast residue in `m_mpi_proxy` (computed variables that are not
+  namelist-bound: `m_glb`/`n_glb`/`p_glb`, `cfl_dt`, `bc_io`, and complex struct-member
+  array loops — these cannot be auto-generated and stay hand-listed). Everything else — scalar declarations, plain arrays (`FORTRAN_ARRAY_DIMS`
+  table in `definitions.py`), derived-type namelist declarations including `GPU_DECLARE`
+  lines and Doxygen descs (`TYPED_DECLS` table in `definitions.py`), the simulation
+  case-optimization declaration block, and the per-target MPI broadcast lists for all
+  namelist-registry scalars (`generated_bcast.fpp`) — is auto-generated at CMake configure
+  time.
   Gotcha: after editing a generator or table, force regen via `cmake_gen.py` into
   `build/staging/*/` or simply reconfigure (`./mfc.sh build`) — cached builds compile
   stale includes. Under `--case-optimization` the baked-in constants are dropped from the
   namelist, so changing one needs a *rebuild*, not a case edit.
+- Shared-state pattern: namelist declarations (`#:include 'generated_decls.fpp'`), the
+  `eqn_idx`/`sys_size`/`b_size`/`tensor_size` state variables, and the common defaults
+  core all live in `src/common/m_global_parameters_common.fpp`. Each per-target
+  `m_global_parameters.fpp` does `use m_global_parameters_common` (default-public), so
+  `use m_global_parameters` continues to work for all downstream modules without change.
+  Sim-only declarations (GPU_DECLARE, Re_idx allocation) stay in
+  `m_global_parameters_common` behind `#ifdef MFC_SIMULATION`. Generated includes
+  (`generated_decls.fpp`, `generated_bcast.fpp`) must exist for every target — the build
+  emits stubs where the content is sim-only, so a common file that includes one will
+  compile for pre/post too.
 - Runtime checks (`@:PROHIBIT`) go where they run: shared →
   `src/common/m_checker_common.fpp`; simulation-only → `src/simulation/m_checker.fpp`;
   pre/post-only → `src/{pre,post}_process/m_checker.fpp` (their `s_check_inputs` are
