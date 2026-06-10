@@ -65,57 +65,7 @@ module m_global_parameters
 
     logical :: cfl_dt
     ! Simulation Algorithm Parameters
-    #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: num_dims = ${num_dims}$  !< Number of spatial dimensions
-        integer, parameter :: num_vels = ${num_vels}$  !< Number of velocity components (different from num_dims for mhd)
-    #:else
-        integer :: num_dims  !< Number of spatial dimensions
-        integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
-    #:endif
-    #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: recon_type = ${recon_type}$    !< Reconstruction type
-        integer, parameter :: weno_polyn = ${weno_polyn}$    !< Degree of the WENO polynomials (polyn)
-        integer, parameter :: muscl_polyn = ${muscl_polyn}$  !< Degree of the MUSCL polynomials (polyn)
-        integer, parameter :: weno_order = ${weno_order}$    !< Order of the WENO reconstruction
-        integer, parameter :: muscl_order = ${muscl_order}$  !< Order of the MUSCL order
-        !> Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
-        integer, parameter  :: weno_num_stencils = ${weno_num_stencils}$
-        integer, parameter  :: muscl_lim = ${muscl_lim}$               !< MUSCL Limiter
-        integer, parameter  :: num_fluids = ${num_fluids}$             !< number of fluids in the simulation
-        logical, parameter  :: wenojs = (${wenojs}$ /= 0)              !< WENO-JS (default)
-        logical, parameter  :: mapped_weno = (${mapped_weno}$ /= 0)    !< WENO-M (WENO with mapping of nonlinear weights)
-        logical, parameter  :: wenoz = (${wenoz}$ /= 0)                !< WENO-Z
-        logical, parameter  :: teno = (${teno}$ /= 0)                  !< TENO (Targeted ENO)
-        real(wp), parameter :: wenoz_q = ${wenoz_q}$                   !< Power constant for WENO-Z
-        logical, parameter  :: mhd = (${mhd}$ /= 0)                    !< Magnetohydrodynamics
-        logical, parameter  :: relativity = (${relativity}$ /= 0)      !< Relativity (only for MHD)
-        integer, parameter  :: igr_iter_solver = ${igr_iter_solver}$   !< IGR elliptic solver
-        integer, parameter  :: igr_order = ${igr_order}$               !< Reconstruction order for IGR
-        logical, parameter  :: igr = (${igr}$ /= 0)                    !< use information geometric regularization
-        logical, parameter  :: igr_pres_lim = (${igr_pres_lim}$ /= 0)  !< Limit to positive pressures for IGR
-        logical, parameter  :: viscous = (${viscous}$ /= 0)            !< Viscous effects
-    #:else
-        integer  :: recon_type
-        integer  :: weno_polyn
-        integer  :: muscl_polyn
-        integer  :: weno_order
-        integer  :: muscl_order
-        integer  :: weno_num_stencils
-        integer  :: muscl_lim
-        integer  :: num_fluids
-        logical  :: wenojs
-        logical  :: mapped_weno
-        logical  :: wenoz
-        logical  :: teno
-        real(wp) :: wenoz_q
-        logical  :: mhd
-        logical  :: relativity
-        integer  :: igr_iter_solver
-        integer  :: igr_order
-        logical  :: igr
-        logical  :: igr_pres_lim
-        logical  :: viscous
-    #:endif
+    #:include 'generated_case_opt_decls.fpp'
 
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer                :: hyper_model                  !< hyperelasticity solver algorithm

@@ -210,17 +210,18 @@ def test_check_target_raises_on_bad_target():
         generate_decls_fpp("bad")
 
 
-def test_get_generated_files_returns_nine():
+def test_get_generated_files_returns_ten():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/build"))
-    assert len(files) == 9
+    assert len(files) == 10
     paths = [str(p) for p, _ in files]
     assert any("pre_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_decls.fpp" in p for p in paths)
     assert any("post_process/generated_namelist.fpp" in p for p in paths)
+    assert any("simulation/generated_case_opt_decls.fpp" in p for p in paths)
 
 
 def test_generate_constants_fpp_content():
@@ -242,5 +243,47 @@ def test_get_generated_files_includes_constants():
 
     files = get_generated_files(Path("/tmp/x"))
     names = {p.name for p, _ in files}
-    assert names == {"generated_namelist.fpp", "generated_decls.fpp", "generated_constants.fpp"}
-    assert len(files) == 9
+    assert names == {"generated_namelist.fpp", "generated_decls.fpp", "generated_constants.fpp", "generated_case_opt_decls.fpp"}
+    assert len(files) == 10
+
+
+def test_generate_case_opt_decls_fpp():
+    from mfc.params.generators.fortran_gen import generate_case_opt_decls_fpp
+
+    out = generate_case_opt_decls_fpp()
+
+    # Must have the case-opt guard structure
+    assert "#:if MFC_CASE_OPTIMIZATION" in out
+    assert "#:else" in out
+    assert "#:endif" in out
+
+    # Representative registry-driven parameter lines (#:if branch)
+    assert "integer, parameter :: weno_order = ${weno_order}$" in out
+    assert "integer, parameter :: num_fluids = ${num_fluids}$" in out
+    assert "logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)" in out
+    assert "real(wp), parameter :: wenoz_q = ${wenoz_q}$" in out
+
+    # #:else branch variable forms
+    assert "integer                 :: weno_order" in out
+    assert "logical                 :: mapped_weno" in out
+    assert "real(wp)                :: wenoz_q" in out
+
+    # case.py-computed extras
+    assert "integer, parameter :: num_dims = ${num_dims}$" in out
+    assert "integer, parameter :: weno_polyn = ${weno_polyn}$" in out
+    assert "logical, parameter :: wenojs = (${wenojs}$ /= 0)" in out
+    assert "integer                 :: num_dims" in out
+    assert "integer                 :: weno_polyn" in out
+    assert "logical                 :: wenojs" in out
+
+    # nb must NOT be in this block (it lives in a separate block)
+    assert ":: nb" not in out
+
+    # All CASE_OPT_PARAMS (minus nb) must appear in both branches
+    from mfc.params.definitions import CASE_OPT_PARAMS
+
+    for name in CASE_OPT_PARAMS - {"nb"}:
+        assert f":: {name}" in out, f"{name!r} missing from generated_case_opt_decls"
+
+    # AUTO-GENERATED header present
+    assert "AUTO-GENERATED" in out
