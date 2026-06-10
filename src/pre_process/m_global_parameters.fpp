@@ -94,8 +94,9 @@ module m_global_parameters
     !> @name Immersed Boundaries
     !> @{
     type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib    !< Immersed boundary patch parameters
-    type(ib_airfoil_parameters), dimension(num_ib_airfoils_max)       :: ib_airfoil  !< Per-airfoil NACA parameters
-    type(ib_stl_parameters), dimension(num_stl_models_max)            :: stl_models  !< Per-STL model parameters (namelist)
+    type(ib_airfoil_parameters), dimension(num_ib_airfoils_max)       :: ib_airfoil       !< Per-airfoil NACA parameters
+    type(ib_airfoil_grid), allocatable, dimension(:)                  :: ib_airfoil_grids !< Per-airfoil computed surface grids (unused in pre_process)
+    type(ib_stl_parameters), dimension(num_stl_models_max)            :: stl_models       !< Per-STL model parameters (namelist)
     !> @}
 
     !> @name Non-polytropic bubble gas compression

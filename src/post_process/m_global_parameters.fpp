@@ -106,6 +106,9 @@ module m_global_parameters
     integer, dimension(3, 2)           :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
     integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
     integer, allocatable, dimension(:) :: start_idx  !< Starting cell-center index of local processor in global grid
+    type(ib_airfoil_parameters), allocatable, dimension(:) :: ib_airfoil       !< Per-airfoil NACA parameters (unused in post_process)
+    type(ib_airfoil_grid), allocatable, dimension(:)       :: ib_airfoil_grids !< Per-airfoil computed surface grids (unused in post_process)
+
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
