@@ -42,7 +42,7 @@ covered in `docs/documentation/contributing.md`.
 - Adding one: `_r()` definition + `_nv()` `NAMELIST_VARS` registration in
   `toolchain/mfc/params/definitions.py`; `case_validator.py` only if physics-constrained
   (with a `PHYSICS_DOCS` entry). Fortran declarations and namelist bindings are
-  auto-generated at CMake configure time — re-run cmake (or `./mfc.sh build`) after editing.
+  auto-generated at build time (ninja-tracked custom command) — re-run cmake (or `./mfc.sh build`) after editing.
 - Still manual: derived-type `TYPE` member definitions in `src/common/m_derived_types.fpp`;
   default-value assignments in `s_assign_default_values_to_user_inputs`; the
   `CASE_OPT_EXTRA_LINES` literal in `toolchain/mfc/params/generators/fortran_gen.py` (covers `num_dims`,
@@ -54,11 +54,10 @@ covered in `docs/documentation/contributing.md`.
   table in `definitions.py`), derived-type namelist declarations including `GPU_DECLARE`
   lines and Doxygen descs (`TYPED_DECLS` table in `definitions.py`), the simulation
   case-optimization declaration block, and the per-target MPI broadcast lists for all
-  namelist-registry scalars (`generated_bcast.fpp`) — is auto-generated at CMake configure
-  time.
-  Gotcha: after editing a generator or table, force regen via `cmake_gen.py` into
-  `build/staging/*/` or simply reconfigure (`./mfc.sh build`) — cached builds compile
-  stale includes. Under `--case-optimization` the baked-in constants are dropped from the
+  namelist-registry scalars (`generated_bcast.fpp`) — is regenerated at build time by a
+  ninja-tracked custom command (editing `params/*.py` triggers regeneration automatically).
+  Gotcha: ADDING a new file under `toolchain/mfc/params/` needs one reconfigure
+  (the custom command's DEPENDS list is globbed at configure time). Under `--case-optimization` the baked-in constants are dropped from the
   namelist, so changing one needs a *rebuild*, not a case edit.
 - Shared-state pattern: namelist declarations (`#:include 'generated_decls.fpp'`), the
   `eqn_idx`/`sys_size`/`b_size`/`tensor_size` state variables, and the common defaults

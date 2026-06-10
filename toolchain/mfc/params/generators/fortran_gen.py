@@ -244,6 +244,7 @@ _POST_BCAST_EXCLUDE = frozenset({"avg_state", "cfl_target", "igr_order", "num_bc
 # TYPED_DECLS entries kept entirely in the manual residue: their member-broadcast structure
 # is irregular (non-uniform subsets, size() arrays, nested loops, complex guards).
 
+
 def _mpi_type_for(ptype: ParamType) -> str:
     """Return the Fortran MPI type constant for a ParamType."""
     if ptype in _REAL_TYPES:

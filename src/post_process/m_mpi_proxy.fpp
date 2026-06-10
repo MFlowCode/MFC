@@ -67,7 +67,7 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         ! Generated: case_dir, namelist scalars (INT/LOG/REAL), array dims (including
-        !            chem_wrt_Y - latent bug fix), fluid_pp loop, bub_pp guard
+        !            chem_wrt_Y, previously missing), fluid_pp loop, bub_pp guard
         #:include 'generated_bcast.fpp'
 
         ! manual: m_glb, n_glb, p_glb (computed in s_read_input_file, not namelist-bound)

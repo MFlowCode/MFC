@@ -316,7 +316,7 @@ If your check enforces a physics constraint, also add a `PHYSICS_DOCS` entry (se
 **Step 5: Fortran declaration and namelist binding (auto-generated)**
 
 Scalar declarations, GPU declare lines, Doxygen descriptions, and namelist bindings are
-auto-generated at CMake configure time from the `TYPED_DECLS` and `FORTRAN_ARRAY_DIMS`
+auto-generated at build time (ninja-tracked custom command) from the `TYPED_DECLS` and `FORTRAN_ARRAY_DIMS`
 tables in `toolchain/mfc/params/definitions.py`. For a plain scalar registered with
 `_r()` / `_nv()` above, no manual Fortran edit is needed — reconfigure (`./mfc.sh build`)
 and the generated include in each target's `m_global_parameters.fpp` is updated

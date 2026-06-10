@@ -20,7 +20,7 @@ module m_global_parameters_common
 
     implicit none
 
-    ! All namelist-bound scalar and array declarations (per-target, auto-generated at CMake configure time)
+    ! All namelist-bound scalar and array declarations (per-target, regenerated at build time by the ninja custom command)
     #:include 'generated_decls.fpp'
 
     ! Case-optimization declarations: parameters (under MFC_CASE_OPTIMIZATION) or plain variables for
