@@ -44,14 +44,12 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer                            :: patch_id, i, j, k, il, ir, jl, jr, kl, kr, xp, yp, zp       !< iterators
         integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper  !< periodic bounds
-        real(wp), dimension(3)             :: center, xyz_local
-        real(wp)                           :: bounding_box_corner_distance
+        real(wp), dimension(3)             :: center, xyz_local, length
+        real(wp)                           :: bounding_box_corner_distance, radius
 
         !  3D Patch Geometries
 
         if (num_dims == 3) then
-            !> IB Patches
-            !> @{
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
@@ -79,8 +77,8 @@ contains
                             call get_bounding_indices(center(3) - bounding_box_corner_distance, &
                                                       & center(3) + bounding_box_corner_distance, z_cc, kl, kr)
 
-                            $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local]', copyin='[patch_id, encoded_patch_id, center]', &
-                                                & collapse=3)
+                            $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, length, radius]', copyin='[patch_id, &
+                                                & encoded_patch_id, center]', collapse=3)
                             do k = kl, kr
                                 do j = jl, jr
                                     do i = il, ir
@@ -88,23 +86,33 @@ contains
                                         xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)]
                                         ! rotate the frame into the IB's coordinates
                                         xyz_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xyz_local)
-                                        ! airfoils are a patch that require a centroid offset
-                                        xyz_local = xyz_local - patch_ib(patch_id)%offset
 
                                         ! perform the interior check for the patch geometry of this IB
                                         if (patch_ib(patch_id)%geometry == 8) then
-                                            if (f_is_inside_sphere(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
+                                            ! sphere geometry
+                                            radius = patch_ib(patch_id)%radius
+                                            if (f_is_inside_sphere(x_cc(i), y_cc(j), z_cc(k), radius)) ib_markers%sf(i, j, &
                                                 & k) = encoded_patch_id
                                         else if (patch_ib(patch_id)%geometry == 9) then
-                                            if (f_is_inside_cuboid(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
+                                            ! cuboid geometry
+                                            length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, &
+                                                               & patch_ib(patch_id)%length_z]
+                                            if (f_is_inside_cuboid(x_cc(i), y_cc(j), z_cc(k), length)) ib_markers%sf(i, j, &
                                                 & k) = encoded_patch_id
                                         else if (patch_ib(ipatch_id)%geometry == 10) then
-                                            if (f_is_inside_cylinder(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
-                                                & k) = encoded_patch_id
+                                            ! cylinder geometry
+                                            radius = radius = patch_ib(patch_id)%radius
+                                            if (f_is_inside_cylinder(x_cc(i), y_cc(j), z_cc(k), radius, &
+                                                & patch_ib(patch_id)%length_x)) ib_markers%sf(i, j, k) = encoded_patch_id
                                         else if (patch_ib(patch_id)%geometry == 11) then
-                                            if (f_is_inside_airfoil(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
-                                                & k) = encoded_patch_id
+                                            ! 3D airfoil geometry
+                                            airfoil_id = patch_ib(patch_id)%airfoil_id
+                                            xyz_local = xyz_local - patch_ib(patch_id)%offset
+                                            if (f_is_inside_airfoil(x_cc(i), y_cc(j), z_cc(k), patch_ib(patch_id)%length_z, &
+                                                & airoil_id)) ib_markers%sf(i, j, k) = encoded_patch_id
                                         else if (patch_ib(patch_id)%geometry == 12) then
+                                            ! STL model geometry
+                                            xyz_local = xyz_local - patch_ib(patch_id)%offset
                                             if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
                                                 & k) = encoded_patch_id
                                         end if
@@ -116,12 +124,9 @@ contains
                     end do
                 end do
             end do
-            !> @}
 
             ! 2D Patch Geometries
         else if (num_dims == 2) then
-            !> IB Patches
-            !> @{
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
@@ -151,23 +156,33 @@ contains
                                 xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                                 ! rotate the frame into the IB's coordinates
                                 xyz_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xyz_local)
-                                ! airfoils are a patch that require a centroid offset
-                                xyz_local = xyz_local - patch_ib(patch_id)%offset
 
                                 ! perform the interior check for the patch geometry of this IB
                                 if (patch_ib(patch_id)%geometry == 2) then
-                                    if (f_is_inside_circle(patch_id, x_cc(i), y_cc(j))) ib_markers%sf(i, j, k) = encoded_patch_id
+                                    ! circular geometries
+                                    radius = patch_ib(patch_id)%radius
+                                    if (f_is_inside_cylinder(0._wp, x_cc(i), y_cc(j), radius, 0._wp)) ib_markers%sf(i, j, &
+                                        & k) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 3) then
-                                    if (f_is_inside_rectangle(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
+                                    ! rectangular geometries
+                                    length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
+                                    if (f_is_inside_cuboid(x_cc(i), y_cc(j), z_cc(k), length)) ib_markers%sf(i, j, &
                                         & k) = encoded_patch_id
                                 else if (patch_ib(ipatch_id)%geometry == 4) then
-                                    if (f_is_inside_airfoil(patch_id, x_cc(i), y_cc(j), 0._wp)) ib_markers%sf(i, j, &
+                                    ! 2D airfoil geometry
+                                    airfoil_id = patch_ib(patch_id)%airfoil_id
+                                    xyz_local = xyz_local - patch_ib(patch_id)%offset
+                                    if (f_is_inside_airfoil(x_cc(i), y_cc(j), 0._wp, 0._wp, airfoil_id)) ib_markers%sf(i, j, &
                                         & k) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 5) then
+                                    ! STL model geometry
+                                    xyz_local = xyz_local - patch_ib(patch_id)%offset
                                     if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), 0._wp)) ib_markers%sf(i, j, &
                                         & k) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 6) then
-                                    if (f_is_inside_ellipse(patch_id, x_cc(i), y_cc(j))) ib_markers%sf(i, j, k) = encoded_patch_id
+                                    ! ellipse geometry
+                                    length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
+                                    if (f_is_inside_ellipse(x_cc(i), y_cc(j), length)) ib_markers%sf(i, j, k) = encoded_patch_id
                                 end if
                             end do
                         end do
@@ -175,7 +190,6 @@ contains
                     end do
                 end do
             end do
-            !> @}
         end if
 
     end subroutine s_apply_ib_patches_grid_cell_parallelism
@@ -191,13 +205,88 @@ contains
         if (num_dims == 3) then
             ! get the periodicities
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
-        else if (num_dims == 2) then
-            ! get the periodicities considered
-            call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
 
-            $:GPU_PARALLEL_LOOP(private='[xp, yp, patch_id, center]')
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
+                    do zp = zp_lower, zp_upper
+                        $:GPU_PARALLEL_LOOP(private='[xp, yp, zp, i, il, ir, j, jl, jr, k, kl, kr, xyz_local, length, radius, &
+                                            & bounding_box_corner_distance, patch_id, encoded_patch_id, center]')
+                        do patch_id = 1, num_ibs
+                            center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+                            center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+                            center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
+                            call s_get_bounding_box_corner_distance(patch_id, bounding_box_corner_distance)
+
+                            ! encode the periodicity information into the patch_id
+                            call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
+
+                            ! find the indices to the left and right of the IB in i, j, k
+                            il = -gp_layers - 1
+                            jl = -gp_layers - 1
+                            kl = -gp_layers - 1
+                            ir = m + gp_layers + 1
+                            jr = n + gp_layers + 1
+                            kr = p + gp_layers + 1
+                            call get_bounding_indices(center(1) - bounding_box_corner_distance, &
+                                                      & center(1) + bounding_box_corner_distance, x_cc, il, ir)
+                            call get_bounding_indices(center(2) - bounding_box_corner_distance, &
+                                                      & center(2) + bounding_box_corner_distance, y_cc, jl, jr)
+                            call get_bounding_indices(center(3) - bounding_box_corner_distance, &
+                                                      & center(3) + bounding_box_corner_distance, z_cc, kl, kr)
+                            do k = kl, kr
+                                do j = jl, jr
+                                    do i = il, ir
+                                        ! get coordinate frame centered on IB
+                                        xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)]
+                                        ! rotate the frame into the IB's coordinates
+                                        xyz_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xyz_local)
+
+                                        ! perform the interior check for the patch geometry of this IB
+                                        if (patch_ib(patch_id)%geometry == 8) then
+                                            ! sphere geometry
+                                            radius = patch_ib(patch_id)%radius
+                                            if (f_is_inside_sphere(x_cc(i), y_cc(j), z_cc(k), radius)) ib_markers%sf(i, j, &
+                                                & k) = encoded_patch_id
+                                        else if (patch_ib(patch_id)%geometry == 9) then
+                                            ! cuboid geometry
+                                            length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, &
+                                                               & patch_ib(patch_id)%length_z]
+                                            if (f_is_inside_cuboid(x_cc(i), y_cc(j), z_cc(k), length)) ib_markers%sf(i, j, &
+                                                & k) = encoded_patch_id
+                                        else if (patch_ib(ipatch_id)%geometry == 10) then
+                                            ! cylinder geometry
+                                            radius = radius = patch_ib(patch_id)%radius
+                                            if (f_is_inside_cylinder(x_cc(i), y_cc(j), z_cc(k), radius, &
+                                                & patch_ib(patch_id)%length_x)) ib_markers%sf(i, j, k) = encoded_patch_id
+                                        else if (patch_ib(patch_id)%geometry == 11) then
+                                            ! 3D airfoil geometry
+                                            airfoil_id = patch_ib(patch_id)%airfoil_id
+                                            xyz_local = xyz_local - patch_ib(patch_id)%offset
+                                            if (f_is_inside_airfoil(x_cc(i), y_cc(j), z_cc(k), patch_ib(patch_id)%length_z, &
+                                                & airoil_id)) ib_markers%sf(i, j, k) = encoded_patch_id
+                                        else if (patch_ib(patch_id)%geometry == 12) then
+                                            ! STL model geometry
+                                            xyz_local = xyz_local - patch_ib(patch_id)%offset
+                                            if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
+                                                & k) = encoded_patch_id
+                                        end if
+                                    end do
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end do
+                end do
+            end do
+        else if (num_dims == 2) then
+            ! get the periodicities
+            call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
+
+            $:GPU_PARALLEL_LOOP(private='[xp, yp, patch_id, center]', collapse=3)
+            do xp = xp_lower, xp_upper
+                do yp = yp_lower, yp_upper
+                    $:GPU_PARALLEL_LOOP(private='[xp, yp, i, il, ir, j, jl, jr, xyz_local, length, radius, &
+                                        & bounding_box_corner_distance, patch_id, encoded_patch_id, center]')
                     do patch_id = 1, num_ibs
                         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
                         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -223,30 +312,41 @@ contains
                                 xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                                 ! rotate the frame into the IB's coordinates
                                 xyz_local = matmul(patch_ib(patch_id)%rotation_matrix_inverse, xyz_local)
-                                ! airfoils are a patch that require a centroid offset
-                                xyz_local = xyz_local - patch_ib(patch_id)%offset
 
                                 ! perform the interior check for the patch geometry of this IB
                                 if (patch_ib(patch_id)%geometry == 2) then
-                                    if (f_is_inside_circle(patch_id, x_cc(i), y_cc(j))) ib_markers%sf(i, j, k) = encoded_patch_id
+                                    ! circular geometries
+                                    radius = patch_ib(patch_id)%radius
+                                    if (f_is_inside_cylinder(x_cc(i), y_cc(j), 0._wp, radius, 0._wp)) ib_markers%sf(i, j, &
+                                        & k) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 3) then
-                                    if (f_is_inside_rectangle(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
+                                    ! rectangular geometries
+                                    length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
+                                    if (f_is_inside_cuboid(x_cc(i), y_cc(j), z_cc(k), length)) ib_markers%sf(i, j, &
                                         & k) = encoded_patch_id
                                 else if (patch_ib(ipatch_id)%geometry == 4) then
-                                    if (f_is_inside_airfoil(patch_id, x_cc(i), y_cc(j), 0._wp)) ib_markers%sf(i, j, &
+                                    ! 2D airfoil geometry
+                                    airfoil_id = patch_ib(patch_id)%airfoil_id
+                                    xyz_local = xyz_local - patch_ib(patch_id)%offset
+                                    if (f_is_inside_airfoil(x_cc(i), y_cc(j), 0._wp, 0._wp, airfoil_id)) ib_markers%sf(i, j, &
                                         & k) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 5) then
+                                    ! STL model geometry
+                                    model_id = patch_ib(patch_id)%model_id
+                                    xyz_local = xyz_local - patch_ib(patch_id)%offset
                                     if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), 0._wp)) ib_markers%sf(i, j, &
                                         & k) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 6) then
-                                    if (f_is_inside_ellipse(patch_id, x_cc(i), y_cc(j))) ib_markers%sf(i, j, k) = encoded_patch_id
+                                    ! ellipse geometry
+                                    length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
+                                    if (f_is_inside_ellipse(x_cc(i), y_cc(j), length)) ib_markers%sf(i, j, k) = encoded_patch_id
                                 end if
                             end do
                         end do
                     end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_apply_ib_patches_ib_parallelism

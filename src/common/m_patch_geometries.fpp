@@ -18,97 +18,67 @@ module m_patch_geometries
 
     implicit none
 
-    public :: f_is_inside_circle, f_is_inside_sphere, f_is_inside_cylinder, f_is_inside_cuboid, f_is_inside_airfoil, &
-        & f_is_inside_ellipse
+    public :: f_is_inside_sphere, f_is_inside_cylinder, f_is_inside_cuboid, f_is_inside_airfoil, f_is_inside_ellipse
 
 contains
 
-    !> Check if the x, and y coordinates would be located inside a circle with the patch_id's radius
-    function f_is_inside_circle(patch_id, x, y) result(is_inside)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(in)  :: patch_id
-        real(wp), intent(in) :: x, y
-        logical              :: is_inside
-
-        is_inside = x**2 + y**2 <= patch_ib(patch_id)%radius**2
-
-    end function f_is_inside_circle
-
     !> Check if the x, y, and z coordinates would be located inside a sphere with the patch_id's radius
-    function f_is_inside_sphere(patch_id, x, y, z) result(is_inside)
+    function f_is_inside_sphere(x, y, z, radius) result(is_inside)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: patch_id
-        real(wp), intent(in) :: x, y, z
+        real(wp), intent(in) :: radius, x, y, z
         logical              :: is_inside
 
-        is_inside = x**2 + y**2 + z**2 <= patch_ib(patch_id)%radius**2
+        is_inside = x**2 + y**2 + z**2 <= radius**2
 
     end function f_is_inside_sphere
 
     !> Check which length of the cylinder is not default. Use that direction as the height and the other two coordinate
     ! values as the radius check
-    function f_is_inside_cylinder(patch_id, x, y, z) result(is_inside)
+    function f_is_inside_cylinder(polar_x, polar_y, height, radius, length) result(is_inside)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: patch_id
-        real(wp), intent(in) :: x, y, z
+        real(wp), intent(in) :: x, y, z, radius, length
         logical              :: is_inside
 
-        ! check if the cylinder is extended in the x direction
-        is_inside = (.not. f_is_default(patch_ib(patch_id)%length_x)) .and. y**2 + z**2 <= patch_ib(patch_id)%radius**2 .and. &
-                     & -0.5_wp*patch_ib(patch_id)%length_x <= x .and. 0.5_wp*patch_ib(patch_id)%length_x >= x
+        ! check if the circular component of the cylinder is correct
+        is_inside = polar_x**2 + polar_y**2 <= patch_ib(patch_id)%radius**2
 
-        ! check if the cylinder is extended in the z direction
-        is_inside = is_inside .or. ((.not. f_is_default(patch_ib(patch_id)%length_y)) .and. x**2 &
-                                    & + z**2 <= patch_ib(patch_id)%radius**2 .and. -0.5_wp*patch_ib(patch_id)%length_y <= y &
-                                    & .and. 0.5_wp*patch_ib(patch_id)%length_y >= y)
-
-        ! check if the cylinder is extended in the z direction
-        is_inside = is_inside .or. ((.not. f_is_default(patch_ib(patch_id)%length_z)) .and. x**2 &
-                                    & + y**2 <= patch_ib(patch_id)%radius**2 .and. -0.5_wp*patch_ib(patch_id)%length_z <= z &
-                                    & .and. 0.5_wp*patch_ib(patch_id)%length_z >= z)
-
-        ! TODO :: This can easily reuse the f_is_inside_circle function with an additional length requirement
+        ! in 3D, also check the length of the cylinder
+        if (num_dims == 3) is_inside = is_inside .and. -0.5_wp*length <= height .and. 0.5_wp*length >= height
 
     end function f_is_inside_cylinder
 
     !> Check if the x, y, and possibly z coordinates would be located inside a cuboid with the patch_id's lengths
-    function f_is_inside_cuboid(patch_id, x, y, z) result(is_inside)
+    function f_is_inside_cuboid(x, y, z, length) result(is_inside)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: patch_id
-        real(wp), intent(in) :: x, y, z
-        logical              :: is_inside
+        real(wp), intent(in)               :: x, y, z
+        real(wp), dimension(3), intent(in) :: length
+        logical                            :: is_inside
 
         ! check if x and y are inside the rectangle plane at z=0
-        is_inside = -0.5_wp*patch_ib(patch_id)%length_x <= x .and. 0.5_wp*patch_ib(patch_id)%length_x >= x is_inside = is_inside &
-                                     & .and. -0.5_wp*patch_ib(patch_id)%length_y <= y .and. 0.5_wp*patch_ib(patch_id)%length_y >= y
+        is_inside = -0.5_wp*length(1) <= x .and. 0.5_wp*length(1) >= x .and. -0.5_wp*length(2) <= y .and. 0.5_wp*length(2) >= y
 
         ! if we are in 3D, this is a cuboid and so we must also check the z axis
-        if (num_dims == 3) is_inside = is_inside .and. -0.5_wp*patch_ib(patch_id)%length_z <= z &
-            & .and. 0.5_wp*patch_ib(patch_id)%length_z >= z
+        if (num_dims == 3) is_inside = is_inside .and. -0.5_wp*length(3) <= z .and. 0.5_wp*length(3) >= z
 
     end function f_is_inside_cuboid
 
     !> Check if the x, y, are bounded by a NACA airfoil. Check if the z coordinate is inside the left and right edges of the
     !! airfoil, if set.
-    function f_is_inside_airfoil(patch_id, x, y, z) result(is_inside)
+    function f_is_inside_airfoil(x, y, z, length, airfoil_id) result(is_inside)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: patch_id
-        real(wp), intent(in) :: x, y, z
+        real(wp), intent(in) :: x, y, z, length
+        integer, intent(in)  :: airfoil_id
         logical              :: is_inside
-        integer              :: k, airfoil_id
+        integer              :: k
         real(wp)             :: f
-
-        airfoil_id = patch_ib(patch_id)%airfoil_id
 
         is_inside = .false.
 
@@ -116,8 +86,7 @@ contains
         if (.not. (x >= 0._wp .and. x <= ib_airfoil(airfoil_id)%c)) return
 
         ! if we are in 3D, we must also check the z axis
-        if (num_dims == 3 .and. (.not. (-0.5_wp*patch_ib(patch_id)%length_z <= z .and. 0.5_wp*patch_ib(patch_id)%length_z >= z))) &
-            & return
+        if (num_dims == 3 .and. (.not. (-0.5_wp*length(3) <= z .and. 0.5_wp*length(3) >= z))) return
 
         ! our check branches for the upper and lower half of the airfoil
         if (y >= 0._wp) then
@@ -158,13 +127,13 @@ contains
 
     end function f_is_inside_airfoil
 
-    function f_is_inside_ellipse(patch_id, x, y) result(is_inside)
+    function f_is_inside_ellipse(x, y, length) result(is_inside)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: patch_id
-        real(wp), intent(in) :: x, y
-        logical              :: is_inside
+        real(wp), intent(in)               :: x, y
+        real(wp), dimension(3), intent(in) :: length
+        logical                            :: is_inside
 
     end function f_is_inside_ellipse
 
