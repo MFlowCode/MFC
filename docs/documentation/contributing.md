@@ -78,6 +78,43 @@ Key data structures (defined in `src/common/m_derived_types.fpp`):
 
 See @ref parameters for the full list of ~3,400 simulation parameters. See @ref case_constraints for feature compatibility and example configurations.
 
+### How the Build Fits Together
+
+The build pipeline has four layers. Each layer has a single responsibility; the handoff
+between them is narrow.
+
+```
+mfc.sh (env bootstrap, venv, module loading, lock)
+  └─ toolchain/mfc/build.py (config slugs, cmake invocation)
+       └─ CMakeLists.txt + cmake/{GPU,Fypp,ParamsCodegen,MFCTargets}.cmake
+            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 15 generated .fpp includes)
+```
+
+**`mfc.sh` → `build.py`.**  `mfc.sh` is a thin shell wrapper that activates the Python
+virtual environment, loads HPC modules, and delegates to `build.py`.  `build.py` calls
+`get_slug` to compute a human-readable variant identifier (`<prefix>-<10-hex>`, e.g.
+`gpu-acc-chem-f93aa400b9`) that encodes every build-affecting flag: GPU backend, precision
+mode, debug, chemistry, MPI.  Staging and install trees are namespaced by slug under
+`build/staging/` and `build/install/`, so multiple variants coexist without interfering.
+
+**CMake layer.**  `cmake/Fypp.cmake` defines `HANDLE_SOURCES`, which sets up one
+`add_custom_command` per `.fpp` file to run Fypp at build time.  `cmake/ParamsCodegen.cmake`
+registers a single ninja-tracked `add_custom_command` (DEPENDS all `params/*.py`) that
+invokes `cmake_gen.py` and writes the 15 generated includes under
+`build/include/<target>/`.  There is no configure-time generation: all 15 files are build
+outputs, so changing any `params/*.py` triggers only a targeted rebuild, not a full
+reconfigure.
+
+**Fypp and per-target stubs.**  Fypp resolves `#:include` at parse time, so every `.fpp`
+file sees exactly the include path for the target being compiled.  `src/common/` is
+compiled once per executable with the `MFC_<TARGET>` preprocessor define
+(`MFC_PRE_PROCESS`, `MFC_SIMULATION`, or `MFC_POST_PROCESS`) — this is intentional.
+It is what lets common modules include per-target generated files and gate
+simulation-only code with `#ifdef MFC_SIMULATION` without duplication.
+
+For which of the 15 files is manual vs. generated and what each contains, see the
+"How to Add a New Simulation Parameter" section below.
+
 ## Development Workflow
 
 | Step | Command / Action |
