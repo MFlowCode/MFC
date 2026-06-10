@@ -72,7 +72,8 @@
             "m_checker",
             "m_checker_common",
             "m_sim_helpers",
-            "m_derived_variables"
+            "m_derived_variables",
+            "m_patch_geometries"
         ]
     },
     {
