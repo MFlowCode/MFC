@@ -140,12 +140,63 @@ def test_decls_array_dims():
     assert "dimension(num_fluids_max)" in post and ":: alpha_wrt" in post
     assert "dimension(num_fluids_max)" in post and ":: alpha_rho_wrt" in post
     assert "dimension(3)" in post and ":: mom_wrt" in post
-    # Structs and families must NOT appear as bare scalar declarations
-    assert ":: fluid_pp" not in post
+    # fluid_pp is now emitted via TYPED_DECLS; bc_x still must not appear
+    assert ":: fluid_pp" in post
     assert ":: bc_x" not in post
 
     pre = generate_decls_fpp("pre")
     assert "dimension(num_fluids_max)" in pre and ":: fluid_rho" in pre
+
+
+def test_generate_decls_emits_typed_declarations():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp
+
+    pre = generate_decls_fpp("pre")
+    sim = generate_decls_fpp("sim")
+    post = generate_decls_fpp("post")
+
+    # patch_icpp is pre-only
+    assert "patch_icpp" in pre and "patch_icpp" not in post and "patch_icpp" not in sim
+
+    # fluid_pp appears in all three targets
+    for out in (pre, sim, post):
+        assert "fluid_pp" in out
+
+    # acoustic is sim-only
+    assert "acoustic" in sim and "acoustic" not in pre
+
+    # Exact line shape (harvested from the manual declaration it replaces).
+    # Note: _ARRAY_DECL_COL=36; the type+dim string is longer so no padding space before ::
+    assert "type(physical_parameters), dimension(num_fluids_max) :: fluid_pp" in sim
+
+    # chem_params is sim-only with GPU declare
+    assert "chem_params" in sim and "chem_params" not in pre and "chem_params" not in post
+    assert "$:GPU_DECLARE(create='[chem_params]')" in sim
+
+    # bub_pp is in all three targets (derived-type scalar, dim=None)
+    for out in (pre, sim, post):
+        assert "bub_pp" in out
+
+    # lag_params is sim-only; the generator owns its GPU_DECLARE (removed from the
+    # grouped list in m_global_parameters.fpp by the Task-2 Fortran edit)
+    assert "lag_params" in sim and "lag_params" not in pre
+    for gpu_var in ("patch_ib", "ib_airfoil", "acoustic", "lag_params", "chem_params"):
+        assert f"$:GPU_DECLARE(create='[{gpu_var}]')" in sim
+
+    # Doxygen descriptions from TYPED_DECLS are emitted as inline comments
+    assert ":: fluid_pp !< Per-fluid stiffened-gas EOS parameters, Reynolds numbers, and shear modulus" in sim
+
+    # simplex_params is pre-only
+    assert "simplex_params" in pre and "simplex_params" not in sim
+
+    # No TYPED_DECLS name emitted twice
+    for name in ("fluid_pp", "bub_pp", "chem_params", "lag_params"):
+        assert sim.count(f":: {name}") == 1, f"{name!r} emitted more than once in sim"
+
+    # TYPED_DECLS keys must not overlap with FORTRAN_ARRAY_DIMS
+    from mfc.params.definitions import FORTRAN_ARRAY_DIMS, TYPED_DECLS
+
+    assert not (set(TYPED_DECLS) & set(FORTRAN_ARRAY_DIMS)), "TYPED_DECLS and FORTRAN_ARRAY_DIMS share keys"
 
 
 def test_check_target_raises_on_bad_target():

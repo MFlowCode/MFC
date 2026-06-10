@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List, Tuple
 
-from ..definitions import CASE_OPT_PARAMS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS  # noqa: F401 - triggers registry population
+from ..definitions import CASE_OPT_PARAMS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
@@ -116,6 +116,9 @@ def generate_decls_fpp(target: str) -> str:
             continue
         if target == "sim" and name in CASE_OPT_PARAMS:
             continue
+        # TYPED_DECLS handles these; skip here to avoid double-emission.
+        if name in TYPED_DECLS:
+            continue
         if name in FORTRAN_ARRAY_DIMS:
             member = REGISTRY.all_params.get(f"{name}(1)")
             if member is None:
@@ -130,6 +133,17 @@ def generate_decls_fpp(target: str) -> str:
         if any(k.startswith(f"{name}(") for k in REGISTRY.all_params):
             raise ValueError(f"{name!r} has indexed variants (e.g. {name}(1)) but is missing from " "FORTRAN_ARRAY_DIMS. Add it there with its Fortran dimension expression.")
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")
+    for name, (ftype, dim, gpu, desc) in TYPED_DECLS.items():
+        if name not in NAMELIST_VARS or target not in NAMELIST_VARS[name]:
+            continue
+        decl = f"{ftype}, dimension({dim})" if dim else ftype
+        padded = decl.ljust(_ARRAY_DECL_COL)
+        if not padded.endswith(" "):
+            padded += " "
+        doc = f" !< {desc}" if desc else ""
+        lines.append(f"{padded}:: {name}{doc}")
+        if gpu and target == "sim":
+            lines.append(f"$:GPU_DECLARE(create='[{name}]')")
     return "\n".join(lines) + "\n"
 
 
