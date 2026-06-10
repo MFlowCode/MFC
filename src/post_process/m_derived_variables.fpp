@@ -11,6 +11,7 @@ module m_derived_variables
     use m_mpi_proxy
     use m_helper_basic
     use m_variables_conversion
+    use m_constants, only: model_eqns_gamma_law
 
     implicit none
 
@@ -488,7 +489,7 @@ contains
         ! model, the amplitude of the exponential's inside is also modulated with respect to the identity of the fluid in which the
         ! function is evaluated. For more information, refer to Marquina and Mulet (2003).
 
-        if (model_eqns == 1) then  ! Gamma/pi_inf model
+        if (model_eqns == model_eqns_gamma_law) then  ! Gamma/pi_inf model
             q_sf = -gm_rho_sf/gm_rho_max(1)
         else  ! Volume fraction model
             do l = -offset_z%beg, p + offset_z%end

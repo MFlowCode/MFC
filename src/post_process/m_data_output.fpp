@@ -12,6 +12,7 @@ module m_data_output
     use m_compile_specific
     use m_helper
     use m_variables_conversion
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq
 
     implicit none
 
@@ -232,7 +233,7 @@ contains
         if (format == 2) then
             dbvars = 0
 
-            if ((model_eqns == 2) .or. (model_eqns == 3)) then
+            if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
                 do i = 1, num_fluids
                     if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
                         dbvars = dbvars + 1
@@ -240,7 +241,8 @@ contains
                 end do
             end if
 
-            if ((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) then
+            if ((rho_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) &
+                & .and. (.not. relativity)) then
                 dbvars = dbvars + 1
             end if
 
@@ -273,7 +275,7 @@ contains
                 end if
             end if
 
-            if ((model_eqns == 2) .or. (model_eqns == 3)) then
+            if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
                 do i = 1, num_fluids - 1
                     if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
                         dbvars = dbvars + 1
@@ -285,13 +287,13 @@ contains
                 end if
             end if
 
-            if (gamma_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+            if (gamma_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
                 dbvars = dbvars + 1
             end if
 
             if (heat_ratio_wrt) dbvars = dbvars + 1
 
-            if (pi_inf_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+            if (pi_inf_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
                 dbvars = dbvars + 1
             end if
 

@@ -26,6 +26,7 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
     implicit none
 
@@ -71,10 +72,9 @@ contains
 #endif
         integer :: i, j  !< Generic loop iterators
 
-        ! Setting number of time-stages for selected time-stepping scheme
-        if (time_stepper == 1) then
+        if (time_stepper == time_stepper_rk1) then
             num_ts = 1
-        else if (any(time_stepper == (/2, 3/))) then
+        else if (any(time_stepper == (/time_stepper_rk2, time_stepper_rk3/))) then
             num_ts = 2
         end if
 
@@ -277,7 +277,7 @@ contains
                 @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%psi))
             end if
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
@@ -417,9 +417,9 @@ contains
             end do
         end do
 
-        if (any(time_stepper == (/1, 2, 3/))) then
+        if (any(time_stepper == (/time_stepper_rk1, time_stepper_rk2, time_stepper_rk3/))) then
             ! temporary array index for TVD RK
-            if (time_stepper == 1) then
+            if (time_stepper == time_stepper_rk1) then
                 stor = 1
             else
                 stor = 2
@@ -427,12 +427,12 @@ contains
 
             ! TVD RK coefficients
             @:ALLOCATE(rk_coef(time_stepper, 4))
-            if (time_stepper == 1) then
+            if (time_stepper == time_stepper_rk1) then
                 rk_coef(1,:) = (/1._wp, 0._wp, 1._wp, 1._wp/)
-            else if (time_stepper == 2) then
+            else if (time_stepper == time_stepper_rk2) then
                 rk_coef(1,:) = (/1._wp, 0._wp, 1._wp, 1._wp/)
                 rk_coef(2,:) = (/1._wp, 1._wp, 1._wp, 2._wp/)
-            else if (time_stepper == 3) then
+            else if (time_stepper == time_stepper_rk3) then
                 rk_coef(1,:) = (/1._wp, 0._wp, 1._wp, 1._wp/)
                 rk_coef(2,:) = (/1._wp, 3._wp, 1._wp, 4._wp/)
                 rk_coef(3,:) = (/2._wp, 1._wp, 2._wp, 3._wp/)
@@ -537,7 +537,7 @@ contains
 
             if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-            if (model_eqns == 3 .and. (.not. relax)) then
+            if (model_eqns == model_eqns_6eq .and. (.not. relax)) then
                 call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
             end if
 
@@ -936,7 +936,7 @@ contains
                 end do
             end if
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do

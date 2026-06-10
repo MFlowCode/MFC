@@ -15,6 +15,8 @@ module m_riemann_solvers
     use m_mpi_proxy
     use m_variables_conversion
     use m_bubbles
+    use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_hlld, riemann_solver_lax_friedrichs, &
+        & model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
     use m_bubbles_EE
     use m_surface_tension
     use m_helper_basic
@@ -1777,7 +1779,7 @@ contains
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
                 ! 6-EQUATION MODEL WITH HLLC HLLC star-state flux with contact wave speed s_S
-                if (model_eqns == 3) then
+                if (model_eqns == model_eqns_6eq) then
                     ! 6-equation model (model_eqns=3): separate phasic internal energies
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, &
                                         & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, &
@@ -2192,7 +2194,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                else if (model_eqns == 4) then
+                else if (model_eqns == model_eqns_4eq) then
                     ! 4-equation model (model_eqns=4): single pressure, velocity equilibrium
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
                                         & nbub_L, nbub_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, &
@@ -2414,7 +2416,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                else if (model_eqns == 2 .and. bubbles_euler) then
+                else if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
                     ! 5-equation model with Euler-Euler bubble dynamics
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, &
                                         & vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, Re_L, Re_R, pcorr, zcoef, rho_L, &
@@ -4480,7 +4482,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                     do l = is3%beg, is3%end
@@ -4530,7 +4532,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                     do j = is1%beg, is1%end
@@ -4566,7 +4568,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1 .or. riemann_solver == 4) then
+            if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                     do l = is3%beg, is3%end

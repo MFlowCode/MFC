@@ -610,11 +610,11 @@ class CaseValidator:
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
         num_stl_models = self.get("num_stl_models", 0)
         self.prohibit(
-            ib and num_stl_models < 0,
+            num_stl_models < 0,
             "num_stl_models must be >= 0",
         )
         self.prohibit(
-            ib and num_stl_models > num_stl_models_max,
+            num_stl_models > num_stl_models_max,
             f"num_stl_models must be <= {num_stl_models_max} (num_stl_models_max in m_constants.fpp)",
         )
         for i in range(1, num_ibs + 1):
@@ -651,6 +651,22 @@ class CaseValidator:
                     True,
                     f"patch_ib({i})%model_id is set but geometry ({geometry}) is not an STL model (5 or 12)",
                 )
+        num_patches = self.get("num_patches", 0) or 0
+        for i in range(1, num_patches + 1):
+            geometry = self.get(f"patch_icpp({i})%geometry", None)
+            model_id = self.get(f"patch_icpp({i})%model_id", None)
+            if geometry == 21:
+                self.prohibit(
+                    model_id is None or model_id <= 0,
+                    f"patch_icpp({i})%model_id must be set to a positive integer for STL geometry (21)",
+                )
+                if model_id is not None:
+                    self.prohibit(
+                        model_id > num_stl_models,
+                        f"patch_icpp({i})%model_id={model_id} exceeds num_stl_models={num_stl_models}",
+                    )
+            elif model_id is not None and model_id > 0:
+                self.prohibit(True, f"patch_icpp({i})%model_id is set but geometry ({geometry}) is not an STL model (21)")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""

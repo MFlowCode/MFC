@@ -40,12 +40,12 @@ data = {
     "t_step_stop": 5000,
     "t_step_save": 50,
     # Simulation Algorithm
-    "model_eqns": 2,
+    "model_eqns": "5eq",
     "alt_soundspeed": "F",
     "mixture_err": "T",
     "mpp_lim": "F",
-    "time_stepper": 3,
-    "riemann_solver": 5,
+    "time_stepper": "rk3",
+    "riemann_solver": "lax_friedrichs",
     "bc_x%beg": -1,
     "bc_x%end": -1,
     "bc_y%beg": -1,
@@ -62,8 +62,8 @@ data = {
     "alf_factor": 10,
     "viscous": "T",
     # Database Structure Parameters
-    "format": 1,
-    "precision": 2,
+    "format": "silo",
+    "precision": "double",
     "prim_vars_wrt": "T",
     "parallel_io": "T",
     # Fluid Parameters (Gas)

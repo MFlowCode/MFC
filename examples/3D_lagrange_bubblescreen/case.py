@@ -60,7 +60,6 @@ Nz = 50  # number of elements into z direction
 
 dt = 7.5e-9  # constant time-step - sec
 
-
 def generate_bubble_cloud():
     """Generate monodisperse bubble cloud with 10 μm radius"""
     # Bubble properties
@@ -131,8 +130,8 @@ print(
             "t_step_stop": 3000,
             "t_step_save": 30,
             # Simulation Algorithm Parameters
-            "model_eqns": 2,
-            "time_stepper": 3,
+            "model_eqns": "5eq",
+            "time_stepper": "rk3",
             "num_fluids": 2,
             "num_patches": 1,
             "viscous": "T",
@@ -140,9 +139,9 @@ print(
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "mapped_weno": "T",
-            "riemann_solver": 2,
-            "wave_speeds": 1,
-            "avg_state": 2,
+            "riemann_solver": "hllc",
+            "wave_speeds": "direct",
+            "avg_state": "arithmetic",
             "bc_x%beg": -6,
             "bc_x%end": -6,
             "bc_y%beg": -1,
@@ -165,8 +164,8 @@ print(
             "acoustic(1)%dir": 0.0,
             "acoustic(1)%delay": 0.0,
             # Formatted Database Files Structure Parameters
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "parallel_io": "T",
             "lag_db_wrt": "T",
@@ -188,7 +187,7 @@ print(
             "patch_icpp(1)%alpha(2)": 0.0,
             # Lagrangian Bubbles
             "bubbles_lagrange": "T",
-            "bubble_model": 2,  # Keller-Miksis model
+            "bubble_model": "keller_miksis",  # Keller-Miksis model
             "thermal": 3,
             "polytropic": "F",
             "lag_params%nBubs_glb": nBubs,  # Number of bubbles

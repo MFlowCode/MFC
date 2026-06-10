@@ -20,6 +20,7 @@ module m_bubbles_EL
     use m_mpi_common
     use m_ibm
     use m_finite_differences
+    use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
     implicit none
 
@@ -1149,7 +1150,7 @@ contains
         integer, intent(in)                                        :: stage
         integer                                                    :: k, q
 
-        if (time_stepper == 1) then  ! 1st order TVD RK
+        if (time_stepper == time_stepper_rk1) then  ! 1st order TVD RK
             $:GPU_PARALLEL_LOOP(private='[k]')
             do k = 1, n_el_bubs_loc
                 ! u{1} = u{n} +  dt * RHS{n}
@@ -1176,7 +1177,7 @@ contains
                 $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
                 call s_write_lag_bubble_evol(mytime)
             end if
-        else if (time_stepper == 2) then  ! 2nd order TVD RK
+        else if (time_stepper == time_stepper_rk2) then  ! 2nd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_bubs_loc
@@ -1225,7 +1226,7 @@ contains
                     call s_write_lag_bubble_evol(mytime)
                 end if
             end if
-        else if (time_stepper == 3) then  ! 3rd order TVD RK
+        else if (time_stepper == time_stepper_rk3) then  ! 3rd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_bubs_loc

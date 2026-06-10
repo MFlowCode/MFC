@@ -85,18 +85,18 @@ print(
             "t_save": saveTime * (c0 / x0),
             "t_stop": stopTime * (c0 / x0),
             # Simulation Algorithm Parameters
-            "model_eqns": 2,
+            "model_eqns": "5eq",
             "num_fluids": 2,
             "num_patches": 1,
             "mpp_lim": "F",
             "viscous": "T",
-            "time_stepper": 3,
+            "time_stepper": "rk3",
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "mapped_weno": "T",
-            "riemann_solver": 2,
-            "wave_speeds": 1,
-            "avg_state": 2,
+            "riemann_solver": "hllc",
+            "wave_speeds": "direct",
+            "avg_state": "arithmetic",
             "bc_x%beg": -6,
             "bc_x%end": -6,
             "bc_y%beg": -6,
@@ -104,8 +104,8 @@ print(
             "bc_z%beg": -6,
             "bc_z%end": -6,
             # Formatted Database Files Structure Parameters
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "parallel_io": "T",
             # Patch 1: Water (left)
@@ -141,7 +141,7 @@ print(
             "acoustic(1)%delay": 0.0,
             # Lagrangian Bubbles
             "bubbles_lagrange": "T",
-            "bubble_model": 2,  # Keller-Miksis model
+            "bubble_model": "keller_miksis",  # Keller-Miksis model
             "thermal": 3,
             "polytropic": "F",
             "lag_params%nBubs_glb": 1,

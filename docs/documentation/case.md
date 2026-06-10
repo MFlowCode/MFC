@@ -98,6 +98,11 @@ There are multiple sets of parameters that must be specified in the python input
 Items 8, 9, 10, 11 and 12 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, phase change, artificial Mach number respectively.
 Definition of the parameters is described in the following subsections.
 
+Enumerated parameters accept named values as well as integer codes: `"riemann_solver": "hllc"`
+is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's table entry
+(e.g. `1` (`hll`), `2` (`hllc`)). Existing case files can be rewritten to named syntax with
+`./mfc.sh validate case.py --migrate`.
+
 ### 1. Runtime {#sec-runtime}
 
 | Parameter        | Type           | Description                               |
@@ -186,12 +191,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `tau_e(i)` *         | Real    | Supported             | Elastic stresses.                                            |
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
 | `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
-| `model_filepath`     | String  | Not Supported         | Path to an STL or OBJ file (not all OBJs are supported).     |
-| `model_scale(i)`     | Real    | Not Supported         | Model's (applied) scaling factor for component $i$.          |
-| `model_rotate(i)`    | Real    | Not Supported         | Model's (applied) angle of rotation about axis $i$.          |
-| `model_translate(i)` | Real    | Not Supported         | Model's $i$-th component of (applied) translation.           |
-| `model_spc`          | Integer | Not Supported         | Number of samples per cell when discretizing the model into the grid. |
-| `model_threshold`    | Real    | Not Supported         | Ray fraction inside the model patch above which the fraction is set to one.|
+| `model_id`           | Integer | Not Supported         | Index into the `stl_models` array (geometry 21)              |
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index.
 
@@ -218,8 +218,10 @@ Some parameters, as described above, can be defined by analytical functions in t
 
 where `alpha_rho` is defined with the `1 + 0.1*sin(20*x*pi)` function.
 
-The expressions are interpreted as Fortran code, in the execution context and scope of the function that defines the patch.
-Additionally, the following variables are made available as shorthand:
+Expressions use **Python syntax** and are parsed at case load time.
+Syntax errors and unknown variable or function names are immediate, named errors — they are reported before any Fortran is compiled, with a message identifying the offending expression and listing the available names.
+
+The following variables are available in IC patch expressions:
 
 | Shorthand | Expands To               | Shorthand | Expands To                | Shorthand | Expands To               |
 | --------- | ------------------------ | --------- | ------------------------- | --------- | ------------------------ |
@@ -227,15 +229,23 @@ Additionally, the following variables are made available as shorthand:
 | `y`       | `y_cc(j)`                | `ly`      | The patch's `length_y`    | `yc`      | The patch's `y_centroid` |
 | `z`       | `z_cc(k)`                | `lz`      | The patch's `length_z`    | `zc`      | The patch's `z_centroid` |
 | `eps`     | The patch's `epsilon`    | `beta`    | The patch's `beta`        | `radii`   | The patch's `radii`      |
-| `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi` and `e` | \f$\pi\f$ and \f$e\f$ |
+| `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi`      | \f$\pi\f$ (Fortran constant from `m_constants`) |
 
 where $(i,j,k)$ are the grid-indices of the current cell in each coordinate direction.
+
+The allowed functions are the standard Fortran intrinsics:
+`sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`,
+`sinh`, `cosh`, `tanh`, `exp`, `log`, `log10`, `sqrt`,
+`abs`, `min`, `max`, `mod`, `sign`.
+
+**Euler's number:** bare `e` is **not** a variable.
+Write `exp(1.0)` or a numeric literal instead (e.g. `2.718281828`).
 
 In the example above, the following code is generated:
 
 ```f90
 if (patch_id == 2) then
-    q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*3.141592653589793)
+    q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 1 + 0.1 * sin(20 * x_cc(i) * pi)
 end if
 ```
 
@@ -306,11 +316,7 @@ Optimal choice of the value of `smooth_coeff` is case-dependent and left to the 
 - `patch_icpp(j)%%alpha(i)`, `patch_icpp(j)%%alpha_rho(i)`, `patch_icpp(j)%%pres`, and `patch_icpp(j)%%vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
 These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
 
-- `model_filepath` defines the root directory of the STL or OBJ model file.
-
-- `model_scale`, `model_rotate` and `model_translate` define how the model should be transformed to domain-space by first scaling by `model_scale`, then rotating about the Z, X, and Y axes (using `model_rotate`), and finally translating by `model_translate`.
-
-- `model_spc` and `model_threshold` are ray-tracing parameters. `model_spc` defines the number of rays per cell to render the model. `model_threshold` defines the ray-tracing threshold at which the cell is marked as the model.
+- `model_id` selects the STL/OBJ model for a geometry-21 patch by indexing into the `stl_models` array. The model file, scaling, and translation, and the inside/outside threshold, are configured on that `stl_models` entry (see the `stl_models` section below); a cell is marked inside the model using a winding-number test.
 
 #### Elliptic Smoothing
 
@@ -374,9 +380,13 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 
-- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
+- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
 
-- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
+- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
+
+  Moving-IB analytic expressions use the same Python syntax and error-reporting as IC patch expressions (see the "Analytical Definition of Primitive Variables" section above).
+  Available variables: `x` (`x_cc(i)`), `y` (`y_cc(j)`), `z` (`z_cc(k)`), `t` (current simulation time), and `r` (the IB patch radius).
+  The same intrinsic functions and `pi` constant apply; bare `e` is not available.
 
 - `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inellastic collisions while 1 is for perfectly ellastic collisions.
 
@@ -1191,7 +1201,7 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 18   | 2D Varcircle            | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
 | 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
 | 20   | 2D Taylor-Green Vortex  | 2     | N      | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
-| 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model_filepath`. |
+| 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model_id`. |
 
 The patch types supported by the MFC are listed in table [Patch Types](#patch-types).
 This includes types exclusive to one-, two-, and three-dimensional problems.
