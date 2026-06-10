@@ -268,7 +268,7 @@ contains
                     end do
                 end if
 
-                if (model_eqns /= 4) then
+                if (model_eqns /= model_eqns_4eq) then
                     ! If in simulation, use acc mixture subroutines
                     if (elasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
@@ -378,7 +378,7 @@ contains
                     end if
                 end if
 
-                if (model_eqns == 3) then
+                if (model_eqns == model_eqns_6eq) then
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%int_en%beg, eqn_idx%int_en%end
                         q_cons_vf(q)%sf(j, k, &

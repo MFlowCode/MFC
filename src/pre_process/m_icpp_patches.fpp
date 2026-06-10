@@ -15,7 +15,7 @@ module m_icpp_patches
     use m_model  ! Subroutine(s) related to STL files
     use m_derived_types  ! Definitions of the derived types
     use m_global_parameters
-    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
+    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius, model_eqns_4eq
     use m_helper_basic
     use m_helper
     use m_mpi_common
@@ -633,7 +633,7 @@ contains
                             @:Hardcoded2D()
                         end if
 
-                        if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
+                        if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == model_eqns_4eq)) then
                             ! zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i, j, 0) = (((q_prim_vf(eqn_idx%E)%sf(i, j, &
                                       & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp &

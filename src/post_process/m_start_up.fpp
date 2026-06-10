@@ -25,6 +25,7 @@ module m_start_up
     use m_checker
     use m_thermochem, only: num_species, species_names
     use m_finite_differences
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
     use m_chemistry
 
 #ifdef MFC_MPI
@@ -224,11 +225,11 @@ contains
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, fd_number, fd_order, offset_z)
         end if
 
-        if ((model_eqns == 2) .or. (model_eqns == 3) .or. (model_eqns == 4)) then
+        if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq) .or. (model_eqns == model_eqns_4eq)) then
             do i = 1, num_fluids
                 if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
                     q_sf(:,:,:) = q_cons_vf(i)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
-                    if (model_eqns /= 4) then
+                    if (model_eqns /= model_eqns_4eq) then
                         write (varname, '(A,I0)') 'alpha_rho', i
                     else
                         write (varname, '(A,I0)') 'rho', i
@@ -240,7 +241,8 @@ contains
             end do
         end if
 
-        if ((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) then
+        if ((rho_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) &
+            & then
             q_sf(:,:,:) = rho_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'rho'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -324,7 +326,7 @@ contains
             varname(:) = ' '
         end if
 
-        if (model_eqns == 3) then
+        if (model_eqns == model_eqns_6eq) then
             do i = 1, num_fluids
                 if (alpha_rho_e_wrt(i) .or. cons_vars_wrt) then
                     q_sf = q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
@@ -515,7 +517,7 @@ contains
             varname(:) = ' '
         end if
 
-        if (((model_eqns == 2) .and. (bubbles_euler .neqv. .true.)) .or. (model_eqns == 3)) then
+        if (((model_eqns == model_eqns_5eq) .and. (bubbles_euler .neqv. .true.)) .or. (model_eqns == model_eqns_6eq)) then
             do i = 1, num_fluids - 1
                 if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
                     q_sf(:,:,:) = q_cons_vf(i + eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
@@ -548,7 +550,7 @@ contains
             end if
         end if
 
-        if (gamma_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+        if (gamma_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
             q_sf(:,:,:) = gamma_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'gamma'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -565,7 +567,7 @@ contains
             varname(:) = ' '
         end if
 
-        if (pi_inf_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+        if (pi_inf_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
             q_sf(:,:,:) = pi_inf_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'pi_inf'
             call s_write_variable_to_formatted_database_file(varname, t_step)

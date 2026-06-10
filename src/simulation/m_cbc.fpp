@@ -12,7 +12,7 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
-    use m_constants, only: riemann_solver_hll
+    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
         & get_mole_fractions, get_species_specific_heats_r
@@ -833,7 +833,7 @@ contains
 
                         drho_dt = 0._wp; dgamma_dt = 0._wp; dpi_inf_dt = 0._wp; dqv_dt = 0._wp
 
-                        if (model_eqns == 1) then
+                        if (model_eqns == model_eqns_gamma_law) then
                             drho_dt = dalpha_rho_dt(1)
                             dgamma_dt = dadv_dt(1)
                             #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1

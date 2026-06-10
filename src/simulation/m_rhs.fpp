@@ -14,7 +14,7 @@ module m_rhs
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
-    use m_constants, only: riemann_solver_hll, riemann_solver_hlld
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -926,7 +926,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k_loop, l_loop, q_loop, inv_ds, advected_qty_val, &
                                     & pressure_val, flux_face1, flux_face2]')
                 do q_loop = 0, p
@@ -972,7 +972,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do l = 0, p
@@ -1070,7 +1070,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do k = 0, p
