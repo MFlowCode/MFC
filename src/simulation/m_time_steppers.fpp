@@ -631,13 +631,14 @@ contains
         real(wp)               :: max_dt
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
+        integer                :: fl       !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
         dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl]', &
                             & reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
@@ -650,6 +651,18 @@ contains
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+
+                    if (any_non_newtonian) then
+                        Re(1) = 0._wp
+                        do fl = 1, num_fluids
+                            if (is_non_newtonian(fl)) then
+                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                            else
+                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                            end if
+                        end do
+                        Re(1) = 1._wp/max(Re(1), sgm_eps)
+                    end if
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
 

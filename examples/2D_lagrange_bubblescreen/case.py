@@ -58,6 +58,7 @@ Ny = 50  # number of elements into y direction
 
 dt = 7.5e-9  # constant time-step - sec
 
+
 def generate_bubble_cloud():
     """Generate bubble cloud with log-normal size distribution"""
     # Bubble properties

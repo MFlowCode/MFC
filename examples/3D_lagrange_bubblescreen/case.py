@@ -60,6 +60,7 @@ Nz = 50  # number of elements into z direction
 
 dt = 7.5e-9  # constant time-step - sec
 
+
 def generate_bubble_cloud():
     """Generate monodisperse bubble cloud with 10 μm radius"""
     # Bubble properties

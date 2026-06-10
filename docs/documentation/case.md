@@ -1123,7 +1123,48 @@ This boundary condition can be used for fixed-temperature (isothermal) walls at 
 
 
 
-### 19. GPU Performance (NVIDIA UVM)
+### 19. Non-Newtonian (Herschel-Bulkley) Viscosity {#sec-non-newtonian}
+
+| Parameter                         | Type    | Description                                                          |
+| ---:                              | :----:  | :---                                                                 |
+| `fluid_pp(i)%%non_newtonian`      | Logical | Enable Herschel-Bulkley non-Newtonian viscosity for fluid \f$i\f$.  |
+| `fluid_pp(i)%%K`                  | Real    | Consistency index \f$K\f$.                                          |
+| `fluid_pp(i)%%nn`                 | Real    | Flow index \f$n\f$ (\f$n<1\f$ shear-thinning, \f$n>1\f$ shear-thickening). |
+| `fluid_pp(i)%%tau0`               | Real    | Yield stress \f$\tau_0\f$; set to 0 for pure power-law.             |
+| `fluid_pp(i)%%hb_m`               | Real    | Papanastasiou regularization parameter \f$m\f$; required when `tau0 > 0`. |
+| `fluid_pp(i)%%mu_min`             | Real    | Lower viscosity clamp \f$\mu_{\min}\f$.                              |
+| `fluid_pp(i)%%mu_max`             | Real    | Upper viscosity clamp \f$\mu_{\max}\f$ (required).                  |
+| `fluid_pp(i)%%mu_bulk`            | Real    | Reserved; non-Newtonian bulk viscosity is not yet supported. The validator rejects it on a non-Newtonian fluid; on a Newtonian fluid it is accepted and ignored. |
+
+The effective dynamic viscosity is computed from the Papanastasiou-regularized Herschel-Bulkley model:
+
+\f[
+\mu_{\rm eff}(\dot\gamma) = \frac{\tau_0}{\dot\gamma}\!\left(1 - e^{-m\,\dot\gamma}\right) + K\,\dot\gamma^{n-1},
+\qquad
+\dot\gamma = \sqrt{2\,D_{ij}D_{ij}},
+\f]
+
+where \f$D_{ij} = \frac{1}{2}(\partial_i u_j + \partial_j u_i)\f$ is the strain-rate tensor and \f$\dot\gamma\f$ is the scalar shear rate.
+The result is clamped to \f$[\mu_{\min},\,\mu_{\max}]\f$.
+
+Special cases:
+
+- `tau0 = 0`: pure power-law fluid, \f$\mu_{\rm eff} = K\,\dot\gamma^{n-1}\f$.
+- `tau0 = 0`, `nn = 1`: Newtonian fluid with constant viscosity \f$\mu = K\f$.
+- `tau0 > 0`, `nn = 1`: Bingham plastic.
+
+Usage notes:
+
+- Requires `viscous = T`. `fluid_pp(i)%%Re(1)` must be set (use `1.0/K` to register the fluid as viscous; the HB model overrides \f$\mu_{\rm eff}\f$ cell-by-cell). `fluid_pp(i)%%Re(2)` (bulk viscosity) must not be set for a non-Newtonian fluid.
+- `mu_max` is required; `mu_min` is inactive if omitted (no lower clamp applied).
+- Positivity requirements: `K`, `nn`, and `mu_max` must be positive; `mu_min` and `hb_m` must be positive when set; `tau0` must be non-negative.
+- Requires `model_eqns = 2` or `3` and is incompatible with `igr`.
+- Supported only with `riemann_solver = 1` (HLL) or `riemann_solver = 2` (HLLC).
+- The HB parameters (`K`, `nn`, `tau0`, `hb_m`, `mu_min`, `mu_max`, `mu_bulk`) may only be set on a fluid with `non_newtonian = T`; the validator rejects them otherwise.
+- All HB parameters are non-dimensional (scaled by \f$\rho_{\rm ref} U_{\rm ref} L_{\rm ref}\f$), so \f$1/\mu_{\rm eff}\f$ equals the local effective Reynolds number.
+- For cylindrical geometry (`cyl_coord = T`) the shear rate uses the grid-direction strain components; curvature corrections to \f$\dot\gamma\f$ are not yet included.
+
+### 20. GPU Performance (NVIDIA UVM)
 
 | Parameter                  | Type    | Description                                              |
 | ---:                       | :---:   | :---                                                     |
