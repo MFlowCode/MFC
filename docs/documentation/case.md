@@ -461,6 +461,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `muscl_order`              | Integer | MUSCL order [1,2] |
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
 | `muscl_eps`                | Real    | MUSCL limiter slope-product threshold (default: hard-coded thresholds; set to 0 for textbook behavior) |
+| `recon_comp_rho`           | Logical | Reconstruct per-component density instead of partial density (default F) |
 | `int_comp`                 | Integer | Interface Compression [0] Off [1] THINC [2] MTHINC (default 0) |
 | `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
@@ -491,6 +492,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD (default F) |
 | `ADC_kappa`                | Real    | ADC sensor scaling parameter (default 1.0) |
 | `hypo_hll_interface_rhs`   | Logical | HLL uses interface-consistent hypo RHS (default F) |
+| `hypo_energy_guard`        | Logical | Guard elastic energy when shear modulus is near zero (default T) |
 | `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
