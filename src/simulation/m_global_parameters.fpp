@@ -726,7 +726,7 @@ contains
         Re_size_max = 0
 
         ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom)
+        call s_initialize_eqn_idx(nmom, nb)
 
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then

@@ -366,7 +366,7 @@ contains
         if (model_eqns == model_eqns_5eq .and. qbmm) nmom = 6
 
         ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom)
+        call s_initialize_eqn_idx(nmom, nb)
 
         ! post-only: 6eq alf is a dummy (no void fraction in 6eq)
         if (model_eqns == model_eqns_6eq) eqn_idx%alf = 1

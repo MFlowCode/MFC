@@ -447,7 +447,7 @@ contains
         if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. qbmm .and. nnode == 4) nmom = 6
 
         ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom)
+        call s_initialize_eqn_idx(nmom, nb)
 
         ! Per-target (pre_process): qbmm_idx allocations and fills
         if (model_eqns == model_eqns_5eq .and. bubbles_euler) then

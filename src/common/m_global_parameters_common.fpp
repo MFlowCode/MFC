@@ -89,15 +89,16 @@ contains
     !!
     !! @param nmom_in  Number of carried moments per R0 location (per-target: pre/post pass an
     !!   integer variable; sim passes its integer parameter nmom = 6).  Used only in the 5eq
-    !!   qbmm bubble-index calculation (eqn_idx%bub%end = eqn_idx%adv%end + nb*nmom_in).
+    !!   qbmm bubble-index calculation (eqn_idx%bub%end = eqn_idx%adv%end + nb_in*nmom_in).
     !!
     !! Per-target callers are responsible for the following after this call:
     !!   - qbmm_idx allocations and fills (diverge between pre vs sim/post)
     !!   - sim-only: gam = bub_pp%gam_g, nmomsp/nmomtot, Re_idx allocation, GPU_UPDATE calls
     !!   - post-only: beta_idx increment (bubbles_lagrange path), offset/grid allocations
-    impure subroutine s_initialize_eqn_idx(nmom_in)
+    impure subroutine s_initialize_eqn_idx(nmom_in, nb_in)
 
         integer, intent(in) :: nmom_in
+        integer, intent(in) :: nb_in
 
         ! Gamma/Pi_inf Model
 
@@ -146,12 +147,12 @@ contains
             if (bubbles_euler) then
                 eqn_idx%bub%beg = sys_size + 1
                 if (qbmm) then
-                    eqn_idx%bub%end = eqn_idx%adv%end + nb*nmom_in
+                    eqn_idx%bub%end = eqn_idx%adv%end + nb_in*nmom_in
                 else
                     if (.not. polytropic) then
-                        eqn_idx%bub%end = sys_size + 4*nb
+                        eqn_idx%bub%end = sys_size + 4*nb_in
                     else
-                        eqn_idx%bub%end = sys_size + 2*nb
+                        eqn_idx%bub%end = sys_size + 2*nb_in
                     end if
                 end if
                 sys_size = eqn_idx%bub%end
@@ -203,9 +204,9 @@ contains
 
             if (bubbles_euler) then
                 eqn_idx%bub%beg = sys_size + 1
-                eqn_idx%bub%end = sys_size + 2*nb
+                eqn_idx%bub%end = sys_size + 2*nb_in
                 if (.not. polytropic) then
-                    eqn_idx%bub%end = sys_size + 4*nb
+                    eqn_idx%bub%end = sys_size + 4*nb_in
                 end if
                 sys_size = eqn_idx%bub%end
             end if
