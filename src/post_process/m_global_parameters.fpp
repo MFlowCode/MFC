@@ -121,10 +121,8 @@ module m_global_parameters
     integer                 :: mpi_info_int
     !> @}
 
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
-    ! Subgrid Bubble Parameters
-    type(subgrid_bubble_physical_parameters) :: bub_pp
-    real(wp), allocatable, dimension(:)      :: adv  !< Advection variables
+    ! fluid_pp, bub_pp: auto-generated in generated_decls.fpp
+    real(wp), allocatable, dimension(:) :: adv  !< Advection variables
     ! Formatted Database File(s) Structure Parameters
 
     type(bounds_info)     :: x_output, y_output, z_output              !< Portion of domain to output for post-processing

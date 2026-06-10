@@ -256,32 +256,25 @@ module m_global_parameters
 
     ! END: Simulation Algorithm Parameters
 
-    ! Fluids Physical Parameters
+    ! Fluids Physical Parameters fluid_pp, bub_pp: auto-generated in generated_decls.fpp
 
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
-    ! Subgrid Bubble Parameters
-    type(subgrid_bubble_physical_parameters) :: bub_pp
-    integer                                  :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+    integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
-    type(vec3_dt), dimension(num_probes_max)             :: probe
-    type(integral_parameters), dimension(num_probes_max) :: integral
+    ! probe, integral: auto-generated in generated_decls.fpp
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
     $:GPU_DECLARE(create='[rhoref, pref]')
 
     !> @name Immersed Boundaries
+    !> patch_ib, ib_airfoil, stl_models, particle_cloud: auto-generated in generated_decls.fpp
     !> @{
-    type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib  !< Immersed boundary patch parameters
     integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
-    type(particle_cloud_parameters), dimension(num_particle_clouds_max) :: particle_cloud  !< Particle bed specifications
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
-    type(ib_airfoil_parameters), dimension(num_ib_airfoils_max) :: ib_airfoil  !< Per-airfoil NACA user inputs (namelist)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
-    type(ib_stl_parameters), dimension(num_stl_models_max) :: stl_models  !< Per-STL model parameters (namelist)
 
-    $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, ib_airfoil, ib_airfoil_grids]')
+    $:GPU_DECLARE(create='[ib, num_ibs, ib_airfoil_grids]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
@@ -323,8 +316,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[mom_sp, mom_3d]')
     !> @}
 
-    type(chemistry_parameters) :: chem_params
-    $:GPU_DECLARE(create='[chem_params]')
+    ! chem_params: auto-generated in generated_decls.fpp
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
@@ -343,11 +335,8 @@ module m_global_parameters
     $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
     !> @}
 
-    !> @name Acoustic acoustic_source parameters
-    !> @{
-    type(acoustic_parameters), dimension(num_probes_max) :: acoustic  !< Acoustic source parameters
-    !> @}
-    $:GPU_DECLARE(create='[acoustic_source, acoustic, num_source]')
+    ! acoustic: auto-generated in generated_decls.fpp
+    $:GPU_DECLARE(create='[acoustic_source, num_source]')
 
     !> @name Surface tension parameters
     !> @{
@@ -365,9 +354,9 @@ module m_global_parameters
     $:GPU_DECLARE(create='[pb_ts, mv_ts]')
 
     !> @name lagrangian subgrid bubble parameters
+    !> lag_params: auto-generated in generated_decls.fpp
     !> @{!
-    type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters
-    $:GPU_DECLARE(create='[bubbles_lagrange, lag_params]')
+    $:GPU_DECLARE(create='[bubbles_lagrange]')
     !> @}
 
     $:GPU_DECLARE(create='[Bx0]')

@@ -58,15 +58,15 @@ module m_global_parameters
     type(int_bounds_info) :: idwint(1:3)
 
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
-    type(int_bounds_info)      :: idwbuff(1:3)
-    type(int_bounds_info)      :: bc_x, bc_y, bc_z       !< Boundary conditions in the x-, y- and z-coordinate directions
-    integer                    :: shear_num              !< Number of shear stress components
-    integer, dimension(3)      :: shear_indices          !< Indices of the stress components that represent shear stress
-    integer                    :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
-    integer, dimension(3, 2)   :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
-    type(simplex_noise_params) :: simplex_params
+    type(int_bounds_info)    :: idwbuff(1:3)
+    type(int_bounds_info)    :: bc_x, bc_y, bc_z       !< Boundary conditions in the x-, y- and z-coordinate directions
+    integer                  :: shear_num              !< Number of shear stress components
+    integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
+    integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
+    integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
+    ! simplex_params: auto-generated in generated_decls.fpp
 
-    ! Perturb density of surrounding air so as to break symmetry of grid fluid_rho: auto-generated in generated_decls.fpp
+    ! fluid_rho (perturbs surrounding-air density to break grid symmetry): auto-generated in generated_decls.fpp
     integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
     integer, allocatable, dimension(:) :: start_idx    !< Starting cell-center index of local processor in global grid
 #ifdef MFC_MPI
@@ -75,16 +75,11 @@ module m_global_parameters
     integer                  :: mpi_info_int  !< MPI info for parallel IO with Lustre file systems
 #endif
 
-    ! Initial Condition Parameters
-    type(ic_patch_parameters), dimension(num_patches_max)    :: patch_icpp  !< IC patch parameters (max: num_patches_max)
-    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc    !< Boundary condition patch parameters
-    logical                                                  :: bc_io       !< whether or not to save BC data
+    ! Initial Condition Parameters patch_icpp, patch_bc: auto-generated in generated_decls.fpp
+    logical :: bc_io  !< whether or not to save BC data
 
-    ! Fluids Physical Parameters
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
-    ! Subgrid Bubble Parameters
-    type(subgrid_bubble_physical_parameters) :: bub_pp
-    type(chemistry_parameters)               :: chem_params
+    ! Fluids Physical Parameters fluid_pp, bub_pp: auto-generated in generated_decls.fpp
+    type(chemistry_parameters) :: chem_params
     !> @name Bubble modeling
     !> @{
     real(wp)                            :: Eu
@@ -92,12 +87,7 @@ module m_global_parameters
     integer                             :: nmom  !< Number of carried moments
     !> @}
 
-    !> @name Immersed Boundaries
-    !> @{
-    type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib    !< Immersed boundary patch parameters
-    type(ib_airfoil_parameters), dimension(num_ib_airfoils_max)       :: ib_airfoil  !< Per-airfoil NACA parameters
-    type(ib_stl_parameters), dimension(num_stl_models_max)            :: stl_models  !< Per-STL model parameters (namelist)
-    !> @}
+    ! patch_ib, ib_airfoil, stl_models: auto-generated in generated_decls.fpp
 
     !> @name Non-polytropic bubble gas compression
     !> @{
