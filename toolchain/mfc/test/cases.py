@@ -773,29 +773,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49}, ppn=2))
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"m": 29, "n": 29, "p": 49, "rdma_mpi": "T"}, ppn=2))
-            cases.append(
-                define_case_d(
-                    stack,
-                    "2 MPI Ranks -> IBM Sphere",
-                    {
-                        "m": 29,
-                        "n": 29,
-                        "p": 49,
-                        "ib": "T",
-                        "num_ibs": 1,
-                        "patch_ib(1)%geometry": 8,
-                        "patch_ib(1)%x_centroid": 0.5,
-                        "patch_ib(1)%y_centroid": 0.5,
-                        "patch_ib(1)%z_centroid": 0.5,
-                        "patch_ib(1)%radius": 0.1,
-                        "patch_icpp(1)%vel(1)": 0.001,
-                        "patch_icpp(2)%vel(1)": 0.001,
-                        "patch_icpp(3)%vel(1)": 0.001,
-                        "patch_ib(1)%slip": "F",
-                    },
-                    ppn=2,
-                )
-            )
+            ibm_sphere_mods = {
+                "m": 29,
+                "n": 29,
+                "p": 49,
+                "ib": "T",
+                "num_ibs": 1,
+                "patch_ib(1)%geometry": 8,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%z_centroid": 0.5,
+                "patch_ib(1)%radius": 0.1,
+                "patch_icpp(1)%vel(1)": 0.001,
+                "patch_icpp(2)%vel(1)": 0.001,
+                "patch_icpp(3)%vel(1)": 0.001,
+                "patch_ib(1)%slip": "F",
+            }
+            cases.append(define_case_d(stack, "2 MPI Ranks -> IBM Sphere", ibm_sphere_mods, ppn=2))
+            # Dimension-agnostic geometry ID 2: a sphere (no lengths) and a
+            # cylinder (one length) in 3D, exercising f_canonical_geometry
+            cases.append(define_case_d(stack, "2 MPI Ranks -> IBM Sphere -> Unified Geometry ID", {**ibm_sphere_mods, "patch_ib(1)%geometry": 2}, ppn=2))
+            cases.append(define_case_d(stack, "2 MPI Ranks -> IBM Cylinder -> Unified Geometry ID", {**ibm_sphere_mods, "patch_ib(1)%geometry": 2, "patch_ib(1)%length_x": 0.1}, ppn=2))
         else:
             cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
             if ARG("rdma_mpi"):

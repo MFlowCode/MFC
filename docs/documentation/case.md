@@ -1150,15 +1150,15 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | #    | Name                    | Dim.  | Smooth | Description |
 | ---: | :----:                  | :---: |  :---: | :--- |
 | 1    | Line segment 	         | 1     | N      | Requires `x_centroid` and `length_x`. |
-| 2    | Circle 		             | 2     | Y      | Requires `[x,y]_centroid` and `radius`. |
-| 3    | Rectangle 	             | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. |
+| 2    | Circle 		             | 2 & 3 | Y      | Requires `[x,y]_centroid` and `radius`. In 3D, equivalent to 10 (cylinder) if a `length_[x,y,z]` is set and to 8 (sphere) otherwise. |
+| 3    | Rectangle 	             | 2 & 3 | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. In 3D, equivalent to 9 (cuboid). |
 | 4    | Sweep line 	           | 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
 | 5    | Ellipse 		             | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
 | 6    | N/A 		                 | N/A   | N/A    | No longer exists. Empty. |
 | 7    | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
-| 8    | Sphere 		             | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
-| 9    | Cuboid 		             | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
-| 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
+| 8    | Sphere 		             | 2 & 3 | Y      | Requires `[x,y,z]_centroid` and `radius`. In 2D, equivalent to 2 (circle). |
+| 9    | Cuboid 		             | 2 & 3 | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. In 2D, equivalent to 3 (rectangle). |
+| 10   | Cylinder 		           | 2 & 3 | Y      | Requires `[x,y,z]_centroid`, `radius`, and exactly one of `length_[x,y,z]`. In 2D, equivalent to 2 (circle). |
 | 11   | Sweep plane 	           | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		           | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
 | 13   | 2D modal (Fourier)      | 2     | Y      | Requires `x_centroid`, `y_centroid`, `radius`. Optional: `fourier_cos(n)`, `fourier_sin(n)` (n=1..10), `modal_clip_r_to_min`, `modal_r_min`, `modal_use_exp_form`. |
@@ -1191,14 +1191,19 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
 
-| #    | Name               | Dim.   |
-| ---: | :----:             | :---   |
-| 2    | 2D Circle          | 2      |
-| 3    | 2D Rectangle       | 2      |
-| 4    | 2D Airfoil         | 2      |
-| 8    | 3D Sphere          | 3      |
-| 10   | 3D Cylinder        | 3      |
-| 11   | 3D Airfoil         | 3      |
+| #    | Name                       | Dim.   |
+| ---: | :----:                     | :---   |
+| 2    | Circle / Sphere / Cylinder | 2 & 3  |
+| 3    | Rectangle / Cuboid         | 2 & 3  |
+| 4    | Airfoil                    | 2 & 3  |
+| 5    | Model (STL/OBJ)            | 2 & 3  |
+| 8    | 3D Sphere (alias of 2)     | 3      |
+| 9    | 3D Cuboid (alias of 3)     | 3      |
+| 10   | 3D Cylinder (alias of 2)   | 3      |
+| 11   | 3D Airfoil (alias of 4)    | 3      |
+| 12   | 3D Model (alias of 5)      | 3      |
+
+Geometry IDs are dimension-agnostic: in 3D, geometry 2 produces a cylinder when exactly one `length_[x,y,z]` is set and a sphere otherwise, and the legacy 3D-specific IDs (8-12) remain supported as aliases.
 
 ### Acoustic Supports {#acoustic-supports}
 

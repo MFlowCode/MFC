@@ -81,7 +81,7 @@ contains
 
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
         logical                            :: file_exist  !< Logical used to check the existence of the input file
-        integer                            :: iostatus
+        integer                            :: iostatus, i
         ! Integer to check iostat of file read
 
         character(len=1000) :: line
@@ -102,6 +102,13 @@ contains
             end if
 
             close (1)
+
+            ! Collapse the dimension-agnostic / legacy patch geometry IDs to
+            ! the canonical ID for this dimensionality (see f_canonical_geometry)
+            do i = 1, min(num_ibs, size(patch_ib))
+                patch_ib(i)%geometry = f_canonical_geometry(patch_ib(i)%geometry, p > 0, &
+                         & .not. f_all_default([patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]), .true.)
+            end do
 
             if ((bf_x) .or. (bf_y) .or. (bf_z)) then
                 bodyForces = .true.

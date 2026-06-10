@@ -73,27 +73,23 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(n == 0 .or. patch_ib(patch_id)%radius <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in circle/cylinder/sphere IB patch ' // trim(iStr))
+                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in circle/sphere/cylinder IB patch ' // trim(iStr))
 
-        ! Additional checks strictly for 3D shapes (Spheres and Cylinders)
+        ! Spheres and cylinders (3D) additionally require a z-centroid
         if (p > 0) then
-            ! Both Spheres and Cylinder require Z centroid
-            @:PROHIBIT(f_is_default(patch_ib(patch_id)%z_centroid), 'in 3D sphere/cylinder IB patch ' //trim(iStr))
+            @:PROHIBIT(f_is_default(patch_ib(patch_id)%z_centroid), 'in 3D sphere/cylinder IB patch ' // trim(iStr))
+        end if
 
-            ! If any length is defined, it is a Cylinder. Ensure exactly ONE length axis is defined.
-            if ((.not. f_is_default(patch_ib(patch_id)%length_x)) .or. (.not. f_is_default(patch_ib(patch_id)%length_y)) &
-                & .or. (.not. f_is_default(patch_ib(patch_id)%length_z))) then
-                ! Check 1: Exactly ONE axis must be provided (prevents double-axis degenerate shapes)
-                @:PROHIBIT(count([.not. f_is_default(patch_ib(patch_id)%length_x), &
-                           & .not. f_is_default(patch_ib(patch_id)%length_y), &
-                           & .not. f_is_default(patch_ib(patch_id)%length_z)]) /= 1, &
-                           & 'in cylinder IB patch ' // trim(iStr) // ': exactly one length must be provided')
-
-                ! Check 2: That single provided axis MUST be a positive number
-                @:PROHIBIT(count([patch_ib(patch_id)%length_x > 0._wp, patch_ib(patch_id)%length_y > 0._wp, &
-                           & patch_ib(patch_id)%length_z > 0._wp]) /= 1, &
-                           & 'in cylinder IB patch ' // trim(iStr) // ': provided length must be positive')
-            end if
+        ! Cylinders are extruded along exactly one positive length
+        if (patch_ib(patch_id)%geometry == 10) then
+            @:PROHIBIT(count([patch_ib(patch_id)%length_x > 0._wp, patch_ib(patch_id)%length_y > 0._wp, &
+                       & patch_ib(patch_id)%length_z > 0._wp]) /= 1, &
+                       & 'in cylinder IB patch ' // trim(iStr) &
+                       & // ': exactly one of length_x, length_y, or length_z must be defined and positive')
+            @:PROHIBIT((.not. f_is_default(patch_ib(patch_id)%length_x) .and. patch_ib(patch_id)%length_x <= 0._wp) &
+                       & .or. (.not. f_is_default(patch_ib(patch_id)%length_y) .and. patch_ib(patch_id)%length_y <= 0._wp) &
+                       & .or. (.not. f_is_default(patch_ib(patch_id)%length_z) .and. patch_ib(patch_id)%length_z <= 0._wp), &
+                       & 'in cylinder IB patch ' // trim(iStr) // ': the defined lengths must be greater than zero')
         end if
 
     end subroutine s_check_circle_ib_patch_geometry
@@ -133,8 +129,6 @@ contains
         end if
 
     end subroutine s_check_airfoil_ib_patch_geometry
-
-    !> Verify that the geometric parameters of the 3D airfoil patch have been consistently inputted.
 
     !> Verify that the geometric parameters of the rectangle patch have been consistently inputted.
 

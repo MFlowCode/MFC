@@ -13,8 +13,8 @@ module m_helper_basic
     implicit none
 
     private
-    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, s_configure_coordinate_bounds, &
-        & s_update_cell_bounds
+    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, f_canonical_geometry, &
+        & s_configure_coordinate_bounds, s_update_cell_bounds
 
 contains
 
@@ -97,6 +97,36 @@ contains
         res = all(f_is_default(var_array))
 
     end function f_all_default
+
+    !> Maps the dimension-agnostic patch geometry IDs and their legacy 2D/3D counterparts to the canonical ID for the grid
+    !! dimensionality, so all downstream dispatch (checks, patch application, IBM) sees one value.
+    !! @param geometry geometry ID as read from the case file
+    !! @param three_d true for 3D grids (p > 0)
+    !! @param has_length true if any of the patch's length_[x,y,z] is set
+    !! @param ib true for patch_ib IDs (also maps airfoils and models)
+    integer elemental function f_canonical_geometry(geometry, three_d, has_length, ib) result(canon)
+
+        integer, intent(in) :: geometry
+        logical, intent(in) :: three_d, has_length, ib
+
+        canon = geometry
+        if (three_d) then
+            select case (geometry)
+            case (2); canon = merge(10, 8, has_length)  ! circle -> cylinder if extruded, sphere otherwise
+            case (3); canon = 9  ! rectangle -> cuboid
+            case (4); if (ib) canon = 11  ! airfoil -> 3D airfoil
+            case (5); if (ib) canon = 12  ! model -> 3D model
+            end select
+        else
+            select case (geometry)
+            case (8, 10); canon = 2  ! sphere/cylinder -> circle
+            case (9); canon = 3  ! cuboid -> rectangle
+            case (11); if (ib) canon = 4  ! 3D airfoil -> airfoil
+            case (12); if (ib) canon = 5  ! 3D model -> model
+            end select
+        end if
+
+    end function f_canonical_geometry
 
     !> Checks if a real(wp) variable is an integer.
     logical elemental function f_is_integer(var) result(res)

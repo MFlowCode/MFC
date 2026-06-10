@@ -2023,7 +2023,7 @@ class CaseValidator:
                     patch_y_hi = yc + ly / 2.0
                     self.prohibit(patch_y_hi < y_beg or patch_y_lo > y_end, f"patch_icpp({i}): y-extent [{patch_y_lo}, {patch_y_hi}] is entirely outside domain [{y_beg}, {y_end}]")
 
-            if geometry == 9 and z_bounds_ok:
+            if geometry in [3, 9] and z_bounds_ok:
                 zc = self.get(f"patch_icpp({i})%z_centroid")
                 lz = self.get(f"patch_icpp({i})%length_z")
                 if zc is not None and lz is not None and self._is_numeric(zc) and self._is_numeric(lz):

@@ -71,7 +71,7 @@ contains
 
         character(LEN=name_len) :: file_loc
         logical                 :: file_check
-        integer                 :: iostatus
+        integer                 :: iostatus, i
         character(len=1000)     :: line
 
         #:include 'generated_namelist.fpp'
@@ -89,6 +89,17 @@ contains
                 call s_mpi_abort('Invalid line in pre_process.inp. It is ' // 'likely due to a datatype mismatch. Exiting.')
             end if
             close (1)
+
+            ! Collapse the dimension-agnostic / legacy patch geometry IDs to
+            ! the canonical ID for this dimensionality (see f_canonical_geometry)
+            do i = 1, num_patches_max
+                patch_icpp(i)%geometry = f_canonical_geometry(patch_icpp(i)%geometry, p > 0, &
+                           & .not. f_all_default([patch_icpp(i)%length_x, patch_icpp(i)%length_y, patch_icpp(i)%length_z]), .false.)
+            end do
+            do i = 1, min(num_ibs, size(patch_ib))
+                patch_ib(i)%geometry = f_canonical_geometry(patch_ib(i)%geometry, p > 0, &
+                         & .not. f_all_default([patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]), .true.)
+            end do
 
             call s_update_cell_bounds(cells_bounds, m, n, p)
 
