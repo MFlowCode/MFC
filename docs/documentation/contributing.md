@@ -276,35 +276,27 @@ def check_my_feature(self):
 
 If your check enforces a physics constraint, also add a `PHYSICS_DOCS` entry (see [How to Document Physics Constraints](#how-to-document-physics-constraints) below).
 
-**Step 5: Declare in Fortran** (`src/<target>/m_global_parameters.fpp`)
+**Step 5: Fortran declaration and namelist binding (auto-generated)**
 
-Add the variable declaration in the appropriate target's global parameters module. Choose the target(s) where the parameter is used:
+Scalar declarations, GPU declare lines, Doxygen descriptions, and namelist bindings are
+auto-generated at CMake configure time from the `TYPED_DECLS` and `FORTRAN_ARRAY_DIMS`
+tables in `toolchain/mfc/params/definitions.py`. For a plain scalar registered with
+`_r()` / `_nv()` above, no manual Fortran edit is needed — reconfigure (`./mfc.sh build`)
+and the generated include in each target's `m_global_parameters.fpp` is updated
+automatically.
 
-- `src/pre_process/m_global_parameters.fpp`
-- `src/simulation/m_global_parameters.fpp`
-- `src/post_process/m_global_parameters.fpp`
+Still manual (not auto-generated):
 
-```fortran
-real(wp) :: my_param    !< Description of the parameter
-```
+- `TYPE` member definitions inside derived types in `src/common/m_derived_types.fpp`
+- Default-value assignments in `s_assign_default_values_to_user_inputs`
+- Multi-variable declaration lines (`bc_x/y/z`, `x/y/z_domain`, `x/y/z_output`)
+- MPI broadcast lists in `src/*/m_mpi_proxy.fpp`
+- `CASE_OPT_EXTRA_LINES` in `toolchain/mfc/params/generators/fortran_gen.py` for case-optimization constants
 
-If the parameter is used in GPU kernels, add a GPU declaration:
+After editing any generator or table, force regen by reconfiguring (`./mfc.sh build`) —
+cached builds compile stale includes.
 
-```fortran
-$:GPU_DECLARE(create='[my_param]')
-```
-
-**Step 6: Add to Fortran namelist** (`src/<target>/m_start_up.fpp`)
-
-Add the parameter name to the `namelist /user_inputs/` declaration:
-
-```fortran
-namelist /user_inputs/ ... , my_param, ...
-```
-
-The toolchain writes the parameter to the input file and Fortran reads it via this namelist. No other I/O code is needed.
-
-**Step 7: Use in Fortran code**
+**Step 6: Use in Fortran code**
 
 Reference `my_param` anywhere in the target's modules. It is available as a global after the namelist is read at startup.
 
