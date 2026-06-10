@@ -148,7 +148,7 @@ contains
                                     ! circular geometries
                                     radius = patch_ib(patch_id)%radius
                                     if (f_is_inside_cylinder(xyz_local(1), xyz_local(2), 0._wp, radius, 0._wp)) ib_markers%sf(i, &
-                                        & j, k) = encoded_patch_id
+                                        & j, 0) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 3) then
                                     ! rectangular geometries
                                     length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
@@ -166,7 +166,7 @@ contains
                                     model_id = patch_ib(patch_id)%model_id
                                     eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                     if (eta > stl_models(model_id)%model_threshold) then
-                                        ib_markers%sf(i, j, k) = encoded_patch_id
+                                        ib_markers%sf(i, j, 0) = encoded_patch_id
                                     end if
                                 else if (patch_ib(patch_id)%geometry == 6) then
                                     ! ellipse geometry
