@@ -126,8 +126,9 @@ include(cmake/GPU.cmake)
 # Fypp discovery and HANDLE_SOURCES macro definition.
 include(cmake/Fypp.cmake)
 
-# Params codegen: configure-time bootstrap, explicit gen-file lists,
-# and the build-time add_custom_command/target.
+# Params codegen: explicit gen-file lists and the build-time
+# add_custom_command/target.  The custom command is the SOLE generator;
+# no configure-time execute_process bootstrap.
 # NOTE: _mfc_gen_files_* lists must exist before HANDLE_SOURCES is called.
 include(cmake/ParamsCodegen.cmake)
 
