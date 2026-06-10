@@ -14,6 +14,7 @@ module m_global_parameters
     use m_derived_types  ! Definitions of the derived types
     use m_helper_basic  ! Functions to compare floating point numbers
     use m_thermochem, only: num_species
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
 
     implicit none
 
@@ -245,11 +246,7 @@ contains
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model_scale(:) = 1._wp
-            patch_icpp(i)%model_translate(:) = 0._wp
-            patch_icpp(i)%model_filepath(:) = dflt_char
-            patch_icpp(i)%model_spc = num_ray
-            patch_icpp(i)%model_threshold = ray_tracing_threshold
+            patch_icpp(i)%model_id = 0
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real
@@ -467,7 +464,7 @@ contains
         ! choice of the equations of motion
 
         ! Gamma/Pi_inf Model
-        if (model_eqns == 1) then
+        if (model_eqns == model_eqns_gamma_law) then
             ! Setting number of fluids
             num_fluids = 1
 
@@ -485,7 +482,7 @@ contains
             sys_size = eqn_idx%adv%end
 
             ! Volume Fraction Model (5-equation model)
-        else if (model_eqns == 2) then
+        else if (model_eqns == model_eqns_5eq) then
             ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
             ! of spatial dimensions and the volume fraction model
             eqn_idx%cont%beg = 1
@@ -585,7 +582,7 @@ contains
             end if
 
             ! Volume Fraction Model (6-equation model)
-        else if (model_eqns == 3) then
+        else if (model_eqns == model_eqns_6eq) then
             ! Annotating structure of the state and flux vectors belonging to the system of equations defined by the selected number
             ! of spatial dimensions and the volume fraction model
             eqn_idx%cont%beg = 1
@@ -598,7 +595,7 @@ contains
             eqn_idx%int_en%beg = eqn_idx%adv%end + 1
             eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
             sys_size = eqn_idx%int_en%end
-        else if (model_eqns == 4) then
+        else if (model_eqns == model_eqns_4eq) then
             ! 4 equation model with subgrid bubbles_euler
             eqn_idx%cont%beg = 1  ! one continuity equation
             eqn_idx%cont%end = 1  ! num_fluids
@@ -652,7 +649,7 @@ contains
             end if
         end if
 
-        if (model_eqns == 2 .or. model_eqns == 3) then
+        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
             if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
                 eqn_idx%stress%beg = sys_size + 1

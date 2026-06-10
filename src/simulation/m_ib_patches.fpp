@@ -104,7 +104,7 @@ contains
                                             ! STL model geometry
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                             model_id = patch_ib(patch_id)%model_id
-                                            eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                            eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                             if (eta > stl_models(model_id)%model_threshold) then
                                                 ib_markers%sf(i, j, k) = encoded_patch_id
                                             end if
@@ -164,7 +164,7 @@ contains
                                     ! STL model geometry
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                     model_id = patch_ib(patch_id)%model_id
-                                    eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                    eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                     if (eta > stl_models(model_id)%model_threshold) then
                                         ib_markers%sf(i, j, k) = encoded_patch_id
                                     end if
@@ -248,7 +248,7 @@ contains
                                             ! STL model geometry
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                             model_id = patch_ib(patch_id)%model_id
-                                            eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                            eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                             if (eta > stl_models(model_id)%model_threshold) then
                                                 ib_markers%sf(i, j, k) = encoded_patch_id
                                             end if
@@ -310,7 +310,7 @@ contains
                                     ! STL model geometry
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                     model_id = patch_ib(patch_id)%model_id
-                                    eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                    eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                     if (eta > stl_models(model_id)%model_threshold) then
                                         ib_markers%sf(i, j, k) = encoded_patch_id
                                     end if

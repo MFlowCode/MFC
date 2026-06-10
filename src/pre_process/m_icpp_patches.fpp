@@ -16,7 +16,7 @@ module m_icpp_patches
     use m_model  ! Subroutine(s) related to STL files
     use m_derived_types  ! Definitions of the derived types
     use m_global_parameters
-    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
+    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius, model_eqns_4eq
     use m_helper_basic
     use m_helper
     use m_mpi_common
@@ -50,7 +50,14 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         integer :: i
+        ! Load STL/OBJ models once into the shared flat arrays if any patch is an STL/OBJ model (geometry 21)
 
+        do i = 1, num_patches
+            if (patch_icpp(i)%geometry == 21) then
+                call s_instantiate_STL_models()
+                exit
+            end if
+        end do
         !  3D Patch Geometries
 
         if (p > 0) then
@@ -633,7 +640,7 @@ contains
                             @:Hardcoded2D()
                         end if
 
-                        if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
+                        if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == model_eqns_4eq)) then
                             ! zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i, j, 0) = (((q_prim_vf(eqn_idx%E)%sf(i, j, &
                                       & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp &
@@ -1267,99 +1274,36 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer :: i, j, k                 !< loop iterators
+        integer :: model_id                !< Index into the preloading stl_models(:)
+        real(wp) :: threshold              !< Inside/outside cutoff for this model
+        real(wp), dimension(1:3) :: point  !< Cell-center query point
+        logical :: in_box                  !< Whether the cell center lies in the model's bounding box
 
-        ! Variables for IBM+STL
-        real(wp)                                :: normals(1:3)  !< Boundary normal buffer
-        integer                                 :: boundary_vertex_count, boundary_edge_count, total_vertices  !< Boundary vertex
-        real(wp), allocatable, dimension(:,:,:) :: boundary_v  !< Boundary vertex buffer
-        integer                                 :: i, j, k  !< Generic loop iterators
-        type(t_bbox)                            :: bbox, bbox_old
-        type(t_model)                           :: model
-        type(ic_model_parameters)               :: params
-        real(wp), dimension(1:3)                :: point, model_center
-        real(wp)                                :: grid_mm(1:3,1:2)
-        integer                                 :: cell_num
-        integer                                 :: ncells
-        real(wp), dimension(1:4,1:4)            :: transform, transform_n
+        model_id = patch_icpp(patch_id)%model_id
+        threshold = stl_models(model_id)%model_threshold
 
-        if (proc_rank == 0) then
-            print *, " * Reading model: " // trim(patch_icpp(patch_id)%model_filepath)
-        end if
-
-        model = f_model_read(patch_icpp(patch_id)%model_filepath)
-        params%scale(:) = patch_icpp(patch_id)%model_scale(:)
-        params%translate(:) = patch_icpp(patch_id)%model_translate(:)
-        params%rotate(:) = patch_icpp(patch_id)%model_rotate(:)
-        params%spc = patch_icpp(patch_id)%model_spc
-        params%threshold = patch_icpp(patch_id)%model_threshold
-
-        if (proc_rank == 0) then
-            print *, " * Transforming model."
-        end if
-
-        ! Get the model center before transforming the model
-        bbox_old = f_create_bbox(model)
-        model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
-
-        ! Compute the transform matrices for vertices and normals
-        transform = f_create_transform_matrix(params, model_center)
-        transform_n = f_create_transform_matrix(params)
-
-        call s_transform_model(model, transform, transform_n)
-
-        ! Recreate the bounding box after transformation
-        bbox = f_create_bbox(model)
-
-        ! Show the number of vertices in the original STL model
-        if (proc_rank == 0) then
-            print *, ' * Number of input model vertices:', 3*model%ntrs
-        end if
-
-        call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
-
-        ! Show the number of edges and boundary edges in 2D STL models
-        if (proc_rank == 0 .and. p == 0) then
-            print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-        end if
-
-        if (proc_rank == 0) then
-            write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
-            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
-            write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
-
-            grid_mm(1,:) = (/minval(x_cc) - 0.e5_wp*dx, maxval(x_cc) + 0.e5_wp*dx/)
-            grid_mm(2,:) = (/minval(y_cc) - 0.e5_wp*dy, maxval(y_cc) + 0.e5_wp*dy/)
-
-            if (p > 0) then
-                grid_mm(3,:) = (/minval(z_cc) - 0.e5_wp*dz, maxval(z_cc) + 0.e5_wp*dz/)
-            else
-                grid_mm(3,:) = (/0._wp, 0._wp/)
-            end if
-
-            write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
-            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2._wp
-            write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
-        end if
-
-        ncells = (m + 1)*(n + 1)*(p + 1)
         do i = 0, m; do j = 0, n; do k = 0, p
-            cell_num = i*(n + 1)*(p + 1) + j*(p + 1) + (k + 1)
-            if (proc_rank == 0 .and. mod(cell_num, ncells/100) == 0) then
-                write (*, "(A, I3, A)", advance="no") char(13) // "  * Generating grid: ", nint(100*real(cell_num)/ncells), "%"
-            end if
-
             point = (/x_cc(i), y_cc(j), 0._wp/)
-            if (p > 0) then
-                point(3) = z_cc(k)
+            if (p > 0) point(3) = z_cc(k)
+            if (grid_geometry == 3) point = f_convert_cyl_to_cart(point)
+
+            ! Run the winding test only on cells whose Cartesian point lies inside the bounding box, else skip the calculation
+            in_box = point(1) >= stl_bounding_boxes(model_id, 1, 1) .and. point(1) <= stl_bounding_boxes(model_id, 1, &
+                           & 3) .and. point(2) >= stl_bounding_boxes(model_id, 2, &
+                           & 1) .and. point(2) <= stl_bounding_boxes(model_id, 2, 3)
+            if (p > 0 .or. grid_geometry == 3) then
+                in_box = in_box .and. point(3) >= stl_bounding_boxes(model_id, 3, &
+                                            & 1) .and. point(3) <= stl_bounding_boxes(model_id, 3, 3)
             end if
 
-            if (grid_geometry == 3) then
-                point = f_convert_cyl_to_cart(point)
+            if (in_box) then
+                eta = f_model_is_inside(gpu_ntrs(model_id), model_id, point)
+            else
+                eta = 0._wp
             end if
 
-            eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_icpp(patch_id)%model_spc)
-
-            if (eta > patch_icpp(patch_id)%model_threshold) then
+            if (eta > threshold) then
                 eta = 1._wp
             else if (.not. patch_icpp(patch_id)%smoothen) then
                 eta = 0._wp
@@ -1367,16 +1311,8 @@ contains
 
             call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
-            ! Note: Should probably use *eta* to compute primitive variables if defining them analytically.
             @:analytical()
         end do; end do; end do
-
-        if (proc_rank == 0) then
-            print *, ""
-            print *, " * Cleaning up."
-        end if
-
-        call s_model_free(model)
 
     end subroutine s_icpp_model
 

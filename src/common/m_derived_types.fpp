@@ -185,11 +185,6 @@ module m_derived_types
         real(wp), dimension(1:3)     :: n  !< Normal vector
     end type t_triangle
 
-    type :: t_ray
-        real(wp), dimension(1:3) :: o  !< Origin
-        real(wp), dimension(1:3) :: d  !< Direction
-    end type t_ray
-
     type :: t_bbox
         real(wp), dimension(1:3) :: min  !< Minimum coordinates
         real(wp), dimension(1:3) :: max  !< Maximum coordinates
@@ -205,7 +200,6 @@ module m_derived_types
         type(t_model), allocatable              :: model                !< STL/OBJ geometry model
         real(wp), allocatable, dimension(:,:,:) :: boundary_v           !< Boundary vertices
         integer                                 :: boundary_edge_count  !< Number of boundary edges
-        integer                                 :: total_vertices       !< Total vertex count
 
         ! GPU-friendly flattened arrays
         integer                                 :: ntrs   !< Copy of model%ntrs
@@ -259,14 +253,8 @@ module m_derived_types
         real(wp) :: cf_val  !< Color function value
         real(wp) :: Y(1:num_species)  !< Species mass fractions
 
-        ! STL or OBJ model input parameter
-        character(LEN=pathlen_max) :: model_filepath   !< Path the STL file relative to case_dir.
-        real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
-        real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
-        !> Angle to rotate the STL object along each cartesian coordinate axis, in radians.
-        real(wp), dimension(1:3) :: model_rotate
-        integer                  :: model_spc        !< Number of samples per cell to use when discretizing the STL object.
-        real(wp)                 :: model_threshold  !< Threshold to turn on smoothen STL patch.
+        ! STL/OBJ model patch: index into the shared stl_models(:) table
+        integer :: model_id  !< index into stl_models(:) for STL/OBJ geometry patches
     end type ic_patch_parameters
 
     !> User-input parameters for a NACA 4-digit airfoil (namelist-safe: scalars only)

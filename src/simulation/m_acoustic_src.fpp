@@ -262,7 +262,8 @@ contains
 
                     if (dipole(ai)) then  ! Double amplitude & No momentum source term (only works for Planar)
                         mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
-                        if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
+                        if (model_eqns /= model_eqns_4eq) E_src(j, k, l) = E_src(j, k, &
+                            & l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
                         cycle
                     end if
 
@@ -300,7 +301,7 @@ contains
                     mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
 
                     ! Update energy source term
-                    if (model_eqns /= 4) then
+                    if (model_eqns /= model_eqns_4eq) then
                         E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp/(small_gamma - 1._wp)
                     end if
                 end do

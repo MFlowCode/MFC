@@ -19,12 +19,12 @@ print(
             "t_step_save": 50000,
             # Simulation Algorithm Parameters
             "num_patches": 2,
-            "model_eqns": 2,
+            "model_eqns": "5eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
             "mpp_lim": "F",
             "mixture_err": "F",
-            "time_stepper": 3,
+            "time_stepper": "rk3",
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
@@ -32,9 +32,9 @@ print(
             "mapped_weno": "T",
             "null_weights": "F",
             "mp_weno": "F",
-            "riemann_solver": 1,
-            "wave_speeds": 1,
-            "avg_state": 2,
+            "riemann_solver": "hll",
+            "wave_speeds": "direct",
+            "avg_state": "arithmetic",
             "bc_x%beg": -3,
             "bc_x%end": -3,
             # Turning on Hypoelasticity
@@ -56,8 +56,8 @@ print(
             "acoustic(1)%frequency": 1e4,
             "acoustic(1)%delay": 0,
             # Formatted Database Files Structure Parameters
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "parallel_io": "F",
             # Patch 1 L
