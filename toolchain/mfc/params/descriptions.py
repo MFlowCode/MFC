@@ -136,6 +136,7 @@ DESCRIPTIONS = {
     "num_stl_models": "Number of STL/OBJ model entries in the stl_models array",
     "num_particle_clouds": "Number of particle bed specifications to generate immersed boundary patches from",
     "ib_neighborhood_radius": "Neighborhood radius in ranks for IB awareness",
+    "many_ib_patch_parallelism": "Parallelize over IB patches instead of grid cells (better for many small patches)",
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",

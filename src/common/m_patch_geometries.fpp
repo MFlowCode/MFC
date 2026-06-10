@@ -90,13 +90,13 @@ contains
 
         ! our check branches for the upper and lower half of the airfoil
         if (y >= 0._wp) then
-            ! incriment the iterator so we know where in the airfoil arrays to look
+            ! increment the iterator so we know where in the airfoil arrays to look
             k = 1
             do while (ib_airfoil_grids(airfoil_id)%upper(k)%x < x)
                 k = k + 1
             end do
 
-            ! If the values are approximately equivilent, skip the next check
+            ! If the values are approximately equivalent, skip the next check
             if (f_approx_equal(ib_airfoil_grids(airfoil_id)%upper(k)%x, x)) then
                 if (y <= ib_airfoil_grids(airfoil_id)%upper(k)%y) is_inside = .true.
             else
@@ -107,13 +107,13 @@ contains
                     & is_inside = .true.
             end if
         else
-            ! incriment the iterator so we know where in the airfoil arrays to look
+            ! increment the iterator so we know where in the airfoil arrays to look
             k = 1
             do while (ib_airfoil_grids(airfoil_id)%lower(k)%x < x)
                 k = k + 1
             end do
 
-            ! If the values are approximately equivilent, skip the next check
+            ! If the values are approximately equivalent, skip the next check
             if (f_approx_equal(ib_airfoil_grids(airfoil_id)%lower(k)%x, x)) then
                 if (y >= ib_airfoil_grids(airfoil_id)%lower(k)%y) is_inside = .true.
             else
