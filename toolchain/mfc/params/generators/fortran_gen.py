@@ -133,6 +133,20 @@ def generate_decls_fpp(target: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def generate_constants_fpp() -> str:
+    """Named integer constants for enumerated parameters; identical for all targets."""
+    from ..definitions import CONSTRAINTS
+
+    lines = [_HEADER.rstrip()]
+    for param in sorted(CONSTRAINTS):
+        names = CONSTRAINTS[param].get("names")
+        if not names:
+            continue
+        for name, value in sorted(names.items(), key=lambda kv: kv[1]):
+            lines.append(f"integer, parameter :: {param}_{name} = {value}")
+    return "\n".join(lines) + "\n"
+
+
 def resolve_namelist_content(fpp_path: Path) -> str:
     """Return the namelist content for an fpp file.
 
@@ -149,14 +163,15 @@ def resolve_namelist_content(fpp_path: Path) -> str:
 
 
 def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
-    """Return (path, content) for all 6 generated .fpp files under build_dir.
+    """Return (path, content) for all 9 generated .fpp files under build_dir.
 
     Paths match the cmake include directory structure:
-      build_dir/include/{full_target}/generated_{namelist,decls}.fpp
+      build_dir/include/{full_target}/generated_{namelist,decls,constants}.fpp
     """
     result = []
     for short, full in TARGETS:
         inc = build_dir / "include" / full
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
+        result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
     return result

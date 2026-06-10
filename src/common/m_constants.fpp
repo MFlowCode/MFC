@@ -116,4 +116,8 @@ module m_constants
     integer, parameter :: BC_SLIP_WALL = -15
     integer, parameter :: BC_NO_SLIP_WALL = -16
     integer, parameter :: BC_DIRICHLET = -17
+
+    ! Named values for enumerated case parameters (e.g. riemann_solver_hllc).
+    ! AUTO-GENERATED from "names" in toolchain/mfc/params/definitions.py.
+    #:include 'generated_constants.fpp'
 end module m_constants
