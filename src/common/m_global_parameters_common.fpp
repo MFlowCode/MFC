@@ -17,7 +17,7 @@ module m_global_parameters_common
     use m_helper_basic
     use m_thermochem, only: num_species
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, &
-        & recon_type_muscl, nnode
+        & recon_type_muscl, nnode, name_len
 
     implicit none
 
@@ -70,6 +70,18 @@ module m_global_parameters_common
 #ifdef MFC_SIMULATION
     $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
 #endif
+
+    !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
+    !> @{
+    integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:) :: start_idx    !< Starting cell-center index of local processor in global grid
+    !> @}
+
+    !> @name MPI info for parallel IO with Lustre file systems (identical across all three targets)
+    !> @{
+    character(len=name_len) :: mpiiofs
+    integer                 :: mpi_info_int
+    !> @}
 
 contains
 
@@ -263,5 +275,69 @@ contains
         end if
 
     end subroutine s_initialize_eqn_idx
+
+    !> Configure MPI parallel I/O settings and allocate processor coordinate arrays. Shared across all three executables;
+    !! num_dims/num_vels are computed here for pre/post unconditionally and for sim only when not case-optimized (in which case they
+    !! are compile-time parameters). Callers must have already populated n and p (grid dimensions).
+    impure subroutine s_initialize_parallel_io_common
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+#endif
+
+#ifdef MFC_SIMULATION
+        ! Under case-optimization, num_dims and num_vels are compile-time parameters; skip assignment.
+        #:if not MFC_CASE_OPTIMIZATION
+            num_dims = 1 + min(1, n) + min(1, p)
+
+            if (mhd) then
+                num_vels = 3
+            else
+                num_vels = num_dims
+            end if
+        #:endif
+#else
+        num_dims = 1 + min(1, n) + min(1, p)
+
+        if (mhd) then
+            num_vels = 3
+        else
+            num_vels = num_dims
+        end if
+#endif
+
+        allocate (proc_coords(1:num_dims))
+
+        if (parallel_io .neqv. .true.) return
+
+#ifdef MFC_MPI
+        ! Option for Lustre file system (Darter/Comet/Stampede)
+        write (mpiiofs, '(A)') '/lustre_'
+        mpiiofs = trim(mpiiofs)
+        call MPI_INFO_CREATE(mpi_info_int, ierr)
+        call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
+
+        ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
+        ! MPI_INFO_NULL
+
+        allocate (start_idx(1:num_dims))
+#endif
+
+    end subroutine s_initialize_parallel_io_common
+
+    !> Shared finalize core: deallocate proc_coords and start_idx. Per-target finalize routines call this first, then handle their
+    !! own extras (qbmm_idx, grid arrays, MPI_IO_DATA null/dealloc - those reference per-target typed variables and stay
+    !! per-target).
+    impure subroutine s_finalize_global_parameters_common
+
+        deallocate (proc_coords)
+
+#ifdef MFC_MPI
+        if (parallel_io) then
+            deallocate (start_idx)
+        end if
+#endif
+
+    end subroutine s_finalize_global_parameters_common
 
 end module m_global_parameters_common

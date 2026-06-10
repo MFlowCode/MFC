@@ -119,20 +119,13 @@ module m_global_parameters
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z, num_gbl_ibs]')
     $:GPU_DECLARE(create='[down_sample]')
 
-    integer, allocatable, dimension(:)            :: proc_coords  !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:)            :: start_idx    !< Starting cell-center index of local processor in global grid
+    ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
     type(mpi_io_airfoil_ib_var), public           :: MPI_IO_airfoil_IB_DATA
     type(mpi_io_levelset_var), public             :: MPI_IO_levelset_DATA
     type(mpi_io_levelset_norm_var), public        :: MPI_IO_levelsetnorm_DATA
     real(wp), allocatable, dimension(:,:), public :: MPI_IO_DATA_lag_bubbles
-
-    !> @name MPI info for parallel IO with Lustre file systems
-    !> @{
-    character(LEN=name_len) :: mpiiofs
-    integer                 :: mpi_info_int
-    !> @}
 
     ! sys_size, eqn_idx, b_size, tensor_size: in m_global_parameters_common (GPU_DECLARE there too)
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings (allocatable; GPU-managed separately).
@@ -995,37 +988,7 @@ contains
     !> Initializes parallel infrastructure
     impure subroutine s_initialize_parallel_io
 
-#ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-#endif
-
-        #:if not MFC_CASE_OPTIMIZATION
-            num_dims = 1 + min(1, n) + min(1, p)
-
-            if (mhd) then
-                num_vels = 3
-            else
-                num_vels = num_dims
-            end if
-        #:endif
-
-        allocate (proc_coords(1:num_dims))
-
-        if (parallel_io .neqv. .true.) return
-
-#ifdef MFC_MPI
-        ! Option for Lustre file system (Darter/Comet/Stampede)
-        write (mpiiofs, '(A)') '/lustre_'
-        mpiiofs = trim(mpiiofs)
-
-        call MPI_INFO_CREATE(mpi_info_int, ierr)
-        call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
-
-        ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
-        ! MPI_INFO_NULL
-
-        allocate (start_idx(1:num_dims))
-#endif
+        call s_initialize_parallel_io_common
 
     end subroutine s_initialize_parallel_io
 
@@ -1054,10 +1017,10 @@ contains
             end if
         end if
 
-        deallocate (proc_coords)
-        if (parallel_io) then
-            deallocate (start_idx)
+        ! Shared: deallocate proc_coords and start_idx
+        call s_finalize_global_parameters_common
 
+        if (parallel_io) then
             if (bubbles_lagrange) then
                 do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()

@@ -96,8 +96,7 @@ module m_global_parameters
     !> @}
 
     ! shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices: in m_global_parameters_common
-    integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:) :: start_idx    !< Starting cell-center index of local processor in global grid
+    ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
@@ -105,12 +104,6 @@ module m_global_parameters
     type(mpi_io_levelset_norm_var), public        :: MPI_IO_levelsetnorm_DATA
     real(wp), allocatable, dimension(:,:), public :: MPI_IO_DATA_lg_bubbles
 #endif
-
-    !> @name MPI info for parallel IO with Lustre file systems
-    !> @{
-    character(LEN=name_len) :: mpiiofs
-    integer                 :: mpi_info_int
-    !> @}
 
     ! fluid_pp, bub_pp: auto-generated in generated_decls.fpp
     real(wp), allocatable, dimension(:) :: adv  !< Advection variables
@@ -586,34 +579,7 @@ contains
     !> Subroutine to initialize parallel infrastructure
     impure subroutine s_initialize_parallel_io
 
-#ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-#endif
-
-        num_dims = 1 + min(1, n) + min(1, p)
-
-        if (mhd) then
-            num_vels = 3
-        else
-            num_vels = num_dims
-        end if
-
-        allocate (proc_coords(1:num_dims))
-
-        if (parallel_io .neqv. .true.) return
-
-#ifdef MFC_MPI
-        ! Option for Lustre file system (Darter/Comet/Stampede)
-        write (mpiiofs, '(A)') '/lustre_'
-        mpiiofs = trim(mpiiofs)
-        call MPI_INFO_CREATE(mpi_info_int, ierr)
-        call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
-
-        ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
-        ! MPI_INFO_NULL
-
-        allocate (start_idx(1:num_dims))
-#endif
+        call s_initialize_parallel_io_common
 
     end subroutine s_initialize_parallel_io
 
@@ -628,7 +594,6 @@ contains
         end if
 
         ! Deallocating the grid variables for the x-coordinate direction
-
         deallocate (x_cc, x_cb, dx)
 
         ! Deallocating grid variables for the y- and z-coordinate directions
@@ -643,13 +608,13 @@ contains
             deallocate (x_root_cb, x_root_cc)
         end if
 
-        deallocate (proc_coords)
+        ! Shared: deallocate proc_coords and start_idx
+        call s_finalize_global_parameters_common
 
         deallocate (adv)
 
 #ifdef MFC_MPI
         if (parallel_io) then
-            deallocate (start_idx)
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
