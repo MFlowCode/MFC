@@ -46,7 +46,7 @@ contains
         integer :: patch_id, airfoil_id, model_id, encoded_patch_id, i, j, k, il, ir, jl, jr, kl, kr, xp, yp, zp  !< iterators
         integer :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper                                     !< periodic bounds
         real(wp), dimension(3) :: center, xyz_local, length
-        real(wp) :: radius
+        real(wp) :: radius, eta
 
         !  3D Patch Geometries
 
@@ -66,8 +66,8 @@ contains
                             ! find the indices to the left and right of the IB in i, j, k
                             call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
 
-                            $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, length, radius, airfoil_id]', copyin='[patch_id, &
-                                                & encoded_patch_id, center]', collapse=3)
+                            $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, length, radius, airfoil_id, eta]', &
+                                                & copyin='[patch_id, encoded_patch_id, center]', collapse=3)
                             do k = kl, kr
                                 do j = jl, jr
                                     do i = il, ir
@@ -103,8 +103,11 @@ contains
                                         else if (patch_ib(patch_id)%geometry == 12) then
                                             ! STL model geometry
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
-                                            ! if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
-                                            !     & k) = encoded_patch_id
+                                            model_id = patch_ib(patch_id)%model_id
+                                            eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                            if (eta > stl_models(model_id)%model_threshold) then
+                                                ib_markers%sf(i, j, k) = encoded_patch_id
+                                            end if
                                         end if
                                     end do
                                 end do
@@ -131,7 +134,7 @@ contains
                         ! find the indices to the left and right of the IB in i, j, k
                         call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
 
-                        $:GPU_PARALLEL_LOOP(private='[i, j, xyz_local, airfoil_id]', copyin='[patch_id, encoded_patch_id, &
+                        $:GPU_PARALLEL_LOOP(private='[i, j, xyz_local, airfoil_id, eta]', copyin='[patch_id, encoded_patch_id, &
                                             & center]', collapse=2)
                         do j = jl, jr
                             do i = il, ir
@@ -160,8 +163,11 @@ contains
                                 else if (patch_ib(patch_id)%geometry == 5) then
                                     ! STL model geometry
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
-                                    ! if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), 0._wp)) ib_markers%sf(i, j, &
-                                    !     & 0) = encoded_patch_id
+                                    model_id = patch_ib(patch_id)%model_id
+                                    eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                    if (eta > stl_models(model_id)%model_threshold) then
+                                        ib_markers%sf(i, j, k) = encoded_patch_id
+                                    end if
                                 else if (patch_ib(patch_id)%geometry == 6) then
                                     ! ellipse geometry
                                     length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
@@ -184,7 +190,7 @@ contains
         integer :: patch_id, airfoil_id, model_id, encoded_patch_id, i, j, k, il, ir, jl, jr, kl, kr, xp, yp, zp  !< iterators
         integer :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper                                     !< periodic bounds
         real(wp), dimension(3) :: center, xyz_local, length
-        real(wp) :: radius
+        real(wp) :: radius, eta
 
         if (num_dims == 3) then
             ! get the periodicities
@@ -194,7 +200,7 @@ contains
                 do yp = yp_lower, yp_upper
                     do zp = zp_lower, zp_upper
                         $:GPU_PARALLEL_LOOP(private='[xp, yp, zp, i, il, ir, j, jl, jr, k, kl, kr, xyz_local, length, radius, &
-                                            & patch_id, airfoil_id, model_id, encoded_patch_id, center]')
+                                            & patch_id, airfoil_id, model_id, encoded_patch_id, center, eta]')
                         do patch_id = 1, num_ibs
                             center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
                             center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -241,8 +247,11 @@ contains
                                         else if (patch_ib(patch_id)%geometry == 12) then
                                             ! STL model geometry
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
-                                            ! if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), z_cc(k))) ib_markers%sf(i, j, &
-                                            !     & k) = encoded_patch_id
+                                            model_id = patch_ib(patch_id)%model_id
+                                            eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                            if (eta > stl_models(model_id)%model_threshold) then
+                                                ib_markers%sf(i, j, k) = encoded_patch_id
+                                            end if
                                         end if
                                     end do
                                 end do
@@ -260,7 +269,7 @@ contains
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     $:GPU_PARALLEL_LOOP(private='[xp, yp, i, il, ir, j, jl, jr, xyz_local, length, radius, &
-                                        & bounding_box_corner_distance, patch_id, airfoil_id, model_id, encoded_patch_id, center]')
+                                        & bounding_box_corner_distance, patch_id, airfoil_id, model_id, encoded_patch_id, center, eta]')
                     do patch_id = 1, num_ibs
                         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
                         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -299,10 +308,12 @@ contains
                                         & airfoil_id)) ib_markers%sf(i, j, k) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 5) then
                                     ! STL model geometry
-                                    model_id = patch_ib(patch_id)%model_id
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
-                                    ! if (f_is_inside_model(patch_id, x_cc(i), y_cc(j), 0._wp)) ib_markers%sf(i, j, &
-                                    !     & k) = encoded_patch_id
+                                    model_id = patch_ib(patch_id)%model_id
+                                    eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                                    if (eta > stl_models(model_id)%model_threshold) then
+                                        ib_markers%sf(i, j, k) = encoded_patch_id
+                                    end if
                                 else if (patch_ib(patch_id)%geometry == 6) then
                                     ! ellipse geometry
                                     length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
@@ -318,116 +329,6 @@ contains
         end if
 
     end subroutine s_apply_ib_patches_ib_parallelism
-
-    !> The STL patch is a 2D geometry that is imported from an STL file.
-    subroutine s_ib_model(patch_id, ib_markers, xp, yp)
-
-        integer, intent(in)                :: patch_id
-        type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp                !< integers containing the periodicity projection information
-        integer                            :: i, j, il, ir, jl, jr  !< Generic loop iterators
-        integer                            :: model_id, encoded_patch_id
-        integer                            :: cx, cy
-        real(wp)                           :: lx(2), ly(2)
-        real(wp), dimension(1:2)           :: bbox_min, bbox_max
-        real(wp), dimension(1:3)           :: local_corner, world_corner
-        real(wp)                           :: eta, threshold
-        real(wp), dimension(1:3)           :: offset
-        real(wp), dimension(1:3)           :: center, xy_local
-        real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
-
-        center = 0._wp
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
-        rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
-        offset(:) = patch_ib(patch_id)%centroid_offset(:)
-        model_id = patch_ib(patch_id)%model_id
-        threshold = stl_models(model_id)%model_threshold
-
-        ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
-
-        il = -gp_layers - 1
-        jl = -gp_layers - 1
-        ir = m + gp_layers + 1
-        jr = n + gp_layers + 1
-        $:GPU_PARALLEL_LOOP(private='[i, j, xy_local, eta]', copyin='[patch_id, model_id, encoded_patch_id, center, &
-                            & inverse_rotation, offset, threshold]', collapse=2)
-        do i = il, ir
-            do j = jl, jr
-                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
-                xy_local = matmul(inverse_rotation, xy_local)
-                xy_local = xy_local - offset
-
-                eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xy_local)
-
-                ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                if (eta > threshold) then
-                    ib_markers%sf(i, j, 0) = encoded_patch_id
-                end if
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_ib_model
-
-    !> The STL patch is a 3D geometry that is imported from an STL file.
-    subroutine s_ib_3d_model(patch_id, ib_markers, xp, yp, zp)
-
-        integer, intent(in)                :: patch_id
-        type(integer_field), intent(inout) :: ib_markers
-        integer, intent(in)                :: xp, yp, zp  !< integers containing the periodicity projection information
-        integer                            :: i, j, k, il, ir, jl, jr, kl, kr  !< Generic loop iterators
-        integer                            :: model_id, encoded_patch_id
-        real(wp)                           :: eta, threshold
-        real(wp), dimension(1:3)           :: offset
-        real(wp), dimension(1:3)           :: center, xyz_local
-        real(wp), dimension(1:3,1:3)       :: inverse_rotation, rotation
-        integer                            :: cx, cy, cz
-        real(wp)                           :: lx(2), ly(2), lz(2)
-        real(wp), dimension(1:3)           :: bbox_min, bbox_max, local_corner, world_corner
-
-        center = 0._wp
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
-        inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)
-        offset(:) = patch_ib(patch_id)%centroid_offset(:)
-        model_id = patch_ib(patch_id)%model_id
-        threshold = stl_models(model_id)%model_threshold
-        rotation(:,:) = patch_ib(patch_id)%rotation_matrix(:,:)
-
-        ! encode the periodicity information into the patch_id
-        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
-
-        il = -gp_layers - 1
-        jl = -gp_layers - 1
-        kl = -gp_layers - 1
-        ir = m + gp_layers + 1
-        jr = n + gp_layers + 1
-        kr = p + gp_layers + 1
-
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, eta]', copyin='[patch_id, model_id, encoded_patch_id, center, &
-                            & inverse_rotation, offset, threshold]', collapse=3)
-        do i = il, ir
-            do j = jl, jr
-                do k = kl, kr
-                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(k) - center(3)]
-                    xyz_local = matmul(inverse_rotation, xyz_local)
-                    xyz_local = xyz_local - offset
-
-                    eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
-
-                    if (eta > threshold) then
-                        ib_markers%sf(i, j, k) = encoded_patch_id
-                    end if
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_ib_3d_model
 
     !> Initialize the NACA surface grids for all airfoil IB patches. Must be called after the grid is established (so dx is valid)
     !! and before s_apply_ib_patches or s_apply_levelset.
