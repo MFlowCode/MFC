@@ -22,6 +22,7 @@ module m_check_patches
     use m_compile_specific
     use m_helper_basic
     use m_helper
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq
 
     implicit none
 
@@ -104,10 +105,10 @@ contains
 
         ! Constraints on smoothing initial condition patch parameters
         do i = 1, num_patches
-            if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 3 .or. patch_icpp(i) &
-                & %geometry == 4 .or. patch_icpp(i)%geometry == 5 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i) &
-                & %geometry == 9 .or. patch_icpp(i)%geometry == 10 .or. patch_icpp(i)%geometry == 11 .or. patch_icpp(i) &
-                & %geometry == 12 .or. patch_icpp(i)%geometry == 13 .or. patch_icpp(i)%geometry == 14)) then
+            if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 3 .or. patch_icpp(i)%geometry == 4 &
+                & .or. patch_icpp(i)%geometry == 5 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i)%geometry == 9 &
+                & .or. patch_icpp(i)%geometry == 10 .or. patch_icpp(i)%geometry == 11 .or. patch_icpp(i)%geometry == 12 &
+                & .or. patch_icpp(i)%geometry == 13 .or. patch_icpp(i)%geometry == 14)) then
                 call s_check_supported_patch_smoothing(i)
             else
                 call s_check_unsupported_patch_smoothing(i)
@@ -462,23 +463,25 @@ contains
         call s_int_to_str(patch_id, iStr)
 
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%vel(1)), "Patch "//trim(iStr)//": vel(1) must be set")
-        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) .and. (.not. f_approx_equal(patch_icpp(patch_id) &
-                   & %vel(2), 0._wp)) .and. (.not. mhd), "Patch " // trim(iStr) // ": vel(2) must not be set when n = 0")
+        @:PROHIBIT(n == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(2))) &
+                   & .and. (.not. f_approx_equal(patch_icpp(patch_id)%vel(2), 0._wp)) .and. (.not. mhd), &
+                   & "Patch " // trim(iStr) // ": vel(2) must not be set when n = 0")
         @:PROHIBIT(n > 0 .and. f_is_default(patch_icpp(patch_id)%vel(2)), "Patch "//trim(iStr)//": vel(2) must be set when n > 0")
-        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) .and. (.not. f_approx_equal(patch_icpp(patch_id) &
-                   & %vel(3), 0._wp)) .and. (.not. mhd), "Patch " // trim(iStr) // ": vel(3) must not be set when p = 0")
+        @:PROHIBIT(p == 0 .and. (.not. f_is_default(patch_icpp(patch_id)%vel(3))) &
+                   & .and. (.not. f_approx_equal(patch_icpp(patch_id)%vel(3), 0._wp)) .and. (.not. mhd), &
+                   & "Patch " // trim(iStr) // ": vel(3) must not be set when p = 0")
         @:PROHIBIT(p > 0 .and. f_is_default(patch_icpp(patch_id)%vel(3)), "Patch "//trim(iStr)//": vel(3) must be set when p > 0")
         @:PROHIBIT(mhd .and. (f_is_default(patch_icpp(patch_id)%vel(2)) .or. f_is_default(patch_icpp(patch_id)%vel(3))), &
                    & "Patch " // trim(iStr) // ": All velocities (vel(1:3)) must be set when mhd = true")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%rho <= 0._wp, &
+        @:PROHIBIT(model_eqns == model_eqns_gamma_law .and. patch_icpp(patch_id)%rho <= 0._wp, &
                    & "Patch " // trim(iStr) // ": rho must be greater than zero when model_eqns = 1")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%gamma <= 0._wp, &
+        @:PROHIBIT(model_eqns == model_eqns_gamma_law .and. patch_icpp(patch_id)%gamma <= 0._wp, &
                    & "Patch " // trim(iStr) // ": gamma must be greater than zero when model_eqns = 1")
-        @:PROHIBIT(model_eqns == 1 .and. patch_icpp(patch_id)%pi_inf < 0._wp, &
+        @:PROHIBIT(model_eqns == model_eqns_gamma_law .and. patch_icpp(patch_id)%pi_inf < 0._wp, &
                    & "Patch " // trim(iStr) // ": pi_inf must be greater than or equal to zero when model_eqns = 1")
         @:PROHIBIT(patch_icpp(patch_id)%geometry == 5 .and. patch_icpp(patch_id)%pi_inf > 0, &
                    & "Patch " // trim(iStr) // ": pi_inf must be less than or equal to zero when geometry = 5")
-        @:PROHIBIT(model_eqns == 2 .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
+        @:PROHIBIT(model_eqns == model_eqns_5eq .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
                    & "Patch " // trim(iStr) &
                    & // ": alpha_rho(1:num_fluids) must be greater than or equal to zero when model_eqns = 2")
 
@@ -491,7 +494,7 @@ contains
         @:PROHIBIT(mhd .and. n > 0 .and. .not. is_set_B(1), "Bx must be set in 2D/3D MHD simulations")
         @:PROHIBIT(mhd .and. .not. (is_set_B(2) .and. is_set_B(3)), "By and Bz must be set in all MHD simulations")
 
-        if (model_eqns == 2 .and. num_fluids < num_fluids_max) then
+        if (model_eqns == model_eqns_5eq .and. num_fluids < num_fluids_max) then
             @:PROHIBIT(.not. f_all_default(patch_icpp(patch_id)%alpha_rho(num_fluids + 1:)), &
                        & "Patch " // trim(iStr) // ": alpha_rho(i) must not be set for i > num_fluids")
             @:PROHIBIT(.not. f_all_default(patch_icpp(patch_id)%alpha(num_fluids + 1:)), &
@@ -523,16 +526,27 @@ contains
 
     end subroutine s_check_inactive_patch_primitive_variables
 
-    !> Verify that the model file referenced by the given patch exists on disk.
+    !> Verify that an STL/OBJ model patch (geometry 21) references a valid stl_models entry whose model file exists on disk.
     impure subroutine s_check_model_geometry(patch_id)
 
         integer, intent(in) :: patch_id
+        integer             :: mid
+        character(len=10)   :: midStr
         logical             :: file_exists
 
-        inquire (file=patch_icpp(patch_id)%model_filepath, exist=file_exists)
+        call s_int_to_str(patch_id, iStr)
+        mid = patch_icpp(patch_id)%model_id
+        call s_int_to_str(mid, midStr)
+
+        @:PROHIBIT(mid <= 0 .or. mid > num_stl_models, &
+                   & "patch_icpp(" // trim(iStr) // ")%model_id=" // trim(midStr) // " must be in [1, num_stl_models]")
+
+        @:PROHIBIT(stl_models(mid)%model_filepath == dflt_char, "Empty model file path for stl_models(" // trim(midStr) // ")")
+
+        inquire (file=stl_models(mid)%model_filepath, exist=file_exists)
 
         @:PROHIBIT(.not. file_exists, &
-                   & "Model file " // trim(patch_icpp(patch_id)%model_filepath) // " requested by patch " // trim(iStr) &
+                   & "Model file " // trim(stl_models(mid)%model_filepath) // " requested by patch " // trim(iStr) &
                    & // " does not exist")
 
     end subroutine s_check_model_geometry

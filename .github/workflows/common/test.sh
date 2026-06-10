@@ -57,10 +57,14 @@ if [ -n "${job_shard:-}" ]; then
     shard_opts="--shard $job_shard"
 fi
 
-# Only prune tests on PRs; master pushes must run the full suite.
-prune_flag=""
+# Coverage-based test selection ENFORCED on PRs: runs only tests whose recorded coverage
+# overlaps the PR's changed files (conservative ladder; non-.fpp and uncovered-.fpp changes
+# fall back to run-all). Pushes to master run the full suite as a backstop. Changed files
+# come from git detection (self-healing deepen) since the SLURM job doesn't receive the
+# paths-filter list.
+select_opts=""
 if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
-    prune_flag="--only-changes"
+    select_opts="--select-enforce"
 fi
 
-./mfc.sh test -v --max-attempts 3 --no-build $prune_flag -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
+./mfc.sh test -v --max-attempts 3 --no-build $select_opts -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster

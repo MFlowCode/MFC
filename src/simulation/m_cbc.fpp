@@ -12,13 +12,10 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
+    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
         & get_mole_fractions, get_species_specific_heats_r
-
-    #:if USING_AMD
-        use m_chemistry, only: molecular_weights_nonparameter
-    #:endif
 
     implicit none
 
@@ -529,7 +526,7 @@ contains
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
-                if (weno_order == 3 .or. dummy) then
+                if (weno_order == 3) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
                         & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
@@ -557,7 +554,7 @@ contains
                 end if
 
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                if (weno_order == 5 .or. dummy) then
+                if (weno_order == 5) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
                         & is3, idwbuff(2)%beg, idwbuff(3)%beg)
 
@@ -725,15 +722,15 @@ contains
 
                         Ma = vel(dir_idx(1))/c
 
-                        if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SLIP_WALL) &
-                            & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_SLIP_WALL)) then
+                        if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SLIP_WALL) .or. (cbc_loc == 1 &
+                            & .and. bc_${XYZ}$%end == BC_CHAR_SLIP_WALL)) then
                             call s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_BUFFER) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_BUFFER)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_BUFFER) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_BUFFER)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
                                 & dvel_ds, dadv_ds, dYs_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_INFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_INFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_INFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_INFLOW)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
@@ -759,8 +756,8 @@ contains
                                   & dir_idx(1))*sign(1, &
                                   & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
                                 & dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
@@ -773,19 +770,19 @@ contains
                                       & + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_FF_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_FF_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_FF_SUB_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, &
                                 & dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_CP_SUB_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_CP_SUB_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_CP_SUB_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
                                 & dvel_ds, dadv_ds)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_INFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_SUP_INFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_INFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_SUP_INFLOW)) then
                             call s_compute_supersonic_inflow_L(L)
-                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_OUTFLOW) &
-                                 & .or. (cbc_loc == 1 .and. bc_${XYZ}$%end == BC_CHAR_SUP_OUTFLOW)) then
+                        else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_OUTFLOW) .or. (cbc_loc == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_SUP_OUTFLOW)) then
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, &
                                                                 & dYs_ds)
                         end if
@@ -836,7 +833,7 @@ contains
 
                         drho_dt = 0._wp; dgamma_dt = 0._wp; dpi_inf_dt = 0._wp; dqv_dt = 0._wp
 
-                        if (model_eqns == 1) then
+                        if (model_eqns == model_eqns_gamma_law) then
                             drho_dt = dalpha_rho_dt(1)
                             dgamma_dt = dadv_dt(1)
                             #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
@@ -871,14 +868,8 @@ contains
                             sum_Enthalpies = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
-                                #:if USING_AMD
-                                    h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
-                                    sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights_nonparameter(i) &
-                                                                       & *Cp/R_gas)*dYs_dt(i)
-                                #:else
-                                    h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
-                                    sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
-                                #:endif
+                                h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
+                                sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                             end do
                             flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
                                                 & eqn_idx%E) + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2) &
@@ -894,7 +885,7 @@ contains
                                                 & + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
                         end if
 
-                        if (riemann_solver == 1) then
+                        if (riemann_solver == riemann_solver_hll) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i) = 0._wp
@@ -1008,7 +999,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1082,7 +1073,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1156,7 +1147,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1221,7 +1212,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1271,7 +1262,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end
@@ -1322,7 +1313,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (riemann_solver == 1) then
+            if (riemann_solver == riemann_solver_hll) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do r = is3%beg, is3%end

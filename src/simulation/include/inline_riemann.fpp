@@ -33,51 +33,28 @@
         eps = 0.001_wp
         call get_species_enthalpies_rt(T_L, h_iL)
         call get_species_enthalpies_rt(T_R, h_iR)
-        #:if USING_AMD
-            h_iL = h_iL*gas_constant/molecular_weights_nonparameter*T_L
-            h_iR = h_iR*gas_constant/molecular_weights_nonparameter*T_R
-        #:else
-            h_iL = h_iL*gas_constant/molecular_weights*T_L
-            h_iR = h_iR*gas_constant/molecular_weights*T_R
-        #:endif
+        h_iL = h_iL*gas_constant/molecular_weights*T_L
+        h_iR = h_iR*gas_constant/molecular_weights*T_R
         call get_species_specific_heats_r(T_L, Cp_iL)
         call get_species_specific_heats_r(T_R, Cp_iR)
 
         h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
         Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))
         T_avg = (sqrt(rho_L)*T_L + sqrt(rho_R)*T_R)/(sqrt(rho_L) + sqrt(rho_R))
-        #:if USING_AMD
-            if (abs(T_L - T_R) < eps) then
-                ! Case when T_L and T_R are very close
-                Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:))
-                Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:) &
-                             & - gas_constant/molecular_weights_nonparameter(:)))
-            else
-                ! Normal calculation when T_L and T_R are sufficiently different
-                Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
-                Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights_nonparameter(:)))
-            end if
-            gamma_avg = Cp_avg/Cv_avg
+        if (abs(T_L - T_R) < eps) then
+            ! Case when T_L and T_R are very close
+            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
+            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
+                         & - gas_constant/molecular_weights(:)))
+        else
+            ! Normal calculation when T_L and T_R are sufficiently different
+            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
+            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights(:)))
+        end if
+        gamma_avg = Cp_avg/Cv_avg
 
-            Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) &
-                    & + gamma_avg*gas_constant/molecular_weights_nonparameter(:)*T_avg
-            c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
-        #:else
-            if (abs(T_L - T_R) < eps) then
-                ! Case when T_L and T_R are very close
-                Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
-                Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
-                             & - gas_constant/molecular_weights(:)))
-            else
-                ! Normal calculation when T_L and T_R are sufficiently different
-                Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
-                Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights(:)))
-            end if
-            gamma_avg = Cp_avg/Cv_avg
-
-            Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
-            c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
-        #:endif
+        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
+        c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
     end if
 #:enddef roe_avg
 
@@ -92,14 +69,14 @@
 #:enddef compute_average_state
 
 #:def compute_low_Mach_correction()
-    if (riemann_solver == 1 .or. riemann_solver == 5) then
+    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_lax_friedrichs) then
         zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
         pcorr = 0._wp
 
         if (low_Mach == 1) then
             pcorr = -(s_P - s_M)*(rho_L + rho_R)/8._wp*(zcoef - 1._wp)
         end if
-    else if (riemann_solver == 2) then
+    else if (riemann_solver == riemann_solver_hllc) then
         zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
         pcorr = 0._wp
 

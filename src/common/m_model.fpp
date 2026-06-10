@@ -17,14 +17,14 @@ module m_model
 
     private
 
-    public :: f_model_read, s_model_write, s_model_free, f_model_is_inside, models, gpu_ntrs, gpu_trs_v, gpu_trs_n, &
-        & gpu_boundary_v, gpu_boundary_edge_count, gpu_total_vertices, stl_bounding_boxes
+    public :: f_model_read, s_model_write, s_model_free, models, gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, &
+        & gpu_boundary_edge_count, stl_bounding_boxes
 
     ! Subroutines for STL immersed boundaries
-    public :: s_check_boundary, s_register_edge, f_model_is_inside_flat, s_distance_normals_3D, s_distance_normals_2D, &
+    public :: s_check_boundary, s_register_edge, f_model_is_inside, s_distance_normals_3D, s_distance_normals_2D, &
         & s_pack_model_for_gpu
 
-#ifdef MFC_SIMULATION
+#ifndef MFC_POST_PROCESS
     public :: s_instantiate_STL_models
 #endif
 
@@ -34,9 +34,8 @@ module m_model
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_boundary_v
     integer, allocatable                      :: gpu_boundary_edge_count(:)
-    integer, allocatable                      :: gpu_total_vertices(:)
     real(wp), allocatable                     :: stl_bounding_boxes(:,:,:)
-    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count, gpu_total_vertices]')
+    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count]')
 
 contains
 
@@ -461,82 +460,12 @@ contains
 
     end subroutine s_skip_ignored_lines
 
-    !> Generate a pseudo-random number using a seed-based xorshift, replacing the Fortran intrinsic which is incompatible with GPU
-    !! routines
-    function f_model_random_number(seed) result(rval)
-
-        ! $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(inout) :: seed
-        real(wp)               :: rval
-
-        seed = ieor(seed, ishft(seed, 13))
-        seed = ieor(seed, ishft(seed, -17))
-        seed = ieor(seed, ishft(seed, 5))
-
-        rval = abs(real(seed, wp))/real(huge(seed), wp)
-
-    end function f_model_random_number
-
-    !> Determine whether a point is inside a model using stochastic ray casting.
-    !! @param spc      Number of samples per cell.
-    impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
-
-        ! $:GPU_ROUTINE(parallelism='[seq]')
-
-        type(t_model), intent(in)            :: model
-        real(wp), dimension(1:3), intent(in) :: point
-        real(wp), dimension(1:3), intent(in) :: spacing
-        integer, intent(in)                  :: spc
-        real(wp)                             :: phi
-        integer                              :: rand_seed
-        real(wp)                             :: fraction
-        type(t_ray)                          :: ray
-        integer                              :: i, j, k, nInOrOut, nHits
-        real(wp), dimension(1:spc,1:3)       :: ray_origins, ray_dirs
-
-        rand_seed = int(point(1)*73856093._wp) + int(point(2)*19349663._wp) + int(point(3)*83492791._wp)
-        if (rand_seed == 0) rand_seed = 1
-
-        ! generate our random collection or rays
-        do i = 1, spc
-            do k = 1, 3
-                ! random jitter in the origin helps us estimate volume fraction instead of only at the cell center
-                ray_origins(i, k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp)*spacing(k)
-                ! cast sample rays in all directions
-                ray_dirs(i, k) = f_model_random_number(rand_seed) - 0.5_wp
-            end do
-            ray_dirs(i,:) = ray_dirs(i,:)/sqrt(sum(ray_dirs(i,:)*ray_dirs(i,:)))
-        end do
-
-        ! ray trace
-        nInOrOut = 0
-        do i = 1, spc
-            ray%o = ray_origins(i,:)
-            ray%d = ray_dirs(i,:)
-
-            nHits = 0
-            do j = 1, model%ntrs
-                ! count the number of triangles this ray intersects
-                if (f_intersects_triangle(ray, model%trs(j)) == 1) then
-                    nHits = nHits + 1
-                end if
-            end do
-
-            ! if the ray hits an odd number of triangles on its way out, then it must be on the inside of the model
-            nInOrOut = nInOrOut + mod(nHits, 2)
-        end do
-
-        fraction = real(nInOrOut)/real(spc)
-
-    end function f_model_is_inside
-
     !> Determine if a point is inside a surface using the generalized winding number (Jacobson et al., SIGGRAPH 2013). In 3D, sums
     !! the solid angle subtended by each triangle (Van Oosterom-Strackee formula). In 2D (p==0), sums the signed angle subtended by
     !! each boundary edge. Returns ~1.0 inside, ~0.0 outside. Unlike ray casting, this is robust to small triangles/edges and vertex
     !! winding order.
     !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
-    function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
+    function f_model_is_inside(ntrs, pid, point) result(fraction)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -594,47 +523,7 @@ contains
             fraction = fraction/(2.0_wp*acos(-1.0_wp))
         end if
 
-    end function f_model_is_inside_flat
-
-    !> Check if a ray intersects a triangle using the Moller-Trumbore algorithm (barycentric coordinates). Unlike the previous
-    !! cross-product sign test, this is vertex winding-order independent.
-    !! @return 1 if the ray intersects the triangle, 0 otherwise.
-    function f_intersects_triangle(ray, triangle) result(intersects)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        type(t_ray), intent(in)      :: ray
-        type(t_triangle), intent(in) :: triangle
-        integer                      :: intersects
-        real(wp)                     :: edge1(3), edge2(3), h(3), s(3), q(3)
-        real(wp)                     :: a, f, u, v, t
-
-        intersects = 0
-
-        edge1 = triangle%v(2,:) - triangle%v(1,:)
-        edge2 = triangle%v(3,:) - triangle%v(1,:)
-        h = f_cross(ray%d, edge2)
-        a = dot_product(edge1, h)
-
-        ! Ray nearly parallel to triangle plane. In single precision builds epsilon(1.0) ~ 1.2e-7, so use 10*epsilon as a floor.
-        if (abs(a) < max(1e-7_wp, 10.0_wp*epsilon(1.0_wp))) return
-
-        f = 1.0_wp/a
-        s = ray%o - triangle%v(1,:)
-        u = f*dot_product(s, h)
-
-        if (u < 0.0_wp .or. u > 1.0_wp) return
-
-        q = f_cross(s, edge1)
-        v = f*dot_product(ray%d, q)
-
-        if (v < 0.0_wp .or. u + v > 1.0_wp) return
-
-        t = f*dot_product(edge2, q)
-
-        if (t > 0.0_wp) intersects = 1
-
-    end function f_intersects_triangle
+    end function f_model_is_inside
 
     !> Check and label edges shared by two or more triangle facets of the 2D STL model.
     subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
@@ -962,17 +851,16 @@ contains
 
     end subroutine s_distance_normals_2D
 
-#ifdef MFC_SIMULATION
+#ifndef MFC_POST_PROCESS
     !> Load, transform, and register STL/OBJ immersed-boundary models onto the simulation grid.
     subroutine s_instantiate_STL_models()
 
         ! Variables for IBM+STL
-        real(wp)                                :: normals(1:3)                                !< Boundary normal buffer
         integer                                 :: boundary_vertex_count, boundary_edge_count  !< Boundary vertex
         real(wp), allocatable, dimension(:,:,:) :: boundary_v                                  !< Boundary vertex buffer
         real(wp)                                :: dx_local, dy_local, dz_local                !< Levelset distance buffer
         integer                                 :: i, j, k                                     !< Generic loop iterators
-        integer                                 :: patch_id
+        integer                                 :: stl_id
         type(t_bbox)                            :: bbox, bbox_old
         type(t_model)                           :: model
         type(ic_model_parameters)               :: params
@@ -980,141 +868,138 @@ contains
         real(wp)                                :: grid_mm(1:3,1:2)
         real(wp), dimension(1:4,1:4)            :: transform, transform_n
 
+#ifdef MFC_SIMULATION
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
+#else
+        dx_local = dx; dy_local = dy
+        if (p /= 0) dz_local = dz
+#endif
+        if (num_stl_models == 0) return
 
-        allocate (stl_bounding_boxes(num_ibs,1:3,1:3))
+        allocate (stl_bounding_boxes(num_stl_models,1:3,1:3))
+        @:ALLOCATE(models(num_stl_models))
 
-        do patch_id = 1, num_ibs
-            if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
-                allocate (models(patch_id)%model)
-                print *, " * Reading model: " // trim(patch_ib(patch_id)%model_filepath)
+        do stl_id = 1, num_stl_models
+            allocate (models(stl_id)%model)
+            if (proc_rank == 0) print *, " * Reading model: " // trim(stl_models(stl_id)%model_filepath)
 
-                model = f_model_read(patch_ib(patch_id)%model_filepath)
-                params%scale(:) = patch_ib(patch_id)%model_scale(:)
-                params%translate(:) = patch_ib(patch_id)%model_translate(:)
-                params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
-                params%spc = patch_ib(patch_id)%model_spc
-                params%threshold = patch_ib(patch_id)%model_threshold
+            model = f_model_read(stl_models(stl_id)%model_filepath)
+            params%scale(:) = stl_models(stl_id)%model_scale(:)
+            params%translate(:) = stl_models(stl_id)%model_translate(:)
+            params%rotate(:) = 0._wp
+            params%spc = num_ray
+            params%threshold = stl_models(stl_id)%model_threshold
 
-                if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
-                    params%scale(:) = 1._wp
+            if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
+                params%scale(:) = 1._wp
+            end if
+
+            if (proc_rank == 0) print *, " * Transforming model."
+
+            ! Get the model center before transforming the model
+            bbox_old = f_create_bbox(model)
+            model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
+
+            ! Compute the transform matrices for vertices and normals
+            transform = f_create_transform_matrix(params, model_center)
+            transform_n = f_create_transform_matrix(params)
+
+            call s_transform_model(model, transform, transform_n)
+
+            ! Recreate the bounding box after transformation
+            bbox = f_create_bbox(model)
+
+            ! Show the number of vertices in the original STL model
+            if (proc_rank == 0) print *, ' * Number of input model vertices:', 3*model%ntrs
+
+            ! Need the cells that form the boundary of the flat projection in 2D
+            if (p == 0) call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+
+            ! Show the number of edges and boundary edges in 2D STL models
+            if (proc_rank == 0 .and. p == 0) print *, ' * Number of 2D model boundary edges:', boundary_edge_count
+
+            if (proc_rank == 0) then
+                write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
+                write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
+                write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
+
+                grid_mm(1,:) = (/minval(x_cc(0:m)) - 0.5_wp*dx_local, maxval(x_cc(0:m)) + 0.5_wp*dx_local/)
+                grid_mm(2,:) = (/minval(y_cc(0:n)) - 0.5_wp*dy_local, maxval(y_cc(0:n)) + 0.5_wp*dy_local/)
+
+                if (p > 0) then
+                    grid_mm(3,:) = (/minval(z_cc(0:p)) - 0.5_wp*dz_local, maxval(z_cc(0:p)) + 0.5_wp*dz_local/)
+                else
+                    grid_mm(3,:) = (/0._wp, 0._wp/)
                 end if
 
-                if (proc_rank == 0) then
-                    print *, " * Transforming model."
-                end if
+                write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
+                write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2._wp
+                write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
+            end if
+            if (proc_rank == 0) print *, " * Transforming model."
 
-                ! Get the model center before transforming the model
-                bbox_old = f_create_bbox(model)
-                model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
+            stl_bounding_boxes(stl_id, 1,1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
+            stl_bounding_boxes(stl_id, 2,1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
+            stl_bounding_boxes(stl_id, 3,1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
 
-                ! Compute the transform matrices for vertices and normals
-                transform = f_create_transform_matrix(params, model_center)
-                transform_n = f_create_transform_matrix(params)
-
-                call s_transform_model(model, transform, transform_n)
-
-                ! Recreate the bounding box after transformation
-                bbox = f_create_bbox(model)
-
-                ! Show the number of vertices in the original STL model
-                if (proc_rank == 0) then
-                    print *, ' * Number of input model vertices:', 3*model%ntrs
-                end if
-
-                ! Need the cells that form the boundary of the flat projection in 2D
-                if (p == 0) call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
-
-                ! Show the number of edges and boundary edges in 2D STL models
-                if (proc_rank == 0 .and. p == 0) then
-                    print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-                end if
-
-                if (proc_rank == 0) then
-                    write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
-                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
-                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
-
-                    grid_mm(1,:) = (/minval(x_cc(0:m)) - 0.5_wp*dx_local, maxval(x_cc(0:m)) + 0.5_wp*dx_local/)
-                    grid_mm(2,:) = (/minval(y_cc(0:n)) - 0.5_wp*dy_local, maxval(y_cc(0:n)) + 0.5_wp*dy_local/)
-
-                    if (p > 0) then
-                        grid_mm(3,:) = (/minval(z_cc(0:p)) - 0.5_wp*dz_local, maxval(z_cc(0:p)) + 0.5_wp*dz_local/)
-                    else
-                        grid_mm(3,:) = (/0._wp, 0._wp/)
-                    end if
-
-                    write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:,1)
-                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:,1) + grid_mm(:,2))/2._wp
-                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:,2)
-                end if
-
-                stl_bounding_boxes(patch_id, 1,1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
-                stl_bounding_boxes(patch_id, 2,1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
-                stl_bounding_boxes(patch_id, 3,1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
-
-                models(patch_id)%model = model
-                if (p == 0) then
-                    models(patch_id)%boundary_v = boundary_v
-                    models(patch_id)%boundary_edge_count = boundary_edge_count
-                end if
+            models(stl_id)%model = model
+            if (p == 0) then
+                models(stl_id)%boundary_v = boundary_v
+                models(stl_id)%boundary_edge_count = boundary_edge_count
             end if
         end do
 
         ! Pack and upload flat arrays for GPU (AFTER the loop)
         block
-            integer :: pid, max_ntrs
+            integer :: mid, max_ntrs
             integer :: max_bv1, max_bv2, max_bv3
 
             max_ntrs = 0
             max_bv1 = 0; max_bv2 = 0; max_bv3 = 0
 
-            do pid = 1, num_ibs
-                if (allocated(models(pid)%model)) then
-                    call s_pack_model_for_gpu(models(pid))
-                    max_ntrs = max(max_ntrs, models(pid)%ntrs)
+            do mid = 1, num_stl_models
+                if (allocated(models(mid)%model)) then
+                    call s_pack_model_for_gpu(models(mid))
+                    max_ntrs = max(max_ntrs, models(mid)%ntrs)
                 end if
-                if (allocated(models(pid)%boundary_v)) then
-                    max_bv1 = max(max_bv1, size(models(pid)%boundary_v, 1))
-                    max_bv2 = max(max_bv2, size(models(pid)%boundary_v, 2))
-                    max_bv3 = max(max_bv3, size(models(pid)%boundary_v, 3))
+                if (allocated(models(mid)%boundary_v)) then
+                    max_bv1 = max(max_bv1, size(models(mid)%boundary_v, 1))
+                    max_bv2 = max(max_bv2, size(models(mid)%boundary_v, 2))
+                    max_bv3 = max(max_bv3, size(models(mid)%boundary_v, 3))
                 end if
             end do
 
             if (max_ntrs > 0) then
-                @:ALLOCATE(gpu_ntrs(1:num_ibs))
-                @:ALLOCATE(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_ibs))
-                @:ALLOCATE(gpu_trs_n(1:3, 1:max_ntrs, 1:num_ibs))
-                @:ALLOCATE(gpu_boundary_edge_count(1:num_ibs))
-                @:ALLOCATE(gpu_total_vertices(1:num_ibs))
+                @:ALLOCATE(gpu_ntrs(1:num_stl_models))
+                @:ALLOCATE(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_stl_models))
+                @:ALLOCATE(gpu_trs_n(1:3, 1:max_ntrs, 1:num_stl_models))
+                @:ALLOCATE(gpu_boundary_edge_count(1:num_stl_models))
 
                 gpu_ntrs = 0
                 gpu_trs_v = 0._wp
                 gpu_trs_n = 0._wp
                 gpu_boundary_edge_count = 0
-                gpu_total_vertices = 0
 
                 if (max_bv1 > 0) then
-                    @:ALLOCATE(gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_ibs))
+                    @:ALLOCATE(gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_stl_models))
                     gpu_boundary_v = 0._wp
                 end if
 
-                do pid = 1, num_ibs
-                    if (allocated(models(pid)%model)) then
-                        gpu_ntrs(pid) = models(pid)%ntrs
-                        gpu_trs_v(:,:,1:models(pid)%ntrs,pid) = models(pid)%trs_v
-                        gpu_trs_n(:,1:models(pid)%ntrs,pid) = models(pid)%trs_n
-                        gpu_boundary_edge_count(pid) = models(pid)%boundary_edge_count
-                        gpu_total_vertices(pid) = models(pid)%total_vertices
+                do mid = 1, num_stl_models
+                    if (allocated(models(mid)%model)) then
+                        gpu_ntrs(mid) = models(mid)%ntrs
+                        gpu_trs_v(:,:,1:models(mid)%ntrs,mid) = models(mid)%trs_v
+                        gpu_trs_n(:,1:models(mid)%ntrs,mid) = models(mid)%trs_n
+                        gpu_boundary_edge_count(mid) = models(mid)%boundary_edge_count
                     end if
-                    if (allocated(models(pid)%boundary_v) .and. p == 0) then
-                        gpu_boundary_v(1:size(models(pid)%boundary_v, 1),1:size(models(pid)%boundary_v, 2), &
-                                       & 1:size(models(pid)%boundary_v, 3),pid) = models(pid)%boundary_v
+                    if (allocated(models(mid)%boundary_v) .and. p == 0) then
+                        gpu_boundary_v(1:size(models(mid)%boundary_v, 1),1:size(models(mid)%boundary_v, 2), &
+                                       & 1:size(models(mid)%boundary_v, 3),mid) = models(mid)%boundary_v
                     end if
                 end do
 
-                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
+                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count]')
                 if (allocated(gpu_boundary_v)) then
                     $:GPU_UPDATE(device='[gpu_boundary_v]')
                 end if

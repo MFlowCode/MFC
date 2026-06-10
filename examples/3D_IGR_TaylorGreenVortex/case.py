@@ -46,9 +46,10 @@ print(
             "t_step_save": int(Nt / 100),
             # Simulation Algorithm Parameters
             "num_patches": 1,
-            "model_eqns": 2,
+            "model_eqns": "5eq",
             "num_fluids": 1,
-            "time_stepper": 3,
+            "time_stepper": "rk3",
+            "riemann_solver": "lax_friedrichs",
             "bc_x%beg": -1,
             "bc_x%end": -1,
             "bc_y%beg": -1,
@@ -63,8 +64,8 @@ print(
             "alf_factor": 10,
             "viscous": "T",
             # Formatted Database Files Structure Parameters
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "omega_wrt(1)": "T",
             "omega_wrt(2)": "T",

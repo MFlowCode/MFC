@@ -25,6 +25,7 @@ module m_start_up
     use m_checker
     use m_thermochem, only: num_species, species_names
     use m_finite_differences
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
     use m_chemistry
 
 #ifdef MFC_MPI
@@ -59,18 +60,7 @@ contains
         integer                 :: iostatus
         character(len=1000)     :: line
 
-        namelist /user_inputs/ case_dir, m, n, p, t_step_start, t_step_stop, t_step_save, model_eqns, num_fluids, mpp_lim, &
-            & weno_order, bc_x, bc_y, bc_z, fluid_pp, bub_pp, format, precision, output_partial_domain, x_output, y_output, &
-            & z_output, hypoelasticity, G, mhd, chem_wrt_Y, chem_wrt_T, avg_state, alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
-            & E_wrt, fft_wrt, pres_wrt, alpha_wrt, gamma_wrt, heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, cons_vars_wrt, &
-            & prim_vars_wrt, c_wrt, omega_wrt, qm_wrt, liutex_wrt, schlieren_wrt, schlieren_alpha, fd_order, mixture_err, &
-            & alt_soundspeed, flux_lim, flux_wrt, cyl_coord, parallel_io, rhoref, pref, bubbles_euler, qbmm, sigR, R0ref, nb, &
-            & polytropic, thermal, Ca, Web, Re_inv, polydisperse, poly_sigma, file_per_process, relax, relax_model, cf_wrt, &
-            & sigma, adv_n, ib, num_ibs, cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, cfl_target, surface_tension, &
-            & bubbles_lagrange, sim_data, hyperelasticity, Bx0, relativity, cont_damage, hyper_cleaning, num_bc_patches, igr, &
-            & igr_order, down_sample, recon_type, muscl_order, lag_header, lag_txt_wrt, lag_db_wrt, lag_id_wrt, lag_pos_wrt, &
-            & lag_pos_prev_wrt, lag_vel_wrt, lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, lag_rmin_wrt, lag_dphidt_wrt, &
-            & lag_pres_wrt, lag_mv_wrt, lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, alpha_rho_e_wrt, ib_state_wrt
+        #:include 'generated_namelist.fpp'
 
         file_loc = 'post_process.inp'
         inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -235,11 +225,11 @@ contains
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, fd_number, fd_order, offset_z)
         end if
 
-        if ((model_eqns == 2) .or. (model_eqns == 3) .or. (model_eqns == 4)) then
+        if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq) .or. (model_eqns == model_eqns_4eq)) then
             do i = 1, num_fluids
                 if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
                     q_sf(:,:,:) = q_cons_vf(i)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
-                    if (model_eqns /= 4) then
+                    if (model_eqns /= model_eqns_4eq) then
                         write (varname, '(A,I0)') 'alpha_rho', i
                     else
                         write (varname, '(A,I0)') 'rho', i
@@ -251,7 +241,8 @@ contains
             end do
         end if
 
-        if ((rho_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) then
+        if ((rho_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) .and. (.not. relativity)) &
+            & then
             q_sf(:,:,:) = rho_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'rho'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -335,7 +326,7 @@ contains
             varname(:) = ' '
         end if
 
-        if (model_eqns == 3) then
+        if (model_eqns == model_eqns_6eq) then
             do i = 1, num_fluids
                 if (alpha_rho_e_wrt(i) .or. cons_vars_wrt) then
                     q_sf = q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
@@ -526,7 +517,7 @@ contains
             varname(:) = ' '
         end if
 
-        if (((model_eqns == 2) .and. (bubbles_euler .neqv. .true.)) .or. (model_eqns == 3)) then
+        if (((model_eqns == model_eqns_5eq) .and. (bubbles_euler .neqv. .true.)) .or. (model_eqns == model_eqns_6eq)) then
             do i = 1, num_fluids - 1
                 if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
                     q_sf(:,:,:) = q_cons_vf(i + eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
@@ -559,7 +550,7 @@ contains
             end if
         end if
 
-        if (gamma_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+        if (gamma_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
             q_sf(:,:,:) = gamma_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'gamma'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -576,7 +567,7 @@ contains
             varname(:) = ' '
         end if
 
-        if (pi_inf_wrt .or. (model_eqns == 1 .and. (cons_vars_wrt .or. prim_vars_wrt))) then
+        if (pi_inf_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
             q_sf(:,:,:) = pi_inf_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'pi_inf'
             call s_write_variable_to_formatted_database_file(varname, t_step)

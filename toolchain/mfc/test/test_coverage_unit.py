@@ -1,784 +1,344 @@
-"""
-Unit tests for toolchain/mfc/test/coverage.py
-
-Run with:
-    python3 -m pytest toolchain/mfc/test/test_coverage_unit.py -v
-
-These tests are fully offline (no build, no git, no gcov binary required).
-They use mocks and in-memory data structures to verify logic.
-"""
-
-import gzip
-import hashlib
-import importlib.util
-import json
-import os
-import sys
 import tempfile
-import types
-import unittest
+import types as _types
 from pathlib import Path
 from unittest.mock import patch
 
-# Import the module under test.
-# We patch the module-level imports that require the full toolchain.
+from mfc.test.coverage import format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
 
 
-# Create minimal stubs for toolchain modules so coverage.py can be imported
-# without the full MFC toolchain being on sys.path.
-def _make_stub(name):
-    mod = types.ModuleType(name)
-    sys.modules[name] = mod
-    return mod
+def test_param_hash_is_order_independent():
+    a = param_hash({"m": 100, "weno_order": 5, "bubbles_euler": "T"})
+    b = param_hash({"weno_order": 5, "bubbles_euler": "T", "m": 100})
+    assert a == b
 
 
-for _mod_name in [
-    "toolchain",
-    "toolchain.mfc",
-    "toolchain.mfc.printer",
-    "toolchain.mfc.common",
-    "toolchain.mfc.build",
-    "toolchain.mfc.test",
-    "toolchain.mfc.test.case",
-]:
-    if _mod_name not in sys.modules:
-        _make_stub(_mod_name)
-
-# Provide the attributes coverage.py needs from its relative imports
-_printer_stub = sys.modules.get("toolchain.mfc.printer", _make_stub("toolchain.mfc.printer"))
+def test_param_hash_changes_with_value():
+    a = param_hash({"weno_order": 5})
+    b = param_hash({"weno_order": 3})
+    assert a != b
 
 
-class _FakeCons:
-    def print(self, *args, **kwargs):
-        pass  # suppress output during tests
+def test_param_hash_is_hex_and_short():
+    h = param_hash({"m": 1})
+    assert len(h) == 16 and all(c in "0123456789abcdef" for c in h)
 
 
-_printer_stub.cons = _FakeCons()
-
-_common_stub = sys.modules.get("toolchain.mfc.common", _make_stub("toolchain.mfc.common"))
-_common_stub.MFC_ROOT_DIR = "/fake/repo"
-
-
-class _FakeMFCException(Exception):
-    pass
+def test_param_hash_nested_order_independent():
+    a = param_hash({"patch": {"x": 1, "y": 2}})
+    b = param_hash({"patch": {"y": 2, "x": 1}})
+    assert a == b
 
 
-_common_stub.MFCException = _FakeMFCException
+def test_save_then_load_roundtrip():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "m.json.gz"
+        save_map(p, {"abc": ["src/simulation/m_rhs.fpp"]}, n_tests=1, git_sha="deadbee", gfortran_version="13")
+        entries, meta = load_map(p)
+        assert entries == {"abc": ["src/simulation/m_rhs.fpp"]}
+        assert meta["n_tests"] == 1 and meta["git_sha"] == "deadbee"
+        assert "built_at" in meta
 
-_build_stub = sys.modules.get("toolchain.mfc.build", _make_stub("toolchain.mfc.build"))
-_build_stub.PRE_PROCESS = "pre_process"
-_build_stub.SIMULATION = "simulation"
-_build_stub.POST_PROCESS = "post_process"
 
-_case_stub = sys.modules.get("toolchain.mfc.test.case", _make_stub("toolchain.mfc.test.case"))
-_case_stub.input_bubbles_lagrange = lambda case: None
-_case_stub.get_post_process_mods = lambda params: {}
-_case_stub.POST_PROCESS_3D_PARAMS = {
-    "fd_order": 1,
-    "omega_wrt(1)": "T",
-    "omega_wrt(2)": "T",
-    "omega_wrt(3)": "T",
-}
+def test_load_missing_returns_none():
+    assert load_map(Path("/nonexistent/m.json.gz")) == (None, None)
 
-# Load coverage.py by injecting stubs into sys.modules so relative imports resolve.
-_COVERAGE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "coverage.py")
 
-sys.modules.pop("toolchain.mfc.test.coverage", None)  # reset if already loaded
+def test_load_corrupt_returns_none():
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "m.json.gz"
+        p.write_bytes(b"not gzip")
+        assert load_map(p) == (None, None)
 
-_spec = importlib.util.spec_from_file_location("toolchain.mfc.test.coverage", _COVERAGE_PATH, submodule_search_locations=[])
-_coverage_mod = importlib.util.module_from_spec(_spec)
-_coverage_mod.__package__ = "toolchain.mfc.test"
 
-sys.modules["toolchain.mfc.test"] = types.ModuleType("toolchain.mfc.test")
-sys.modules["toolchain.mfc.test"].__package__ = "toolchain.mfc.test"
+def test_macro_file_forces_all():
+    assert is_always_run_all({"src/common/include/parallel_macros.fpp"})
 
-with patch.dict(
-    "sys.modules",
-    {
-        "toolchain.mfc.printer": _printer_stub,
-        "toolchain.mfc.common": _common_stub,
-        "toolchain.mfc.build": _build_stub,
-        "toolchain.mfc.test.case": _case_stub,
-    },
-):
-    try:
-        _spec.loader.exec_module(_coverage_mod)
-    except ImportError:
-        pass  # fallback below
 
-# If the importlib approach failed (relative imports unresolvable), fall back to exec.
-try:
-    _parse_diff_files = _coverage_mod._parse_diff_files
-    _parse_gcov_json_output = _coverage_mod._parse_gcov_json_output
-    _normalize_cache = _coverage_mod._normalize_cache
-    _compute_gcov_prefix_strip = _coverage_mod._compute_gcov_prefix_strip
-    load_coverage_cache = _coverage_mod.load_coverage_cache
-    should_run_all_tests = _coverage_mod.should_run_all_tests
-    filter_tests_by_coverage = _coverage_mod.filter_tests_by_coverage
-    ALWAYS_RUN_ALL = _coverage_mod.ALWAYS_RUN_ALL
-    COVERAGE_CACHE_PATH = _coverage_mod.COVERAGE_CACHE_PATH
-except AttributeError:
-    _globals = {
-        "__name__": "toolchain.mfc.test.coverage",
-        "__package__": "toolchain.mfc.test",
-        "cons": _printer_stub.cons,
-        "common": _common_stub,
-        "MFCException": _FakeMFCException,
-        "PRE_PROCESS": "pre_process",
-        "SIMULATION": "simulation",
-        "POST_PROCESS": "post_process",
-    }
-    with open(_COVERAGE_PATH, encoding="utf-8") as _f:
-        _src = _f.read()
+def test_cmake_forces_all():
+    assert is_always_run_all({"CMakeLists.txt"})
+    assert is_always_run_all({"toolchain/cmake/foo.cmake"})
 
-    _src = (
-        _src.replace("from ..printer import cons", "cons = _globals['cons']")
-        .replace("from .. import common", "")
-        .replace("from ..common import MFCException", "MFCException = _globals['MFCException']")
-        .replace("from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS", "")
-        .replace(
-            "from .case import (input_bubbles_lagrange, get_post_process_mods,\n                    POST_PROCESS_3D_PARAMS)",
-            "input_bubbles_lagrange = lambda case: None\n"
-            "get_post_process_mods = lambda params: {}\n"
-            "POST_PROCESS_3D_PARAMS = {'fd_order': 1, 'omega_wrt(1)': 'T', "
-            "'omega_wrt(2)': 'T', 'omega_wrt(3)': 'T'}",
-        )
+
+def test_param_codegen_forces_all():
+    assert is_always_run_all({"toolchain/mfc/params/definitions.py"})
+
+
+def test_ordinary_common_module_does_not_force_all():
+    assert not is_always_run_all({"src/common/m_helper.fpp"})
+
+
+def test_ordinary_sim_module_does_not_force_all():
+    assert not is_always_run_all({"src/simulation/m_rhs.fpp"})
+
+
+class _Case:
+    def __init__(self, ph, params=None):
+        self._ph = ph
+        self.params = params or {}
+
+    def coverage_key(self):
+        return self._ph
+
+
+def _cases(*phs):
+    return [_Case(p) for p in phs]
+
+
+def test_rung1_no_changed_files_runs_all():
+    cases = _cases("a", "b")
+    run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, None)
+    assert len(run) == 2 and skip == [] and reason.startswith("rung1")
+
+
+def test_rung2_always_run_all():
+    cases = _cases("a", "b")
+    run, skip, reason = select_tests(cases, {"a": [], "b": []}, {"CMakeLists.txt"})
+    assert len(run) == 2 and reason.startswith("rung2")
+
+
+def test_rung3_f90_change_runs_all():
+    cases = _cases("a")
+    run, skip, reason = select_tests(cases, {"a": []}, {"src/common/m_precision_select.f90"})
+    assert len(run) == 1 and reason.startswith("rung3")
+
+
+def test_rung4_changed_fpp_with_zero_coverage_runs_all():
+    cases = _cases("a")
+    # m_gpu_only.fpp is covered by no test in the map
+    run, skip, reason = select_tests(cases, {"a": ["src/simulation/m_rhs.fpp"]}, {"src/simulation/m_gpu_only.fpp"})
+    assert len(run) == 1 and reason.startswith("rung4")
+
+
+def test_rung5_unmapped_test_is_included():
+    cases = _cases("a", "new")  # 'new' not in map
+    run, skip, _ = select_tests(cases, {"a": ["src/simulation/m_rhs.fpp"]}, {"src/simulation/m_rhs.fpp"})
+    assert {c.coverage_key() for c in run} == {"a", "new"}
+
+
+def test_rung6_and_7_overlap_selects_subset():
+    cases = _cases("hit", "miss")
+    cov = {"hit": ["src/simulation/m_bubbles_EE.fpp"], "miss": ["src/simulation/m_rhs.fpp"]}
+    run, skip, _ = select_tests(cases, cov, {"src/simulation/m_bubbles_EE.fpp"})
+    assert [c.coverage_key() for c in run] == ["hit"]
+    assert [c.coverage_key() for c in skip] == ["miss"]
+
+
+def test_case_coverage_key_uses_full_params():
+    from mfc.test.case import TestCase
+
+    tc = TestCase("1D -> Foo", {"m": 100, "weno_order": 5})
+    assert tc.coverage_key() == param_hash(tc.params)
+
+
+def test_case_coverage_key_changes_with_params():
+    from mfc.test.case import TestCase
+
+    a = TestCase("1D -> Foo", {"weno_order": 5})
+    b = TestCase("1D -> Foo", {"weno_order": 3})
+    assert a.coverage_key() != b.coverage_key()
+
+
+def test_case_coverage_key_ignores_trace():
+    from mfc.test.case import TestCase
+
+    a = TestCase("1D -> Foo", {"m": 100})
+    b = TestCase("totally -> different -> trace", {"m": 100})
+    assert a.coverage_key() == b.coverage_key()
+
+
+def test_changed_files_prefers_explicit_list():
+    files = get_changed_files("/repo", "master", explicit="src/a.fpp\nsrc/b.fpp\n")
+    assert files == {"src/a.fpp", "src/b.fpp"}
+
+
+def test_changed_files_deepens_then_recovers():
+    state = {"deepened": False}
+
+    def fake_run(cmd, **kw):
+        sub = cmd[1] if len(cmd) > 1 else ""
+        if sub == "fetch":
+            state["deepened"] = True
+            return _types.SimpleNamespace(returncode=0, stdout="", stderr="")
+        if sub == "merge-base":
+            return _types.SimpleNamespace(returncode=0 if state["deepened"] else 1, stdout="base\n", stderr="")
+        if sub == "diff":
+            return _types.SimpleNamespace(returncode=0, stdout="src/x.fpp\n", stderr="")
+        return _types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    with patch("subprocess.run", fake_run):
+        assert get_changed_files("/repo", "master") == {"src/x.fpp"}
+
+
+def test_changed_files_returns_none_when_unrecoverable():
+    def fake_run(cmd, **kw):
+        rc = 1 if (len(cmd) > 1 and cmd[1] == "merge-base") else 0
+        return _types.SimpleNamespace(returncode=rc, stdout="", stderr="boom")
+
+    with patch("subprocess.run", fake_run):
+        assert get_changed_files("/repo", "master") is None
+
+
+def test_summary_mentions_counts_age_reason():
+    s = format_summary(
+        ran=47,
+        total=610,
+        reason="selected 47/610 by coverage overlap",
+        meta={"built_at": "2026-05-20T00:00:00+00:00"},
+        now="2026-05-29T00:00:00+00:00",
     )
-    exec(compile(_src, _COVERAGE_PATH, "exec"), _globals)  # noqa: S102
+    assert "47/610" in s and "9d" in s and "coverage overlap" in s
+
+
+def test_summary_handles_missing_meta():
+    s = format_summary(
+        ran=610,
+        total=610,
+        reason="rung1: changed-file list unavailable",
+        meta=None,
+        now="2026-05-29T00:00:00+00:00",
+    )
+    assert "610/610" in s and "map age unknown" in s
 
-    _parse_diff_files = _globals["_parse_diff_files"]
-    _parse_gcov_json_output = _globals["_parse_gcov_json_output"]
-    _normalize_cache = _globals["_normalize_cache"]
-    _compute_gcov_prefix_strip = _globals["_compute_gcov_prefix_strip"]
-    load_coverage_cache = _globals["load_coverage_cache"]
-    should_run_all_tests = _globals["should_run_all_tests"]
-    filter_tests_by_coverage = _globals["filter_tests_by_coverage"]
-    ALWAYS_RUN_ALL = _globals["ALWAYS_RUN_ALL"]
-    COVERAGE_CACHE_PATH = _globals["COVERAGE_CACHE_PATH"]
 
+def test_health_ok():
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-28T00:00:00+00:00", "n_tests": 600},
+        current_keys=set(str(i) for i in range(600)),
+        mapped_keys=set(str(i) for i in range(580)),
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+    )
+    assert ok, msg
 
-# Helper: minimal fake test case
+
+def test_health_stale_fails():
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-01T00:00:00+00:00", "n_tests": 600},
+        current_keys=set(["a"]),
+        mapped_keys=set(["a"]),
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+    )
+    assert not ok and "stale" in msg.lower()
 
 
-class FakeCase:
-    """Minimal stand-in for TestCase — only get_uuid() is needed."""
+def test_health_undercoverage_fails():
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-28T00:00:00+00:00", "n_tests": 10},
+        current_keys=set(str(i) for i in range(100)),
+        mapped_keys=set(str(i) for i in range(50)),
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+    )
+    assert not ok and "coverage" in msg.lower()
 
-    def __init__(self, uuid: str):
-        self._uuid = uuid
 
-    def get_uuid(self) -> str:
-        return self._uuid
+def test_builder_has_coverage_key_matching_case():
+    from mfc.test.case import TestCaseBuilder
 
+    b = TestCaseBuilder(trace="1D -> Foo", mods={"m": 100, "weno_order": 5}, path="", args=[], ppn=1, functor=None)
+    assert b.coverage_key() == b.to_case().coverage_key()
 
-# Group 1: _parse_diff_files — git diff --name-only parsing
 
+def test_rung5_empty_coverage_is_included():
+    # a test whose map entry is [] (uncertain) must be RUN, not skipped, on a .fpp change.
+    # "anchor" covers the changed .fpp so rung4 passes and we reach the per-test rungs.
+    cases = _cases("hasempty", "anchor")
+    cov_map = {
+        "hasempty": [],
+        "anchor": ["src/simulation/m_rhs.fpp"],
+    }
+    run, skip, _ = select_tests(cases, cov_map, {"src/simulation/m_rhs.fpp"})
+    run_keys = {c.coverage_key() for c in run}
+    assert "hasempty" in run_keys and skip == []
 
-class TestParseDiffFiles(unittest.TestCase):
-    def test_parse_single_file(self):
-        result = _parse_diff_files("src/simulation/m_rhs.fpp\n")
-        assert result == {"src/simulation/m_rhs.fpp"}
 
-    def test_parse_multiple_files(self):
-        text = "src/simulation/m_rhs.fpp\nsrc/simulation/m_weno.fpp\nREADME.md\n"
-        result = _parse_diff_files(text)
-        assert result == {
-            "src/simulation/m_rhs.fpp",
-            "src/simulation/m_weno.fpp",
-            "README.md",
-        }
+def test_changed_files_explicit_space_and_comma_separated():
+    from mfc.test.coverage import get_changed_files
 
-    def test_parse_empty(self):
-        assert _parse_diff_files("") == set()
-        assert _parse_diff_files("\n") == set()
+    assert get_changed_files("/r", "master", explicit="src/a.fpp src/b.fpp") == {"src/a.fpp", "src/b.fpp"}
+    assert get_changed_files("/r", "master", explicit="src/a.fpp,src/b.fpp") == {"src/a.fpp", "src/b.fpp"}
 
-    def test_parse_ignores_blank_lines(self):
-        text = "src/simulation/m_rhs.fpp\n\n\nsrc/simulation/m_weno.fpp\n"
-        result = _parse_diff_files(text)
-        assert result == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
 
-    def test_parse_mixed_extensions(self):
-        text = "src/simulation/m_rhs.fpp\ntoolchain/mfc/test/cases.py\nCMakeLists.txt\n"
-        result = _parse_diff_files(text)
-        assert len(result) == 3
-        assert "toolchain/mfc/test/cases.py" in result
-        assert "CMakeLists.txt" in result
+def test_sim_include_fpp_forces_all():
+    # gcov can't reliably attribute #:include'd files; any src include change runs all.
+    assert is_always_run_all({"src/simulation/include/inline_riemann.fpp"})
+    assert is_always_run_all({"src/pre_process/include/2dHardcodedIC.fpp"})
 
 
-# Group 2: should_run_all_tests — ALWAYS_RUN_ALL detection
+def test_empty_explicit_is_uncertainty_not_skipall():
+    # An empty/whitespace --changed-files must NOT become an empty set (skip-all under
+    # enforce). It falls through to git detection -> None when that fails -> run all.
+    def fail_git(cmd, **kw):
+        rc = 1 if (len(cmd) > 1 and cmd[1] == "merge-base") else 0
+        return _types.SimpleNamespace(returncode=rc, stdout="", stderr="x")
 
+    with patch("subprocess.run", fail_git):
+        assert get_changed_files("/r", "master", explicit="") is None
+        assert get_changed_files("/r", "master", explicit="  ,  ") is None
 
-class TestShouldRunAllTests(unittest.TestCase):
-    def test_parallel_macros_triggers_all(self):
-        assert should_run_all_tests({"src/common/include/parallel_macros.fpp"}) is True
 
-    def test_acc_macros_triggers_all(self):
-        assert should_run_all_tests({"src/common/include/acc_macros.fpp"}) is True
+def test_run_and_test_infra_force_all():
+    assert is_always_run_all({"toolchain/mfc/run/input.py"})
+    assert is_always_run_all({"toolchain/mfc/test/case.py"})
+    assert is_always_run_all({"toolchain/mfc/test/test.py"})
 
-    def test_omp_macros_triggers_all(self):
-        assert should_run_all_tests({"src/common/include/omp_macros.fpp"}) is True
 
-    def test_shared_parallel_macros_triggers_all(self):
-        assert should_run_all_tests({"src/common/include/shared_parallel_macros.fpp"}) is True
+def test_cases_py_is_not_always_run():
+    assert not is_always_run_all({"toolchain/mfc/test/cases.py"})
 
-    def test_macros_fpp_triggers_all(self):
-        assert should_run_all_tests({"src/common/include/macros.fpp"}) is True
 
-    def test_cases_py_does_not_trigger_all(self):
-        """cases.py removed from ALWAYS_RUN_ALL: new tests are conservatively included."""
-        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is False
-
-    def test_case_py_triggers_all(self):
-        assert should_run_all_tests({"toolchain/mfc/test/case.py"}) is True
-
-    def test_definitions_py_does_not_trigger_all(self):
-        """definitions.py removed from ALWAYS_RUN_ALL: new params are covered by .fpp changes."""
-        assert should_run_all_tests({"toolchain/mfc/params/definitions.py"}) is False
-
-    def test_input_py_triggers_all(self):
-        assert should_run_all_tests({"toolchain/mfc/run/input.py"}) is True
-
-    def test_case_validator_does_not_trigger_all(self):
-        """case_validator.py removed: validation only affects error messages, not test outputs."""
-        assert should_run_all_tests({"toolchain/mfc/case_validator.py"}) is False
-
-    def test_cmakelists_triggers_all(self):
-        assert should_run_all_tests({"CMakeLists.txt"}) is True
-
-    def test_case_fpp_triggers_all(self):
-        assert should_run_all_tests({"src/common/include/case.fpp"}) is True
-
-    def test_coverage_py_triggers_all(self):
-        assert should_run_all_tests({"toolchain/mfc/test/coverage.py"}) is True
-
-    def test_cmake_dir_triggers_all(self):
-        assert should_run_all_tests({"toolchain/cmake/FindFFTW.cmake"}) is True
-
-    def test_cmake_subdir_triggers_all(self):
-        assert should_run_all_tests({"toolchain/cmake/some/nested/file.cmake"}) is True
-
-    def test_simulation_module_does_not_trigger_all(self):
-        assert should_run_all_tests({"src/simulation/m_rhs.fpp"}) is False
-
-    def test_empty_set_does_not_trigger_all(self):
-        assert should_run_all_tests(set()) is False
-
-    def test_mixed_one_trigger_fires_all(self):
-        assert (
-            should_run_all_tests(
-                {
-                    "src/simulation/m_rhs.fpp",
-                    "src/common/include/macros.fpp",
-                }
-            )
-            is True
-        )
-
-
-# Group 3: filter_tests_by_coverage — core file-level selection logic
-
-
-class TestFilterTestsByCoverage(unittest.TestCase):
-    def test_file_overlap_includes_test(self):
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"]}
-        changed = {"src/simulation/m_rhs.fpp"}
-        cases = [FakeCase("AAAA0001")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        assert len(to_run) == 1
-        assert len(skipped) == 0
-
-    def test_no_file_overlap_skips_test(self):
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
-        changed = {"src/simulation/m_weno.fpp"}
-        cases = [FakeCase("AAAA0001")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        assert len(to_run) == 0
-        assert len(skipped) == 1
-
-    def test_uuid_not_in_cache_is_conservative(self):
-        """Newly added test not in cache -> include it (conservative)."""
-        cache = {}
-        changed = {"src/simulation/m_rhs.fpp"}
-        to_run, _ = filter_tests_by_coverage([FakeCase("NEWTEST1")], cache, changed)
-        assert len(to_run) == 1
-
-    def test_no_fpp_changes_skips_all(self):
-        """Only non-.fpp files changed -> skip all tests."""
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
-        changed = {"toolchain/setup.py", "README.md"}
-        cases = [FakeCase("AAAA0001")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        assert len(to_run) == 0
-        assert len(skipped) == 1
-
-    def test_f90_changes_under_src_run_all(self):
-        """.f90 files under src/ are not in the cache — run all tests."""
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
-        changed = {"src/common/m_precision_select.f90"}
-        cases = [FakeCase("AAAA0001")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        assert len(to_run) == 1
-        assert len(skipped) == 0
-
-    def test_f_extension_under_src_runs_all(self):
-        """.f files under src/ also trigger run-all."""
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
-        changed = {"src/common/something.f"}
-        cases = [FakeCase("AAAA0001")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        assert len(to_run) == 1
-        assert len(skipped) == 0
-
-    def test_f90_outside_src_does_not_trigger_run_all(self):
-        """.f90 files outside src/ (e.g. misc/) should not trigger run-all."""
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
-        changed = {"misc/acc_devices.f90"}
-        cases = [FakeCase("AAAA0001")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        assert len(to_run) == 0
-        assert len(skipped) == 1
-
-    def test_empty_changed_files_skips_all(self):
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
-        changed = set()
-        to_run, skipped = filter_tests_by_coverage([FakeCase("AAAA0001")], cache, changed)
-        assert len(to_run) == 0
-        assert len(skipped) == 1
-
-    def test_multiple_tests_partial_selection(self):
-        """Only the test covering the changed file should run."""
-        cache = {
-            "TEST_A": ["src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"],
-            "TEST_B": ["src/simulation/m_bubbles.fpp"],
-            "TEST_C": ["src/simulation/m_rhs.fpp"],
-        }
-        changed = {"src/simulation/m_bubbles.fpp"}
-        cases = [FakeCase("TEST_A"), FakeCase("TEST_B"), FakeCase("TEST_C")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        uuids_run = {c.get_uuid() for c in to_run}
-        assert uuids_run == {"TEST_B"}
-        assert len(skipped) == 2
-
-    def test_multiple_changed_files_union(self):
-        """Changing multiple files includes any test that covers any of them."""
-        cache = {
-            "TEST_A": ["src/simulation/m_rhs.fpp"],
-            "TEST_B": ["src/simulation/m_weno.fpp"],
-            "TEST_C": ["src/simulation/m_bubbles.fpp"],
-        }
-        changed = {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
-        cases = [FakeCase("TEST_A"), FakeCase("TEST_B"), FakeCase("TEST_C")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        uuids_run = {c.get_uuid() for c in to_run}
-        assert uuids_run == {"TEST_A", "TEST_B"}
-        assert len(skipped) == 1
-
-    def test_test_covering_multiple_files_matched_via_second(self):
-        """Test matched because m_weno.fpp (its second covered file) was changed."""
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"]}
-        changed = {"src/simulation/m_weno.fpp"}
-        to_run, _ = filter_tests_by_coverage([FakeCase("AAAA0001")], cache, changed)
-        assert len(to_run) == 1
-
-    def test_empty_cache_runs_all_conservatively(self):
-        """Empty coverage cache -> all tests included (conservative)."""
-        cache = {}
-        changed = {"src/simulation/m_rhs.fpp"}
-        cases = [FakeCase("T1"), FakeCase("T2"), FakeCase("T3")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        assert len(to_run) == 3
-        assert len(skipped) == 0
-
-    def test_mixed_fpp_and_nonfpp_changes(self):
-        """Non-.fpp files in changed set are ignored for matching."""
-        cache = {"TEST_A": ["src/simulation/m_rhs.fpp"]}
-        changed = {"src/simulation/m_rhs.fpp", "README.md", "toolchain/setup.py"}
-        to_run, _ = filter_tests_by_coverage([FakeCase("TEST_A")], cache, changed)
-        assert len(to_run) == 1
-
-    def test_incomplete_coverage_included_conservatively(self):
-        """Test with no simulation coverage but simulation file changed -> include."""
-        cache = {
-            "GOOD_T": ["src/simulation/m_rhs.fpp", "src/pre_process/m_start_up.fpp"],
-            "BAD_T": ["src/pre_process/m_start_up.fpp", "src/common/m_helper.fpp"],
-        }
-        changed = {"src/simulation/m_rhs.fpp"}
-        cases = [FakeCase("GOOD_T"), FakeCase("BAD_T")]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        uuids_run = {c.get_uuid() for c in to_run}
-        assert "GOOD_T" in uuids_run  # direct file overlap
-        assert "BAD_T" in uuids_run  # no sim coverage -> conservative include
-        assert len(skipped) == 0
-
-    def test_incomplete_coverage_not_triggered_by_preprocess(self):
-        """Test with no sim coverage is NOT auto-included for pre_process changes."""
-        cache = {
-            "BAD_T": ["src/pre_process/m_start_up.fpp"],
-        }
-        changed = {"src/pre_process/m_data_output.fpp"}
-        to_run, skipped = filter_tests_by_coverage([FakeCase("BAD_T")], cache, changed)
-        assert len(to_run) == 0  # no sim change, no overlap -> skip
-        assert len(skipped) == 1
-
-
-# Group 4: Corner cases from design discussion
-
-
-class TestDesignCornerCases(unittest.TestCase):
-    def test_gpu_ifdef_file_still_triggers_if_covered(self):
-        """
-        GPU-specific code lives in the same .fpp file as CPU code.
-        At file level, changing any part of the file triggers tests that cover it.
-        """
-        cache = {"MUSCL_T": ["src/simulation/m_muscl.fpp"]}
-        changed = {"src/simulation/m_muscl.fpp"}
-        to_run, _ = filter_tests_by_coverage([FakeCase("MUSCL_T")], cache, changed)
-        assert len(to_run) == 1
-
-    def test_macro_file_triggers_all_via_should_run_all(self):
-        """parallel_macros.fpp in changed files -> should_run_all_tests() is True."""
-        assert should_run_all_tests({"src/common/include/parallel_macros.fpp"}) is True
-
-    def test_new_fpp_file_no_coverage_skips(self):
-        """
-        Brand new .fpp file has no coverage in cache.
-        All tests are skipped (no test covers the new file).
-        """
-        cache = {"AAAA0001": ["src/simulation/m_rhs.fpp"]}
-        changed = {"src/simulation/m_brand_new.fpp"}
-        to_run, skipped = filter_tests_by_coverage([FakeCase("AAAA0001")], cache, changed)
-        assert len(to_run) == 0
-        assert len(skipped) == 1
-
-    def test_non_fpp_always_run_all_detected(self):
-        """
-        End-to-end: diff lists only case.py (non-.fpp, in ALWAYS_RUN_ALL) ->
-        _parse_diff_files includes it -> should_run_all_tests fires.
-        """
-        files = _parse_diff_files("toolchain/mfc/test/case.py\n")
-        assert should_run_all_tests(files) is True
-
-    def test_niche_feature_pruning(self):
-        """
-        Niche features: most tests don't cover m_bubbles.fpp.
-        Changing it skips tests that don't touch it.
-        """
-        cache = {
-            "BUBBLE1": ["src/simulation/m_bubbles.fpp", "src/simulation/m_rhs.fpp"],
-            "BUBBLE2": ["src/simulation/m_bubbles.fpp"],
-            "BASIC_1": ["src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"],
-            "BASIC_2": ["src/simulation/m_rhs.fpp"],
-            "BASIC_3": ["src/simulation/m_weno.fpp"],
-        }
-        changed = {"src/simulation/m_bubbles.fpp"}
-        cases = [FakeCase(u) for u in ["BUBBLE1", "BUBBLE2", "BASIC_1", "BASIC_2", "BASIC_3"]]
-        to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
-        uuids_run = {c.get_uuid() for c in to_run}
-        assert uuids_run == {"BUBBLE1", "BUBBLE2"}
-        assert len(skipped) == 3
-
-
-# Group 5: _parse_gcov_json_output — gcov JSON parsing (file-level)
-
-
-class TestParseGcovJsonOutput(unittest.TestCase):
-    def _make_gcov_json(self, files_data: list) -> bytes:
-        """Build a fake gzip-compressed gcov JSON blob."""
-        data = {
-            "format_version": "2",
-            "gcc_version": "15.2.0",
-            "files": files_data,
-        }
-        return gzip.compress(json.dumps(data).encode())
-
-    def test_returns_set_of_covered_fpp_files(self):
-        compressed = self._make_gcov_json(
-            [
-                {
-                    "file": "/repo/src/simulation/m_rhs.fpp",
-                    "lines": [
-                        {"line_number": 45, "count": 3},
-                        {"line_number": 46, "count": 0},
-                        {"line_number": 47, "count": 1},
-                    ],
-                }
-            ]
-        )
-        result = _parse_gcov_json_output(compressed, "/repo")
-        assert result == {"src/simulation/m_rhs.fpp"}
-
-    def test_ignores_file_with_zero_coverage(self):
-        compressed = self._make_gcov_json(
-            [
-                {
-                    "file": "/repo/src/simulation/m_rhs.fpp",
-                    "lines": [
-                        {"line_number": 10, "count": 0},
-                        {"line_number": 11, "count": 0},
-                    ],
-                }
-            ]
-        )
-        result = _parse_gcov_json_output(compressed, "/repo")
-        assert result == set()
-
-    def test_ignores_f90_files(self):
-        """Generated .f90 files must not appear in coverage output."""
-        compressed = self._make_gcov_json(
-            [
-                {
-                    "file": "/repo/build/fypp/simulation/m_rhs.fpp.f90",
-                    "lines": [{"line_number": 10, "count": 5}],
-                },
-                {
-                    "file": "/repo/src/simulation/m_rhs.fpp",
-                    "lines": [{"line_number": 45, "count": 1}],
-                },
-            ]
-        )
-        result = _parse_gcov_json_output(compressed, "/repo")
-        assert result == {"src/simulation/m_rhs.fpp"}
-
-    def test_handles_raw_json_gcov12(self):
-        """gcov 12 outputs raw JSON (not gzip). Must parse correctly."""
-        data = {
-            "format_version": "1",
-            "gcc_version": "12.3.0",
-            "files": [
-                {
-                    "file": "/repo/src/simulation/m_rhs.fpp",
-                    "lines": [{"line_number": 45, "count": 3}],
-                }
-            ],
-        }
-        raw = json.dumps(data).encode()
-        result = _parse_gcov_json_output(raw, "/repo")
-        assert result == {"src/simulation/m_rhs.fpp"}
-
-    def test_handles_invalid_data_gracefully(self):
-        result = _parse_gcov_json_output(b"not valid gzip or json", "/repo")
-        assert result is None
-
-    def test_handles_empty_files_list(self):
-        compressed = self._make_gcov_json([])
-        result = _parse_gcov_json_output(compressed, "/repo")
-        assert result == set()
-
-    def test_multiple_fpp_files(self):
-        compressed = self._make_gcov_json(
-            [
-                {
-                    "file": "/repo/src/simulation/m_rhs.fpp",
-                    "lines": [{"line_number": 45, "count": 1}],
-                },
-                {
-                    "file": "/repo/src/simulation/m_weno.fpp",
-                    "lines": [{"line_number": 200, "count": 2}],
-                },
-            ]
-        )
-        result = _parse_gcov_json_output(compressed, "/repo")
-        assert result == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
-
-    def test_concatenated_json_from_batched_gcov(self):
-        """Batched gcov calls produce concatenated JSON objects (gcov 12)."""
-        obj1 = json.dumps(
-            {
-                "format_version": "1",
-                "gcc_version": "12.3.0",
-                "files": [
-                    {
-                        "file": "/repo/src/simulation/m_rhs.fpp",
-                        "lines": [{"line_number": 45, "count": 3}],
-                    }
-                ],
-            }
-        )
-        obj2 = json.dumps(
-            {
-                "format_version": "1",
-                "gcc_version": "12.3.0",
-                "files": [
-                    {
-                        "file": "/repo/src/simulation/m_weno.fpp",
-                        "lines": [{"line_number": 10, "count": 1}],
-                    }
-                ],
-            }
-        )
-        raw = (obj1 + "\n" + obj2).encode()
-        result = _parse_gcov_json_output(raw, "/repo")
-        assert result == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
-
-    def test_concatenated_json_skips_zero_coverage(self):
-        """Batched gcov: files with zero coverage are excluded."""
-        obj1 = json.dumps(
-            {
-                "format_version": "1",
-                "files": [
-                    {
-                        "file": "/repo/src/simulation/m_rhs.fpp",
-                        "lines": [{"line_number": 45, "count": 3}],
-                    }
-                ],
-            }
-        )
-        obj2 = json.dumps(
-            {
-                "format_version": "1",
-                "files": [
-                    {
-                        "file": "/repo/src/simulation/m_weno.fpp",
-                        "lines": [{"line_number": 10, "count": 0}],
-                    }
-                ],
-            }
-        )
-        raw = (obj1 + "\n" + obj2).encode()
-        result = _parse_gcov_json_output(raw, "/repo")
-        assert result == {"src/simulation/m_rhs.fpp"}
-
-
-# Group 6: _normalize_cache — old format conversion
-
-
-class TestNormalizeCache(unittest.TestCase):
-    def test_converts_old_line_level_format(self):
-        """Old format {uuid: {file: [lines]}} -> new format {uuid: [files]}."""
-        old_cache = {
-            "TEST_A": {
-                "src/simulation/m_rhs.fpp": [45, 46, 47],
-                "src/simulation/m_weno.fpp": [100, 200],
-            },
-            "TEST_B": {
-                "src/simulation/m_bubbles.fpp": [10],
-            },
-            "_meta": {"cases_hash": "abc123"},
-        }
-        result = _normalize_cache(old_cache)
-        assert isinstance(result["TEST_A"], list)
-        assert set(result["TEST_A"]) == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
-        assert result["TEST_B"] == ["src/simulation/m_bubbles.fpp"]
-        assert result["_meta"] == {"cases_hash": "abc123"}
-
-    def test_new_format_unchanged(self):
-        """New format {uuid: [files]} passes through unchanged."""
-        new_cache = {
-            "TEST_A": ["src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"],
-            "_meta": {"cases_hash": "abc123"},
-        }
-        result = _normalize_cache(new_cache)
-        assert result["TEST_A"] == ["src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"]
-
-    def test_empty_coverage_dict_becomes_empty_list(self):
-        """Test with 0 coverage (old format: empty dict) -> empty list."""
-        old_cache = {"TEST_A": {}, "_meta": {"cases_hash": "abc"}}
-        result = _normalize_cache(old_cache)
-        assert result["TEST_A"] == []
-
-
-# Group 7: Cache path format
-
-
-class TestCachePath(unittest.TestCase):
-    def test_cache_path_is_gzipped(self):
-        """Cache file must use .json.gz so it can be committed to the repo."""
-        assert str(COVERAGE_CACHE_PATH).endswith(".json.gz")
-
-
-# Group 8: _compute_gcov_prefix_strip
-
-
-class TestComputeGcovPrefixStrip(unittest.TestCase):
-    def test_typical_linux_path(self):
-        """Standard absolute path strips all components except root /."""
-        # /a/b/c has 4 parts: ('/', 'a', 'b', 'c'), strip = 3
-        result = _compute_gcov_prefix_strip("/a/b/c")
-        assert result == "3"
-
-    def test_root_path(self):
-        """Root / has 1 part, strip = 0."""
-        result = _compute_gcov_prefix_strip("/")
-        assert result == "0"
-
-    def test_deep_path(self):
-        """/storage/scratch1/6/user/MFC has 6 parts, strip = 5."""
-        result = _compute_gcov_prefix_strip("/storage/scratch1/6/user/MFC")
-        assert result == "5"
-
-
-# Group 9: load_coverage_cache
-
-
-class TestLoadCoverageCache(unittest.TestCase):
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-        self.cases_py = os.path.join(self.tmpdir, "toolchain", "mfc", "test", "cases.py")
-        os.makedirs(os.path.dirname(self.cases_py), exist_ok=True)
-        with open(self.cases_py, "w") as f:
-            f.write("# test cases\n")
-        self.cases_hash = hashlib.sha256(Path(self.cases_py).read_bytes()).hexdigest()
-
-    def tearDown(self):
-        import shutil
-
-        shutil.rmtree(self.tmpdir, ignore_errors=True)
-
-    def _cache_path(self):
-        return Path(self.tmpdir) / "toolchain/mfc/test/test_coverage_cache.json.gz"
-
-    def _write_cache(self, data):
-        cp = self._cache_path()
-        with gzip.open(cp, "wt", encoding="utf-8") as f:
-            json.dump(data, f)
-
-    def _run(self):
-        """Call load_coverage_cache with COVERAGE_CACHE_PATH patched to tmpdir."""
-        mod = sys.modules.get("toolchain.mfc.test.coverage", _coverage_mod)
-        old = getattr(mod, "COVERAGE_CACHE_PATH", COVERAGE_CACHE_PATH)
-        try:
-            mod.COVERAGE_CACHE_PATH = self._cache_path()
-            return load_coverage_cache(self.tmpdir)
-        finally:
-            mod.COVERAGE_CACHE_PATH = old
-
-    def test_missing_file_returns_none(self):
-        """No cache file -> None."""
-        assert self._run() is None
-
-    def test_corrupt_gzip_returns_none(self):
-        """Corrupt gzip -> None."""
-        cp = self._cache_path()
-        with open(cp, "wb") as f:
-            f.write(b"not gzip at all")
-        assert self._run() is None
-
-    def test_stale_cache_still_loads(self):
-        """Cache with wrong cases_hash still loads (new tests included conservatively)."""
-        self._write_cache({"_meta": {"cases_hash": "wrong_hash"}, "TEST1": ["src/simulation/m_rhs.fpp"]})
-        result = self._run()
-        assert result is not None
-        assert "TEST1" in result
-
-    def test_empty_cache_returns_none(self):
-        """Cache with only _meta and no test entries -> None."""
-        self._write_cache({"_meta": {"cases_hash": self.cases_hash}})
-        assert self._run() is None
-
-    def test_valid_cache_returns_dict(self):
-        """Valid cache with matching hash -> dict with test entries."""
-        self._write_cache({"_meta": {"cases_hash": self.cases_hash}, "TEST1": ["src/simulation/m_rhs.fpp"]})
-        result = self._run()
-        assert result is not None
-        assert "TEST1" in result
-        assert result["TEST1"] == ["src/simulation/m_rhs.fpp"]
-
-    def test_non_dict_json_returns_none(self):
-        """Cache containing a JSON array instead of dict -> None."""
-        cp = self._cache_path()
-        with gzip.open(cp, "wt", encoding="utf-8") as f:
-            json.dump([1, 2, 3], f)
-        assert self._run() is None
-
-
-if __name__ == "__main__":
-    unittest.main()
+def test_cases_py_change_runs_new_tests_not_skipall():
+    # cases.py-only change must run the NEW/modified tests (rung 5), not skip everything.
+    cases = _cases("mapped", "newtest")  # "newtest" absent from map
+    run, skip, _ = select_tests(cases, {"mapped": ["src/simulation/m_rhs.fpp"]}, {"toolchain/mfc/test/cases.py"})
+    assert [c.coverage_key() for c in run] == ["newtest"]
+    assert [c.coverage_key() for c in skip] == ["mapped"]
+
+
+def test_unattributable_nonsource_change_runs_all():
+    cases = _cases("a")
+    for f in ("mfc.sh", "toolchain/pyproject.toml", "tests/ABC12345/golden.txt", ".github/workflows/test.yml"):
+        run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, {f})
+        assert len(run) == 1 and "run all" in reason, f
+
+
+def test_docs_only_still_skips_all():
+    cases = _cases("a")
+    for f in ("README.md", "docs/foo.rst", "LICENSE", ".claude/x.md"):
+        run, skip, reason = select_tests(cases, {"a": ["src/x.fpp"]}, {f})
+        assert run == [] and "rung7" in reason, f
+
+
+def test_load_map_rejects_malformed_entry(tmp_path):
+    import gzip
+    import json
+
+    from mfc.test.coverage import load_map
+
+    p = tmp_path / "m.json.gz"
+    with gzip.open(p, "wt") as fh:
+        json.dump({"_meta": {"built_at": "x"}, "good": ["a.fpp"], "bad": "not-a-list"}, fh)
+    assert load_map(Path(p)) == (None, None)
+
+
+def test_uppercase_fortran_extension_forces_all():
+    cases = _cases("a")
+    run, skip, reason = select_tests(cases, {"a": []}, {"src/common/m_x.F90"})
+    assert len(run) == 1 and reason.startswith("rung3")
+
+
+def test_toolchain_py_change_forces_all_except_cases():
+    assert is_always_run_all({"toolchain/mfc/case.py"})
+    assert is_always_run_all({"toolchain/mfc/build.py"})
+    assert is_always_run_all({"toolchain/mfc/common.py"})
+    assert not is_always_run_all({"toolchain/mfc/test/cases.py"})
+
+
+def test_empty_map_with_fpp_change_runs_all_rung4():
+    cases = _cases("a", "b")
+    run, skip, reason = select_tests(cases, {}, {"src/simulation/m_rhs.fpp"})
+    assert len(run) == 2 and reason.startswith("rung4")

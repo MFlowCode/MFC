@@ -26,6 +26,7 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
     implicit none
 
@@ -73,9 +74,9 @@ contains
         integer :: i, j  !< Generic loop iterators
         ! Setting number of time-stages for selected time-stepping scheme
 
-        if (time_stepper == 1) then
+        if (time_stepper == time_stepper_rk1) then
             num_ts = 1
-        else if (any(time_stepper == (/2, 3/))) then
+        else if (any(time_stepper == (/time_stepper_rk2, time_stepper_rk3/))) then
             num_ts = 2
         end if
 
@@ -278,7 +279,7 @@ contains
                 @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%psi))
             end if
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
@@ -422,9 +423,9 @@ contains
             end do
         end do
 
-        if (any(time_stepper == (/1, 2, 3/))) then
+        if (any(time_stepper == (/time_stepper_rk1, time_stepper_rk2, time_stepper_rk3/))) then
             ! temporary array index for TVD RK
-            if (time_stepper == 1) then
+            if (time_stepper == time_stepper_rk1) then
                 stor = 1
             else
                 stor = 2
@@ -432,12 +433,12 @@ contains
 
             ! TVD RK coefficients
             @:ALLOCATE(rk_coef(time_stepper, 4))
-            if (time_stepper == 1) then
+            if (time_stepper == time_stepper_rk1) then
                 rk_coef(1,:) = (/1._wp, 0._wp, 1._wp, 1._wp/)
-            else if (time_stepper == 2) then
+            else if (time_stepper == time_stepper_rk2) then
                 rk_coef(1,:) = (/1._wp, 0._wp, 1._wp, 1._wp/)
                 rk_coef(2,:) = (/1._wp, 1._wp, 1._wp, 2._wp/)
-            else if (time_stepper == 3) then
+            else if (time_stepper == time_stepper_rk3) then
                 rk_coef(1,:) = (/1._wp, 0._wp, 1._wp, 1._wp/)
                 rk_coef(2,:) = (/1._wp, 3._wp, 1._wp, 4._wp/)
                 rk_coef(3,:) = (/2._wp, 1._wp, 2._wp, 3._wp/)
@@ -471,10 +472,10 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
-                    if (igr .or. dummy) then
+                    if (igr) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                     end if
-                    if (.not. igr .or. dummy) then
+                    if (.not. igr) then
                         call s_write_run_time_information(q_prim_vf, t_step)
                     end if
                 end if
@@ -542,7 +543,7 @@ contains
 
             if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-            if (model_eqns == 3 .and. (.not. relax)) then
+            if (model_eqns == model_eqns_6eq .and. (.not. relax)) then
                 call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
             end if
 
@@ -552,7 +553,6 @@ contains
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
-                    ! compute ib forces for fixed immersed boundaries if requested for output
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -564,10 +564,11 @@ contains
             end if
         end do
 
-        !
         if (ib) then
-            if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
-            if (ib_state_wrt .and. (.not. moving_immersed_boundary_flag)) then
+            if (moving_immersed_boundary_flag) then
+                call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
+                call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
+            else if (ib_state_wrt) then
                 call s_compute_ib_forces(q_prim_vf, fluid_pp)
             end if
         end if
@@ -638,7 +639,7 @@ contains
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
 
-        if (.not. igr .or. dummy) then
+        if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
@@ -708,12 +709,13 @@ contains
 
         integer, intent(in) :: s
         integer             :: i
-        logical             :: forces_computed
+        integer             :: gbl_id  ! used for analytic ib patch motion
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
-        forces_computed = .false.
+        if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s]')
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -726,11 +728,6 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm == 2 .and. .not. forces_computed) then
-                call s_compute_ib_forces(q_prim_vf, fluid_pp)
-                forces_computed = .true.
-            end if
-
             if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
@@ -765,8 +762,8 @@ contains
                          & 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_UPDATE(device='[patch_ib]')
         call s_update_mib(num_ibs)
 
         call nvtxEndRange
@@ -947,7 +944,7 @@ contains
                 end do
             end if
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do

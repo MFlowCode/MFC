@@ -13,6 +13,7 @@ module m_assign_variables
     use m_variables_conversion
     use m_helper_basic
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
+    use m_constants, only: model_eqns_gamma_law, model_eqns_6eq, model_eqns_4eq
 
     implicit none
 
@@ -60,7 +61,7 @@ contains
 
         ! Select procedure pointer based on multicomponent flow model
 
-        if (model_eqns == 1) then  ! Gamma/pi_inf model
+        if (model_eqns == model_eqns_gamma_law) then  ! Gamma/pi_inf model
             s_assign_patch_primitive_variables => s_assign_patch_mixture_primitive_variables
         else  ! Volume fraction model
             s_assign_patch_primitive_variables => s_assign_patch_species_primitive_variables
@@ -97,15 +98,15 @@ contains
 
         do i = 1, eqn_idx%E - eqn_idx%mom%beg
             q_prim_vf(i + 1)%sf(j, k, l) = 1._wp/q_prim_vf(1)%sf(j, k, &
-                      & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta)*patch_icpp(smooth_patch_id) &
-                      & %rho*patch_icpp(smooth_patch_id)%vel(i))
+                      & l)*(eta*patch_icpp(patch_id)%rho*patch_icpp(patch_id)%vel(i) + (1._wp - eta) &
+                      & *patch_icpp(smooth_patch_id)%rho*patch_icpp(smooth_patch_id)%vel(i))
         end do
 
         q_prim_vf(eqn_idx%gamma)%sf(j, k, l) = eta*patch_icpp(patch_id)%gamma + (1._wp - eta)*patch_icpp(smooth_patch_id)%gamma
 
         q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp/q_prim_vf(eqn_idx%gamma)%sf(j, k, &
-                  & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta)*patch_icpp(smooth_patch_id) &
-                  & %gamma*patch_icpp(smooth_patch_id)%pres)
+                  & l)*(eta*patch_icpp(patch_id)%gamma*patch_icpp(patch_id)%pres + (1._wp - eta) &
+                  & *patch_icpp(smooth_patch_id)%gamma*patch_icpp(smooth_patch_id)%pres)
 
         q_prim_vf(eqn_idx%pi_inf)%sf(j, k, l) = eta*patch_icpp(patch_id)%pi_inf + (1._wp - eta)*patch_icpp(smooth_patch_id)%pi_inf
 
@@ -275,7 +276,7 @@ contains
             end do
         end if
 
-        if (model_eqns /= 4) then
+        if (model_eqns /= model_eqns_4eq) then
             do i = 1, eqn_idx%cont%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
             end do
@@ -284,7 +285,7 @@ contains
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, patch_icpp(patch_id)%rho, patch_icpp(patch_id)%gamma, &
                                             & patch_icpp(patch_id)%pi_inf, patch_icpp(patch_id)%qv)
 
-        if (model_eqns /= 4) then
+        if (model_eqns /= model_eqns_4eq) then
             do i = 1, eqn_idx%cont%end
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
             end do
@@ -416,7 +417,7 @@ contains
             end do
         end if
 
-        if (model_eqns /= 4) then
+        if (model_eqns /= model_eqns_4eq) then
             ! mixture density is an input
             do i = 1, eqn_idx%cont%end
                 q_prim_vf(i)%sf(j, k, l) = eta*patch_icpp(patch_id)%alpha_rho(i) + (1._wp - eta)*orig_prim_vf(i)
@@ -469,7 +470,7 @@ contains
         end if
 
         ! Set partial pressures to mixture pressure for the 6-eqn model
-        if (model_eqns == 3) then
+        if (model_eqns == model_eqns_6eq) then
             do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                 q_prim_vf(i)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             end do

@@ -67,6 +67,30 @@ CASE_MD_SKIP = {
     # Hardcoded Fortran constants (not case-file params)
     "init_dir",
     "zeros_default",
+    # Enumerated value names used as prose examples (not parameter names)
+    "hll",
+    "hllc",
+    # Analytic expression language: Fortran intrinsics and module name (not case params)
+    "m_constants",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "sinh",
+    "cosh",
+    "tanh",
+    "exp",
+    "log",
+    "log10",
+    "sqrt",
+    "abs",
+    "min",
+    "max",
+    "mod",
+    "sign",
 }
 
 # Docs to check for parameter references, with per-file skip sets
@@ -407,6 +431,9 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
     # Methods without PHYSICS_DOCS entries. Add a PHYSICS_DOCS entry (with math,
     # references, and explanation) to case_validator.py to remove from this set.
     skip = {
+        # Private helpers — called from check_* methods, not check methods themselves
+        "_check_order_fits_grid",
+        "_get_recon_type",
         # Structural/mechanical checks (no physics meaning)
         "check_parameter_types",  # type validation
         "check_output_format",  # output format selection

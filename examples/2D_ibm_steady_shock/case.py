@@ -60,7 +60,7 @@ print(
             # Simulation Algorithm Parameters
             "num_patches": 2,
             # Use the 5 equation model
-            "model_eqns": 2,
+            "model_eqns": "5eq",
             "alt_soundspeed": "F",
             "num_fluids": 1,
             # No need to ensure the volume fractions sum to unity at the end of each
@@ -69,21 +69,21 @@ print(
             # Correct errors when computing speed of sound
             "mixture_err": "T",
             # Use TVD RK3 for time marching
-            "time_stepper": 3,
+            "time_stepper": "rk3",
             # Reconstruct the primitive variables to minimize spurious
             # Use WENO5
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "T",
-            "avg_state": 2,
+            "avg_state": "arithmetic",
             # Use the mapped WENO weights to maintain monotinicity
             "mapped_weno": "T",
             "null_weights": "F",
             "mp_weno": "F",
             # Use the HLLC  Riemann solver
-            "riemann_solver": 2,
-            "wave_speeds": 1,
+            "riemann_solver": "hllc",
+            "wave_speeds": "direct",
             "bc_x%beg": -7,
             "bc_x%end": -8,
             "bc_y%beg": -3,
@@ -94,8 +94,8 @@ print(
             # Formatted Database Files Structure Parameters
             # Export primitive variables in double precision with parallel
             # I/O to minimize I/O computational time during large simulations
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "fd_order": 1,
             "omega_wrt(3)": "T",
@@ -145,12 +145,12 @@ print(
             "patch_ib(1)%geometry": 4,
             "patch_ib(1)%x_centroid": 1.5e-03 / x0,
             "patch_ib(1)%y_centroid": 1.5e-03 / x0,
-            "patch_ib(1)%c": 1.0e-03 / x0,
-            "patch_ib(1)%t": 0.15,
-            "patch_ib(1)%p": 0.4,
-            "patch_ib(1)%m": 0.02,
+            "patch_ib(1)%airfoil_id": 1,
             "patch_ib(1)%slip": "F",
-            "patch_ib(1)%theta": 15,
+            "ib_airfoil(1)%c": 1.0e-03 / x0,
+            "ib_airfoil(1)%t": 0.15,
+            "ib_airfoil(1)%p": 0.4,
+            "ib_airfoil(1)%m": 0.02,
             # Fluids Physical Parameters
             # Surrounding liquid
             "fluid_pp(1)%gamma": 1.0e00 / (n_tait - 1.0e00),

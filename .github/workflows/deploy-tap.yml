@@ -28,6 +28,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    environment:
+      name: homebrew
+      url: https://github.com/MFlowCode/homebrew-mfc
     steps:
       - name: Checkout MFC repository
         uses: actions/checkout@v4
