@@ -22,7 +22,9 @@ def migrate_text(text: str) -> Tuple[str, int]:
         if not names:
             continue
         by_value = {v: n for n, v in names.items()}
-        pattern = re.compile(r"""(["']""" + re.escape(param) + r"""["']\s*:\s*)(\d+)(\s*[,}\n])""")
+        # Lookahead (not capture) for the terminator so values followed by an
+        # inline comment without a trailing comma are rewritten too.
+        pattern = re.compile(r"""(["']""" + re.escape(param) + r"""["']\s*:\s*)(\d+)(?=\s*(?:[,}\n#]|$))""")
 
         def repl(m, by_value=by_value):
             nonlocal total
@@ -30,7 +32,7 @@ def migrate_text(text: str) -> Tuple[str, int]:
             if value not in by_value:
                 return m.group(0)
             total += 1
-            return f'{m.group(1)}"{by_value[value]}"{m.group(3)}'
+            return f'{m.group(1)}"{by_value[value]}"'
 
         text = pattern.sub(repl, text)
     return text, total

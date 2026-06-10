@@ -48,3 +48,19 @@ def test_migrate_text_rewrites_comments_too():
     out, n = migrate_text('# "riemann_solver": 2,\n"riemann_solver": 2,\n')
     assert out == '# "riemann_solver": "hllc",\n"riemann_solver": "hllc",\n'
     assert n == 2
+
+
+def test_migrate_text_handles_inline_comment_without_comma():
+    from mfc.params.migrate import migrate_text
+
+    out, n = migrate_text('"time_stepper": 3  # final entry, no trailing comma\n')
+    assert out == '"time_stepper": "rk3"  # final entry, no trailing comma\n'
+    assert n == 1
+
+
+def test_migrate_text_handles_end_of_string():
+    from mfc.params.migrate import migrate_text
+
+    out, n = migrate_text('"format": 1')
+    assert out == '"format": "silo"'
+    assert n == 1
