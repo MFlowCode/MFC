@@ -265,7 +265,6 @@ contains
             ! get the periodicities
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
 
-            $:GPU_PARALLEL_LOOP(private='[xp, yp, patch_id, center]', collapse=3)
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     $:GPU_PARALLEL_LOOP(private='[xp, yp, i, il, ir, j, jl, jr, xyz_local, length, radius, patch_id, airfoil_id, &
@@ -548,6 +547,8 @@ contains
 
     subroutine get_indices_from_bounds(left_bound, right_bound, cell_centers, left_index, right_index)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         real(wp), intent(in)                         :: left_bound, right_bound
         integer, intent(inout)                       :: left_index, right_index
         real(wp), dimension(-buff_size:), intent(in) :: cell_centers
@@ -587,6 +588,8 @@ contains
 
     !> Encode the patch ID with a unique offset containing periodicity information
     subroutine s_encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in)  :: patch_id, x_periodicity, y_periodicity, z_periodicity
         integer, intent(out) :: encoded_patch_id
