@@ -21,56 +21,15 @@ module m_data_output
         & s_write_variable_to_formatted_database_file, s_write_lag_bubbles_results_to_text, &
         & s_write_lag_bubbles_to_formatted_database_file, s_write_ib_state_files, s_write_intf_data_file, &
         & s_write_energy_data_file, s_write_ib_bodies_to_formatted_database_file, s_close_formatted_database_file, &
-        & s_close_intf_data_file, s_close_energy_data_file, s_finalize_data_output_module
+        & s_close_intf_data_file, s_close_energy_data_file, s_finalize_data_output_module, out
 
     ! Include Silo-HDF5 interface library
     include 'silo_f9x.inc'
 
-    ! Flow variable storage; q_root_sf gathers to rank 0 in 1D parallel runs
-    real(wp), allocatable, dimension(:,:,:), public :: q_sf
-    real(wp), allocatable, dimension(:,:,:)         :: q_root_sf
-    real(wp), allocatable, dimension(:,:,:)         :: cyl_q_sf
+    !> Output workspace: flow variable buffers, VisIt extents/offsets, directory paths, file handles, and variable count.
+    type(output_context) :: out
 
-    ! Single precision storage for flow variables
-    real(sp), allocatable, dimension(:,:,:), public :: q_sf_s
-    real(sp), allocatable, dimension(:,:,:)         :: q_root_sf_s
-    real(sp), allocatable, dimension(:,:,:)         :: cyl_q_sf_s
-
-    ! Spatial and data extents for VisIt visualization
-    real(wp), allocatable, dimension(:,:) :: spatial_extents
-    real(wp), allocatable, dimension(:,:) :: data_extents
-
-    ! Ghost zone layer sizes (lo/hi) for subdomain connectivity in VisIt
-    integer, allocatable, dimension(:) :: lo_offset
-    integer, allocatable, dimension(:) :: hi_offset
-
-    ! Track cell-boundary count per active coordinate direction
-    integer, allocatable, dimension(:) :: dims
-
-    ! Locations of various folders in the case's directory tree, associated with the choice of the formatted database format. These
-    ! include, in order, the location of the folder named after the selected formatted database format, and the locations of two
-    ! sub-directories of the latter, the first of which is named after the local processor rank, while the second is named 'root'.
-    ! The folder associated with the local processor rank contains only the data pertaining to the part of the domain taken care of
-    ! by the local processor. The root directory, on the other hand, will contain either the information about the connectivity
-    ! required to put the entire domain back together, or the actual data associated with the entire computational domain. This all
-    ! depends on dimensionality and the choice of the formatted database format.
-    character(LEN=path_len + name_len)   :: dbdir
-    character(LEN=path_len + 2*name_len) :: proc_rank_dir
-    character(LEN=path_len + 2*name_len) :: rootdir
-
-    ! Handles of the formatted database master/root file, slave/local processor file and options list. The list of options is
-    ! explicitly used in the Silo- HDF5 database format to provide additional details about the contents of a formatted database
-    ! file, such as the previously described spatial and data extents.
-    integer :: dbroot
-    integer :: dbfile
-    integer :: optlist
-
-    ! The total number of flow variable(s) to be stored in a formatted database file. Note that this is only needed when using the
-    ! Binary format.
-    integer :: dbvars
-
-    ! Generic error flags utilized in the handling, checking and the reporting of the input and output operations errors with a
-    ! formatted database file
+    ! Generic error flag for Silo-HDF5 and Binary I/O operations
     integer, private :: err
 
 contains
@@ -82,22 +41,23 @@ contains
         logical                                        :: dir_check
         integer                                        :: i
 
-        allocate (q_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
+        allocate (out%q_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
         if (grid_geometry == 3) then
-            allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,-offset_x%beg:m + offset_x%end))
+            allocate (out%cyl_q_sf(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,-offset_x%beg:m + offset_x%end))
         end if
 
         if (precision == precision_single) then
-            allocate (q_sf_s(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
+            allocate (out%q_sf_s(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
             if (grid_geometry == 3) then
-                allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,-offset_x%beg:m + offset_x%end))
+                allocate (out%cyl_q_sf_s(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end, &
+                          & -offset_x%beg:m + offset_x%end))
             end if
         end if
 
         if (n == 0) then
-            allocate (q_root_sf(0:m_root,0:0,0:0))
+            allocate (out%q_root_sf(0:m_root,0:0,0:0))
             if (precision == precision_single) then
-                allocate (q_root_sf_s(0:m_root,0:0,0:0))
+                allocate (out%q_root_sf_s(0:m_root,0:0,0:0))
             end if
         end if
 
@@ -105,23 +65,23 @@ contains
         ! cell-boundaries in each active coordinate direction. Note that all these variables are only needed by the Silo-HDF5 format
         ! for multidimensional data.
         if (format == format_silo) then
-            allocate (data_extents(1:2,0:num_procs - 1))
+            allocate (out%data_extents(1:2,0:num_procs - 1))
 
             if (p > 0) then
-                allocate (spatial_extents(1:6,0:num_procs - 1))
-                allocate (lo_offset(1:3))
-                allocate (hi_offset(1:3))
-                allocate (dims(1:3))
+                allocate (out%spatial_extents(1:6,0:num_procs - 1))
+                allocate (out%lo_offset(1:3))
+                allocate (out%hi_offset(1:3))
+                allocate (out%dims(1:3))
             else if (n > 0) then
-                allocate (spatial_extents(1:4,0:num_procs - 1))
-                allocate (lo_offset(1:2))
-                allocate (hi_offset(1:2))
-                allocate (dims(1:2))
+                allocate (out%spatial_extents(1:4,0:num_procs - 1))
+                allocate (out%lo_offset(1:2))
+                allocate (out%hi_offset(1:2))
+                allocate (out%dims(1:2))
             else
-                allocate (spatial_extents(1:2,0:num_procs - 1))
-                allocate (lo_offset(1:1))
-                allocate (hi_offset(1:1))
-                allocate (dims(1:1))
+                allocate (out%spatial_extents(1:2,0:num_procs - 1))
+                allocate (out%lo_offset(1:1))
+                allocate (out%hi_offset(1:1))
+                allocate (out%dims(1:1))
             end if
         end if
 
@@ -132,92 +92,92 @@ contains
         if (format == format_silo) then
             if (p > 0) then
                 if (grid_geometry == 3) then
-                    lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
-                    hi_offset(:) = (/offset_y%end, offset_z%end, offset_x%end/)
+                    out%lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
+                    out%hi_offset(:) = (/offset_y%end, offset_z%end, offset_x%end/)
                 else
-                    lo_offset(:) = (/offset_x%beg, offset_y%beg, offset_z%beg/)
-                    hi_offset(:) = (/offset_x%end, offset_y%end, offset_z%end/)
+                    out%lo_offset(:) = (/offset_x%beg, offset_y%beg, offset_z%beg/)
+                    out%hi_offset(:) = (/offset_x%end, offset_y%end, offset_z%end/)
                 end if
 
                 if (grid_geometry == 3) then
-                    dims(:) = (/n + offset_y%beg + offset_y%end + 2, p + offset_z%beg + offset_z%end + 2, &
-                         & m + offset_x%beg + offset_x%end + 2/)
+                    out%dims(:) = (/n + offset_y%beg + offset_y%end + 2, p + offset_z%beg + offset_z%end + 2, &
+                             & m + offset_x%beg + offset_x%end + 2/)
                 else
-                    dims(:) = (/m + offset_x%beg + offset_x%end + 2, n + offset_y%beg + offset_y%end + 2, &
-                         & p + offset_z%beg + offset_z%end + 2/)
+                    out%dims(:) = (/m + offset_x%beg + offset_x%end + 2, n + offset_y%beg + offset_y%end + 2, &
+                             & p + offset_z%beg + offset_z%end + 2/)
                 end if
             else if (n > 0) then
-                lo_offset(:) = (/offset_x%beg, offset_y%beg/)
-                hi_offset(:) = (/offset_x%end, offset_y%end/)
+                out%lo_offset(:) = (/offset_x%beg, offset_y%beg/)
+                out%hi_offset(:) = (/offset_x%end, offset_y%end/)
 
-                dims(:) = (/m + offset_x%beg + offset_x%end + 2, n + offset_y%beg + offset_y%end + 2/)
+                out%dims(:) = (/m + offset_x%beg + offset_x%end + 2, n + offset_y%beg + offset_y%end + 2/)
             else
-                lo_offset(:) = (/offset_x%beg/)
-                hi_offset(:) = (/offset_x%end/)
-                dims(:) = (/m + offset_x%beg + offset_x%end + 2/)
+                out%lo_offset(:) = (/offset_x%beg/)
+                out%hi_offset(:) = (/offset_x%end/)
+                out%dims(:) = (/m + offset_x%beg + offset_x%end + 2/)
             end if
         end if
 
         if (format == format_silo) then
-            dbdir = trim(case_dir) // '/silo_hdf5'
+            out%dbdir = trim(case_dir) // '/silo_hdf5'
 
-            write (proc_rank_dir, '(A,I0)') '/p', proc_rank
+            write (out%proc_rank_dir, '(A,I0)') '/p', proc_rank
 
-            proc_rank_dir = trim(dbdir) // trim(proc_rank_dir)
+            out%proc_rank_dir = trim(out%dbdir) // trim(out%proc_rank_dir)
 
-            file_loc = trim(proc_rank_dir) // '/.'
+            file_loc = trim(out%proc_rank_dir) // '/.'
 
             call my_inquire(file_loc, dir_check)
             if (dir_check .neqv. .true.) then
-                call s_create_directory(trim(proc_rank_dir))
+                call s_create_directory(trim(out%proc_rank_dir))
             end if
 
             if (proc_rank == 0) then
-                rootdir = trim(dbdir) // '/root'
+                out%rootdir = trim(out%dbdir) // '/root'
 
-                file_loc = trim(rootdir) // '/.'
+                file_loc = trim(out%rootdir) // '/.'
 
                 call my_inquire(file_loc, dir_check)
                 if (dir_check .neqv. .true.) then
-                    call s_create_directory(trim(rootdir))
+                    call s_create_directory(trim(out%rootdir))
                 end if
             end if
         else
-            dbdir = trim(case_dir) // '/binary'
+            out%dbdir = trim(case_dir) // '/binary'
 
-            write (proc_rank_dir, '(A,I0)') '/p', proc_rank
+            write (out%proc_rank_dir, '(A,I0)') '/p', proc_rank
 
-            proc_rank_dir = trim(dbdir) // trim(proc_rank_dir)
+            out%proc_rank_dir = trim(out%dbdir) // trim(out%proc_rank_dir)
 
-            file_loc = trim(proc_rank_dir) // '/.'
+            file_loc = trim(out%proc_rank_dir) // '/.'
 
             call my_inquire(file_loc, dir_check)
 
             if (dir_check .neqv. .true.) then
-                call s_create_directory(trim(proc_rank_dir))
+                call s_create_directory(trim(out%proc_rank_dir))
             end if
 
             if (n == 0 .and. proc_rank == 0) then
-                rootdir = trim(dbdir) // '/root'
+                out%rootdir = trim(out%dbdir) // '/root'
 
-                file_loc = trim(rootdir) // '/.'
+                file_loc = trim(out%rootdir) // '/.'
 
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check .neqv. .true.) then
-                    call s_create_directory(trim(rootdir))
+                    call s_create_directory(trim(out%rootdir))
                 end if
             end if
         end if
 
         if (bubbles_lagrange) then  ! Lagrangian solver
             if (lag_txt_wrt) then
-                dbdir = trim(case_dir) // '/lag_bubbles_post_process'
-                file_loc = trim(dbdir) // '/.'
+                out%dbdir = trim(case_dir) // '/lag_bubbles_post_process'
+                file_loc = trim(out%dbdir) // '/.'
                 call my_inquire(file_loc, dir_check)
 
                 if (dir_check .neqv. .true.) then
-                    call s_create_directory(trim(dbdir))
+                    call s_create_directory(trim(out%dbdir))
                 end if
             end if
         end if
@@ -226,91 +186,91 @@ contains
         ! perfectly static throughout post-process. Hence, they are set here so that they do not have to be repetitively computed in
         ! later procedures.
         if (format == format_binary) then
-            if (n == 0 .and. proc_rank == 0) dbroot = 2
-            dbfile = 1
+            if (n == 0 .and. proc_rank == 0) out%dbroot = 2
+            out%dbfile = 1
         end if
 
         if (format == format_binary) then
-            dbvars = 0
+            out%dbvars = 0
 
             if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
                 do i = 1, num_fluids
                     if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                        dbvars = dbvars + 1
+                        out%dbvars = out%dbvars + 1
                     end if
                 end do
             end if
 
             if ((rho_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) &
                 & .and. (.not. relativity)) then
-                dbvars = dbvars + 1
+                out%dbvars = out%dbvars + 1
             end if
 
-            if (relativity .and. (rho_wrt .or. prim_vars_wrt)) dbvars = dbvars + 1
-            if (relativity .and. (rho_wrt .or. cons_vars_wrt)) dbvars = dbvars + 1
+            if (relativity .and. (rho_wrt .or. prim_vars_wrt)) out%dbvars = out%dbvars + 1
+            if (relativity .and. (rho_wrt .or. cons_vars_wrt)) out%dbvars = out%dbvars + 1
 
             do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (mom_wrt(i) .or. cons_vars_wrt) dbvars = dbvars + 1
+                if (mom_wrt(i) .or. cons_vars_wrt) out%dbvars = out%dbvars + 1
             end do
 
             do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (vel_wrt(i) .or. prim_vars_wrt) dbvars = dbvars + 1
+                if (vel_wrt(i) .or. prim_vars_wrt) out%dbvars = out%dbvars + 1
             end do
 
             do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (flux_wrt(i)) dbvars = dbvars + 1
+                if (flux_wrt(i)) out%dbvars = out%dbvars + 1
             end do
 
-            if (E_wrt .or. cons_vars_wrt) dbvars = dbvars + 1
-            if (pres_wrt .or. prim_vars_wrt) dbvars = dbvars + 1
-            if (hypoelasticity) dbvars = dbvars + (num_dims*(num_dims + 1))/2
-            if (cont_damage) dbvars = dbvars + 1
-            if (hyper_cleaning) dbvars = dbvars + 1
+            if (E_wrt .or. cons_vars_wrt) out%dbvars = out%dbvars + 1
+            if (pres_wrt .or. prim_vars_wrt) out%dbvars = out%dbvars + 1
+            if (hypoelasticity) out%dbvars = out%dbvars + (num_dims*(num_dims + 1))/2
+            if (cont_damage) out%dbvars = out%dbvars + 1
+            if (hyper_cleaning) out%dbvars = out%dbvars + 1
 
             if (mhd) then
                 if (n == 0) then
-                    dbvars = dbvars + 2
+                    out%dbvars = out%dbvars + 2
                 else
-                    dbvars = dbvars + 3
+                    out%dbvars = out%dbvars + 3
                 end if
             end if
 
             if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
                 do i = 1, num_fluids - 1
                     if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                        dbvars = dbvars + 1
+                        out%dbvars = out%dbvars + 1
                     end if
                 end do
 
                 if (alpha_wrt(num_fluids) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                    dbvars = dbvars + 1
+                    out%dbvars = out%dbvars + 1
                 end if
             end if
 
             if (gamma_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
-                dbvars = dbvars + 1
+                out%dbvars = out%dbvars + 1
             end if
 
-            if (heat_ratio_wrt) dbvars = dbvars + 1
+            if (heat_ratio_wrt) out%dbvars = out%dbvars + 1
 
             if (pi_inf_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
-                dbvars = dbvars + 1
+                out%dbvars = out%dbvars + 1
             end if
 
-            if (pres_inf_wrt) dbvars = dbvars + 1
-            if (c_wrt) dbvars = dbvars + 1
+            if (pres_inf_wrt) out%dbvars = out%dbvars + 1
+            if (c_wrt) out%dbvars = out%dbvars + 1
 
             if (p > 0) then
                 do i = 1, num_vels
-                    if (omega_wrt(i)) dbvars = dbvars + 1
+                    if (omega_wrt(i)) out%dbvars = out%dbvars + 1
                 end do
             else if (n > 0) then
                 do i = 1, num_vels
-                    if (omega_wrt(i)) dbvars = dbvars + 1
+                    if (omega_wrt(i)) out%dbvars = out%dbvars + 1
                 end do
             end if
 
-            if (schlieren_wrt) dbvars = dbvars + 1
+            if (schlieren_wrt) out%dbvars = out%dbvars + 1
         end if
 
     end subroutine s_initialize_data_output_module
@@ -359,56 +319,56 @@ contains
 
         if (format == format_silo) then
             write (file_loc, '(A,I0,A)') '/', t_step, '.silo'
-            file_loc = trim(proc_rank_dir) // trim(file_loc)
+            file_loc = trim(out%proc_rank_dir) // trim(file_loc)
 
-            ierr = DBCREATE(trim(file_loc), len_trim(file_loc), DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, DB_HDF5, dbfile)
+            ierr = DBCREATE(trim(file_loc), len_trim(file_loc), DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, DB_HDF5, out%dbfile)
 
-            if (dbfile == -1) then
+            if (out%dbfile == -1) then
                 call s_mpi_abort('Unable to create Silo-HDF5 database ' // 'slave file ' // trim(file_loc) // '. ' // 'Exiting.')
             end if
 
             if (proc_rank == 0) then
                 write (file_loc, '(A,I0,A)') '/collection_', t_step, '.silo'
-                file_loc = trim(rootdir) // trim(file_loc)
+                file_loc = trim(out%rootdir) // trim(file_loc)
 
-                ierr = DBCREATE(trim(file_loc), len_trim(file_loc), DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, DB_HDF5, dbroot)
+                ierr = DBCREATE(trim(file_loc), len_trim(file_loc), DB_CLOBBER, DB_LOCAL, 'MFC v3.0', 8, DB_HDF5, out%dbroot)
 
-                if (dbroot == -1) then
+                if (out%dbroot == -1) then
                     call s_mpi_abort('Unable to create Silo-HDF5 database ' // 'master file ' // trim(file_loc) // '. ' &
                                      & // 'Exiting.')
                 end if
             end if
         else
             write (file_loc, '(A,I0,A)') '/', t_step, '.dat'
-            file_loc = trim(proc_rank_dir) // trim(file_loc)
+            file_loc = trim(out%proc_rank_dir) // trim(file_loc)
 
-            open (dbfile, IOSTAT=err, FILE=trim(file_loc), form='unformatted', STATUS='replace')
+            open (out%dbfile, IOSTAT=err, FILE=trim(file_loc), form='unformatted', STATUS='replace')
 
             if (err /= 0) then
                 call s_mpi_abort('Unable to create Binary database slave ' // 'file ' // trim(file_loc) // '. Exiting.')
             end if
 
             if (output_partial_domain) then
-                write (dbfile) x_output_idx%end - x_output_idx%beg, y_output_idx%end - y_output_idx%beg, &
-                       & z_output_idx%end - z_output_idx%beg, dbvars
+                write (out%dbfile) x_output_idx%end - x_output_idx%beg, y_output_idx%end - y_output_idx%beg, &
+                       & z_output_idx%end - z_output_idx%beg, out%dbvars
             else
-                write (dbfile) m, n, p, dbvars
+                write (out%dbfile) m, n, p, out%dbvars
             end if
 
             if (n == 0 .and. proc_rank == 0) then
                 write (file_loc, '(A,I0,A)') '/', t_step, '.dat'
-                file_loc = trim(rootdir) // trim(file_loc)
+                file_loc = trim(out%rootdir) // trim(file_loc)
 
-                open (dbroot, IOSTAT=err, FILE=trim(file_loc), form='unformatted', STATUS='replace')
+                open (out%dbroot, IOSTAT=err, FILE=trim(file_loc), form='unformatted', STATUS='replace')
 
                 if (err /= 0) then
                     call s_mpi_abort('Unable to create Binary database ' // 'master file ' // trim(file_loc) // '. Exiting.')
                 end if
 
                 if (output_partial_domain) then
-                    write (dbroot) x_output_idx%end - x_output_idx%beg, 0, 0, dbvars
+                    write (out%dbroot) x_output_idx%end - x_output_idx%beg, 0, 0, out%dbvars
                 else
-                    write (dbroot) m_root, 0, 0, dbvars
+                    write (out%dbroot) m_root, 0, 0, out%dbvars
                 end if
             end if
         end if
@@ -454,17 +414,19 @@ contains
             ! For multidimensional data sets, the spatial extents of all of the grid(s) handled by the local processor(s) are
             ! recorded so that they may be written, by root processor, to the formatted database master file.
             if (num_procs > 1) then
-                call s_mpi_gather_spatial_extents(spatial_extents)
+                call s_mpi_gather_spatial_extents(out%spatial_extents)
             else if (p > 0) then
                 if (grid_geometry == 3) then
-                    spatial_extents(:,0) = (/minval(y_cb), minval(z_cb), minval(x_cb), maxval(y_cb), maxval(z_cb), maxval(x_cb)/)
+                    out%spatial_extents(:,0) = (/minval(y_cb), minval(z_cb), minval(x_cb), maxval(y_cb), maxval(z_cb), &
+                                        & maxval(x_cb)/)
                 else
-                    spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), minval(z_cb), maxval(x_cb), maxval(y_cb), maxval(z_cb)/)
+                    out%spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), minval(z_cb), maxval(x_cb), maxval(y_cb), &
+                                        & maxval(z_cb)/)
                 end if
             else if (n > 0) then
-                spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), maxval(x_cb), maxval(y_cb)/)
+                out%spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), maxval(x_cb), maxval(y_cb)/)
             else
-                spatial_extents(:,0) = (/minval(x_cb), maxval(x_cb)/)
+                out%spatial_extents(:,0) = (/minval(x_cb), maxval(x_cb)/)
             end if
 
             ! Next, the root processor proceeds to record all of the spatial extents in the formatted database master file. In
@@ -478,66 +440,66 @@ contains
                 meshtypes = DB_QUAD_RECT
 
                 err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBMKOPTLIST(2, optlist)
-                err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, size(spatial_extents, 1))
-                err = DBADDDOPT(optlist, DBOPT_EXTENTS, spatial_extents)
-                err = DBPUTMMESH(dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, optlist, &
-                                 & ierr)
-                err = DBFREEOPTLIST(optlist)
+                err = DBMKOPTLIST(2, out%optlist)
+                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, size(out%spatial_extents, 1))
+                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%spatial_extents)
+                err = DBPUTMMESH(out%dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, &
+                                 & out%optlist, ierr)
+                err = DBFREEOPTLIST(out%optlist)
             end if
 
             ! Finally, the local quadrilateral mesh, either 2D or 3D, along with its offsets that indicate the presence and size of
             ! ghost zone layer(s), are put in the formatted database slave file.
 
             if (p > 0) then
-                err = DBMKOPTLIST(2, optlist)
-                err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, size(lo_offset), lo_offset)
-                err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, size(hi_offset), hi_offset)
+                err = DBMKOPTLIST(2, out%optlist)
+                err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
+                err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
                 if (grid_geometry == 3) then
-                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, dims, 3, DB_DOUBLE, &
-                                  & DB_COLLINEAR, optlist, ierr)
+                    err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, out%dims, 3, &
+                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
                 else
-                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, dims, 3, DB_DOUBLE, &
-                                  & DB_COLLINEAR, optlist, ierr)
+                    err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, out%dims, 3, &
+                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
                 end if
-                err = DBFREEOPTLIST(optlist)
+                err = DBFREEOPTLIST(out%optlist)
             else if (n > 0) then
-                err = DBMKOPTLIST(2, optlist)
-                err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, size(lo_offset), lo_offset)
-                err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, size(hi_offset), hi_offset)
-                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, DB_F77NULL, dims, 2, DB_DOUBLE, &
-                              & DB_COLLINEAR, optlist, ierr)
-                err = DBFREEOPTLIST(optlist)
+                err = DBMKOPTLIST(2, out%optlist)
+                err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
+                err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
+                err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, DB_F77NULL, out%dims, 2, &
+                              & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                err = DBFREEOPTLIST(out%optlist)
             else
-                err = DBMKOPTLIST(2, optlist)
-                err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, size(lo_offset), lo_offset)
-                err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, size(hi_offset), hi_offset)
-                err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, DB_F77NULL, DB_F77NULL, dims, 1, &
-                              & DB_DOUBLE, DB_COLLINEAR, optlist, ierr)
-                err = DBFREEOPTLIST(optlist)
+                err = DBMKOPTLIST(2, out%optlist)
+                err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
+                err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
+                err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, DB_F77NULL, DB_F77NULL, out%dims, &
+                              & 1, DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                err = DBFREEOPTLIST(out%optlist)
             end if
         else if (format == format_binary) then
             ! Multidimensional local grid data is written to the formatted database slave file. Recall that no master file to
             ! maintained in multidimensions.
             if (p > 0) then
                 if (precision == precision_single) then
-                    write (dbfile) real(x_cb, sp), real(y_cb, sp), real(z_cb, sp)
+                    write (out%dbfile) real(x_cb, sp), real(y_cb, sp), real(z_cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), y_cb(y_output_idx%beg - 1:y_output_idx%end), &
-                               & z_cb(z_output_idx%beg - 1:z_output_idx%end)
+                        write (out%dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), &
+                               & y_cb(y_output_idx%beg - 1:y_output_idx%end), z_cb(z_output_idx%beg - 1:z_output_idx%end)
                     else
-                        write (dbfile) x_cb, y_cb, z_cb
+                        write (out%dbfile) x_cb, y_cb, z_cb
                     end if
                 end if
             else if (n > 0) then
                 if (precision == precision_single) then
-                    write (dbfile) real(x_cb, sp), real(y_cb, sp)
+                    write (out%dbfile) real(x_cb, sp), real(y_cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), y_cb(y_output_idx%beg - 1:y_output_idx%end)
+                        write (out%dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end), y_cb(y_output_idx%beg - 1:y_output_idx%end)
                     else
-                        write (dbfile) x_cb, y_cb
+                        write (out%dbfile) x_cb, y_cb
                     end if
                 end if
 
@@ -545,12 +507,12 @@ contains
                 ! is put together by the root process and written to the master file.
             else
                 if (precision == precision_single) then
-                    write (dbfile) real(x_cb, sp)
+                    write (out%dbfile) real(x_cb, sp)
                 else
                     if (output_partial_domain) then
-                        write (dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end)
+                        write (out%dbfile) x_cb(x_output_idx%beg - 1:x_output_idx%end)
                     else
-                        write (dbfile) x_cb
+                        write (out%dbfile) x_cb
                     end if
                 end if
 
@@ -562,12 +524,12 @@ contains
 
                 if (proc_rank == 0) then
                     if (precision == precision_single) then
-                        write (dbroot) real(x_root_cb, wp)
+                        write (out%dbroot) real(x_root_cb, wp)
                     else
                         if (output_partial_domain) then
-                            write (dbroot) x_root_cb(x_output_idx%beg - 1:x_output_idx%end)
+                            write (out%dbroot) x_root_cb(x_output_idx%beg - 1:x_output_idx%end)
                         else
-                            write (dbroot) x_root_cb
+                            write (out%dbroot) x_root_cb
                         end if
                     end if
                 end if
@@ -591,9 +553,9 @@ contains
         if (format == format_silo) then
             ! Determining the extents of the flow variable on each local process and gathering all this information on root process
             if (num_procs > 1) then
-                call s_mpi_gather_data_extents(q_sf, data_extents)
+                call s_mpi_gather_data_extents(out%q_sf, out%data_extents)
             else
-                data_extents(:,0) = (/minval(q_sf), maxval(q_sf)/)
+                out%data_extents(:,0) = (/minval(out%q_sf), maxval(out%q_sf)/)
             end if
 
             if (proc_rank == 0) then
@@ -604,12 +566,12 @@ contains
                 vartypes = DB_QUADVAR
 
                 err = DBSET2DSTRLEN(len(varnames(1)))
-                err = DBMKOPTLIST(2, optlist)
-                err = DBADDIOPT(optlist, DBOPT_EXTENTS_SIZE, 2)
-                err = DBADDDOPT(optlist, DBOPT_EXTENTS, data_extents)
-                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
-                                & optlist, ierr)
-                err = DBFREEOPTLIST(optlist)
+                err = DBMKOPTLIST(2, out%optlist)
+                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, 2)
+                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%data_extents)
+                err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
+                                & out%optlist, ierr)
+                err = DBFREEOPTLIST(out%optlist)
             end if
 
             if (wp == dp) then
@@ -617,7 +579,7 @@ contains
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
-                                q_sf_s(i, j, k) = real(q_sf(i, j, k), sp)
+                                out%q_sf_s(i, j, k) = real(out%q_sf(i, j, k), sp)
                             end do
                         end do
                     end do
@@ -625,7 +587,7 @@ contains
                         do i = -offset_x%beg, m + offset_x%end
                             do j = -offset_y%beg, n + offset_y%end
                                 do k = -offset_z%beg, p + offset_z%end
-                                    cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                                    out%cyl_q_sf_s(j, k, i) = out%q_sf_s(i, j, k)
                                 end do
                             end do
                         end do
@@ -635,7 +597,7 @@ contains
                         do i = -offset_x%beg, m + offset_x%end
                             do j = -offset_y%beg, n + offset_y%end
                                 do k = -offset_z%beg, p + offset_z%end
-                                    cyl_q_sf(j, k, i) = q_sf(i, j, k)
+                                    out%cyl_q_sf(j, k, i) = out%q_sf(i, j, k)
                                 end do
                             end do
                         end do
@@ -645,7 +607,7 @@ contains
                 do i = -offset_x%beg, m + offset_x%end
                     do j = -offset_y%beg, n + offset_y%end
                         do k = -offset_z%beg, p + offset_z%end
-                            q_sf_s(i, j, k) = q_sf(i, j, k)
+                            out%q_sf_s(i, j, k) = out%q_sf(i, j, k)
                         end do
                     end do
                 end do
@@ -653,7 +615,7 @@ contains
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
-                                cyl_q_sf_s(j, k, i) = q_sf_s(i, j, k)
+                                out%cyl_q_sf_s(j, k, i) = out%q_sf_s(i, j, k)
                             end do
                         end do
                     end do
@@ -664,18 +626,19 @@ contains
                 if (precision == ${PRECISION}$) then
                     if (p > 0) then
                         if (grid_geometry == 3) then
-                            err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, cyl_q_sf${SFX}$, &
-                                           & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                            err = DBPUTQV1(out%dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, &
+                                           & out%cyl_q_sf${SFX}$, out%dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, &
+                                           & DB_F77NULL, ierr)
                         else
-                            err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, &
-                                           & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                            err = DBPUTQV1(out%dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, out%q_sf${SFX}$, &
+                                           & out%dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
                         end if
                     else if (n > 0) then
-                        err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, dims - 1, &
-                                       & 2, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                        err = DBPUTQV1(out%dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, out%q_sf${SFX}$, &
+                                       & out%dims - 1, 2, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
                     else
-                        err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, dims - 1, &
-                                       & 1, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                        err = DBPUTQV1(out%dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, out%q_sf${SFX}$, &
+                                       & out%dims - 1, 1, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
                     end if
                 end if
             #:endfor
@@ -683,25 +646,25 @@ contains
             ! Writing the name of the flow variable and its data, associated with the local processor, to the formatted database
             ! slave file
             if (precision == precision_single) then
-                write (dbfile) varname, real(q_sf, wp)
+                write (out%dbfile) varname, real(out%q_sf, wp)
             else
-                write (dbfile) varname, q_sf
+                write (out%dbfile) varname, out%q_sf
             end if
 
             ! In 1D, the root process also takes care of gathering the flow variable data from all of the local processor(s) and
             ! writes it to the formatted database master file.
             if (n == 0) then
                 if (num_procs > 1) then
-                    call s_mpi_defragment_1d_flow_variable(q_sf, q_root_sf)
+                    call s_mpi_defragment_1d_flow_variable(out%q_sf, out%q_root_sf)
                 else
-                    q_root_sf(:,:,:) = q_sf(:,:,:)
+                    out%q_root_sf(:,:,:) = out%q_sf(:,:,:)
                 end if
 
                 if (proc_rank == 0) then
                     if (precision == precision_single) then
-                        write (dbroot) varname, real(q_root_sf, wp)
+                        write (out%dbroot) varname, real(out%q_root_sf, wp)
                     else
-                        write (dbroot) varname, q_root_sf
+                        write (out%dbroot) varname, out%q_root_sf
                     end if
                 end if
             end if
@@ -993,10 +956,11 @@ contains
                     meshtypes(i) = DB_POINTMESH
                 end do
                 err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
+                err = DBPUTMMESH(out%dbroot, 'lag_bubbles', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, &
+                                 & ierr)
             end if
 
-            err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, px, py, pz, nBub, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, px, py, pz, nBub, DB_DOUBLE, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             if (lag_vel_wrt) then
@@ -1041,11 +1005,12 @@ contains
                     meshtypes(i) = DB_POINTMESH
                 end do
                 err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
+                err = DBPUTMMESH(out%dbroot, 'lag_bubbles', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, &
+                                 & ierr)
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, dummy_data, dummy_data, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, dummy_data, dummy_data, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
             if (lag_vel_wrt) then
@@ -1091,11 +1056,12 @@ contains
                     var_types(i) = DB_POINTVAR
                 end do
                 err = DBSET2DSTRLEN(len(var_names(1)))
-                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), num_procs, var_names, len_trim(var_names), var_types, &
-                                & DB_F77NULL, ierr)
+                err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, var_names, len_trim(var_names), &
+                                & var_types, DB_F77NULL, ierr)
             end if
 
-            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, &
+                           & ierr)
         else
             if (proc_rank == 0) then
                 do i = 1, num_procs
@@ -1104,12 +1070,13 @@ contains
                 end do
                 err = DBSET2DSTRLEN(len(var_names(1)))
                 err = DBSETEMPTYOK(1)
-                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), num_procs, var_names, len_trim(var_names), var_types, &
-                                & DB_F77NULL, ierr)
+                err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, var_names, len_trim(var_names), &
+                                & var_types, DB_F77NULL, ierr)
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, &
+                           & ierr)
         end if
 
     end subroutine s_write_lag_variable_to_formatted_database_file
@@ -1440,9 +1407,9 @@ contains
                 write (meshnames(1), '(A,I0,A)') '../p0/', t_step, '.silo:ib_bodies'
                 meshtypes(1) = DB_POINTMESH
                 err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBPUTMMESH(dbroot, 'ib_bodies', 16, 1, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
+                err = DBPUTMMESH(out%dbroot, 'ib_bodies', 16, 1, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
 
-                err = DBPUTPM(dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+                err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
 
                 call s_write_ib_variable('ib_force_x', t_step, force_x, nBodies)
                 call s_write_ib_variable('ib_force_y', t_step, force_y, nBodies)
@@ -1484,10 +1451,10 @@ contains
         write (var_name_entry, '(A,I0,A)') '../p0/', t_step, '.silo:' // trim(varname)
         var_type_entry = DB_POINTVAR
         err = DBSET2DSTRLEN(len(var_name_entry))
-        err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), 1, var_name_entry, len_trim(var_name_entry), var_type_entry, &
-                        & DB_F77NULL, ierr)
+        err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), 1, var_name_entry, len_trim(var_name_entry), &
+                        & var_type_entry, DB_F77NULL, ierr)
 
-        err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+        err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
 
     end subroutine s_write_ib_variable
 
@@ -1497,11 +1464,11 @@ contains
         integer :: ierr
 
         if (format == format_silo) then
-            ierr = DBCLOSE(dbfile)
-            if (proc_rank == 0) ierr = DBCLOSE(dbroot)
+            ierr = DBCLOSE(out%dbfile)
+            if (proc_rank == 0) ierr = DBCLOSE(out%dbroot)
         else
-            close (dbfile)
-            if (n == 0 .and. proc_rank == 0) close (dbroot)
+            close (out%dbfile)
+            if (n == 0 .and. proc_rank == 0) close (out%dbroot)
         end if
 
     end subroutine s_close_formatted_database_file
@@ -1523,21 +1490,21 @@ contains
     !> Deallocate module arrays and release all data-output resources.
     impure subroutine s_finalize_data_output_module()
 
-        deallocate (q_sf)
-        if (n == 0) deallocate (q_root_sf)
+        deallocate (out%q_sf)
+        if (n == 0) deallocate (out%q_root_sf)
         if (grid_geometry == 3) then
-            deallocate (cyl_q_sf)
+            deallocate (out%cyl_q_sf)
         end if
 
         ! Deallocating spatial and data extents and also the variables for the offsets and the one bookkeeping the number of
         ! cell-boundaries in each active coordinate direction. Note that all these variables were only needed by Silo-HDF5 format
         ! for multidimensional data.
         if (format == format_silo) then
-            deallocate (spatial_extents)
-            deallocate (data_extents)
-            deallocate (lo_offset)
-            deallocate (hi_offset)
-            deallocate (dims)
+            deallocate (out%spatial_extents)
+            deallocate (out%data_extents)
+            deallocate (out%lo_offset)
+            deallocate (out%hi_offset)
+            deallocate (out%dims)
         end if
 
     end subroutine s_finalize_data_output_module
