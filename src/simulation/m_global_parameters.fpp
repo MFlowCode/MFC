@@ -224,7 +224,7 @@ module m_global_parameters
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
 
-    $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, ib_airfoil, ib_airfoil_grids, stl_models]')
+    $:GPU_DECLARE(create='[ib, num_ibs, ib_airfoil_grids, stl_models]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
     !> @}
 
