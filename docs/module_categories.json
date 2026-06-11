@@ -38,6 +38,8 @@
             "m_cbc",
             "m_compute_cbc",
             "m_boundary_common",
+            "m_boundary_primitives",
+            "m_boundary_io",
             "m_ibm",
             "m_particle_cloud",
             "m_igr",
