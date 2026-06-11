@@ -1016,6 +1016,83 @@ contains
 
     end subroutine s_calculate_bulk_stress_tensor
 
+    !> Accumulate the mixture density, specific heat ratio function, liquid stiffness function, and internal energy reference of one
+    !! Riemann state from its partial densities and volume fractions. The number of fluids is an explicit argument because the
+    !! 5-equation bubble model accumulates over num_fluids - 1 fluids.
+    subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+
+        $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)                 :: nf  !< Number of fluids to accumulate over
+        real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
+        real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
+        integer                             :: i   !< Loop iterator over fluids
+
+        rho_K = 0._wp
+        gamma_K = 0._wp
+        pi_inf_K = 0._wp
+        qv_K = 0._wp
+
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, nf
+            rho_K = rho_K + alpha_rho_K(i)
+            gamma_K = gamma_K + alpha_K(i)*gammas(i)
+            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+        end do
+
+    end subroutine s_accumulate_mixture_properties
+
+    !> Compute the shear and volume Reynolds numbers of one Riemann state by inverse-weighting the fluid Reynolds numbers with the
+    !! volume fractions.
+    subroutine s_compute_interface_reynolds(alpha_K, Re_K)
+
+        $:GPU_ROUTINE(function_name='s_compute_interface_reynolds', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_K
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_K
+        #:endif
+        real(wp), dimension(2), intent(out) :: Re_K
+        integer                             :: i, q  !< Loop iterators
+
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, 2
+            Re_K(i) = dflt_real
+
+            if (Re_size(i) > 0) Re_K(i) = 0._wp
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do q = 1, Re_size(i)
+                Re_K(i) = alpha_K(Re_idx(i, q))/Res_gs(i, q) + Re_K(i)
+            end do
+
+            Re_K(i) = 1._wp/max(Re_K(i), sgm_eps)
+        end do
+
+    end subroutine s_compute_interface_reynolds
+
+    !> Compute the advective part of the HLLC star-state momentum flux in the wave-normal direction (pressure excluded), used to
+    !! assemble the geometrical source flux of the cylindrical and azimuthal sweeps.
+    function f_compute_hllc_star_momentum_flux(rho_L, rho_R, vel_L_norm, vel_R_norm, s_M, s_P, s_S, xi_L, xi_R, xi_M, xi_P, &
+        & dir_flg_norm) result(flux_mom)
+
+        $:GPU_ROUTINE(function_name='f_compute_hllc_star_momentum_flux', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: rho_L, rho_R            !< Left and right densities
+        real(wp), intent(in) :: vel_L_norm, vel_R_norm  !< Left and right wave-normal velocities
+        real(wp), intent(in) :: s_M, s_P, s_S           !< Clamped left/right and contact wave speeds
+        real(wp), intent(in) :: xi_L, xi_R, xi_M, xi_P  !< Star-state compression factors and upwind selectors
+        real(wp), intent(in) :: dir_flg_norm            !< Direction flag of the wave-normal direction
+        real(wp)             :: flux_mom
+
+        flux_mom = xi_M*(rho_L*(vel_L_norm*vel_L_norm + s_M*(xi_L*(dir_flg_norm*s_S + (1._wp - dir_flg_norm)*vel_L_norm) &
+                         & - vel_L_norm))) + xi_P*(rho_R*(vel_R_norm*vel_R_norm + s_P*(xi_R*(dir_flg_norm*s_S + (1._wp &
+                         & - dir_flg_norm)*vel_R_norm) - vel_R_norm)))
+
+    end function f_compute_hllc_star_momentum_flux
+
     !> Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver
     subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
 

@@ -95,7 +95,7 @@ contains
         type(riemann_states)      :: vdotB, B2
         type(riemann_states_vec3) :: b4              !< 4-magnetic field components (spatial: b4x, b4y, b4z)
         type(riemann_states_vec3) :: cm              !< Conservative momentum variables
-        integer                   :: i, j, k, l, q   !< Generic loop iterators
+        integer                   :: i, j, k, l      !< Generic loop iterators
         integer, dimension(3)     :: idx_right_phys  !< Physical (j,k,l) indices for right state.
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
@@ -111,9 +111,9 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, &
-                                    & alpha_R, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, &
-                                    & Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, &
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
+                                    & tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, &
+                                    & Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, &
                                     & Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, &
                                     & vel_grad_L, vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, &
                                     & vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, &
@@ -197,37 +197,12 @@ contains
                                 alpha_R = alpha_R/max(alpha_R_sum, sgm_eps)
                             end if
 
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho_L = rho_L + alpha_rho_L(i)
-                                gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
-
-                                rho_R = rho_R + alpha_rho_R(i)
-                                gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
-                            end do
+                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_L)
+                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                             if (viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real
-                                    Re_R(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, Re_size(i)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                    Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                end do
+                                call s_compute_interface_reynolds(alpha_L, Re_L)
+                                call s_compute_interface_reynolds(alpha_R, Re_R)
                             end if
 
                             if (chemistry) then
@@ -645,23 +620,8 @@ contains
                             end do
                         end if
 
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, 2
-                            Re_L(i) = dflt_real
-                            Re_R(i) = dflt_real
-
-                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                            if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, Re_size(i)
-                                Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                            end do
-
-                            Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                            Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                        end do
+                        call s_compute_interface_reynolds(alpha_L, Re_L)
+                        call s_compute_interface_reynolds(alpha_R, Re_R)
 
                         if (shear_stress) then
                             $:GPU_LOOP(parallelism='[seq]')
