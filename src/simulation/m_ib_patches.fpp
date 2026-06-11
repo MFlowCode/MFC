@@ -397,6 +397,8 @@ contains
 
                 $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%upper, ib_airfoil_grids(airfoil_id)%lower]')
             end if
+
+            $:GPU_UPDATE(device='[ib_airfoil(airfoil_id)]')
         end do
 
     end subroutine s_initialize_ib_airfoils
