@@ -414,6 +414,10 @@ def test_generate_bcast_fpp_fluid_pp_loop():
         assert "do i = 1, num_fluids_max" in out, f"{target}: fluid_pp loop missing"
         assert "call MPI_BCAST(fluid_pp(i)%gamma, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out
         assert "call MPI_BCAST(fluid_pp(i)%cv, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out
+        # Herschel-Bulkley members (#1545) — dropping any is a multi-rank regression
+        for hb in ("K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"):
+            assert f"call MPI_BCAST(fluid_pp(i)%{hb}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"missing HB member {hb}"
+        assert "call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)" in out
 
     sim = generate_bcast_fpp("sim")
     assert "call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)" in sim

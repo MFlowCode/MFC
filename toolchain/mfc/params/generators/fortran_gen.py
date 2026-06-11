@@ -318,16 +318,16 @@ def _emit_bcast_group(lines: List[str], vars_list: List[str], mpi_type: str) -> 
 def _emit_fluid_pp(lines: List[str], target: str) -> None:
     """Emit the fluid_pp(i) member-loop broadcast block.
 
-    Members broadcast: gamma, pi_inf, G, cv, qv, qvp (all REAL, mpi_p).
-    Sim additionally: Re(1) with count=2.
+    Members broadcast: the 13 REAL members (EOS core plus the Herschel-Bulkley
+    non-Newtonian set) and the LOGICAL non_newtonian flag, matching the manual
+    lists this generator replaces. Sim additionally: Re(1) with count=2.
     """
-    # These are the core EOS members broadcast in all three targets.
-    # Other fluid_pp members in the registry (mu_v, pv, mul0, ss, D_v, etc.) are
-    # physics-specific and are initialised from input on rank 0 only or derived.
-    fp_real_members = ["gamma", "pi_inf", "G", "cv", "qv", "qvp"]
+    fp_real_members = ["gamma", "pi_inf", "G", "cv", "qv", "qvp",
+                       "K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"]
     lines.append("        do i = 1, num_fluids_max")
     for mem in fp_real_members:
         lines.append(f"            call MPI_BCAST(fluid_pp(i)%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    lines.append("            call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
     if target == "sim":
         lines.append("            call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end do")
