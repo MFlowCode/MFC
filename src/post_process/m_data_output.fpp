@@ -12,7 +12,7 @@ module m_data_output
     use m_compile_specific
     use m_helper
     use m_variables_conversion
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single
 
     implicit none
 
@@ -87,7 +87,7 @@ contains
             allocate (cyl_q_sf(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,-offset_x%beg:m + offset_x%end))
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             allocate (q_sf_s(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
             if (grid_geometry == 3) then
                 allocate (cyl_q_sf_s(-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end,-offset_x%beg:m + offset_x%end))
@@ -96,7 +96,7 @@ contains
 
         if (n == 0) then
             allocate (q_root_sf(0:m_root,0:0,0:0))
-            if (precision == 1) then
+            if (precision == precision_single) then
                 allocate (q_root_sf_s(0:m_root,0:0,0:0))
             end if
         end if
@@ -104,7 +104,7 @@ contains
         ! Allocating the spatial and data extents and also the variables for the offsets and the one bookkeeping the number of
         ! cell-boundaries in each active coordinate direction. Note that all these variables are only needed by the Silo-HDF5 format
         ! for multidimensional data.
-        if (format == 1) then
+        if (format == format_silo) then
             allocate (data_extents(1:2,0:num_procs - 1))
 
             if (p > 0) then
@@ -129,7 +129,7 @@ contains
         ! results are now transferred to the local variables of this module when they are required by the Silo-HDF5 format, for
         ! multidimensional data sets. With the same, latter, requirements, the variables bookkeeping the number of cell-boundaries
         ! in each active coordinate direction are also set here.
-        if (format == 1) then
+        if (format == format_silo) then
             if (p > 0) then
                 if (grid_geometry == 3) then
                     lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
@@ -158,7 +158,7 @@ contains
             end if
         end if
 
-        if (format == 1) then
+        if (format == format_silo) then
             dbdir = trim(case_dir) // '/silo_hdf5'
 
             write (proc_rank_dir, '(A,I0)') '/p', proc_rank
@@ -225,12 +225,12 @@ contains
         ! Contrary to the Silo-HDF5 database format, handles of the Binary database master/root and slave/local process files are
         ! perfectly static throughout post-process. Hence, they are set here so that they do not have to be repetitively computed in
         ! later procedures.
-        if (format == 2) then
+        if (format == format_binary) then
             if (n == 0 .and. proc_rank == 0) dbroot = 2
             dbfile = 1
         end if
 
-        if (format == 2) then
+        if (format == format_binary) then
             dbvars = 0
 
             if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
@@ -357,7 +357,7 @@ contains
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc
         integer                                        :: ierr
 
-        if (format == 1) then
+        if (format == format_silo) then
             write (file_loc, '(A,I0,A)') '/', t_step, '.silo'
             file_loc = trim(proc_rank_dir) // trim(file_loc)
 
@@ -450,7 +450,7 @@ contains
         integer                                         :: i
         integer                                         :: ierr
 
-        if (format == 1) then
+        if (format == format_silo) then
             ! For multidimensional data sets, the spatial extents of all of the grid(s) handled by the local processor(s) are
             ! recorded so that they may be written, by root processor, to the formatted database master file.
             if (num_procs > 1) then
@@ -516,11 +516,11 @@ contains
                               & DB_DOUBLE, DB_COLLINEAR, optlist, ierr)
                 err = DBFREEOPTLIST(optlist)
             end if
-        else if (format == 2) then
+        else if (format == format_binary) then
             ! Multidimensional local grid data is written to the formatted database slave file. Recall that no master file to
             ! maintained in multidimensions.
             if (p > 0) then
-                if (precision == 1) then
+                if (precision == precision_single) then
                     write (dbfile) real(x_cb, sp), real(y_cb, sp), real(z_cb, sp)
                 else
                     if (output_partial_domain) then
@@ -531,7 +531,7 @@ contains
                     end if
                 end if
             else if (n > 0) then
-                if (precision == 1) then
+                if (precision == precision_single) then
                     write (dbfile) real(x_cb, sp), real(y_cb, sp)
                 else
                     if (output_partial_domain) then
@@ -544,7 +544,7 @@ contains
                 ! One-dimensional local grid data is written to the formatted database slave file. In addition, the local grid data
                 ! is put together by the root process and written to the master file.
             else
-                if (precision == 1) then
+                if (precision == precision_single) then
                     write (dbfile) real(x_cb, sp)
                 else
                     if (output_partial_domain) then
@@ -561,7 +561,7 @@ contains
                 end if
 
                 if (proc_rank == 0) then
-                    if (precision == 1) then
+                    if (precision == precision_single) then
                         write (dbroot) real(x_root_cb, wp)
                     else
                         if (output_partial_domain) then
@@ -588,7 +588,7 @@ contains
         integer                                         :: i, j, k
         integer                                         :: ierr
 
-        if (format == 1) then
+        if (format == format_silo) then
             ! Determining the extents of the flow variable on each local process and gathering all this information on root process
             if (num_procs > 1) then
                 call s_mpi_gather_data_extents(q_sf, data_extents)
@@ -613,7 +613,7 @@ contains
             end if
 
             if (wp == dp) then
-                if (precision == 1) then
+                if (precision == precision_single) then
                     do i = -offset_x%beg, m + offset_x%end
                         do j = -offset_y%beg, n + offset_y%end
                             do k = -offset_z%beg, p + offset_z%end
@@ -682,7 +682,7 @@ contains
         else
             ! Writing the name of the flow variable and its data, associated with the local processor, to the formatted database
             ! slave file
-            if (precision == 1) then
+            if (precision == precision_single) then
                 write (dbfile) varname, real(q_sf, wp)
             else
                 write (dbfile) varname, q_sf
@@ -698,7 +698,7 @@ contains
                 end if
 
                 if (proc_rank == 0) then
-                    if (precision == 1) then
+                    if (precision == precision_single) then
                         write (dbroot) varname, real(q_root_sf, wp)
                     else
                         write (dbroot) varname, q_root_sf
@@ -1496,7 +1496,7 @@ contains
 
         integer :: ierr
 
-        if (format == 1) then
+        if (format == format_silo) then
             ierr = DBCLOSE(dbfile)
             if (proc_rank == 0) ierr = DBCLOSE(dbroot)
         else
@@ -1532,7 +1532,7 @@ contains
         ! Deallocating spatial and data extents and also the variables for the offsets and the one bookkeeping the number of
         ! cell-boundaries in each active coordinate direction. Note that all these variables were only needed by Silo-HDF5 format
         ! for multidimensional data.
-        if (format == 1) then
+        if (format == format_silo) then
             deallocate (spatial_extents)
             deallocate (data_extents)
             deallocate (lo_offset)

@@ -1130,6 +1130,29 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "vel_wrt": "3",
 }
 
+# Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
+# Maps variable name -> (fortran_type, dimension_expr_or_None, sim_gpu_declare, doxygen_desc_or_None).
+# sim_gpu_declare=True means the generator emits this variable's $:GPU_DECLARE line
+# alongside its declaration; the variable must then be REMOVED from any grouped
+# GPU_DECLARE list in src/simulation/m_global_parameters.fpp (multiple declare
+# directives accumulate identically in OpenACC and OpenMP).
+TYPED_DECLS: dict[str, tuple] = {
+    "fluid_pp": ("type(physical_parameters)", "num_fluids_max", False, "Per-fluid stiffened-gas EOS parameters, Reynolds numbers, and shear modulus"),
+    "bub_pp": ("type(subgrid_bubble_physical_parameters)", None, False, "Subgrid bubble physical parameters"),
+    "patch_icpp": ("type(ic_patch_parameters)", "num_patches_max", False, "IC patch parameters"),
+    "patch_bc": ("type(bc_patch_parameters)", "num_bc_patches_max", False, "Boundary condition patch parameters"),
+    "patch_ib": ("type(ib_patch_parameters)", "num_ib_patches_max_namelist", True, "Immersed boundary patch parameters"),
+    "ib_airfoil": ("type(ib_airfoil_parameters)", "num_ib_airfoils_max", True, "Per-airfoil NACA user inputs"),
+    "stl_models": ("type(ib_stl_parameters)", "num_stl_models_max", False, "Per-STL model parameters"),
+    "probe": ("type(vec3_dt)", "num_probes_max", False, None),
+    "integral": ("type(integral_parameters)", "num_probes_max", False, None),
+    "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
+    "chem_params": ("type(chemistry_parameters)", None, True, None),
+    "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
+    "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
+    "simplex_params": ("type(simplex_noise_params)", None, False, None),
+}
+
 
 def _nv(targets: set, *names: str) -> None:
     for n in names:

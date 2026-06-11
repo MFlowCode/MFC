@@ -14,7 +14,8 @@ module m_global_parameters
     use m_derived_types
     use m_helper_basic
     use m_thermochem, only: num_species, species_names
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo, precision_single, &
+        & recon_type_weno
 
     implicit none
 
@@ -125,10 +126,8 @@ module m_global_parameters
     integer                 :: mpi_info_int
     !> @}
 
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
-    ! Subgrid Bubble Parameters
-    type(subgrid_bubble_physical_parameters) :: bub_pp
-    real(wp), allocatable, dimension(:)      :: adv  !< Advection variables
+    ! fluid_pp, bub_pp: auto-generated in generated_decls.fpp
+    real(wp), allocatable, dimension(:) :: adv  !< Advection variables
     ! Formatted Database File(s) Structure Parameters
 
     type(bounds_info)     :: x_output, y_output, z_output              !< Portion of domain to output for post-processing
@@ -192,7 +191,7 @@ contains
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
-        recon_type = WENO_TYPE
+        recon_type = recon_type_weno
         weno_order = dflt_int
         muscl_order = dflt_int
         mixture_err = .false.
@@ -672,7 +671,7 @@ contains
         ! Size of the ghost zone layer is non-zero only when post-processing the raw simulation data of a parallel multidimensional
         ! computation in the Silo-HDF5 format. If this is the case, one must also verify whether the raw simulation data is 2D or
         ! 3D. In the 2D case, size of the z-coordinate direction ghost zone layer must be zeroed out.
-        if (num_procs == 1 .or. format /= 1) then
+        if (num_procs == 1 .or. format /= format_silo) then
             offset_x%beg = 0
             offset_x%end = 0
             offset_y%beg = 0
@@ -737,7 +736,7 @@ contains
             allocate (x_root_cb(-1:m_root))
             allocate (x_root_cc(0:m_root))
 
-            if (precision == 1) then
+            if (precision == precision_single) then
                 allocate (x_root_cc_s(0:m_root))
             end if
         end if

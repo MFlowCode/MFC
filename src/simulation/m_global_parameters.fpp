@@ -14,7 +14,7 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, recon_type_muscl
     ! $:USE_GPU_MODULE()
 
     implicit none
@@ -65,57 +65,7 @@ module m_global_parameters
 
     logical :: cfl_dt
     ! Simulation Algorithm Parameters
-    #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: num_dims = ${num_dims}$  !< Number of spatial dimensions
-        integer, parameter :: num_vels = ${num_vels}$  !< Number of velocity components (different from num_dims for mhd)
-    #:else
-        integer :: num_dims  !< Number of spatial dimensions
-        integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
-    #:endif
-    #:if MFC_CASE_OPTIMIZATION
-        integer, parameter :: recon_type = ${recon_type}$    !< Reconstruction type
-        integer, parameter :: weno_polyn = ${weno_polyn}$    !< Degree of the WENO polynomials (polyn)
-        integer, parameter :: muscl_polyn = ${muscl_polyn}$  !< Degree of the MUSCL polynomials (polyn)
-        integer, parameter :: weno_order = ${weno_order}$    !< Order of the WENO reconstruction
-        integer, parameter :: muscl_order = ${muscl_order}$  !< Order of the MUSCL order
-        !> Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
-        integer, parameter  :: weno_num_stencils = ${weno_num_stencils}$
-        integer, parameter  :: muscl_lim = ${muscl_lim}$               !< MUSCL Limiter
-        integer, parameter  :: num_fluids = ${num_fluids}$             !< number of fluids in the simulation
-        logical, parameter  :: wenojs = (${wenojs}$ /= 0)              !< WENO-JS (default)
-        logical, parameter  :: mapped_weno = (${mapped_weno}$ /= 0)    !< WENO-M (WENO with mapping of nonlinear weights)
-        logical, parameter  :: wenoz = (${wenoz}$ /= 0)                !< WENO-Z
-        logical, parameter  :: teno = (${teno}$ /= 0)                  !< TENO (Targeted ENO)
-        real(wp), parameter :: wenoz_q = ${wenoz_q}$                   !< Power constant for WENO-Z
-        logical, parameter  :: mhd = (${mhd}$ /= 0)                    !< Magnetohydrodynamics
-        logical, parameter  :: relativity = (${relativity}$ /= 0)      !< Relativity (only for MHD)
-        integer, parameter  :: igr_iter_solver = ${igr_iter_solver}$   !< IGR elliptic solver
-        integer, parameter  :: igr_order = ${igr_order}$               !< Reconstruction order for IGR
-        logical, parameter  :: igr = (${igr}$ /= 0)                    !< use information geometric regularization
-        logical, parameter  :: igr_pres_lim = (${igr_pres_lim}$ /= 0)  !< Limit to positive pressures for IGR
-        logical, parameter  :: viscous = (${viscous}$ /= 0)            !< Viscous effects
-    #:else
-        integer  :: recon_type
-        integer  :: weno_polyn
-        integer  :: muscl_polyn
-        integer  :: weno_order
-        integer  :: muscl_order
-        integer  :: weno_num_stencils
-        integer  :: muscl_lim
-        integer  :: num_fluids
-        logical  :: wenojs
-        logical  :: mapped_weno
-        logical  :: wenoz
-        logical  :: teno
-        real(wp) :: wenoz_q
-        logical  :: mhd
-        logical  :: relativity
-        integer  :: igr_iter_solver
-        integer  :: igr_order
-        logical  :: igr
-        logical  :: igr_pres_lim
-        logical  :: viscous
-    #:endif
+    #:include 'generated_case_opt_decls.fpp'
 
     $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer                :: hyper_model                  !< hyperelasticity solver algorithm
@@ -256,30 +206,23 @@ module m_global_parameters
 
     ! END: Simulation Algorithm Parameters
 
-    ! Fluids Physical Parameters
+    ! Fluids Physical Parameters fluid_pp, bub_pp: auto-generated in generated_decls.fpp
 
-    type(physical_parameters), dimension(num_fluids_max) :: fluid_pp  !< Stiffened gas EOS parameters and Reynolds numbers per fluid
-    ! Subgrid Bubble Parameters
-    type(subgrid_bubble_physical_parameters) :: bub_pp
-    integer                                  :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
+    integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_order, fd_number]')
 
-    type(vec3_dt), dimension(num_probes_max)             :: probe
-    type(integral_parameters), dimension(num_probes_max) :: integral
+    ! probe, integral: auto-generated in generated_decls.fpp
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
     $:GPU_DECLARE(create='[rhoref, pref]')
 
     !> @name Immersed Boundaries
+    !> patch_ib, ib_airfoil, stl_models, particle_cloud: auto-generated in generated_decls.fpp
     !> @{
-    type(ib_patch_parameters), dimension(num_ib_patches_max_namelist) :: patch_ib  !< Immersed boundary patch parameters
     integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
-    type(particle_cloud_parameters), dimension(num_particle_clouds_max) :: particle_cloud  !< Particle bed specifications
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
-    type(ib_airfoil_parameters), dimension(num_ib_airfoils_max) :: ib_airfoil  !< Per-airfoil NACA user inputs (namelist)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
-    type(ib_stl_parameters), dimension(num_stl_models_max) :: stl_models  !< Per-STL model parameters (namelist)
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, ib_airfoil, ib_airfoil_grids, stl_models]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
@@ -323,8 +266,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[mom_sp, mom_3d]')
     !> @}
 
-    type(chemistry_parameters) :: chem_params
-    $:GPU_DECLARE(create='[chem_params]')
+    ! chem_params: auto-generated in generated_decls.fpp
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
@@ -343,11 +285,8 @@ module m_global_parameters
     $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
     !> @}
 
-    !> @name Acoustic acoustic_source parameters
-    !> @{
-    type(acoustic_parameters), dimension(num_probes_max) :: acoustic  !< Acoustic source parameters
-    !> @}
-    $:GPU_DECLARE(create='[acoustic_source, acoustic, num_source]')
+    ! acoustic: auto-generated in generated_decls.fpp
+    $:GPU_DECLARE(create='[acoustic_source, num_source]')
 
     !> @name Surface tension parameters
     !> @{
@@ -365,9 +304,9 @@ module m_global_parameters
     $:GPU_DECLARE(create='[pb_ts, mv_ts]')
 
     !> @name lagrangian subgrid bubble parameters
+    !> lag_params: auto-generated in generated_decls.fpp
     !> @{!
-    type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters
-    $:GPU_DECLARE(create='[bubbles_lagrange, lag_params]')
+    $:GPU_DECLARE(create='[bubbles_lagrange]')
     !> @}
 
     $:GPU_DECLARE(create='[Bx0]')
@@ -567,7 +506,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
-            recon_type = WENO_TYPE
+            recon_type = recon_type_weno
             weno_order = dflt_int
             muscl_order = dflt_int
             muscl_lim = dflt_int
@@ -778,14 +717,14 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
-            if (recon_type == WENO_TYPE) then
+            if (recon_type == recon_type_weno) then
                 weno_polyn = (weno_order - 1)/2
                 if (teno) then
                     weno_num_stencils = weno_order - 3
                 else
                     weno_num_stencils = weno_polyn
                 end if
-            else if (recon_type == MUSCL_TYPE) then
+            else if (recon_type == recon_type_muscl) then
                 muscl_polyn = muscl_order
             end if
             $:GPU_UPDATE(device='[weno_polyn, muscl_polyn]')
