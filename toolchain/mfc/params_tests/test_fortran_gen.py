@@ -605,3 +605,19 @@ def test_generate_bcast_fpp_lag_params_registry_walk():
     # Dead members must not appear
     for dead in ("T0", "Thost", "c0", "rho0", "x0"):
         assert f"lag_params%{dead}" not in sim, f"dead member lag_params%{dead} present in sim"
+
+
+def test_mpi_proxy_residue_pins_wall_velocity_and_bc_datatypes():
+    """The vb/ve wall-velocity broadcasts and integer BC datatypes live in
+    hand-written residue (not codegen); pin them so an edit or merge conflict
+    that drops them fails loudly."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[3]
+    for target in ("pre_process", "post_process"):
+        src = (root / "src" / target / "m_mpi_proxy.fpp").read_text()
+        assert "bc_${DIM}$%vb${DIR}$" in src, f"{target}: vb broadcasts missing"
+        assert "bc_${DIM}$%ve${DIR}$" in src, f"{target}: ve broadcasts missing"
+        assert "'bc_x%beg', 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end']" in src
+        seg = src.split("'bc_z%beg', 'bc_z%end']", 1)[1]
+        assert "MPI_INTEGER" in seg.split("#:endfor")[0], f"{target}: BC codes not MPI_INTEGER"
