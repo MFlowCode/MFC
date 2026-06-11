@@ -34,15 +34,15 @@ contains
 
         ! Allocate FD coefficients (up to 4th order; higher orders need extension)
 
-        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt) then
+        if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt .or. liutex_wrt) then
             allocate (fd%fd_coeff_x(-fd_number:fd_number,-offset_x%beg:m + offset_x%end))
         end if
 
-        if (omega_wrt(1) .or. omega_wrt(3) .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
+        if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
             allocate (fd%fd_coeff_y(-fd_number:fd_number,-offset_y%beg:n + offset_y%end))
         end if
 
-        if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
+        if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
             allocate (fd%fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
         end if
 
