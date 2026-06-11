@@ -10,6 +10,7 @@
             "m_riemann_solver_hlld",
             "m_riemann_solver_hll",
             "m_riemann_solver_lf",
+            "m_riemann_solver_hllc",
             "m_muscl",
             "m_variables_conversion",
             "m_thinc"
