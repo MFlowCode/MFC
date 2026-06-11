@@ -322,8 +322,7 @@ def _emit_fluid_pp(lines: List[str], target: str) -> None:
     non-Newtonian set) and the LOGICAL non_newtonian flag, matching the manual
     lists this generator replaces. Sim additionally: Re(1) with count=2.
     """
-    fp_real_members = ["gamma", "pi_inf", "G", "cv", "qv", "qvp",
-                       "K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"]
+    fp_real_members = ["gamma", "pi_inf", "G", "cv", "qv", "qvp", "K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"]
     lines.append("        do i = 1, num_fluids_max")
     for mem in fp_real_members:
         lines.append(f"            call MPI_BCAST(fluid_pp(i)%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
