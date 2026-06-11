@@ -79,137 +79,18 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
-        integer                                                                                              :: k, l
         type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
-        ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
-
-        if (bc_x%beg >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in, q_T_sf)
-        else
-            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
-            do l = 0, p
-                do k = 0, n
-                    select case (int(bc_type(1, 1)%sf(0, k, l)))
-                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                        call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l, q_T_sf)
-                    case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in, q_T_sf)
-                    case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in, q_T_sf)
-                    case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, 1, -1, k, l, q_T_sf)
-                    case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, 1, -1, k, l, q_T_sf)
-                    case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, 1, -1, k, l, q_T_sf)
-                    end select
-
-                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 1)%sf(0, k, &
-                        & l) <= BC_GHOST_EXTRAP)) then
-                        call s_qbmm_extrapolation(1, -1, k, l, pb_in, mv_in)
-                    end if
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-        if (bc_x%end >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb_in, mv_in, q_T_sf)
-        else
-            $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
-            do l = 0, p
-                do k = 0, n
-                    select case (int(bc_type(1, 2)%sf(0, k, l)))
-                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)  ! Ghost-cell extrap. BC at end
-                        call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l, q_T_sf)
-                    case (BC_REFLECTIVE)
-                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in, q_T_sf)
-                    case (BC_PERIODIC)
-                        call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in, q_T_sf)
-                    case (BC_SLIP_WALL)
-                        call s_slip_wall(q_prim_vf, 1, 1, k, l, q_T_sf)
-                    case (BC_NO_SLIP_WALL)
-                        call s_no_slip_wall(q_prim_vf, 1, 1, k, l, q_T_sf)
-                    case (BC_DIRICHLET)
-                        call s_dirichlet(q_prim_vf, 1, 1, k, l, q_T_sf)
-                    end select
-
-                    if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(1, 2)%sf(0, k, &
-                        & l) <= BC_GHOST_EXTRAP)) then
-                        call s_qbmm_extrapolation(1, 1, k, l, pb_in, mv_in)
-                    end if
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        call s_populate_bc_direction(1, -1, bc_x, bc_type(1, 1), q_prim_vf, pb_in, mv_in, q_T_sf)
+        call s_populate_bc_direction(1, 1, bc_x, bc_type(1, 2), q_prim_vf, pb_in, mv_in, q_T_sf)
 
         ! Population of Buffers in y-direction
 
         if (n == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            if (bc_y%beg >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb_in, mv_in, q_T_sf)
-            else
-                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
-                do l = 0, p
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(2, 1)%sf(k, 0, l)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l, q_T_sf)
-                        case (BC_AXIS)
-                            call s_axis(q_prim_vf, pb_in, mv_in, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 2, -1, k, l, q_T_sf)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 2, -1, k, l, q_T_sf)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, -1, k, l, q_T_sf)
-                        end select
-
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 1)%sf(k, 0, &
-                            & l) <= BC_GHOST_EXTRAP) .and. (bc_type(2, 1)%sf(k, 0, l) /= BC_AXIS)) then
-                            call s_qbmm_extrapolation(2, -1, k, l, pb_in, mv_in)
-                        end if
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
-            if (bc_y%end >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb_in, mv_in, q_T_sf)
-            else
-                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
-                do l = 0, p
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(2, 2)%sf(k, 0, l)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l, q_T_sf)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 2, 1, k, l, q_T_sf)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 2, 1, k, l, q_T_sf)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, 1, k, l, q_T_sf)
-                        end select
-
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(2, 2)%sf(k, 0, &
-                            & l) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(2, 1, k, l, pb_in, mv_in)
-                        end if
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+            call s_populate_bc_direction(2, -1, bc_y, bc_type(2, 1), q_prim_vf, pb_in, mv_in, q_T_sf)
+            call s_populate_bc_direction(2, 1, bc_y, bc_type(2, 2), q_prim_vf, pb_in, mv_in, q_T_sf)
         #:endif
 
         ! Population of Buffers in z-direction
@@ -217,68 +98,82 @@ contains
         if (p == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            if (bc_z%beg >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb_in, mv_in, q_T_sf)
-            else
-                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(3, 1)%sf(k, l, 0)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l, q_T_sf)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 3, -1, k, l, q_T_sf)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 3, -1, k, l, q_T_sf)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, -1, k, l, q_T_sf)
-                        end select
-
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 1)%sf(k, l, &
-                            & 0) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(3, -1, k, l, pb_in, mv_in)
-                        end if
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
-            if (bc_z%end >= 0) then
-                call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in, q_T_sf)
-            else
-                $:GPU_PARALLEL_LOOP(private='[l, k]', collapse=2)
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(3, 2)%sf(k, l, 0)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l, q_T_sf)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in, q_T_sf)
-                        case (BC_SlIP_WALL)
-                            call s_slip_wall(q_prim_vf, 3, 1, k, l, q_T_sf)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 3, 1, k, l, q_T_sf)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, 1, k, l, q_T_sf)
-                        end select
-
-                        if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_type(3, 2)%sf(k, l, &
-                            & 0) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(3, 1, k, l, pb_in, mv_in)
-                        end if
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+            call s_populate_bc_direction(3, -1, bc_z, bc_type(3, 1), q_prim_vf, pb_in, mv_in, q_T_sf)
+            call s_populate_bc_direction(3, 1, bc_z, bc_type(3, 2), q_prim_vf, pb_in, mv_in, q_T_sf)
         #:endif
 
     end subroutine s_populate_variables_buffers
+
+    !> Populate the variable buffers along one direction and location, via MPI exchange for processor boundaries or by dispatching
+    !! the per-cell BC routines over the boundary face.
+    impure subroutine s_populate_bc_direction(bc_dir, bc_loc, bc_bounds, bc_type_edge, q_prim_vf, pb_in, mv_in, q_T_sf)
+
+        integer, intent(in) :: bc_dir, bc_loc
+        type(int_bounds_info), intent(in) :: bc_bounds
+        type(integer_field), intent(in) :: bc_type_edge
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        type(scalar_field), optional, intent(inout) :: q_T_sf
+        integer :: bc_edge, k_beg, k_end, l_beg, l_end
+        integer :: bc_code, k, l
+
+        if (bc_loc == -1) then
+            bc_edge = bc_bounds%beg
+        else
+            bc_edge = bc_bounds%end
+        end if
+
+        ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
+        if (bc_edge >= 0) then
+            call s_mpi_sendrecv_variables_buffers(q_prim_vf, bc_dir, bc_loc, sys_size, pb_in, mv_in, q_T_sf)
+            return
+        end if
+
+        if (bc_dir == 1) then
+            k_beg = 0; k_end = n; l_beg = 0; l_end = p
+        else if (bc_dir == 2) then
+            k_beg = -buff_size; k_end = m + buff_size; l_beg = 0; l_end = p
+        else
+            k_beg = -buff_size; k_end = m + buff_size; l_beg = -buff_size; l_end = n + buff_size
+        end if
+
+        $:GPU_PARALLEL_LOOP(private='[l, k, bc_code]', collapse=2)
+        do l = l_beg, l_end
+            do k = k_beg, k_end
+                if (bc_dir == 1) then
+                    bc_code = int(bc_type_edge%sf(0, k, l))
+                else if (bc_dir == 2) then
+                    bc_code = int(bc_type_edge%sf(k, 0, l))
+                else
+                    bc_code = int(bc_type_edge%sf(k, l, 0))
+                end if
+
+                select case (bc_code)
+                case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
+                    call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+                case (BC_AXIS)
+                    if (bc_dir == 2 .and. bc_loc == -1) call s_axis(q_prim_vf, pb_in, mv_in, k, l)
+                case (BC_REFLECTIVE)
+                    call s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
+                case (BC_PERIODIC)
+                    call s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
+                case (BC_SLIP_WALL)
+                    call s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+                case (BC_NO_SLIP_WALL)
+                    call s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+                case (BC_DIRICHLET)
+                    call s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+                end select
+
+                if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_code <= BC_GHOST_EXTRAP) &
+                    & .and. .not. (bc_dir == 2 .and. bc_loc == -1 .and. bc_code == BC_AXIS)) then
+                    call s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
+                end if
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_populate_bc_direction
 
     !> Fill ghost cells by copying the nearest boundary cell value along the specified direction.
     subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
