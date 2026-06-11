@@ -232,34 +232,6 @@ contains
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
 
-                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
-                                if (hypoelasticity) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
-                                        tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    end do
-                                    G_L = 0._wp; G_R = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                        G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                    end do
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic contribution to energy if G large enough
-                                        if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            end if
-                                        end if
-                                    end do
-                                end if
-
                                 ! Hyperelastic stress contribution: strain energy added to total energy
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -1261,35 +1233,6 @@ contains
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
-                                end if
-
-                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
-                                if (hypoelasticity) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
-                                        tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    end do
-                                    G_L = 0._wp
-                                    G_R = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                        G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                    end do
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic contribution to energy if G large enough
-                                        if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            end if
-                                        end if
-                                    end do
                                 end if
 
                                 ! Hyperelastic stress contribution: strain energy added to total energy

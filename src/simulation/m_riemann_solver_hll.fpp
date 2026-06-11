@@ -75,6 +75,7 @@ contains
         real(wp)                  :: c_L, c_R
         real(wp), dimension(6)    :: tau_e_L, tau_e_R
         real(wp)                  :: G_L, G_R
+        real(wp)                  :: damage_L, damage_R
         real(wp), dimension(2)    :: Re_L, Re_R
         real(wp), dimension(3)    :: xi_field_L, xi_field_R
         real(wp)                  :: rho_avg
@@ -117,9 +118,9 @@ contains
                                     & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, &
                                     & pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, &
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
-                                    & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
-                                    & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
+                                    & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, damage_R, &
+                                    & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, &
+                                    & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -298,34 +299,20 @@ contains
 
                             ! elastic energy update
                             if (hypoelasticity) then
-                                G_L = 0._wp; G_R = 0._wp
-
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                    G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                end do
-
-                                if (cont_damage) then
-                                    G_L = G_L*max((1._wp - qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)), 0._wp)
-                                    G_R = G_R*max((1._wp - qR_prim_rsx_vf(${SF('')}$, eqn_idx%damage)), 0._wp)
-                                end if
-
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                                     tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
                                     tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    ! Elastic contribution to energy if G large enough TODO take out if statement if stable without
-                                    if ((G_L > 1000) .and. (G_R > 1000)) then
-                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        ! Double for shear stresses
-                                        if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        end if
-                                    end if
                                 end do
+
+                                damage_L = 0._wp; damage_R = 0._wp
+                                if (cont_damage) then
+                                    damage_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                    damage_R = qR_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                end if
+
+                                call s_compute_hypoelastic_interface_energy(num_fluids, alpha_L, alpha_R, damage_L, damage_R, &
+                                    & tau_e_L, tau_e_R, G_L, G_R, E_L, E_R)
                             end if
 
                             @:compute_average_state()
