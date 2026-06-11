@@ -169,6 +169,15 @@ module m_derived_types
 #endif
     end type ic_context
 
+    !> Finite-difference state for post_process: density gradient magnitude for
+    !> numerical Schlieren and centered FD coefficients in x-, y-, and z-directions.
+    type fd_context
+        real(wp), allocatable, dimension(:,:,:) :: gm_rho_sf   !< Density gradient magnitude for numerical Schlieren
+        real(wp), allocatable, dimension(:,:)   :: fd_coeff_x  !< FD coefficients in the x-direction
+        real(wp), allocatable, dimension(:,:)   :: fd_coeff_y  !< FD coefficients in the y-direction
+        real(wp), allocatable, dimension(:,:)   :: fd_coeff_z  !< FD coefficients in the z-direction
+    end type fd_context
+
     type bc_patch_parameters
         integer                :: geometry
         integer                :: type

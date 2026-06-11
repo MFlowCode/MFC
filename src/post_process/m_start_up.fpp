@@ -214,15 +214,15 @@ contains
         call s_write_grid_to_formatted_database_file(t_step)
 
         if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. liutex_wrt .or. schlieren_wrt) then
-            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, fd_number, fd_order, offset_x)
+            call s_compute_finite_difference_coefficients(m, x_cc, fd%fd_coeff_x, buff_size, fd_number, fd_order, offset_x)
         end if
 
         if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, fd_number, fd_order, offset_y)
+            call s_compute_finite_difference_coefficients(n, y_cc, fd%fd_coeff_y, buff_size, fd_number, fd_order, offset_y)
         end if
 
         if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, fd_number, fd_order, offset_z)
+            call s_compute_finite_difference_coefficients(p, z_cc, fd%fd_coeff_z, buff_size, fd_number, fd_order, offset_z)
         end if
 
         if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq) .or. (model_eqns == model_eqns_4eq)) then
