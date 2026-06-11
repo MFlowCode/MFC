@@ -11,8 +11,6 @@ module m_riemann_solvers
 
     use m_derived_types
     use m_global_parameters
-    use m_mpi_proxy
-    use m_helper_basic
     use m_riemann_state
     use m_riemann_solver_hllc
     use m_riemann_solver_lf
