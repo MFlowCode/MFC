@@ -16,7 +16,8 @@ module m_riemann_solvers
     use m_variables_conversion
     use m_bubbles
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_hlld, riemann_solver_lax_friedrichs, &
-        & model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
+        & model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, avg_state_roe, avg_state_arithmetic, wave_speeds_direct, &
+        & wave_speeds_pressure
     use m_bubbles_EE
     use m_surface_tension
     use m_helper_basic
@@ -483,7 +484,7 @@ contains
                             end if
 
                             ! Wave speed estimates (wave_speeds=1: direct, wave_speeds=2: pressure-based)
-                            if (wave_speeds == 1) then
+                            if (wave_speeds == wave_speeds_direct) then
                                 if (mhd) then
                                     ! MHD: use fast magnetosonic speed
                                     s_L = min(vel_L(dir_idx(1)) - c_fast%L, vel_R(dir_idx(1)) - c_fast%R)
@@ -517,7 +518,7 @@ contains
                                 s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
                                        & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) &
                                        & - rho_R*(s_R - vel_R(dir_idx(1))))
-                            else if (wave_speeds == 2) then
+                            else if (wave_speeds == wave_speeds_pressure) then
                                 pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
 
                                 pres_SR = pres_SL
@@ -1973,7 +1974,7 @@ contains
                                 end if
 
                                 ! COMPUTING THE DIRECT WAVE SPEEDS
-                                if (wave_speeds == 1) then
+                                if (wave_speeds == wave_speeds_direct) then
                                     if (elasticity) then
                                         ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
@@ -1995,7 +1996,7 @@ contains
                                                & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L &
                                                & - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
                                     end if
-                                else if (wave_speeds == 2) then
+                                else if (wave_speeds == wave_speeds_pressure) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
@@ -2277,14 +2278,14 @@ contains
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, vel_avg_rms, &
                                                               & 0._wp, c_avg, qv_avg)
 
-                                if (wave_speeds == 1) then
+                                if (wave_speeds == wave_speeds_direct) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
 
                                     s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
                                            & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) &
                                            & - rho_R*(s_R - vel_R(dir_idx(1))))
-                                else if (wave_speeds == 2) then
+                                else if (wave_speeds == wave_speeds_pressure) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
@@ -2522,7 +2523,7 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
 
-                                if (avg_state == 2) then
+                                if (avg_state == avg_state_arithmetic) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, nb
                                         R0_L(i) = qL_prim_rsx_vf(${SF('')}$, rs(i))
@@ -2634,14 +2635,14 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                if (wave_speeds == 1) then
+                                if (wave_speeds == wave_speeds_direct) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
 
                                     s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
                                            & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) &
                                            & - rho_R*(s_R - vel_R(dir_idx(1))))
-                                else if (wave_speeds == 2) then
+                                else if (wave_speeds == wave_speeds_pressure) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL
@@ -2696,7 +2697,7 @@ contains
 
                                 ! Include p_tilde
 
-                                if (avg_state == 2) then
+                                if (avg_state == avg_state_arithmetic) then
                                     if (alpha_L(num_fluids) < small_alf .or. R3Lbar < small_alf) then
                                         pres_L = pres_L - alpha_L(num_fluids)*pres_L
                                     else
@@ -3052,7 +3053,7 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
-                                if (wave_speeds == 1) then
+                                if (wave_speeds == wave_speeds_direct) then
                                     if (elasticity) then
                                         ! Elastic wave speed, Rodriguez et al. JCP (2019)
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
@@ -3074,7 +3075,7 @@ contains
                                                & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L &
                                                & - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
                                     end if
-                                else if (wave_speeds == 2) then
+                                else if (wave_speeds == wave_speeds_pressure) then
                                     pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
 
                                     pres_SR = pres_SL

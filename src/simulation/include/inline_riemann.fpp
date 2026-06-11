@@ -59,11 +59,11 @@
 #:enddef roe_avg
 
 #:def compute_average_state()
-    if (avg_state == 1) then
+    if (avg_state == avg_state_roe) then
         @:roe_avg()
     end if
 
-    if (avg_state == 2) then
+    if (avg_state == avg_state_arithmetic) then
         @:arithmetic_avg()
     end if
 #:enddef compute_average_state

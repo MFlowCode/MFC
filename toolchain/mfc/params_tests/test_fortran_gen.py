@@ -140,12 +140,63 @@ def test_decls_array_dims():
     assert "dimension(num_fluids_max)" in post and ":: alpha_wrt" in post
     assert "dimension(num_fluids_max)" in post and ":: alpha_rho_wrt" in post
     assert "dimension(3)" in post and ":: mom_wrt" in post
-    # Structs and families must NOT appear as bare scalar declarations
-    assert ":: fluid_pp" not in post
+    # fluid_pp is now emitted via TYPED_DECLS; bc_x still must not appear
+    assert ":: fluid_pp" in post
     assert ":: bc_x" not in post
 
     pre = generate_decls_fpp("pre")
     assert "dimension(num_fluids_max)" in pre and ":: fluid_rho" in pre
+
+
+def test_generate_decls_emits_typed_declarations():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp
+
+    pre = generate_decls_fpp("pre")
+    sim = generate_decls_fpp("sim")
+    post = generate_decls_fpp("post")
+
+    # patch_icpp is pre-only
+    assert "patch_icpp" in pre and "patch_icpp" not in post and "patch_icpp" not in sim
+
+    # fluid_pp appears in all three targets
+    for out in (pre, sim, post):
+        assert "fluid_pp" in out
+
+    # acoustic is sim-only
+    assert "acoustic" in sim and "acoustic" not in pre
+
+    # Exact line shape (harvested from the manual declaration it replaces).
+    # Note: _ARRAY_DECL_COL=36; the type+dim string is longer so no padding space before ::
+    assert "type(physical_parameters), dimension(num_fluids_max) :: fluid_pp" in sim
+
+    # chem_params is sim-only with GPU declare
+    assert "chem_params" in sim and "chem_params" not in pre and "chem_params" not in post
+    assert "$:GPU_DECLARE(create='[chem_params]')" in sim
+
+    # bub_pp is in all three targets (derived-type scalar, dim=None)
+    for out in (pre, sim, post):
+        assert "bub_pp" in out
+
+    # lag_params is sim-only; the generator owns its GPU_DECLARE (removed from the
+    # grouped list in m_global_parameters.fpp by the Task-2 Fortran edit)
+    assert "lag_params" in sim and "lag_params" not in pre
+    for gpu_var in ("patch_ib", "ib_airfoil", "acoustic", "lag_params", "chem_params"):
+        assert f"$:GPU_DECLARE(create='[{gpu_var}]')" in sim
+
+    # Doxygen descriptions from TYPED_DECLS are emitted as inline comments
+    assert ":: fluid_pp !< Per-fluid stiffened-gas EOS parameters, Reynolds numbers, and shear modulus" in sim
+
+    # simplex_params is pre-only
+    assert "simplex_params" in pre and "simplex_params" not in sim
+
+    # No TYPED_DECLS name emitted twice
+    for name in ("fluid_pp", "bub_pp", "chem_params", "lag_params"):
+        assert sim.count(f":: {name}") == 1, f"{name!r} emitted more than once in sim"
+
+    # TYPED_DECLS keys must not overlap with FORTRAN_ARRAY_DIMS
+    from mfc.params.definitions import FORTRAN_ARRAY_DIMS, TYPED_DECLS
+
+    assert not (set(TYPED_DECLS) & set(FORTRAN_ARRAY_DIMS)), "TYPED_DECLS and FORTRAN_ARRAY_DIMS share keys"
 
 
 def test_check_target_raises_on_bad_target():
@@ -159,17 +210,18 @@ def test_check_target_raises_on_bad_target():
         generate_decls_fpp("bad")
 
 
-def test_get_generated_files_returns_nine():
+def test_get_generated_files_returns_ten():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/build"))
-    assert len(files) == 9
+    assert len(files) == 10
     paths = [str(p) for p, _ in files]
     assert any("pre_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_decls.fpp" in p for p in paths)
     assert any("post_process/generated_namelist.fpp" in p for p in paths)
+    assert any("simulation/generated_case_opt_decls.fpp" in p for p in paths)
 
 
 def test_generate_constants_fpp_content():
@@ -191,5 +243,47 @@ def test_get_generated_files_includes_constants():
 
     files = get_generated_files(Path("/tmp/x"))
     names = {p.name for p, _ in files}
-    assert names == {"generated_namelist.fpp", "generated_decls.fpp", "generated_constants.fpp"}
-    assert len(files) == 9
+    assert names == {"generated_namelist.fpp", "generated_decls.fpp", "generated_constants.fpp", "generated_case_opt_decls.fpp"}
+    assert len(files) == 10
+
+
+def test_generate_case_opt_decls_fpp():
+    from mfc.params.generators.fortran_gen import generate_case_opt_decls_fpp
+
+    out = generate_case_opt_decls_fpp()
+
+    # Must have the case-opt guard structure
+    assert "#:if MFC_CASE_OPTIMIZATION" in out
+    assert "#:else" in out
+    assert "#:endif" in out
+
+    # Representative registry-driven parameter lines (#:if branch)
+    assert "integer, parameter :: weno_order = ${weno_order}$" in out
+    assert "integer, parameter :: num_fluids = ${num_fluids}$" in out
+    assert "logical, parameter :: mapped_weno = (${mapped_weno}$ /= 0)" in out
+    assert "real(wp), parameter :: wenoz_q = ${wenoz_q}$" in out
+
+    # #:else branch variable forms
+    assert "integer                 :: weno_order" in out
+    assert "logical                 :: mapped_weno" in out
+    assert "real(wp)                :: wenoz_q" in out
+
+    # case.py-computed extras
+    assert "integer, parameter :: num_dims = ${num_dims}$" in out
+    assert "integer, parameter :: weno_polyn = ${weno_polyn}$" in out
+    assert "logical, parameter :: wenojs = (${wenojs}$ /= 0)" in out
+    assert "integer                 :: num_dims" in out
+    assert "integer                 :: weno_polyn" in out
+    assert "logical                 :: wenojs" in out
+
+    # nb must NOT be in this block (it lives in a separate block)
+    assert ":: nb" not in out
+
+    # All CASE_OPT_PARAMS (minus nb) must appear in both branches
+    from mfc.params.definitions import CASE_OPT_PARAMS
+
+    for name in CASE_OPT_PARAMS - {"nb"}:
+        assert f":: {name}" in out, f"{name!r} missing from generated_case_opt_decls"
+
+    # AUTO-GENERATED header present
+    assert "AUTO-GENERATED" in out

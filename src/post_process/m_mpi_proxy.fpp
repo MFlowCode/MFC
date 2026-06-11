@@ -13,6 +13,7 @@ module m_mpi_proxy
     use m_global_parameters
     use m_mpi_common
     use ieee_arithmetic
+    use m_constants, only: format_silo
 
     implicit none
 
@@ -35,7 +36,7 @@ contains
         ! procedures. Note that these are only needed for either multidimensional runs that utilize the Silo database file format or
         ! for 1D simulations.
 
-        if ((format == 1 .and. n > 0) .or. n == 0) then
+        if ((format == format_silo .and. n > 0) .or. n == 0) then
             allocate (recvcounts(0:num_procs - 1))
             allocate (displs(0:num_procs - 1))
 
@@ -249,7 +250,7 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Silo-HDF5 database format
 
-        if (format == 1) then
+        if (format == format_silo) then
             call MPI_GATHERV(x_cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             ! Binary database format
@@ -319,7 +320,7 @@ contains
 
 #ifdef MFC_MPI
         ! Deallocating the receive counts and the displacement vector variables used in variable-gather communication procedures
-        if ((format == 1 .and. n > 0) .or. n == 0) then
+        if ((format == format_silo .and. n > 0) .or. n == 0) then
             deallocate (recvcounts)
             deallocate (displs)
         end if

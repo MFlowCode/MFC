@@ -51,7 +51,7 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
 
     implicit none
 
@@ -907,9 +907,9 @@ contains
             call s_initialize_igr_module()
         end if
         if (.not. igr) then
-            if (recon_type == WENO_TYPE) then
+            if (recon_type == recon_type_weno) then
                 call s_initialize_weno_module()
-            else if (recon_type == MUSCL_TYPE) then
+            else if (recon_type == recon_type_muscl) then
                 call s_initialize_muscl_module()
             end if
             call s_initialize_cbc_module()
@@ -1081,9 +1081,9 @@ contains
         else
             call s_finalize_cbc_module()
             call s_finalize_riemann_solvers_module()
-            if (recon_type == WENO_TYPE) then
+            if (recon_type == recon_type_weno) then
                 call s_finalize_weno_module()
-            else if (recon_type == MUSCL_TYPE) then
+            else if (recon_type == recon_type_muscl) then
                 call s_finalize_muscl_module()
             end if
         end if

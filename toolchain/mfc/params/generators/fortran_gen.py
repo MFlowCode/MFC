@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List, Tuple
 
-from ..definitions import CASE_OPT_PARAMS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS  # noqa: F401 - triggers registry population
+from ..definitions import CASE_OPT_PARAMS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
@@ -116,6 +116,9 @@ def generate_decls_fpp(target: str) -> str:
             continue
         if target == "sim" and name in CASE_OPT_PARAMS:
             continue
+        # TYPED_DECLS handles these; skip here to avoid double-emission.
+        if name in TYPED_DECLS:
+            continue
         if name in FORTRAN_ARRAY_DIMS:
             member = REGISTRY.all_params.get(f"{name}(1)")
             if member is None:
@@ -130,6 +133,17 @@ def generate_decls_fpp(target: str) -> str:
         if any(k.startswith(f"{name}(") for k in REGISTRY.all_params):
             raise ValueError(f"{name!r} has indexed variants (e.g. {name}(1)) but is missing from " "FORTRAN_ARRAY_DIMS. Add it there with its Fortran dimension expression.")
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")
+    for name, (ftype, dim, gpu, desc) in TYPED_DECLS.items():
+        if name not in NAMELIST_VARS or target not in NAMELIST_VARS[name]:
+            continue
+        decl = f"{ftype}, dimension({dim})" if dim else ftype
+        padded = decl.ljust(_ARRAY_DECL_COL)
+        if not padded.endswith(" "):
+            padded += " "
+        doc = f" !< {desc}" if desc else ""
+        lines.append(f"{padded}:: {name}{doc}")
+        if gpu and target == "sim":
+            lines.append(f"$:GPU_DECLARE(create='[{name}]')")
     return "\n".join(lines) + "\n"
 
 
@@ -145,6 +159,74 @@ def generate_constants_fpp() -> str:
         for name, value in sorted(names.items(), key=lambda kv: kv[1]):
             lines.append(f"integer, parameter :: {param}_{name} = {value}")
     return "\n".join(lines) + "\n"
+
+
+# case.py-computed extras that are not CASE_OPT_PARAMS but appear in the
+# case-optimization declaration block (injected as Fypp #:set variables
+# by toolchain/mfc/case.py, not from the namelist registry).
+# Order matches the reference manual block.
+CASE_OPT_EXTRA_LINES = [
+    ("num_dims", "integer", "Number of spatial dimensions"),
+    ("num_vels", "integer", "Number of velocity components (different from num_dims for mhd)"),
+    ("weno_polyn", "integer", "Degree of the WENO polynomials"),
+    ("muscl_polyn", "integer", "Degree of the MUSCL polynomials"),
+    ("weno_num_stencils", "integer", "Number of stencils for WENO reconstruction"),
+    ("wenojs", "logical", "WENO-JS (default)"),
+]
+
+_CASE_OPT_DECL_COL = 24  # '::' alignment for case-opt declarations
+
+
+def generate_case_opt_decls_fpp() -> str:
+    """Return the case-optimization declaration block for src/simulation/m_global_parameters.fpp.
+
+    Emits one #:if MFC_CASE_OPTIMIZATION / #:else / #:endif block containing:
+    - The CASE_OPT_EXTRA_LINES (case.py-computed: num_dims, num_vels, weno_polyn,
+      muscl_polyn, weno_num_stencils, wenojs) — stored as a literal list because
+      they are not namelist-registry parameters.
+    - Every CASE_OPT_PARAMS entry (excluding nb, which lives in a separate block)
+      driven by the registry for its Fortran type.
+    """
+    params_to_emit = sorted(CASE_OPT_PARAMS - {"nb"})
+
+    if_lines = []
+    else_lines = []
+
+    # Emit extras first (case.py-computed, not in registry)
+    for name, ftype, desc in CASE_OPT_EXTRA_LINES:
+        if ftype == "logical":
+            rhs = f"(${{{name}}}$ /= 0)"
+            if_lines.append(f"    {ftype}, parameter :: {name} = {rhs}  !< {desc}")
+        else:
+            if_lines.append(f"    {ftype}, parameter :: {name} = ${{{name}}}$  !< {desc}")
+        else_lines.append(f"    {ftype.ljust(_CASE_OPT_DECL_COL)}:: {name}")
+
+    # Emit registry-driven CASE_OPT_PARAMS
+    for name in params_to_emit:
+        pdef = REGISTRY.get_param_def(name)
+        if pdef is None:
+            raise ValueError(f"CASE_OPT_PARAMS entry {name!r} not found in registry")
+        desc = pdef.description or ""
+        if pdef.param_type in _REAL_TYPES:
+            ftype = "real(wp)"
+            if_lines.append(f"    {ftype}, parameter :: {name} = ${{{name}}}$  !< {desc}")
+            else_lines.append(f"    {ftype.ljust(_CASE_OPT_DECL_COL)}:: {name}")
+        elif pdef.param_type == ParamType.LOG:
+            ftype = "logical"
+            rhs = f"(${{{name}}}$ /= 0)"
+            if_lines.append(f"    {ftype}, parameter :: {name} = {rhs}  !< {desc}")
+            else_lines.append(f"    {ftype.ljust(_CASE_OPT_DECL_COL)}:: {name}")
+        else:
+            ftype = "integer"
+            if_lines.append(f"    {ftype}, parameter :: {name} = ${{{name}}}$  !< {desc}")
+            else_lines.append(f"    {ftype.ljust(_CASE_OPT_DECL_COL)}:: {name}")
+
+    parts = [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"]
+    parts.extend(if_lines)
+    parts.append("#:else")
+    parts.extend(else_lines)
+    parts.append("#:endif")
+    return "\n".join(parts) + "\n"
 
 
 def resolve_namelist_content(fpp_path: Path) -> str:
@@ -163,10 +245,11 @@ def resolve_namelist_content(fpp_path: Path) -> str:
 
 
 def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
-    """Return (path, content) for all 9 generated .fpp files under build_dir.
+    """Return (path, content) for all 10 generated .fpp files under build_dir.
 
     Paths match the cmake include directory structure:
       build_dir/include/{full_target}/generated_{namelist,decls,constants}.fpp
+    The simulation target also gets generated_case_opt_decls.fpp.
     """
     result = []
     for short, full in TARGETS:
@@ -174,4 +257,6 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
+    sim_inc = build_dir / "include" / "simulation"
+    result.append((sim_inc / "generated_case_opt_decls.fpp", generate_case_opt_decls_fpp()))
     return result

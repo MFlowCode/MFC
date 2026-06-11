@@ -43,16 +43,27 @@ covered in `docs/documentation/contributing.md`.
   `toolchain/mfc/params/definitions.py`; `case_validator.py` only if physics-constrained
   (with a `PHYSICS_DOCS` entry). Fortran declarations and namelist bindings are
   auto-generated at CMake configure time — re-run cmake (or `./mfc.sh build`) after editing.
-- Still manual: array variables and derived-type members (declare in
-  `src/*/m_global_parameters.fpp` / the relevant type), and case-optimization parameters
-  (`CASE_OPT_PARAMS` + the `#:else` block in `src/simulation/m_global_parameters.fpp`).
-  Gotcha: under `--case-optimization` those are baked into the binary and dropped from
-  the namelist, so changing one needs a *rebuild*, not a case edit.
+- Still manual: derived-type `TYPE` member definitions in `src/common/m_derived_types.fpp`;
+  default-value assignments in `s_assign_default_values_to_user_inputs`; the
+  `CASE_OPT_EXTRA_LINES` literal in `toolchain/mfc/params/generators/fortran_gen.py` (covers `num_dims`,
+  `num_vels`, `weno_polyn`, `muscl_polyn`, `weno_num_stencils`, `wenojs`);
+  multi-variable declaration lines (`bc_x/y/z`, `x/y/z_domain`, `x/y/z_output`, post's
+  `G`); and MPI broadcast lists in `m_mpi_proxy`. Everything else — scalar declarations,
+  plain arrays (`FORTRAN_ARRAY_DIMS` table in `definitions.py`), derived-type namelist
+  declarations including `GPU_DECLARE` lines and Doxygen descs (`TYPED_DECLS` table in
+  `definitions.py`), and the simulation case-optimization declaration block — is
+  auto-generated at CMake configure time.
+  Gotcha: after editing a generator or table, force regen via `cmake_gen.py` into
+  `build/staging/*/` or simply reconfigure (`./mfc.sh build`) — cached builds compile
+  stale includes. Under `--case-optimization` the baked-in constants are dropped from the
+  namelist, so changing one needs a *rebuild*, not a case edit.
 - Runtime checks (`@:PROHIBIT`) go where they run: shared →
   `src/common/m_checker_common.fpp`; simulation-only → `src/simulation/m_checker.fpp`;
   pre/post-only → `src/{pre,post}_process/m_checker.fpp` (their `s_check_inputs` are
   currently empty — that IS the right place, not m_checker_common).
-- Analytic ICs are compiled into the binary (syntax error = build failure, not runtime).
+- Analytic ICs are compiled into the binary. Expressions are AST-validated at case load
+  (syntax errors and unknown variables are immediate, named errors; bare `e` is not a
+  variable — write `exp(1.0)`).
   Each IC variable maps to an `eqn_idx%…` expression in `QPVF_IDX_VARS`
   (`toolchain/mfc/case.py`); a new patch-settable conserved variable means updating that
   map AND the Fortran `eqn_idx` builder to agree — a mismatch is a silent wrong index.
