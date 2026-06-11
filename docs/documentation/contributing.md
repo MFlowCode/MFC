@@ -319,7 +319,7 @@ Scalar declarations, GPU declare lines, Doxygen descriptions, and namelist bindi
 auto-generated at build time (ninja-tracked custom command) from the `TYPED_DECLS` and `FORTRAN_ARRAY_DIMS`
 tables in `toolchain/mfc/params/definitions.py`. For a plain scalar registered with
 `_r()` / `_nv()` above, no manual Fortran edit is needed — reconfigure (`./mfc.sh build`)
-and the generated include in each target's `m_global_parameters.fpp` is updated
+and the generated include in `m_global_parameters_common.fpp` (compiled per target) is updated
 automatically.
 
 Still manual (not auto-generated):

@@ -14,7 +14,7 @@ covered in `docs/documentation/contributing.md`.
   bubbles and IB. Read that routine for the current value rather than assuming one.
 - Riemann solvers: left state at `j`, right state at `j+1`.
 - All equation indices live in the `eqn_idx` struct (`eqn_idx_info` in
-  `m_derived_types.fpp`, populated in `m_global_parameters.fpp`): `%cont`, `%mom`, `%E`,
+  `m_derived_types.fpp`, populated by `s_initialize_eqn_idx` in `m_global_parameters_common.fpp`): `%cont`, `%mom`, `%E`,
   `%adv`, plus optional ranges (`%bub`, `%stress`, `%species`, `%B`, ...). The old
   `contxb`/`momxb` shorthands are gone. Index positions depend on `model_eqns` and
   enabled features — changing either moves ALL indices; never hard-code one.
@@ -66,7 +66,7 @@ covered in `docs/documentation/contributing.md`.
   `use m_global_parameters` continues to work for all downstream modules without change.
   Sim-only declarations (GPU_DECLARE, Re_idx allocation) stay in
   `m_global_parameters_common` behind `#ifdef MFC_SIMULATION`. Generated includes
-  (`generated_decls.fpp`, `generated_bcast.fpp`) must exist for every target — the build
+  (`generated_decls.fpp`, `generated_bcast.fpp`, `generated_case_opt_decls.fpp`) must exist for every target — the build
   emits stubs where the content is sim-only, so a common file that includes one will
   compile for pre/post too.
 - Runtime checks (`@:PROHIBIT`) go where they run: shared →
