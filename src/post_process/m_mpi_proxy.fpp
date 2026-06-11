@@ -118,6 +118,14 @@ contains
             call MPI_BCAST(fluid_pp(i)%qv, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%qvp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%G, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%K, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%nn, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%tau0, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%hb_m, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%mu_min, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%mu_max, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%mu_bulk, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         end do
 
         ! Subgrid bubble parameters
