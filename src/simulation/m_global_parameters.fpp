@@ -42,7 +42,7 @@ module m_global_parameters
     !> @{
     integer :: grid_geometry
     !> @}
-    $:GPU_DECLARE(create='[cyl_coord, grid_geometry]')
+    $:GPU_DECLARE(create='[grid_geometry]')
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
@@ -59,14 +59,11 @@ module m_global_parameters
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
-    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz, dt, m, n, p]')
-
-    $:GPU_DECLARE(create='[cfl_target]')
+    $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz]')
 
     logical :: cfl_dt
     ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
 
-    $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
     integer :: hyper_model  !< hyperelasticity solver algorithm
     ! elasticity, chemistry: in m_global_parameters_common
     logical                :: shear_stress  !< Shear stresses
@@ -78,21 +75,8 @@ module m_global_parameters
 
     integer :: cpu_start, cpu_end, cpu_rate
 
-    #:if not MFC_CASE_OPTIMIZATION
-        $:GPU_DECLARE(create='[num_dims, num_vels, weno_polyn, weno_order]')
-        $:GPU_DECLARE(create='[weno_num_stencils, num_fluids, wenojs]')
-        $:GPU_DECLARE(create='[mapped_weno, wenoz, teno, wenoz_q, mhd, relativity]')
-        $:GPU_DECLARE(create='[igr_iter_solver, igr_order, viscous, igr_pres_lim, igr]')
-        $:GPU_DECLARE(create='[recon_type, muscl_order, muscl_polyn, muscl_lim]')
-    #:endif
-
-    $:GPU_DECLARE(create='[muscl_eps]')
-    $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
-    $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
-    $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
-    $:GPU_DECLARE(create='[shear_stress, bulk_stress, cont_damage, hyper_cleaning]')
-
-    $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
+    $:GPU_DECLARE(create='[hyper_model]')
+    $:GPU_DECLARE(create='[shear_stress, bulk_stress]')
 
     logical :: bc_io
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
@@ -117,7 +101,6 @@ module m_global_parameters
     type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
     integer           :: num_gbl_ibs, num_local_ibs
     $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z, num_gbl_ibs]')
-    $:GPU_DECLARE(create='[down_sample]')
 
     ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
     type(mpi_io_var), public                      :: MPI_IO_DATA
@@ -188,14 +171,12 @@ module m_global_parameters
     ! Fluids Physical Parameters fluid_pp, bub_pp: auto-generated in generated_decls.fpp
 
     integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
-    $:GPU_DECLARE(create='[fd_order, fd_number]')
+    $:GPU_DECLARE(create='[fd_number]')
 
     ! probe, integral: auto-generated in generated_decls.fpp
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
-    $:GPU_DECLARE(create='[rhoref, pref]')
-
     !> @name Immersed Boundaries
     !> patch_ib, ib_airfoil, stl_models, particle_cloud: auto-generated in generated_decls.fpp
     !> @{
@@ -203,8 +184,7 @@ module m_global_parameters
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
 
-    $:GPU_DECLARE(create='[ib, num_ibs, ib_airfoil_grids]')
-    $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
+    $:GPU_DECLARE(create='[ib_airfoil_grids]')
     !> @}
 
     !> @name Bubble modeling
@@ -216,25 +196,19 @@ module m_global_parameters
     #:endif
 
     real(wp) :: Eu  !< Euler number
-    $:GPU_DECLARE(create='[Eu, Ca, Web, Re_inv]')
+    $:GPU_DECLARE(create='[Eu]')
 
     real(wp), dimension(:), allocatable :: weight  !< Simpson quadrature weights
     real(wp), dimension(:), allocatable :: R0      !< Bubble sizes
     $:GPU_DECLARE(create='[weight, R0]')
 
-    $:GPU_DECLARE(create='[bubbles_euler, polytropic, polydisperse]')
-
-    $:GPU_DECLARE(create='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters]')
-
-    $:GPU_DECLARE(create='[bubble_model, thermal]')
-
     real(wp), allocatable, dimension(:,:,:) :: ptil  !< Pressure modification
-    $:GPU_DECLARE(create='[ptil, poly_sigma]')
+    $:GPU_DECLARE(create='[ptil]')
 
     integer, parameter :: nmom = 6  !< Number of carried moments per R0 location
     integer            :: nmomsp    !< Number of moments required by ensemble-averaging
     integer            :: nmomtot   !< Total number of carried moments moments/transport equations
-    $:GPU_DECLARE(create='[qbmm, nmomsp, nmomtot, pi_fac]')
+    $:GPU_DECLARE(create='[nmomsp, nmomtot]')
 
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[nb]')
@@ -261,15 +235,13 @@ module m_global_parameters
     $:GPU_DECLARE(create='[gam, gam_m]')
 
     real(wp) :: p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
-    $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
+    $:GPU_DECLARE(create='[p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
     !> @}
 
     ! acoustic: auto-generated in generated_decls.fpp
-    $:GPU_DECLARE(create='[acoustic_source, num_source]')
 
     !> @name Surface tension parameters
     !> @{
-    $:GPU_DECLARE(create='[sigma, surface_tension]')
     !> @}
 
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
@@ -285,19 +257,14 @@ module m_global_parameters
     !> @name lagrangian subgrid bubble parameters
     !> lag_params: auto-generated in generated_decls.fpp
     !> @{!
-    $:GPU_DECLARE(create='[bubbles_lagrange]')
     !> @}
-
-    $:GPU_DECLARE(create='[Bx0]')
 
     !> @name Continuum damage model parameters
     !> @{!
-    $:GPU_DECLARE(create='[tau_star, cont_damage_s, alpha_bar]')
     !> @}
 
     !> @name MHD Hyperbolic cleaning parameters
     !> @{!
-    $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
     !> @}
 
 contains

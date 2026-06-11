@@ -67,6 +67,44 @@ module m_global_parameters_common
 #ifdef MFC_SIMULATION
     $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
+    ! Device residency for namelist/case-opt state declared above via the generated
+    ! includes: declare directives must live in the declaring module (Cray ftn rejects
+    ! declare-target on use-associated names), so these moved here from simulation.
+    $:GPU_DECLARE(create='[cyl_coord]')
+    $:GPU_DECLARE(create='[dt, m, n, p]')
+    $:GPU_DECLARE(create='[cfl_target]')
+    $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
+    $:GPU_DECLARE(create='[muscl_eps]')
+    $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
+    $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
+    $:GPU_DECLARE(create='[hyperelasticity, elasticity, low_Mach]')
+    $:GPU_DECLARE(create='[cont_damage, hyper_cleaning]')
+    $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
+    $:GPU_DECLARE(create='[down_sample]')
+    $:GPU_DECLARE(create='[fd_order]')
+    $:GPU_DECLARE(create='[rhoref, pref]')
+    $:GPU_DECLARE(create='[ib, num_ibs]')
+    $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
+    $:GPU_DECLARE(create='[Ca, Web, Re_inv]')
+    $:GPU_DECLARE(create='[bubbles_euler, polytropic, polydisperse]')
+    $:GPU_DECLARE(create='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters]')
+    $:GPU_DECLARE(create='[bubble_model, thermal]')
+    $:GPU_DECLARE(create='[poly_sigma]')
+    $:GPU_DECLARE(create='[qbmm, pi_fac]')
+    $:GPU_DECLARE(create='[R0ref]')
+    $:GPU_DECLARE(create='[acoustic_source, num_source]')
+    $:GPU_DECLARE(create='[sigma, surface_tension]')
+    $:GPU_DECLARE(create='[bubbles_lagrange]')
+    $:GPU_DECLARE(create='[Bx0]')
+    $:GPU_DECLARE(create='[tau_star, cont_damage_s, alpha_bar]')
+    $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
+    #:if not MFC_CASE_OPTIMIZATION
+        $:GPU_DECLARE(create='[num_dims, num_vels, weno_polyn, weno_order]')
+        $:GPU_DECLARE(create='[weno_num_stencils, num_fluids, wenojs]')
+        $:GPU_DECLARE(create='[mapped_weno, wenoz, teno, wenoz_q, mhd, relativity]')
+        $:GPU_DECLARE(create='[igr_iter_solver, igr_order, viscous, igr_pres_lim, igr]')
+        $:GPU_DECLARE(create='[recon_type, muscl_order, muscl_polyn, muscl_lim]')
+    #:endif
 #endif
 
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
