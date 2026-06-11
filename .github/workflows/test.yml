@@ -156,9 +156,19 @@ jobs:
       # Replaces the container: directive so we can free disk space first.
       # Uses "docker run -d ... sleep infinity" + "docker exec" to preserve
       # installed packages and env vars across steps.
+      # Retry the pull: nvcr.io intermittently times out ("context deadline
+      # exceeded") under load, and ~30 matrix jobs hit it at once. Pulls
+      # resume completed layers, so retries are cheap.
       - name: Pull NVHPC container
         if:   matrix.nvhpc
-        run:  docker pull "$NVHPC_IMAGE"
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker pull "$NVHPC_IMAGE" && exit 0
+            echo "docker pull failed (attempt $attempt/5); retrying in $((attempt * 30))s..."
+            sleep $((attempt * 30))
+          done
+          echo "::error::Failed to pull $NVHPC_IMAGE after 5 attempts"
+          exit 1
 
       - name: Start NVHPC container
         if:   matrix.nvhpc
