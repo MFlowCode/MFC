@@ -8,6 +8,7 @@
             "m_riemann_solvers",
             "m_riemann_state",
             "m_riemann_solver_hlld",
+            "m_riemann_solver_hll",
             "m_muscl",
             "m_variables_conversion",
             "m_thinc"
