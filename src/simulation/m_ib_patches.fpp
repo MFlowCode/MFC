@@ -134,8 +134,8 @@ contains
                         ! find the indices to the left and right of the IB in i, j, k
                         call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
 
-                        $:GPU_PARALLEL_LOOP(private='[i, j, xyz_local, airfoil_id, eta]', copyin='[patch_id, encoded_patch_id, &
-                                            & center, length]', collapse=2)
+                        $:GPU_PARALLEL_LOOP(private='[i, j, xyz_local, airfoil_id, eta, length]', copyin='[patch_id, encoded_patch_id, &
+                                            & center]', collapse=2)
                         do j = jl, jr
                             do i = il, ir
                                 ! get coordinate frame centered on IB
