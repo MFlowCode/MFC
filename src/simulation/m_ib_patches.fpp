@@ -66,6 +66,9 @@ contains
                             ! find the indices to the left and right of the IB in i, j, k
                             call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
 
+                            ! skip patches whose bounding box does not overlap this rank's domain
+                            if (ir < il .or. jr < jl .or. kr < kl) cycle
+
                             $:GPU_PARALLEL_LOOP(private='[i, j, k, xyz_local, length, radius, airfoil_id, eta]', &
                                                 & copyin='[patch_id, encoded_patch_id, center]', collapse=3)
                             do k = kl, kr
@@ -80,6 +83,7 @@ contains
                                         if (patch_ib(patch_id)%geometry == 8) then
                                             ! sphere geometry
                                             radius = patch_ib(patch_id)%radius
+
                                             if (f_is_inside_sphere(xyz_local(1), xyz_local(2), xyz_local(3), &
                                                 & radius)) ib_markers%sf(i, j, k) = encoded_patch_id
                                         else if (patch_ib(patch_id)%geometry == 9) then
@@ -133,6 +137,9 @@ contains
 
                         ! find the indices to the left and right of the IB in i, j, k
                         call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
+
+                        ! skip patches whose bounding box does not overlap this rank's domain
+                        if (ir < il .or. jr < jl) cycle
 
                         $:GPU_PARALLEL_LOOP(private='[i, j, xyz_local, airfoil_id, eta, length]', copyin='[patch_id, &
                                             & encoded_patch_id, center]', collapse=2)
@@ -199,8 +206,8 @@ contains
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     do zp = zp_lower, zp_upper
-                        $:GPU_PARALLEL_LOOP(private='[xp, yp, zp, i, il, ir, j, jl, jr, k, kl, kr, xyz_local, length, radius, &
-                                            & patch_id, airfoil_id, model_id, encoded_patch_id, center, eta]')
+                        $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, k, kl, kr, xyz_local, length, radius, patch_id, &
+                                            & airfoil_id, model_id, encoded_patch_id, center, eta]', copyin='[xp, yp, zp]')
                         do patch_id = 1, num_ibs
                             center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
                             center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -224,6 +231,7 @@ contains
                                         if (patch_ib(patch_id)%geometry == 8) then
                                             ! sphere geometry
                                             radius = patch_ib(patch_id)%radius
+
                                             if (f_is_inside_sphere(xyz_local(1), xyz_local(2), xyz_local(3), &
                                                 & radius)) ib_markers%sf(i, j, k) = encoded_patch_id
                                         else if (patch_ib(patch_id)%geometry == 9) then
@@ -267,8 +275,8 @@ contains
 
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
-                    $:GPU_PARALLEL_LOOP(private='[xp, yp, i, il, ir, j, jl, jr, xyz_local, length, radius, patch_id, airfoil_id, &
-                                        & model_id, encoded_patch_id, center, eta]')
+                    $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, xyz_local, length, radius, patch_id, airfoil_id, &
+                                        & model_id, encoded_patch_id, center, eta]', copyin='[xp, yp]')
                     do patch_id = 1, num_ibs
                         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
                         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
@@ -293,31 +301,31 @@ contains
                                     ! circular geometries
                                     radius = patch_ib(patch_id)%radius
                                     if (f_is_inside_cylinder(xyz_local(1), xyz_local(2), 0._wp, radius, 0._wp)) ib_markers%sf(i, &
-                                        & j, k) = encoded_patch_id
+                                        & j, 0) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 3) then
                                     ! rectangular geometries
                                     length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
                                     if (f_is_inside_cuboid(xyz_local(1), xyz_local(2), xyz_local(3), length)) ib_markers%sf(i, j, &
-                                        & k) = encoded_patch_id
+                                        & 0) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 4) then
                                     ! 2D airfoil geometry
                                     airfoil_id = patch_ib(patch_id)%airfoil_id
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                     if (f_is_inside_airfoil(xyz_local(1), xyz_local(2), 0._wp, 0._wp, &
-                                        & airfoil_id)) ib_markers%sf(i, j, k) = encoded_patch_id
+                                        & airfoil_id)) ib_markers%sf(i, j, 0) = encoded_patch_id
                                 else if (patch_ib(patch_id)%geometry == 5) then
                                     ! STL model geometry
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                     model_id = patch_ib(patch_id)%model_id
                                     eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                     if (eta > stl_models(model_id)%model_threshold) then
-                                        ib_markers%sf(i, j, k) = encoded_patch_id
+                                        ib_markers%sf(i, j, 0) = encoded_patch_id
                                     end if
                                 else if (patch_ib(patch_id)%geometry == 6) then
                                     ! ellipse geometry
                                     length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
                                     if (f_is_inside_ellipse(xyz_local(1), xyz_local(2), length)) ib_markers%sf(i, j, &
-                                        & k) = encoded_patch_id
+                                        & 0) = encoded_patch_id
                                 end if
                             end do
                         end do
@@ -460,6 +468,7 @@ contains
         real(wp), dimension(3)             :: bbox_min, bbox_max, local_corner, world_corner
         real(wp), dimension(2)             :: lx, ly, lz
         integer                            :: cx, cy, cz
+        logical                            :: outside_domain
 
         if (patch_ib(patch_id)%geometry == 2 .or. patch_ib(patch_id)%geometry == 8) then
             ! circle and sphere geometries
@@ -533,6 +542,20 @@ contains
                     end do
                 end do
             end do
+        end if
+
+        ! completely skip patches whose bounding box does not overlap this rank's domain
+        outside_domain = bbox_min(1) > x_cc(m + gp_layers + 1) .or. bbox_max(1) < x_cc(-gp_layers - 1) .or. bbox_min(2) > y_cc(n &
+                                  & + gp_layers + 1) .or. bbox_max(2) < y_cc(-gp_layers - 1)
+        if (num_dims == 3) then
+            outside_domain = outside_domain .or. bbox_min(3) > z_cc(p + gp_layers + 1) .or. bbox_max(3) < z_cc(-gp_layers - 1)
+        end if
+
+        if (outside_domain) then
+            il = 1; ir = 0
+            jl = 1; jr = 0
+            kl = 1; kr = 0
+            return
         end if
 
         il = -gp_layers - 1
