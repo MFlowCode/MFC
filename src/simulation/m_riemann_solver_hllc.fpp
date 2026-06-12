@@ -442,17 +442,6 @@ contains
 
                                 flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
 
-                                ! HYPOELASTIC STRESS EVOLUTION FLUX.
-                                if (hypoelasticity) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%stress%beg - 1 + i) = xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) &
-                                                    & - rho_L*vel_L(dir_idx(1))*tau_e_L(i)) + xi_P*(s_S/(s_R - s_S)) &
-                                                    & *(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(dir_idx(1))*tau_e_R(i))
-                                    end do
-                                end if
-
                                 ! Hyperelastic reference map flux for material deformation tracking
                                 if (hyperelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -1402,17 +1391,6 @@ contains
                                                                         & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
                                     end do
                                     flux_rsx_vf(${SF('')}$, eqn_idx%E) = flux_rsx_vf(${SF('')}$, eqn_idx%E) + flux_ene_e
-                                end if
-
-                                ! HYPOELASTIC STRESS EVOLUTION FLUX.
-                                if (hypoelasticity) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%stress%beg - 1 + i) = xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*tau_e_L(i) &
-                                                    & - rho_L*vel_L(dir_idx(1))*tau_e_L(i)) + xi_P*(s_S/(s_R - s_S)) &
-                                                    & *(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(dir_idx(1))*tau_e_R(i))
-                                    end do
                                 end if
 
                                 ! VOLUME FRACTION FLUX.

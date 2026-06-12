@@ -635,9 +635,11 @@ end subroutine s_accumulate_mixture_properties
 
 **Key idioms.**
 
-- Always ``parallelism='[seq]'`` and `cray_inline=True` for these helpers. The Cray
-  compiler does not inline cross-file `routine` calls without `cray_inline`; without
-  it, performance collapses silently on that backend.
+- Always ``parallelism='[seq]'`` for these helpers. `cray_inline=True` is required
+  when the helper is called from other modules — the Cray compiler does not inline
+  cross-file `routine` calls without it, and performance collapses silently on that
+  backend. Helpers called only from their own module (e.g., the shear/bulk stress
+  tensor pair in `m_riemann_state.fpp`) do not need it.
 - `function_name=` is required when `cray_inline=True` (the Cray inline directive
   needs the explicit name).
 - The `GPU_ROUTINE` directive lives in the *definition*, not the call site. The
@@ -654,8 +656,9 @@ arrays that are sized by runtime parameters at compile time must be declared wit
 explicit constant bound. Use an explicit `n` argument (e.g., `integer, intent(in) ::
 nf`) and dimension helpers as `dimension(nf)` rather than `dimension(num_fluids)`.
 See `s_compute_interface_reynolds` in `src/simulation/m_riemann_state.fpp` for the
-`#:if not MFC_CASE_OPTIMIZATION and USING_AMD` guard pattern where the caller-side
-dimensioning differs.
+`#:if not MFC_CASE_OPTIMIZATION and USING_AMD` guard pattern: the guard sits on the
+dummy-argument declaration in the helper's definition, with matching guards on the
+callers' own local declarations so the actual and dummy bounds agree.
 
 **Declare scoping.** The `GPU_ROUTINE` directive must appear in the source file
 that defines the routine. Helpers added to `m_riemann_state.fpp` are automatically

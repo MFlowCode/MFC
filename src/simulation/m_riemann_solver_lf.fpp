@@ -35,7 +35,6 @@ contains
 
         ! Intercell fluxes
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
-        real(wp)                                               :: flux_tau_L, flux_tau_R
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
@@ -73,9 +72,7 @@ contains
         real(wp)                  :: pi_inf_L, pi_inf_R
         real(wp)                  :: qv_L, qv_R
         real(wp)                  :: c_L, c_R
-        real(wp), dimension(6)    :: tau_e_L, tau_e_R
         real(wp), dimension(2)    :: Re_L, Re_R
-        real(wp), dimension(3)    :: xi_field_L, xi_field_R
         real(wp)                  :: rho_avg
         real(wp)                  :: H_avg
         real(wp)                  :: gamma_avg
@@ -111,14 +108,13 @@ contains
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
-                                    & tau_e_L, tau_e_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, &
-                                    & xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, &
-                                    & h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_grad_L, &
-                                    & vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, &
-                                    & Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, rho_L, rho_R, &
-                                    & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, H_L, H_R, ptilde_L, &
-                                    & ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, &
-                                    & Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]')
+                                    & Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, &
+                                    & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, &
+                                    & B2, b4, cm, pcorr, zcoef, vel_grad_L, vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, &
+                                    & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, &
+                                    & c_avg, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, &
+                                    & c_R, E_L, E_R, H_L, H_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, &
+                                    & eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -379,16 +375,6 @@ contains
                                                 & + s_M*s_P*(rho_L*vel_L(dir_idx(i)) - rho_R*vel_R(dir_idx(i))))/(s_M - s_P) &
                                                 & + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R(dir_idx(i)) - vel_L(dir_idx(i)))
                                 end do
-                            else if (hypoelasticity) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_vels
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%cont%end + dir_idx(i)) = (s_M*(rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) &
-                                                & + dir_flg(dir_idx(i))*pres_R - tau_e_R(dir_idx_tau(i))) &
-                                                & - s_P*(rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L &
-                                                & - tau_e_L(dir_idx_tau(i))) + s_M*s_P*(rho_L*vel_L(dir_idx(i)) &
-                                                & - rho_R*vel_R(dir_idx(i))))/(s_M - s_P)
-                                end do
                             else
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_vels
@@ -422,32 +408,11 @@ contains
                                             & eqn_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) - s_P*vel_L(dir_idx(1) &
                                             & )*(E_L + pres_L - ptilde_L) + s_M*s_P*(E_L - E_R))/(s_M - s_P) + (s_M/s_L)*(s_P/s_R) &
                                             & *pcorr*(vel_R_rms - vel_L_rms)/2._wp
-                            else if (hypoelasticity) then
-                                flux_tau_L = 0._wp; flux_tau_R = 0._wp
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_dims
-                                    flux_tau_L = flux_tau_L + tau_e_L(dir_idx_tau(i))*vel_L(dir_idx(i))
-                                    flux_tau_R = flux_tau_R + tau_e_R(dir_idx_tau(i))*vel_R(dir_idx(i))
-                                end do
-                                flux_rsx_vf(${SF('')}$, &
-                                            & eqn_idx%E) = (s_M*(vel_R(dir_idx(1))*(E_R + pres_R) - flux_tau_R) &
-                                            & - s_P*(vel_L(dir_idx(1))*(E_L + pres_L) - flux_tau_L) + s_M*s_P*(E_L - E_R))/(s_M &
-                                            & - s_P)
                             else
                                 flux_rsx_vf(${SF('')}$, &
                                             & eqn_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R) - s_P*vel_L(dir_idx(1))*(E_L &
                                             & + pres_L) + s_M*s_P*(E_L - E_R))/(s_M - s_P) + (s_M/s_L)*(s_P/s_R)*pcorr*(vel_R_rms &
                                             & - vel_L_rms)/2._wp
-                            end if
-
-                            ! Elastic Stresses
-                            if (hypoelasticity) then
-                                do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1  ! TODO: this indexing may be slow
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%stress%beg - 1 + i) = (s_M*(rho_R*vel_R(dir_idx(1))*tau_e_R(i)) &
-                                                & - s_P*(rho_L*vel_L(dir_idx(1))*tau_e_L(i)) + s_M*s_P*(rho_L*tau_e_L(i) &
-                                                & - rho_R*tau_e_R(i)))/(s_M - s_P)
-                                end do
                             end if
 
                             ! Advection flux and source: interface velocity for volume fraction transport
@@ -518,17 +483,6 @@ contains
                                     ! Geometrical source of the void fraction(s) is zero
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
-                                    end do
-                                end if
-
-                                if (cyl_coord .and. hypoelasticity) then
-                                    ! += tau_sigmasigma using HLL
-                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%cont%end + 2) = flux_gsrc_rsx_vf(${SF('')}$, &
-                                                     & eqn_idx%cont%end + 2) + (s_M*tau_e_R(4) - s_P*tau_e_L(4))/(s_M - s_P)
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = eqn_idx%stress%beg, eqn_idx%stress%end
                                         flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
                                     end do
                                 end if
