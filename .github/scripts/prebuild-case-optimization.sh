@@ -27,12 +27,26 @@ esac
 # case list. Unset = build all cases in one job (default; other clusters).
 shard="${job_shard:-}"
 if [ -n "$shard" ]; then
+    # Validate full shape: must be exactly "digits/digits" — one slash with
+    # non-empty, purely numeric, non-leading-zero parts on both sides.
+    # Split first, then validate each part independently so that inputs like
+    # "1/" "/2" "//" "1/2/3" "a/b" "12" are all caught before any arithmetic.
     shard_idx="${shard%%/*}"
     shard_count="${shard##*/}"
-    case "${shard_idx}${shard_count}" in
-        ''|*[!0-9]*) echo "ERROR: bad shard '$shard' (expected i/N)"; exit 1 ;;
+    # Reject if no slash (idx and count are equal and equal to the whole string)
+    case "$shard_idx" in
+        ''|*[!0-9]*|0*) echo "ERROR: bad shard '$shard' (expected i/N)"; exit 1 ;;
     esac
-    if [ "$shard" != "$shard_idx/$shard_count" ] || [ "$shard_idx" -lt 1 ] || [ "$shard_idx" -gt "$shard_count" ]; then
+    case "$shard_count" in
+        ''|*[!0-9]*|0*) echo "ERROR: bad shard '$shard' (expected i/N)"; exit 1 ;;
+    esac
+    # Confirm the string is exactly "idx/count" — catches "12" (no slash) and
+    # "1/2/3" (extra slash, where idx=1 and count=2/3 would have failed above,
+    # but this is an extra safety net).
+    if [ "$shard" != "$shard_idx/$shard_count" ]; then
+        echo "ERROR: bad shard '$shard' (expected i/N)"; exit 1
+    fi
+    if [ "$shard_idx" -lt 1 ] || [ "$shard_idx" -gt "$shard_count" ]; then
         echo "ERROR: bad shard '$shard' (expected i/N with 1 <= i <= N)"; exit 1
     fi
 fi
@@ -61,22 +75,33 @@ esac
 # Case-optimized simulation builds land in per-case hash-named staging dirs,
 # but syscheck/pre_process/post_process hash identically across these cases.
 # Concurrent shards must not build those shared staging dirs simultaneously:
-# shard 1 builds them first; the other shards wait for its marker, after
-# which their builds no-op in the shared dirs.
+# shard 1 builds them first and drops a done marker; other shards wait for it,
+# after which their builds no-op in the shared dirs.
 if [ -n "$shard" ] && [ "$shard_count" -gt 1 ]; then
-    shared_marker="build/.prebuild-shared-targets-done"
+    shared_marker_done="build/.prebuild-shared-targets-done"
+    shared_marker_failed="build/.prebuild-shared-targets-failed"
     set -- benchmarks/*/case.py
     first_case="$1"
     if [ "$shard_idx" -eq 1 ]; then
+        # Remove both markers at the start so reruns and manual invocations
+        # never observe stale state from a prior run.
+        rm -f "$shared_marker_done" "$shared_marker_failed"
         echo "=== Shard 1/$shard_count: building shared targets ==="
+        # Write the failure marker if the build exits non-zero so other shards
+        # can detect the failure immediately instead of waiting 90 minutes.
+        trap 'touch "$shared_marker_failed"' ERR
         ./mfc.sh build -i "$first_case" -t syscheck pre_process post_process --case-optimization $gpu_opts -j 8
-        touch "$shared_marker"
+        trap - ERR
+        touch "$shared_marker_done"
     else
         echo "=== Shard $shard_idx/$shard_count: waiting for shard 1 to build shared targets ==="
         waited=0
-        until [ -f "$shared_marker" ]; do
+        until [ -f "$shared_marker_done" ]; do
+            if [ -f "$shared_marker_failed" ]; then
+                echo "ERROR: shard 1 failed to build shared targets; see shard 1 log"; exit 1
+            fi
             if [ "$waited" -ge 5400 ]; then
-                echo "ERROR: timed out waiting for $shared_marker"; exit 1
+                echo "ERROR: timed out waiting for $shared_marker_done"; exit 1
             fi
             sleep 30
             waited=$((waited + 30))
