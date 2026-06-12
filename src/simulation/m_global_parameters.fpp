@@ -293,7 +293,7 @@ contains
             #:endfor
         #:endfor
 
-        #:for dir in {'x', 'y', 'z'}
+        #:for dir in ['x', 'y', 'z']
             bc_${dir}$%isothermal_in = .false.
             bc_${dir}$%isothermal_out = .false.
             bc_${dir}$%Twall_in = dflt_real
@@ -456,8 +456,8 @@ contains
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
         !> amplitude, frequency, and phase shift sinusoid in each direction
-        #:for dir in {'x', 'y', 'z'}
-            #:for param in {'k','w','p','g'}
+        #:for dir in ['x', 'y', 'z']
+            #:for param in ['k', 'w', 'p', 'g']
                 ${param}$_${dir}$ = dflt_real
             #:endfor
         #:endfor
@@ -513,7 +513,7 @@ contains
         end do
 
         ! GRCBC flags
-        #:for dir in {'x', 'y', 'z'}
+        #:for dir in ['x', 'y', 'z']
             bc_${dir}$%grcbc_in = .false.
             bc_${dir}$%grcbc_out = .false.
             bc_${dir}$%grcbc_vel_out = .false.

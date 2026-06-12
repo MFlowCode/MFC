@@ -6,6 +6,11 @@
             "m_time_steppers",
             "m_weno",
             "m_riemann_solvers",
+            "m_riemann_state",
+            "m_riemann_solver_hlld",
+            "m_riemann_solver_hll",
+            "m_riemann_solver_lf",
+            "m_riemann_solver_hllc",
             "m_muscl",
             "m_variables_conversion",
             "m_thinc"

@@ -294,7 +294,14 @@ class CaseValidator:
             if param in self.params:  # Only validate params that are set
                 self._validate_logical(param)
 
-        self.prohibit(self.get("recon_type", 1) not in [1, 2], "recon_type must be 1 (WENO) or 2 (MUSCL)")
+        _recon_constraint = CONSTRAINTS["recon_type"]
+        _recon_choices = _recon_constraint["choices"]
+        _recon_by_value = {v: n for n, v in _recon_constraint.get("names", {}).items()}
+        _recon_shown = ", ".join(f"{c} ({_recon_by_value[c]})" if c in _recon_by_value else str(c) for c in _recon_choices)
+        self.prohibit(
+            self.get("recon_type", 1) not in _recon_choices,
+            f"recon_type must be one of {_recon_shown}",
+        )
 
         # Required domain parameters when m > 0
         m = self.get("m")

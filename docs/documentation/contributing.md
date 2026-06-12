@@ -318,9 +318,9 @@ If your check enforces a physics constraint, also add a `PHYSICS_DOCS` entry (se
 Scalar declarations, GPU declare lines, Doxygen descriptions, and namelist bindings are
 auto-generated at build time (ninja-tracked custom command) from the `TYPED_DECLS` and `FORTRAN_ARRAY_DIMS`
 tables in `toolchain/mfc/params/definitions.py`. For a plain scalar registered with
-`_r()` / `_nv()` above, no manual Fortran edit is needed — reconfigure (`./mfc.sh build`)
-and the generated include in `m_global_parameters_common.fpp` (compiled per target) is updated
-automatically.
+`_r()` / `_nv()` above, no manual Fortran edit is needed — the next build regenerates the
+include in `m_global_parameters_common.fpp` (compiled per target) automatically: the
+generation command is ninja-tracked against every file under `toolchain/mfc/params/`.
 
 Still manual (not auto-generated):
 
@@ -333,8 +333,9 @@ Still manual (not auto-generated):
   include)
 - `CASE_OPT_EXTRA_LINES` in `toolchain/mfc/params/generators/fortran_gen.py` for case-optimization constants
 
-After editing any generator or table, force regen by reconfiguring (`./mfc.sh build`) —
-cached builds compile stale includes.
+Editing any existing file under `toolchain/mfc/params/` (tables or generators) triggers
+regeneration on the next build automatically. Only *adding a new file* there requires one
+reconfigure — the dependency list is globbed at configure time.
 
 **Step 6: Use in Fortran code**
 
