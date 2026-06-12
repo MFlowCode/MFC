@@ -154,6 +154,21 @@ module m_derived_types
         integer               :: psi      !< Psi variable equation
     end type eqn_idx_info
 
+    !> Initial-condition state assembled by pre_process: working primitive and
+    !> conservative fields, temperature, boundary-condition types, and the
+    !> patch-identity bookkeeping array.
+    type ic_context
+        type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< Primitive variables
+        type(scalar_field), allocatable, dimension(:)    :: q_cons_vf  !< Conservative variables
+        type(scalar_field)                               :: q_T_sf     !< Temperature field
+        type(integer_field), allocatable, dimension(:,:) :: bc_type    !< Boundary-condition type fields
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), allocatable, dimension(:,:,:) :: patch_id_fp  !< Patch identities bookkeeping
+#else
+        integer, allocatable, dimension(:,:,:) :: patch_id_fp  !< Patch identities bookkeeping
+#endif
+    end type ic_context
+
     type bc_patch_parameters
         integer                :: geometry
         integer                :: type
