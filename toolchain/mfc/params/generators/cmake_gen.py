@@ -1,6 +1,6 @@
 """Generate Fortran parameter .fpp files into the CMake build directory.
 
-Called by CMakeLists.txt at configure time:
+Invoked by the build-time custom command in cmake/ParamsCodegen.cmake:
   python3 cmake_gen.py <cmake_binary_dir>
 """
 

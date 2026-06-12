@@ -210,18 +210,21 @@ def test_check_target_raises_on_bad_target():
         generate_decls_fpp("bad")
 
 
-def test_get_generated_files_returns_ten():
+def test_get_generated_files_returns_fifteen():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/build"))
-    assert len(files) == 10
+    assert len(files) == 15
     paths = [str(p) for p, _ in files]
     assert any("pre_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_decls.fpp" in p for p in paths)
     assert any("post_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_case_opt_decls.fpp" in p for p in paths)
+    assert any("pre_process/generated_bcast.fpp" in p for p in paths)
+    assert any("simulation/generated_bcast.fpp" in p for p in paths)
+    assert any("post_process/generated_bcast.fpp" in p for p in paths)
 
 
 def test_generate_constants_fpp_content():
@@ -236,15 +239,21 @@ def test_generate_constants_fpp_content():
     assert out == generate_constants_fpp()
 
 
-def test_get_generated_files_includes_constants():
+def test_get_generated_files_includes_bcast():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/tmp/x"))
     names = {p.name for p, _ in files}
-    assert names == {"generated_namelist.fpp", "generated_decls.fpp", "generated_constants.fpp", "generated_case_opt_decls.fpp"}
-    assert len(files) == 10
+    assert names == {
+        "generated_namelist.fpp",
+        "generated_decls.fpp",
+        "generated_constants.fpp",
+        "generated_case_opt_decls.fpp",
+        "generated_bcast.fpp",
+    }
+    assert len(files) == 15
 
 
 def test_generate_case_opt_decls_fpp():
@@ -287,3 +296,237 @@ def test_generate_case_opt_decls_fpp():
 
     # AUTO-GENERATED header present
     assert "AUTO-GENERATED" in out
+
+
+# ── generate_bcast_fpp tests ──────────────────────────────────────────────────
+
+
+def test_generate_bcast_fpp_header_and_case_dir():
+    """All targets emit the AUTO-GENERATED header and case_dir broadcast."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    for target in ("pre", "sim", "post"):
+        out = generate_bcast_fpp(target)
+        assert "AUTO-GENERATED" in out, f"{target}: missing header"
+        assert "call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)" in out
+
+
+def test_generate_bcast_fpp_class_a_int_scalars():
+    """Class-(a) integer scalars are broadcast for all targets."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    pre = generate_bcast_fpp("pre")
+    sim = generate_bcast_fpp("sim")
+    post = generate_bcast_fpp("post")
+
+    # m, n, p are in all three targets
+    for out, target in [(pre, "pre"), (sim, "sim"), (post, "post")]:
+        assert "call MPI_BCAST(m, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: m missing"
+        assert "call MPI_BCAST(n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: n missing"
+        assert "call MPI_BCAST(p, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: p missing"
+
+    # precision is in all three
+    for out, target in [(pre, "pre"), (sim, "sim"), (post, "post")]:
+        assert "call MPI_BCAST(precision, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: precision missing"
+
+
+def test_generate_bcast_fpp_class_a_log_scalars():
+    """Class-(a) logical scalars are broadcast per target."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    pre = generate_bcast_fpp("pre")
+    sim = generate_bcast_fpp("sim")
+    post = generate_bcast_fpp("post")
+
+    # bubbles_euler is in all three
+    for out, target in [(pre, "pre"), (sim, "sim"), (post, "post")]:
+        assert "call MPI_BCAST(bubbles_euler, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: bubbles_euler missing"
+
+    # run_time_info is sim-only
+    assert "run_time_info" in sim
+    assert "run_time_info" not in pre
+    assert "run_time_info" not in post
+
+    # old_grid is pre-only
+    assert "old_grid" in pre
+    assert "old_grid" not in sim
+    assert "old_grid" not in post
+
+
+def test_generate_bcast_fpp_class_a_real_scalars():
+    """Class-(a) real scalars (mpi_p) are broadcast per target."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    sim = generate_bcast_fpp("sim")
+    pre = generate_bcast_fpp("pre")
+    post = generate_bcast_fpp("post")
+
+    # dt is sim-only REAL
+    assert "call MPI_BCAST(dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in sim
+    assert "call MPI_BCAST(dt, " not in pre and "call MPI_BCAST(dt, " not in post
+
+    # pref is in all three
+    for out, target in [(pre, "pre"), (sim, "sim"), (post, "post")]:
+        assert "call MPI_BCAST(pref, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: pref missing"
+
+
+def test_generate_bcast_fpp_case_opt_guard_sim():
+    """Sim case-opt scalars are wrapped in #:if not MFC_CASE_OPTIMIZATION."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    out = generate_bcast_fpp("sim")
+    assert "#:if not MFC_CASE_OPTIMIZATION" in out
+    assert "#:endif" in out
+
+    # weno_order and num_fluids are CASE_OPT_PARAMS — must be inside the guard
+    lines = out.splitlines()
+    guard_start = next(i for i, ln in enumerate(lines) if "#:if not MFC_CASE_OPTIMIZATION" in ln)
+    guard_end = next(i for i, ln in enumerate(lines) if i > guard_start and "#:endif" in ln)
+    guard_body = "\n".join(lines[guard_start:guard_end])
+    assert "weno_order" in guard_body
+    assert "num_fluids" in guard_body
+    assert "mapped_weno" in guard_body
+
+    # muscl_eps must NOT appear anywhere (it is excluded — derived post-broadcast)
+    assert "muscl_eps" not in out
+
+
+def test_generate_bcast_fpp_case_opt_not_in_pre_post():
+    """CASE_OPT_PARAMS that apply to pre/post are emitted unconditionally there."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    pre = generate_bcast_fpp("pre")
+    post = generate_bcast_fpp("post")
+
+    # weno_order and nb are in pre and post (not only sim) — emitted unconditionally
+    assert "call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in pre
+    assert "call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in post
+    assert "#:if not MFC_CASE_OPTIMIZATION" not in pre
+    assert "#:if not MFC_CASE_OPTIMIZATION" not in post
+
+
+def test_generate_bcast_fpp_fluid_pp_loop():
+    """fluid_pp member-loop is emitted for all targets; Re(1) count=2 only for sim."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    for target in ("pre", "sim", "post"):
+        out = generate_bcast_fpp(target)
+        assert "do i = 1, num_fluids_max" in out, f"{target}: fluid_pp loop missing"
+        assert "call MPI_BCAST(fluid_pp(i)%gamma, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out
+        assert "call MPI_BCAST(fluid_pp(i)%cv, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out
+        # Herschel-Bulkley members (#1545) — dropping any is a multi-rank regression
+        for hb in ("K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"):
+            assert f"call MPI_BCAST(fluid_pp(i)%{hb}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"missing HB member {hb}"
+        assert "call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)" in out
+
+    sim = generate_bcast_fpp("sim")
+    assert "call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)" in sim
+
+    pre = generate_bcast_fpp("pre")
+    post = generate_bcast_fpp("post")
+    assert "fluid_pp(i)%Re(1)" not in pre
+    assert "fluid_pp(i)%Re(1)" not in post
+
+
+def test_generate_bcast_fpp_bub_pp_under_guard():
+    """bub_pp members are emitted under a bubbles guard for all targets."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    for target in ("pre", "sim", "post"):
+        out = generate_bcast_fpp(target)
+        assert "if (bubbles_euler .or. bubbles_lagrange) then" in out, f"{target}: bub_pp guard missing"
+        assert "call MPI_BCAST(bub_pp%R0ref, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out
+        assert "call MPI_BCAST(bub_pp%gam_g, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out
+
+
+def test_generate_bcast_fpp_lag_chem_sim_only():
+    """lag_params and chem_params broadcasts are emitted for sim only."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    sim = generate_bcast_fpp("sim")
+    pre = generate_bcast_fpp("pre")
+    post = generate_bcast_fpp("post")
+
+    # lag_params under bubbles_lagrange guard
+    assert "if (bubbles_lagrange) then" in sim
+    assert "call MPI_BCAST(lag_params%solver_approach, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in sim
+    assert "lag_params" not in pre
+    assert "lag_params" not in post
+
+    # chem_params under chemistry guard
+    assert "if (chemistry) then" in sim
+    assert "call MPI_BCAST(chem_params%diffusion, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)" in sim
+    assert "chem_params" not in pre
+    assert "chem_params" not in post
+
+
+def test_generate_bcast_fpp_fortran_array_dims():
+    """FORTRAN_ARRAY_DIMS arrays are broadcast with the correct dim and type."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    pre = generate_bcast_fpp("pre")
+    post = generate_bcast_fpp("post")
+
+    # fluid_rho is pre-only, REAL → mpi_p
+    assert "call MPI_BCAST(fluid_rho(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)" in pre
+    assert "fluid_rho" not in post
+
+    # alpha_wrt, mom_wrt are post-only LOGICAL → MPI_LOGICAL
+    assert "call MPI_BCAST(alpha_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)" in post
+    assert "call MPI_BCAST(mom_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)" in post
+
+    # schlieren_alpha is post-only REAL → mpi_p
+    assert "call MPI_BCAST(schlieren_alpha(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)" in post
+
+
+def test_generate_bcast_fpp_chem_wrt_Y_latent_bug_fix():
+    """chem_wrt_Y is broadcast for post (latent bug fix: previously missing)."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    post = generate_bcast_fpp("post")
+    # chem_wrt_Y is FORTRAN_ARRAY_DIMS with dim=num_species, type=LOG
+    assert "call MPI_BCAST(chem_wrt_Y(1), num_species, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)" in post
+
+    # Must not appear in pre or sim (post-only)
+    pre = generate_bcast_fpp("pre")
+    sim = generate_bcast_fpp("sim")
+    assert "chem_wrt_Y" not in pre
+    assert "chem_wrt_Y" not in sim
+
+
+def test_generate_bcast_fpp_excludes_manual_residue():
+    """Class-(c) vars and excluded vars must not appear in generated output."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    for target in ("pre", "sim", "post"):
+        out = generate_bcast_fpp(target)
+        # These are non-namelist and must stay manual
+        assert "m_glb" not in out, f"{target}: m_glb should be manual"
+        assert "n_glb" not in out, f"{target}: n_glb should be manual"
+        assert "p_glb" not in out, f"{target}: p_glb should be manual"
+        # muscl_eps is excluded (derived post-broadcast)
+        assert "muscl_eps" not in out, f"{target}: muscl_eps should be excluded"
+
+    sim = generate_bcast_fpp("sim")
+    # shear_stress, bulk_stress, bodyForces are derived (non-namelist)
+    assert "shear_stress" not in sim
+    assert "bulk_stress" not in sim
+    assert "bodyForces" not in sim
+
+
+def test_generate_bcast_fpp_deterministic():
+    """Calling generate_bcast_fpp twice produces identical output (sorted, stable)."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    for target in ("pre", "sim", "post"):
+        assert generate_bcast_fpp(target) == generate_bcast_fpp(target), f"{target}: not deterministic"
+
+
+def test_generate_bcast_fpp_bad_target():
+    """Unknown target raises ValueError."""
+    import pytest
+
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    with pytest.raises(ValueError, match="Unknown target"):
+        generate_bcast_fpp("bad")
