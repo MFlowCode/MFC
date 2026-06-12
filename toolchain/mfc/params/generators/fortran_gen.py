@@ -243,7 +243,7 @@ _BCAST_EXCLUDE: frozenset = frozenset()
 
 # Post-process scalars that are namelist-bound but consumed on rank 0 only (reading/init).
 # Broadcasting them would be harmless but changes the existing call set, which we preserve.
-_POST_BCAST_EXCLUDE = frozenset({"avg_state", "cfl_target", "igr_order", "num_bc_patches", "recon_type", "sigR"})
+_POST_BCAST_EXCLUDE = frozenset({"avg_state", "cfl_target", "num_bc_patches", "sigR"})
 
 # TYPED_DECLS entries kept entirely in the manual residue: their member-broadcast structure
 # is irregular (non-uniform subsets, size() arrays, nested loops, complex guards).
