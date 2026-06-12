@@ -17,6 +17,7 @@ module m_bubbles_EL
     use m_helper_basic
     use m_sim_helpers
     use m_helper
+    use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, precision_single
 
     implicit none
 
@@ -969,7 +970,7 @@ contains
         integer, intent(in) :: stage
         integer             :: k
 
-        if (time_stepper == 1) then  ! 1st order TVD RK
+        if (time_stepper == time_stepper_rk1) then  ! 1st order TVD RK
             $:GPU_PARALLEL_LOOP(private='[k]')
             do k = 1, nBubs
                 ! u{1} = u{n} +  dt * RHS{n}
@@ -990,7 +991,7 @@ contains
                 $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
                 call s_write_lag_particles(mytime)
             end if
-        else if (time_stepper == 2) then  ! 2nd order TVD RK
+        else if (time_stepper == time_stepper_rk2) then  ! 2nd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
@@ -1025,7 +1026,7 @@ contains
                     call s_write_lag_particles(mytime)
                 end if
             end if
-        else if (time_stepper == 3) then  ! 3rd order TVD RK
+        else if (time_stepper == time_stepper_rk3) then  ! 3rd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
@@ -1280,7 +1281,7 @@ contains
         file_loc = trim(case_dir) // '/D/' // trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(A16,A14,8A16)"
         else
             FMT = "(A24,A14,8A24)"
@@ -1294,7 +1295,7 @@ contains
             open (11, FILE=trim(file_loc), form='formatted', position='append')
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(F16.8,I14,8F16.8)"
         else
             FMT = "(F24.16,I14,8F24.16)"
@@ -1542,7 +1543,7 @@ contains
 
         $:GPU_UPDATE(host='[Rmax_glb, Rmin_glb]')
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(A10,A14,5A16)"
         else
             FMT = "(A10,A14,5A24)"
@@ -1551,7 +1552,7 @@ contains
         open (13, FILE=trim(file_loc), form='formatted', position='rewind')
         write (13, FMT) 'proc_rank', 'particleID', 'x', 'y', 'z', 'Rmax_glb', 'Rmin_glb'
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(I10,I14,5F16.8)"
         else
             FMT = "(I10,I14,5F24.16)"

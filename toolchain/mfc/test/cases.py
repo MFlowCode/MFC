@@ -624,6 +624,50 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
+                if len(dimInfo[0]) <= 2:
+                    stack.push(
+                        "Non-Newtonian",
+                        {
+                            "dt": 1e-11,
+                            "patch_icpp(1)%vel(1)": 1.0,
+                            "viscous": "T",
+                            "riemann_solver": 2,
+                            "model_eqns": 2,
+                            "fluid_pp(1)%Re(1)": 1.0e4,
+                            "fluid_pp(1)%non_newtonian": "T",
+                            "fluid_pp(1)%tau0": 0.0,
+                            "fluid_pp(1)%K": 1e-4,
+                            "fluid_pp(1)%mu_max": 0.1,
+                            "fluid_pp(1)%mu_min": 1e-6,
+                            "fluid_pp(1)%hb_m": 1000.0,
+                        },
+                    )
+                    cases.append(define_case_d(stack, "nn=0.5", {"fluid_pp(1)%nn": 0.5}))
+                    cases.append(define_case_d(stack, "nn=1.5", {"fluid_pp(1)%nn": 1.5}))
+                    cases.append(define_case_d(stack, "tau0=0.001", {"fluid_pp(1)%nn": 0.5, "fluid_pp(1)%tau0": 1.0e-3, "fluid_pp(1)%hb_m": 1.0e3}))
+                    if len(dimInfo[0]) == 2:
+                        # IBM + non-Newtonian: ib_state_wrt also exercises the
+                        # per-stencil-sample HB viscosity in the IB force integration
+                        cases.append(
+                            define_case_d(
+                                stack,
+                                "IBM -> nn=0.5",
+                                {
+                                    "fluid_pp(1)%nn": 0.5,
+                                    "ib": "T",
+                                    "num_ibs": 1,
+                                    "ib_state_wrt": "T",
+                                    "patch_ib(1)%geometry": 3,
+                                    "patch_ib(1)%x_centroid": 0.5,
+                                    "patch_ib(1)%y_centroid": 0.5,
+                                    "patch_ib(1)%length_x": 0.05,
+                                    "patch_ib(1)%length_y": 0.05,
+                                    "patch_ib(1)%slip": "F",
+                                },
+                            )
+                        )
+                    stack.pop()
+
             if num_fluids == 2:
                 stack.push(
                     "Viscous",
@@ -644,6 +688,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     stack.pop()
 
                 stack.pop()
+
+                if len(dimInfo[0]) == 2:
+                    # Mixed non-Newtonian (fluid 1) / Newtonian (fluid 2) case
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "Non-Newtonian",
+                            {
+                                "dt": 1e-11,
+                                "patch_icpp(1)%vel(1)": 1.0,
+                                "viscous": "T",
+                                "riemann_solver": 2,
+                                "model_eqns": 2,
+                                "fluid_pp(1)%Re(1)": 1.0e4,
+                                "fluid_pp(1)%non_newtonian": "T",
+                                "fluid_pp(1)%tau0": 0.0,
+                                "fluid_pp(1)%K": 1e-4,
+                                "fluid_pp(1)%nn": 0.5,
+                                "fluid_pp(1)%mu_max": 0.1,
+                                "fluid_pp(1)%mu_min": 1e-6,
+                                "fluid_pp(1)%hb_m": 1000.0,
+                                "fluid_pp(2)%Re(1)": 1.0e4,
+                            },
+                        )
+                    )
+
                 stack.pop()
 
             stack.pop()
@@ -925,6 +995,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         for ndim in range(2, 4):
             cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=common_mods))
+
+        # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
+        cases.append(define_case_f("3D -> ICPP -> STL", "examples/3D_icpp_stl_cube/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
+        cases.append(define_case_f("2D -> ICPP -> STL", "examples/2D_icpp_stl_circle/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
 
     ibm_stl()
 
@@ -1776,6 +1850,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
+                # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
+                # by a large mu_max: even on the downsized grid the step count to reach t_stop
+                # is too large for the CI smoke suite. The faster NN examples remain tested.
+                "2D_poiseuille_nn",
+                "2D_bingham_poiseuille_nn",
+                # The CI grid cap (~25x25) thins this case's immersed-boundary wall slabs
+                # to ~2 cells, an under-resolved IB whose body-forced dead-fluid dynamics
+                # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
+                # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
+                "2D_ibm_poiseuille_nn",
             ]
             if path in casesToSkip:
                 continue

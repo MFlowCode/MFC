@@ -46,7 +46,7 @@ print(
             # gas bubble
             "num_patches": 2,
             # Use the 6 equation model
-            "model_eqns": 3,
+            "model_eqns": "6eq",
             # 6 equations model does not need the K \div(u) term
             "alt_soundspeed": "F",
             # Two fluids: water and air
@@ -56,20 +56,20 @@ print(
             # Correct errors when computing speed of sound
             "mixture_err": "T",
             # Use TVD RK3 for time marching
-            "time_stepper": 3,
+            "time_stepper": "rk3",
             # Use WENO5
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "F",
-            "avg_state": 2,
+            "avg_state": "arithmetic",
             # Use the mapped WENO weights to maintain monotinicity
             "mapped_weno": "T",
             "null_weights": "F",
             "mp_weno": "F",
             # Use the HLLC  Riemann solver
-            "riemann_solver": 2,
-            "wave_speeds": 1,
+            "riemann_solver": "hllc",
+            "wave_speeds": "direct",
             # We use reflective boundary conditions at octant edges and
             # non-reflective boundary conditions at the domain edges
             "bc_x%beg": -2,
@@ -81,8 +81,8 @@ print(
             # Formatted Database Files Structure Parameters
             # Export primitive variables in double precision with parallel
             # I/O to minimize I/O computational time during large simulations
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "parallel_io": "T",
             # Patch 1: High pressured water

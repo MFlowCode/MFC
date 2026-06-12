@@ -91,7 +91,12 @@ class ParamDef:
         if "choices" in self.constraints:
             choices = self.constraints["choices"]
             if value not in choices:
-                errors.append(constraint_error(self.name, "choices", choices, value))
+                by_value = {v: n for n, v in self.constraints.get("names", {}).items()}
+                if by_value:
+                    shown = ", ".join(f"{c} ({by_value[c]})" if c in by_value else str(c) for c in choices)
+                    errors.append(constraint_error(self.name, "choices", shown, value))
+                else:
+                    errors.append(constraint_error(self.name, "choices", choices, value))
 
         # Check numeric range constraints (only for numeric values, not analytic strings)
         if isinstance(value, (int, float)):
