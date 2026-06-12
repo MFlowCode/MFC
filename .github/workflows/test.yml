@@ -402,6 +402,13 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'cpu'
+            interface: 'none'
+            shard: '2/2'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.runner }}
