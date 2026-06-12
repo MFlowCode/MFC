@@ -229,6 +229,269 @@ def generate_case_opt_decls_fpp() -> str:
     return "\n".join(parts) + "\n"
 
 
+# Struct roots in NAMELIST_VARS whose member-level broadcasts are irregular
+# (per-target member subsets, grouped array members, nested loops, etc.).
+# These are kept in the manual residue of m_mpi_proxy.fpp.
+_STRUCT_ROOTS = frozenset({"bc_x", "bc_y", "bc_z", "x_domain", "y_domain", "z_domain", "x_output", "y_output", "z_output"})
+
+# Variables excluded from broadcast generation (derived post-broadcast or non-namelist).
+# muscl_eps was previously excluded here on the assumption that it was derived
+# post-broadcast, but the derivation only fires under f_is_default(muscl_eps),
+# and default values are assigned on rank 0 only.  Every multi-rank MUSCL run
+# therefore had rank-divergent muscl_eps.  Removed from exclusion to fix the bug.
+_BCAST_EXCLUDE: frozenset = frozenset()
+
+# Post-process scalars that are namelist-bound but consumed on rank 0 only (reading/init).
+# Broadcasting them would be harmless but changes the existing call set, which we preserve.
+_POST_BCAST_EXCLUDE = frozenset({"avg_state", "cfl_target", "igr_order", "num_bc_patches", "recon_type", "sigR"})
+
+# TYPED_DECLS entries kept entirely in the manual residue: their member-broadcast structure
+# is irregular (non-uniform subsets, size() arrays, nested loops, complex guards).
+
+
+def _mpi_type_for(ptype: ParamType) -> str:
+    """Return the Fortran MPI type constant for a ParamType."""
+    if ptype in _REAL_TYPES:
+        return "mpi_p"
+    if ptype in (ParamType.INT, ParamType.ANALYTIC_INT):
+        return "MPI_INTEGER"
+    if ptype == ParamType.LOG:
+        return "MPI_LOGICAL"
+    if ptype == ParamType.STR:
+        return "MPI_CHARACTER"
+    raise ValueError(f"No MPI type mapping for {ptype!r}")
+
+
+def _bcast_scalar(name: str, mpi_type: str, count: str = "1") -> str:
+    return f"        call MPI_BCAST({name}, {count}, {mpi_type}, 0, MPI_COMM_WORLD, ierr)"
+
+
+def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str], List[str]]:
+    """Return (int_vars, log_vars, real_vars, case_opt_vars) for class-(a) scalars.
+
+    case_opt_vars are sim CASE_OPT_PARAMS (wrapped in #:if not MFC_CASE_OPTIMIZATION).
+    All four lists contain variable names suitable for a 1-element MPI_BCAST.
+    Struct roots, TYPED_DECLS, FORTRAN_ARRAY_DIMS, case_dir, and _BCAST_EXCLUDE are removed.
+    """
+    int_vars: List[str] = []
+    log_vars: List[str] = []
+    real_vars: List[str] = []
+    case_opt_vars: List[str] = []  # (name, mpi_type) pairs for sim case-opt section
+
+    for name in sorted(NAMELIST_VARS):
+        if target not in NAMELIST_VARS[name]:
+            continue
+        if name in _BCAST_EXCLUDE:
+            continue
+        if target == "post" and name in _POST_BCAST_EXCLUDE:
+            continue
+        if name in _STRUCT_ROOTS:
+            continue
+        if name in TYPED_DECLS:
+            continue
+        if name in FORTRAN_ARRAY_DIMS:
+            continue
+        if name == "case_dir":
+            continue
+
+        pdef = REGISTRY.all_params.get(name)
+        if pdef is None:
+            continue  # no registry entry — skip (e.g. 'G' in post is rank-0-only)
+
+        if target == "sim" and name in CASE_OPT_PARAMS:
+            case_opt_vars.append(name)
+            continue
+
+        mpi_type = _mpi_type_for(pdef.param_type)
+        if mpi_type == "MPI_INTEGER":
+            int_vars.append(name)
+        elif mpi_type == "MPI_LOGICAL":
+            log_vars.append(name)
+        else:
+            real_vars.append(name)
+
+    return sorted(int_vars), sorted(log_vars), sorted(real_vars), sorted(case_opt_vars)
+
+
+def _emit_bcast_group(lines: List[str], vars_list: List[str], mpi_type: str) -> None:
+    """Append one MPI_BCAST per variable in vars_list to lines."""
+    for name in vars_list:
+        lines.append(_bcast_scalar(name, mpi_type))
+
+
+def _emit_fluid_pp(lines: List[str], target: str) -> None:
+    """Emit the fluid_pp(i) member-loop broadcast block.
+
+    Walks the registry for every fluid_pp member, emitting the MPI datatype that
+    matches each member's registered ParamType (the Herschel-Bulkley merge added
+    a LOGICAL member, so the datatype must come from the registry, not be assumed
+    REAL).  Sim additionally broadcasts Re(1) with count=2 (kept sim-only to
+    preserve the historical call set; pre/post never consumed Re).
+    mul0/ss/pv/gamma_v/M_v/mu_v/k_v/cp_v/D_v were removed from the Fortran type by
+    upstream #1085/#1093 and are no longer registered.
+    """
+    fp_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("fluid_pp(1)%") and not k.startswith("fluid_pp(1)%Re("))
+    lines.append("        do i = 1, num_fluids_max")
+    for mem in fp_members:
+        ptype = REGISTRY.all_params[f"fluid_pp(1)%{mem}"].param_type
+        lines.append(f"            call MPI_BCAST(fluid_pp(i)%{mem}, 1, {_mpi_type_for(ptype)}, 0, MPI_COMM_WORLD, ierr)")
+    if target == "sim":
+        lines.append("            call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    lines.append("        end do")
+
+
+def _emit_bub_pp(lines: List[str]) -> None:
+    """Emit the bub_pp member broadcast block (all targets, under bubbles guard).
+
+    All bub_pp members in the registry are REAL — emit them all sorted.
+    """
+    bub_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("bub_pp%"))
+    lines.append("        if (bubbles_euler .or. bubbles_lagrange) then")
+    for mem in bub_members:
+        lines.append(f"            call MPI_BCAST(bub_pp%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    lines.append("        end if")
+
+
+def _emit_lag_params(lines: List[str]) -> None:
+    """Emit the lag_params member broadcast block (sim-only, under bubbles_lagrange guard).
+
+    All registered lag_params members are broadcast.  T0/Thost/c0/rho0/x0 were removed
+    from the Fortran type by upstream #1085/#1093 and are no longer in the registry.
+    """
+    # Walk the registry for lag_params members, split by type.
+    lag_log = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type == ParamType.LOG)
+    lag_int = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
+    lag_real = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in _REAL_TYPES)
+    lines.append("        if (bubbles_lagrange) then")
+    for mem in sorted(lag_log):
+        lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
+    for mem in sorted(lag_int):
+        lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)")
+    for mem in sorted(lag_real):
+        lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    lines.append("        end if")
+
+
+def _emit_chem_params(lines: List[str]) -> None:
+    """Emit the chem_params member broadcast block (sim-only, under chemistry guard).
+
+    Broadcasts the registry's LOG and INT chem_params members (the only kinds registered today; extend the type split if REAL members appear).
+    """
+    chem_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("chem_params%"))
+    chem_log = [m for m in chem_members if REGISTRY.all_params[f"chem_params%{m}"].param_type == ParamType.LOG]
+    chem_int = [m for m in chem_members if REGISTRY.all_params[f"chem_params%{m}"].param_type == ParamType.INT]
+    lines.append("        if (chemistry) then")
+    for mem in sorted(chem_log):
+        lines.append(f"            call MPI_BCAST(chem_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
+    for mem in sorted(chem_int):
+        lines.append(f"            call MPI_BCAST(chem_params%{mem}, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)")
+    lines.append("        end if")
+
+
+def _emit_fortran_array_dims(lines: List[str], target: str) -> None:
+    """Emit broadcasts for FORTRAN_ARRAY_DIMS entries belonging to this target.
+
+    Each entry is a 1D array; we emit: MPI_BCAST(name(1), dim, mpi_type, ...).
+    The element type is determined by the registered member param_type.
+    """
+    for name in sorted(FORTRAN_ARRAY_DIMS):
+        if name not in NAMELIST_VARS or target not in NAMELIST_VARS[name]:
+            continue
+        dim = FORTRAN_ARRAY_DIMS[name]
+        # Determine element type from registry (use the (1) example entry)
+        member_key = f"{name}(1)"
+        pdef = REGISTRY.all_params.get(member_key)
+        if pdef is None:
+            raise ValueError(f"No registry entry for {member_key!r} (needed for FORTRAN_ARRAY_DIMS broadcast)")
+        mpi_type = _mpi_type_for(pdef.param_type)
+        lines.append(f"        call MPI_BCAST({name}(1), {dim}, {mpi_type}, 0, MPI_COMM_WORLD, ierr)")
+
+
+def generate_bcast_fpp(target: str) -> str:
+    """Return the generated MPI broadcast statements for a target as a Fortran string.
+
+    Generates class-(a) namelist scalar broadcasts (sorted, MPI type from registry)
+    and class-(b) struct/array broadcasts for cleanly walkable TYPED_DECLS entries.
+    The manual residue (bc_x members, patch_ib, patch_icpp, simplex_params, etc.)
+    stays in the hand-written m_mpi_proxy.fpp.
+
+    For sim, CASE_OPT_PARAMS scalars are wrapped in ``#:if not MFC_CASE_OPTIMIZATION``.
+    The ``chem_wrt_Y`` array broadcast for post is intentionally ADDED here (latent bug fix:
+    it is namelist-bound and consumed on all ranks but was previously not broadcast).
+    """
+    _check_target(target)
+    lines: List[str] = [_HEADER.rstrip()]
+
+    # -- case_dir (STR, special len() form) --
+    lines.append("        call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)")
+    lines.append("")
+
+    # -- Class (a): simple scalar broadcasts --
+    int_vars, log_vars, real_vars, case_opt_vars = _classify_scalar_vars(target)
+
+    if int_vars:
+        lines.append("        ! Integer scalars")
+        _emit_bcast_group(lines, int_vars, "MPI_INTEGER")
+        lines.append("")
+
+    if log_vars:
+        lines.append("        ! Logical scalars")
+        _emit_bcast_group(lines, log_vars, "MPI_LOGICAL")
+        lines.append("")
+
+    if real_vars:
+        lines.append("        ! Real scalars")
+        _emit_bcast_group(lines, real_vars, "mpi_p")
+        lines.append("")
+
+    # Sim case-optimization guard
+    if target == "sim" and case_opt_vars:
+        lines.append("        ! Case-optimization scalars (absent when constants are baked in)")
+        lines.append("        #:if not MFC_CASE_OPTIMIZATION")
+        # Classify by type
+        co_int = sorted(v for v in case_opt_vars if _mpi_type_for(REGISTRY.all_params[v].param_type) == "MPI_INTEGER")
+        co_log = sorted(v for v in case_opt_vars if _mpi_type_for(REGISTRY.all_params[v].param_type) == "MPI_LOGICAL")
+        co_real = sorted(v for v in case_opt_vars if _mpi_type_for(REGISTRY.all_params[v].param_type) == "mpi_p")
+        for name in co_int:
+            lines.append("    " + _bcast_scalar(name, "MPI_INTEGER"))
+        for name in co_log:
+            lines.append("    " + _bcast_scalar(name, "MPI_LOGICAL"))
+        for name in co_real:
+            lines.append("    " + _bcast_scalar(name, "mpi_p"))
+        lines.append("        #:endif")
+        lines.append("")
+
+    # -- Class (b): FORTRAN_ARRAY_DIMS (simple 1D arrays) --
+    array_dim_names = [n for n in FORTRAN_ARRAY_DIMS if n in NAMELIST_VARS and target in NAMELIST_VARS[n]]
+    if array_dim_names:
+        lines.append("        ! Array broadcasts (dimension from FORTRAN_ARRAY_DIMS)")
+        _emit_fortran_array_dims(lines, target)
+        lines.append("")
+
+    # -- Class (b): TYPED_DECLS structs (cleanly walkable) --
+    if "fluid_pp" in NAMELIST_VARS and target in NAMELIST_VARS["fluid_pp"]:
+        lines.append("        ! fluid_pp member loop")
+        _emit_fluid_pp(lines, target)
+        lines.append("")
+
+    if "bub_pp" in NAMELIST_VARS and target in NAMELIST_VARS["bub_pp"]:
+        lines.append("        ! bub_pp members (under bubbles guard)")
+        _emit_bub_pp(lines)
+        lines.append("")
+
+    if target == "sim":
+        if "lag_params" in NAMELIST_VARS and "sim" in NAMELIST_VARS["lag_params"]:
+            lines.append("        ! lag_params members (under bubbles_lagrange guard)")
+            _emit_lag_params(lines)
+            lines.append("")
+        if "chem_params" in NAMELIST_VARS and "sim" in NAMELIST_VARS["chem_params"]:
+            lines.append("        ! chem_params members (under chemistry guard)")
+            _emit_chem_params(lines)
+            lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
 def resolve_namelist_content(fpp_path: Path) -> str:
     """Return the namelist content for an fpp file.
 
@@ -245,11 +508,14 @@ def resolve_namelist_content(fpp_path: Path) -> str:
 
 
 def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
-    """Return (path, content) for all 10 generated .fpp files under build_dir.
+    """Return (path, content) for all 15 generated .fpp files under build_dir.
 
     Paths match the cmake include directory structure:
-      build_dir/include/{full_target}/generated_{namelist,decls,constants}.fpp
-    The simulation target also gets generated_case_opt_decls.fpp.
+      build_dir/include/{full_target}/generated_{namelist,decls,constants,case_opt_decls,bcast}.fpp
+    Every target gets generated_case_opt_decls.fpp: real content for simulation,
+    a header-only stub for the others (Fypp resolves #:include at parse time, so
+    the file must exist for every target even inside a dead conditional).
+    Every target gets generated_bcast.fpp with its MPI broadcast statements.
     """
     result = []
     for short, full in TARGETS:
@@ -257,6 +523,11 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
-    sim_inc = build_dir / "include" / "simulation"
-    result.append((sim_inc / "generated_case_opt_decls.fpp", generate_case_opt_decls_fpp()))
+    for short, full in TARGETS:
+        inc = build_dir / "include" / full
+        content = generate_case_opt_decls_fpp() if short == "sim" else _HEADER + "! (no case-optimization declarations for this target)\n"
+        result.append((inc / "generated_case_opt_decls.fpp", content))
+    for short, full in TARGETS:
+        inc = build_dir / "include" / full
+        result.append((inc / "generated_bcast.fpp", generate_bcast_fpp(short)))
     return result

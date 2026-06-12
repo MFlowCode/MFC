@@ -1349,7 +1349,7 @@ contains
 
         toggle = .false.
 
-        #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
+        #:for BC in [-5, -6, -7, -8, -9, -10, -11, -12, -13]
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
                 toggle = .true.
             end if

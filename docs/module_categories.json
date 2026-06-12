@@ -6,6 +6,11 @@
             "m_time_steppers",
             "m_weno",
             "m_riemann_solvers",
+            "m_riemann_state",
+            "m_riemann_solver_hlld",
+            "m_riemann_solver_hll",
+            "m_riemann_solver_lf",
+            "m_riemann_solver_hllc",
             "m_muscl",
             "m_variables_conversion",
             "m_thinc"
@@ -38,6 +43,8 @@
             "m_cbc",
             "m_compute_cbc",
             "m_boundary_common",
+            "m_boundary_primitives",
+            "m_boundary_io",
             "m_ibm",
             "m_particle_cloud",
             "m_igr",
@@ -59,6 +66,7 @@
         "modules": [
             "m_derived_types",
             "m_global_parameters",
+            "m_global_parameters_common",
             "m_mpi_common",
             "m_mpi_proxy",
             "m_constants",
