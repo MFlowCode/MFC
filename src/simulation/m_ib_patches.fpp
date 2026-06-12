@@ -141,7 +141,7 @@ contains
                         ! skip patches whose bounding box does not overlap this rank's domain
                         if (ir < il .or. jr < jl) cycle
 
-                        $:GPU_PARALLEL_LOOP(private='[i, j, xyz_local, airfoil_id, eta, length]', copyin='[patch_id, &
+                        $:GPU_PARALLEL_LOOP(private='[i, j, xyz_local, airfoil_id, eta, length, radius]', copyin='[patch_id, &
                                             & encoded_patch_id, center]', collapse=2)
                         do j = jl, jr
                             do i = il, ir
