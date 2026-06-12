@@ -420,7 +420,7 @@ jobs:
 
       - name: Fetch Dependencies
         if:   matrix.cluster != 'phoenix'
-        timeout-minutes: 60
+        timeout-minutes: 120
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
