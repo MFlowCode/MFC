@@ -304,7 +304,11 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
         if pdef is None:
             if name in _NO_REGISTRY_ALLOWLIST:
                 continue
-            raise ValueError(f"namelist var {name!r} ({target}) has no registry entry - " "register it or allowlist it; a silent skip here means a " "silently missing broadcast")
+            raise ValueError(
+                f"namelist var {name!r} ({target}) has no registry entry. "
+                f"Register it in definitions.py or add it to _NO_REGISTRY_ALLOWLIST; "
+                f"a silent skip here means a silently missing broadcast."
+            )
 
         if target == "sim" and name in CASE_OPT_PARAMS:
             case_opt_vars.append(name)
