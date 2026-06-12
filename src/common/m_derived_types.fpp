@@ -154,6 +154,61 @@ module m_derived_types
         integer               :: psi      !< Psi variable equation
     end type eqn_idx_info
 
+    !> Initial-condition state assembled by pre_process: working primitive and
+    !> conservative fields, temperature, boundary-condition types, and the
+    !> patch-identity bookkeeping array.
+    type ic_context
+        type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< Primitive variables
+        type(scalar_field), allocatable, dimension(:)    :: q_cons_vf  !< Conservative variables
+        type(scalar_field)                               :: q_T_sf     !< Temperature field
+        type(integer_field), allocatable, dimension(:,:) :: bc_type    !< Boundary-condition type fields
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), allocatable, dimension(:,:,:) :: patch_id_fp  !< Patch identities bookkeeping
+#else
+        integer, allocatable, dimension(:,:,:) :: patch_id_fp  !< Patch identities bookkeeping
+#endif
+    end type ic_context
+
+    !> Finite-difference state for post_process: density gradient magnitude for
+    !> numerical Schlieren and centered FD coefficients in x-, y-, and z-directions.
+    type fd_context
+        real(wp), allocatable, dimension(:,:,:) :: gm_rho_sf   !< Density gradient magnitude for numerical Schlieren
+        real(wp), allocatable, dimension(:,:)   :: fd_coeff_x  !< FD coefficients in the x-direction
+        real(wp), allocatable, dimension(:,:)   :: fd_coeff_y  !< FD coefficients in the y-direction
+        real(wp), allocatable, dimension(:,:)   :: fd_coeff_z  !< FD coefficients in the z-direction
+    end type fd_context
+
+    !> Output workspace for post_process: flow variable buffers, VisIt extents/offsets,
+    !> directory paths, Silo/Binary file handles, and variable count.
+    type output_context
+        ! Flow variable storage; q_root_sf gathers to rank 0 in 1D parallel runs
+        real(wp), allocatable, dimension(:,:,:) :: q_sf       !< Working flow variable field (public)
+        real(wp), allocatable, dimension(:,:,:) :: q_root_sf  !< Gathered 1D flow variable field (rank 0 only)
+        real(wp), allocatable, dimension(:,:,:) :: cyl_q_sf   !< Cylindrical-geometry reordered field
+        ! Single precision storage for flow variables
+        real(sp), allocatable, dimension(:,:,:) :: q_sf_s       !< Single-precision working field (public)
+        real(sp), allocatable, dimension(:,:,:) :: q_root_sf_s  !< Single-precision gathered 1D field
+        real(sp), allocatable, dimension(:,:,:) :: cyl_q_sf_s   !< Single-precision cylindrical reordered field
+        ! Spatial and data extents for VisIt visualization (Silo only)
+        real(wp), allocatable, dimension(:,:) :: spatial_extents  !< Spatial extents per process
+        real(wp), allocatable, dimension(:,:) :: data_extents     !< Data extents per process
+        ! Ghost zone layer sizes (lo/hi) for subdomain connectivity in VisIt (Silo only)
+        integer, allocatable, dimension(:) :: lo_offset  !< Ghost zone lo sizes per active direction
+        integer, allocatable, dimension(:) :: hi_offset  !< Ghost zone hi sizes per active direction
+        ! Cell-boundary count per active coordinate direction (Silo only)
+        integer, allocatable, dimension(:) :: dims  !< Cell-boundary counts per active direction
+        ! Formatted database directory paths
+        character(LEN=path_len + name_len)   :: dbdir          !< Base database directory
+        character(LEN=path_len + 2*name_len) :: proc_rank_dir  !< Per-rank subdirectory
+        character(LEN=path_len + 2*name_len) :: rootdir        !< Root subdirectory
+        ! Formatted database file handles
+        integer :: dbroot   !< Master/root file handle
+        integer :: dbfile   !< Slave/local file handle
+        integer :: optlist  !< Silo options list handle (per-call scratch)
+        ! Variable count for Binary format
+        integer :: dbvars  !< Total flow variables to write
+    end type output_context
+
     type bc_patch_parameters
         integer                :: geometry
         integer                :: type
@@ -323,13 +378,21 @@ module m_derived_types
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
     type physical_parameters
-        real(wp)               :: gamma   !< Sp. heat ratio
-        real(wp)               :: pi_inf  !< Liquid stiffness
-        real(wp), dimension(2) :: Re      !< Reynolds number
-        real(wp)               :: cv      !< heat capacity
-        real(wp)               :: qv      !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
-        real(wp)               :: qvp     !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
+        real(wp)               :: gamma          !< Sp. heat ratio
+        real(wp)               :: pi_inf         !< Liquid stiffness
+        real(wp), dimension(2) :: Re             !< Reynolds number
+        real(wp)               :: cv             !< heat capacity
+        real(wp)               :: qv             !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
+        real(wp)               :: qvp            !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp)               :: G
+        logical                :: non_newtonian  !< Enable Herschel-Bulkley non-Newtonian viscosity
+        real(wp)               :: K              !< HB consistency index
+        real(wp)               :: nn             !< HB flow behavior index
+        real(wp)               :: tau0           !< HB yield stress (0 => power-law)
+        real(wp)               :: hb_m           !< Papanastasiou regularization parameter
+        real(wp)               :: mu_min         !< Lower viscosity clamp (inactive sentinel = dflt_real)
+        real(wp)               :: mu_max         !< Upper viscosity clamp (required when non_newtonian)
+        real(wp)               :: mu_bulk        !< Bulk viscosity for NN (inactive sentinel = dflt_real)
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models
