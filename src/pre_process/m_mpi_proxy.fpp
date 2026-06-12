@@ -39,14 +39,26 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        ! manual: bc_x/y/z and domain bounds (registered as struct members, not in NAMELIST_VARS)
+        ! manual: domain bounds and wall temperatures (REAL struct members, not in NAMELIST_VARS)
         #:for VAR in [ 'x_domain%beg', 'x_domain%end', 'y_domain%beg',         &
             & 'y_domain%end', 'z_domain%beg', 'z_domain%end',                   &
-            & 'bc_x%beg', 'bc_x%end', 'bc_y%beg', 'bc_y%end',                  &
-            & 'bc_z%beg', 'bc_z%end', 'bc_x%Twall_in', 'bc_x%Twall_out',       &
+            & 'bc_x%Twall_in', 'bc_x%Twall_out',                                &
             & 'bc_y%Twall_in', 'bc_y%Twall_out', 'bc_z%Twall_in',              &
             & 'bc_z%Twall_out']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        #:endfor
+
+        ! manual: BC type codes (INTEGER struct members)
+        #:for VAR in [ 'bc_x%beg', 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end']
+            call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        #:endfor
+
+        ! wall-velocity members consumed by s_slip_wall/s_no_slip_wall on all ranks
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                call MPI_BCAST(bc_${DIM}$%vb${DIR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(bc_${DIM}$%ve${DIR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
         #:endfor
 
         ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence)

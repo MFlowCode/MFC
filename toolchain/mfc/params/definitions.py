@@ -842,14 +842,13 @@ def _load():
                 _r(f"{px}sph_har_coeff({ll},{mm})", REAL)
 
     # fluid_pp (10 fluids)
+    # Members present in physical_parameters: gamma, pi_inf, Re, cv, qv, qvp, G.
+    # mul0/ss/pv/gamma_v/M_v/mu_v/k_v/cp_v/D_v were removed from the Fortran type
+    # by upstream #1085/#1093 — they must NOT be registered (namelist read would crash).
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        _r(f"{px}mul0", REAL, {"viscosity"}, math=r"\f$\mu_{l,k}\f$")
-        _r(f"{px}ss", REAL, {"surface_tension"}, math=r"\f$\sigma_k\f$")
-        for a in ["pv", "gamma_v", "M_v", "mu_v", "k_v", "cp_v", "D_v"]:
-            _r(f"{px}{a}", REAL, {"bubbles"})
         _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
@@ -1049,11 +1048,16 @@ def _load():
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # lag_params (Lagrangian bubbles)
+    # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
+    # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
+    # write_bubbles, write_bubbles_stats, nBubs_glb, epsilonb, charwidth, valmaxvoid.
+    # T0/Thost/c0/rho0/x0 were removed from the Fortran type by upstream #1085/#1093
+    # — they must NOT be registered (namelist read would crash).
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
     for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
-    for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
+    for a in ["epsilonb", "valmaxvoid", "charwidth"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
 
     # chem_params

@@ -387,8 +387,9 @@ def test_generate_bcast_fpp_case_opt_guard_sim():
     assert "num_fluids" in guard_body
     assert "mapped_weno" in guard_body
 
-    # muscl_eps must NOT appear anywhere (it is excluded — derived post-broadcast)
-    assert "muscl_eps" not in out
+    # muscl_eps IS inside the case-opt guard (it is sim-only, non-CASE_OPT_PARAM,
+    # so it appears in the real-scalars section, which is outside the case-opt block)
+    assert "call MPI_BCAST(muscl_eps, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out
 
 
 def test_generate_bcast_fpp_case_opt_not_in_pre_post():
@@ -504,8 +505,6 @@ def test_generate_bcast_fpp_excludes_manual_residue():
         assert "m_glb" not in out, f"{target}: m_glb should be manual"
         assert "n_glb" not in out, f"{target}: n_glb should be manual"
         assert "p_glb" not in out, f"{target}: p_glb should be manual"
-        # muscl_eps is excluded (derived post-broadcast)
-        assert "muscl_eps" not in out, f"{target}: muscl_eps should be excluded"
 
     sim = generate_bcast_fpp("sim")
     # shear_stress, bulk_stress, bodyForces are derived (non-namelist)
@@ -530,3 +529,95 @@ def test_generate_bcast_fpp_bad_target():
 
     with pytest.raises(ValueError, match="Unknown target"):
         generate_bcast_fpp("bad")
+
+
+def test_generate_bcast_fpp_muscl_eps_now_broadcast():
+    """muscl_eps is broadcast for sim (latent-bug fix: derivation is rank-0-only).
+
+    Previously excluded via _BCAST_EXCLUDE; every multi-rank MUSCL run had
+    rank-divergent muscl_eps because f_is_default() only fires on rank 0.
+    """
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    sim = generate_bcast_fpp("sim")
+    assert "call MPI_BCAST(muscl_eps, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in sim
+
+    # muscl_eps is sim-only; must not appear in pre/post
+    pre = generate_bcast_fpp("pre")
+    post = generate_bcast_fpp("post")
+    assert "muscl_eps" not in pre
+    assert "muscl_eps" not in post
+
+
+def test_generate_bcast_fpp_fluid_pp_registry_walk():
+    """fluid_pp emitter walks registry; no dead members (mul0/ss/pv/gamma_v/M_v/mu_v/k_v/cp_v/D_v removed upstream).
+
+    Re(1) count=2 is sim-only; all other registered REAL members appear in all three
+    targets.
+    """
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    sim = generate_bcast_fpp("sim")
+    pre = generate_bcast_fpp("pre")
+    post = generate_bcast_fpp("post")
+
+    # All registered members appear in every target
+    for mem in ("gamma", "pi_inf", "cv", "qv", "qvp", "G"):
+        for out, t in [(sim, "sim"), (pre, "pre"), (post, "post")]:
+            assert f"fluid_pp(i)%{mem}" in out, f"{t}: fluid_pp(i)%{mem} missing"
+
+    # Re(1) count=2 is sim-only
+    assert "fluid_pp(i)%Re(1)" in sim
+    assert "fluid_pp(i)%Re(1)" not in pre
+    assert "fluid_pp(i)%Re(1)" not in post
+
+    # Dead members must not appear
+    for dead in ("mul0", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "cp_v", "D_v"):
+        for out, t in [(sim, "sim"), (pre, "pre"), (post, "post")]:
+            assert f"fluid_pp(i)%{dead}" not in out, f"{t}: dead member fluid_pp(i)%{dead} present"
+
+
+def test_generate_bcast_fpp_fluid_pp_member_datatypes():
+    # The HB merge added a LOGICAL fluid_pp member; datatypes must come from the
+    # registry, not be assumed REAL.
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    sim = generate_bcast_fpp("sim")
+    assert "call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL," in sim
+    assert "call MPI_BCAST(fluid_pp(i)%tau0, 1, mpi_p," in sim
+    assert "non_newtonian, 1, mpi_p" not in sim
+
+
+def test_generate_bcast_fpp_lag_params_registry_walk():
+    """lag_params emitter walks registry; no dead members (T0/Thost/c0/rho0/x0 removed upstream)."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    sim = generate_bcast_fpp("sim")
+
+    # All registered members must appear
+    for mem in ("solver_approach", "cluster_type", "smooth_type", "nBubs_glb"):
+        assert f"lag_params%{mem}" in sim, f"lag_params%{mem} missing from sim"
+    for mem in ("heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"):
+        assert f"lag_params%{mem}" in sim, f"lag_params%{mem} missing from sim"
+    for mem in ("epsilonb", "charwidth", "valmaxvoid"):
+        assert f"lag_params%{mem}" in sim, f"lag_params%{mem} missing from sim"
+
+    # Dead members must not appear
+    for dead in ("T0", "Thost", "c0", "rho0", "x0"):
+        assert f"lag_params%{dead}" not in sim, f"dead member lag_params%{dead} present in sim"
+
+
+def test_mpi_proxy_residue_pins_wall_velocity_and_bc_datatypes():
+    """The vb/ve wall-velocity broadcasts and integer BC datatypes live in
+    hand-written residue (not codegen); pin them so an edit or merge conflict
+    that drops them fails loudly."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[3]
+    for target in ("pre_process", "post_process"):
+        src = (root / "src" / target / "m_mpi_proxy.fpp").read_text()
+        assert "bc_${DIM}$%vb${DIR}$" in src, f"{target}: vb broadcasts missing"
+        assert "bc_${DIM}$%ve${DIR}$" in src, f"{target}: ve broadcasts missing"
+        assert "'bc_x%beg', 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end']" in src
+        seg = src.split("'bc_z%beg', 'bc_z%end']", 1)[1]
+        assert "MPI_INTEGER" in seg.split("#:endfor")[0], f"{target}: BC codes not MPI_INTEGER"

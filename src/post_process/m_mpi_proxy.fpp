@@ -85,6 +85,14 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
+        ! wall-velocity members consumed by s_slip_wall/s_no_slip_wall on all ranks
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                call MPI_BCAST(bc_${DIM}$%vb${DIR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(bc_${DIM}$%ve${DIR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        #:endfor
+
         ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence)
         call MPI_BCAST(cfl_dt, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
