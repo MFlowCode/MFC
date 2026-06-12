@@ -425,15 +425,10 @@ contains
                                         alpha_jwl_L = alpha_L(jwl_idx)
                                         alpha_jwl_R = alpha_R(jwl_idx)
                                     end if
-                                    call s_jwl_energy_pr(rho_L, pres_L, Y_L, alpha_jwl_L, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                         & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                         & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                         & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                    ! L/R interface energies via the active JWL/air mixture closure (jwl_mix_type).
+                                    call s_jwl_mix_energy_pr(rho_L, pres_L, Y_L, alpha_jwl_L, jwl_idx, eps)
                                     E_L = rho_L*eps + 5.e-1_wp*rho_L*vel_L_rms
-                                    call s_jwl_energy_pr(rho_R, pres_R, Y_R, alpha_jwl_R, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                         & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                         & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                         & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                    call s_jwl_mix_energy_pr(rho_R, pres_R, Y_R, alpha_jwl_R, jwl_idx, eps)
                                     E_R = rho_R*eps + 5.e-1_wp*rho_R*vel_R_rms
                                 else
                                     E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
@@ -1133,15 +1128,10 @@ contains
                                         alpha_jwl_L = alpha_L(jwl_idx)
                                         alpha_jwl_R = alpha_R(jwl_idx)
                                     end if
-                                    call s_jwl_energy_pr(rho_L, pres_L, Y_L, alpha_jwl_L, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                         & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                         & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                         & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                    ! L/R interface energies via the active JWL/air mixture closure (jwl_mix_type).
+                                    call s_jwl_mix_energy_pr(rho_L, pres_L, Y_L, alpha_jwl_L, jwl_idx, eps)
                                     E_L = rho_L*eps + 5.e-1_wp*rho_L*vel_L_rms
-                                    call s_jwl_energy_pr(rho_R, pres_R, Y_R, alpha_jwl_R, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                         & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                         & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                         & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                    call s_jwl_mix_energy_pr(rho_R, pres_R, Y_R, alpha_jwl_R, jwl_idx, eps)
                                     E_R = rho_R*eps + 5.e-1_wp*rho_R*vel_R_rms
                                 else
                                     E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
@@ -3024,15 +3014,10 @@ contains
                                             alpha_jwl_L = alpha_L(jwl_idx)
                                             alpha_jwl_R = alpha_R(jwl_idx)
                                         end if
-                                        call s_jwl_energy_pr(rho_L, pres_L, Y_L, alpha_jwl_L, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                             & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                             & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                             & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                        ! L/R interface energies via the active JWL/air mixture closure (jwl_mix_type).
+                                        call s_jwl_mix_energy_pr(rho_L, pres_L, Y_L, alpha_jwl_L, jwl_idx, eps)
                                         E_L = rho_L*eps + 5.e-1_wp*rho_L*vel_L_rms
-                                        call s_jwl_energy_pr(rho_R, pres_R, Y_R, alpha_jwl_R, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                             & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                             & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                             & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), eps)
+                                        call s_jwl_mix_energy_pr(rho_R, pres_R, Y_R, alpha_jwl_R, jwl_idx, eps)
                                         E_R = rho_R*eps + 5.e-1_wp*rho_R*vel_R_rms
                                     else
                                         E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L

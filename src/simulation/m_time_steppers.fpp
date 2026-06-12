@@ -627,16 +627,17 @@ contains
             real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
         #:endif
-        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)               :: pres     !< Cell-avg. pressure
-        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv       !< Cell-avg. fluid reference energy
-        real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp)               :: H        !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum     !< Cell-avg. velocity sum
+        real(wp)               :: pres        !< Cell-avg. pressure
+        real(wp)               :: gamma       !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf      !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv          !< Cell-avg. fluid reference energy
+        real(wp)               :: c           !< Cell-avg. sound speed
+        real(wp)               :: H           !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re          !< Cell-avg. Reynolds numbers
         real(wp)               :: dt_local
-        integer                :: j, k, l  !< Generic loop iterators
+        real(wp)               :: dt_ib, max_ib_vel, min_dx_loc
+        integer                :: i, j, k, l  !< Generic loop iterators
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -669,6 +670,23 @@ contains
             dt = dt_local
         else
             call s_mpi_allreduce_min(dt_local, dt)
+        end if
+
+        ! Particle CFL: limit dt so a moving IB advances < cfl_target*min(dx) per step
+        if (moving_immersed_boundary_flag) then
+            min_dx_loc = minval(dx(0:m))
+            if (n > 0) min_dx_loc = min(min_dx_loc, minval(dy(0:n)))
+            if (p > 0) min_dx_loc = min(min_dx_loc, minval(dz(0:p)))
+
+            do i = 1, num_ibs
+                if (patch_ib(i)%moving_ibm == 2) then
+                    max_ib_vel = maxval(abs(patch_ib(i)%vel(1:num_dims)))
+                    if (max_ib_vel > 0._wp) then
+                        dt_ib = cfl_target*min_dx_loc/max_ib_vel
+                        dt = min(dt, dt_ib)
+                    end if
+                end if
+            end do
         end if
 
         $:GPU_UPDATE(device='[dt]')
@@ -744,6 +762,14 @@ contains
                     call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                     ! update the moment of inertia to be based on the direction of the angular momentum
                     patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment
+                end if
+
+                ! Abort if the particle velocity went NaN (light-particle instability)
+                if (.not. f_approx_equal(patch_ib(i)%vel(1), patch_ib(i)%vel(1))) then
+                    print *, 'IBM particle ', i, ' velocity is NaN. mass = ', patch_ib(i)%mass, ' force = ', patch_ib(i)%force
+                    call s_mpi_abort('IBM particle velocity is NaN. ' &
+                                     & // 'Particle mass may be too small for the current time step. ' &
+                                     & // 'Try increasing mass, reducing dt, or enabling cfl_dt.')
                 end if
 
                 ! Update the angle of the IB

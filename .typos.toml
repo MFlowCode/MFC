@@ -29,6 +29,8 @@ ordr = "ordr"         # typo for "order" in "weno_ordr" - tests param suggestion
 unknwn = "unknwn"     # typo for "unknown" - tests unknown param detection
 tru = "tru"           # typo for "true" in "when_tru" - tests dependency keys
 PNGs = "PNGs"
+Kuhl = "Kuhl"   # researcher surname (Kuhl et al. JWL additive mixing model)
+kuhl = "kuhl"   # lowercase form in Fortran identifiers (e.g. s_jwl_kuhl_pressure_er)
 
 [files]
-extend-exclude = ["docs/documentation/references*", "docs/references.bib", "tests/", "toolchain/cce_simulation_workgroup_256.sh", "build-docs/", "build/", "build_test/", "fp-stability-logs/"]
+extend-exclude = ["docs/documentation/references*", "docs/references.bib", "tests/", "toolchain/cce_simulation_workgroup_256.sh", "build-docs/", "build/", "build_test/", "fp-stability-logs/", "_ibm_clamp_benchmark/", "_jwl_oscillation_fix/", "_jwl_verification/", "jwl_verification_out/", "README-JWL-EOS.md", "README-JWL-TEST-SUGGESTIONS.md"]

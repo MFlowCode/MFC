@@ -143,7 +143,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
         integer :: i, j, k, l, q, r                                          !< Iterator variables
-        integer :: patch_id                                                  !< Patch ID of ghost point
+        integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
         real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
@@ -179,14 +179,14 @@ contains
 
         ! set the Moving IBM interior conservative variables
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, patch_id_temp, rho]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     patch_id = ib_markers%sf(j, k, l)
                     if (patch_id /= 0) then
-                        call s_decode_patch_periodicity(patch_id, patch_id)
-                        call s_get_neighborhood_idx(patch_id, patch_id)
+                        call s_decode_patch_periodicity(patch_id, patch_id_temp)
+                        call s_get_neighborhood_idx(patch_id_temp, patch_id)
                         if (patch_id > 0) then
                             q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                             rho = 0._wp
@@ -258,10 +258,12 @@ contains
                     q_prim_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
-                        ! Pressure correction for moving IB: accounts for acceleration of IB surface
-                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
-                                  & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
-                                  & *dot_product(patch_ib(patch_id) %force/patch_ib(patch_id)%mass, gp%levelset_norm))
+                        ! Moving-IB pressure correction (dp/dn = -rho*a_n)
+                        buf = 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
+                                        & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm)
+                        ! cap at 0.5 to keep the denominator positive
+                        if (.not. (buf <= 0.5_wp)) buf = 0.5_wp
+                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, l) + pres_IP/(1._wp - buf)
                     end do
                 end if
 
@@ -1025,9 +1027,9 @@ contains
 
         call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
 
-        ! reduce the forces across all MPI ranks
-        call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
-        call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
+        ! Reduce force/torque by global IB id (num_ibs is rank-local, so a global
+        ! allreduce would mismatch counts and sum unrelated boundaries)
+        call s_communicate_ib_forces(forces, torques)
 
         ! consider body forces after reducing to avoid double counting
         do i = 1, num_ibs
@@ -1229,7 +1231,7 @@ contains
 
     end subroutine s_wrap_periodic_ibs
 
-    !> @brief reasseses ownership of IBs and passes ownership of IBs to neighbor processors
+    !> @brief reassesses ownership of IBs and passes ownership of IBs to neighbor processors
     !> Reduces forces and torques across the local neighborhood without a global allreduce. Accumulation phase: 2 passes per
     !! dimension receiving from the low-index (-X) neighbor. Pass 1: add received values; save what was received as recv_snap. Pass
     !! 2: send current (post-pass-1) values; add received; subtract recv_snap to remove double-counting of the direct contribution

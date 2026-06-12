@@ -304,7 +304,7 @@ _SIMPLE_DESCS = {
     # Misc physics
     "alt_soundspeed": "Alternative sound speed formulation",
     "mixture_err": "Enable mixture error checking",
-    "jwl_contact_blend": "Blend HLLC toward HLL across JWL contacts (contact-preserving fix)",
+    "jwl_mix_type": "JWL mixture rule: 0=isobaric, 1=Kuhl additive, 2=p-T equilibrium, 3=Rocflu blend",
     "cont_damage": "Enable continuum damage model",
 }
 
@@ -1048,32 +1048,6 @@ def _load():
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
-    # Reactive JWL (progressive burn): unreacted-explosive JWL EOS + Lee-Tarver Ignition & Growth rate
-    for n in [
-        "jwl_unr_A",
-        "jwl_unr_B",
-        "jwl_unr_R1",
-        "jwl_unr_R2",
-        "jwl_unr_omega",
-        "jwl_unr_rho0",
-        "jwl_unr_E0",
-        "jwl_lt_I",
-        "jwl_lt_b",
-        "jwl_lt_a",
-        "jwl_lt_x",
-        "jwl_lt_G1",
-        "jwl_lt_c",
-        "jwl_lt_d",
-        "jwl_lt_y",
-        "jwl_lt_G2",
-        "jwl_lt_e",
-        "jwl_lt_g",
-        "jwl_lt_z",
-        "jwl_lt_figmax",
-        "jwl_lt_fg1max",
-        "jwl_lt_fg2min",
-    ]:
-        _r(n, REAL)
     for n in [
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
@@ -1108,14 +1082,13 @@ def _load():
         "simplex_perturb",
         "alt_soundspeed",
         "mixture_err",
-        "jwl_contact_blend",
-        "jwl_reactive",
         "rdma_mpi",
         "igr_pres_lim",
         "nv_uvm_out_of_core",
         "nv_uvm_pref_gpu",
     ]:
         _r(n, LOG)
+    _r("jwl_mix_type", INT)
     _r("int_comp", INT)
     _r("case_dir", STR)
 

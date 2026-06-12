@@ -149,29 +149,20 @@ module m_global_parameters
     logical :: nv_uvm_pref_gpu  !< Enable explicit gpu memory hints (default FALSE)
     !> @}
 
-    real(wp) :: muscl_eps          !< MUSCL limiter slope-product threshold
-    real(wp) :: weno_eps           !< Binding for the WENO nonlinear weights
-    real(wp) :: teno_CT            !< Smoothness threshold for TENO
-    logical  :: mp_weno            !< Monotonicity preserving (MP) WENO
-    logical  :: weno_avg           !< Average left/right cell-boundary states
-    logical  :: weno_Re_flux       !< WENO reconstruct velocity gradients for viscous stress tensor
-    integer  :: riemann_solver     !< Riemann solver algorithm
-    integer  :: low_Mach           !< Low Mach number fix to HLLC Riemann solver
-    integer  :: wave_speeds        !< Wave speeds estimation method
-    integer  :: avg_state          !< Average state evaluation method
-    logical  :: alt_soundspeed     !< Alternate mixture sound speed
-    logical  :: null_weights       !< Null undesired WENO weights
-    logical  :: mixture_err        !< Mixture properties correction
-    logical  :: jwl_contact_blend  !< Blend HLLC->HLL across JWL contacts (contact-preserving fix)
-    logical  :: jwl_reactive       !< Enable progressive (reactive) JWL burn with a transported reaction-progress variable
-    !> @name Reactive JWL: unreacted-explosive JWL EOS constants and Lee-Tarver Ignition & Growth rate coefficients
-    !> @{
-    real(wp) :: jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0
-    real(wp) :: jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x
-    real(wp) :: jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y
-    real(wp) :: jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z
-    real(wp) :: jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min
-    !> @}
+    real(wp) :: muscl_eps        !< MUSCL limiter slope-product threshold
+    real(wp) :: weno_eps         !< Binding for the WENO nonlinear weights
+    real(wp) :: teno_CT          !< Smoothness threshold for TENO
+    logical  :: mp_weno          !< Monotonicity preserving (MP) WENO
+    logical  :: weno_avg         !< Average left/right cell-boundary states
+    logical  :: weno_Re_flux     !< WENO reconstruct velocity gradients for viscous stress tensor
+    integer  :: riemann_solver   !< Riemann solver algorithm
+    integer  :: low_Mach         !< Low Mach number fix to HLLC Riemann solver
+    integer  :: wave_speeds      !< Wave speeds estimation method
+    integer  :: avg_state        !< Average state evaluation method
+    logical  :: alt_soundspeed   !< Alternate mixture sound speed
+    logical  :: null_weights     !< Null undesired WENO weights
+    logical  :: mixture_err      !< Mixture properties correction
+    integer  :: jwl_mix_type     !< JWL mixture rule: 0=isobaric, 1=Kuhl additive, 2=p-T equilibrium, 3=Rocflu blend
     logical  :: hypoelasticity   !< hypoelasticity modeling
     logical  :: hyperelasticity  !< hyperelasticity modeling
     integer  :: int_comp         !< Interface compression: 0=off, 1=THINC, 2=MTHINC
@@ -212,10 +203,7 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[muscl_eps]')
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
-    $:GPU_DECLARE(create='[jwl_contact_blend]')
-    $:GPU_DECLARE(create='[jwl_reactive, jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0]')
-    $:GPU_DECLARE(create='[jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x, jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y]')
-    $:GPU_DECLARE(create='[jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z, jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min]')
+    $:GPU_DECLARE(create='[jwl_mix_type]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, hyper_model, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress, cont_damage, hyper_cleaning]')
@@ -576,14 +564,7 @@ contains
         alt_soundspeed = .false.
         null_weights = .false.
         mixture_err = .false.
-        jwl_contact_blend = .true.
-        jwl_reactive = .false.
-        jwl_unr_A = 0._wp; jwl_unr_B = 0._wp; jwl_unr_R1 = 0._wp; jwl_unr_R2 = 0._wp
-        jwl_unr_omega = 0._wp; jwl_unr_rho0 = 0._wp; jwl_unr_E0 = 0._wp
-        jwl_lt_I = 0._wp; jwl_lt_b = 0._wp; jwl_lt_a = 0._wp; jwl_lt_x = 0._wp
-        jwl_lt_G1 = 0._wp; jwl_lt_c = 0._wp; jwl_lt_d = 0._wp; jwl_lt_y = 0._wp
-        jwl_lt_G2 = 0._wp; jwl_lt_e = 0._wp; jwl_lt_g = 0._wp; jwl_lt_z = 0._wp
-        jwl_lt_figmax = 1._wp; jwl_lt_fg1max = 1._wp; jwl_lt_fg2min = 0._wp
+        jwl_mix_type = 0
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
@@ -1209,12 +1190,6 @@ contains
             sys_size = eqn_idx%species%end
         end if
 
-        eqn_idx%reac = 0
-        if (jwl_reactive) then
-            eqn_idx%reac = sys_size + 1
-            sys_size = eqn_idx%reac
-        end if
-
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
@@ -1293,10 +1268,7 @@ contains
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
-        $:GPU_UPDATE(device='[jwl_contact_blend]')
-        $:GPU_UPDATE(device='[jwl_reactive, jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0]')
-        $:GPU_UPDATE(device='[jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x, jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y]')
-        $:GPU_UPDATE(device='[jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z, jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min]')
+        $:GPU_UPDATE(device='[jwl_mix_type]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
                      & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
                      & hyperelasticity, hyper_model, elasticity, low_Mach]')

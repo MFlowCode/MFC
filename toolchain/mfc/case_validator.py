@@ -651,7 +651,7 @@ class CaseValidator:
                     self.prohibit(value is not None and value <= 0, f"JWL EOS requires fluid_pp({i})%{suffix} > 0")
                 value = self.get(f"fluid_pp({i})%jwl_B")
                 self.prohibit(value is None, f"JWL EOS requires fluid_pp({i})%jwl_B")
-                self.prohibit(value is not None and value < 0, f"JWL EOS requires fluid_pp({i})%jwl_B >= 0")
+                # B may be negative for insensitive explosives (e.g. LX-17, PBX-9502)
 
         if num_jwl:
             self.prohibit(num_jwl > 1, "JWL EOS currently supports one JWL fluid per case")
@@ -661,15 +661,21 @@ class CaseValidator:
                 "JWL EOS currently supports at most two fluids; the interface-compression path assumes num_fluids = 2",
             )
 
-        jwl_reactive = self.get("jwl_reactive", "F") == "T"
-        if jwl_reactive:
-            self.prohibit(num_jwl == 0, "jwl_reactive = T requires a JWL fluid (fluid_pp%eos = 2)")
-            for suffix in ("jwl_unr_A", "jwl_unr_R1", "jwl_unr_R2", "jwl_unr_omega", "jwl_unr_rho0"):
-                value = self.get(suffix)
-                self.prohibit(value is None, f"jwl_reactive = T requires {suffix}")
-                self.prohibit(value is not None and value <= 0, f"jwl_reactive = T requires {suffix} > 0")
-            unr_b = self.get("jwl_unr_B")
-            self.prohibit(unr_b is not None and unr_b < 0, "jwl_reactive = T requires jwl_unr_B >= 0")
+            jwl_mix_type = self.get("jwl_mix_type", 0)
+            self.prohibit(
+                jwl_mix_type not in (0, 1, 2, 3),
+                "jwl_mix_type must be 0 (isobaric), 1 (Kuhl), 2 (p-T equilibrium), or 3 (Rocflu blend)",
+            )
+            if jwl_mix_type == 2:
+                # p-T equilibrium shares one temperature, so the ideal-gas (air) fluid needs a real heat capacity.
+                air_cv = next(
+                    (self.get(f"fluid_pp({j})%cv") for j in range(1, num_fluids + 1) if self.get(f"fluid_pp({j})%eos", 1) == 1),
+                    None,
+                )
+                self.prohibit(
+                    air_cv is None or air_cv <= 0,
+                    "jwl_mix_type = 2 (p-T equilibrium) requires the ideal-gas fluid_pp%cv > 0 (e.g. 717.5 J/kg/K for air)",
+                )
 
     def check_surface_tension(self):
         """Checks constraints on surface tension"""

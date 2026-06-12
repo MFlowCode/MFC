@@ -24,6 +24,7 @@
             "m_hyperelastic",
             "m_hypoelastic",
             "m_phase_change",
+            "m_jwl",
             "m_chemistry",
             "m_acoustic_src",
             "m_body_forces",

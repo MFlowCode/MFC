@@ -100,10 +100,7 @@ contains
             ib_coefficient_of_friction, ib_state_wrt, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
-            alt_soundspeed, mixture_err, jwl_contact_blend, weno_Re_flux, &
-            jwl_reactive, jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0, &
-            jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x, jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y, &
-            jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z, jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min, &
+            alt_soundspeed, mixture_err, jwl_mix_type, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &

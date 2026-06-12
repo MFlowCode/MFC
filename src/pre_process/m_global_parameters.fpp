@@ -56,12 +56,7 @@ module m_global_parameters
 
     ! Simulation Algorithm Parameters
     integer            :: model_eqns  !< Multicomponent flow model
-    logical            :: jwl_reactive  !< Enable progressive (reactive) JWL burn (transported reaction-progress variable)
-    real(wp)           :: jwl_unr_A, jwl_unr_B, jwl_unr_R1, jwl_unr_R2, jwl_unr_omega, jwl_unr_rho0, jwl_unr_E0
-    real(wp)           :: jwl_lt_I, jwl_lt_b, jwl_lt_a, jwl_lt_x
-    real(wp)           :: jwl_lt_G1, jwl_lt_c, jwl_lt_d, jwl_lt_y
-    real(wp)           :: jwl_lt_G2, jwl_lt_e, jwl_lt_g, jwl_lt_z
-    real(wp)           :: jwl_lt_figmax, jwl_lt_fg1max, jwl_lt_fg2min
+    integer            :: jwl_mix_type  !< JWL mixture rule: 0=isobaric, 1=Kuhl additive, 2=p-T equilibrium, 3=Rocflu blend
     logical            :: relax  !< activate phase change
     integer            :: relax_model  !< Relax Model
     real(wp)           :: palpha_eps  !< trigger parameter for the p relaxation procedure, phase change model
@@ -246,13 +241,7 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
-        jwl_reactive = .false.
-        jwl_unr_A = 0._wp; jwl_unr_B = 0._wp; jwl_unr_R1 = 0._wp; jwl_unr_R2 = 0._wp
-        jwl_unr_omega = 0._wp; jwl_unr_rho0 = 0._wp; jwl_unr_E0 = 0._wp
-        jwl_lt_I = 0._wp; jwl_lt_b = 0._wp; jwl_lt_a = 0._wp; jwl_lt_x = 0._wp
-        jwl_lt_G1 = 0._wp; jwl_lt_c = 0._wp; jwl_lt_d = 0._wp; jwl_lt_y = 0._wp
-        jwl_lt_G2 = 0._wp; jwl_lt_e = 0._wp; jwl_lt_g = 0._wp; jwl_lt_z = 0._wp
-        jwl_lt_figmax = 1._wp; jwl_lt_fg1max = 1._wp; jwl_lt_fg2min = 0._wp
+        jwl_mix_type = 0
         relax = .false.
         relax_model = dflt_int
         palpha_eps = dflt_real
@@ -803,12 +792,6 @@ contains
             eqn_idx%species%beg = sys_size + 1
             eqn_idx%species%end = sys_size + num_species
             sys_size = eqn_idx%species%end
-        end if
-
-        eqn_idx%reac = 0
-        if (jwl_reactive) then
-            eqn_idx%reac = sys_size + 1
-            sys_size = eqn_idx%reac
         end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &

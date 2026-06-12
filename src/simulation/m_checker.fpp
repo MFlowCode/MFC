@@ -111,7 +111,7 @@ contains
             else if (fluid_pp(i)%eos == 2) then
                 num_jwl = num_jwl + 1
                 @:PROHIBIT(fluid_pp(i)%jwl_A <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_A > 0.")
-                @:PROHIBIT(fluid_pp(i)%jwl_B < 0._wp, "JWL EOS requires fluid_pp(i)%jwl_B >= 0.")
+                ! jwl_B may be negative for insensitive explosives (e.g. LX-17, PBX-9502)
                 @:PROHIBIT(fluid_pp(i)%jwl_R1 <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_R1 > 0.")
                 @:PROHIBIT(fluid_pp(i)%jwl_R2 <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_R2 > 0.")
                 @:PROHIBIT(fluid_pp(i)%jwl_omega <= 0._wp, "JWL EOS requires fluid_pp(i)%jwl_omega > 0.")
@@ -122,21 +122,13 @@ contains
 
         if (num_jwl > 0) then
             @:PROHIBIT(num_jwl > 1, "JWL EOS currently supports one JWL fluid per case.")
+            @:PROHIBIT(jwl_mix_type < 0 .or. jwl_mix_type > 3, &
+                       & "jwl_mix_type must be 0 (isobaric), 1 (Kuhl), 2 (p-T equilibrium), or 3 (Rocflu blend).")
             @:PROHIBIT(riemann_solver == 4, "JWL EOS is not supported with the HLLD/MHD flux solver. Use HLL, HLLC, or LF.")
             @:PROHIBIT(model_eqns == 3 .and. .not. relax, &
                        & "JWL six-equation cases require relax=T so the JWL pressure-relaxation closure is applied.")
             @:PROHIBIT(num_fluids > 2, &
                        & "JWL EOS currently supports at most two fluids; the interface-compression path assumes num_fluids = 2.")
-        end if
-
-        if (jwl_reactive) then
-            @:PROHIBIT(num_jwl == 0, "jwl_reactive = T requires a JWL fluid (fluid_pp%eos = 2).")
-            @:PROHIBIT(jwl_unr_A <= 0._wp, "jwl_reactive = T requires jwl_unr_A > 0.")
-            @:PROHIBIT(jwl_unr_B < 0._wp, "jwl_reactive = T requires jwl_unr_B >= 0.")
-            @:PROHIBIT(jwl_unr_R1 <= 0._wp, "jwl_reactive = T requires jwl_unr_R1 > 0.")
-            @:PROHIBIT(jwl_unr_R2 <= 0._wp, "jwl_reactive = T requires jwl_unr_R2 > 0.")
-            @:PROHIBIT(jwl_unr_omega <= 0._wp, "jwl_reactive = T requires jwl_unr_omega > 0.")
-            @:PROHIBIT(jwl_unr_rho0 <= 0._wp, "jwl_reactive = T requires jwl_unr_rho0 > 0.")
         end if
 
     end subroutine s_check_inputs_eos

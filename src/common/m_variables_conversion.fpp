@@ -10,6 +10,7 @@ module m_variables_conversion
 
     use m_derived_types
     use m_global_parameters
+    use m_jwl
     use m_mpi_proxy
     use m_mpi_common, only: s_mpi_allreduce_integer_sum
     use m_helper_basic
@@ -34,9 +35,11 @@ module m_variables_conversion
               s_jwl_pcold, &
               s_jwl_sound_speed_squared, &
               s_jwl_energy_pr, &
-              s_jwl_reactive_pressure_er, &
-              s_jwl_reactive_energy_pr, &
-              f_lee_tarver_rate, &
+              s_jwl_mix_pressure_er, &
+              s_jwl_mix_energy_pr, &
+              s_jwl_kuhl_pressure_er, &
+              s_jwl_kuhl_energy_pr, &
+              s_jwl_kuhl_sound_speed_squared, &
               jwl_idx, &
               s_compute_species_fraction, &
 #ifndef MFC_PRE_PROCESS
@@ -49,11 +52,7 @@ module m_variables_conversion
 #ifndef MFC_SIMULATION
     integer, allocatable, public, dimension(:)  :: eos_idxs
     real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    real(wp), allocatable, public, dimension(:) :: jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s
-    real(wp), allocatable, public, dimension(:) :: jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas
     $:GPU_DECLARE(create='[eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
-    $:GPU_DECLARE(create='[jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s]')
-    $:GPU_DECLARE(create='[jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas]')
 #endif
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -62,10 +61,9 @@ module m_variables_conversion
     $:GPU_DECLARE(create='[bubrs_vc, Gs_vc, Res_vc]')
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
-    integer :: jwl_idx
     integer :: jwl_pressure_floor_count
     $:GPU_DECLARE(create='[is1b, is2b, is3b, is1e, is2e, is3e]')
-    $:GPU_DECLARE(create='[jwl_idx, jwl_pressure_floor_count]')
+    $:GPU_DECLARE(create='[jwl_pressure_floor_count]')
 
     real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
     real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
@@ -92,317 +90,6 @@ contains
         end if
 
     end subroutine s_convert_to_mixture_variables
-
-    !> Compute the JWL cold pressure term with relative volume V = rho0/rho.
-    subroutine s_jwl_pcold(rho, A, B, R1, R2, omega, rho0, pcold)
-
-        $:GPU_ROUTINE(function_name='s_jwl_pcold',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, A, B, R1, R2, omega, rho0
-        real(wp), intent(out) :: pcold
-        real(wp)              :: V
-
-        V = rho0/max(rho, sgm_eps)
-        pcold = A*(1._wp - omega/(R1*V))*exp(-R1*V) + B*(1._wp - omega/(R2*V))*exp(-R2*V)
-
-    end subroutine s_jwl_pcold
-
-    !> Compute d(pcold)/d(rho) for the JWL EOS.
-    subroutine s_jwl_dpcold_drho(rho, A, B, R1, R2, omega, rho0, dpcold_drho)
-
-        $:GPU_ROUTINE(function_name='s_jwl_dpcold_drho',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, A, B, R1, R2, omega, rho0
-        real(wp), intent(out) :: dpcold_drho
-        real(wp)              :: V, rho_safe
-
-        rho_safe = max(rho, sgm_eps)
-        V = rho0/rho_safe
-        dpcold_drho = A*exp(-R1*V)*(V/rho_safe)*(R1 - omega/V - omega/(R1*V**2)) + B*exp(-R2*V)*(V/rho_safe)*(R2 - omega/V &
-                            & - omega/(R2*V**2))
-
-    end subroutine s_jwl_dpcold_drho
-
-    !> Compute the JWL isentropic sound-speed squared using the Rocflu/Stanley form.
-    subroutine s_jwl_sound_speed_squared(rho, pres, A, B, R1, R2, omega, rho0, c2)
-
-        $:GPU_ROUTINE(function_name='s_jwl_sound_speed_squared',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, pres, A, B, R1, R2, omega, rho0
-        real(wp), intent(out) :: c2
-        real(wp)              :: rho_safe, exp1, exp2, v, e
-
-        rho_safe = max(rho, sgm_eps)
-        v = rho0/rho_safe
-        exp1 = exp(-R1*v)
-        exp2 = exp(-R2*v)
-
-        e = (v/omega)*(pres - A*(1._wp - omega/(R1*v))*exp1 - B*(1._wp - omega/(R2*v))*exp2)
-        c2 = A*exp1*(omega/(R1*v**2._wp) - R1*(1._wp - omega/(R1*v))) + B*exp2*(omega/(R2*v**2._wp) - R2*(1._wp - omega/(R2*v)))
-        c2 = c2*(-rho0/(rho_safe*rho_safe)) + omega*e/rho0 + omega*pres/(rho_safe*rho0)
-        c2 = max(c2, sgm_eps)
-
-    end subroutine s_jwl_sound_speed_squared
-
-    !> Sound-speed squared for mixed JWL/ideal-gas states using the frozen (mass-weighted) mixture rule, c^2 = sum_k Y_k*c_k^2, with
-    !! each phase sound speed evaluated at its own density rho_k = (Y_k*rho)/alpha_k. The frozen estimate is smooth and monotone
-    !! between the phase values (unlike Wood's equilibrium rule, whose sharp dip at intermediate alpha collapses the HLLC wave-speed
-    !! estimates and drives spurious velocity oscillations at the contact). It recovers each single-material limit and only feeds
-    !! the Riemann wave-speed/dissipation estimate, not the isobaric pressure closure.
-    subroutine s_jwl_mixture_sound_speed_squared(rho, pres, Y, alpha_j, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, &
-        & air_gamma, c2)
-
-        $:GPU_ROUTINE(function_name='s_jwl_mixture_sound_speed_squared',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, pres, Y, alpha_j, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma
-        real(wp), intent(out) :: c2
-        real(wp)              :: rho_safe, Y_safe, a_j, a_a, rho1, rho2, c2_air, c2_jwl
-
-        rho_safe = max(rho, sgm_eps)
-        Y_safe = min(max(Y, 0._wp), 1._wp)
-        a_j = min(max(alpha_j, 0._wp), 1._wp)
-        a_a = 1._wp - a_j
-
-        if (a_j <= sgm_eps) then
-            c2 = max((air_gamma + 1._wp)*pres/rho_safe, sgm_eps)
-            return
-        end if
-
-        if (a_a <= sgm_eps) then
-            call s_jwl_sound_speed_squared(rho_safe, pres, A, B, R1, R2, omega0, rho0, c2)
-            c2 = max(c2, sgm_eps)
-            return
-        end if
-
-        rho1 = max(Y_safe*rho_safe/a_j, sgm_eps)
-        rho2 = max((1._wp - Y_safe)*rho_safe/a_a, sgm_eps)
-
-        call s_jwl_sound_speed_squared(rho1, pres, A, B, R1, R2, omega0, rho0, c2_jwl)
-        c2_air = max((air_gamma + 1._wp)*pres/rho2, sgm_eps)
-
-        ! Frozen (mass-weighted) mixture sound speed: smooth and monotone between the phase values, avoiding Wood's interface dip
-        c2 = Y_safe*max(c2_jwl, sgm_eps) + (1._wp - Y_safe)*c2_air
-        c2 = max(c2, sgm_eps)
-
-    end subroutine s_jwl_mixture_sound_speed_squared
-
-    !> JWL/ideal-gas mixture pressure from specific internal energy and density via the closed-form isobaric
-    !! (mechanical-equilibrium) closure. Each phase is evaluated at its own density rho_k = (Y_k*rho)/alpha_k, so the JWL cold curve
-    !! is taken at the dense-products density and air at its own density. Both EOS are linear in pressure, so the common pressure
-    !! that partitions the cell internal energy is exact (no iteration) and recovers pure air (alpha_j->0) and pure JWL (alpha_j->1)
-    !! exactly.
-    subroutine s_jwl_pressure_er(rho, e, Y, alpha_j, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma, pres)
-
-        $:GPU_ROUTINE(function_name='s_jwl_pressure_er',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, e, Y, alpha_j, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma
-        real(wp), intent(out) :: pres
-        real(wp)              :: rho_safe, Y_safe, a_j, a_a, rho1, rhoe, pref1, Kj
-
-        rho_safe = max(rho, sgm_eps)
-        Y_safe = min(max(Y, 0._wp), 1._wp)
-        a_j = min(max(alpha_j, 0._wp), 1._wp)
-        a_a = 1._wp - a_j
-        rhoe = rho_safe*e
-
-        if (a_j <= sgm_eps) then
-            pres = air_gamma*rhoe
-            return
-        end if
-
-        if (a_a <= sgm_eps) then
-            rho1 = rho_safe
-        else
-            rho1 = max(Y_safe*rho_safe/a_j, sgm_eps)
-        end if
-
-        pref1 = A*(1._wp - omega0*rho1/(R1*rho0))*exp(-R1*rho0/rho1) + B*(1._wp - omega0*rho1/(R2*rho0))*exp(-R2*rho0/rho1)
-        Kj = rho0/max(omega0, sgm_eps)
-
-        pres = (rhoe + a_j*Kj*pref1)/max(a_j*Kj + a_a/max(air_gamma, sgm_eps), sgm_eps)
-
-    end subroutine s_jwl_pressure_er
-
-    !> Specific internal energy from pressure and density: exact inverse of the isobaric mixture pressure in s_jwl_pressure_er,
-    !! keeping primitive<->conservative consistent.
-    subroutine s_jwl_energy_pr(rho, pres, Y, alpha_j, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma, e)
-
-        $:GPU_ROUTINE(function_name='s_jwl_energy_pr',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, pres, Y, alpha_j, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma
-        real(wp), intent(out) :: e
-        real(wp)              :: rho_safe, Y_work, a_j, a_a, rho1, pref1, Kj
-
-        rho_safe = max(rho, sgm_eps)
-        Y_work = min(max(Y, 0._wp), 1._wp)
-        a_j = min(max(alpha_j, 0._wp), 1._wp)
-        a_a = 1._wp - a_j
-
-        if (a_j <= sgm_eps) then
-            e = max(pres/max(air_gamma*rho_safe, sgm_eps), 0._wp)
-            return
-        end if
-
-        if (a_a <= sgm_eps) then
-            rho1 = rho_safe
-        else
-            rho1 = max(Y_work*rho_safe/a_j, sgm_eps)
-        end if
-
-        pref1 = A*(1._wp - omega0*rho1/(R1*rho0))*exp(-R1*rho0/rho1) + B*(1._wp - omega0*rho1/(R2*rho0))*exp(-R2*rho0/rho1)
-        Kj = rho0/max(omega0, sgm_eps)
-
-        e = (pres*(a_j*Kj + a_a/max(air_gamma, sgm_eps)) - a_j*Kj*pref1)/rho_safe
-        e = max(e, 0._wp)
-
-    end subroutine s_jwl_energy_pr
-
-    !> Reactive (progressive-burn) JWL/ideal-gas mixture pressure from specific internal energy and density. The condensed phase is
-    !! a reaction-progress (lambda) blend of the unreacted-explosive JWL EOS (lambda=0) and the products JWL EOS (lambda=1), so the
-    !! products' pressure and density evolve as the burn proceeds instead of being a fixed constant state. The unreacted-explosive
-    !! constants are taken from the module globals jwl_unr_*. Reduces to s_jwl_pressure_er when lambda=1.
-    subroutine s_jwl_reactive_pressure_er(rho, e, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma, pres)
-
-        $:GPU_ROUTINE(function_name='s_jwl_reactive_pressure_er',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, e, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma
-        real(wp), intent(out) :: pres
-        real(wp)              :: rho_safe, Y_safe, a_j, a_a, rho1, rhoe, lam, pref_p, pref_u, pref1, K_p, K_u, Kj
-
-        rho_safe = max(rho, sgm_eps)
-        Y_safe = min(max(Y, 0._wp), 1._wp)
-        a_j = min(max(alpha_j, 0._wp), 1._wp)
-        a_a = 1._wp - a_j
-        rhoe = rho_safe*e
-        lam = min(max(lambda, 0._wp), 1._wp)
-
-        if (a_j <= sgm_eps) then
-            pres = air_gamma*rhoe
-            return
-        end if
-
-        if (a_a <= sgm_eps) then
-            rho1 = rho_safe
-        else
-            rho1 = max(Y_safe*rho_safe/a_j, sgm_eps)
-        end if
-
-        pref_p = A*(1._wp - omega0*rho1/(R1*rho0))*exp(-R1*rho0/rho1) + B*(1._wp - omega0*rho1/(R2*rho0))*exp(-R2*rho0/rho1)
-        K_p = rho0/max(omega0, sgm_eps)
-        pref_u = jwl_unr_A*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R1*jwl_unr_rho0))*exp(-jwl_unr_R1*jwl_unr_rho0/rho1) &
-                            & + jwl_unr_B*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R2*jwl_unr_rho0))*exp(-jwl_unr_R2*jwl_unr_rho0/rho1)
-        K_u = jwl_unr_rho0/max(jwl_unr_omega, sgm_eps)
-
-        pref1 = (1._wp - lam)*pref_u + lam*pref_p
-        Kj = (1._wp - lam)*K_u + lam*K_p
-
-        pres = (rhoe + a_j*Kj*pref1)/max(a_j*Kj + a_a/max(air_gamma, sgm_eps), sgm_eps)
-
-    end subroutine s_jwl_reactive_pressure_er
-
-    !> Specific internal energy from pressure and density for the reactive JWL mixture: exact inverse of s_jwl_reactive_pressure_er,
-    !! keeping primitive<->conservative consistent across the burn.
-    subroutine s_jwl_reactive_energy_pr(rho, pres, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma, e)
-
-        $:GPU_ROUTINE(function_name='s_jwl_reactive_energy_pr',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: rho, pres, Y, alpha_j, lambda, A, B, R1, R2, omega0, rho0, air_gamma
-        real(wp), intent(out) :: e
-        real(wp)              :: rho_safe, Y_safe, a_j, a_a, rho1, lam, pref_p, pref_u, pref1, K_p, K_u, Kj
-
-        rho_safe = max(rho, sgm_eps)
-        Y_safe = min(max(Y, 0._wp), 1._wp)
-        a_j = min(max(alpha_j, 0._wp), 1._wp)
-        a_a = 1._wp - a_j
-        lam = min(max(lambda, 0._wp), 1._wp)
-
-        if (a_j <= sgm_eps) then
-            e = max(pres/max(air_gamma*rho_safe, sgm_eps), 0._wp)
-            return
-        end if
-
-        if (a_a <= sgm_eps) then
-            rho1 = rho_safe
-        else
-            rho1 = max(Y_safe*rho_safe/a_j, sgm_eps)
-        end if
-
-        pref_p = A*(1._wp - omega0*rho1/(R1*rho0))*exp(-R1*rho0/rho1) + B*(1._wp - omega0*rho1/(R2*rho0))*exp(-R2*rho0/rho1)
-        K_p = rho0/max(omega0, sgm_eps)
-        pref_u = jwl_unr_A*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R1*jwl_unr_rho0))*exp(-jwl_unr_R1*jwl_unr_rho0/rho1) &
-                            & + jwl_unr_B*(1._wp - jwl_unr_omega*rho1/(jwl_unr_R2*jwl_unr_rho0))*exp(-jwl_unr_R2*jwl_unr_rho0/rho1)
-        K_u = jwl_unr_rho0/max(jwl_unr_omega, sgm_eps)
-
-        pref1 = (1._wp - lam)*pref_u + lam*pref_p
-        Kj = (1._wp - lam)*K_u + lam*K_p
-
-        e = (pres*(a_j*Kj + a_a/max(air_gamma, sgm_eps)) - a_j*Kj*pref1)/rho_safe
-        e = max(e, 0._wp)
-
-    end subroutine s_jwl_reactive_energy_pr
-
-    !> Lee-Tarver Ignition & Growth reaction rate dlambda/dt for progressive JWL burn. Three additive terms (ignition, growth,
-    !! completion) gated by the lambda-window limiters jwl_lt_figmax/fg1max/fg2min. Coefficients (jwl_lt_*) and the unreacted
-    !! reference density (jwl_unr_rho0) are read from the module globals. The caller supplies pressure and (condensed-phase)
-    !! density; coefficient units must be consistent with the case's pressure units.
-    pure function f_lee_tarver_rate(lambda, rho, pres) result(rate)
-
-        $:GPU_ROUTINE(function_name='f_lee_tarver_rate',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in) :: lambda, rho, pres
-        real(wp)             :: rate
-        real(wp)             :: lam, one_m_lam, p_pos, comp, rho0u
-
-        lam = min(max(lambda, 0._wp), 1._wp)
-        one_m_lam = max(1._wp - lam, 0._wp)
-        p_pos = max(pres, 0._wp)
-        rho0u = max(jwl_unr_rho0, sgm_eps)
-        rate = 0._wp
-
-        ! Ignition term: hot-spot creation driven by compression (rho/rho0 - 1 - a)
-        if (lam < jwl_lt_figmax) then
-            comp = rho/rho0u - 1._wp - jwl_lt_a
-            if (comp > 0._wp) then
-                rate = rate + jwl_lt_I*one_m_lam**jwl_lt_b*comp**jwl_lt_x
-            end if
-        end if
-
-        ! Growth term: pressure-driven burn spreading from hot spots
-        if (lam < jwl_lt_fg1max .and. lam > 0._wp) then
-            rate = rate + jwl_lt_G1*one_m_lam**jwl_lt_c*lam**jwl_lt_d*p_pos**jwl_lt_y
-        end if
-
-        ! Completion term: fast burnout at high reaction progress
-        if (lam > jwl_lt_fg2min .and. one_m_lam > 0._wp) then
-            rate = rate + jwl_lt_G2*one_m_lam**jwl_lt_e*lam**jwl_lt_g*p_pos**jwl_lt_z
-        end if
-
-        rate = max(rate, 0._wp)
-
-    end function f_lee_tarver_rate
-
-    !> Rocflu-style temperature from pressure and density.
-    subroutine s_jwl_temperature_pr(rho, pres, e, Y, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma, cv, T)
-
-        $:GPU_ROUTINE(function_name='s_jwl_temperature_pr',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)    :: rho, pres, e, Y, A, B, R1, R2, omega0, rho0, E0, air_e0, air_rho0, air_gamma, cv
-        real(wp), intent(inout) :: T
-        real(wp)                :: rho_safe, Y_safe, cv_safe, T_air, T_jwl
-
-        rho_safe = max(rho, sgm_eps)
-        Y_safe = min(max(Y, 0._wp), 1._wp)
-        cv_safe = max(cv, sgm_eps)
-
-        ! Mass-weighted blend, consistent with the blended pressure EOS: ideal-gas air
-        ! at Y->0 and the JWL thermal relation at Y->1, continuous in between.
-        T_air = pres/max(air_gamma*rho_safe*cv_safe, sgm_eps)
-        T_jwl = (pres - A*exp(-R1*rho0/rho_safe) - B*exp(-R2*rho0/rho_safe))/max(omega0*cv_safe*rho_safe, sgm_eps)
-
-        T = (1._wp - Y_safe)*T_air + Y_safe*T_jwl
-        if (T <= 0._wp .and. Y_safe > 1.e-2_wp) T = 270._wp
-
-    end subroutine s_jwl_temperature_pr
 
     !> Compute the pressure from the appropriate equation of state
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag, jwl_Y, &
@@ -439,9 +126,7 @@ contains
                 if (present(jwl_alpha)) alpha_jwl = jwl_alpha
                 eint = energy - dyn_p
                 e_sp = eint/max(rho, sgm_eps)
-                call s_jwl_pressure_er(rho, e_sp, Y_jwl, alpha_jwl, jwl_As(jwl_idx), jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), &
-                                       & jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), &
-                                       & jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), pres)
+                call s_jwl_mix_pressure_er(rho, e_sp, Y_jwl, alpha_jwl, jwl_idx, pres)
                 if (pres < 1._wp) then
 #ifdef MFC_SIMULATION
                     $:GPU_ATOMIC(atomic='update')
@@ -482,9 +167,8 @@ contains
                     alpha_jwl = 1._wp
                     if (present(jwl_alpha)) alpha_jwl = jwl_alpha
                     e_sp = (energy - 0.5_wp*(mom**2._wp)/rho - E_e)/max(rho, sgm_eps)
-                    call s_jwl_pressure_er(rho, e_sp, Y_jwl, alpha_jwl, jwl_As(jwl_idx), jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), &
-                                           & jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), &
-                                           & jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), pres)
+                    ! Mixture pressure via the active JWL/air mixture closure (jwl_mix_type).
+                    call s_jwl_mix_pressure_er(rho, e_sp, Y_jwl, alpha_jwl, jwl_idx, pres)
                 else
                     pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
                 end if
@@ -694,19 +378,11 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(jwl_As    (1:num_fluids))
-        @:ALLOCATE(jwl_Bs    (1:num_fluids))
-        @:ALLOCATE(jwl_R1s   (1:num_fluids))
-        @:ALLOCATE(jwl_R2s   (1:num_fluids))
-        @:ALLOCATE(jwl_omegas(1:num_fluids))
-        @:ALLOCATE(jwl_rho0s (1:num_fluids))
-        @:ALLOCATE(jwl_E0s   (1:num_fluids))
-        @:ALLOCATE(jwl_air_e0s    (1:num_fluids))
-        @:ALLOCATE(jwl_air_rho0s  (1:num_fluids))
-        @:ALLOCATE(jwl_air_gammas (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
-        jwl_idx = 0
+        ! Allocate/populate the JWL parameter tables, set jwl_idx, and cache the closure specific heats.
+        call s_initialize_jwl_module
+
         jwl_pressure_floor_count = 0
         num_jwl = 0
         do i = 1, num_fluids
@@ -719,20 +395,7 @@ contains
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
-            jwl_As(i) = fluid_pp(i)%jwl_A
-            jwl_Bs(i) = fluid_pp(i)%jwl_B
-            jwl_R1s(i) = fluid_pp(i)%jwl_R1
-            jwl_R2s(i) = fluid_pp(i)%jwl_R2
-            jwl_omegas(i) = fluid_pp(i)%jwl_omega
-            jwl_rho0s(i) = fluid_pp(i)%jwl_rho0
-            jwl_E0s(i) = fluid_pp(i)%jwl_E0
-            jwl_air_e0s(i) = fluid_pp(i)%jwl_air_e0
-            jwl_air_rho0s(i) = fluid_pp(i)%jwl_air_rho0
-            jwl_air_gammas(i) = fluid_pp(i)%jwl_air_gamma
-            if (eos_idxs(i) == 2) then
-                jwl_idx = i
-                num_jwl = num_jwl + 1
-            end if
+            if (eos_idxs(i) == 2) num_jwl = num_jwl + 1
         end do
 
         if (num_jwl > 1) call s_mpi_abort('JWL EOS currently supports one JWL fluid per case.')
@@ -758,8 +421,7 @@ contains
         end do
 
         $:GPU_UPDATE(device='[eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc]')
-        $:GPU_UPDATE(device='[jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s]')
-        $:GPU_UPDATE(device='[jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas, jwl_idx, jwl_pressure_floor_count]')
+        $:GPU_UPDATE(device='[jwl_pressure_floor_count]')
 
 #ifdef MFC_SIMULATION
         if (viscous) then
@@ -1338,10 +1000,8 @@ contains
                                 Y_jwl = q_prim_vf(jwl_idx)%sf(j, k, l)/max(rho, sgm_eps)
                                 alpha_jwl = q_prim_vf(eqn_idx%adv%beg + jwl_idx - 1)%sf(j, k, l)
                             end if
-                            call s_jwl_energy_pr(rho, q_prim_vf(eqn_idx%E)%sf(j, k, l), Y_jwl, alpha_jwl, jwl_As(jwl_idx), &
-                                                 & jwl_Bs(jwl_idx), jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                 & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                 & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), e_sp)
+                            ! Mixture energy via the active JWL/air closure (inverse of s_jwl_mix_pressure_er).
+                            call s_jwl_mix_energy_pr(rho, q_prim_vf(eqn_idx%E)%sf(j, k, l), Y_jwl, alpha_jwl, jwl_idx, e_sp)
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + rho*e_sp
                         else if (mhd) then
                             if (n == 0) then
@@ -1574,10 +1234,8 @@ contains
                                 Y_jwl = alpha_rho_K(jwl_idx)/max(rho_K, sgm_eps)
                                 alpha_jwl = alpha_K(jwl_idx)
                             end if
-                            call s_jwl_energy_pr(rho_K, pres_K, Y_jwl, alpha_jwl, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                 & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), jwl_rho0s(jwl_idx), &
-                                                 & jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), jwl_air_rho0s(jwl_idx), &
-                                                 & jwl_air_gammas(jwl_idx), e_sp)
+                            ! Mixture energy via the active JWL/air closure (inverse of s_jwl_mix_pressure_er).
+                            call s_jwl_mix_energy_pr(rho_K, pres_K, Y_jwl, alpha_jwl, jwl_idx, e_sp)
                             E_K = rho_K*e_sp + 5.e-1_wp*rho_K*vel_K_sum
                         else
                             E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
@@ -1705,15 +1363,15 @@ contains
         end if
 
         @:DEALLOCATE(eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
-        @:DEALLOCATE(jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s)
-        @:DEALLOCATE(jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas, Gs_vc)
+        @:DEALLOCATE(Gs_vc)
+        call s_finalize_jwl_module
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
 #else
         @:DEALLOCATE(eos_idxs, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps)
-        @:DEALLOCATE(jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s)
-        @:DEALLOCATE(jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas, Gs_vc)
+        @:DEALLOCATE(Gs_vc)
+        call s_finalize_jwl_module
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1765,11 +1423,18 @@ contains
                 else if (jwl_idx <= size(adv)) then
                     alpha_jwl = adv(jwl_idx)
                 end if
-                call s_jwl_mixture_sound_speed_squared(rho, pres, Y_jwl, alpha_jwl, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
-                                                       & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
-                                                       & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
-                                                       & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), c)
-                c = max(c, jwl_omegas(jwl_idx)*max(pres, 1._wp)/(max(rho, sgm_eps)*jwl_rho0s(jwl_idx)))
+                if (jwl_mix_type == 1) then
+                    call s_jwl_kuhl_sound_speed_squared(rho, pres, Y_jwl, alpha_jwl, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
+                                                        & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
+                                                        & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
+                                                        & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), c)
+                else
+                    call s_jwl_mixture_sound_speed_squared(rho, pres, Y_jwl, alpha_jwl, jwl_As(jwl_idx), jwl_Bs(jwl_idx), &
+                                                           & jwl_R1s(jwl_idx), jwl_R2s(jwl_idx), jwl_omegas(jwl_idx), &
+                                                           & jwl_rho0s(jwl_idx), jwl_E0s(jwl_idx), jwl_air_e0s(jwl_idx), &
+                                                           & jwl_air_rho0s(jwl_idx), jwl_air_gammas(jwl_idx), c)
+                end if
+                c = max(c, jwl_omegas(jwl_idx)*max(pres, 1._wp)/max(rho, sgm_eps))
             else if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
                 blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
