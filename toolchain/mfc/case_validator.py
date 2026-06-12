@@ -177,6 +177,23 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
+    "check_non_newtonian": {
+        "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
+        "category": "Feature Compatibility",
+        "math": r"\tau = (\tau_0 + K \dot{\gamma}^n) \hat{e}, \quad \mu_{\rm eff} \in [\mu_{\min}, \mu_{\max}]",
+        "explanation": (
+            "Per-fluid Herschel-Bulkley shear-dependent viscosity. "
+            "Requires viscous=T, model_eqns 2 or 3, riemann_solver 1 (HLL) or 2 (HLLC), "
+            "and K, nn, mu_max to be set. "
+            "When tau0 > 0, hb_m (Papanastasiou regularization) must also be set. "
+            "K, nn, mu_max must be positive; mu_min and hb_m must be positive when set; tau0 must be non-negative. "
+            "Re(2) and mu_bulk (bulk viscosity) are rejected for non-Newtonian fluids, "
+            "and HB parameters are rejected on fluids without non_newtonian=T. "
+            "Incompatible with igr."
+        ),
+        "references": ["Papanastasiou87"],
+        "docs_section": "sec-non-newtonian",
+    },
     # Acoustic Sources
     "check_acoustic_source": {
         "title": "Acoustic Sources",
@@ -932,6 +949,66 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+
+    def check_non_newtonian(self):
+        """Checks constraints on non-Newtonian (Herschel-Bulkley) parameters (simulation)"""
+        num_fluids = self.get("num_fluids")
+        if num_fluids is None:
+            num_fluids = 1
+
+        viscous = self.get("viscous", "F") == "T"
+        igr = self.get("igr", "F") == "T"
+        model_eqns = self.get("model_eqns")
+        riemann_solver = self.get("riemann_solver")
+
+        for i in range(1, num_fluids + 1):
+            if self.get(f"fluid_pp({i})%non_newtonian", "F") != "T":
+                for hb_param in ["K", "nn", "tau0", "hb_m", "mu_min", "mu_max", "mu_bulk"]:
+                    self.prohibit(
+                        self.get(f"fluid_pp({i})%{hb_param}") is not None,
+                        f"fluid_pp({i})%{hb_param} is set, but fluid_pp({i})%non_newtonian is not enabled",
+                    )
+                continue
+
+            self.prohibit(not viscous, f"fluid_pp({i})%non_newtonian requires viscous = T")
+            self.prohibit(self.get(f"fluid_pp({i})%K") is None, f"fluid_pp({i})%non_newtonian requires fluid_pp({i})%K to be set")
+            self.prohibit(self.get(f"fluid_pp({i})%nn") is None, f"fluid_pp({i})%non_newtonian requires fluid_pp({i})%nn to be set")
+            self.prohibit(self.get(f"fluid_pp({i})%mu_max") is None, f"fluid_pp({i})%non_newtonian requires fluid_pp({i})%mu_max to be set")
+
+            K = self.get(f"fluid_pp({i})%K")
+            nn = self.get(f"fluid_pp({i})%nn")
+            mu_min = self.get(f"fluid_pp({i})%mu_min")
+            mu_max = self.get(f"fluid_pp({i})%mu_max")
+            hb_m = self.get(f"fluid_pp({i})%hb_m")
+            tau0 = self.get(f"fluid_pp({i})%tau0", 0.0)
+
+            self.prohibit(K is not None and K <= 0, f"fluid_pp({i})%K must be positive")
+            self.prohibit(nn is not None and nn <= 0, f"fluid_pp({i})%nn must be positive")
+            self.prohibit(mu_max is not None and mu_max <= 0, f"fluid_pp({i})%mu_max must be positive")
+            self.prohibit(mu_min is not None and mu_min <= 0, f"fluid_pp({i})%mu_min must be positive")
+            self.prohibit(hb_m is not None and hb_m <= 0, f"fluid_pp({i})%hb_m must be positive")
+            self.prohibit(tau0 is not None and tau0 < 0, f"fluid_pp({i})%tau0 must be non-negative")
+
+            if tau0 is not None and tau0 > 0:
+                self.prohibit(hb_m is None, f"fluid_pp({i})%non_newtonian: tau0 > 0 requires fluid_pp({i})%hb_m to be set")
+
+            if mu_min is not None and mu_max is not None:
+                self.prohibit(mu_max <= mu_min, f"fluid_pp({i})%non_newtonian: mu_max must exceed mu_min")
+
+            self.prohibit(igr, f"fluid_pp({i})%non_newtonian is incompatible with igr")
+            self.prohibit(model_eqns is not None and model_eqns not in (2, 3), f"fluid_pp({i})%non_newtonian requires model_eqns 2 or 3")
+            self.prohibit(
+                riemann_solver is not None and riemann_solver not in (1, 2),
+                f"fluid_pp({i})%non_newtonian requires riemann_solver 1 (HLL) or 2 (HLLC)",
+            )
+            self.prohibit(
+                self.get(f"fluid_pp({i})%mu_bulk") is not None,
+                f"fluid_pp({i})%mu_bulk (non-Newtonian bulk viscosity) is not yet supported",
+            )
+            self.prohibit(
+                self.get(f"fluid_pp({i})%Re(2)") is not None,
+                f"fluid_pp({i})%Re(2) (bulk viscosity) is not supported for non-Newtonian fluids",
+            )
 
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""
@@ -2141,6 +2218,7 @@ class CaseValidator:
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
         self.check_viscosity()
+        self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
         self.check_acoustic_source()

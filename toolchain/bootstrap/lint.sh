@@ -38,6 +38,7 @@ if [ "$RUN_TESTS" = true ]; then
     python3 -m unittest mfc.cli.test_cli -v
     python3 -m unittest mfc.viz.test_viz -v
     python3 -m unittest mfc.run.test_archive -v
+    python3 -m unittest mfc.test.test_jwl_inverse -v
     cd - > /dev/null
 fi
 

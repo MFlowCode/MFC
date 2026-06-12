@@ -290,6 +290,17 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
 
+    !> @name Herschel-Bulkley non-Newtonian viscosity: per-fluid flags and parameter arrays.
+    !> @{
+    logical                             :: any_non_newtonian  !< .true. if any fluid is non-Newtonian
+    logical, allocatable, dimension(:)  :: is_non_newtonian   !< per-fluid NN flag
+    real(wp), allocatable, dimension(:) :: hb_tau0, hb_K, hb_nn, hb_m_arr
+    real(wp), allocatable, dimension(:) :: hb_mu_min, hb_mu_max
+    real(wp), allocatable, dimension(:) :: fluid_inv_re       !< per-fluid Newtonian inverse-Re
+    !> @}
+
+    $:GPU_DECLARE(create='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
+
     ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values
     !> @{
     real(wp) :: wa_flg
@@ -627,6 +638,7 @@ contains
         z_domain%beg = dflt_real; z_domain%end = dflt_real
 
         ! Fluids physical parameters
+        any_non_newtonian = .false.
         do i = 1, num_fluids_max
             fluid_pp(i)%eos = 1
             fluid_pp(i)%gamma = dflt_real
@@ -636,6 +648,14 @@ contains
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%non_newtonian = .false.
+            fluid_pp(i)%K = dflt_real
+            fluid_pp(i)%nn = dflt_real
+            fluid_pp(i)%tau0 = 0._wp
+            fluid_pp(i)%hb_m = dflt_real
+            fluid_pp(i)%mu_min = dflt_real
+            fluid_pp(i)%mu_max = dflt_real
+            fluid_pp(i)%mu_bulk = dflt_real
             fluid_pp(i)%jwl_A = dflt_real
             fluid_pp(i)%jwl_B = dflt_real
             fluid_pp(i)%jwl_R1 = dflt_real
@@ -1122,6 +1142,25 @@ contains
                         k = k + 1; Re_idx(2, k) = i
                     end if
                 end do
+
+                @:ALLOCATE(is_non_newtonian(1:num_fluids))
+                @:ALLOCATE(hb_tau0(1:num_fluids), hb_K(1:num_fluids), hb_nn(1:num_fluids), hb_m_arr(1:num_fluids))
+                @:ALLOCATE(hb_mu_min(1:num_fluids), hb_mu_max(1:num_fluids))
+                @:ALLOCATE(fluid_inv_re(1:num_fluids))
+
+                any_non_newtonian = .false.
+                do i = 1, num_fluids
+                    is_non_newtonian(i) = fluid_pp(i)%non_newtonian
+                    if (is_non_newtonian(i)) any_non_newtonian = .true.
+                    hb_tau0(i) = fluid_pp(i)%tau0
+                    hb_K(i) = fluid_pp(i)%K
+                    hb_nn(i) = fluid_pp(i)%nn
+                    hb_m_arr(i) = fluid_pp(i)%hb_m
+                    hb_mu_min(i) = fluid_pp(i)%mu_min
+                    hb_mu_max(i) = fluid_pp(i)%mu_max
+                end do
+
+                $:GPU_UPDATE(device='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
             end if
         end if
 
@@ -1369,6 +1408,10 @@ contains
 
         if (viscous) then
             @:DEALLOCATE(Re_idx)
+            @:DEALLOCATE(is_non_newtonian)
+            @:DEALLOCATE(hb_tau0, hb_K, hb_nn, hb_m_arr)
+            @:DEALLOCATE(hb_mu_min, hb_mu_max)
+            @:DEALLOCATE(fluid_inv_re)
         end if
 
         if (bubbles_euler) then
