@@ -88,15 +88,16 @@ contains
         real(wp)                  :: vel_L_tmp, vel_R_tmp
         real(wp)                  :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp)                  :: alpha_L_sum, alpha_R_sum
-        real(wp)                  :: zcoef, pcorr    !< low Mach number correction
+        real(wp)                  :: zcoef, pcorr  !< low Mach number correction
         type(riemann_states)      :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
-        type(riemann_states)      :: Ga              !< Gamma (Lorentz factor)
+        type(riemann_states)      :: Ga  !< Gamma (Lorentz factor)
         type(riemann_states)      :: vdotB, B2
-        type(riemann_states_vec3) :: b4              !< 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm              !< Conservative momentum variables
-        integer                   :: i, j, k, l, q   !< Generic loop iterators
+        type(riemann_states_vec3) :: b4  !< 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm  !< Conservative momentum variables
+        integer                   :: i, j, k, l, q  !< Generic loop iterators
         integer, dimension(3)     :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+        integer, dimension(2)     :: Re_size_loc  !< host copy of Re_size; amdflang reads the declare-target original stale cross-TU
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -104,6 +105,7 @@ contains
 
         ! Reshaping inputted data based on dimensional splitting direction
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+        Re_size_loc = Re_size
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
                      (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2', 'is1', 'is3'), &
@@ -119,7 +121,8 @@ contains
                                     & vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, &
                                     & rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, H_L, &
                                     & H_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, &
-                                    & Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]')
+                                    & Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R, Gamm_L, Gamm_R, &
+                                    & flux_tau_L, flux_tau_R]', firstprivate='[Re_size_loc]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -216,11 +219,11 @@ contains
                                     Re_L(i) = dflt_real
                                     Re_R(i) = dflt_real
 
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
+                                    if (Re_size_loc(i) > 0) Re_L(i) = 0._wp
+                                    if (Re_size_loc(i) > 0) Re_R(i) = 0._wp
 
                                     $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, Re_size(i)
+                                    do q = 1, Re_size_loc(i)
                                         Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
                                         Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
                                     end do
@@ -599,7 +602,7 @@ contains
 
         if (viscous) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, &
-                                & vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]')
+                                & vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -650,11 +653,11 @@ contains
                             Re_L(i) = dflt_real
                             Re_R(i) = dflt_real
 
-                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                            if (Re_size(i) > 0) Re_R(i) = 0._wp
+                            if (Re_size_loc(i) > 0) Re_L(i) = 0._wp
+                            if (Re_size_loc(i) > 0) Re_R(i) = 0._wp
 
                             $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, Re_size(i)
+                            do q = 1, Re_size_loc(i)
                                 Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
                                 Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
                             end do
