@@ -64,7 +64,7 @@ contains
                             call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
                             ! find the indices to the left and right of the IB in i, j, k
-                            call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
+                            call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
 
                             ! skip patches whose bounding box does not overlap this rank's domain
                             if (ir < il .or. jr < jl .or. kr < kl) cycle
@@ -136,7 +136,7 @@ contains
                         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
                         ! find the indices to the left and right of the IB in i, j, k
-                        call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
+                        call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
 
                         ! skip patches whose bounding box does not overlap this rank's domain
                         if (ir < il .or. jr < jl) cycle
@@ -217,7 +217,7 @@ contains
                             call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
                             ! find the indices to the left and right of the IB in i, j, k
-                            call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
+                            call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
 
                             do k = kl, kr
                                 do j = jl, jr
@@ -286,8 +286,7 @@ contains
                         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
                         ! find the indices to the left and right of the IB in i, j, k
-                        ! find the indices to the left and right of the IB in i, j, k
-                        call get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
+                        call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
 
                         do j = jl, jr
                             do i = il, ir
@@ -458,19 +457,20 @@ contains
 
     end subroutine s_update_ib_rotation_matrix
 
-    subroutine get_bounding_indices(center, patch_id, il, ir, jl, jr, kl, kr)
+    subroutine get_bounding_indices(patch, center, patch_id, il, ir, jl, jr, kl, kr)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(3), intent(in) :: center
-        integer, intent(in)                :: patch_id
-        integer, intent(out)               :: il, ir, jl, jr, kl, kr
-        real(wp), dimension(3)             :: bbox_min, bbox_max, local_corner, world_corner
-        real(wp), dimension(2)             :: lx, ly, lz
-        integer                            :: cx, cy, cz
-        logical                            :: outside_domain
+        type(ib_patch_parameters), intent(in) :: patch  !< EXPERIMENT: passed patch_ib(patch_id) to test declare-target array access
+        real(wp), dimension(3), intent(in)    :: center
+        integer, intent(in)                   :: patch_id
+        integer, intent(out)                  :: il, ir, jl, jr, kl, kr
+        real(wp), dimension(3)                :: bbox_min, bbox_max, local_corner, world_corner
+        real(wp), dimension(2)                :: lx, ly, lz
+        integer                               :: cx, cy, cz
+        logical                               :: outside_domain
 
-        if (patch_ib(patch_id)%geometry == 2 .or. patch_ib(patch_id)%geometry == 8) then
+        if (patch%geometry == 2 .or. patch%geometry == 8) then
             ! circle and sphere geometries
             bbox_min = center - patch_ib(patch_id)%radius
             bbox_max = center + patch_ib(patch_id)%radius

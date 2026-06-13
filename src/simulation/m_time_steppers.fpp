@@ -756,7 +756,8 @@ contains
                     ! update the angular velocity with the torque value
                     patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, &
                              & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
-                    call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
+                    ! patch_ib(i)%moment = 0.5_wp*patch_ib(i)%mass*(patch_ib(i)%radius)**2
+                    if (num_dims == 3) call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                     ! update the moment of inertia to be based on the direction of the angular momentum
                     patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment
                 end if
