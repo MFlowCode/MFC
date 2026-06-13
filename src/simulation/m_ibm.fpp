@@ -1137,16 +1137,6 @@ contains
         real(wp), dimension(3)             :: position, closest_point_along_axis, vector_to_axis, normal_axis
         integer                            :: i, j, k, count, ib_marker
 
-        if (p == 0) then
-            normal_axis = [0, 0, 1]
-        else if (sqrt(sum(axis**2)) < sgm_eps) then
-            ! if the object is not actually rotating at this time, return a dummy value and exit
-            patch_ib(ib_idx)%moment = 1._wp
-            return
-        else
-            normal_axis = axis/sqrt(sum(axis))
-        end if
-
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
         if (patch_ib(ib_idx)%geometry == 2) then  ! circle
             patch_ib(ib_idx)%moment = 0.5_wp*patch_ib(ib_idx)%mass*(patch_ib(ib_idx)%radius)**2
@@ -1166,6 +1156,16 @@ contains
             end if
 
             ib_marker = patch_ib(ib_idx)%gbl_patch_id
+
+            if (p == 0) then
+                normal_axis = [0, 0, 1]
+            else if (sqrt(sum(axis**2)) < sgm_eps) then
+                ! if the object is not actually rotating at this time, return a dummy value and exit
+                patch_ib(ib_idx)%moment = 1._wp
+                return
+            else
+                normal_axis = axis/sqrt(sum(axis**2))
+            end if
 
             do i = 0, m
                 do j = 0, n
