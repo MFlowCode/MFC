@@ -64,7 +64,7 @@ contains
                             call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
                             ! find the indices to the left and right of the IB in i, j, k
-                            call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
+                            call get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
 
                             ! skip patches whose bounding box does not overlap this rank's domain
                             if (ir < il .or. jr < jl .or. kr < kl) cycle
@@ -136,7 +136,7 @@ contains
                         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
                         ! find the indices to the left and right of the IB in i, j, k
-                        call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
+                        call get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
 
                         ! skip patches whose bounding box does not overlap this rank's domain
                         if (ir < il .or. jr < jl) cycle
@@ -217,7 +217,7 @@ contains
                             call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
 
                             ! find the indices to the left and right of the IB in i, j, k
-                            call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
+                            call get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
 
                             do k = kl, kr
                                 do j = jl, jr
@@ -286,7 +286,7 @@ contains
                         call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
 
                         ! find the indices to the left and right of the IB in i, j, k
-                        call get_bounding_indices(patch_ib(patch_id), center, patch_id, il, ir, jl, jr, kl, kr)
+                        call get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
 
                         do j = jl, jr
                             do i = il, ir
@@ -457,13 +457,12 @@ contains
 
     end subroutine s_update_ib_rotation_matrix
 
-    subroutine get_bounding_indices(patch, center, patch_id, il, ir, jl, jr, kl, kr)
+    subroutine get_bounding_indices(patch, center, il, ir, jl, jr, kl, kr)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        type(ib_patch_parameters), intent(in) :: patch  !< EXPERIMENT: passed patch_ib(patch_id) to test declare-target array access
+        type(ib_patch_parameters), intent(in) :: patch
         real(wp), dimension(3), intent(in)    :: center
-        integer, intent(in)                   :: patch_id
         integer, intent(out)                  :: il, ir, jl, jr, kl, kr
         real(wp), dimension(3)                :: bbox_min, bbox_max, local_corner, world_corner
         real(wp), dimension(2)                :: lx, ly, lz
@@ -472,22 +471,22 @@ contains
 
         if (patch%geometry == 2 .or. patch%geometry == 8) then
             ! circle and sphere geometries
-            bbox_min = center - patch_ib(patch_id)%radius
-            bbox_max = center + patch_ib(patch_id)%radius
-        else if (patch_ib(patch_id)%geometry == 3) then
+            bbox_min = center - patch%radius
+            bbox_max = center + patch%radius
+        else if (patch%geometry == 3) then
             ! rectangular geometries
-            bbox_min = center - 0.5_wp*sqrt(patch_ib(patch_id)%length_x**2 + patch_ib(patch_id)%length_y**2)
-            bbox_max = center + 0.5_wp*sqrt(patch_ib(patch_id)%length_x**2 + patch_ib(patch_id)%length_y**2)
-        else if (patch_ib(patch_id)%geometry == 4 .or. patch_ib(patch_id)%geometry == 11) then
+            bbox_min = center - 0.5_wp*sqrt(patch%length_x**2 + patch%length_y**2)
+            bbox_max = center + 0.5_wp*sqrt(patch%length_x**2 + patch%length_y**2)
+        else if (patch%geometry == 4 .or. patch%geometry == 11) then
             ! airfoil geometries TODO :: This can be better optimized, since airfoils are typically very long in one dimension
-            bbox_min = center - ib_airfoil(patch_ib(patch_id)%airfoil_id)%c
-            bbox_max = center + ib_airfoil(patch_ib(patch_id)%airfoil_id)%c
-        else if (patch_ib(patch_id)%geometry == 5) then
+            bbox_min = center - ib_airfoil(patch%airfoil_id)%c
+            bbox_max = center + ib_airfoil(patch%airfoil_id)%c
+        else if (patch%geometry == 5) then
             ! STL model geometry
-            lx(1) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 1, 1) + patch_ib(patch_id)%centroid_offset(1)
-            lx(2) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 1, 3) + patch_ib(patch_id)%centroid_offset(1)
-            ly(1) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 2, 1) + patch_ib(patch_id)%centroid_offset(2)
-            ly(2) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 2, 3) + patch_ib(patch_id)%centroid_offset(2)
+            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
+            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
+            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
+            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
 
             bbox_min = 1e12
             bbox_max = -1e12
@@ -495,35 +494,33 @@ contains
             do cx = 1, 2
                 do cy = 1, 2
                     local_corner = [lx(cx), ly(cy), 0._wp]
-                    world_corner = matmul(patch_ib(patch_id)%rotation_matrix, local_corner) + center
+                    world_corner = matmul(patch%rotation_matrix, local_corner) + center
                     bbox_min(1) = min(bbox_min(1), world_corner(1))
                     bbox_min(2) = min(bbox_min(2), world_corner(2))
                     bbox_max(1) = max(bbox_max(1), world_corner(1))
                     bbox_max(2) = max(bbox_max(2), world_corner(2))
                 end do
             end do
-        else if (patch_ib(patch_id)%geometry == 6) then
+        else if (patch%geometry == 6) then
             ! ellipse geometry
-            bbox_min = center - 0.5_wp*max(patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y)
-            bbox_max = center + 0.5_wp*max(patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y)
-        else if (patch_ib(patch_id)%geometry == 9) then
+            bbox_min = center - 0.5_wp*max(patch%length_x, patch%length_y)
+            bbox_max = center + 0.5_wp*max(patch%length_x, patch%length_y)
+        else if (patch%geometry == 9) then
             ! cuboid geometries
-            bbox_min = center - 0.5_wp*sqrt(patch_ib(patch_id)%length_x**2 + patch_ib(patch_id)%length_y**2 &
-                                            & + patch_ib(patch_id)%length_z**2)
-            bbox_max = center + 0.5_wp*sqrt(patch_ib(patch_id)%length_x**2 + patch_ib(patch_id)%length_y**2 &
-                                            & + patch_ib(patch_id)%length_z**2)
-        else if (patch_ib(patch_id)%geometry == 10) then
+            bbox_min = center - 0.5_wp*sqrt(patch%length_x**2 + patch%length_y**2 + patch%length_z**2)
+            bbox_max = center + 0.5_wp*sqrt(patch%length_x**2 + patch%length_y**2 + patch%length_z**2)
+        else if (patch%geometry == 10) then
             ! cylinder geometry
-            bbox_min = center - sqrt(patch_ib(patch_id)%radius**2 + patch_ib(patch_id)%length_x**2)
-            bbox_max = center + sqrt(patch_ib(patch_id)%radius**2 + patch_ib(patch_id)%length_x**2)
-        else if (patch_ib(patch_id)%geometry == 12) then
+            bbox_min = center - sqrt(patch%radius**2 + patch%length_x**2)
+            bbox_max = center + sqrt(patch%radius**2 + patch%length_x**2)
+        else if (patch%geometry == 12) then
             ! Local-space bounding box extents (min=1, max=2 in the third index)
-            lx(1) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 1, 1) + patch_ib(patch_id)%centroid_offset(1)
-            lx(2) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 1, 3) + patch_ib(patch_id)%centroid_offset(1)
-            ly(1) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 2, 1) + patch_ib(patch_id)%centroid_offset(2)
-            ly(2) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 2, 3) + patch_ib(patch_id)%centroid_offset(2)
-            lz(1) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 3, 1) + patch_ib(patch_id)%centroid_offset(3)
-            lz(2) = stl_bounding_boxes(patch_ib(patch_id)%model_id, 3, 3) + patch_ib(patch_id)%centroid_offset(3)
+            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
+            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
+            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
+            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
+            lz(1) = stl_bounding_boxes(patch%model_id, 3, 1) + patch%centroid_offset(3)
+            lz(2) = stl_bounding_boxes(patch%model_id, 3, 3) + patch%centroid_offset(3)
 
             bbox_min = 1e12
             bbox_max = -1e12
@@ -532,7 +529,7 @@ contains
                 do cy = 1, 2
                     do cz = 1, 2
                         local_corner = [lx(cx), ly(cy), lz(cz)]
-                        world_corner = matmul(patch_ib(patch_id)%rotation_matrix, local_corner) + center
+                        world_corner = matmul(patch%rotation_matrix, local_corner) + center
                         bbox_min(1) = min(bbox_min(1), world_corner(1))
                         bbox_min(2) = min(bbox_min(2), world_corner(2))
                         bbox_min(3) = min(bbox_min(3), world_corner(3))
