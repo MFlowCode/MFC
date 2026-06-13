@@ -388,7 +388,7 @@ class TestCaseBuilder:
         if self.kind == "convergence":
             # Convergence cases drive their own runs — the BASE_CFG mods/path
             # machinery is unused. Trace + spec are the only inputs.
-            return TestCase(self.trace, {}, self.ppn, self.override_tol, self.restart_check, kind=self.kind, convergence_spec=self.convergence_spec)
+            return TestCase(self.trace, {}, self.ppn, self.override_tol, self.restart_check, kind=self.kind, convergence_spec=self.convergence_spec, canary=self.canary)
 
         dictionary = {}
         if self.path:
