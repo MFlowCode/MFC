@@ -102,11 +102,13 @@ contains
 
         if (viscous) then
             @:DEALLOCATE(Re_avg_rsx_vf)
+            @:DEALLOCATE(Res_gs)
         end if
         @:DEALLOCATE(vel_src_rsx_vf)
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
+        @:DEALLOCATE(Gs_rs)
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsx_vf)
         end if
