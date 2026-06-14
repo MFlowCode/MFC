@@ -121,7 +121,7 @@
 #:def FOLD_DIRECTIVE(directive, sentinel, width=200)
     #! Fold a long GPU directive across free-form continuation lines so it stays
     #! under nvfortran's ~1000-char source-line limit. Breaks only at whole-clause
-    #! boundaries (clause(...) groups and bare keywords), repeating the sentinel
+    #! boundaries (clause(args) groups and bare keywords), repeating the sentinel
     #! (e.g. '!$acc&') on each continuation -- which fypp's --no-folding cannot do
     #! because its generic folder omits the sentinel. Every emitted line is no
     #! longer than the prefix plus the single longest clause, i.e. no longer than
