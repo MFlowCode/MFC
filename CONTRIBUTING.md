@@ -1,11 +1,9 @@
 # Reproduction Process
 
-To repoduce the issue, I first commented out the call to get() in line 1487 and replaced it with a call to flag instead.
-
-The terminal blanks out seen in the following output:
-<summary><b>chemistry</b> (`chemistry`)</summary>
-
-I expect the computer to know what to do when it is given a function like flag() and output the correct result.
+Observations:
+   - To repoduce the issue, I first commented out the call to get() in line 1487 and replaced it with a call to flag instead.
+   - The terminal blanks and doesn't output anything when the flag() method is called.
+   - I expect the computer to know what to do when it is given a function like flag() and output the correct result.
 
 Environment Setup: I did not face any problems during the environment setup process as I have been using.
 
