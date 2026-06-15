@@ -1484,7 +1484,8 @@ class CaseValidator:
         runtime if misconfigured.
         """
         # Fetch global chemistry and diffusion flags
-        chemistry = self.get("chemistry", "F") == "T"
+        # chemistry = self.get("chemistry", "F") == "T"
+        chemistry = self.flag("chemistry")
         diffusion = self.get("chem_params%diffusion", "F") == "T"
         num_fluids = self.get("num_fluids")
 

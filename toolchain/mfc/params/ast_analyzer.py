@@ -235,6 +235,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
                         and isinstance(call.args[0].value, str)
                     ):
                         param_name = call.args[0].value
+                        print(f"Issue reproduced: {param_name}")
                         for target in node.targets:
                             if isinstance(target, ast.Name):
                                 m[target.id] = param_name
