@@ -228,15 +228,12 @@ contains
         if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq) .or. (model_eqns == model_eqns_4eq)) then
             do i = 1, num_fluids
                 if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                    out%q_sf(:,:,:) = q_cons_vf(i)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     if (model_eqns /= model_eqns_4eq) then
                         write (varname, '(A,I0)') 'alpha_rho', i
                     else
                         write (varname, '(A,I0)') 'rho', i
                     end if
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                    varname(:) = ' '
+                    call s_write_field(varname, t_step, q_cons_vf(i), x_beg, x_end, y_beg, y_end, z_beg, z_end)
                 end if
             end do
         end if
@@ -245,95 +242,69 @@ contains
             & then
             out%q_sf(:,:,:) = rho_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'rho'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         if (relativity .and. (rho_wrt .or. prim_vars_wrt)) then
-            out%q_sf(:,:,:) = q_prim_vf(1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'rho'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step, q_prim_vf(1), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (relativity .and. (rho_wrt .or. cons_vars_wrt)) then
             ! For relativistic flow, conservative and primitive densities are different Hard-coded single-component for now
-            out%q_sf(:,:,:) = q_cons_vf(1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'D'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step, q_cons_vf(1), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         do i = 1, eqn_idx%E - eqn_idx%mom%beg
             if (mom_wrt(i) .or. cons_vars_wrt) then
-                out%q_sf(:,:,:) = q_cons_vf(i + eqn_idx%cont%end)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I0)') 'mom', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
+                call s_write_field(varname, t_step, q_cons_vf(i + eqn_idx%cont%end), x_beg, x_end, y_beg, y_end, z_beg, z_end)
             end if
         end do
 
         do i = 1, eqn_idx%E - eqn_idx%mom%beg
             if (vel_wrt(i) .or. prim_vars_wrt) then
-                out%q_sf(:,:,:) = q_prim_vf(i + eqn_idx%cont%end)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I0)') 'vel', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
+                call s_write_field(varname, t_step, q_prim_vf(i + eqn_idx%cont%end), x_beg, x_end, y_beg, y_end, z_beg, z_end)
             end if
         end do
 
         if (chemistry) then
             do i = 1, num_species
                 if (chem_wrt_Y(i) .or. prim_vars_wrt) then
-                    out%q_sf(:,:,:) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,A)') 'Y_', trim(species_names(i))
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                    varname(:) = ' '
+                    call s_write_field(varname, t_step, q_prim_vf(eqn_idx%species%beg + i - 1), x_beg, x_end, y_beg, y_end, &
+                                       & z_beg, z_end)
                 end if
             end do
 
             if (chem_wrt_T) then
                 out%q_sf(:,:,:) = q_T_sf%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A)') 'T'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
+                call s_write_field(varname, t_step)
             end if
         end if
 
         do i = 1, eqn_idx%E - eqn_idx%mom%beg
             if (flux_wrt(i)) then
                 call s_derive_flux_limiter(i, q_prim_vf, out%q_sf)
-
                 write (varname, '(A,I0)') 'flux', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
+                call s_write_field(varname, t_step)
             end if
         end do
 
         if (E_wrt .or. cons_vars_wrt) then
-            out%q_sf(:,:,:) = q_cons_vf(eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'E'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step, q_cons_vf(eqn_idx%E), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (model_eqns == model_eqns_6eq) then
             do i = 1, num_fluids
                 if (alpha_rho_e_wrt(i) .or. cons_vars_wrt) then
-                    out%q_sf = q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I0)') 'alpha_rho_e', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                    varname(:) = ' '
+                    call s_write_field(varname, t_step, q_cons_vf(i + eqn_idx%int_en%beg - 1), x_beg, x_end, y_beg, y_end, z_beg, &
+                                       & z_end)
                 end if
             end do
         end if
@@ -446,8 +417,6 @@ contains
 
         if (mhd .and. prim_vars_wrt) then
             do i = eqn_idx%B%beg, eqn_idx%B%end
-                out%q_sf(:,:,:) = q_prim_vf(i)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
-
                 ! 1D: output By, Bz
                 if (n == 0) then
                     if (i == eqn_idx%B%beg) then
@@ -465,66 +434,49 @@ contains
                         write (varname, '(A)') 'Bz'
                     end if
                 end if
-
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-                varname(:) = ' '
+                call s_write_field(varname, t_step, q_prim_vf(i), x_beg, x_end, y_beg, y_end, z_beg, z_end)
             end do
         end if
 
         if (elasticity) then
             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                 if (prim_vars_wrt) then
-                    out%q_sf(:,:,:) = q_prim_vf(i - 1 + eqn_idx%stress%beg)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I0)') 'tau', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                    call s_write_field(varname, t_step, q_prim_vf(i - 1 + eqn_idx%stress%beg), x_beg, x_end, y_beg, y_end, z_beg, &
+                                       & z_end)
                 end if
-                varname(:) = ' '
             end do
         end if
 
         if (hyperelasticity) then
             do i = 1, eqn_idx%xi%end - eqn_idx%xi%beg + 1
                 if (prim_vars_wrt) then
-                    out%q_sf(:,:,:) = q_prim_vf(i - 1 + eqn_idx%xi%beg)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I0)') 'xi', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
+                    call s_write_field(varname, t_step, q_prim_vf(i - 1 + eqn_idx%xi%beg), x_beg, x_end, y_beg, y_end, z_beg, z_end)
                 end if
-                varname(:) = ' '
             end do
         end if
 
         if (cont_damage) then
-            out%q_sf(:,:,:) = q_cons_vf(eqn_idx%damage)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'damage_state'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step, q_cons_vf(eqn_idx%damage), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (hyper_cleaning) then
-            out%q_sf = q_cons_vf(eqn_idx%psi)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'psi'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step, q_cons_vf(eqn_idx%psi), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (pres_wrt .or. prim_vars_wrt) then
-            out%q_sf(:,:,:) = q_prim_vf(eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'pres'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step, q_prim_vf(eqn_idx%E), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (((model_eqns == model_eqns_5eq) .and. (bubbles_euler .neqv. .true.)) .or. (model_eqns == model_eqns_6eq)) then
             do i = 1, num_fluids - 1
                 if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                    out%q_sf(:,:,:) = q_cons_vf(i + eqn_idx%E)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I0)') 'alpha', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                    varname(:) = ' '
+                    call s_write_field(varname, t_step, q_cons_vf(i + eqn_idx%E), x_beg, x_end, y_beg, y_end, z_beg, z_end)
                 end if
             end do
 
@@ -544,44 +496,32 @@ contains
                     out%q_sf(:,:,:) = q_cons_vf(eqn_idx%adv%end)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 end if
                 write (varname, '(A,I0)') 'alpha', num_fluids
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
+                call s_write_field(varname, t_step)
             end if
         end if
 
         if (gamma_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
             out%q_sf(:,:,:) = gamma_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'gamma'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         if (heat_ratio_wrt) then
             call s_derive_specific_heat_ratio(out%q_sf)
-
             write (varname, '(A)') 'heat_ratio'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         if (pi_inf_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
             out%q_sf(:,:,:) = pi_inf_sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A)') 'pi_inf'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         if (pres_inf_wrt) then
             call s_derive_liquid_stiffness(out%q_sf)
-
             write (varname, '(A)') 'pres_inf'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         if (c_wrt) then
@@ -605,123 +545,92 @@ contains
             end do
 
             write (varname, '(A)') 'c'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         do i = 1, 3
             if (omega_wrt(i)) then
                 call s_derive_vorticity_component(i, q_prim_vf, out%q_sf)
-
                 write (varname, '(A,I0)') 'omega', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
+                call s_write_field(varname, t_step)
             end if
         end do
 
         if (ib) then
             out%q_sf(:,:,:) = real(ib_markers%sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
-                     & -offset_z%beg:p + offset_z%end))
+                     & -offset_z%beg:p + offset_z%end), wp)
             varname = 'ib_markers'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
+            call s_write_field(varname, t_step)
         end if
 
         if (p > 0 .and. qm_wrt) then
             call s_derive_qm(q_prim_vf, out%q_sf)
-
             write (varname, '(A)') 'qm'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         if (liutex_wrt) then
             call s_derive_liutex(q_prim_vf, liutex_mag, liutex_axis)
 
             out%q_sf = liutex_mag
-
             write (varname, '(A)') 'liutex_mag'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
 
             do i = 1, 3
                 out%q_sf = liutex_axis(:,:,:,i)
-
                 write (varname, '(A,I0)') 'liutex_axis', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-
-                varname(:) = ' '
+                call s_write_field(varname, t_step)
             end do
         end if
 
         if (schlieren_wrt) then
             call s_derive_numerical_schlieren_function(q_cons_vf, out%q_sf)
-
             write (varname, '(A)') 'schlieren'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
         end if
 
         if (cf_wrt) then
-            out%q_sf(:,:,:) = q_cons_vf(eqn_idx%c)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
             write (varname, '(A,I0)') 'color_function'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-            varname(:) = ' '
+            call s_write_field(varname, t_step, q_cons_vf(eqn_idx%c), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (bubbles_euler) then
             do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                out%q_sf(:,:,:) = q_cons_vf(i)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I0)') 'alpha', i - eqn_idx%E
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-                varname(:) = ' '
+                call s_write_field(varname, t_step, q_cons_vf(i), x_beg, x_end, y_beg, y_end, z_beg, z_end)
             end do
         end if
 
         if (bubbles_euler) then
             ! nR
             do i = 1, nb
-                out%q_sf(:,:,:) = q_cons_vf(qbmm_idx%rs(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I3.3)') 'nR', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-                varname(:) = ' '
+                call s_write_field(varname, t_step, q_cons_vf(qbmm_idx%rs(i)), x_beg, x_end, y_beg, y_end, z_beg, z_end)
             end do
 
             ! nRdot
             do i = 1, nb
-                out%q_sf(:,:,:) = q_cons_vf(qbmm_idx%vs(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A,I3.3)') 'nV', i
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-                varname(:) = ' '
+                call s_write_field(varname, t_step, q_cons_vf(qbmm_idx%vs(i)), x_beg, x_end, y_beg, y_end, z_beg, z_end)
             end do
             if ((polytropic .neqv. .true.) .and. (.not. qbmm)) then
                 ! nP
                 do i = 1, nb
-                    out%q_sf(:,:,:) = q_cons_vf(qbmm_idx%ps(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I3.3)') 'nP', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                    varname(:) = ' '
+                    call s_write_field(varname, t_step, q_cons_vf(qbmm_idx%ps(i)), x_beg, x_end, y_beg, y_end, z_beg, z_end)
                 end do
 
                 ! nM
                 do i = 1, nb
-                    out%q_sf(:,:,:) = q_cons_vf(qbmm_idx%ms(i))%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                     write (varname, '(A,I3.3)') 'nM', i
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
-                    varname(:) = ' '
+                    call s_write_field(varname, t_step, q_cons_vf(qbmm_idx%ms(i)), x_beg, x_end, y_beg, y_end, z_beg, z_end)
                 end do
             end if
 
             ! number density
             if (adv_n) then
-                out%q_sf(:,:,:) = q_cons_vf(eqn_idx%n)%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
                 write (varname, '(A)') 'n'
-                call s_write_variable_to_formatted_database_file(varname, t_step)
-                varname(:) = ' '
+                call s_write_field(varname, t_step, q_cons_vf(eqn_idx%n), x_beg, x_end, y_beg, y_end, z_beg, z_end)
             end if
         end if
 
@@ -730,8 +639,7 @@ contains
             out%q_sf(:,:,:) = 1._wp - q_cons_vf(beta_idx)%sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
                      & -offset_z%beg:p + offset_z%end)
             write (varname, '(A)') 'voidFraction'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-            varname(:) = ' '
+            call s_write_field(varname, t_step)
 
             if (lag_txt_wrt) call s_write_lag_bubbles_results_to_text(t_step)  ! text output
             if (lag_db_wrt) call s_write_lag_bubbles_to_formatted_database_file(t_step)  ! silo file output
@@ -747,6 +655,27 @@ contains
         call s_close_formatted_database_file()
 
     end subroutine s_save_data
+
+    !> Fill out%q_sf from src (if given), write varname to the database, and clear varname.
+    !! @param varname  field name (set by caller); blanked on return
+    !! @param t_step   current time step
+    !! @param src      optional scalar_field to slice into out%q_sf
+    !! @param x_beg, x_end, y_beg, y_end, z_beg, z_end  output region bounds (required if src present)
+
+    impure subroutine s_write_field(varname, t_step, src, x_beg, x_end, y_beg, y_end, z_beg, z_end)
+
+        character(LEN=name_len), intent(inout)   :: varname
+        integer, intent(in)                      :: t_step
+        type(scalar_field), intent(in), optional :: src
+        integer, intent(in), optional            :: x_beg, x_end, y_beg, y_end, z_beg, z_end
+
+        if (present(src)) then
+            out%q_sf(:,:,:) = src%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
+        end if
+        call s_write_variable_to_formatted_database_file(varname, t_step)
+        varname(:) = ' '
+
+    end subroutine s_write_field
 
     !> Transpose 3-D complex data from x-pencil to y-pencil layout via MPI_Alltoall.
     subroutine s_mpi_transpose_x2y
