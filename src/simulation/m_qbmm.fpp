@@ -56,6 +56,7 @@ contains
             $:GPU_UPDATE(device='[nterms]')
         #:endif
 
+        ! NOTE: momrhs is a program-lifetime allocation; no s_finalize_* subroutine exists for this module.
         @:ALLOCATE(momrhs(1:3, 0:2, 0:2, 1:nterms, 1:nb))
         momrhs = 0._wp
 
@@ -383,6 +384,7 @@ contains
 
         $:GPU_UPDATE(device='[momrhs]')
 
+        ! NOTE: bubmoms is a program-lifetime allocation; no s_finalize_* subroutine exists for this module.
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
 
         do j = 1, nmom

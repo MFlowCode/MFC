@@ -875,6 +875,10 @@ contains
 
             Nf = max(Nx, Ny, Nz)
 
+            ! NOTE: data_in, data_out, data_cmplx, data_cmplx_y, data_cmplx_z,
+            ! En_real, En are program-lifetime allocations; no s_finalize_start_up_module exists.
+
+            @:ALLOCATE(data_in(Nx*Nyloc*Nzloc))
             @:ALLOCATE(data_in(Nx*Nyloc*Nzloc))
             @:ALLOCATE(data_out(Nx*Nyloc*Nzloc))
 

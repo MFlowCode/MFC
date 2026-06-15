@@ -64,6 +64,10 @@ contains
 
         integer :: i, j  !< generic loop variables
 
+        ! NOTE: loc_acoustic, mass_src, mom_src, E_src, source_spatials, source_spatials_num_points are program-lifetime
+        ! allocations;
+        ! no s_finalize_acoustic_src subroutine exists for this module.
+
         @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), &
                    & length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), &
                    & gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), &

@@ -1840,8 +1840,14 @@ contains
             end do
 
             @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
-            @:DEALLOCATE(qL_prim)
-            @:DEALLOCATE(qR_prim)
+            do i = 1, num_dims
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                    @:DEALLOCATE(qL_prim(i)%vf(l)%sf)
+                    @:DEALLOCATE(qR_prim(i)%vf(l)%sf)
+                end do
+                @:DEALLOCATE(qL_prim(i)%vf, qR_prim(i)%vf)
+            end do
+            @:DEALLOCATE(qL_prim, qR_prim)
         end if
 
         if (alt_soundspeed) then

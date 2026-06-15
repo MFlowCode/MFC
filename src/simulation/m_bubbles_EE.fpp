@@ -32,6 +32,9 @@ contains
 
         integer :: l
 
+        ! NOTE: rs, vs, ps, ms, divu%sf, bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src are program-lifetime allocations;
+        ! no s_finalize_bubbles_EE_module subroutine exists.
+
         @:ALLOCATE(rs(1:nb))
         @:ALLOCATE(vs(1:nb))
         @:ALLOCATE(ps(1:nb))

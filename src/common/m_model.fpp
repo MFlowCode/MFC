@@ -970,6 +970,9 @@ contains
                 end if
             end do
 
+            ! NOTE: gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices, gpu_boundary_v are program-lifetime
+            ! allocations;
+            ! no s_finalize_* subroutine exists for this module.
             if (max_ntrs > 0) then
                 @:ALLOCATE(gpu_ntrs(1:num_stl_models))
                 @:ALLOCATE(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_stl_models))
