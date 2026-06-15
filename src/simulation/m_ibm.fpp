@@ -1143,7 +1143,7 @@ contains
             patch_ib(ib_idx)%moment = 1._wp
             return
         else
-            normal_axis = axis/sqrt(sum(axis))
+            normal_axis = axis/sqrt(sum(axis**2))
         end if
 
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
