@@ -1,6 +1,6 @@
 # Reproduction Process
 
-To repoduce the issue, I first commented out the call to get() in line 1487 and replaced it with a call to flag instead like so: chemistry = self.flag("chemistry")
+To repoduce the issue, I first commented out the call to get() in line 1487 and replaced it with a call to flag instead.
 
 The terminal blanks out seen in the following output:
 <summary><b>chemistry</b> (`chemistry`)</summary>
@@ -18,6 +18,8 @@ Steps to Reproduce:
 Branch Link: https://github.com/mansibrahman03/MFlowCode/tree/main
 
 # Solution Approach
+
+Implementation:
 
 1. At the moment, case_validator.py reads boolean case flags with the verbose form self.get("name", "F") == "T" in 134 places. To clean this code up I want to implement a map function. However, I am prevented from doing so at the moment because of the hard coding in ast_analyzer.py in the _build_local_param_map() method in line 232: call.func.attr == "get". Thus, when the analyzer sees the word "flag", it doesn't recognize it and blanks out.
 
