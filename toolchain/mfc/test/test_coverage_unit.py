@@ -72,9 +72,10 @@ def test_ordinary_sim_module_does_not_force_all():
 
 
 class _Case:
-    def __init__(self, ph, params=None):
+    def __init__(self, ph, params=None, canary=False):
         self._ph = ph
         self.params = params or {}
+        self.canary = canary
 
     def coverage_key(self):
         return self._ph
@@ -121,6 +122,22 @@ def test_rung6_and_7_overlap_selects_subset():
     run, skip, _ = select_tests(cases, cov, {"src/simulation/m_bubbles_EE.fpp"})
     assert [c.coverage_key() for c in run] == ["hit"]
     assert [c.coverage_key() for c in skip] == ["miss"]
+
+
+def test_canary_always_runs_even_when_its_coverage_misses():
+    # 'canary' and 'plain' have identical, non-overlapping coverage; only the canary must
+    # run. 'other' covers the changed file so rung 4 (run-all) does not fire and we reach
+    # the per-test rungs where the canary bypass is exercised.
+    cases = [_Case("canary", canary=True), _Case("plain"), _Case("other")]
+    cov = {
+        "canary": ["src/simulation/m_viscous.fpp"],
+        "plain": ["src/simulation/m_viscous.fpp"],
+        "other": ["src/simulation/m_rhs.fpp"],
+    }
+    run, skip, _ = select_tests(cases, cov, {"src/simulation/m_rhs.fpp"})
+    run_keys = {c.coverage_key() for c in run}
+    assert "canary" in run_keys and "other" in run_keys
+    assert [c.coverage_key() for c in skip] == ["plain"]
 
 
 def test_case_coverage_key_uses_full_params():

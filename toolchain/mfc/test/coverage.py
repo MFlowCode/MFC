@@ -156,6 +156,9 @@ def select_tests(cases, coverage_map, changed_files):
     # Rungs 5-7: per-test.
     to_run, skipped = [], []
     for case in cases:
+        if getattr(case, "canary", False):  # canary smoke set: always run, never skipped
+            to_run.append(case)
+            continue
         key = case.coverage_key()
         cov = coverage_map.get(key)
         if not cov:  # rung 5: unmapped/new test, or empty (uncertain) coverage -> run
