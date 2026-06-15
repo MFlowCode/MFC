@@ -1,13 +1,21 @@
 # Reproduction Process
 
-To repoduce the issue, I first commented out the call to get() in line 1487 and replaced it with a call to flag instead like so:
-
-chemistry = self.flag("chemistry")
+To repoduce the issue, I first commented out the call to get() in line 1487 and replaced it with a call to flag instead like so: chemistry = self.flag("chemistry")
 
 The terminal blanks out seen in the following output:
 <summary><b>chemistry</b> (`chemistry`)</summary>
 
-I expect the computer to know what to do when it is given a new function like flag() and output the correct result.
+I expect the computer to know what to do when it is given a function like flag() and output the correct result.
+
+Environment Setup: I did not face any problems during the environment setup process as I have been using.
+
+Steps to Reproduce:
+   1. Open the file case_validator.py using the file path toolchain/mfc/case_validator.py
+   2. Go to line 1487 in the check_chemistry() method
+   3. Replace the value assigned to the chemistry variable with self.flag("chemistry")
+   4. Reproduce the issue on your terminal by running the following: python3 toolchain/mfc/gen_case_constraints_docs.py | grep "ANALYZER"
+
+Branch Link: https://github.com/mansibrahman03/MFlowCode/tree/main
 
 # Solution Approach
 
