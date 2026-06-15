@@ -729,14 +729,6 @@ contains
                 p_glb_save = p_glb + 1
             end if
 
-            m_MOK = int(m_glb_save + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb_save + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb_save + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
-            MOK = int(1._wp, MPI_OFFSET_KIND)
-            str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
-
             if (bubbles_euler) then
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)

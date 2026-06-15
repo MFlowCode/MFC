@@ -386,12 +386,6 @@ contains
                     p_glb_read = p_glb + 1
                 end if
 
-                m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
-                n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
-                p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
