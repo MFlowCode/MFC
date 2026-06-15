@@ -95,7 +95,7 @@ contains
         end do
 
         ! Constraints on overwrite rights initial condition patch parameters
-        do i = 1, num_patches
+        do i = 1, num_patches_max
             if (i <= num_patches) then
                 call s_check_active_patch_alteration_rights(i)
             else
@@ -104,7 +104,7 @@ contains
         end do
 
         ! Constraints on smoothing initial condition patch parameters
-        do i = 1, num_patches
+        do i = 1, num_patches_max
             if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 3 .or. patch_icpp(i)%geometry == 4 &
                 & .or. patch_icpp(i)%geometry == 5 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i)%geometry == 9 &
                 & .or. patch_icpp(i)%geometry == 10 .or. patch_icpp(i)%geometry == 11 .or. patch_icpp(i)%geometry == 12 &
@@ -116,7 +116,7 @@ contains
         end do
 
         ! Constraints on flow variables initial condition patch parameters
-        do i = 1, num_patches
+        do i = 1, num_patches_max
             if (i <= num_patches) then
                 call s_check_active_patch_primitive_variables(i)
             else
