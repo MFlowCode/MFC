@@ -1045,7 +1045,7 @@ contains
 
     !> Compute the shear and volume Reynolds numbers of one Riemann state by inverse-weighting the fluid Reynolds numbers with the
     !! volume fractions.
-    subroutine s_compute_interface_reynolds(alpha_K, Re_K)
+    subroutine s_compute_interface_reynolds(alpha_K, Re_K, Re_size_loc1, Re_size_loc2)
 
         $:GPU_ROUTINE(function_name='s_compute_interface_reynolds', parallelism='[seq]', cray_inline=True)
 
@@ -1055,16 +1055,18 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha_K
         #:endif
         real(wp), dimension(2), intent(out) :: Re_K
-        integer                             :: i, q  !< Loop iterators
+        !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
+        integer, intent(in) :: Re_size_loc1, Re_size_loc2
+        integer             :: i, q  !< Loop iterators
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, 2
             Re_K(i) = dflt_real
 
-            if (Re_size(i) > 0) Re_K(i) = 0._wp
+            if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_K(i) = 0._wp
 
             $:GPU_LOOP(parallelism='[seq]')
-            do q = 1, Re_size(i)
+            do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
                 Re_K(i) = alpha_K(Re_idx(i, q))/Res_gs(i, q) + Re_K(i)
             end do
 

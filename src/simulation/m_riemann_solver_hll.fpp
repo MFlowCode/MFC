@@ -57,47 +57,48 @@ contains
             real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
             real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
         #:endif
-        real(wp)                  :: rho_L, rho_R
-        real(wp)                  :: pres_L, pres_R
-        real(wp)                  :: E_L, E_R
-        real(wp)                  :: H_L, H_R
-        real(wp)                  :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
-        real(wp)                  :: T_L, T_R
-        real(wp)                  :: Y_L, Y_R
-        real(wp)                  :: MW_L, MW_R
-        real(wp)                  :: R_gas_L, R_gas_R
-        real(wp)                  :: Cp_L, Cp_R
-        real(wp)                  :: Cv_L, Cv_R
-        real(wp)                  :: Gamm_L, Gamm_R
-        real(wp)                  :: gamma_L, gamma_R
-        real(wp)                  :: pi_inf_L, pi_inf_R
-        real(wp)                  :: qv_L, qv_R
-        real(wp)                  :: c_L, c_R
-        real(wp), dimension(6)    :: tau_e_L, tau_e_R
-        real(wp)                  :: G_L, G_R
-        real(wp)                  :: damage_L, damage_R
-        real(wp), dimension(2)    :: Re_L, Re_R
-        real(wp), dimension(3)    :: xi_field_L, xi_field_R
-        real(wp)                  :: rho_avg
-        real(wp)                  :: H_avg
-        real(wp)                  :: qv_avg
-        real(wp)                  :: gamma_avg
-        real(wp)                  :: c_avg
-        real(wp)                  :: s_L, s_R, s_M, s_P, s_S
-        real(wp)                  :: xi_M, xi_P
-        real(wp)                  :: ptilde_L, ptilde_R
-        real(wp)                  :: vel_L_rms, vel_R_rms, vel_avg_rms
-        real(wp)                  :: vel_L_tmp, vel_R_tmp
-        real(wp)                  :: Ms_L, Ms_R, pres_SL, pres_SR
-        real(wp)                  :: alpha_L_sum, alpha_R_sum
-        real(wp)                  :: zcoef, pcorr  !< low Mach number correction
-        type(riemann_states)      :: c_fast, pres_mag
+        real(wp) :: rho_L, rho_R
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_L, H_R
+        real(wp) :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
+        real(wp) :: T_L, T_R
+        real(wp) :: Y_L, Y_R
+        real(wp) :: MW_L, MW_R
+        real(wp) :: R_gas_L, R_gas_R
+        real(wp) :: Cp_L, Cp_R
+        real(wp) :: Cv_L, Cv_R
+        real(wp) :: Gamm_L, Gamm_R
+        real(wp) :: gamma_L, gamma_R
+        real(wp) :: pi_inf_L, pi_inf_R
+        real(wp) :: qv_L, qv_R
+        real(wp) :: c_L, c_R
+        real(wp), dimension(6) :: tau_e_L, tau_e_R
+        real(wp) :: G_L, G_R
+        real(wp) :: damage_L, damage_R
+        real(wp), dimension(2) :: Re_L, Re_R
+        real(wp), dimension(3) :: xi_field_L, xi_field_R
+        real(wp) :: rho_avg
+        real(wp) :: H_avg
+        real(wp) :: qv_avg
+        real(wp) :: gamma_avg
+        real(wp) :: c_avg
+        real(wp) :: s_L, s_R, s_M, s_P, s_S
+        real(wp) :: xi_M, xi_P
+        real(wp) :: ptilde_L, ptilde_R
+        real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(wp) :: vel_L_tmp, vel_R_tmp
+        real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
+        real(wp) :: alpha_L_sum, alpha_R_sum
+        real(wp) :: zcoef, pcorr               !< low Mach number correction
+        type(riemann_states) :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
-        type(riemann_states)      :: Ga            !< Gamma (Lorentz factor)
-        type(riemann_states)      :: vdotB, B2
-        type(riemann_states_vec3) :: b4            !< 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm            !< Conservative momentum variables
-        integer                   :: i, j, k, l    !< Generic loop iterators
+        type(riemann_states) :: Ga             !< Gamma (Lorentz factor)
+        type(riemann_states) :: vdotB, B2
+        type(riemann_states_vec3) :: b4        !< 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm        !< Conservative momentum variables
+        integer :: i, j, k, l                  !< Generic loop iterators
+        integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -105,6 +106,7 @@ contains
 
         ! Reshaping inputted data based on dimensional splitting direction
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
                      (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2', 'is1', 'is3'), &
@@ -120,7 +122,8 @@ contains
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, damage_R, &
                                     & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, &
-                                    & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
+                                    & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', &
+                                    & copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -202,8 +205,8 @@ contains
                             call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                             if (viscous) then
-                                call s_compute_interface_reynolds(alpha_L, Re_L)
-                                call s_compute_interface_reynolds(alpha_R, Re_R)
+                                call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
+                                call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                             end if
 
                             if (chemistry) then

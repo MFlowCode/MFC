@@ -120,8 +120,9 @@ contains
         real(wp) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_star
         real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(wp) :: flux_ene_e
-        real(wp) :: zcoef, pcorr   !< low Mach number correction
-        integer  :: i, j, k, l, q  !< Generic loop iterators
+        real(wp) :: zcoef, pcorr                !< low Mach number correction
+        integer  :: i, j, k, l, q               !< Generic loop iterators
+        integer  :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -130,6 +131,8 @@ contains
         ! Reshaping inputted data based on dimensional splitting direction
 
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -150,7 +153,8 @@ contains
                                         & qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, &
                                         & vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, &
                                         & alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, &
-                                        & s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP]')
+                                        & s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP]', &
+                                        & firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -225,8 +229,8 @@ contains
                                                                      & qv_R)
 
                                 if (viscous) then
-                                    call s_compute_interface_reynolds(alpha_L, Re_L)
-                                    call s_compute_interface_reynolds(alpha_R, Re_R)
+                                    call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
+                                    call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                                 end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
@@ -717,7 +721,8 @@ contains
                                         & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
                                         & alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, &
                                         & xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Ys_L, &
-                                        & Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]')
+                                        & Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, &
+                                        & h_avg_2]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -774,11 +779,11 @@ contains
                                             Re_L(i) = dflt_real
                                             Re_R(i) = dflt_real
 
-                                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                            if (Re_size(i) > 0) Re_R(i) = 0._wp
+                                            if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_L(i) = 0._wp
+                                            if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_R(i) = 0._wp
 
                                             $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 1, Re_size(i)
+                                            do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
                                                 Re_L(i) = (1._wp - qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + Re_idx(i, &
                                                      & q)))/Res_gs(i, q) + Re_L(i)
                                                 Re_R(i) = (1._wp - qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + Re_idx(i, &
@@ -1097,7 +1102,7 @@ contains
                                         & alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, &
                                         & vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, &
                                         & Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, &
-                                        & h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]')
+                                        & h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -1164,8 +1169,8 @@ contains
                                                                      & pi_inf_R, qv_R)
 
                                 if (viscous) then
-                                    call s_compute_interface_reynolds(alpha_L, Re_L)
-                                    call s_compute_interface_reynolds(alpha_R, Re_R)
+                                    call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
+                                    call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                                 end if
 
                                 if (chemistry) then
