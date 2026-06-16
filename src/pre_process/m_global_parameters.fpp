@@ -50,11 +50,11 @@ module m_global_parameters
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
-    type(bc_xyz_info)     :: bc                 !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
+    type(bc_xyz_info)     :: bc                !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
     ! simplex_params: auto-generated in generated_decls.fpp
     ! shear_num/shear_indices/shear_BC_flip_*, bc: in m_global_parameters_common
-    integer                           :: fd_order   !< Finite-difference order for CoM/probe derivative approximations
-    integer                           :: fd_number  !< FD half-stencil size: MAX(1, fd_order/2)
+    integer                           :: fd_order    !< Finite-difference order for CoM/probe derivative approximations
+    integer                           :: fd_number   !< FD half-stencil size: MAX(1, fd_order/2)
     type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters (pre_process-local; not in generated_decls)
 
     ! fluid_rho (perturbs surrounding-air density to break grid symmetry): auto-generated in generated_decls.fpp
