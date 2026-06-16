@@ -77,7 +77,7 @@ def _family_attr_error(name: str) -> Optional[str]:
 
     # Unknown attribute — provide targeted message
     valid = sorted(fam.attrs.keys())
-    if len(valid) > 8:
+    if len(valid) > 9:
         shown = ", ".join(valid[:8]) + f", ... ({len(valid)} total)"
     else:
         shown = ", ".join(valid)

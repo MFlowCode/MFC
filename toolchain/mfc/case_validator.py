@@ -1499,6 +1499,8 @@ class CaseValidator:
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
+        num_ibs = self.get("num_ibs", 0) or 0
+
         for dir in ["x", "y", "z"]:
             isothermal_in = self.get(f"bc_{dir}%isothermal_in", "F") == "T"
             isothermal_out = self.get(f"bc_{dir}%isothermal_out", "F") == "T"
@@ -1531,6 +1533,21 @@ class CaseValidator:
                 if tw_out is not None and self._is_numeric(tw_out):
                     self.prohibit(tw_out <= 0.0, f"Wall temperature bc_{dir}%Tw_out must be strictly positive for thermodynamics (got {tw_out}).")
 
+        for patch_id in range(1, num_ibs + 1):
+            isothermal = self.get(f"patch_ib({patch_id})%isothermal", "F") == "T"
+
+            if not isothermal:
+                continue
+
+            self.prohibit(
+                not chemistry or not diffusion, f"Isothermal immersed boundary patch_ib({patch_id})%isothermal requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction."
+            )
+
+            twall = self.get(f"patch_ib({patch_id})%Twall")
+            self.prohibit(twall is None, f"Isothermal immersed boundary patch_ib({patch_id})%isothermal requires patch_ib({patch_id})%Twall to be set.")
+            if twall is not None and self._is_numeric(twall):
+                self.prohibit(twall <= 0.0, f"Wall temperature patch_ib({patch_id})%Twall must be strictly positive for thermodynamics (got {twall}).")
+          
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""
         mixlayer_vel_profile = self.get("mixlayer_vel_profile", "F") == "T"

@@ -893,7 +893,7 @@ def _load():
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm", "airfoil_id", "model_id"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("isothermal", LOG)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)

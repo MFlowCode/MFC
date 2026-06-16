@@ -630,7 +630,7 @@ contains
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
-        ! Time-stepping loop controls 
+        ! Time-stepping loop controls
         t_step = t_step + 1
 
     end subroutine s_perform_time_step

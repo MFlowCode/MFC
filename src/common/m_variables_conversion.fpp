@@ -702,10 +702,8 @@ contains
 
 #ifdef MFC_SIMULATION
                     if (.not. (t_step == 0 .and. stage == 1)) then 
-                        if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0  .and. l <= p)   then 
-                            if (ghost_points_index%sf(j, k, l) == 1)  then 
-                                pres = pressure_ghost_point%sf(j, k, l) 
-                            end if
+                        if (ghost_points_index%sf(j, k, l) == 1)  then 
+                            pres = pressure_ghost_point%sf(j, k, l) 
                         end if
                     end if
 #endif
