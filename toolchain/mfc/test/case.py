@@ -157,14 +157,18 @@ class TestCase(case.Case):
     restart_check: bool = False
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
+    canary: bool = False
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False, kind: str = "golden", convergence_spec: Optional[dict] = None) -> None:
+    def __init__(
+        self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False, kind: str = "golden", convergence_spec: Optional[dict] = None, canary: bool = False
+    ) -> None:
         self.trace = trace
         self.ppn = ppn or 1
         self.override_tol = override_tol
         self.restart_check = restart_check
         self.kind = kind
         self.convergence_spec = convergence_spec
+        self.canary = canary
         merge = {**BASE_CFG.copy(), **mods}
         merge = {key: val for key, val in merge.items() if val is not None}
         super().__init__(merge)
@@ -372,6 +376,7 @@ class TestCaseBuilder:
     restart_check: bool = False
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
+    canary: bool = False
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -383,7 +388,7 @@ class TestCaseBuilder:
         if self.kind == "convergence":
             # Convergence cases drive their own runs — the BASE_CFG mods/path
             # machinery is unused. Trace + spec are the only inputs.
-            return TestCase(self.trace, {}, self.ppn, self.override_tol, self.restart_check, kind=self.kind, convergence_spec=self.convergence_spec)
+            return TestCase(self.trace, {}, self.ppn, self.override_tol, self.restart_check, kind=self.kind, convergence_spec=self.convergence_spec, canary=self.canary)
 
         dictionary = {}
         if self.path:
@@ -404,7 +409,7 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, canary=self.canary)
 
 
 @dataclasses.dataclass

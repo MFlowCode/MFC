@@ -46,7 +46,7 @@ module m_viscous
     use m_muscl
     use m_helper
     use m_finite_differences
-    use m_constants, only: model_eqns_5eq
+    use m_constants, only: model_eqns_5eq, recon_type_weno, recon_type_muscl
     use m_hb_function
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
@@ -848,7 +848,7 @@ contains
         integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer :: i, j, k, l
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl','recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
 
@@ -932,7 +932,7 @@ contains
         integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer :: i, j, k, l
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl','recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
 

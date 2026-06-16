@@ -21,7 +21,7 @@ module m_data_output
     use m_boundary_conditions
     use m_thermochem, only: species_names
     use m_helper
-    use m_constants, only: model_eqns_5eq
+    use m_constants, only: model_eqns_5eq, precision_single
 
     implicit none
 
@@ -168,7 +168,7 @@ contains
         pi_inf = pi_infs(1)
         qv = qvs(1)
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(2F30.3)"
         else
             FMT = "(2F40.14)"
@@ -293,7 +293,7 @@ contains
             end if
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(3F30.7)"
         else
             FMT = "(3F40.14)"
@@ -344,7 +344,7 @@ contains
             end if
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(4F30.7)"
         else
             FMT = "(4F40.14)"

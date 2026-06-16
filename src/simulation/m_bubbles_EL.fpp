@@ -20,7 +20,7 @@ module m_bubbles_EL
     use m_mpi_common
     use m_ibm
     use m_finite_differences
-    use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+    use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, precision_single
 
     implicit none
 
@@ -1679,7 +1679,7 @@ contains
         file_loc = trim(case_dir) // '/D/' // trim(file_loc)
         call my_inquire(trim(file_loc), file_exist)
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(A16,A14,8A16)"
         else
             FMT = "(A24,A14,8A24)"
@@ -1706,7 +1706,7 @@ contains
         file_loc = trim(case_dir) // '/D/' // trim(file_loc)
         call my_inquire(trim(file_loc), file_exist)
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(A16,A14,8A16)"
         else
             FMT = "(A24,A14,8A24)"
@@ -1731,7 +1731,7 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc, path
         logical                              :: file_exist
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(F16.8,I14,8F16.8)"
         else
             FMT = "(F24.16,I14,8F24.16)"
@@ -1994,7 +1994,7 @@ contains
         file_loc = trim(case_dir) // '/D/' // trim(file_loc)
         call my_inquire(trim(file_loc), file_exist)
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(A10,A14,5A16)"
         else
             FMT = "(A10,A14,5A24)"
@@ -2018,7 +2018,7 @@ contains
 
         $:GPU_UPDATE(host='[Rmax_glb, Rmin_glb]')
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(I10,I14,5F16.8)"
         else
             FMT = "(I10,I14,5F24.16)"

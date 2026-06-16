@@ -31,7 +31,7 @@ NF = _fc("num_fluids_max", 10)  # fluid_pp
 NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
-NIB = _fc("num_ib_patches_max", 54000)  # patch_ib (Fortran array bound)
+NIB = _fc("num_ib_patches_max_namelist", 54000)  # patch_ib namelist array bound
 NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
 NSM = _fc("num_stl_models_max", 10)  # stl_models (Fortran array bound)
 NPB = _fc("num_particle_clouds_max", 10)  # particle_cloud (Fortran array bound)
@@ -849,14 +849,13 @@ def _load():
                 _r(f"{px}sph_har_coeff({ll},{mm})", REAL)
 
     # fluid_pp (10 fluids)
+    # Members present in physical_parameters: gamma, pi_inf, Re, cv, qv, qvp, G.
+    # mul0/ss/pv/gamma_v/M_v/mu_v/k_v/cp_v/D_v were removed from the Fortran type
+    # by upstream #1085/#1093 — they must NOT be registered (namelist read would crash).
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        _r(f"{px}mul0", REAL, {"viscosity"}, math=r"\f$\mu_{l,k}\f$")
-        _r(f"{px}ss", REAL, {"surface_tension"}, math=r"\f$\sigma_k\f$")
-        for a in ["pv", "gamma_v", "M_v", "mu_v", "k_v", "cp_v", "D_v"]:
-            _r(f"{px}{a}", REAL, {"bubbles"})
         _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
@@ -1056,11 +1055,17 @@ def _load():
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # lag_params (Lagrangian bubbles)
+    # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
+    # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
+    # write_bubbles, write_bubbles_stats, write_void_evol, pressure_force,
+    # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
+    # were removed from the Fortran type by upstream #1085/#1093 — they must NOT be
+    # registered (namelist read would crash).
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
     for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
-    for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
+    for a in ["epsilonb", "valmaxvoid", "charwidth"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
     _r("lag_params%input_path", STR, {"bubbles"})
 
@@ -1135,6 +1140,29 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "mom_wrt": "3",
     "omega_wrt": "3",
     "vel_wrt": "3",
+}
+
+# Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
+# Maps variable name -> (fortran_type, dimension_expr_or_None, sim_gpu_declare, doxygen_desc_or_None).
+# sim_gpu_declare=True means the generator emits this variable's $:GPU_DECLARE line
+# alongside its declaration; the variable must then be REMOVED from any grouped
+# GPU_DECLARE list in src/simulation/m_global_parameters.fpp (multiple declare
+# directives accumulate identically in OpenACC and OpenMP).
+TYPED_DECLS: dict[str, tuple] = {
+    "fluid_pp": ("type(physical_parameters)", "num_fluids_max", False, "Per-fluid stiffened-gas EOS parameters, Reynolds numbers, and shear modulus"),
+    "bub_pp": ("type(subgrid_bubble_physical_parameters)", None, False, "Subgrid bubble physical parameters"),
+    "patch_icpp": ("type(ic_patch_parameters)", "num_patches_max", False, "IC patch parameters"),
+    "patch_bc": ("type(bc_patch_parameters)", "num_bc_patches_max", False, "Boundary condition patch parameters"),
+    "patch_ib": ("type(ib_patch_parameters)", "num_ib_patches_max_namelist", True, "Immersed boundary patch parameters"),
+    "ib_airfoil": ("type(ib_airfoil_parameters)", "num_ib_airfoils_max", True, "Per-airfoil NACA user inputs"),
+    "stl_models": ("type(ib_stl_parameters)", "num_stl_models_max", False, "Per-STL model parameters"),
+    "probe": ("type(vec3_dt)", "num_probes_max", False, None),
+    "integral": ("type(integral_parameters)", "num_probes_max", False, None),
+    "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
+    "chem_params": ("type(chemistry_parameters)", None, True, None),
+    "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
+    "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
+    "simplex_params": ("type(simplex_noise_params)", None, False, None),
 }
 
 

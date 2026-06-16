@@ -13,6 +13,7 @@ module m_mpi_proxy
     use m_global_parameters
     use m_mpi_common
     use ieee_arithmetic
+    use m_constants, only: format_silo
 
     implicit none
 
@@ -35,7 +36,7 @@ contains
         ! procedures. Note that these are only needed for either multidimensional runs that utilize the Silo database file format or
         ! for 1D simulations.
 
-        if ((format == 1 .and. n > 0) .or. n == 0) then
+        if ((format == format_silo .and. n > 0) .or. n == 0) then
             allocate (recvcounts(0:num_procs - 1))
             allocate (displs(0:num_procs - 1))
 
@@ -64,88 +65,45 @@ contains
 #ifdef MFC_MPI
         integer :: i     !< Generic loop iterator
         integer :: ierr  !< Generic flag used to identify and report MPI errors
-        ! Logistics
 
-        call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+        ! Generated: case_dir, namelist scalars (INT/LOG/REAL), array dims (including
+        !            chem_wrt_Y, previously missing), fluid_pp loop, bub_pp guard
+        #:include 'generated_bcast.fpp'
 
-        #:for VAR in [ 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',               &
-            & 't_step_start', 't_step_stop', 't_step_save', 'weno_order',      &
-            & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
-            & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
-            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model',         &
-            & 'n_start', 'num_ibs', 'muscl_order' ]
+        ! manual: m_glb, n_glb, p_glb (computed in s_read_input_file, not namelist-bound)
+        call MPI_BCAST(m_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(n_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(p_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        ! manual: bc_x/y/z member broadcasts (struct members not in NAMELIST_VARS)
+        #:for VAR in [ 'bc_x%beg', 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end']
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'cyl_coord', 'mpp_lim', 'mixture_err',                     &
-            & 'alt_soundspeed', 'hypoelasticity', 'mhd', 'parallel_io',           &
-            & 'rho_wrt', 'E_wrt', 'pres_wrt', 'gamma_wrt', 'sim_data',            &
-            & 'heat_ratio_wrt', 'pi_inf_wrt', 'pres_inf_wrt', 'cons_vars_wrt',    &
-            & 'prim_vars_wrt', 'c_wrt', 'qm_wrt','schlieren_wrt','chem_wrt_T',    &
-            & 'bubbles_euler', 'qbmm', 'polytropic', 'polydisperse',              &
-            & 'file_per_process', 'relax', 'cf_wrt', 'igr', 'liutex_wrt',         &
-            & 'bc_x%isothermal_in', 'bc_y%isothermal_in', 'bc_z%isothermal_in',   &
-            & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out',&
-            & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',             &
-            & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',           &
-            & 'output_partial_domain', 'relativity', 'cont_damage', 'bc_io',      &
-            & 'down_sample','fft_wrt', 'hyper_cleaning', 'ib_state_wrt']
+        #:for VAR in [ 'bc_x%isothermal_in', 'bc_y%isothermal_in', 'bc_z%isothermal_in',   &
+            & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        if (bubbles_lagrange) then
-            #:for VAR in ['lag_header', 'lag_txt_wrt', 'lag_db_wrt', 'lag_id_wrt',         &
-                & 'lag_pos_wrt', 'lag_pos_prev_wrt', 'lag_vel_wrt', 'lag_rad_wrt', &
-                & 'lag_rvel_wrt', 'lag_r0_wrt', 'lag_rmax_wrt', 'lag_rmin_wrt',    &
-                & 'lag_dphidt_wrt', 'lag_pres_wrt', 'lag_mv_wrt', 'lag_mg_wrt',    &
-                & 'lag_betaT_wrt', 'lag_betaC_wrt', 'bc_io', 'down_sample' ]
-                call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        ! wall-velocity members consumed by s_slip_wall/s_no_slip_wall on all ranks
+        #:for DIM in ['x', 'y', 'z']
+            #:for DIR in [1, 2, 3]
+                call MPI_BCAST(bc_${DIM}$%vb${DIR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(bc_${DIM}$%ve${DIR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-        end if
+        #:endfor
 
-        call MPI_BCAST(flux_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(omega_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(mom_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(vel_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alpha_rho_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alpha_rho_e_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(alpha_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence)
+        call MPI_BCAST(cfl_dt, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(bc_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
-        do i = 1, num_fluids_max
-            call MPI_BCAST(fluid_pp(i)%gamma, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%pi_inf, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%cv, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%qv, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%qvp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%G, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%K, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%nn, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%tau0, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%hb_m, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%mu_min, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%mu_max, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%mu_bulk, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%non_newtonian, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-        end do
-
-        ! Subgrid bubble parameters
-        if (bubbles_euler .or. bubbles_lagrange) then
-            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
-                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
-                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
-                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-        end if
-
-        #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
-            & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop',      &
-            & 'x_output%beg', 'x_output%end', 'y_output%beg',    &
-            & 'y_output%end', 'z_output%beg', 'z_output%end',    &
-            & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in',&
-            & 'bc_y%Twall_out','bc_z%Twall_in', 'bc_z%Twall_out' ]
+        ! manual: output domain and Twall bc members (struct members not in NAMELIST_VARS)
+        #:for VAR in [ 'x_output%beg', 'x_output%end', 'y_output%beg',    &
+            & 'y_output%end', 'z_output%beg', 'z_output%end',              &
+            & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in',         &
+            & 'bc_y%Twall_out','bc_z%Twall_in', 'bc_z%Twall_out']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
-        call MPI_BCAST(schlieren_alpha(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 
     end subroutine s_mpi_bcast_user_inputs
@@ -249,7 +207,7 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         ! Silo-HDF5 database format
 
-        if (format == 1) then
+        if (format == format_silo) then
             call MPI_GATHERV(x_cc(0), m + 1, mpi_p, x_root_cc(0), recvcounts, displs, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
             ! Binary database format
@@ -319,7 +277,7 @@ contains
 
 #ifdef MFC_MPI
         ! Deallocating the receive counts and the displacement vector variables used in variable-gather communication procedures
-        if ((format == 1 .and. n > 0) .or. n == 0) then
+        if ((format == format_silo .and. n > 0) .or. n == 0) then
             deallocate (recvcounts)
             deallocate (displs)
         end if

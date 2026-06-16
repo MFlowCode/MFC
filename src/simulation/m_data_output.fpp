@@ -19,7 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
-    use m_constants, only: model_eqns_5eq, model_eqns_4eq
+    use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
 
     implicit none
 
@@ -375,7 +375,7 @@ contains
         pi_inf = pi_infs(1)
         qv = qvs(1)
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(2F30.3)"
         else
             FMT = "(2F40.14)"
@@ -456,7 +456,7 @@ contains
             end if
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(3F30.7)"
         else
             FMT = "(3F40.14)"
@@ -540,7 +540,7 @@ contains
             end if
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(4F30.7)"
         else
             FMT = "(4F40.14)"
