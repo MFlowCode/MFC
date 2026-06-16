@@ -320,7 +320,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `num_ibs`            | Integer | Number of immersed boundary patches |
 | `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
 | `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
-| `ib_neighborhood_radius` | Integer | Parameter that controls the neighborhood size for IB detection. |
+| `ib_neighborhood_radius`    | Integer | Parameter that controls the neighborhood size for IB detection. |
+| `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -1268,7 +1269,7 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 | 3    | 2D Rectangle       | 2      |
 | 4    | 2D Airfoil         | 2      |
 | 8    | 3D Sphere          | 3      |
-| 10   | 3D Cylinder        | 3      |
+| 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder. |
 | 11   | 3D Airfoil         | 3      |
 
 ### Acoustic Supports {#acoustic-supports}

@@ -79,6 +79,7 @@ print(
             "ib": "T",
             "num_ibs": 0,
             "viscous": "T",
+            "many_ib_patch_parallelism": "T",
             # Collision model (soft-sphere, from 3D_mibm_sphere_head_on_collision)
             "collision_model": 1,
             "coefficient_of_restitution": 0.9,
