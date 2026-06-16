@@ -141,7 +141,7 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
 
     #:set omp_clause_val = omp_clause_val.strip('\n')
-    #:set omp_directive = '!$omp target teams ' + omp_clause_val + extraOmpArgs_val.strip('\n')
+    #:set omp_directive = FOLD_DIRECTIVE('!$omp target teams ' + omp_clause_val + extraOmpArgs_val.strip('\n'), '!$omp').strip('\n')
 
     #:set omp_end_directive = '!$omp end target teams'
     $:omp_directive
@@ -186,7 +186,7 @@
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
     #:endif
 
-    #:set omp_directive = omp_start_directive + clause_val + extraOmpArgs_val.strip('\n')
+    #:set omp_directive = FOLD_DIRECTIVE(omp_start_directive + clause_val + extraOmpArgs_val.strip('\n'), '!$omp').strip('\n')
     $:omp_directive
 #:enddef
 
