@@ -132,7 +132,7 @@ contains
             call MPI_BCAST(patch_ib(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%slip, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%isothermal, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
+        end do
         ! manual: ib_airfoil (kept manual alongside patch_ib)
         do i = 1, num_ib_airfoils_max
             #:for VAR in ['c', 'p', 't', 'm']
