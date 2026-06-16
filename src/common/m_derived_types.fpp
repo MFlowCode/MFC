@@ -372,7 +372,7 @@ module m_derived_types
         real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
-        integer  :: packing_method  !< Packing algorithm: 1=rejection sampling
+        integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
     end type particle_cloud_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
