@@ -30,6 +30,9 @@ RAW_DIRECTIVE_EXCLUDE = {
 PRECISION_EXCLUDE_DIRS = {"syscheck"}
 PRECISION_EXCLUDE_PATTERNS = {"nvtx", "precision_select"}
 
+# MPI proxy source directory -> params-registry target key
+MPI_PROXY_TARGETS = {"pre_process": "pre", "simulation": "sim", "post_process": "post"}
+
 
 def _is_comment_or_blank(stripped: str) -> bool:
     """True if stripped line is blank, a Fortran comment, or a Fypp directive."""
@@ -309,6 +312,131 @@ def check_junk_comments(repo_root: Path) -> list[str]:
     return errors
 
 
+_BCAST_CALL_RE = re.compile(r"\bcall\s+MPI_BCAST\s*\(", re.IGNORECASE)
+_FYPP_FOR_RE = re.compile(r"#:\s*for\s+(\w+)\s+in\s+\[")
+_FYPP_ENDFOR_RE = re.compile(r"#:\s*endfor\b")
+_PLACEHOLDER_RE = re.compile(r"\$\{(\w+)\}\$")
+_IDENTIFIER_RE = re.compile(r"[A-Za-z_]\w*$")
+
+
+def _first_bcast_argument(after_paren: str) -> str:
+    """Return the first argument of an MPI_BCAST call, given the text after '('."""
+    depth = 0
+    for pos, ch in enumerate(after_paren):
+        if ch == "(":
+            depth += 1
+        elif ch == ")" and depth > 0:
+            depth -= 1
+        elif ch in ",)" and depth == 0:
+            return after_paren[:pos]
+    return after_paren
+
+
+def _expand_placeholders(arg: str, loops: dict[str, list[str]]) -> list[str]:
+    """Substitute Fypp ``${VAR}$`` placeholders with each active loop entry.
+
+    Placeholders whose loop list has no quoted entries (e.g. numeric lists)
+    expand to nothing — those arguments cannot name a namelist scalar root.
+    """
+    match = _PLACEHOLDER_RE.search(arg)
+    if not match:
+        return [arg]
+    expanded: list[str] = []
+    for entry in loops.get(match.group(1), []):
+        expanded.extend(_expand_placeholders(arg[: match.start()] + entry + arg[match.end() :], loops))
+    return expanded
+
+
+def _normalize_bcast_root(candidate: str) -> str | None:
+    """Reduce a broadcast first argument to its root name, or None if not a top-level scalar.
+
+    Struct members (containing '%') are legitimate manual residue; arguments
+    that are not plain identifiers after dropping the index part are skipped.
+    """
+    candidate = candidate.strip()
+    if "%" in candidate or "$" in candidate:
+        return None
+    root = candidate.split("(", 1)[0].strip()
+    return root if _IDENTIFIER_RE.fullmatch(root) else None
+
+
+def _extract_bcast_roots(lines: list[str]) -> list[tuple[int, str]]:
+    """Return (line_number, root_name) for every MPI_BCAST first argument.
+
+    Resolves Fypp ``#:for VAR in ['a', 'b', ...]`` loop lists (including '&'
+    continuations and nested loops) so list-driven broadcasts are attributed
+    to the quoted variable names.
+    """
+    roots: list[tuple[int, str]] = []
+    loop_stack: list[tuple[str, list[str]]] = []
+
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
+        for_match = _FYPP_FOR_RE.match(stripped)
+        if for_match:
+            full = stripped
+            while full.rstrip().endswith("&") and i + 1 < len(lines):
+                i += 1
+                full += " " + lines[i].strip()
+            entries = re.findall(r"['\"]([^'\"]*)['\"]", full[full.find("[") :])
+            loop_stack.append((for_match.group(1), entries))
+        elif _FYPP_ENDFOR_RE.match(stripped):
+            if loop_stack:
+                loop_stack.pop()
+        elif not stripped.startswith("!"):
+            call = _BCAST_CALL_RE.search(stripped)
+            if call:
+                first_arg = _first_bcast_argument(stripped[call.end() :])
+                for candidate in _expand_placeholders(first_arg, dict(loop_stack)):
+                    root = _normalize_bcast_root(candidate)
+                    if root:
+                        roots.append((i + 1, root))
+        i += 1
+
+    return roots
+
+
+def _registry_bcast_vars(repo_root: Path, target: str) -> set[str]:
+    """Names auto-broadcast by generated_bcast.fpp for one target.
+
+    Derived from the generator itself so the lint and the generated code can
+    never disagree about which scalars are auto-broadcast: struct roots,
+    TYPED_DECLS, FORTRAN_ARRAY_DIMS, and per-target exclusions are already
+    removed by _classify_scalar_vars.
+    """
+    toolchain_dir = str(repo_root / "toolchain")
+    if toolchain_dir not in sys.path:
+        sys.path.insert(0, toolchain_dir)
+    from mfc.params.generators.fortran_gen import _classify_scalar_vars
+
+    return set().union(*_classify_scalar_vars(target))
+
+
+def check_manual_registry_bcasts(repo_root: Path) -> list[str]:
+    """Flag hand-written MPI_BCASTs of registry-bound namelist scalars.
+
+    Those scalars are broadcast by the generated include (generated_bcast.fpp);
+    a manual copy in m_mpi_proxy.fpp is a duplicate broadcast, or a new
+    parameter bypassing the generator. Manual residue (computed variables and
+    struct members) is permitted.
+    """
+    errors: list[str] = []
+
+    for dirname, target in MPI_PROXY_TARGETS.items():
+        proxy = repo_root / SRC_DIR / dirname / "m_mpi_proxy.fpp"
+        if not proxy.exists():
+            continue
+        auto_broadcast = _registry_bcast_vars(repo_root, target)
+        rel = proxy.relative_to(repo_root)
+
+        for lineno, root in _extract_bcast_roots(proxy.read_text(encoding="utf-8").splitlines()):
+            if root in auto_broadcast:
+                errors.append(f"  {rel}:{lineno} manual MPI_BCAST of registry-bound scalar '{root}' — it is auto-broadcast via generated_bcast.fpp; remove the manual copy")
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -321,6 +449,7 @@ def main():
     all_errors.extend(check_fypp_list_duplicates(repo_root))
     all_errors.extend(check_duplicate_lines(repo_root))
     all_errors.extend(check_hardcoded_byte_size(repo_root))
+    all_errors.extend(check_manual_registry_bcasts(repo_root))
 
     if all_errors:
         print("Source lint failed:")

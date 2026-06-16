@@ -643,6 +643,7 @@ def _load():
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
     _r("ib_coefficient_of_friction", REAL, {"ib"})
+    _r("many_ib_patch_parallelism", LOG, {"ib"})
 
     # Probes
     for n in ["num_probes", "num_integrals"]:
@@ -1148,7 +1149,7 @@ TYPED_DECLS: dict[str, tuple] = {
     "patch_bc": ("type(bc_patch_parameters)", "num_bc_patches_max", False, "Boundary condition patch parameters"),
     "patch_ib": ("type(ib_patch_parameters)", "num_ib_patches_max_namelist", True, "Immersed boundary patch parameters"),
     "ib_airfoil": ("type(ib_airfoil_parameters)", "num_ib_airfoils_max", True, "Per-airfoil NACA user inputs"),
-    "stl_models": ("type(ib_stl_parameters)", "num_stl_models_max", False, "Per-STL model parameters"),
+    "stl_models": ("type(ib_stl_parameters)", "num_stl_models_max", True, "Per-STL model parameters"),
     "probe": ("type(vec3_dt)", "num_probes_max", False, None),
     "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
@@ -1313,6 +1314,7 @@ _nv(
     "ib_coefficient_of_friction",
     "num_particle_clouds",
     "ib_neighborhood_radius",
+    "many_ib_patch_parallelism",
     "particle_cloud",
     "tau_star",
     "cont_damage_s",

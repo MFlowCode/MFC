@@ -259,6 +259,29 @@ def get_dimensions():
     return r
 
 
+# Always-run "canary" smoke set: one cheap, feature-dominant regression case per major
+# physics module. Tagged canary=True in list_cases() so coverage-based selection
+# (toolchain/mfc/test/coverage.py:select_tests) can never skip them on any lane -- a silent
+# regression that disables a feature then trips on every PR. Validated in list_cases(), so a
+# renamed/removed trace fails loudly instead of silently un-tagging the canary.
+_CANARY_TRACES = frozenset(
+    {
+        "1D -> 1 Fluid(s) -> Viscous",  # m_viscous (Newtonian, Re=1e-4)
+        "1D -> 1 Fluid(s) -> Non-Newtonian -> nn=0.5",  # m_hb_function (Herschel-Bulkley)
+        "2D -> 2 Fluid(s) -> capillary=T -> model_eqns=3",  # m_surface_tension
+        "1D -> Bubbles -> QBMM",  # m_qbmm / m_bubbles_EE
+        "2D -> Lagrange Bubbles -> One-way Coupling",  # m_bubbles_EL
+        "1D -> MHD -> HLLD",  # m_mhd / m_riemann_solver_hlld
+        "1D -> Hypoelasticity -> 1 Fluid(s)",  # m_hypoelastic
+        "1D -> Chemistry -> Perfect Reactor",  # chemistry
+        "2D -> 1 Fluid(s) -> IBM -> Circle -> slip",  # m_ibm
+        "1D -> Phase Change model 5 -> 2 Fluid(s) -> model equation -> 3",  # m_pressure_relaxation (6-eq)
+        "1D -> Acoustic Source -> Sine -> Frequency",  # m_acoustic_src
+        "1D -> Bodyforces",  # m_body_forces
+    }
+)
+
+
 def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
 
@@ -2459,5 +2482,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     l1, l2 = len(uuids), len(set(uuids))
     if l1 != l2:
         raise common.MFCException(f"list_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
+
+    # Tag the always-run canary smoke set (see _CANARY_TRACES). Validate first so a renamed
+    # or removed trace is a loud error, not a silently dropped canary.
+    missing = _CANARY_TRACES - {case.trace for case in cases}
+    if missing:
+        raise common.MFCException(f"list_cases: canary trace(s) not found (renamed/removed?): {sorted(missing)}")
+    for case in cases:
+        if case.trace in _CANARY_TRACES:
+            case.canary = True
 
     return cases

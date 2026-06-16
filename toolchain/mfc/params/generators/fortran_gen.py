@@ -243,16 +243,22 @@ _BCAST_EXCLUDE: frozenset = frozenset()
 
 # Post-process scalars that are namelist-bound but consumed on rank 0 only (reading/init).
 # Broadcasting them would be harmless but changes the existing call set, which we preserve.
-_POST_BCAST_EXCLUDE = frozenset({"avg_state", "cfl_target", "igr_order", "num_bc_patches", "recon_type", "sigR"})
+# Namelist-bound names with no registry definition, verified rank-0-only consumers.
+_NO_REGISTRY_ALLOWLIST = frozenset({"G"})
+
+_POST_BCAST_EXCLUDE = frozenset({"avg_state", "cfl_target", "num_bc_patches", "sigR"})
 
 # TYPED_DECLS entries kept entirely in the manual residue: their member-broadcast structure
 # is irregular (non-uniform subsets, size() arrays, nested loops, complex guards).
 
 
-def _mpi_type_for(ptype: ParamType) -> str:
-    """Return the Fortran MPI type constant for a ParamType."""
+def _mpi_type_for(ptype: ParamType, storage_precision: bool = False) -> str:
+    """Return the Fortran MPI type constant for a ParamType.
+
+    REAL parameters declared real(stp) (storage_precision=True) must broadcast
+    with mpi_io_p; mpi_p would silently mismatch under --mixed precision."""
     if ptype in _REAL_TYPES:
-        return "mpi_p"
+        return "mpi_io_p" if storage_precision else "mpi_p"
     if ptype in (ParamType.INT, ParamType.ANALYTIC_INT):
         return "MPI_INTEGER"
     if ptype == ParamType.LOG:
@@ -298,13 +304,19 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
 
         pdef = REGISTRY.all_params.get(name)
         if pdef is None:
-            continue  # no registry entry — skip (e.g. 'G' in post is rank-0-only)
+            if name in _NO_REGISTRY_ALLOWLIST:
+                continue
+            raise ValueError(
+                f"namelist var {name!r} ({target}) has no registry entry. "
+                f"Register it in definitions.py or add it to _NO_REGISTRY_ALLOWLIST; "
+                f"a silent skip here means a silently missing broadcast."
+            )
 
         if target == "sim" and name in CASE_OPT_PARAMS:
             case_opt_vars.append(name)
             continue
 
-        mpi_type = _mpi_type_for(pdef.param_type)
+        mpi_type = _mpi_type_for(pdef.param_type, getattr(pdef, "storage_precision", False))
         if mpi_type == "MPI_INTEGER":
             int_vars.append(name)
         elif mpi_type == "MPI_LOGICAL":
@@ -407,7 +419,7 @@ def _emit_fortran_array_dims(lines: List[str], target: str) -> None:
         pdef = REGISTRY.all_params.get(member_key)
         if pdef is None:
             raise ValueError(f"No registry entry for {member_key!r} (needed for FORTRAN_ARRAY_DIMS broadcast)")
-        mpi_type = _mpi_type_for(pdef.param_type)
+        mpi_type = _mpi_type_for(pdef.param_type, getattr(pdef, "storage_precision", False))
         lines.append(f"        call MPI_BCAST({name}(1), {dim}, {mpi_type}, 0, MPI_COMM_WORLD, ierr)")
 
 
