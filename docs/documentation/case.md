@@ -320,7 +320,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `num_ibs`            | Integer | Number of immersed boundary patches |
 | `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
 | `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
-| `ib_neighborhood_radius` | Integer | Parameter that controls the neighborhood size for IB detection. |
+| `ib_neighborhood_radius`    | Integer | Parameter that controls the neighborhood size for IB detection. |
+| `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -387,6 +388,26 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
 - `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IB's up to 1 ranks away. This parameter is required to strong-scale a case when IB's eventually grow to be larger than one full processor domain wide.
+
+#### Particle Clouds
+
+A particle cloud is a compact specification of a bed of identical circular (2D) or spherical (3D) immersed boundaries; each cloud is expanded into individual `patch_ib` particles at startup. Set `num_particle_clouds` to the number of beds and prepend the parameters below with `particle_cloud(j)%` where $j$ is the cloud index.
+
+| Parameter         | Type    | Description |
+| ---:              | :----:  | :---        |
+| `x[y,z]_centroid` | Real    | Centre of the cloud region in the [x,y,z]-direction. |
+| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction. |
+| `num_particles`   | Integer | Number of particles to place in the region. |
+| `radius`          | Real    | Radius of every particle in the cloud. |
+| `mass`            | Real    | Mass of every particle in the cloud. |
+| `min_spacing`     | Real    | Minimum surface-to-surface gap between particles (centres are `2*radius + min_spacing` apart). |
+| `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`). |
+| `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
+| `packing_method`  | Integer | Algorithm used to place the particles. |
+
+- `packing_method` selects how the `num_particles` are positioned within the cloud region:
+  - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
+  - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
@@ -1271,7 +1292,7 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 | 3    | 2D Rectangle       | 2      |
 | 4    | 2D Airfoil         | 2      |
 | 8    | 3D Sphere          | 3      |
-| 10   | 3D Cylinder        | 3      |
+| 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder. |
 | 11   | 3D Airfoil         | 3      |
 
 ### Acoustic Supports {#acoustic-supports}

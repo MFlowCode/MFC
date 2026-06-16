@@ -420,6 +420,7 @@ contains
             muscl_order = dflt_int
             num_fluids = dflt_int
             igr = .false.
+            igr_order = dflt_int
             mhd = .false.
             relativity = .false.
         #:endif

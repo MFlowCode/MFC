@@ -38,6 +38,7 @@ contains
         call s_check_inputs_time_stepping
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
+        @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
@@ -124,10 +125,10 @@ contains
         do i = 1, num_particle_clouds
             call s_int_to_str(i, idxStr)
             @:PROHIBIT(particle_cloud(i)%packing_method == dflt_int, &
-                       & "particle_cloud("//trim(idxStr)//")%packing_method must be specified (1 = rejection sampling)")
-            @:PROHIBIT(particle_cloud(i)%packing_method /= 1, &
                        & "particle_cloud("//trim(idxStr) &
-                       & //")%packing_method must be 1 (rejection sampling is the only supported method)")
+                       & //")%packing_method must be specified (1 = rejection sampling, 2 = lattice)")
+            @:PROHIBIT(particle_cloud(i)%packing_method /= 1 .and. particle_cloud(i)%packing_method /= 2, &
+                       & "particle_cloud("//trim(idxStr) //")%packing_method must be 1 (rejection sampling) or 2 (lattice)")
         end do
 
     end subroutine s_check_inputs_particle_clouds
