@@ -17,6 +17,7 @@ module m_mpi_common
     use m_helper
     use ieee_arithmetic
     use m_nvtx
+    use m_constants, only: recon_type_weno, format_silo
 
     implicit none
 
@@ -1031,7 +1032,7 @@ contains
         integer  :: i, j           !< Generic loop iterators
         integer  :: ierr           !< Generic flag used to identify and report MPI errors
 
-        if (recon_type == WENO_TYPE) then
+        if (recon_type == recon_type_weno) then
             recon_order = weno_order
         else
             recon_order = muscl_order
@@ -1194,14 +1195,14 @@ contains
 
 #ifdef MFC_POST_PROCESS
                 ! Ghost zone at the beginning
-                if (proc_coords(3) > 0 .and. format == 1) then
+                if (proc_coords(3) > 0 .and. format == format_silo) then
                     offset_z%beg = 2
                 else
                     offset_z%beg = 0
                 end if
 
                 ! Ghost zone at the end
-                if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
+                if (proc_coords(3) < num_procs_z - 1 .and. format == format_silo) then
                     offset_z%end = 2
                 else
                     offset_z%end = 0
@@ -1306,14 +1307,14 @@ contains
 
 #ifdef MFC_POST_PROCESS
             ! Ghost zone at the beginning
-            if (proc_coords(2) > 0 .and. format == 1) then
+            if (proc_coords(2) > 0 .and. format == format_silo) then
                 offset_y%beg = 2
             else
                 offset_y%beg = 0
             end if
 
             ! Ghost zone at the end
-            if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
+            if (proc_coords(2) < num_procs_y - 1 .and. format == format_silo) then
                 offset_y%end = 2
             else
                 offset_y%end = 0
@@ -1389,14 +1390,14 @@ contains
 
 #ifdef MFC_POST_PROCESS
         ! Ghost zone at the beginning
-        if (proc_coords(1) > 0 .and. format == 1) then
+        if (proc_coords(1) > 0 .and. format == format_silo) then
             offset_x%beg = 2
         else
             offset_x%beg = 0
         end if
 
         ! Ghost zone at the end
-        if (proc_coords(1) < num_procs_x - 1 .and. format == 1) then
+        if (proc_coords(1) < num_procs_x - 1 .and. format == format_silo) then
             offset_x%end = 2
         else
             offset_x%end = 0

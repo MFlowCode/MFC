@@ -531,7 +531,7 @@ contains
 
         call cpu_time(start)
 
-        if (old_ic) call s_read_ic_data_files(q_cons_vf)
+        if (old_ic) call s_read_ic_data_files(ic%q_cons_vf)
 
         call s_generate_initial_condition()
 
@@ -544,8 +544,8 @@ contains
                         r2 = x_cc(j)**2
                         if (n > 0) r2 = r2 + y_cc(k)**2
                         if (p > 0) r2 = r2 + z_cc(l)**2
-                        q_cons_vf(eqn_idx%psi)%sf(j, k, l) = 1.0e-2_wp*exp(-r2/(2.0_wp*0.05_wp**2))
-                        q_prim_vf(eqn_idx%psi)%sf(j, k, l) = q_cons_vf(eqn_idx%psi)%sf(j, k, l)
+                        ic%q_cons_vf(eqn_idx%psi)%sf(j, k, l) = 1.0e-2_wp*exp(-r2/(2.0_wp*0.05_wp**2))
+                        ic%q_prim_vf(eqn_idx%psi)%sf(j, k, l) = ic%q_cons_vf(eqn_idx%psi)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -556,13 +556,13 @@ contains
                 print *, 'initial condition might have been altered due to enforcement of pTg-equilibrium (relax = "T" activated)'
             end if
 
-            call s_infinite_relaxation_k(q_cons_vf)
+            call s_infinite_relaxation_k(ic%q_cons_vf)
         end if
 
         if (chemistry) then
-            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type, q_T_sf)
+            call s_write_data_files(ic%q_cons_vf, ic%q_prim_vf, ic%bc_type, ic%q_T_sf)
         else
-            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
+            call s_write_data_files(ic%q_cons_vf, ic%q_prim_vf, ic%bc_type)
         end if
 
         call cpu_time(finish)

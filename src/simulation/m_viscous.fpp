@@ -4,6 +4,39 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+#! Fill Re_visc(1:2) at a cylindrical-axis cell. Non-Newtonian path uses a
+#! Herschel-Bulkley mixture inv-Re from the local strain rate; Newtonian path is
+#! the original alpha-weighted harmonic average. Component-3 strain terms are
+#! gated for compile validity (num_dims <= 2) and runtime safety (p > 0).
+#:def compute_axis_inv_re()
+    if (any_non_newtonian) then
+        gamma_dot_c = f_compute_shear_rate_from_components(grad_x_vf(1)%sf(j, k, l), grad_y_vf(2)%sf(j, k, l), 0._wp, &
+            & 0.5_wp*(grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l)), 0._wp, 0._wp)
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+            if (p > 0) then
+                gamma_dot_c = f_compute_shear_rate_from_components(grad_x_vf(1)%sf(j, k, l), grad_y_vf(2)%sf(j, k, l), &
+                    & grad_z_vf(3)%sf(j, k, l), 0.5_wp*(grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l)), &
+                    & 0.5_wp*(grad_z_vf(1)%sf(j, k, l) + grad_x_vf(3)%sf(j, k, l)), 0.5_wp*(grad_z_vf(2)%sf(j, k, &
+                    & l) + grad_y_vf(3)%sf(j, k, l)))
+            end if
+        #:endif
+        call s_compute_mixture_inv_re(alpha_visc, gamma_dot_c, Res_viscous, Re_visc)
+    else
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, 2
+            Re_visc(i) = dflt_real
+
+            if (Re_size(i) > 0) Re_visc(i) = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do q = 1, Re_size(i)
+                Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
+            end do
+
+            Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
+        end do
+    end if
+#:enddef
+
 !> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
 
@@ -13,6 +46,8 @@ module m_viscous
     use m_muscl
     use m_helper
     use m_finite_differences
+    use m_constants, only: model_eqns_5eq, recon_type_weno, recon_type_muscl
+    use m_hb_function
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
         & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
@@ -52,6 +87,7 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(wp), dimension(2) :: Re_visc
+        real(wp) :: gamma_dot_c                                        !< Effective shear rate for non-Newtonian mixture inv-Re.
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
@@ -83,7 +119,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -102,14 +138,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)
@@ -147,18 +183,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
@@ -186,7 +211,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -205,14 +230,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)
@@ -250,18 +275,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
@@ -283,7 +297,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -302,14 +316,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)
@@ -347,18 +361,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
@@ -383,7 +386,7 @@ contains
 
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -402,14 +405,14 @@ contains
                                 gamma_visc = 0._wp
                                 pi_inf_visc = 0._wp
 
-                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         rho_visc = rho_visc + alpha_rho_visc(i)
                                         gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                         pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                     end do
-                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids - 1
                                         rho_visc = rho_visc + alpha_rho_visc(i)
@@ -447,18 +450,7 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-                                    end do
+                                    @:compute_axis_inv_re()
                                 end if
                             end if
 
@@ -856,7 +848,7 @@ contains
         integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer :: i, j, k, l
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl','recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
 
@@ -940,7 +932,7 @@ contains
         integer :: recon_dir  !< Coordinate direction of the WENO reconstruction
         integer :: i, j, k, l
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl','recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
 
@@ -1273,7 +1265,9 @@ contains
         real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
         real(wp), dimension(1:3)                              :: dx
         real(wp)                                              :: divergence
+        real(wp)                                              :: mu_eff, gamma_dot_c
         integer                                               :: l, q  !< iterators
+        integer                                               :: fl
 
         ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
         viscous_stress_tensor = 0._wp
@@ -1299,6 +1293,25 @@ contains
             end if
         end do
 
+        ! Non-Newtonian: per-sample mixture viscosity from the local strain rate, so each
+        ! stencil cell (i,j,k) uses its own viscosity instead of a reused cell-center value.
+        mu_eff = dynamic_viscosity
+        if (any_non_newtonian) then
+            gamma_dot_c = f_compute_shear_rate_from_components(velocity_gradient_tensor(1, 1), velocity_gradient_tensor(2, 2), &
+                & velocity_gradient_tensor(3, 3), 0.5_wp*(velocity_gradient_tensor(1, 2) + velocity_gradient_tensor(2, 1)), &
+                & 0.5_wp*(velocity_gradient_tensor(1, 3) + velocity_gradient_tensor(3, 1)), 0.5_wp*(velocity_gradient_tensor(2, &
+                & 3) + velocity_gradient_tensor(3, 2)))
+            mu_eff = 0._wp
+            do fl = 1, num_fluids
+                if (is_non_newtonian(fl)) then
+                    mu_eff = mu_eff + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(i, j, k)*f_compute_hb_viscosity(hb_tau0(fl), &
+                                                & hb_K(fl), hb_nn(fl), hb_mu_min(fl), hb_mu_max(fl), gamma_dot_c, hb_m_arr(fl))
+                else
+                    mu_eff = mu_eff + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(i, j, k)*fluid_inv_re(fl)
+                end if
+            end do
+        end if
+
         ! compute divergence
         divergence = 0._wp
         do l = 1, num_dims
@@ -1308,13 +1321,13 @@ contains
         ! Viscous stress tensor: tau_ij = mu * (du_i/dx_j + du_j/dx_i) - 2/3 * mu * div(u) * delta_ij
         do l = 1, num_dims
             do q = 1, num_dims
-                viscous_stress_tensor(l, q) = dynamic_viscosity*(velocity_gradient_tensor(l, q) + velocity_gradient_tensor(q, l))
+                viscous_stress_tensor(l, q) = mu_eff*(velocity_gradient_tensor(l, q) + velocity_gradient_tensor(q, l))
             end do
         end do
 
         ! Subtract isotropic bulk viscosity term (Stokes hypothesis)
         do l = 1, num_dims
-            viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp*divergence*dynamic_viscosity/3._wp
+            viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp*divergence*mu_eff/3._wp
         end do
 
         if (num_dims == 2) then

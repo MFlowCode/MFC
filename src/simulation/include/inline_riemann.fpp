@@ -59,24 +59,24 @@
 #:enddef roe_avg
 
 #:def compute_average_state()
-    if (avg_state == 1) then
+    if (avg_state == avg_state_roe) then
         @:roe_avg()
     end if
 
-    if (avg_state == 2) then
+    if (avg_state == avg_state_arithmetic) then
         @:arithmetic_avg()
     end if
 #:enddef compute_average_state
 
 #:def compute_low_Mach_correction()
-    if (riemann_solver == 1 .or. riemann_solver == 5) then
+    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_lax_friedrichs) then
         zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
         pcorr = 0._wp
 
         if (low_Mach == 1) then
             pcorr = -(s_P - s_M)*(rho_L + rho_R)/8._wp*(zcoef - 1._wp)
         end if
-    else if (riemann_solver == 2) then
+    else if (riemann_solver == riemann_solver_hllc) then
         zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
         pcorr = 0._wp
 

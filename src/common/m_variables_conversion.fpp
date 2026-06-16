@@ -13,6 +13,8 @@ module m_variables_conversion
     use m_mpi_proxy
     use m_helper_basic
     use m_helper
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, &
+        & model_eqns_4eq, avg_state_roe
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
@@ -79,7 +81,7 @@ contains
         real(wp), optional, intent(out)                       :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
 
-        if (model_eqns == 1) then  ! Gamma/pi_inf model
+        if (model_eqns == model_eqns_gamma_law) then  ! Gamma/pi_inf model
             call s_convert_mixture_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv)
         else  ! Volume fraction model
             call s_convert_species_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv, Re_K, G_K, G)
@@ -114,10 +116,10 @@ contains
             if (mhd) then
                 ! MHD pressure: subtract magnetic pressure from total energy
                 pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
-            else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
+            else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
                 ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002): p from mixture EOS
                 pres = (energy - dyn_p - pi_inf - qv)/gamma
-            else if ((model_eqns /= 4) .and. bubbles_euler) then
+            else if ((model_eqns /= model_eqns_4eq) .and. bubbles_euler) then
                 ! Bubble-augmented pressure with void fraction correction
                 pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
             else
@@ -535,7 +537,7 @@ contains
 
                     call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
 
-                    if (model_eqns /= 4) then
+                    if (model_eqns /= model_eqns_4eq) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
                         if (elasticity) then
@@ -665,7 +667,7 @@ contains
                     ! Recover velocity from momentum: u = rho*u / rho, and accumulate dynamic pressure 0.5*rho*|u|^2
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
-                        if (model_eqns /= 4) then
+                        if (model_eqns /= model_eqns_4eq) then
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                             dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l)*qK_prim_vf(i)%sf(j, k, l)
                         else
@@ -954,10 +956,10 @@ contains
                             ! MHD energy includes magnetic pressure contribution
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, &
                                       & l) + dyn_pres + pres_mag + pi_inf + qv
-                        else if ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
+                        else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
                             ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
-                        else if ((model_eqns /= 4) .and. (bubbles_euler)) then
+                        else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler)) then
                             ! Bubble-augmented energy with void fraction correction
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, &
                                       & l))*(gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + pi_inf)
@@ -968,7 +970,7 @@ contains
                     end if
 
                     ! Six-equation model (Saurel et al. JCP 2009): compute per-phase internal energies
-                    if (model_eqns == 3) then
+                    if (model_eqns == model_eqns_6eq) then
                         do i = 1, num_fluids
                             q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
                                       & l)*(gammas(i)*q_prim_vf(eqn_idx%E)%sf(j, k, &
@@ -1180,7 +1182,7 @@ contains
                         end do
                     end if
 
-                    if (riemann_solver == 1 .or. riemann_solver == 4) then
+                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
                             FK_vf(j, k, l, i) = 0._wp
@@ -1302,7 +1304,7 @@ contains
         integer               :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
-            if (avg_state == 1 .and. abs(c_c) > verysmall) then
+            if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
                 c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
             else
                 c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
@@ -1314,14 +1316,14 @@ contains
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
                 blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-            else if (model_eqns == 3) then  ! Six-equation model sound speed
+            else if (model_eqns == model_eqns_6eq) then  ! Six-equation model sound speed
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
                     c = c + adv(q)*gs_min(q)*(pres + pi_infs(q)/(gammas(q) + 1._wp))
                 end do
                 c = c/rho
-            else if (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles_euler))) then
+            else if (((model_eqns == model_eqns_4eq) .or. (model_eqns == model_eqns_5eq .and. bubbles_euler))) then
                 ! Sound speed for bubble mixture to order O(\alpha)
 
                 if (mpp_lim .and. (num_fluids > 1)) then

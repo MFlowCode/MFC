@@ -148,6 +148,7 @@ MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Progr
 	* Euler-Lagrange particle tracking
 	* Quadrature-based moment methods (QBMM)
 * Viscous effects (high-order accurate representations)
+	* Newtonian and non-Newtonian rheology (Herschel-Bulkley: power-law, Bingham, and yield-stress fluids)
 * Hypoelastic and hyperelastic material models
 * Ideal and stiffened gas equations of state
 * Body forces

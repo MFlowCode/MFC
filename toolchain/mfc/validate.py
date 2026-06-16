@@ -58,6 +58,34 @@ def validate():
             cons.print("[bold yellow]Case validation complete with warnings.[/bold yellow]")
             cons.print("[dim]Note: Some constraint violations may be OK if you're not using that stage.[/dim]")
 
+        if ARG("migrate") and not all_passed:
+            cons.print("[yellow]Skipping --migrate: fix the validation issues above first.[/yellow]")
+        elif ARG("migrate"):
+            from .params.migrate import migrate_text
+
+            with open(input_file, "r") as f:
+                original = f.read()
+            new_text, n = migrate_text(original)
+            if n == 0:
+                cons.print("No integer codes to migrate.")
+                return
+            with open(input_file, "w") as f:
+                f.write(new_text)
+            # Safety: the migrated file must load to the same normalized parameters.
+            try:
+                re_case = run_input.load(input_file, do_print=False)
+            except MFCException:
+                with open(input_file, "w") as f:
+                    f.write(original)
+                cons.print("[bold red]Error:[/bold red] Migrated file failed to load; original restored.")
+                sys.exit(1)
+            if re_case.params != case.params:
+                with open(input_file, "w") as f:
+                    f.write(original)
+                cons.print("[bold red]Error:[/bold red] Migration changed case semantics; file restored.")
+                sys.exit(1)
+            cons.print(f"[bold green]✓[/bold green] Migrated {n} value(s) to named syntax")
+
     except MFCException as e:
         cons.print("\n[bold red]✗ Validation failed:[/bold red]")
         cons.print(f"{e}")

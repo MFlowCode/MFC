@@ -723,7 +723,7 @@ contains
                 xy_local = matmul(inverse_rotation, xy_local)
                 xy_local = xy_local - offset
 
-                eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xy_local)
+                eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xy_local)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
                 if (eta > threshold) then
@@ -810,7 +810,7 @@ contains
                     xyz_local = matmul(inverse_rotation, xyz_local)
                     xyz_local = xyz_local - offset
 
-                    eta = f_model_is_inside_flat(gpu_ntrs(model_id), model_id, xyz_local)
+                    eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
 
                     if (eta > threshold) then
                         ib_markers%sf(i, j, k) = encoded_patch_id

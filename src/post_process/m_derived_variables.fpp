@@ -11,22 +11,16 @@ module m_derived_variables
     use m_mpi_proxy
     use m_helper_basic
     use m_variables_conversion
+    use m_constants, only: model_eqns_gamma_law
 
     implicit none
 
     private; public :: s_initialize_derived_variables_module, s_derive_specific_heat_ratio, s_derive_liquid_stiffness, &
         & s_derive_sound_speed, s_derive_flux_limiter, s_derive_vorticity_component, s_derive_qm, s_derive_liutex, &
-        & s_derive_numerical_schlieren_function, s_compute_speed_of_sound, s_finalize_derived_variables_module
+        & s_derive_numerical_schlieren_function, s_compute_speed_of_sound, s_finalize_derived_variables_module, fd
 
-    real(wp), allocatable, dimension(:,:,:) :: gm_rho_sf  !< Density gradient magnitude for numerical Schlieren
-    !> @name Finite-difference (fd) coefficients in x-, y- and z-coordinate directions. Note that because sufficient boundary
-    !! information is available for all the active coordinate directions, the centered family of the finite-difference schemes is
-    !! used.
-    !> @{
-    real(wp), allocatable, dimension(:,:), public :: fd_coeff_x
-    real(wp), allocatable, dimension(:,:), public :: fd_coeff_y
-    real(wp), allocatable, dimension(:,:), public :: fd_coeff_z
-    !> @}
+    !> Finite-difference state: density gradient magnitude and centered FD coefficients in x-, y-, and z-directions.
+    type(fd_context) :: fd
 
 contains
 
@@ -35,21 +29,21 @@ contains
 
         ! Allocate density gradient magnitude if Schlieren output requested
         if (schlieren_wrt) then
-            allocate (gm_rho_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
+            allocate (fd%gm_rho_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
         end if
 
         ! Allocate FD coefficients (up to 4th order; higher orders need extension)
 
-        if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt) then
-            allocate (fd_coeff_x(-fd_number:fd_number,-offset_x%beg:m + offset_x%end))
+        if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt .or. liutex_wrt) then
+            allocate (fd%fd_coeff_x(-fd_number:fd_number,-offset_x%beg:m + offset_x%end))
         end if
 
-        if (omega_wrt(1) .or. omega_wrt(3) .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
-            allocate (fd_coeff_y(-fd_number:fd_number,-offset_y%beg:n + offset_y%end))
+        if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
+            allocate (fd%fd_coeff_y(-fd_number:fd_number,-offset_y%beg:n + offset_y%end))
         end if
 
-        if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
-            allocate (fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
+        if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
+            allocate (fd%fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
         end if
 
     end subroutine s_initialize_derived_variables_module
@@ -218,12 +212,12 @@ contains
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
-                                q_sf(j, k, l) = q_sf(j, k, l) + 1._wp/y_cc(k)*(fd_coeff_y(r, &
-                                     & k)*y_cc(r + k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, l) - fd_coeff_z(r, &
+                                q_sf(j, k, l) = q_sf(j, k, l) + 1._wp/y_cc(k)*(fd%fd_coeff_y(r, &
+                                     & k)*y_cc(r + k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, l) - fd%fd_coeff_z(r, &
                                      & l)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l))
                             else
-                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, &
-                                     & l) - fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l)
+                                q_sf(j, k, l) = q_sf(j, k, l) + fd%fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%end)%sf(j, r + k, &
+                                     & l) - fd%fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, r + l)
                             end if
                         end do
                     end do
@@ -237,11 +231,11 @@ contains
 
                         do r = -fd_number, fd_number
                             if (grid_geometry == 3) then
-                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)/y_cc(k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
+                                q_sf(j, k, l) = q_sf(j, k, l) + fd%fd_coeff_z(r, l)/y_cc(k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                     & r + l) - fd%fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
                             else
-                                q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                     & r + l) - fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
+                                q_sf(j, k, l) = q_sf(j, k, l) + fd%fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg)%sf(j, k, &
+                                     & r + l) - fd%fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%end)%sf(r + j, k, l)
                             end if
                         end do
                     end do
@@ -254,8 +248,8 @@ contains
                         q_sf(j, k, l) = 0._wp
 
                         do r = -fd_number, fd_number
-                            q_sf(j, k, l) = q_sf(j, k, l) + fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(r + j, k, &
-                                 & l) - fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, r + k, l)
+                            q_sf(j, k, l) = q_sf(j, k, l) + fd%fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%beg + 1)%sf(r + j, k, &
+                                 & l) - fd%fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%beg)%sf(j, r + k, l)
                         end do
                     end do
                 end do
@@ -285,13 +279,13 @@ contains
                     do r = -fd_number, fd_number
                         do jj = 1, 3
                             ! d()/dx
-                            q_jacobian_sf(jj, 1) = q_jacobian_sf(jj, 1) + fd_coeff_x(r, &
+                            q_jacobian_sf(jj, 1) = q_jacobian_sf(jj, 1) + fd%fd_coeff_x(r, &
                                           & j)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(r + j, k, l)
                             ! d()/dy
-                            q_jacobian_sf(jj, 2) = q_jacobian_sf(jj, 2) + fd_coeff_y(r, &
+                            q_jacobian_sf(jj, 2) = q_jacobian_sf(jj, 2) + fd%fd_coeff_y(r, &
                                           & k)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, r + k, l)
                             ! d()/dz
-                            q_jacobian_sf(jj, 3) = q_jacobian_sf(jj, 3) + fd_coeff_z(r, &
+                            q_jacobian_sf(jj, 3) = q_jacobian_sf(jj, 3) + fd%fd_coeff_z(r, &
                                           & l)*q_prim_vf(eqn_idx%mom%beg + jj - 1)%sf(j, k, r + l)
                         end do
                     end do
@@ -363,11 +357,11 @@ contains
                     do r = -fd_number, fd_number
                         do i = 1, 3
                             ! d()/dx
-                            vgt(i, 1) = vgt(i, 1) + fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(r + j, k, l)
+                            vgt(i, 1) = vgt(i, 1) + fd%fd_coeff_x(r, j)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(r + j, k, l)
                             ! d()/dy
-                            vgt(i, 2) = vgt(i, 2) + fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, r + k, l)
+                            vgt(i, 2) = vgt(i, 2) + fd%fd_coeff_y(r, k)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, r + k, l)
                             ! d()/dz
-                            vgt(i, 3) = vgt(i, 3) + fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, r + l)
+                            vgt(i, 3) = vgt(i, 3) + fd%fd_coeff_z(r, l)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, r + l)
                         end do
                     end do
 
@@ -448,11 +442,11 @@ contains
                     drho_dy = 0._wp
 
                     do i = -fd_number, fd_number
-                        drho_dx = drho_dx + fd_coeff_x(i, j)*rho_sf(i + j, k, l)
-                        drho_dy = drho_dy + fd_coeff_y(i, k)*rho_sf(j, i + k, l)
+                        drho_dx = drho_dx + fd%fd_coeff_x(i, j)*rho_sf(i + j, k, l)
+                        drho_dy = drho_dy + fd%fd_coeff_y(i, k)*rho_sf(j, i + k, l)
                     end do
 
-                    gm_rho_sf(j, k, l) = drho_dx*drho_dx + drho_dy*drho_dy
+                    fd%gm_rho_sf(j, k, l) = drho_dx*drho_dx + drho_dy*drho_dy
                 end do
             end do
         end do
@@ -465,21 +459,21 @@ contains
 
                         do i = -fd_number, fd_number
                             if (grid_geometry == 3) then
-                                drho_dz = drho_dz + fd_coeff_z(i, l)/y_cc(k)*rho_sf(j, k, i + l)
+                                drho_dz = drho_dz + fd%fd_coeff_z(i, l)/y_cc(k)*rho_sf(j, k, i + l)
                             else
-                                drho_dz = drho_dz + fd_coeff_z(i, l)*rho_sf(j, k, i + l)
+                                drho_dz = drho_dz + fd%fd_coeff_z(i, l)*rho_sf(j, k, i + l)
                             end if
                         end do
 
-                        gm_rho_sf(j, k, l) = gm_rho_sf(j, k, l) + drho_dz*drho_dz
+                        fd%gm_rho_sf(j, k, l) = fd%gm_rho_sf(j, k, l) + drho_dz*drho_dz
                     end do
                 end do
             end do
         end if
 
-        gm_rho_sf = sqrt(gm_rho_sf)
+        fd%gm_rho_sf = sqrt(fd%gm_rho_sf)
 
-        gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, wp)/)
+        gm_rho_max = (/maxval(fd%gm_rho_sf), real(proc_rank, wp)/)
 
         if (num_procs > 1) call s_mpi_reduce_maxloc(gm_rho_max)
 
@@ -488,8 +482,8 @@ contains
         ! model, the amplitude of the exponential's inside is also modulated with respect to the identity of the fluid in which the
         ! function is evaluated. For more information, refer to Marquina and Mulet (2003).
 
-        if (model_eqns == 1) then  ! Gamma/pi_inf model
-            q_sf = -gm_rho_sf/gm_rho_max(1)
+        if (model_eqns == model_eqns_gamma_law) then  ! Gamma/pi_inf model
+            q_sf = -fd%gm_rho_sf/gm_rho_max(1)
         else  ! Volume fraction model
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -504,14 +498,15 @@ contains
                             alpha_last = 1._wp
                             do i = 1, eqn_idx%adv%end - eqn_idx%E
                                 q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, &
-                                     & l)*gm_rho_sf(j, k, l)/gm_rho_max(1)
+                                     & l)*fd%gm_rho_sf(j, k, l)/gm_rho_max(1)
                                 alpha_last = alpha_last - q_cons_vf(i + eqn_idx%E)%sf(j, k, l)
                             end do
-                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(num_fluids)*alpha_last*gm_rho_sf(j, k, l)/gm_rho_max(1)
+                            q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(num_fluids)*alpha_last*fd%gm_rho_sf(j, k, &
+                                 & l)/gm_rho_max(1)
                         else
                             do i = 1, eqn_idx%adv%end - eqn_idx%E
                                 q_sf(j, k, l) = q_sf(j, k, l) - schlieren_alpha(i)*q_cons_vf(i + eqn_idx%E)%sf(j, k, &
-                                     & l)*gm_rho_sf(j, k, l)/gm_rho_max(1)
+                                     & l)*fd%gm_rho_sf(j, k, l)/gm_rho_max(1)
                             end do
                         end if
                     end do
@@ -530,13 +525,13 @@ contains
 
         ! Deallocating the variable containing the gradient magnitude of the density field provided that the numerical Schlieren
         ! function was was outputted during the post-process
-        if (schlieren_wrt) deallocate (gm_rho_sf)
+        if (schlieren_wrt) deallocate (fd%gm_rho_sf)
 
         ! Deallocating the variables that might have been used to bookkeep the finite-difference coefficients in the x-, y- and
         ! z-directions
-        if (allocated(fd_coeff_x)) deallocate (fd_coeff_x)
-        if (allocated(fd_coeff_y)) deallocate (fd_coeff_y)
-        if (allocated(fd_coeff_z)) deallocate (fd_coeff_z)
+        if (allocated(fd%fd_coeff_x)) deallocate (fd%fd_coeff_x)
+        if (allocated(fd%fd_coeff_y)) deallocate (fd%fd_coeff_y)
+        if (allocated(fd%fd_coeff_z)) deallocate (fd%fd_coeff_z)
 
     end subroutine s_finalize_derived_variables_module
 

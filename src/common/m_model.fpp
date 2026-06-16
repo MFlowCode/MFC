@@ -17,14 +17,14 @@ module m_model
 
     private
 
-    public :: f_model_read, s_model_write, s_model_free, f_model_is_inside, models, gpu_ntrs, gpu_trs_v, gpu_trs_n, &
-        & gpu_boundary_v, gpu_boundary_edge_count, gpu_total_vertices, stl_bounding_boxes
+    public :: f_model_read, s_model_write, s_model_free, models, gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, &
+        & gpu_boundary_edge_count, stl_bounding_boxes
 
     ! Subroutines for STL immersed boundaries
-    public :: s_check_boundary, s_register_edge, f_model_is_inside_flat, s_distance_normals_3D, s_distance_normals_2D, &
+    public :: s_check_boundary, s_register_edge, f_model_is_inside, s_distance_normals_3D, s_distance_normals_2D, &
         & s_pack_model_for_gpu
 
-#ifdef MFC_SIMULATION
+#ifndef MFC_POST_PROCESS
     public :: s_instantiate_STL_models
 #endif
 
@@ -34,9 +34,8 @@ module m_model
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_boundary_v
     integer, allocatable                      :: gpu_boundary_edge_count(:)
-    integer, allocatable                      :: gpu_total_vertices(:)
     real(wp), allocatable                     :: stl_bounding_boxes(:,:,:)
-    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count, gpu_total_vertices]')
+    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count]')
 
 contains
 
@@ -461,82 +460,12 @@ contains
 
     end subroutine s_skip_ignored_lines
 
-    !> Generate a pseudo-random number using a seed-based xorshift, replacing the Fortran intrinsic which is incompatible with GPU
-    !! routines
-    function f_model_random_number(seed) result(rval)
-
-        ! $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(inout) :: seed
-        real(wp)               :: rval
-
-        seed = ieor(seed, ishft(seed, 13))
-        seed = ieor(seed, ishft(seed, -17))
-        seed = ieor(seed, ishft(seed, 5))
-
-        rval = abs(real(seed, wp))/real(huge(seed), wp)
-
-    end function f_model_random_number
-
-    !> Determine whether a point is inside a model using stochastic ray casting.
-    !! @param spc      Number of samples per cell.
-    impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
-
-        ! $:GPU_ROUTINE(parallelism='[seq]')
-
-        type(t_model), intent(in)            :: model
-        real(wp), dimension(1:3), intent(in) :: point
-        real(wp), dimension(1:3), intent(in) :: spacing
-        integer, intent(in)                  :: spc
-        real(wp)                             :: phi
-        integer                              :: rand_seed
-        real(wp)                             :: fraction
-        type(t_ray)                          :: ray
-        integer                              :: i, j, k, nInOrOut, nHits
-        real(wp), dimension(1:spc,1:3)       :: ray_origins, ray_dirs
-
-        rand_seed = int(point(1)*73856093._wp) + int(point(2)*19349663._wp) + int(point(3)*83492791._wp)
-        if (rand_seed == 0) rand_seed = 1
-
-        ! generate our random collection or rays
-        do i = 1, spc
-            do k = 1, 3
-                ! random jitter in the origin helps us estimate volume fraction instead of only at the cell center
-                ray_origins(i, k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp)*spacing(k)
-                ! cast sample rays in all directions
-                ray_dirs(i, k) = f_model_random_number(rand_seed) - 0.5_wp
-            end do
-            ray_dirs(i,:) = ray_dirs(i,:)/sqrt(sum(ray_dirs(i,:)*ray_dirs(i,:)))
-        end do
-
-        ! ray trace
-        nInOrOut = 0
-        do i = 1, spc
-            ray%o = ray_origins(i,:)
-            ray%d = ray_dirs(i,:)
-
-            nHits = 0
-            do j = 1, model%ntrs
-                ! count the number of triangles this ray intersects
-                if (f_intersects_triangle(ray, model%trs(j)) == 1) then
-                    nHits = nHits + 1
-                end if
-            end do
-
-            ! if the ray hits an odd number of triangles on its way out, then it must be on the inside of the model
-            nInOrOut = nInOrOut + mod(nHits, 2)
-        end do
-
-        fraction = real(nInOrOut)/real(spc)
-
-    end function f_model_is_inside
-
     !> Determine if a point is inside a surface using the generalized winding number (Jacobson et al., SIGGRAPH 2013). In 3D, sums
     !! the solid angle subtended by each triangle (Van Oosterom-Strackee formula). In 2D (p==0), sums the signed angle subtended by
     !! each boundary edge. Returns ~1.0 inside, ~0.0 outside. Unlike ray casting, this is robust to small triangles/edges and vertex
     !! winding order.
     !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
-    function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
+    function f_model_is_inside(ntrs, pid, point) result(fraction)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -594,47 +523,7 @@ contains
             fraction = fraction/(2.0_wp*acos(-1.0_wp))
         end if
 
-    end function f_model_is_inside_flat
-
-    !> Check if a ray intersects a triangle using the Moller-Trumbore algorithm (barycentric coordinates). Unlike the previous
-    !! cross-product sign test, this is vertex winding-order independent.
-    !! @return 1 if the ray intersects the triangle, 0 otherwise.
-    function f_intersects_triangle(ray, triangle) result(intersects)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        type(t_ray), intent(in)      :: ray
-        type(t_triangle), intent(in) :: triangle
-        integer                      :: intersects
-        real(wp)                     :: edge1(3), edge2(3), h(3), s(3), q(3)
-        real(wp)                     :: a, f, u, v, t
-
-        intersects = 0
-
-        edge1 = triangle%v(2,:) - triangle%v(1,:)
-        edge2 = triangle%v(3,:) - triangle%v(1,:)
-        h = f_cross(ray%d, edge2)
-        a = dot_product(edge1, h)
-
-        ! Ray nearly parallel to triangle plane. In single precision builds epsilon(1.0) ~ 1.2e-7, so use 10*epsilon as a floor.
-        if (abs(a) < max(1e-7_wp, 10.0_wp*epsilon(1.0_wp))) return
-
-        f = 1.0_wp/a
-        s = ray%o - triangle%v(1,:)
-        u = f*dot_product(s, h)
-
-        if (u < 0.0_wp .or. u > 1.0_wp) return
-
-        q = f_cross(s, edge1)
-        v = f*dot_product(ray%d, q)
-
-        if (v < 0.0_wp .or. u + v > 1.0_wp) return
-
-        t = f*dot_product(edge2, q)
-
-        if (t > 0.0_wp) intersects = 1
-
-    end function f_intersects_triangle
+    end function f_model_is_inside
 
     !> Check and label edges shared by two or more triangle facets of the 2D STL model.
     subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
@@ -962,7 +851,7 @@ contains
 
     end subroutine s_distance_normals_2D
 
-#ifdef MFC_SIMULATION
+#ifndef MFC_POST_PROCESS
     !> Load, transform, and register STL/OBJ immersed-boundary models onto the simulation grid.
     subroutine s_instantiate_STL_models()
 
@@ -979,9 +868,13 @@ contains
         real(wp)                                :: grid_mm(1:3,1:2)
         real(wp), dimension(1:4,1:4)            :: transform, transform_n
 
+#ifdef MFC_SIMULATION
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
-
+#else
+        dx_local = dx; dy_local = dy
+        if (p /= 0) dz_local = dz
+#endif
         if (num_stl_models == 0) return
 
         allocate (stl_bounding_boxes(num_stl_models,1:3,1:3))
@@ -1082,13 +975,11 @@ contains
                 @:ALLOCATE(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_stl_models))
                 @:ALLOCATE(gpu_trs_n(1:3, 1:max_ntrs, 1:num_stl_models))
                 @:ALLOCATE(gpu_boundary_edge_count(1:num_stl_models))
-                @:ALLOCATE(gpu_total_vertices(1:num_stl_models))
 
                 gpu_ntrs = 0
                 gpu_trs_v = 0._wp
                 gpu_trs_n = 0._wp
                 gpu_boundary_edge_count = 0
-                gpu_total_vertices = 0
 
                 if (max_bv1 > 0) then
                     @:ALLOCATE(gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_stl_models))
@@ -1101,7 +992,6 @@ contains
                         gpu_trs_v(:,:,1:models(mid)%ntrs,mid) = models(mid)%trs_v
                         gpu_trs_n(:,1:models(mid)%ntrs,mid) = models(mid)%trs_n
                         gpu_boundary_edge_count(mid) = models(mid)%boundary_edge_count
-                        gpu_total_vertices(mid) = models(mid)%total_vertices
                     end if
                     if (allocated(models(mid)%boundary_v) .and. p == 0) then
                         gpu_boundary_v(1:size(models(mid)%boundary_v, 1),1:size(models(mid)%boundary_v, 2), &
@@ -1109,7 +999,7 @@ contains
                     end if
                 end do
 
-                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
+                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count]')
                 if (allocated(gpu_boundary_v)) then
                     $:GPU_UPDATE(device='[gpu_boundary_v]')
                 end if
