@@ -1547,7 +1547,7 @@ class CaseValidator:
             self.prohibit(twall is None, f"Isothermal immersed boundary patch_ib({patch_id})%isothermal requires patch_ib({patch_id})%Twall to be set.")
             if twall is not None and self._is_numeric(twall):
                 self.prohibit(twall <= 0.0, f"Wall temperature patch_ib({patch_id})%Twall must be strictly positive for thermodynamics (got {twall}).")
-          
+
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""
         mixlayer_vel_profile = self.get("mixlayer_vel_profile", "F") == "T"

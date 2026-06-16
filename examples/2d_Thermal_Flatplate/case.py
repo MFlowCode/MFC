@@ -7,7 +7,7 @@ import cantera as ct
 Lx = 0.05
 Ly = 0.05
 
-ctfile = "o2.yaml"
+ctfile = "h2o2.yaml"
 sol_L = ct.Solution(ctfile)
 sol_L.TPY = 1125, ct.one_atm, "O2:0.21,N2:0.79"
 # Configuring case dictionary
@@ -15,15 +15,15 @@ case = {
     "run_time_info": "T",
     "x_domain%beg": 0.0,
     "x_domain%end": Lx,
-    "y_domain%beg": -Ly/10,
+    "y_domain%beg": 0,
     "y_domain%end": Ly,
-    "m": 399,
-    "n": 399,
+    "m": 699,
+    "n": 699,
     "p": 0,
-    "dt": 4e-08,
+    "dt": 4.0e-08,
     "t_step_start": 0,
-    "t_step_stop": 150000,
-    "t_step_save": 30000,
+    "t_step_stop": 75000,
+    "t_step_save": 4500,
     "num_patches": 1,
     "model_eqns": "5eq",
     "alt_soundspeed": "F",
@@ -52,25 +52,17 @@ case = {
     "chem_params%reactions": "F",
     "cantera_file": ctfile,
     "chem_wrt_T": "T",
-   # "ib": "T",
-   # "num_ibs": 1,
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%hcid": 291,
     "patch_icpp(1)%x_centroid": Lx / 2,
     "patch_icpp(1)%y_centroid": Ly / 2,
     "patch_icpp(1)%length_x": Lx,
-    "patch_icpp(1)%length_y": 10 * Ly,
+    "patch_icpp(1)%length_y": Ly,
     "patch_icpp(1)%vel(1)": 0,
     "patch_icpp(1)%vel(2)": 0,
     "patch_icpp(1)%pres": 101325,
     "patch_icpp(1)%alpha_rho(1)": 1.00,
     "patch_icpp(1)%alpha(1)": 1,
-   # "patch_ib(1)%geometry": 3,
-   # "patch_ib(1)%x_centroid": Lx / 2,
-#   "patch_ib(1)%y_centroid": -Ly / 20,
-#    "patch_ib(1)%length_x": Lx,
-#    "patch_ib(1)%length_y": Ly / 10,
-#    "patch_ib(1)%slip": "F",
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
     "viscous": "T",

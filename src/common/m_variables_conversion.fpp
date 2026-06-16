@@ -701,9 +701,9 @@ contains
                                             & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
 
 #ifdef MFC_SIMULATION
-                    if (.not. (t_step == 0 .and. stage == 1)) then 
-                        if (ghost_points_index%sf(j, k, l) == 1)  then 
-                            pres = pressure_ghost_point%sf(j, k, l) 
+                    if (.not. (t_step == 0 .and. stage == 1)) then
+                        if (ghost_points_index%sf(j, k, l) == 1) then
+                            pres = pressure_ghost_point%sf(j, k, l)
                         end if
                     end if
 #endif

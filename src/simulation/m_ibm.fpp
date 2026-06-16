@@ -853,7 +853,7 @@ contains
                         do l = eqn_idx%species%beg, eqn_idx%species%end
                             Ys_S(l - eqn_idx%species%beg + 1) = q_prim_vf(l)%sf(i, j, k)
                         end do
-                        call get_mixture_molecular_weight(Ys_S,MW_S)
+                        call get_mixture_molecular_weight(Ys_S, MW_S)
                         R_gas_S = gas_constant/MW_S
                         T_S = q_prim_vf(eqn_idx%E)%sf(i, j, k)/q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k)/R_gas_S
                         T_IP = T_IP + coeff*T_S

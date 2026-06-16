@@ -1,0 +1,18 @@
+This file was created on 2026-06-16 09:55:16.826941.
+
+mfc.sh:
+
+    Invocation: test --generate -o CF9AFA00 --debug
+    Lock:       mpi=Yes & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        a9e42494496a0be09cf005328041d9baf148c78d on Chem_IBM_V2 (dirty)
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M3
+

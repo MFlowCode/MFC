@@ -86,7 +86,6 @@ contains
 
     end subroutine s_check_ib_patch_thermal
 
-
     !> Verify that the geometric parameters of the circle patch have been consistently inputted.
 
     impure subroutine s_check_circle_ib_patch_geometry(patch_id)
@@ -247,7 +246,7 @@ contains
         @:PROHIBIT((.not. f_is_default(patch_ib(patch_id)%x_centroid)) .or. (.not. f_is_default(patch_ib(patch_id)%y_centroid)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%z_centroid)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%length_x)) .or. (.not. f_is_default(patch_ib(patch_id)%length_y)) &
-                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)) .or. (.not. f_is_default(patch_ib(patch_id)%radius))  &
+                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)) .or. (.not. f_is_default(patch_ib(patch_id)%radius)) &
                    & .or. patch_ib(patch_id)%isothermal .or. (.not. f_is_default(patch_ib(patch_id)%Twall)), &
                    & 'in inactive IB patch ' // trim(iStr))
 
