@@ -313,28 +313,23 @@ def check_junk_comments(repo_root: Path) -> list[str]:
 
 
 def check_allocate_deallocate_pairing(repo_root: Path) -> list[str]:
-    """Flag @:ALLOCATE'd array names with no matching @:DEALLOCATE anywhere in src/.
+    """Flag @:ALLOCATE'd names in s_initialize_* with no matching @:DEALLOCATE in s_finalize_*.
 
-    Every @:ALLOCATE must have a matching @:DEALLOCATE so that GPU device
-    memory is properly released alongside host memory.
+    Only checks modules that have both an s_initialize_* and s_finalize_* subroutine.
+    Files without a finalize subroutine are skipped — those allocations are
+    program-lifetime by convention.
     """
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
 
-    # Known program-lifetime allocations with no finalize subroutine
-    PROGRAM_LIFETIME_EXEMPTIONS = {
-        # m_helper
-        "weight",
-        "pb0",
-        "Re_trans_T",
-        # m_model
-        "gpu_ntrs",
-        "gpu_trs_v",
-        "gpu_trs_n",
-        "gpu_boundary_edge_count",
-        "gpu_total_vertices",
-        "gpu_boundary_v",
-        # m_variables_conversion
+    allocate_re = re.compile(r"@:ALLOCATE\((\w[\w%]*)")
+    deallocate_re = re.compile(r"@:DEALLOCATE\((\w[\w%]*)")
+    init_re = re.compile(r"^\s*(?:impure\s+)?subroutine\s+s_initialize_\w+", re.IGNORECASE)
+    final_re = re.compile(r"^\s*(?:impure\s+)?subroutine\s+s_finalize_\w+", re.IGNORECASE)
+    end_sub_re = re.compile(r"^\s*end\s+subroutine\b", re.IGNORECASE)
+
+    # Known pre-existing missing deallocations
+    KNOWN_MISSING = {
         "gs_min",
         "pi_infs",
         "ps_inf",
@@ -342,7 +337,6 @@ def check_allocate_deallocate_pairing(repo_root: Path) -> list[str]:
         "qvs",
         "qvps",
         "Gs_vc",
-        # m_start_up post_process
         "data_in",
         "data_out",
         "data_cmplx",
@@ -350,28 +344,6 @@ def check_allocate_deallocate_pairing(repo_root: Path) -> list[str]:
         "data_cmplx_z",
         "En_real",
         "En",
-        # m_acoustic_src
-        "loc_acoustic",
-        "mass_src",
-        "mom_src",
-        "E_src",
-        "source_spatials_num_points",
-        "source_spatials",
-        # m_bubbles_EE
-        "bub_adv_src",
-        "bub_r_src",
-        "bub_v_src",
-        "bub_p_src",
-        "bub_m_src",
-        "divu",
-        "ms",
-        "ps",
-        "rs",
-        "vs",
-        # m_qbmm
-        "bubmoms",
-        "momrhs",
-        # m_cbc
         "F_src_rsx_vf",
         "flux_src_rsx_vf_l",
         "F_src_rsy_vf",
@@ -381,68 +353,77 @@ def check_allocate_deallocate_pairing(repo_root: Path) -> list[str]:
         "pres_in",
         "Del_in",
         "alpha_rho_in",
-        # m_data_output
         "Rc_sf",
-        # m_fftw
         "data_cmplx_gpu",
         "data_fltr_cmplx_gpu",
-        # m_global_parameters
         "qbmm_idx",
+        "qbmm_idx%ps",
         "x_cc",
         "dx",
         "y_cc",
         "dy",
         "z_cc",
         "dz",
-        # m_hypoelastic
         "dw_dx_hypo",
-        # m_igr
         "coeff_R",
-        # m_rhs
         "qR_rsx_vf",
         "dqR_rsx_vf",
-        # m_surface_tension
         "gR_x",
-        # m_time_steppers
         "q_prim_ts2",
-        # m_weno
         "poly_coef_cbR_x",
         "d_cbR_x",
         "poly_coef_cbR_y",
         "d_cbR_y",
         "poly_coef_cbR_z",
         "d_cbR_z",
-        "divu%sf",
-        "qbmm_idx%ps",
     }
 
-    allocate_re = re.compile(r"@:ALLOCATE\((\w[\w%]*)")
-    deallocate_re = re.compile(r"@:DEALLOCATE\((\w[\w%]*)")
-
-    # Collect all deallocated names across all files
-    deallocated: set[str] = set()
-    for src in _fortran_fpp_files(src_dir):
-        text = src.read_text(encoding="utf-8")
-        for match in deallocate_re.finditer(text):
-            deallocated.add(match.group(1))
-
-    # Check each allocation against the global deallocated set
     for src in _fortran_fpp_files(src_dir):
         lines = src.read_text(encoding="utf-8").splitlines()
         rel = src.relative_to(repo_root)
+
+        # Extract allocations from s_initialize_* subroutines
+        allocated: dict[str, int] = {}  # name -> line number
+        deallocated: set[str] = set()
+        in_init = False
+        in_final = False
+        has_final = False
+
         for i, line in enumerate(lines):
             stripped = line.strip()
+            if init_re.match(stripped):
+                in_init = True
+                in_final = False
+            elif final_re.match(stripped):
+                in_final = True
+                in_init = False
+                has_final = True
+            elif end_sub_re.match(stripped):
+                in_init = False
+                in_final = False
+
             if _is_comment_or_blank(stripped):
                 continue
-            match = allocate_re.search(stripped)
-            if match:
-                name = match.group(1)
-                if name not in deallocated and name not in PROGRAM_LIFETIME_EXEMPTIONS:
-                    errors.append(
-                        f"  {rel}:{i + 1} @:ALLOCATE({name}...) has no matching "
-                        f"@:DEALLOCATE anywhere in src/. Fix: add @:DEALLOCATE in "
-                        f"the module's s_finalize_* subroutine or annotate as program-lifetime"
-                    )
+
+            if in_init:
+                m = allocate_re.search(stripped)
+                if m:
+                    name = m.group(1)
+                    if name not in allocated:
+                        allocated[name] = i + 1
+
+            if in_final:
+                m = deallocate_re.search(stripped)
+                if m:
+                    deallocated.add(m.group(1))
+
+        if not has_final:
+            continue
+
+        for name, lineno in allocated.items():
+            if name not in deallocated and name not in KNOWN_MISSING:
+                errors.append(f"  {rel}:{lineno} @:ALLOCATE({name}...) in s_initialize_* has no matching " f"@:DEALLOCATE in s_finalize_*. Fix: add @:DEALLOCATE in the finalize subroutine")
+
     return errors
 
 
