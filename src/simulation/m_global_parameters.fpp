@@ -84,8 +84,7 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[hyper_model]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress]')
-    $:GPU_DECLARE(create='[recon_comp_rho, riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, &
-                  & hypo_energy_guard, hypo_nc_interface]')
+    $:GPU_DECLARE(create='[hypo_nc_interface]')
 
     logical :: bc_io
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively

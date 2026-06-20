@@ -151,13 +151,38 @@
 
 #:def FOLD_DIRECTIVE(directive, sentinel, width=200)
     #! Fold a long GPU directive across free-form continuation lines so it stays
-    #! under nvfortran's ~1000-char source-line limit. Breaks only at whole-clause
+    #! under nvfortran's ~1000-char source-line limit. Breaks at whole-clause
     #! boundaries (clause(args) groups and bare keywords), repeating the sentinel
     #! (e.g. '!$acc&') on each continuation -- which fypp's --no-folding cannot do
-    #! because its generic folder omits the sentinel. Every emitted line is no
-    #! longer than the prefix plus the single longest clause, i.e. no longer than
-    #! the unfolded line a build with one fewer clause already compiles.
-    #:set _toks = re.findall(r'\w+\([^)]*\)|\S+', directive)
+    #! because its generic folder omits the sentinel. A single clause itself wider
+    #! than `width` (e.g. the hypoelastic HLLD kernel's private() list of ~150
+    #! names) is further split at its top-level commas, so even that clause stays
+    #! within the limit instead of emitting one over-long line.
+    #:set _clauses = re.findall(r'\w+\([^)]*\)|\S+', directive)
+    #:set _toks = []
+    #:for _cl in _clauses
+        #:if len(_cl) > width and ',' in _cl
+            #:set _buf = ''
+            #:set _depth = 0
+            #:for _ch in _cl
+                #:if _ch == '('
+                    #:set _depth = _depth + 1
+                #:elif _ch == ')'
+                    #:set _depth = _depth - 1
+                #:endif
+                #:set _buf = _buf + _ch
+                #:if _ch == ',' and _depth == 1
+                    #:set _ = _toks.append(_buf.strip())
+                    #:set _buf = ''
+                #:endif
+            #:endfor
+            #:if _buf.strip() != ''
+                #:set _ = _toks.append(_buf.strip())
+            #:endif
+        #:else
+            #:set _ = _toks.append(_cl)
+        #:endif
+    #:endfor
     #:set _lines = []
     #:set _cur = ''
     #:for _t in _toks
