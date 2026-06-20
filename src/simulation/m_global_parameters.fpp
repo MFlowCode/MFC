@@ -336,7 +336,6 @@ contains
         mpp_lim = .false.
         time_stepper = dflt_int
         muscl_eps = dflt_real
-        recon_comp_rho = .false.
         weno_eps = dflt_real
         teno_CT = dflt_real
         mp_weno = .false.
@@ -938,7 +937,7 @@ contains
         #:endif
 
         $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')
-        $:GPU_UPDATE(device='[muscl_eps, recon_comp_rho]')
+        $:GPU_UPDATE(device='[muscl_eps]')
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')

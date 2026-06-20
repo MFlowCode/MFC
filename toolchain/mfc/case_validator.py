@@ -581,6 +581,10 @@ class CaseValidator:
         self.prohibit(riemann_solver is not None and riemann_solver not in [1, 2, 4], "hypoelasticity requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
         self.prohibit(riemann_hypo_ADC and riemann_solver is not None and riemann_solver not in [2, 4], "riemann_hypo_ADC only applies to HLLC (2) or HLLD (4)")
         self.prohibit(hypo_hll_interface_rhs and riemann_solver is not None and riemann_solver != 1, "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
+        viscous = self.get("viscous", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        self.prohibit(riemann_solver == 4 and viscous, "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
+        self.prohibit(riemann_solver == 4 and surface_tension, "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
 
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""

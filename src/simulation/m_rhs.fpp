@@ -884,23 +884,6 @@ contains
 
         call nvtxStartRange("RHS-RECONSTRUCTION")
 
-        ! Per-component density reconstruction: divide alpha_rho_K by alpha_K before reconstruction so the limiter acts on rho_K
-        ! (smooth at contacts) instead of alpha_rho_K (jumps with alpha at contacts).
-        if (recon_comp_rho .and. num_fluids > 1) then
-            do l = eqn_idx%cont%beg, eqn_idx%cont%end
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            q_prim_qp%vf(l)%sf(i, j, k) = q_prim_qp%vf(l)%sf(i, j, &
-                                         & k)/max(q_prim_qp%vf(eqn_idx%adv%beg + l - eqn_idx%cont%beg)%sf(i, j, k), verysmall)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end do
-        end if
-
         if (.not. surface_tension) then
             if ((.not. weno_Re_flux) .or. int_comp > 0) then
                 ! Reconstruct densitiess
@@ -972,39 +955,6 @@ contains
                 iv%beg = eqn_idx%E + 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qR_rsx_vf, id)
             end if
-        end if
-
-        ! Per-component density reconstruction: restore q_prim and convert reconstructed face rho_K back to alpha_rho_K = alpha_K *
-        ! rho_K
-        if (recon_comp_rho .and. num_fluids > 1) then
-            ! Restore q_prim_qp: multiply cont slots back by alpha
-            do l = eqn_idx%cont%beg, eqn_idx%cont%end
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            q_prim_qp%vf(l)%sf(i, j, k) = q_prim_qp%vf(l)%sf(i, j, &
-                                         & k)*q_prim_qp%vf(eqn_idx%adv%beg + l - eqn_idx%cont%beg)%sf(i, j, k)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end do
-            ! Convert the reconstructed face values for this sweep: rho_K_face * alpha_K_face -> alpha_rho_K_face. The single
-            ! physical-layout face buffer is fully rewritten by each sweep's reconstruction, so the conversion is per-sweep by
-            ! construction (the dual-pass hat_R re-solve reads the same converted buffer within the sweep).
-            do l = eqn_idx%cont%beg, eqn_idx%cont%end
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k]')
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            qL_rsx_vf(i, j, k, l) = qL_rsx_vf(i, j, k, l)*qL_rsx_vf(i, j, k, eqn_idx%adv%beg + l - eqn_idx%cont%beg)
-                            qR_rsx_vf(i, j, k, l) = qR_rsx_vf(i, j, k, l)*qR_rsx_vf(i, j, k, eqn_idx%adv%beg + l - eqn_idx%cont%beg)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end do
         end if
 
         ! Reconstruct viscous derivatives for viscosity

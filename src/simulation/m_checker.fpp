@@ -138,6 +138,10 @@ contains
                    & "HLLD hypoelasticity requires at least 2D (n must be > 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
                    & "HLLD hypoelasticity currently requires exactly 2 fluid components")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. viscous, &
+                   & "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. surface_tension, &
+                   & "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
         @:PROHIBIT(riemann_solver == 4 .and. (.not. mhd) .and. (.not. hypoelasticity), &
                    & "HLLD is only available for MHD or hypoelasticity")
 

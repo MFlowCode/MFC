@@ -609,7 +609,6 @@ def _load():
     _r("muscl_order", INT)
     _r("muscl_lim", INT)
     _r("muscl_eps", REAL)
-    _r("recon_comp_rho", LOG)
     _r("weno_eps", REAL, {"weno"}, math=r"\f$\varepsilon\f$")
     _r("teno_CT", REAL, {"weno"}, math=r"\f$C_T\f$")
     _r("wenoz_q", REAL, {"weno"})
@@ -1300,7 +1299,6 @@ _nv(
     "weno_Re_flux",
     "null_weights",
     "muscl_eps",
-    "recon_comp_rho",
     "int_comp",
     "ic_eps",
     "ic_beta",

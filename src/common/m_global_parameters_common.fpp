@@ -78,7 +78,7 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, elasticity, low_Mach]')
-    $:GPU_DECLARE(create='[recon_comp_rho, riemann_hypo_ADC, ADC_kappa]')
+    $:GPU_DECLARE(create='[riemann_hypo_ADC, ADC_kappa]')
     $:GPU_DECLARE(create='[hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard]')
     $:GPU_DECLARE(create='[cont_damage, hyper_cleaning]')
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')

@@ -482,7 +482,6 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `muscl_order`              | Integer | MUSCL order [1,2] |
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
 | `muscl_eps`                | Real    | MUSCL limiter slope-product threshold (default: hard-coded thresholds; set to 0 for textbook behavior) |
-| `recon_comp_rho`           | Logical | Reconstruct per-component density instead of partial density (default F) |
 | `int_comp`                 | Integer | Interface Compression [0] Off [1] THINC [2] MTHINC (default 0) |
 | `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
