@@ -320,7 +320,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `num_ibs`            | Integer | Number of immersed boundary patches |
 | `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
 | `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
-| `ib_neighborhood_radius` | Integer | Parameter that controls the neighborhood size for IB detection. |
+| `ib_neighborhood_radius`    | Integer | Parameter that controls the neighborhood size for IB detection. |
+| `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -368,7 +369,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 
-- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
+- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon its own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 
 - `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
 
@@ -378,15 +379,35 @@ Additional details on this specification can be found in [NACA airfoil](https://
   Available variables: `x` (`x_cc(i)`), `y` (`y_cc(j)`), `z` (`z_cc(k)`), `t` (current simulation time), and `r` (the IB patch radius).
   The same intrinsic functions and `pi` constant apply; bare `e` is not available.
 
-- `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inellastic collisions while 1 is for perfectly ellastic collisions.
+- `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inelastic collisions while 1 is for perfectly elastic collisions.
 
-- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collisiono checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
+- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collision checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
 
-- `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring gonstant used to apply collision forces.
+- `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring constant used to apply collision forces.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
-- `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IB's up to 1 ranks away. This parameter is required to strong-scale a case when IB's eventually grow to be larger than one full processor domain wide.
+- `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IBs up to 1 ranks away. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
+
+#### Particle Clouds
+
+A particle cloud is a compact specification of a bed of identical circular (2D) or spherical (3D) immersed boundaries; each cloud is expanded into individual `patch_ib` particles at startup. Set `num_particle_clouds` to the number of beds and prepend the parameters below with `particle_cloud(j)%` where $j$ is the cloud index.
+
+| Parameter         | Type    | Description |
+| ---:              | :----:  | :---        |
+| `x[y,z]_centroid` | Real    | Centre of the cloud region in the [x,y,z]-direction. |
+| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction. |
+| `num_particles`   | Integer | Number of particles to place in the region. |
+| `radius`          | Real    | Radius of every particle in the cloud. |
+| `mass`            | Real    | Mass of every particle in the cloud. |
+| `min_spacing`     | Real    | Minimum surface-to-surface gap between particles (centres are `2*radius + min_spacing` apart). |
+| `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`). |
+| `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
+| `packing_method`  | Integer | Algorithm used to place the particles. |
+
+- `packing_method` selects how the `num_particles` are positioned within the cloud region:
+  - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
+  - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
@@ -1116,7 +1137,48 @@ This boundary condition can be used for fixed-temperature (isothermal) walls at 
 
 
 
-### 19. GPU Performance (NVIDIA UVM)
+### 19. Non-Newtonian (Herschel-Bulkley) Viscosity {#sec-non-newtonian}
+
+| Parameter                         | Type    | Description                                                          |
+| ---:                              | :----:  | :---                                                                 |
+| `fluid_pp(i)%%non_newtonian`      | Logical | Enable Herschel-Bulkley non-Newtonian viscosity for fluid \f$i\f$.  |
+| `fluid_pp(i)%%K`                  | Real    | Consistency index \f$K\f$.                                          |
+| `fluid_pp(i)%%nn`                 | Real    | Flow index \f$n\f$ (\f$n<1\f$ shear-thinning, \f$n>1\f$ shear-thickening). |
+| `fluid_pp(i)%%tau0`               | Real    | Yield stress \f$\tau_0\f$; set to 0 for pure power-law.             |
+| `fluid_pp(i)%%hb_m`               | Real    | Papanastasiou regularization parameter \f$m\f$; required when `tau0 > 0`. |
+| `fluid_pp(i)%%mu_min`             | Real    | Lower viscosity clamp \f$\mu_{\min}\f$.                              |
+| `fluid_pp(i)%%mu_max`             | Real    | Upper viscosity clamp \f$\mu_{\max}\f$ (required).                  |
+| `fluid_pp(i)%%mu_bulk`            | Real    | Reserved; non-Newtonian bulk viscosity is not yet supported. The validator rejects it on a non-Newtonian fluid; on a Newtonian fluid it is accepted and ignored. |
+
+The effective dynamic viscosity is computed from the Papanastasiou-regularized Herschel-Bulkley model:
+
+\f[
+\mu_{\rm eff}(\dot\gamma) = \frac{\tau_0}{\dot\gamma}\!\left(1 - e^{-m\,\dot\gamma}\right) + K\,\dot\gamma^{n-1},
+\qquad
+\dot\gamma = \sqrt{2\,D_{ij}D_{ij}},
+\f]
+
+where \f$D_{ij} = \frac{1}{2}(\partial_i u_j + \partial_j u_i)\f$ is the strain-rate tensor and \f$\dot\gamma\f$ is the scalar shear rate.
+The result is clamped to \f$[\mu_{\min},\,\mu_{\max}]\f$.
+
+Special cases:
+
+- `tau0 = 0`: pure power-law fluid, \f$\mu_{\rm eff} = K\,\dot\gamma^{n-1}\f$.
+- `tau0 = 0`, `nn = 1`: Newtonian fluid with constant viscosity \f$\mu = K\f$.
+- `tau0 > 0`, `nn = 1`: Bingham plastic.
+
+Usage notes:
+
+- Requires `viscous = T`. `fluid_pp(i)%%Re(1)` must be set (use `1.0/K` to register the fluid as viscous; the HB model overrides \f$\mu_{\rm eff}\f$ cell-by-cell). `fluid_pp(i)%%Re(2)` (bulk viscosity) must not be set for a non-Newtonian fluid.
+- `mu_max` is required; `mu_min` is inactive if omitted (no lower clamp applied).
+- Positivity requirements: `K`, `nn`, and `mu_max` must be positive; `mu_min` and `hb_m` must be positive when set; `tau0` must be non-negative.
+- Requires `model_eqns = 2` or `3` and is incompatible with `igr`.
+- Supported only with `riemann_solver = 1` (HLL) or `riemann_solver = 2` (HLLC).
+- The HB parameters (`K`, `nn`, `tau0`, `hb_m`, `mu_min`, `mu_max`, `mu_bulk`) may only be set on a fluid with `non_newtonian = T`; the validator rejects them otherwise.
+- All HB parameters are non-dimensional (scaled by \f$\rho_{\rm ref} U_{\rm ref} L_{\rm ref}\f$), so \f$1/\mu_{\rm eff}\f$ equals the local effective Reynolds number.
+- For cylindrical geometry (`cyl_coord = T`) the shear rate uses the grid-direction strain components; curvature corrections to \f$\dot\gamma\f$ are not yet included.
+
+### 20. GPU Performance (NVIDIA UVM)
 
 | Parameter                  | Type    | Description                                              |
 | ---:                       | :---:   | :---                                                     |
@@ -1222,7 +1284,7 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 | 3    | 2D Rectangle       | 2      |
 | 4    | 2D Airfoil         | 2      |
 | 8    | 3D Sphere          | 3      |
-| 10   | 3D Cylinder        | 3      |
+| 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder. |
 | 11   | 3D Airfoil         | 3      |
 
 ### Acoustic Supports {#acoustic-supports}

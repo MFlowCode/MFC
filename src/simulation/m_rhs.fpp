@@ -14,7 +14,8 @@ module m_rhs
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
-    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
+        & recon_type_muscl
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -649,7 +650,7 @@ contains
             call nvtxEndRange
         end if
 
-        if (int_comp == 2 .and. n > 0) then
+        if (int_comp == int_comp_mthinc .and. n > 0) then
             call nvtxStartRange("RHS-COMPRESSION-NORMALS")
             call s_compute_mthinc_normals(q_prim_qp%vf)
             call nvtxEndRange
@@ -1988,7 +1989,7 @@ contains
         integer :: recon_dir  !< Coordinate direction of the reconstruction
         integer :: i, j, k, l
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl','recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
                 if (norm_dir == 1) then
@@ -2023,7 +2024,7 @@ contains
         integer :: i, j, k, l
         ! Reconstruction in s1-direction
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl', 'MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl', 'recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 if (norm_dir == 1) then
                     is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)

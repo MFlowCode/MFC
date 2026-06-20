@@ -67,30 +67,8 @@ CASE_MD_SKIP = {
     # Hardcoded Fortran constants (not case-file params)
     "init_dir",
     "zeros_default",
-    # Enumerated value names used as prose examples (not parameter names)
-    "hll",
-    "hllc",
-    # Analytic expression language: Fortran intrinsics and module name (not case params)
+    # Analytic expression language: module name (not a case param)
     "m_constants",
-    "sin",
-    "cos",
-    "tan",
-    "asin",
-    "acos",
-    "atan",
-    "atan2",
-    "sinh",
-    "cosh",
-    "tanh",
-    "exp",
-    "log",
-    "log10",
-    "sqrt",
-    "abs",
-    "min",
-    "max",
-    "mod",
-    "sign",
 }
 
 # Docs to check for parameter references, with per-file skip sets
@@ -196,10 +174,18 @@ def check_param_refs(repo_root: Path) -> list[str]:
     if toolchain_dir not in sys.path:
         sys.path.insert(0, toolchain_dir)
     try:
+        from mfc.analytic_expr import INTRINSICS, PASSTHROUGH
         from mfc.params import REGISTRY
+        from mfc.params.definitions import CONSTRAINTS
     except ImportError:
         print("  Warning: could not import REGISTRY, skipping parameter check")
         return []
+
+    # Collect all enumerated value names from CONSTRAINTS (e.g. "hll", "hllc", "rk3")
+    _constraint_names: set[str] = set()
+    for _entry in CONSTRAINTS.values():
+        if isinstance(_entry, dict) and "names" in _entry:
+            _constraint_names.update(_entry["names"].keys())
 
     valid_params = set(REGISTRY.all_params.keys())
     # Build set of sub-parameter base names (strip trailing (N) indexes)
@@ -233,6 +219,8 @@ def check_param_refs(repo_root: Path) -> list[str]:
             if len(param) <= 1:
                 continue
             if param in extra_skip:
+                continue
+            if param in _constraint_names or param in INTRINSICS or param in PASSTHROUGH:
                 continue
             if "(" in param or ")" in param:
                 continue

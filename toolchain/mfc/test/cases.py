@@ -259,6 +259,29 @@ def get_dimensions():
     return r
 
 
+# Always-run "canary" smoke set: one cheap, feature-dominant regression case per major
+# physics module. Tagged canary=True in list_cases() so coverage-based selection
+# (toolchain/mfc/test/coverage.py:select_tests) can never skip them on any lane -- a silent
+# regression that disables a feature then trips on every PR. Validated in list_cases(), so a
+# renamed/removed trace fails loudly instead of silently un-tagging the canary.
+_CANARY_TRACES = frozenset(
+    {
+        "1D -> 1 Fluid(s) -> Viscous",  # m_viscous (Newtonian, Re=1e-4)
+        "1D -> 1 Fluid(s) -> Non-Newtonian -> nn=0.5",  # m_hb_function (Herschel-Bulkley)
+        "2D -> 2 Fluid(s) -> capillary=T -> model_eqns=3",  # m_surface_tension
+        "1D -> Bubbles -> QBMM",  # m_qbmm / m_bubbles_EE
+        "2D -> Lagrange Bubbles -> One-way Coupling",  # m_bubbles_EL
+        "1D -> MHD -> HLLD",  # m_mhd / m_riemann_solver_hlld
+        "1D -> Hypoelasticity -> 1 Fluid(s)",  # m_hypoelastic
+        "1D -> Chemistry -> Perfect Reactor",  # chemistry
+        "2D -> 1 Fluid(s) -> IBM -> Circle -> slip",  # m_ibm
+        "1D -> Phase Change model 5 -> 2 Fluid(s) -> model equation -> 3",  # m_pressure_relaxation (6-eq)
+        "1D -> Acoustic Source -> Sine -> Frequency",  # m_acoustic_src
+        "1D -> Bodyforces",  # m_body_forces
+    }
+)
+
+
 def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
 
@@ -630,6 +653,50 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
+                if len(dimInfo[0]) <= 2:
+                    stack.push(
+                        "Non-Newtonian",
+                        {
+                            "dt": 1e-11,
+                            "patch_icpp(1)%vel(1)": 1.0,
+                            "viscous": "T",
+                            "riemann_solver": 2,
+                            "model_eqns": 2,
+                            "fluid_pp(1)%Re(1)": 1.0e4,
+                            "fluid_pp(1)%non_newtonian": "T",
+                            "fluid_pp(1)%tau0": 0.0,
+                            "fluid_pp(1)%K": 1e-4,
+                            "fluid_pp(1)%mu_max": 0.1,
+                            "fluid_pp(1)%mu_min": 1e-6,
+                            "fluid_pp(1)%hb_m": 1000.0,
+                        },
+                    )
+                    cases.append(define_case_d(stack, "nn=0.5", {"fluid_pp(1)%nn": 0.5}))
+                    cases.append(define_case_d(stack, "nn=1.5", {"fluid_pp(1)%nn": 1.5}))
+                    cases.append(define_case_d(stack, "tau0=0.001", {"fluid_pp(1)%nn": 0.5, "fluid_pp(1)%tau0": 1.0e-3, "fluid_pp(1)%hb_m": 1.0e3}))
+                    if len(dimInfo[0]) == 2:
+                        # IBM + non-Newtonian: ib_state_wrt also exercises the
+                        # per-stencil-sample HB viscosity in the IB force integration
+                        cases.append(
+                            define_case_d(
+                                stack,
+                                "IBM -> nn=0.5",
+                                {
+                                    "fluid_pp(1)%nn": 0.5,
+                                    "ib": "T",
+                                    "num_ibs": 1,
+                                    "ib_state_wrt": "T",
+                                    "patch_ib(1)%geometry": 3,
+                                    "patch_ib(1)%x_centroid": 0.5,
+                                    "patch_ib(1)%y_centroid": 0.5,
+                                    "patch_ib(1)%length_x": 0.05,
+                                    "patch_ib(1)%length_y": 0.05,
+                                    "patch_ib(1)%slip": "F",
+                                },
+                            )
+                        )
+                    stack.pop()
+
             if num_fluids == 2:
                 stack.push(
                     "Viscous",
@@ -650,6 +717,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     stack.pop()
 
                 stack.pop()
+
+                if len(dimInfo[0]) == 2:
+                    # Mixed non-Newtonian (fluid 1) / Newtonian (fluid 2) case
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "Non-Newtonian",
+                            {
+                                "dt": 1e-11,
+                                "patch_icpp(1)%vel(1)": 1.0,
+                                "viscous": "T",
+                                "riemann_solver": 2,
+                                "model_eqns": 2,
+                                "fluid_pp(1)%Re(1)": 1.0e4,
+                                "fluid_pp(1)%non_newtonian": "T",
+                                "fluid_pp(1)%tau0": 0.0,
+                                "fluid_pp(1)%K": 1e-4,
+                                "fluid_pp(1)%nn": 0.5,
+                                "fluid_pp(1)%mu_max": 0.1,
+                                "fluid_pp(1)%mu_min": 1e-6,
+                                "fluid_pp(1)%hb_m": 1000.0,
+                                "fluid_pp(2)%Re(1)": 1.0e4,
+                            },
+                        )
+                    )
+
                 stack.pop()
 
             stack.pop()
@@ -2000,6 +2093,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_hypo_hlld",  # acoustic demo case, not a regression test
                 "3D_hypo_hlld",  # acoustic demo case, not a regression test
                 "2D_axisym_hypo_hlld",  # acoustic demo case, not a regression test
+                # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
+                # by a large mu_max: even on the downsized grid the step count to reach t_stop
+                # is too large for the CI smoke suite. The faster NN examples remain tested.
+                "2D_poiseuille_nn",
+                "2D_bingham_poiseuille_nn",
+                # The CI grid cap (~25x25) thins this case's immersed-boundary wall slabs
+                # to ~2 cells, an under-resolved IB whose body-forced dead-fluid dynamics
+                # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
+                # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
+                "2D_ibm_poiseuille_nn",
             ]
             if path in casesToSkip:
                 continue
@@ -2598,5 +2701,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     l1, l2 = len(uuids), len(set(uuids))
     if l1 != l2:
         raise common.MFCException(f"list_cases: uuids aren't unique ({l1} cases but {l2} unique uuids)")
+
+    # Tag the always-run canary smoke set (see _CANARY_TRACES). Validate first so a renamed
+    # or removed trace is a loud error, not a silently dropped canary.
+    missing = _CANARY_TRACES - {case.trace for case in cases}
+    if missing:
+        raise common.MFCException(f"list_cases: canary trace(s) not found (renamed/removed?): {sorted(missing)}")
+    for case in cases:
+        if case.trace in _CANARY_TRACES:
+            case.canary = True
 
     return cases
