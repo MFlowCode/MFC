@@ -1552,7 +1552,7 @@ contains
 #ifdef MFC_MPI
         if (num_procs > 1) then
             @:DEALLOCATE(send_ids, send_ft)
-            @:DEALLOCATE(recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
+            deallocate (recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
         end if
 #endif
 
