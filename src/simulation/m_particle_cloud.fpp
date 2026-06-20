@@ -46,6 +46,8 @@ contains
             select case (particle_cloud(cloud_idx)%packing_method)
             case (1)  ! random box packing method
                 call s_particle_cloud_random_box(cloud_idx, ib_idx, particle_cloud_ibs)
+            case (2)  ! lattice packing method
+                call s_particle_cloud_lattice(cloud_idx, ib_idx, particle_cloud_ibs)
             end select
         end do
 
@@ -159,36 +161,7 @@ contains
                 chain_next(n_placed) = hash_head(slot)
                 hash_head(slot) = n_placed
 
-                ib_idx = ib_idx + 1
-
-                ! gbl_patch_id is relative within particle_cloud_ibs here; s_reduce_ib_patch_array adjusts to global indexing.
-                particle_cloud_ibs(ib_idx)%gbl_patch_id = ib_idx
-                particle_cloud_ibs(ib_idx)%geometry = geom
-                particle_cloud_ibs(ib_idx)%x_centroid = rx
-                particle_cloud_ibs(ib_idx)%y_centroid = ry
-                particle_cloud_ibs(ib_idx)%z_centroid = rz
-                particle_cloud_ibs(ib_idx)%step_x_centroid = rx
-                particle_cloud_ibs(ib_idx)%step_y_centroid = ry
-                particle_cloud_ibs(ib_idx)%step_z_centroid = rz
-                particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%step_angles(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%step_vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%angular_vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%step_angular_vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%force(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%torque(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%centroid_offset(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix = 0._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix(1, 1) = 1._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix(2, 2) = 1._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix(3, 3) = 1._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix_inverse = particle_cloud_ibs(ib_idx)%rotation_matrix
-                particle_cloud_ibs(ib_idx)%radius = particle_cloud(cloud_idx)%radius
-                particle_cloud_ibs(ib_idx)%mass = particle_cloud(cloud_idx)%mass
-                particle_cloud_ibs(ib_idx)%moment = dflt_real
-                particle_cloud_ibs(ib_idx)%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
-                particle_cloud_ibs(ib_idx)%slip = .false.
+                call s_add_cloud_particle(cloud_idx, ib_idx, geom, rx, ry, rz, particle_cloud_ibs)
             end if
         end do
 
@@ -199,6 +172,135 @@ contains
         deallocate (placed, hash_head, chain_next)
 
     end subroutine s_particle_cloud_random_box
+
+    !> Places particles on the optimally dense lattice for the cloud region: a triangular lattice in 2D, a face-centered cubic
+    !! lattice in 3D. The lattice spacing is set by the particle density (num_particles over the region area/volume); if that
+    !! spacing falls below the required centre-to-centre distance (2*radius + min_spacing), the region is too dense and the run is
+    !! aborted.
+    subroutine s_particle_cloud_lattice(cloud_idx, ib_idx, particle_cloud_ibs)
+
+        integer, intent(in)                                    :: cloud_idx
+        integer, intent(inout)                                 :: ib_idx
+        type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
+        integer                                                :: n_placed, n_target, geom
+        integer                                                :: row, col, ncx, ncy, ix, jy, kz, b
+        real(wp)                                               :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
+        real(wp)                                               :: spacing, row_dy, cell, x0, px, py
+        real(wp), dimension(4)                                 :: bx_off, by_off, bz_off
+
+        xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
+        xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
+        ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_y
+        ymax = particle_cloud(cloud_idx)%y_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_y
+        zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_z
+        zmax = particle_cloud(cloud_idx)%z_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_z
+
+        min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
+        n_target = particle_cloud(cloud_idx)%num_particles
+        n_placed = 0
+
+        if (p == 0) then
+            geom = 2  ! circle for 2D
+            ! Triangular lattice: area per particle = (sqrt(3)/2)*spacing**2.
+            spacing = sqrt(2._wp*(xmax - xmin)*(ymax - ymin)/(sqrt(3._wp)*real(n_target, wp)))
+        else
+            geom = 8  ! sphere for 3D
+            ! Face-centered cubic lattice: volume per particle = spacing**3/sqrt(2).
+            spacing = (sqrt(2._wp)*(xmax - xmin)*(ymax - ymin)*(zmax - zmin)/real(n_target, wp))**(1._wp/3._wp)
+        end if
+
+        if (spacing < min_dist) then
+            call s_mpi_abort("Error :: Particle cloud is too dense for lattice packing; " &
+                             & // "reduce num_particles or min_spacing, or enlarge the cloud region")
+        end if
+
+        if (p == 0) then
+            ! Triangular lattice: rows pitched by spacing*sqrt(3)/2, odd rows shifted by half a spacing.
+            row_dy = spacing*sqrt(3._wp)/2._wp
+            row = 0
+            do while (n_placed < n_target)
+                py = ymin + real(row, wp)*row_dy
+                x0 = xmin
+                if (mod(row, 2) == 1) x0 = xmin + 0.5_wp*spacing
+                col = 0
+                px = x0
+                do while (px <= xmax .and. n_placed < n_target)
+                    call s_add_cloud_particle(cloud_idx, ib_idx, geom, px, py, particle_cloud(cloud_idx)%z_centroid, &
+                                              & particle_cloud_ibs)
+                    n_placed = n_placed + 1
+                    col = col + 1
+                    px = x0 + real(col, wp)*spacing
+                end do
+                row = row + 1
+            end do
+        else
+            ! Face-centered cubic lattice via the conventional cubic cell (side = spacing*sqrt(2)) and its four basis points.
+            cell = spacing*sqrt(2._wp)
+            bx_off = [0._wp, 0.5_wp, 0.5_wp, 0._wp]*cell
+            by_off = [0._wp, 0.5_wp, 0._wp, 0.5_wp]*cell
+            bz_off = [0._wp, 0._wp, 0.5_wp, 0.5_wp]*cell
+            ncx = max(1, ceiling((xmax - xmin)/cell))
+            ncy = max(1, ceiling((ymax - ymin)/cell))
+            kz = 0
+            do while (n_placed < n_target)
+                do jy = 0, ncy - 1
+                    do ix = 0, ncx - 1
+                        do b = 1, 4
+                            if (n_placed >= n_target) exit
+                            call s_add_cloud_particle(cloud_idx, ib_idx, geom, xmin + real(ix, wp)*cell + bx_off(b), &
+                                                      & ymin + real(jy, wp)*cell + by_off(b), zmin + real(kz, &
+                                                      & wp)*cell + bz_off(b), particle_cloud_ibs)
+                            n_placed = n_placed + 1
+                        end do
+                    end do
+                end do
+                kz = kz + 1
+            end do
+        end if
+
+    end subroutine s_particle_cloud_lattice
+
+    !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx. Shared by all packing
+    !! methods so the per-particle ib_patch_parameters setup stays in one place.
+    subroutine s_add_cloud_particle(cloud_idx, ib_idx, geom, px, py, pz, particle_cloud_ibs)
+
+        integer, intent(in)                                    :: cloud_idx, geom
+        integer, intent(inout)                                 :: ib_idx
+        real(wp), intent(in)                                   :: px, py, pz
+        type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
+
+        ib_idx = ib_idx + 1
+
+        ! gbl_patch_id is relative within particle_cloud_ibs here; s_reduce_ib_patch_array adjusts to global indexing.
+        particle_cloud_ibs(ib_idx)%gbl_patch_id = ib_idx
+        particle_cloud_ibs(ib_idx)%geometry = geom
+        particle_cloud_ibs(ib_idx)%x_centroid = px
+        particle_cloud_ibs(ib_idx)%y_centroid = py
+        particle_cloud_ibs(ib_idx)%z_centroid = pz
+        particle_cloud_ibs(ib_idx)%step_x_centroid = px
+        particle_cloud_ibs(ib_idx)%step_y_centroid = py
+        particle_cloud_ibs(ib_idx)%step_z_centroid = pz
+        particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%step_angles(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%vel(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%step_vel(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%angular_vel(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%step_angular_vel(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%force(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%torque(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%centroid_offset(:) = 0._wp
+        particle_cloud_ibs(ib_idx)%rotation_matrix = 0._wp
+        particle_cloud_ibs(ib_idx)%rotation_matrix(1, 1) = 1._wp
+        particle_cloud_ibs(ib_idx)%rotation_matrix(2, 2) = 1._wp
+        particle_cloud_ibs(ib_idx)%rotation_matrix(3, 3) = 1._wp
+        particle_cloud_ibs(ib_idx)%rotation_matrix_inverse = particle_cloud_ibs(ib_idx)%rotation_matrix
+        particle_cloud_ibs(ib_idx)%radius = particle_cloud(cloud_idx)%radius
+        particle_cloud_ibs(ib_idx)%mass = particle_cloud(cloud_idx)%mass
+        particle_cloud_ibs(ib_idx)%moment = dflt_real
+        particle_cloud_ibs(ib_idx)%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
+        particle_cloud_ibs(ib_idx)%slip = .false.
+
+    end subroutine s_add_cloud_particle
 
     !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).
     function f_xorshift(seed) result(rval)

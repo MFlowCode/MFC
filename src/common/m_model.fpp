@@ -35,7 +35,7 @@ module m_model
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_boundary_v
     integer, allocatable                      :: gpu_boundary_edge_count(:)
     real(wp), allocatable                     :: stl_bounding_boxes(:,:,:)
-    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count]')
+    $:GPU_DECLARE(create='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count, stl_bounding_boxes]')
 
 contains
 
@@ -877,7 +877,7 @@ contains
 #endif
         if (num_stl_models == 0) return
 
-        allocate (stl_bounding_boxes(num_stl_models,1:3,1:3))
+        @:ALLOCATE(stl_bounding_boxes(num_stl_models,1:3,1:3))
         @:ALLOCATE(models(num_stl_models))
 
         do stl_id = 1, num_stl_models
@@ -949,6 +949,9 @@ contains
                 models(stl_id)%boundary_edge_count = boundary_edge_count
             end if
         end do
+
+        $:GPU_UPDATE(device='[stl_bounding_boxes]')
+        $:GPU_UPDATE(device='[stl_models(1:num_stl_models)]')
 
         ! Pack and upload flat arrays for GPU (AFTER the loop)
         block
