@@ -66,6 +66,9 @@ contains
                     print *, 'Processing patch', i
                 end if
 
+                call s_compute_rotation_matrix(patch_icpp(i)%angles, patch_icpp(i)%rotation_matrix, &
+                                               & patch_icpp(i)%rotation_matrix_inverse)
+
                 !> ICPP Patches
                 !> @{
                 ! Spherical patch
@@ -102,6 +105,9 @@ contains
                 if (proc_rank == 0) then
                     print *, 'Processing patch', i
                 end if
+
+                call s_compute_rotation_matrix(patch_icpp(i)%angles, patch_icpp(i)%rotation_matrix, &
+                                               & patch_icpp(i)%rotation_matrix_inverse)
 
                 !> ICPP Patches
                 !> @{
@@ -146,6 +152,9 @@ contains
                 if (proc_rank == 0) then
                     print *, 'Processing patch', i
                 end if
+
+                call s_compute_rotation_matrix(patch_icpp(i)%angles, patch_icpp(i)%rotation_matrix, &
+                                               & patch_icpp(i)%rotation_matrix_inverse)
 
                 ! Line segment patch
                 if (patch_icpp(i)%geometry == 1) then
@@ -604,7 +613,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k                   !< generic loop iterators
         real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< Equation of state parameters
-
+        real(wp), dimension(1:3)                                 :: xyz_local
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
@@ -630,7 +639,10 @@ contains
         ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
-                if (f_is_inside_cuboid(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, [length_x, length_y, 0._wp])) then
+                ! Rotate the centroid-relative grid point into the patch frame
+                xyz_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [x_cc(i) - x_centroid, y_cc(j) - y_centroid, &
+                                   & 0._wp])
+                if (f_is_inside_cuboid(xyz_local(1), xyz_local(2), 0._wp, [length_x, length_y, 0._wp])) then
                     if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 

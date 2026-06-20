@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+import json
+
+# Configuring case dictionary
+print(
+    json.dumps(
+        {
+            # Logistics
+            "run_time_info": "T",
+            # Computational Domain Parameters
+            "x_domain%beg": 0.0e00,
+            "x_domain%end": 1.0e00,
+            "y_domain%beg": 0.0e00,
+            "y_domain%end": 1.0e00,
+            "m": 99,
+            "n": 99,
+            "p": 0,
+            "dt": 1.0e-06,
+            "t_step_start": 0,
+            "t_step_stop": 50,
+            "t_step_save": 10,
+            # Simulation Algorithm Parameters
+            "num_patches": 2,
+            "model_eqns": "6eq",
+            "alt_soundspeed": "F",
+            "num_fluids": 2,
+            "mpp_lim": "T",
+            "mixture_err": "T",
+            "time_stepper": "rk3",
+            "weno_order": 5,
+            "weno_eps": 1.0e-16,
+            "weno_Re_flux": "F",
+            "weno_avg": "F",
+            "mapped_weno": "T",
+            "null_weights": "F",
+            "mp_weno": "F",
+            "riemann_solver": "hllc",
+            "wave_speeds": "direct",
+            "avg_state": "arithmetic",
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            # Formatted Database Files Structure Parameters
+            "format": "silo",
+            "precision": "double",
+            "prim_vars_wrt": "T",
+            "parallel_io": "T",
+            # Patch 1: Base
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5e00,
+            "patch_icpp(1)%y_centroid": 0.5e00,
+            "patch_icpp(1)%length_x": 1.0e00,
+            "patch_icpp(1)%length_y": 1.0e00,
+            "patch_icpp(1)%vel(1)": 0.0e00,
+            "patch_icpp(1)%vel(2)": 0.0e00,
+            "patch_icpp(1)%pres": 1.0e05,
+            "patch_icpp(1)%alpha_rho(1)": 1.0e00,
+            "patch_icpp(1)%alpha_rho(2)": 1.0e-12,
+            "patch_icpp(1)%alpha(1)": 1.0 - 1.0e-12,
+            "patch_icpp(1)%alpha(2)": 1.0e-12,
+            # Patch 2: Rotated rectangle (45 degrees)
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.5e00,
+            "patch_icpp(2)%y_centroid": 0.5e00,
+            "patch_icpp(2)%length_x": 0.4e00,
+            "patch_icpp(2)%length_y": 0.15e00,
+            "patch_icpp(2)%angles(3)": 0.785398e00,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%vel(1)": 0.0e00,
+            "patch_icpp(2)%vel(2)": 0.0e00,
+            "patch_icpp(2)%pres": 1.0e05,
+            "patch_icpp(2)%alpha_rho(1)": 1.0e-12,
+            "patch_icpp(2)%alpha_rho(2)": 1.0e00,
+            "patch_icpp(2)%alpha(1)": 1.0e-12,
+            "patch_icpp(2)%alpha(2)": 1.0 - 1.0e-12,
+            # Fluids Physical Parameters
+            "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+            "fluid_pp(1)%pi_inf": 0.0e00,
+            "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+            "fluid_pp(2)%pi_inf": 0.0e00,
+        }
+    )
+)

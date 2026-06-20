@@ -820,6 +820,7 @@ def _load():
         for j in range(1, 4):
             _r(f"{px}radii({j})", REAL)
             _r(f"{px}normal({j})", REAL)
+            _r(f"{px}angles({j})", REAL)
             _r(f"{px}vel({j})", A_REAL, math=r"\f$u_" + str(j) + r"\f$")
         for f in range(1, NF + 1):
             _r(f"{px}alpha({f})", A_REAL, math=r"\f$\alpha_" + str(f) + r"\f$")

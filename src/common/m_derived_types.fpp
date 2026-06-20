@@ -284,6 +284,10 @@ module m_derived_types
         ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
         real(wp), dimension(0:max_sph_harm_degree,-max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
         real(wp), dimension(3) :: normal  !< Patch orientation normal vector (x, y, z)
+        ! Patch rotation (shared framework; see m_patch_geometries)
+        real(wp), dimension(1:3) :: angles  !< Rotation angles about x, y, z axes
+        real(wp), dimension(1:3,1:3) :: rotation_matrix  !< Rotation matrix built from angles
+        real(wp), dimension(1:3,1:3) :: rotation_matrix_inverse  !< Inverse of rotation matrix
         logical, dimension(0:num_patches_max - 1) :: alter_patch  !< Overwrite permissions for preceding patches
         logical :: smoothen  !< Whether patch boundaries are smoothed across cells
         integer :: smooth_patch_id  !< Identity (id) of the patch with which current patch is to get smoothed

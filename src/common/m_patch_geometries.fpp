@@ -18,7 +18,8 @@ module m_patch_geometries
 
     implicit none
 
-    public :: f_is_inside_sphere, f_is_inside_cylinder, f_is_inside_cuboid, f_is_inside_airfoil, f_is_inside_ellipse
+    public :: f_is_inside_sphere, f_is_inside_cylinder, f_is_inside_cuboid, f_is_inside_airfoil, f_is_inside_ellipse, &
+        & s_compute_rotation_matrix
 
 contains
 
@@ -139,5 +140,53 @@ contains
         is_inside = (x/(0.5_wp*length(1)))**2 + (y/(0.5_wp*length(2)))**2 <= 1._wp
 
     end function f_is_inside_ellipse
+
+    !> Compute a rotation matrix for converting to the rotating frame of the boundary
+    subroutine s_compute_rotation_matrix(angles, rotation_matrix, rotation_matrix_inverse)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(1:3), intent(in)      :: angles
+        real(wp), dimension(1:3,1:3), intent(out) :: rotation_matrix
+        real(wp), dimension(1:3,1:3), intent(out) :: rotation_matrix_inverse
+        real(wp), dimension(3, 3, 3)              :: rotation
+        real(wp)                                  :: angle
+
+        ! construct the x, y, and z rotation matrices
+
+        if (num_dims == 3) then
+            ! also compute the x and y axes in 3D
+            angle = angles(1)
+            rotation(1, 1,:) = [1._wp, 0._wp, 0._wp]
+            rotation(1, 2,:) = [0._wp, cos(angle), -sin(angle)]
+            rotation(1, 3,:) = [0._wp, sin(angle), cos(angle)]
+
+            angle = angles(2)
+            rotation(2, 1,:) = [cos(angle), 0._wp, sin(angle)]
+            rotation(2, 2,:) = [0._wp, 1._wp, 0._wp]
+            rotation(2, 3,:) = [-sin(angle), 0._wp, cos(angle)]
+
+            ! apply the y rotation to the x rotation
+            rotation_matrix(:,:) = matmul(rotation(1,:,:), rotation(2,:,:))
+            rotation_matrix_inverse(:,:) = matmul(transpose(rotation(2,:,:)), transpose(rotation(1,:,:)))
+        end if
+
+        ! z component first, since it applies in 2D and 3D
+        angle = angles(3)
+        rotation(3, 1,:) = [cos(angle), -sin(angle), 0._wp]
+        rotation(3, 2,:) = [sin(angle), cos(angle), 0._wp]
+        rotation(3, 3,:) = [0._wp, 0._wp, 1._wp]
+
+        if (num_dims == 3) then
+            ! apply the z rotation to the xy rotation in 3D
+            rotation_matrix(:,:) = matmul(rotation_matrix(:,:), rotation(3,:,:))
+            rotation_matrix_inverse(:,:) = matmul(transpose(rotation(3,:,:)), rotation_matrix_inverse(:,:))
+        else
+            ! write out only the z rotation in 2D
+            rotation_matrix(:,:) = rotation(3,:,:)
+            rotation_matrix_inverse(:,:) = transpose(rotation(3,:,:))
+        end if
+
+    end subroutine s_compute_rotation_matrix
 
 end module m_patch_geometries

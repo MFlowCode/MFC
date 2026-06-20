@@ -205,6 +205,7 @@ contains
             patch_icpp(i)%epsilon = dflt_real
             patch_icpp(i)%beta = dflt_real
             patch_icpp(i)%normal = dflt_real
+            patch_icpp(i)%angles = 0._wp
             patch_icpp(i)%radii = dflt_real
             patch_icpp(i)%alter_patch = .false.
             patch_icpp(i)%alter_patch(0) = .true.
