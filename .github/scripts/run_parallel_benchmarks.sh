@@ -62,6 +62,12 @@ bash "${SCRIPT_DIR}/run_monitored_slurm_job.sh" "$pr_job_id" "pr/${job_slug}.out
 if [ "$pr_exit" -ne 0 ]; then
     echo "PR job exited with code: $pr_exit"
     tail -n 50 "pr/${job_slug}.out" 2>/dev/null || echo "  Could not read PR log"
+    # The PR benchmark run genuinely failed (cases crashed/hung/SIGTERM'd, not a
+    # monitor false-positive -- run_monitored_slurm_job.sh re-checks sacct). Fail
+    # the job instead of falling through to the YAML-exists check, which would let
+    # a broken PR pass green as long as a partial YAML was written. Scoped to PR
+    # only: a master/baseline infra flake stays a warning and does not red-cross.
+    exit 1
 else
     echo "PR job completed successfully"
 fi

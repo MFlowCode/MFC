@@ -19,6 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
+    use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
 
     implicit none
 
@@ -182,16 +183,29 @@ contains
         real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
+        integer                :: fl       !< Fluid loop iterator
 
         ! Computing Stability Criteria at Current Time-step
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+
+                    if (any_non_newtonian) then
+                        Re(1) = 0._wp
+                        do fl = 1, num_fluids
+                            if (is_non_newtonian(fl)) then
+                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                            else
+                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                            end if
+                        end do
+                        Re(1) = 1._wp/max(Re(1), sgm_eps)
+                    end if
 
                     if (viscous) then
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
@@ -367,7 +381,7 @@ contains
         pi_inf = pi_infs(1)
         qv = qvs(1)
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(2F30.3)"
         else
             FMT = "(2F40.14)"
@@ -393,7 +407,7 @@ contains
         end if
 
         if (n == 0 .and. p == 0) then
-            if (model_eqns == 2 .and. (.not. igr)) then
+            if (model_eqns == model_eqns_5eq .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -448,7 +462,7 @@ contains
             end if
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(3F30.7)"
         else
             FMT = "(3F40.14)"
@@ -532,7 +546,7 @@ contains
             end if
         end if
 
-        if (precision == 1) then
+        if (precision == precision_single) then
             FMT = "(4F30.7)"
         else
             FMT = "(4F40.14)"
@@ -753,6 +767,10 @@ contains
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
+
+            if (ib) then
+                call s_write_parallel_ib_data(t_step)
+            end if
         else
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers)
@@ -889,6 +907,8 @@ contains
 
         integer, intent(in) :: time_step
 
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
         if (parallel_io) then
             call s_write_parallel_ib_data(time_step)
         else
@@ -908,52 +928,95 @@ contains
         integer(kind=MPI_OFFSET_KIND)        :: WP_MOK
         integer                              :: ifile, ierr
         integer, dimension(MPI_STATUS_SIZE)  :: status
-        logical                              :: file_exist
+        logical                              :: file_exist, dir_check
         integer                              :: i, ib_idx
         integer, parameter                   :: NFIELDS_PER_IB = 20
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+        integer                              :: file_unit
+        character(len=10)                    :: t_step_string
 
         ! Partition IBs across ranks round-robin style
         integer :: ib_start, ib_end, nibs_per_rank, remainder
 
         WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
 
-        if (proc_rank == 0) then
-            call s_create_directory(trim(case_dir) // '/restart_data')
+        if (file_per_process) then
+            call s_int_to_str(t_step, t_step_string)
+
+            if (proc_rank == 0) then
+                file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string)
+                call s_create_directory(trim(file_loc))
+            end if
+            call s_mpi_barrier()
+            call DelayFileAccess(proc_rank)
+
+            write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', proc_rank, '.dat'
+            file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
+
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist) then
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace')
+            else
+                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='new')
+            end if
+
+            write (file_unit) num_local_ibs
+            do i = 1, num_local_ibs
+                ib_idx = local_ib_patch_ids(i)
+                ib_buf(1) = mytime
+                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
+                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
+                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
+                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
+                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
+                ib_buf(17) = patch_ib(ib_idx)%x_centroid
+                ib_buf(18) = patch_ib(ib_idx)%y_centroid
+                ib_buf(19) = patch_ib(ib_idx)%z_centroid
+                ib_buf(20) = patch_ib(ib_idx)%radius
+
+                write (file_unit) patch_ib(ib_idx)%gbl_patch_id
+                write (file_unit) ib_buf
+            end do
+
+            close (file_unit)
+        else
+            if (proc_rank == 0) then
+                call s_create_directory(trim(case_dir) // '/restart_data')
+            end if
+            call s_mpi_barrier()
+
+            write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
+            file_loc = trim(case_dir) // trim(file_loc)
+
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call s_mpi_barrier()
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+
+            do i = 1, num_local_ibs
+                ib_idx = local_ib_patch_ids(i)
+                ib_buf(1) = mytime
+                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
+                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
+                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
+                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
+                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
+                ib_buf(17) = patch_ib(ib_idx)%x_centroid
+                ib_buf(18) = patch_ib(ib_idx)%y_centroid
+                ib_buf(19) = patch_ib(ib_idx)%z_centroid
+                ib_buf(20) = patch_ib(ib_idx)%radius
+
+                ! Global IB index determines position in file
+                disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+
+                call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
+            end do
+
+            call MPI_FILE_CLOSE(ifile, ierr)
         end if
-        call s_mpi_barrier()
-
-        write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
-        file_loc = trim(case_dir) // trim(file_loc)
-
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (file_exist .and. proc_rank == 0) then
-            call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-        end if
-        call s_mpi_barrier()
-
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
-
-        do i = 1, num_local_ibs
-            ib_idx = local_ib_patch_ids(i)
-            ib_buf(1) = mytime
-            ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
-            ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
-            ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
-            ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-            ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
-            ib_buf(17) = patch_ib(ib_idx)%x_centroid
-            ib_buf(18) = patch_ib(ib_idx)%y_centroid
-            ib_buf(19) = patch_ib(ib_idx)%z_centroid
-            ib_buf(20) = patch_ib(ib_idx)%radius
-
-            ! Global IB index (i) determines position in file
-            disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
-
-            call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
-        end do
-
-        call MPI_FILE_CLOSE(ifile, ierr)
 #endif
 
     end subroutine s_write_parallel_ib_state
@@ -1168,7 +1231,7 @@ contains
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                     end if
 
-                    if (model_eqns == 4) then
+                    if (model_eqns == model_eqns_4eq) then
                         lit_gamma = gammas(1)
                     else if (elasticity) then
                         tau_e(1) = q_cons_vf(eqn_idx%stress%end)%sf(j - 2, k, l)/rho
@@ -1272,7 +1335,7 @@ contains
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                         end if
 
-                        if (model_eqns == 4) then
+                        if (model_eqns == model_eqns_4eq) then
                             lit_gamma = gs_min(1)
                         else if (elasticity) then
                             do s = 1, 3
