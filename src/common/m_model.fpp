@@ -887,7 +887,7 @@ contains
             model = f_model_read(stl_models(stl_id)%model_filepath)
             params%scale(:) = stl_models(stl_id)%model_scale(:)
             params%translate(:) = stl_models(stl_id)%model_translate(:)
-            params%rotate(:) = 0._wp
+            params%rotate(:) = stl_models(stl_id)%model_rotate(:)
             params%spc = num_ray
             params%threshold = stl_models(stl_id)%model_threshold
 

@@ -784,6 +784,7 @@ contains
                                    & 0._wp])
                 if (f_is_inside_cuboid(xyz_local(1), xyz_local(2), 0._wp, [length_x, length_y, &
                     & 0._wp]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
                     @:analytical()
                     if (patch_icpp(patch_id)%hcid /= dflt_int) then
                         @:Hardcoded2D()
@@ -1298,12 +1299,11 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer :: i, j, k                       !< loop iterators
-        integer :: model_id                      !< Index into the preloading stl_models(:)
-        real(wp) :: threshold                    !< Inside/outside cutoff for this model
-        real(wp), dimension(1:3) :: point        !< Cell-center query point
-        real(wp), dimension(1:3) :: point_local  !< Query point transformed into the model frame
-        logical :: in_box                        !< Whether the cell center lies in the model's bounding box
+        integer :: i, j, k                 !< loop iterators
+        integer :: model_id                !< Index into the preloading stl_models(:)
+        real(wp) :: threshold              !< Inside/outside cutoff for this model
+        real(wp), dimension(1:3) :: point  !< Cell-center query point
+        logical :: in_box                  !< Whether the cell center lies in the model's bounding box
 
         model_id = patch_icpp(patch_id)%model_id
         threshold = stl_models(model_id)%model_threshold
@@ -1313,20 +1313,16 @@ contains
             if (p > 0) point(3) = z_cc(k)
             if (grid_geometry == 3) point = f_convert_cyl_to_cart(point)
 
-            ! Transform the query point into the model frame: centroid-relative, then rotate
-            point_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [point(1) - patch_icpp(patch_id)%x_centroid, &
-                                 & point(2) - patch_icpp(patch_id)%y_centroid, point(3) - patch_icpp(patch_id)%z_centroid])
-
-            ! Run the winding test only on cells whose transformed point lies inside the bounding box, else skip the calculation
-            in_box = point_local(1) >= stl_bounding_boxes(model_id, 1, 1) .and. point_local(1) <= stl_bounding_boxes(model_id, 1, &
-                                 & 3) .and. point_local(2) >= stl_bounding_boxes(model_id, 2, &
-                                 & 1) .and. point_local(2) <= stl_bounding_boxes(model_id, 2, 3)
+            ! Run the winding test only on cells whose Cartesian point lies inside the bounding box, else skip the calculation
+            in_box = point(1) >= stl_bounding_boxes(model_id, 1, 1) .and. point(1) <= stl_bounding_boxes(model_id, 1, &
+                           & 3) .and. point(2) >= stl_bounding_boxes(model_id, 2, &
+                           & 1) .and. point(2) <= stl_bounding_boxes(model_id, 2, 3)
             if (p > 0 .or. grid_geometry == 3) then
-                in_box = in_box .and. point_local(3) >= stl_bounding_boxes(model_id, 3, &
-                                                  & 1) .and. point_local(3) <= stl_bounding_boxes(model_id, 3, 3)
+                in_box = in_box .and. point(3) >= stl_bounding_boxes(model_id, 3, &
+                                            & 1) .and. point(3) <= stl_bounding_boxes(model_id, 3, 3)
             end if
             if (in_box) then
-                eta = f_model_is_inside(gpu_ntrs(model_id), model_id, point_local)
+                eta = f_model_is_inside(gpu_ntrs(model_id), model_id, point)
             else
                 eta = 0._wp
             end if

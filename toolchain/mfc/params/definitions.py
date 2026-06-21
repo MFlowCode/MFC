@@ -932,7 +932,7 @@ def _load():
     _sm_attrs: Dict[str, tuple] = {}
     _sm_attrs["model_filepath"] = (STR, set())
     _sm_attrs["model_threshold"] = (REAL, set())
-    for t in ["translate", "scale"]:
+    for t in ["translate", "scale", "rotate"]:
         for j in range(1, 4):
             _sm_attrs[f"model_{t}({j})"] = (REAL, set())
     REGISTRY.register_family(

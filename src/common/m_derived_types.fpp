@@ -337,6 +337,7 @@ module m_derived_types
         real(wp), dimension(1:3)   :: model_translate  !< Translation of the STL object.
         real(wp), dimension(1:3)   :: model_scale      !< Scale factor for the STL object.
         real(wp)                   :: model_threshold  !< Threshold to turn on smooth STL patch.
+        real(wp), dimension(1:3)   :: model_rotate     !< Rotation of the STL object (radians, per axis).
     end type ib_stl_parameters
 
     type ib_patch_parameters

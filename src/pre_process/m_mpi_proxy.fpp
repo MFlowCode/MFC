@@ -144,7 +144,7 @@ contains
         do i = 1, num_stl_models_max
             call MPI_BCAST(stl_models(i)%model_filepath, len(stl_models(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(stl_models(i)%model_threshold, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:for VAR in ['model_translate', 'model_scale']
+            #:for VAR in ['model_translate', 'model_scale', 'model_rotate']
                 call MPI_BCAST(stl_models(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do

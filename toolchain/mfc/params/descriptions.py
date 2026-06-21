@@ -356,6 +356,7 @@ PATTERNS = [
     (r"stl_models\((\d+)\)%model_threshold", "Inside/outside winding number threshold for STL model {0}"),
     (r"stl_models\((\d+)\)%model_translate\((\d+)\)", "Translation component {1} for STL model {0}"),
     (r"stl_models\((\d+)\)%model_scale\((\d+)\)", "Scale component {1} for STL model {0}"),
+    (r"stl_models\((\d+)\)%model_rotate\((\d+)\)", "Rotation component {1} (radians) for STL model {0}"),
     # bc patterns
     (r"bc_([xyz])%vel_in\((\d+)\)", "Inlet velocity component {1} at {0}-boundary"),
     (r"bc_([xyz])%vel_out\((\d+)\)", "Outlet velocity component {1} at {0}-boundary"),

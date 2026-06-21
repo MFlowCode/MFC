@@ -337,6 +337,7 @@ contains
             stl_models(i)%model_filepath(:) = dflt_char
             stl_models(i)%model_translate(:) = 0._wp
             stl_models(i)%model_scale(:) = 1._wp
+            stl_models(i)%model_rotate(:) = 0._wp
             stl_models(i)%model_threshold = ray_tracing_threshold
         end do
 
