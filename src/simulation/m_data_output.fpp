@@ -32,10 +32,11 @@ module m_data_output
     real(wp), public, allocatable, dimension(:,:) :: c_mass
     $:GPU_DECLARE(create='[c_mass]')
 
-    !> @name ICFL, VCFL, and Rc stability criteria extrema over all the time-steps
+    !> @name ICFL, VCFL, CCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
     real(wp) :: icfl_max  !< ICFL criterion maximum
     real(wp) :: vcfl_max  !< VCFL criterion maximum
+    real(wp) :: ccfl_max  !< CCFL criterion maximum
     real(wp) :: Rc_min    !< Rc criterion maximum
     !> @}
 
@@ -86,6 +87,10 @@ contains
         write (3, '(A)') ''; write (3, '(A)') ''
 
         write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
+
+        if (surface_tension) then
+            write (3, '(13X,A10)', advance="no") trim('CCFL Max')
+        end if
 
         if (viscous) then
             write (3, '(13X,A10,13X,A16)', advance="no") trim('VCFL Max'), trim('Rc Min')
@@ -182,15 +187,16 @@ contains
         real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
         real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
         real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
-        real(wp)               :: icfl, vcfl, Rc
+        real(wp)               :: icfl, vcfl, ccfl, Rc
         integer                :: fl                          !< Fluid loop iterator
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
+        ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, fl]', reduction='[[icfl_max_loc, vcfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
+                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -210,14 +216,11 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    if (viscous) then
-                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc)
-                    else
-                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl)
-                    end if
+                    call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
 
                     icfl_max_loc = max(icfl_max_loc, icfl)
                     vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
+                    ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
                     Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                 end do
             end do
@@ -227,15 +230,20 @@ contains
 
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, n_el_bubs_loc, icfl_max_glb, &
-                & vcfl_max_glb, Rc_min_glb, n_el_bubs_glb)
+                & vcfl_max_glb, Rc_min_glb, n_el_bubs_glb, ccfl_max_loc, ccfl_max_glb)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
+            if (surface_tension) ccfl_max_glb = ccfl_max_loc
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
+
+        if (surface_tension) then
+            if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
+        end if
 
         if (viscous) then
             if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
@@ -244,6 +252,10 @@ contains
 
         if (proc_rank == 0) then
             write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
+
+            if (surface_tension) then
+                write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
+            end if
 
             if (viscous) then
                 write (3, '(13X,F10.6,13X,ES16.6)', advance="no") vcfl_max_glb, Rc_min_glb
@@ -1642,6 +1654,7 @@ contains
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+        if (surface_tension) write (3, '(A,F9.6)') 'CCFL Max: ', ccfl_max
         if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
         if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
 
@@ -1683,6 +1696,9 @@ contains
 
         if (run_time_info) then
             icfl_max = 0._wp
+            if (surface_tension) then
+                ccfl_max = 0._wp
+            end if
             if (viscous) then
                 vcfl_max = 0._wp
                 Rc_min = 1.e12_wp

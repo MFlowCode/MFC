@@ -138,13 +138,13 @@ contains
     end subroutine s_compute_enthalpy
 
     !> Computes stability criterion for a specified dt
-    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc)
+    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc, ccfl)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in)                      :: c, rho
         real(wp), intent(inout)                   :: icfl
-        real(wp), intent(inout), optional         :: vcfl, Rc
+        real(wp), intent(inout)                   :: vcfl, Rc, ccfl
         real(wp), dimension(2), intent(in)        :: Re_l
         integer, intent(in)                       :: j, k, l
         real(wp)                                  :: fltr_dtheta
@@ -178,6 +178,24 @@ contains
             end if
         end if
 
+        ! Capillary CFL calculation
+        if (surface_tension) then
+            if (p > 0) then
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                    if (grid_geometry == 3) then
+                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp))
+                    else
+                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), dz(l))**3._wp))
+                    end if
+                #:endif
+            else if (n > 0) then
+                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k))**3._wp))
+            else
+                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*dx(j)**3._wp))
+            end if
+        end if
+
     end subroutine s_compute_stability_from_dt
 
     !> Computes dt for a specified CFL number
@@ -189,14 +207,14 @@ contains
         real(wp), intent(inout)                   :: max_dt
         real(wp), dimension(2), intent(in)        :: Re_l
         integer, intent(in)                       :: j, k, l
-        real(wp)                                  :: icfl_dt, vcfl_dt
+        real(wp)                                  :: vcfl_dt, ccfl_dt
         real(wp)                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
         if (p > 0 .or. n > 0) then
-            icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
+            max_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
         else
-            icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
+            max_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if
 
         ! Viscous calculations
@@ -213,12 +231,26 @@ contains
             else
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
+            max_dt = min(max_dt, vcfl_dt)
         end if
 
-        if (viscous) then
-            max_dt = min(icfl_dt, vcfl_dt)
-        else
-            max_dt = icfl_dt
+        ! Capillary CFL calculations
+        if (surface_tension) then
+            if (p > 0) then
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                    if (grid_geometry == 3) then
+                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
+                    else
+                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
+                    end if
+                #:endif
+            else if (n > 0) then
+                ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
+            else
+                ccfl_dt = cfl_target*sqrt(rho*dx(j)**3._wp/(2._wp*pi*sigma))
+            end if
+            max_dt = min(max_dt, ccfl_dt)
         end if
 
     end subroutine s_compute_dt_from_cfl
