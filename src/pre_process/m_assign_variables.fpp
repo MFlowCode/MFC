@@ -257,11 +257,9 @@ contains
 
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, orig_rho, orig_gamma, orig_pi_inf, orig_qv)
 
-        if (.not. igr .or. num_fluids > 1) then
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - eqn_idx%E)
-            end do
-        end if
+        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+            q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - eqn_idx%E)
+        end do
 
         if (mpp_lim .and. bubbles_euler) then
             ! adjust volume fractions, according to modeled gas void fraction
@@ -290,11 +288,9 @@ contains
             end do
         end if
 
-        if (.not. igr .or. num_fluids > 1) then
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - eqn_idx%E)
-            end do
-        end if
+        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+            q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - eqn_idx%E)
+        end do
 
         if (mpp_lim .and. bubbles_euler) then
             ! adjust volume fractions, according to modeled gas void fraction
@@ -355,11 +351,9 @@ contains
 
         q_prim_vf(eqn_idx%E)%sf(j, k, l) = (eta*patch_icpp(patch_id)%pres + (1._wp - eta)*orig_prim_vf(eqn_idx%E))
 
-        if (.not. igr .or. num_fluids > 1) then
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                q_prim_vf(i)%sf(j, k, l) = eta*patch_icpp(patch_id)%alpha(i - eqn_idx%E) + (1._wp - eta)*orig_prim_vf(i)
-            end do
-        end if
+        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+            q_prim_vf(i)%sf(j, k, l) = eta*patch_icpp(patch_id)%alpha(i - eqn_idx%E) + (1._wp - eta)*orig_prim_vf(i)
+        end do
 
         if (mhd) then
             if (n == 0) then  ! 1D: By, Bz

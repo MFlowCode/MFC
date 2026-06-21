@@ -492,18 +492,18 @@ contains
             eqn_idx%mom%end = eqn_idx%cont%end + num_vels
             eqn_idx%E = eqn_idx%mom%end + 1
 
-            if (igr) then
-                ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of (N-1)
-                ! volume fractions for N fluids, hence the "-1" in eqn_idx%adv%end. If num_fluids = 1 then eqn_idx%adv%end <
-                ! eqn_idx%adv%beg, which skips all loops over the volume fractions since there is no volume fraction to track
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids - 1
-            else
-                ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann tracks
-                ! a total of (N) volume fractions for N fluids, hence the lack of "-1" in eqn_idx%adv%end
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids
-            end if
+            ! if (igr) then
+            ! Volume fractions are stored in the indices immediately following the energy equation. IGR tracks a total of (N-1)
+            ! volume fractions for N fluids, hence the "-1" in eqn_idx%adv%end. If num_fluids = 1 then eqn_idx%adv%end <
+            ! eqn_idx%adv%beg, which skips all loops over the volume fractions since there is no volume fraction to track
+            ! eqn_idx%adv%beg = eqn_idx%E + 1
+            ! eqn_idx%adv%end = eqn_idx%E + num_fluids - 1
+            ! else
+            ! Volume fractions are stored in the indices immediately following the energy equation. WENO/MUSCL + Riemann tracks
+            ! a total of (N) volume fractions for N fluids, hence the lack of "-1" in eqn_idx%adv%end
+            eqn_idx%adv%beg = eqn_idx%E + 1
+            eqn_idx%adv%end = eqn_idx%E + num_fluids
+            ! end if
 
             sys_size = eqn_idx%adv%end
 

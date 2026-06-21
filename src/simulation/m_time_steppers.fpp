@@ -26,6 +26,7 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
 
     implicit none
 
@@ -510,7 +511,7 @@ contains
                             ! the igr branch in s_compute_rhs (from m_rhs) fills rhs_vf
                             ! after already scaling it by dt through subroutines in m_igr
                             ! e.g. s_igr_sigma_x
-                            if (igr) then
+                            if (igr .and. viscous) then
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
                                           & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
                                           & l))/rk_coef(s, 4)
@@ -524,6 +525,16 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
+#ifdef MFC_DEBUG
+            do i = 1, sys_size
+                if (.not. all(ieee_is_finite(real(q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p), wp)))) then
+                    print *, "NONFINITE AFTER RK:", t_step, s, i
+                    call s_mpi_abort("Non-finite RK state")
+                end if
+            end do
+#endif
+
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 $:GPU_PARALLEL_LOOP(collapse=5)

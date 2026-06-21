@@ -908,6 +908,8 @@ contains
         ! TODO: main igr divergence point
         if (igr) then
             call s_initialize_igr_module()
+            ! initialize riemann solvers module for inviscid igr branch
+            call s_initialize_riemann_solvers_module()
         end if
         ! non-igr implementation uses WENO, MUSCL reconstruction modules and riemann solvers module
         ! goal is to initialize these modules alongside igr and make igr a flux modifier
@@ -1087,6 +1089,8 @@ contains
         ! TODO: igr divergence point, the same way they diverged in s_initialize_modules
         if (igr) then
             call s_finalize_igr_module()
+            ! finalize riemann solvers module for inviscid igr branch
+            call s_finalize_riemann_solvers_module()
         else
             call s_finalize_cbc_module()
             call s_finalize_riemann_solvers_module()
