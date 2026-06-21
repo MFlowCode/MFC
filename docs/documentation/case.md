@@ -379,7 +379,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 
-- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
+- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon its own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 
 - `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
 
@@ -389,15 +389,15 @@ Additional details on this specification can be found in [NACA airfoil](https://
   Available variables: `x` (`x_cc(i)`), `y` (`y_cc(j)`), `z` (`z_cc(k)`), `t` (current simulation time), and `r` (the IB patch radius).
   The same intrinsic functions and `pi` constant apply; bare `e` is not available.
 
-- `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inellastic collisions while 1 is for perfectly ellastic collisions.
+- `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inelastic collisions while 1 is for perfectly elastic collisions.
 
-- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collisiono checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
+- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collision checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
 
-- `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring gonstant used to apply collision forces.
+- `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring constant used to apply collision forces.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
-- `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IB's up to 1 ranks away. This parameter is required to strong-scale a case when IB's eventually grow to be larger than one full processor domain wide.
+- `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IBs up to 1 ranks away. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
 #### Particle Clouds
 
