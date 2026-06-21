@@ -483,6 +483,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop operators
         real(wp)                                                 :: a, b
+        real(wp), dimension(1:3)                                 :: xyz_local
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -497,17 +498,17 @@ contains
 
         ! Initialize eta=1; modified if smoothing is enabled
         eta = 1._wp
-
-        ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
+                ! Rotate the centroid-relative grid point into the patch frame
+                xyz_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [x_cc(i) - x_centroid, y_cc(j) - y_centroid, &
+                                   & 0._wp])
                 if (patch_icpp(patch_id)%smoothen) then
                     eta = tanh(smooth_coeff/min(dx, &
-                               & dy)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2) - 1._wp))*(-0.5_wp) &
-                               & + 0.5_wp
+                               & dy)*(sqrt((xyz_local(1)/a)**2 + (xyz_local(2)/b)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
                 end if
 
-                if ((f_is_inside_ellipse(x_cc(i) - x_centroid, y_cc(j) - y_centroid, [2._wp*a, 2._wp*b, &
+                if ((f_is_inside_ellipse(xyz_local(1), xyz_local(2), [2._wp*a, 2._wp*b, &
                     & 0._wp]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
                     & 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
@@ -541,8 +542,9 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
-        integer  :: i, j, k
-        real(wp) :: a, b, c
+        integer                  :: i, j, k
+        real(wp)                 :: a, b, c
+        real(wp), dimension(1:3) :: xyz_local
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -571,13 +573,17 @@ contains
                         cart_z = z_cc(k)
                     end if
 
+                    ! Rotate the centroid-relative grid point into the patch frame
+                    xyz_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [x_cc(i) - x_centroid, cart_y - y_centroid, &
+                                       & cart_z - z_centroid])
+
                     if (patch_icpp(patch_id)%smoothen) then
                         eta = tanh(smooth_coeff/min(dx, dy, &
-                                   & dz)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z &
-                                   & - z_centroid)/c)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
+                                   & dz)*(sqrt((xyz_local(1)/a)**2 + (xyz_local(2)/b)**2 + (xyz_local(3)/c)**2) - 1._wp)) &
+                                   & *(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c)**2 <= 1._wp &
+                    if (((xyz_local(1)/a)**2 + (xyz_local(2)/b)**2 + (xyz_local(3)/c)**2 <= 1._wp &
                         & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
@@ -743,6 +749,7 @@ contains
         integer                                                  :: i, j, k                   !< generic loop iterators
         real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< equation of state parameters
         real(wp)                                                 :: L0, U0                    !< Taylor Green Vortex parameters
+        real(wp), dimension(1:3)                                 :: xyz_local
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -772,10 +779,11 @@ contains
         ! Assign patch vars if cell is covered and patch has write permission
         do j = 0, n
             do i = 0, m
-                if (f_is_inside_cuboid(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, [length_x, length_y, &
+                ! Rotate the centroid-relative grid point into the patch frame
+                xyz_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [x_cc(i) - x_centroid, y_cc(j) - y_centroid, &
+                                   & 0._wp])
+                if (f_is_inside_cuboid(xyz_local(1), xyz_local(2), 0._wp, [length_x, length_y, &
                     & 0._wp]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
-                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
-
                     @:analytical()
                     if (patch_icpp(patch_id)%hcid /= dflt_int) then
                         @:Hardcoded2D()
@@ -1054,6 +1062,7 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
+        real(wp), dimension(1:3)                                 :: xyz_local
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -1088,8 +1097,11 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (f_is_inside_cuboid(x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, [length_x, length_y, &
-                        & length_z])) then
+                    ! Rotate the centroid-relative grid point into the patch frame
+                    xyz_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [x_cc(i) - x_centroid, cart_y - y_centroid, &
+                                       & cart_z - z_centroid])
+
+                    if (f_is_inside_cuboid(xyz_local(1), xyz_local(2), xyz_local(3), [length_x, length_y, length_z])) then
                         if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -1125,6 +1137,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: radius
+        real(wp), dimension(1:3)                                 :: xyz_local
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -1163,30 +1176,29 @@ contains
                         cart_z = z_cc(k)
                     end if
 
+                    ! Rotate the centroid-relative grid point into the patch frame
+                    xyz_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [x_cc(i) - x_centroid, cart_y - y_centroid, &
+                                       & cart_z - z_centroid])
+
                     if (patch_icpp(patch_id)%smoothen) then
                         if (.not. f_is_default(length_x)) then
                             eta = tanh(smooth_coeff/min(dy, &
-                                       & dz)*(sqrt((cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                                       & dz)*(sqrt(xyz_local(2)**2 + xyz_local(3)**2) - radius))*(-0.5_wp) + 0.5_wp
                         else if (.not. f_is_default(length_y)) then
                             eta = tanh(smooth_coeff/min(dx, &
-                                       & dz)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                                       & dz)*(sqrt(xyz_local(1)**2 + xyz_local(3)**2) - radius))*(-0.5_wp) + 0.5_wp
                         else
                             eta = tanh(smooth_coeff/min(dx, &
-                                       & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                                       & dy)*(sqrt(xyz_local(1)**2 + xyz_local(2)**2) - radius))*(-0.5_wp) + 0.5_wp
                         end if
                     end if
 
-                    if (((.not. f_is_default(length_x) .and. f_is_inside_cylinder(cart_y - y_centroid, cart_z - z_centroid, &
-                        & x_cc(i) - x_centroid, radius, &
-                        & length_x)) .or. (.not. f_is_default(length_y) .and. f_is_inside_cylinder(x_cc(i) - x_centroid, &
-                        & cart_z - z_centroid, cart_y - y_centroid, radius, &
-                        & length_y)) .or. (.not. f_is_default(length_z) .and. f_is_inside_cylinder(x_cc(i) - x_centroid, &
-                        & cart_y - y_centroid, cart_z - z_centroid, radius, &
-                        & length_z)) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
-                        & k) == smooth_patch_id) then
+                    if (((.not. f_is_default(length_x) .and. f_is_inside_cylinder(xyz_local(2), xyz_local(3), xyz_local(1), &
+                        & radius, length_x)) .or. (.not. f_is_default(length_y) .and. f_is_inside_cylinder(xyz_local(1), &
+                        & xyz_local(3), xyz_local(2), radius, &
+                        & length_y)) .or. (.not. f_is_default(length_z) .and. f_is_inside_cylinder(xyz_local(1), xyz_local(2), &
+                        & xyz_local(3), radius, length_z)) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &
+                        & k))) .or. patch_id_fp(i, j, k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
@@ -1286,11 +1298,12 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer :: i, j, k                 !< loop iterators
-        integer :: model_id                !< Index into the preloading stl_models(:)
-        real(wp) :: threshold              !< Inside/outside cutoff for this model
-        real(wp), dimension(1:3) :: point  !< Cell-center query point
-        logical :: in_box                  !< Whether the cell center lies in the model's bounding box
+        integer :: i, j, k                       !< loop iterators
+        integer :: model_id                      !< Index into the preloading stl_models(:)
+        real(wp) :: threshold                    !< Inside/outside cutoff for this model
+        real(wp), dimension(1:3) :: point        !< Cell-center query point
+        real(wp), dimension(1:3) :: point_local  !< Query point transformed into the model frame
+        logical :: in_box                        !< Whether the cell center lies in the model's bounding box
 
         model_id = patch_icpp(patch_id)%model_id
         threshold = stl_models(model_id)%model_threshold
@@ -1300,17 +1313,20 @@ contains
             if (p > 0) point(3) = z_cc(k)
             if (grid_geometry == 3) point = f_convert_cyl_to_cart(point)
 
-            ! Run the winding test only on cells whose Cartesian point lies inside the bounding box, else skip the calculation
-            in_box = point(1) >= stl_bounding_boxes(model_id, 1, 1) .and. point(1) <= stl_bounding_boxes(model_id, 1, &
-                           & 3) .and. point(2) >= stl_bounding_boxes(model_id, 2, &
-                           & 1) .and. point(2) <= stl_bounding_boxes(model_id, 2, 3)
-            if (p > 0 .or. grid_geometry == 3) then
-                in_box = in_box .and. point(3) >= stl_bounding_boxes(model_id, 3, &
-                                            & 1) .and. point(3) <= stl_bounding_boxes(model_id, 3, 3)
-            end if
+            ! Transform the query point into the model frame: centroid-relative, then rotate
+            point_local = matmul(patch_icpp(patch_id)%rotation_matrix_inverse, [point(1) - patch_icpp(patch_id)%x_centroid, &
+                                 & point(2) - patch_icpp(patch_id)%y_centroid, point(3) - patch_icpp(patch_id)%z_centroid])
 
+            ! Run the winding test only on cells whose transformed point lies inside the bounding box, else skip the calculation
+            in_box = point_local(1) >= stl_bounding_boxes(model_id, 1, 1) .and. point_local(1) <= stl_bounding_boxes(model_id, 1, &
+                                 & 3) .and. point_local(2) >= stl_bounding_boxes(model_id, 2, &
+                                 & 1) .and. point_local(2) <= stl_bounding_boxes(model_id, 2, 3)
+            if (p > 0 .or. grid_geometry == 3) then
+                in_box = in_box .and. point_local(3) >= stl_bounding_boxes(model_id, 3, &
+                                                  & 1) .and. point_local(3) <= stl_bounding_boxes(model_id, 3, 3)
+            end if
             if (in_box) then
-                eta = f_model_is_inside(gpu_ntrs(model_id), model_id, point)
+                eta = f_model_is_inside(gpu_ntrs(model_id), model_id, point_local)
             else
                 eta = 0._wp
             end if

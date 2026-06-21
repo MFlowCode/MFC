@@ -22,8 +22,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
-        & s_initialize_ib_airfoils
+    private; public :: s_apply_ib_patches, s_instantiate_STL_models, s_decode_patch_periodicity, s_initialize_ib_airfoils
 
 contains
 
@@ -409,18 +408,6 @@ contains
         end do
 
     end subroutine s_initialize_ib_airfoils
-
-    !> Compute a rotation matrix for converting to the rotating frame of the boundary
-    subroutine s_update_ib_rotation_matrix(patch_id)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(in) :: patch_id
-
-        call s_compute_rotation_matrix(patch_ib(patch_id)%angles, patch_ib(patch_id)%rotation_matrix, &
-                                       & patch_ib(patch_id)%rotation_matrix_inverse)
-
-    end subroutine s_update_ib_rotation_matrix
 
     subroutine get_bounding_indices(patch, center, il, ir, jl, jr, kl, kr)
 

@@ -150,21 +150,18 @@ contains
         real(wp), dimension(1:3,1:3), intent(out) :: rotation_matrix
         real(wp), dimension(1:3,1:3), intent(out) :: rotation_matrix_inverse
         real(wp), dimension(3, 3, 3)              :: rotation
-        real(wp)                                  :: angle
 
         ! construct the x, y, and z rotation matrices
 
         if (num_dims == 3) then
             ! also compute the x and y axes in 3D
-            angle = angles(1)
             rotation(1, 1,:) = [1._wp, 0._wp, 0._wp]
-            rotation(1, 2,:) = [0._wp, cos(angle), -sin(angle)]
-            rotation(1, 3,:) = [0._wp, sin(angle), cos(angle)]
+            rotation(1, 2,:) = [0._wp, cos(angles(1)), -sin(angles(1))]
+            rotation(1, 3,:) = [0._wp, sin(angles(1)), cos(angles(1))]
 
-            angle = angles(2)
-            rotation(2, 1,:) = [cos(angle), 0._wp, sin(angle)]
+            rotation(2, 1,:) = [cos(angles(2)), 0._wp, sin(angles(2))]
             rotation(2, 2,:) = [0._wp, 1._wp, 0._wp]
-            rotation(2, 3,:) = [-sin(angle), 0._wp, cos(angle)]
+            rotation(2, 3,:) = [-sin(angles(2)), 0._wp, cos(angles(2))]
 
             ! apply the y rotation to the x rotation
             rotation_matrix(:,:) = matmul(rotation(1,:,:), rotation(2,:,:))
@@ -172,9 +169,8 @@ contains
         end if
 
         ! z component first, since it applies in 2D and 3D
-        angle = angles(3)
-        rotation(3, 1,:) = [cos(angle), -sin(angle), 0._wp]
-        rotation(3, 2,:) = [sin(angle), cos(angle), 0._wp]
+        rotation(3, 1,:) = [cos(angles(3)), -sin(angles(3)), 0._wp]
+        rotation(3, 2,:) = [sin(angles(3)), cos(angles(3)), 0._wp]
         rotation(3, 3,:) = [0._wp, 0._wp, 1._wp]
 
         if (num_dims == 3) then

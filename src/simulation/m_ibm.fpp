@@ -90,7 +90,7 @@ contains
             if (patch_ib(i)%moving_ibm /= 0) then
                 call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
             end if
-            call s_update_ib_rotation_matrix(i)
+            call s_compute_rotation_matrix(patch_ib(i)%angles, patch_ib(i)%rotation_matrix, patch_ib(i)%rotation_matrix_inverse)
         end do
         $:END_GPU_PARALLEL_LOOP()
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
@@ -876,7 +876,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[i]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
-                call s_update_ib_rotation_matrix(i)
+                call s_compute_rotation_matrix(patch_ib(i)%angles, patch_ib(i)%rotation_matrix, patch_ib(i)%rotation_matrix_inverse)
             end if
         end do
         $:END_GPU_PARALLEL_LOOP()
