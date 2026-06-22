@@ -9,7 +9,6 @@
 module m_ibm
 
     use m_derived_types
-    use m_derived_variables
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
@@ -955,17 +954,15 @@ contains
                             local_force_contribution(:) = 0._wp
 
                             ! compute the pressure force component, which is the negative pressure gradient
-                            do fluid_idx = 0, num_fluids - 1
-                                do l = -fd_number, fd_number
-                                    local_force_contribution(1) = local_force_contribution(1) - (fd_coeff_x(l, &
-                                                             & i)*q_prim_vf(eqn_idx%E + fluid_idx)%sf(i + l, j, k))
-                                    local_force_contribution(2) = local_force_contribution(2) - (fd_coeff_y(l, &
-                                                             & j)*q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j + l, k))
-                                    if (num_dims == 3) then
-                                        local_force_contribution(3) = local_force_contribution(3) - (fd_coeff_z(l, &
-                                                                 & k)*q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j, k + l))
-                                    end if
-                                end do
+                            do l = -fd_number, fd_number
+                                local_force_contribution(1) = local_force_contribution(1) - (fd_coeff_x(l, &
+                                                         & i)*q_prim_vf(eqn_idx%E)%sf(i + l, j, k))
+                                local_force_contribution(2) = local_force_contribution(2) - (fd_coeff_y(l, &
+                                                         & j)*q_prim_vf(eqn_idx%E)%sf(i, j + l, k))
+                                if (num_dims == 3) then
+                                    local_force_contribution(3) = local_force_contribution(3) - (fd_coeff_z(l, &
+                                                             & k)*q_prim_vf(eqn_idx%E)%sf(i, j, k + l))
+                                end if
                             end do
 
                             ! get the viscous stress and add its contribution if that is considered

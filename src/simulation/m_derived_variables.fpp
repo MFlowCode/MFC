@@ -21,16 +21,7 @@ module m_derived_variables
     private; public :: s_initialize_derived_variables_module, s_initialize_derived_variables, s_compute_derived_variables, &
         & s_finalize_derived_variables_module
 
-    !> @name Finite-difference coefficients Finite-difference (fd) coefficients in x-, y- and z-coordinate directions. Note that
-    !! because sufficient boundary information is available for all the active coordinate directions, the centered family of the
-    !! finite-difference schemes is used.
-    !> @{
-    real(wp), public, allocatable, dimension(:,:) :: fd_coeff_x
-    real(wp), public, allocatable, dimension(:,:) :: fd_coeff_y
-    real(wp), public, allocatable, dimension(:,:) :: fd_coeff_z
-    !> @}
-
-    $:GPU_DECLARE(create='[fd_coeff_x, fd_coeff_y, fd_coeff_z]')
+    ! fd_coeff_x, fd_coeff_y, fd_coeff_z: declared in m_global_parameters so m_viscous can see them too
 
     ! @name Variables for computing acceleration
     !> @{
