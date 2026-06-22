@@ -948,13 +948,9 @@ contains
                         call s_get_neighborhood_idx(ib_idx_temp, ib_idx)  ! global patch ID -> local index
                         if (ib_idx > 0) then
                             ! get the vector pointing to the grid cell from the IB centroid
-                            if (num_dims == 3) then
-                                radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, &
-                                                      & patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid]
-                            else
-                                radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, &
-                                                      & patch_ib(ib_idx)%y_centroid, 0._wp]
-                            end if
+                            radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, &
+                                                  & patch_ib(ib_idx)%y_centroid, 0._wp]
+                            if (num_dims == 3) radial_vector(3) = patch_ib(ib_idx)%z_centroid
 
                             local_force_contribution(:) = 0._wp
 
