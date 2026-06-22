@@ -25,7 +25,7 @@ domain_size = 4.0 * radius
 lead_distance = 0.2 * radius
 
 # simulation runs long enough to collide and travel about lead distance away again
-simulation_time = 1.2 * (lead_distance / velocity) + collision_time
+simulation_time = 2.0 * (lead_distance / velocity) + collision_time
 num_time_steps = int(simulation_time / dt)
 num_saves = 10
 t_step_save = int(num_time_steps / num_saves)

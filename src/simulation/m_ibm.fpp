@@ -1024,7 +1024,7 @@ contains
                                 $:GPU_ATOMIC(atomic='update')
                                 ib_ft(l, ib_idx) = ib_ft(l, ib_idx) + (local_force_contribution(l)*cell_volume)
                                 $:GPU_ATOMIC(atomic='update')
-                                ib_ft(l+3, ib_idx) = ib_ft(l+3, ib_idx) + local_torque_contribution(l)*cell_volume
+                                ib_ft(l + 3, ib_idx) = ib_ft(l + 3, ib_idx) + local_torque_contribution(l)*cell_volume
                             end do
                         end if  ! ib_idx > 0
                     end if
