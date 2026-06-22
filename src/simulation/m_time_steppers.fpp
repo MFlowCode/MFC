@@ -26,7 +26,6 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
-    use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
     implicit none
@@ -224,9 +223,6 @@ contains
         ! Allocating the cell-average primitive variables
         @:ALLOCATE(q_prim_vf(1:sys_size))
 
-        ! TODO: first igr divergence point. igr does not allocate q_prim_vf
-        ! Done: allocates q_prim_vf for both normal & igr
-        ! if (.not. igr) then
         do i = 1, eqn_idx%adv%end
             @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -475,9 +471,7 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
-                    ! TODO: igr divergence point, minor
-                    ! igr does not allocate q_prim_vf so q_cons_ts(1)%vf is passed
-                    ! Integration goal: allocate q_prim_vf for igr so both use the same branch
+                    ! TODO: route IGR runtime information through q_prim_vf once primitive workspace semantics are fully integrated.
                     if (igr) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                     end if
@@ -507,34 +501,13 @@ contains
                             if (s == 1 .and. nstage > 1) then
                                 q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
-                            ! TODO: igr divergence point, major
-                            ! igr branch does not multiply rhs_vf by dt in the rk update
-                            ! the igr branch in s_compute_rhs (from m_rhs) fills rhs_vf
-                            ! after already scaling it by dt through subroutines in m_igr
-                            ! e.g. s_igr_sigma_x
-                            if (igr .and. viscous) then
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            else
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            end if
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
+                                      & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
                         end do
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-
-#ifdef MFC_DEBUG
-            do i = 1, sys_size
-                if (.not. all(ieee_is_finite(real(q_cons_ts(1)%vf(i)%sf(0:m,0:n,0:p), wp)))) then
-                    print *, "NONFINITE AFTER RK:", t_step, s, i
-                    call s_mpi_abort("Non-finite RK state")
-                end if
-            end do
-#endif
 
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
@@ -661,7 +634,8 @@ contains
         integer                :: j, k, l  !< Generic loop iterators
         integer                :: fl       !< Fluid loop iterator
 
-        ! TODO: igr divergence
+        ! TODO: use the normal primitive workspace for IGR dt calculation once
+        ! q_prim_vf is authoritative for IGR diagnostics and stability checks.
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
@@ -940,9 +914,6 @@ contains
             @:DEALLOCATE(q_prim_ts1, q_prim_ts2)
         end if
 
-        ! TODO: igr divergence point, q_prim_vf(i)%sf not allocated for igr
-        ! Done: Deallocates q_prim_vf for both normal & igr
-        ! if (.not. igr) then
         ! Deallocating the cell-average primitive variables
         do i = 1, eqn_idx%adv%end
             @:DEALLOCATE(q_prim_vf(i)%sf)

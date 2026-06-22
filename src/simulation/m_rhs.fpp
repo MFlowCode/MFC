@@ -36,7 +36,6 @@ module m_rhs
     use m_igr
     use m_thinc
     use m_pressure_relaxation
-    use ieee_arithmetic, only: ieee_is_finite
 
     implicit none
 
@@ -116,10 +115,6 @@ module m_rhs
     integer :: iglob
     $:GPU_DECLARE(create='[iglob]')
 
-#ifdef MFC_DEBUG
-    type(scalar_field), allocatable, dimension(:) :: rhs_igr_reference
-#endif
-
 contains
 
     !> Initialize the RHS module
@@ -133,7 +128,6 @@ contains
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
 
-        ! TODO: igr divergence point igr does not allocates scalar fields for q_cons_qp/q_prim_qp if (.not. igr) then
         do l = 1, sys_size
             @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
@@ -142,7 +136,6 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
         end do
-        ! end if
 
         if (surface_tension) then
             do l = eqn_idx%adv%end + 1, eqn_idx%c - 1
@@ -156,7 +149,6 @@ contains
             end do
         end if
 
-        ! TODO: igr divergence point if (.not. igr) then
         @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
 
         do l = 1, eqn_idx%cont%end
@@ -190,7 +182,6 @@ contains
             $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(eqn_idx%psi)%sf]')
         end if
 
-        ! TODO: igr divergence point, target for s_lf_riemann_solver refactor must be allocated for s_lf_riemann_solver
         @:ALLOCATE(flux_n(1:num_dims))
         @:ALLOCATE(flux_src_n(1:num_dims))
         @:ALLOCATE(flux_gsrc_n(1:num_dims))
@@ -262,12 +253,6 @@ contains
             end if
         end do
 
-        ! TODO: igr divergence point, target for s_lf_riemann_solver refactor
-        ! some allocations are needed to call s_lf_riemann_solver
-        ! moving necessary allocations outside the (.not. igr) block temporarily
-        ! some remaining allocations inside the if .not. igr block become necessary
-        ! for the viscous path in s_lf_riemann_solver, will modify later
-        ! if ((.not. igr)) then
         @:ALLOCATE(dq_prim_dx_qp(1:1))
         @:ALLOCATE(dq_prim_dy_qp(1:1))
         @:ALLOCATE(dq_prim_dz_qp(1:1))
@@ -469,16 +454,6 @@ contains
 
         call s_initialize_pressure_relaxation_module
 
-#ifdef MFC_DEBUG
-        if (igr .and. .not. viscous) then
-            allocate (rhs_igr_reference(1:sys_size))
-
-            do i = 1, sys_size
-                allocate (rhs_igr_reference(i)%sf(-1:m + 1,-1:n + 1,-1:p + 1))
-            end do
-        end if
-#endif
-
     end subroutine s_initialize_rhs_module
 
     !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
@@ -504,21 +479,12 @@ contains
         integer :: id
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
 
-#ifdef MFC_DEBUG
-        real(wp) :: debug_max_diff, debug_ref_scale, debug_rel_diff
-        real(wp) :: debug_direction_max_diff, debug_direction_rel_diff
-        integer  :: debug_loc(3), debug_direction_var
-        logical  :: debug_compare_rhs
-#endif
-
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
 
-        ! TODO: igr divergence point igr does not copy q_cons_vf into q_cons_qp but keeps using q_cons_vf instead
-        ! if (.not. igr) then
         ! Association/Population of Working Variables
         $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
         do i = 1, sys_size
@@ -554,20 +520,14 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-        ! end if
 
-        ! TODO: igr divergence point, major
-        ! igr does not call s_convert_conservative_to_primitive_variables
-        ! at this point neither q_cons_qp nor q_prim_qp is populated for igr
-        ! igr fills ghost cells in q_cons_vf
+        ! TODO: Native IGR reconstruction still reads conservative ghost cells directly.
         if (igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
             call nvtxEndRange
         end if
-        ! temporarily filling q_prim_qp for igr. igr branch does not use q_prim_qp yet
-        ! but it's required for s_compute_advection_source_term
-        ! if (.not. igr) then
+        ! q_prim_qp is required by shared LF/advection-source infrastructure.
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
         call nvtxEndRange
@@ -575,7 +535,6 @@ contains
         call nvtxStartRange("RHS-COMMUNICATION")
         call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
         call nvtxEndRange
-        ! end if
 
         call nvtxStartRange("RHS-ELASTIC")
         if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
@@ -590,7 +549,7 @@ contains
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
 
-        ! TODO: igr divergence point igr handles viscosity in m_igr
+        ! TODO: IGR viscous terms are still evaluated by native IGR logic.
         if ((viscous .and. .not. igr)) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, dqR_prim_dx_n, &
@@ -612,9 +571,7 @@ contains
         end if
 
         ! Loop over coordinate directions for dimensional splitting
-        ! TODO: igr divergence point
-        ! currently, igr rhs_vf contains extra padding, uses it own s_igr_riemann_solver,
-        ! s_igr_iterative_solve, and s_igr_sigma_x logic
+        ! TODO: IGR rhs_vf keeps stencil padding required by native IGR correction terms.
         do id = 1, num_dims
             if (igr) then
                 if (id == 1) then
@@ -631,83 +588,37 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
 
-                ! temporary igr viscous branch, keeping original logic
-                if (viscous) then
-                    call nvtxStartRange("IGR_RIEMANN")
-                    call s_igr_riemann_solver(q_cons_vf, rhs_vf, id)
-                    call nvtxEndRange
+                call nvtxStartRange("IGR-RECONSTRUCTION")
+                call s_igr_reconstruct_cell_boundary_values(q_cons_vf, qL_rsx_vf, qR_rsx_vf, id)
+                call nvtxEndRange
 
-                    ! The legacy IGR path evolves N-1 independent volume fractions.
-                    ! Complete the stored final-alpha equation from sum(alpha_i) = 1.
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]')
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(eqn_idx%adv%end)%sf(j, k, l) = 0._stp
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                                    rhs_vf(eqn_idx%adv%end)%sf(j, k, l) = rhs_vf(eqn_idx%adv%end)%sf(j, k, l) - rhs_vf(i)%sf(j, &
-                                           & k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                    ! temporary igr inviscid branch, refactored
+                ! Configuring Coordinate Direction Indexes
+                if (id == 1) then
+                    irx%beg = -1; iry%beg = 0; irz%beg = 0
+                else if (id == 2) then
+                    irx%beg = 0; iry%beg = -1; irz%beg = 0
                 else
-#ifdef MFC_DEBUG
-                    debug_compare_rhs = t_step <= 2 .or. t_step == 5 .or. t_step == 10 .or. t_step == 20 .or. t_step == 30 &
-                        & .or. t_step == 60 .or. t_step == 90
-                    if (debug_compare_rhs) then
-                        do i = 1, sys_size
-                            rhs_igr_reference(i)%sf = real(dt*rhs_vf(i)%sf, kind=stp)
-                        end do
+                    irx%beg = 0; iry%beg = 0; irz%beg = -1
+                end if
+                irx%end = m; iry%end = n; irz%end = p
 
-                        call s_igr_riemann_solver(q_cons_vf, rhs_igr_reference, id)
-                    end if
-#endif
+                call nvtxStartRange("IGR-LF-RIEMANN")
+                call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
+                                      & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
+                                      & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
+                                      & flux_gsrc_n(id)%vf, id, irx, iry, irz)
+                call nvtxEndRange
 
-                    call nvtxStartRange("IGR-RECONSTRUCTION")
-                    call s_igr_reconstruct_cell_boundary_values(q_cons_vf, qL_rsx_vf, qR_rsx_vf, id)
-                    call nvtxEndRange
+                ! Match legacy IGR alpha-flux/source semantics before shared RHS accumulation.
+                call s_igr_correct_lf_fluxes(qR_rsx_vf, qL_rsx_vf, flux_n(id)%vf, flux_src_n(id)%vf, id)
 
-                    ! Configuring Coordinate Direction Indexes
-                    if (id == 1) then
-                        irx%beg = -1; iry%beg = 0; irz%beg = 0
-                    else if (id == 2) then
-                        irx%beg = 0; iry%beg = -1; irz%beg = 0
-                    else
-                        irx%beg = 0; iry%beg = 0; irz%beg = -1
-                    end if
-                    irx%end = m; iry%end = n; irz%end = p
+                ! Additional physics and source terms RHS addition for advection source
+                call nvtxStartRange("RHS-ADVECTION-SRC")
+                call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
+                call nvtxEndRange
 
-                    call nvtxStartRange("IGR-LF-RIEMANN")
-                    call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
-                                          & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
-                                          & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
-                                          & flux_gsrc_n(id)%vf, id, irx, iry, irz)
-                    call nvtxEndRange
-
-#ifdef MFC_DEBUG
-                    call s_debug_check_vf("after LF: flux", flux_n(id)%vf, t_step, stage, id)
-#endif
-                    ! temporary igr flux fix for LF Riemann solver
-                    call s_igr_correct_lf_fluxes(qR_rsx_vf, qL_rsx_vf, flux_n(id)%vf, flux_src_n(id)%vf, id)
-
-                    ! Additional physics and source terms RHS addition for advection source
-                    call nvtxStartRange("RHS-ADVECTION-SRC")
-                    call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
-                    call nvtxEndRange
-
-#ifdef MFC_DEBUG
-                    if (debug_compare_rhs .and. id == 1) then
-                        call s_debug_compare_igr_rhs("pre-Sigma", rhs_vf, t_step, stage, id)
-                    end if
-#endif
-
-#ifdef MFC_DEBUG
-                    call s_debug_check_vf("after advection", rhs_vf, t_step, stage, id)
-#endif
+                if (viscous) then
+                    call s_igr_add_viscous_rhs(q_cons_vf, rhs_vf, id)
                 end if
 
                 if (id == 1) then
@@ -716,25 +627,9 @@ contains
                     call nvtxEndRange
                 end if
 
-                if (viscous) then
-                    if (id == 1) then
-                        call nvtxStartRange("IGR_SIGMA_X")
-                        call s_igr_sigma_x(q_cons_vf, rhs_vf)
-                        call nvtxEndRange
-                    end if
-                else
-                    call nvtxStartRange("IGR_SIGMA")
-                    call s_igr_sigma(q_cons_vf, rhs_vf, id)
-                    call nvtxEndRange
-                end if
-
-#ifdef MFC_DEBUG
-                if (debug_compare_rhs .and. id > 1 .and. (.not. viscous)) then
-                    call s_debug_compare_igr_rhs("post-Sigma", rhs_vf, t_step, stage, id)
-                end if
-
-                call s_debug_check_vf("after Sigma", rhs_vf, t_step, stage, id)
-#endif
+                call nvtxStartRange("IGR_SIGMA")
+                call s_igr_sigma(q_cons_vf, rhs_vf, id)
+                call nvtxEndRange
             end if
 
             if (.not. igr) then
@@ -991,78 +886,6 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_rhs
-
-#ifdef MFC_DEBUG
-    subroutine s_debug_check_vf(label, vf, t_step, stage, idir)
-
-        character(len=*), intent(in)                 :: label
-        type(scalar_field), dimension(:), intent(in) :: vf
-        integer, intent(in)                          :: t_step, stage, idir
-        integer                                      :: i
-
-        do i = 1, size(vf)
-            if (.not. associated(vf(i)%sf)) cycle
-
-            if (.not. all(ieee_is_finite(real(vf(i)%sf(0:m,0:n,0:p), wp)))) then
-                print *, "NONFINITE: ", trim(label)
-                print *, "step/stage/dir/variable:", t_step, stage, idir, i
-                call s_mpi_abort("Non-finite intermediate RHS data")
-            end if
-
-            if (t_step == 0 .and. stage == 1) then
-                print *, trim(label), i, minval(real(vf(i)%sf(0:m,0:n,0:p), wp)), maxval(real(vf(i)%sf(0:m,0:n,0:p), wp))
-            end if
-        end do
-
-    end subroutine s_debug_check_vf
-
-    subroutine s_debug_compare_igr_rhs(label, rhs_vf, t_step, stage, idir)
-
-        character(len=*), intent(in)                        :: label
-        type(scalar_field), dimension(sys_size), intent(in) :: rhs_vf
-        integer, intent(in)                                 :: t_step, stage, idir
-        integer                                             :: i, debug_direction_var
-        integer, dimension(3)                               :: debug_loc
-        real(wp)                                            :: debug_max_diff, debug_ref_scale, debug_rel_diff
-        real(wp)                                            :: debug_direction_max_diff, debug_direction_rel_diff
-
-        debug_direction_max_diff = 0._wp
-        debug_direction_rel_diff = 0._wp
-        debug_direction_var = 0
-
-        do i = 1, sys_size
-            ! Old IGR does not evolve the newly stored final alpha.
-            if (i == eqn_idx%adv%end) cycle
-
-            debug_max_diff = maxval(abs(real(rhs_igr_reference(i)%sf(0:m,0:n,0:p), wp) - dt*real(rhs_vf(i)%sf(0:m,0:n,0:p), wp)))
-
-            debug_ref_scale = maxval(abs(real(rhs_igr_reference(i)%sf(0:m,0:n,0:p), wp)))
-
-            debug_rel_diff = debug_max_diff/max(debug_ref_scale, epsilon(1._wp))
-
-            debug_loc = maxloc(abs(real(rhs_igr_reference(i)%sf(0:m,0:n,0:p), wp) - dt*real(rhs_vf(i)%sf(0:m,0:n,0:p), wp))) - 1
-
-            if (debug_max_diff > debug_direction_max_diff) then
-                debug_direction_max_diff = debug_max_diff
-                debug_direction_rel_diff = debug_rel_diff
-                debug_direction_var = i
-            end if
-
-            if (debug_max_diff > 1.e-10_wp) then
-                print *, "IGR RHS mismatch: ", trim(label)
-                print *, "step/stage/direction/variable:", t_step, stage, idir, i
-                print *, "maximum difference:", debug_max_diff
-                print *, "relative difference:", debug_rel_diff
-                print *, "location:", debug_loc
-            end if
-        end do
-
-        print *, "IGR RHS summary: ", trim(label)
-        print *, "step/stage/direction:", t_step, stage, idir
-        print *, "maximum difference/relative/variable:", debug_direction_max_diff, debug_direction_rel_diff, debug_direction_var
-
-    end subroutine s_debug_compare_igr_rhs
-#endif
 
     !> Accumulate advection source contributions from a given coordinate direction into the RHS
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
@@ -1908,7 +1731,6 @@ contains
 
         call s_finalize_pressure_relaxation_module
 
-        ! TODO: igr divergence point, mirroring initialization if (.not. igr) then
         do j = eqn_idx%cont%beg, eqn_idx%cont%end
             if (relativity) then
                 ! Cons and Prim densities are different for relativity
@@ -1931,7 +1753,6 @@ contains
 
         @:DEALLOCATE(q_cons_qp%vf, q_prim_qp%vf)
 
-        ! TODO: igr divergence point change only if these arrays are allocated for igr if (.not. igr) then
         @:DEALLOCATE(qL_rsx_vf, qR_rsx_vf)
 
         if (viscous) then
@@ -2002,7 +1823,6 @@ contains
             deallocate (alf_sum%sf)
         end if
 
-        ! TODO: igr divergence point if flux arrays are allocated for igr then they need to be deallocated here
         do i = num_dims, 1, -1
             if (i /= 1) then
                 do l = 1, sys_size
@@ -2043,18 +1863,6 @@ contains
         end do
 
         @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
-
-#ifdef MFC_DEBUG
-        if (allocated(rhs_igr_reference)) then
-            do i = 1, size(rhs_igr_reference)
-                if (associated(rhs_igr_reference(i)%sf)) then
-                    deallocate (rhs_igr_reference(i)%sf)
-                end if
-            end do
-
-            deallocate (rhs_igr_reference)
-        end if
-#endif
 
     end subroutine s_finalize_rhs_module
 

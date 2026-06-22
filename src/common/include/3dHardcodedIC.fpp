@@ -134,6 +134,7 @@
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = (rho_th - rho_am)*rcut*xcut + rho_am
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = (1._wp - 2._wp*eps)*rcut*xcut + eps
+            q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = rho_th*q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = rho_am*(1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k))
         end if
@@ -160,6 +161,7 @@
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = (rho_th - rho_am)*rcut*xcut + rho_am
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = (1._wp - 2._wp*eps)*rcut*xcut + eps
+            q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = rho_th*q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = rho_am*(1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k))
         end if
