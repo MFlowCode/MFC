@@ -936,9 +936,9 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, &
-                            & cell_volume, local_torque_contribution, dynamic_viscosity, viscous_stress]', copy='[forces, &
-                            & torques]', copyin='[dynamic_viscosities]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, &
+                            & local_force_contribution, cell_volume, local_torque_contribution, dynamic_viscosity, &
+                            & viscous_stress]', copy='[forces, torques]', copyin='[dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
