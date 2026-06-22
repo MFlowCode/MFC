@@ -48,12 +48,12 @@ contains
 
     end subroutine s_initialize_collisions_module
 
-    subroutine s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+    subroutine s_apply_collision_forces(ghost_points, num_gps, ib_markers, ib_ft)
 
         type(ghost_point), dimension(:), intent(in)    :: ghost_points
         integer, intent(in)                            :: num_gps
         type(integer_field), intent(in)                :: ib_markers
-        real(wp), dimension(3, num_ibs), intent(inout) :: forces, torques
+        real(wp), dimension(6, num_ibs), intent(inout) :: ib_ft
         integer                                        :: num_considered_collisions
 
         ! return if no collisions
@@ -67,17 +67,17 @@ contains
 
         select case (collision_model)
         case (1)  ! soft sphere model
-            call s_apply_wall_collision_forces_soft_sphere(forces, torques)
-            call s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
+            call s_apply_wall_collision_forces_soft_sphere(ib_ft)
+            call s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, ib_ft)
         end select
 
     end subroutine s_apply_collision_forces
 
     !> @brief applies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
-    subroutine s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
+    subroutine s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, ib_ft)
 
         integer, intent(in) :: num_considered_collisions
-        real(wp), dimension(3, num_ibs), intent(inout) :: forces, torques
+        real(wp), dimension(6, num_ibs), intent(inout) :: ib_ft
         integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l  ! iterators and patch IDs
         real(wp) :: overlap_distance
         real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
@@ -93,7 +93,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[i, l, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, centroid_1, &
                             & centroid_2, normal_vector, overlap_distance, effective_mass, k, eta, normal_velocity, &
                             & tangental_vector, normal_force, tangental_force, torque, radial_vector, rotation_velocity, vel1, &
-                            & vel2]', copy='[forces, torques]')
+                            & vel2]', copy='[ib_ft]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
             encoded_pid2 = collision_lookup(i, 4)
@@ -144,15 +144,15 @@ contains
                     do l = 1, num_dims
                         ! update the first IB
                         $:GPU_ATOMIC(atomic='update')
-                        forces(l, pid1) = forces(l, pid1) + (normal_force(l) + tangental_force(l))
+                        ib_ft(l, pid1) = ib_ft(l, pid1) + (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
-                        torques(l, pid1) = torques(l, pid1) + torque(l)
+                        ib_ft(l + 3, pid1) = ib_ft(l + 3, pid1) + torque(l)
 
                         ! apply equal and opposite force/torque to second IB
                         $:GPU_ATOMIC(atomic='update')
-                        forces(l, pid2) = forces(l, pid2) - (normal_force(l) + tangental_force(l))
+                        ib_ft(l, pid2) = ib_ft(l, pid2) - (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
-                        torques(l, pid2) = torques(l, pid2) + torque(l)*patch_ib(pid2)%radius/patch_ib(pid1)%radius
+                        ib_ft(l + 3, pid2) = ib_ft(l + 3, pid2) + torque(l)*patch_ib(pid2)%radius/patch_ib(pid1)%radius
                     end do
                 end if
             end if
@@ -162,9 +162,9 @@ contains
     end subroutine s_apply_ib_collision_forces_soft_sphere
 
     !> @brief applies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
-    subroutine s_apply_wall_collision_forces_soft_sphere(forces, torques)
+    subroutine s_apply_wall_collision_forces_soft_sphere(ib_ft)
 
-        real(wp), dimension(3, num_ibs), intent(inout) :: forces, torques
+        real(wp), dimension(6, num_ibs), intent(inout) :: ib_ft
         integer :: patch_id, i, l
         real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector, &
              & collision_location, torque, radial_vector, rotation_velocity, velocity
@@ -172,7 +172,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[patch_id, i, l, collision_location, normal_vector, k, eta, normal_velocity, &
                             & tangental_vector, normal_force, tangental_force, torque, radial_vector, rotation_velocity, &
-                            & velocity]', copy='[forces, torques]', collapse=2)
+                            & velocity]', copy='[ib_ft]', collapse=2)
         do patch_id = 1, num_ibs
             do i = 1, num_dims*2
                 ! only compute force contributions if there was an overlap
@@ -217,9 +217,9 @@ contains
 
                     do l = 1, num_dims
                         $:GPU_ATOMIC(atomic='update')
-                        forces(l, patch_id) = forces(l, patch_id) + (normal_force(l) + tangental_force(l))
+                        ib_ft(l, patch_id) = ib_ft(l, patch_id) + (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
-                        torques(l, patch_id) = torques(l, patch_id) + torque(l)
+                        ib_ft(l + 3, patch_id) = ib_ft(l + 3, patch_id) + torque(l)
                     end do
                 end if
             end do

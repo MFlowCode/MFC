@@ -47,8 +47,7 @@ module m_ibm
 
     ! IB MPI buffers
     integer, allocatable  :: send_ids(:), recv_ids(:)
-    real(wp), allocatable :: recv_forces(:,:), recv_torques(:,:)
-    real(wp), allocatable :: recv_forces_snap(:,:), recv_torques_snap(:,:)
+    real(wp), allocatable :: recv_ft(:,:), recv_ft_snap(:,:)
 
 contains
 
@@ -99,8 +98,7 @@ contains
 #ifdef MFC_MPI
         if (num_procs > 1) then
             @:ALLOCATE(send_ids(size(patch_ib)))
-            allocate (recv_forces_snap(3, size(patch_ib)), recv_torques_snap(3, size(patch_ib)), recv_ids(size(patch_ib)), &
-                      & recv_forces(3, size(patch_ib)), recv_torques(3, size(patch_ib)))
+            allocate (recv_ft_snap(6, size(patch_ib)), recv_ids(size(patch_ib)), recv_ft(6, size(patch_ib)))
         end if
 #endif
 
@@ -908,7 +906,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
         integer                                                        :: i, j, k, l, encoded_ib_idx, ib_idx, ib_idx_temp, fluid_idx
-        real(wp), dimension(3, num_ibs)                                :: forces, torques
+        real(wp), dimension(6, num_ibs)                                :: ib_ft
         ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3,1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2
         real(wp), dimension(1:3)     :: local_force_contribution, radial_vector, local_torque_contribution
@@ -922,8 +920,7 @@ contains
 
         call nvtxStartRange("COMPUTE-IB-FORCES")
 
-        forces = 0._wp
-        torques = 0._wp
+        ib_ft = 0._wp
 
         if (viscous) then
             do fluid_idx = 1, num_fluids
@@ -937,8 +934,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, l, ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, &
                             & local_force_contribution, cell_volume, local_torque_contribution, dynamic_viscosity, &
-                            & viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces, &
-                            & torques]', copyin='[dynamic_viscosities]', collapse=3)
+                            & viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[ib_ft]', &
+                            & copyin='[dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1025,9 +1022,9 @@ contains
                             ! Update the force and torque values atomically to prevent race conditions
                             do l = 1, 3
                                 $:GPU_ATOMIC(atomic='update')
-                                forces(l, ib_idx) = forces(l, ib_idx) + (local_force_contribution(l)*cell_volume)
+                                ib_ft(l, ib_idx) = ib_ft(l, ib_idx) + (local_force_contribution(l)*cell_volume)
                                 $:GPU_ATOMIC(atomic='update')
-                                torques(l, ib_idx) = torques(l, ib_idx) + local_torque_contribution(l)*cell_volume
+                                ib_ft(l+3, ib_idx) = ib_ft(l+3, ib_idx) + local_torque_contribution(l)*cell_volume
                             end do
                         end if  ! ib_idx > 0
                     end if
@@ -1036,29 +1033,29 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+        call s_apply_collision_forces(ghost_points, num_gps, ib_markers, ib_ft)
 
         ! reduce the forces across local neighborhood ranks
-        call s_communicate_ib_forces(forces, torques)
+        call s_communicate_ib_forces(ib_ft)
 
         ! consider body forces after reducing to avoid double counting
         do i = 1, num_ibs
             if (bf_x) then
-                forces(1, i) = forces(1, i) + accel_bf(1)*patch_ib(i)%mass
+                ib_ft(1, i) = ib_ft(1, i) + accel_bf(1)*patch_ib(i)%mass
             end if
             if (bf_y) then
-                forces(2, i) = forces(2, i) + accel_bf(2)*patch_ib(i)%mass
+                ib_ft(2, i) = ib_ft(2, i) + accel_bf(2)*patch_ib(i)%mass
             end if
             if (bf_z) then
-                forces(3, i) = forces(3, i) + accel_bf(3)*patch_ib(i)%mass
+                ib_ft(3, i) = ib_ft(3, i) + accel_bf(3)*patch_ib(i)%mass
             end if
         end do
 
         ! apply the summed forces
-        $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
+        $:GPU_PARALLEL_LOOP(private='[i]', copyin='[ib_ft]')
         do i = 1, num_ibs
-            patch_ib(i)%force(:) = forces(:,i)
-            patch_ib(i)%torque(:) = torques(:,i)
+            patch_ib(i)%force(:) = ib_ft(1:3,i)
+            patch_ib(i)%torque(:) = ib_ft(4:6,i)
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -1246,9 +1243,9 @@ contains
     !! 2: send current (post-pass-1) values; add received; subtract recv_snap to remove double-counting of the direct contribution
     !! already added in pass 1. Back-propagation phase: 2 passes per dimension receiving from the high-index (+X) neighbor, each
     !! overwriting local forces with the neighbor's accumulated total.
-    subroutine s_communicate_ib_forces(forces, torques)
+    subroutine s_communicate_ib_forces(ib_ft)
 
-        real(wp), dimension(3, num_ibs), intent(inout) :: forces, torques
+        real(wp), dimension(6, num_ibs), intent(inout) :: ib_ft
 
 #ifdef MFC_MPI
         integer                       :: i, j, k, pack_pos, unpack_pos, buf_size, ierr
@@ -1266,8 +1263,7 @@ contains
                 send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
                 recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
 
-                recv_forces_snap = 0._wp
-                recv_torques_snap = 0._wp
+                recv_ft_snap = 0._wp
                 tag = 300
 
                 do k = 1, 2*ib_neighborhood_radius
@@ -1278,11 +1274,10 @@ contains
                         send_ids(i) = patch_ib(i)%gbl_patch_id
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    $:GPU_UPDATE(host='[send_ids, forces, torques]')
+                    $:GPU_UPDATE(host='[send_ids]')
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(forces, 3*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(torques, 3*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(ib_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
                                       & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
@@ -1291,20 +1286,14 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_forces, 3*recv_count, mpi_p, &
-                                        & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_torques, 3*recv_count, mpi_p, &
-                                        & MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_forces, recv_torques, recv_ids]', copy='[forces, &
-                                            & torques, recv_forces_snap, recv_torques_snap]')
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
+                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[ib_ft, recv_ft_snap]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
                                 ! add forces and subtract recv_snap prevent double-counting
-                                forces(:,j) = forces(:,j) + recv_forces(:,i) - recv_forces_snap(:,j)
-                                torques(:,j) = torques(:,j) + recv_torques(:,i) - recv_torques_snap(:,j)
-                                recv_forces_snap(:,j) = recv_forces(:,i)
-                                recv_torques_snap(:,j) = recv_torques(:,i)
+                                ib_ft(:,j) = ib_ft(:,j) + recv_ft(:,i) - recv_ft_snap(:,j)
+                                recv_ft_snap(:,j) = recv_ft(:,i)
                             end if
                         end do
                         $:END_GPU_PARALLEL_LOOP()
@@ -1327,11 +1316,10 @@ contains
                         send_ids(i) = patch_ib(i)%gbl_patch_id
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    $:GPU_UPDATE(host='[send_ids, forces, torques]')
+                    $:GPU_UPDATE(host='[send_ids]')
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(forces, 3*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(torques, 3*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                    call MPI_PACK(ib_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
                                       & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     if (recv_neighbor /= MPI_PROC_NULL) then
@@ -1339,17 +1327,12 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_forces, 3*recv_count, mpi_p, &
-                                        & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_torques, 3*recv_count, mpi_p, &
-                                        & MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_forces, recv_torques, recv_ids]', &
-                                            & copy='[forces, torques]')
+                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
+                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[ib_ft]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
-                                forces(:,j) = recv_forces(:,i)
-                                torques(:,j) = recv_torques(:,i)
+                                ib_ft(:,j) = recv_ft(:,i)
                             end if
                         end do
                         $:END_GPU_PARALLEL_LOOP()
@@ -1562,7 +1545,7 @@ contains
 #ifdef MFC_MPI
         if (num_procs > 1) then
             @:DEALLOCATE(send_ids)
-            deallocate (recv_forces_snap, recv_torques_snap, recv_ids, recv_forces, recv_torques)
+            deallocate (recv_ft_snap, recv_ids, recv_ft)
         end if
 #endif
 
