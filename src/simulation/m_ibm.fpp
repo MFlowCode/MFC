@@ -988,13 +988,13 @@ contains
                                                              & i)*viscous_stress(1,1:3)
 
                                     call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, j + l, k)
-                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd%fd_coeff_x(l, &
+                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd%fd_coeff_y(l, &
                                                              & i)*viscous_stress(2,1:3)
 
                                     if (num_dims == 3) then
                                         call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, j, &
                                                                              & k + l)
-                                        local_force_contribution(1:3) = local_force_contribution(1:3) + fd%fd_coeff_x(l, &
+                                        local_force_contribution(1:3) = local_force_contribution(1:3) + fd%fd_coeff_z(l, &
                                                                  & i)*viscous_stress(3,1:3)
                                     end if
                                 end do
