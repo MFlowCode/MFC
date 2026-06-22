@@ -818,15 +818,7 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 
-        if (elasticity) then
-            fd_number = max(1, fd_order/2)
-        end if
-
-        if (mhd) then
-            fd_number = max(1, fd_order/2)
-        end if
-
-        if (probe_wrt) then
+        if (elasticity .or. mhd .or. probe_wrt .or. ib) then
             fd_number = max(1, fd_order/2)
         end if
 

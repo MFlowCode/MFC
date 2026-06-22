@@ -50,7 +50,7 @@ contains
         ! to be implemented in the subroutine s_compute_finite_difference_coefficients.
 
         ! Allocating centered finite-difference coefficients
-        if (probe_wrt) then
+        if (probe_wrt .or. ib) then
             @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
             if (n > 0) then
                 @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, 0:n))
@@ -74,9 +74,9 @@ contains
     !> Allocate and open derived variables. Computing FD coefficients.
     impure subroutine s_initialize_derived_variables
 
-        if (probe_wrt) then
+        if (probe_wrt .or. ib) then
             ! Opening and writing header of flow probe files
-            if (proc_rank == 0) then
+            if (proc_rank == 0 .and. probe_wrt) then
                 call s_open_probe_files()
                 call s_open_com_files()
             end if
