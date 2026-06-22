@@ -192,7 +192,7 @@
     end select
 #:enddef
 
-#:def HardcodedDellacation()
+#:def HardcodedDeallocation()
     if (allocated(stored_values)) then
         @:DEALLOCATE(stored_values)
         @:DEALLOCATE(x_coords)
