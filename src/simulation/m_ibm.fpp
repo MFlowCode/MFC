@@ -913,7 +913,7 @@ contains
         ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3,1:3) :: viscous_stress
         real(wp), dimension(1:3)     :: local_force_contribution, radial_vector, local_torque_contribution
-        real(wp)                     :: cell_volume, dx, dy, dz, dynamic_viscosity
+        real(wp)                     :: cell_volume, dynamic_viscosity
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: dynamic_viscosities
@@ -957,12 +957,12 @@ contains
                             ! compute the pressure force component, which is the negative pressure gradient
                             do fluid_idx = 0, num_fluids - 1
                                 do l = -fd_number, fd_number
-                                    local_force_contribution(1) = local_force_contribution(1) - (fd%fd_coeff_x(l, &
+                                    local_force_contribution(1) = local_force_contribution(1) - (fd_coeff_x(l, &
                                                              & i)*q_prim_vf(eqn_idx%E + fluid_idx)%sf(i + l, j, k))
-                                    local_force_contribution(2) = local_force_contribution(2) - (fd%fd_coeff_y(l, &
+                                    local_force_contribution(2) = local_force_contribution(2) - (fd_coeff_y(l, &
                                                              & j)*q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j + l, k))
                                     if (num_dims == 3) then
-                                        local_force_contribution(3) = local_force_contribution(3) - (fd%fd_coeff_z(l, &
+                                        local_force_contribution(3) = local_force_contribution(3) - (fd_coeff_z(l, &
                                                                  & k)*q_prim_vf(eqn_idx%E + fluid_idx)%sf(i, j, k + l))
                                     end if
                                 end do
@@ -980,17 +980,17 @@ contains
 
                                 do l = -fd_number, fd_number
                                     call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i + l, j, k)
-                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd%fd_coeff_x(l, &
+                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_x(l, &
                                                              & i)*viscous_stress(1,1:3)
 
                                     call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, j + l, k)
-                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd%fd_coeff_y(l, &
+                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_y(l, &
                                                              & j)*viscous_stress(2,1:3)
 
                                     if (num_dims == 3) then
                                         call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, j, &
                                                                              & k + l)
-                                        local_force_contribution(1:3) = local_force_contribution(1:3) + fd%fd_coeff_z(l, &
+                                        local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_z(l, &
                                                                  & k)*viscous_stress(3,1:3)
                                     end if
                                 end do
