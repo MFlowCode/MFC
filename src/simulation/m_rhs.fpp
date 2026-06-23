@@ -458,8 +458,7 @@ contains
 
     !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-
-        & time_avg, stage)
+                                    & time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
         type(scalar_field), intent(inout)                                                          :: q_T_sf
@@ -1375,7 +1374,6 @@ contains
         integer                                                :: i, j, k, l
 
         if (idir == 1) then  ! x-direction
-
             if (surface_tension) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
