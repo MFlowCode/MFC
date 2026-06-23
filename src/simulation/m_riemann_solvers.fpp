@@ -42,6 +42,15 @@ contains
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
+        ! Hypoelasticity enters the Riemann layer in THREE distinct code shapes:
+        !   1. HLLC - inline "if (hypoelasticity)" branches inside s_hllc_riemann_solver
+        !   2. HLL  - inline "if (hypoelasticity)" branches inside s_hll_riemann_solver
+        !   3. HLLD - a separate module (m_riemann_solver_hypo_hlld), reached by the hypo_nc_dual_pass path below
+        ! HLLD needs its own path because its anchored dual pass produces BOTH the hat_L and hat_R anchored flux
+        ! sets in one fused solve, whose partial RHS are then summed in m_rhs; HLLC/HLL instead add their
+        ! non-conservative contribution within a single-pass solve. See
+        ! misc/dev_notes/Riemann_and_RHS_source_terms_explanations.md (S5.3).
+
         if (hypo_nc_dual_pass) then
             ! Fused dual-pass: one call computes BOTH anchored flux sets (hat_L -> flux_vf via the regular finalize; hat_R into
             ! flux_hatR_rs*, finalized separately via s_finalize_riemann_solver_hatR between the two RHS assemblies).

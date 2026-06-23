@@ -289,6 +289,8 @@ contains
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
 
                                 ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
+                                ! HLLC handles hypoelasticity as inline branches like this one - one of three code
+                                ! shapes (cf. HLL inline, and the separate HLLD dual-pass module). See s_riemann_solver.
                                 if (hypoelasticity) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1

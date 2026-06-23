@@ -160,6 +160,14 @@ Three NC modes for the stress evolution equation, selected by solver:
 | HLLC | — | `hypo_nc_interface` | `nc_iface_vel_n` (`s_compute_hypoelastic_rhs_iface`) |
 | HLLD | — | `hypo_nc_dual_pass` | Built into Riemann flux (no separate RHS routine) |
 
+**Code organization (three shapes).** These three stress treatments also live in three
+different code *shapes*: HLLC and HLL add their hypoelastic handling as inline
+`if (hypoelasticity)` branches inside `s_hllc_riemann_solver` / `s_hll_riemann_solver`;
+HLLD is a separate module `m_riemann_solver_hypo_hlld`, reached via the `hypo_nc_dual_pass`
+path in `s_riemann_solver`. HLLD is separate because its anchored dual pass produces both the
+hat_L and hat_R anchored flux sets in one fused solve (whose partial RHS are summed in
+`m_rhs`), a different control flow from the single-pass inline branches the other two use.
+
 ### 5.4 `use_nc_iface_vel` — allocation condition
 
 ```

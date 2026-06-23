@@ -324,6 +324,8 @@ contains
                             end if
 
                             ! elastic energy update
+                            ! HLL handles hypoelasticity as inline branches like this one - one of three code
+                            ! shapes (cf. HLLC inline, and the separate HLLD dual-pass module). See s_riemann_solver.
                             if (hypoelasticity) then
                                 G_L = 0._wp; G_R = 0._wp
 
