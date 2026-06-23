@@ -333,8 +333,7 @@ contains
     !> Adaptive time stepping routine for subgrid bubbles (See Heirer, E. Hairer S.P.Norsett G. Wanner, Solving Ordinary
     !! Differential Equations I, Chapter II.4)
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, fmass_v, &
-
-        & fmass_g, fbeta_c, fbeta_t, fCson, adap_dt_stop)
+                              & fmass_g, fbeta_c, fbeta_t, fCson, adap_dt_stop)
         $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(inout) :: fR, fV, fpb, fmass_v
@@ -488,8 +487,7 @@ contains
 
     !> Integrate bubble variables over the given time step size, h, using a third-order accurate embedded Runge-Kutta scheme.
     subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, &
-
-        & fmass_v, fmass_g, fbeta_c, fbeta_t, fCson, h, myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+                                 & fmass_v, fmass_g, fbeta_c, fbeta_t, fCson, h, myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
         $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(out)               :: err

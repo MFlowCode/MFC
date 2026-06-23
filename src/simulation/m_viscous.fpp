@@ -470,10 +470,9 @@ contains
     end subroutine s_compute_viscous_stress_cylindrical_boundary
 
     !> Computes viscous terms
-    subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-
-        & qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, &
-            & dq_prim_dz_qp, ix, iy, iz)
+    subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, &
+                             & dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, &
+                             & iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(vector_field), dimension(num_dims), intent(inout) :: qL_prim, qR_prim
@@ -836,9 +835,7 @@ contains
     end subroutine s_get_viscous
 
     !> Reconstruct left and right cell-boundary values of viscous primitive variables
-    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, &
-
-        & vR_prim_vf, ix, iy, iz)
+    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
@@ -921,9 +918,8 @@ contains
     end subroutine s_reconstruct_cell_boundary_values_visc
 
     !> Reconstruct left and right cell-boundary values of viscous primitive variable derivatives
-    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, &
+    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
-        & vR_prim_vf, ix, iy, iz)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(inout) :: vL_x, vR_x
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
