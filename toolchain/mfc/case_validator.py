@@ -246,6 +246,10 @@ class CaseValidator:
     def get(self, key: str, default=None):
         """Get parameter value with default"""
         return self.params.get(key, default)
+    
+    def flag(self, name: str) -> bool:
+        """True if and only if the case sets `name` to "T"."""
+        return self.get(name, "F") == "T"
 
     def is_set(self, key: str) -> bool:
         """Check if parameter is set (not None and present)"""
