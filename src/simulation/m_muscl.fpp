@@ -84,9 +84,7 @@ contains
     end subroutine s_initialize_muscl_module
 
     !> Perform MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables
-    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, &
-
-        & is2_muscl_d, is3_muscl_d)
+    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, is2_muscl_d, is3_muscl_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vR_rs_vf_x
