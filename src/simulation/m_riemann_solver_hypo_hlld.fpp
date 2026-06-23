@@ -128,6 +128,11 @@ contains
                 ! Anchor-cell index pattern: the fused kernel reads both anchors (hat_L: face cell, hat_R: face cell + 1)
                 ! directly from q_prim_vf; loop indices are physical, so the offset rides the stencil index.
                 #:set HATIDX = SF(' + ipass - 1')
+                ! The fused HLLD kernel privatizes ~150 scalars -- a private() list large enough that
+                ! the single clause must be wrapped across continuation lines. The four fragments
+                ! (_hlld_p1..p4) are ONLY for source readability; fypp concatenates them into one
+                ! clause below. That wrapping is FOLD_DIRECTIVE's job -- its within-clause comma split
+                ! exists for exactly this case -- not the fragments'.
                 #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
@@ -378,13 +383,16 @@ contains
                                 ! stress star states)
                                 pTot_star = pTot_L + A_L*(S_M - u_n_L)
 
-                                rhoL_star = rho%L*(S_L - u_n_L)/(S_L - S_M + verysmall)
-                                rhoR_star = rho%R*(S_R - u_n_R)/(S_R - S_M + verysmall)
-                                fac_L = (S_L - u_n_L)/(S_L - S_M + verysmall)
-                                fac_R = (S_R - u_n_R)/(S_R - S_M + verysmall)
+                                ! Signed floor (HLLC-style, see m_riemann_solver_hllc.fpp) on the wave-fan denominators: guards the
+                                ! degenerate S_M -> S_L / S_M -> S_R limit, sign-preserving, and a no-op away from it (|denom| >>
+                                ! verysmall)
+                                rhoL_star = rho%L*(S_L - u_n_L)/min(S_L - S_M, -verysmall)
+                                rhoR_star = rho%R*(S_R - u_n_R)/max(S_R - S_M, verysmall)
+                                fac_L = (S_L - u_n_L)/min(S_L - S_M, -verysmall)
+                                fac_R = (S_R - u_n_R)/max(S_R - S_M, verysmall)
 
-                                E_L_star = (E%L*(u_n_L - S_L) + u_n_L*pTot_L - S_M*pTot_star)/(S_M - S_L)
-                                E_R_star = (E%R*(u_n_R - S_R) + u_n_R*pTot_R - S_M*pTot_star)/(S_M - S_R)
+                                E_L_star = (E%L*(u_n_L - S_L) + u_n_L*pTot_L - S_M*pTot_star)/max(S_M - S_L, verysmall)
+                                E_R_star = (E%R*(u_n_R - S_R) + u_n_R*pTot_R - S_M*pTot_star)/min(S_M - S_R, -verysmall)
 
                                 if (riemann_hypo_ADC) then
                                     ! ADC sensors depend only on the L/R face states: computed once, shared by both anchored solves
@@ -605,11 +613,11 @@ contains
                                                                    & + (u_t2_star*tau_nt2_star - u_t2_R*tau_nt2_R))
                                     end if
 
-                                    alpha1_L_star = (alpha_L(1)*(S_L - u_n_L) - C_hat_1*(S_M - u_n_L))/(S_L - S_M)
-                                    alpha1_R_star = (alpha_R(1)*(S_R - u_n_R) - C_hat_1*(S_M - u_n_R))/(S_R - S_M)
+                                    alpha1_L_star = (alpha_L(1)*(S_L - u_n_L) - C_hat_1*(S_M - u_n_L))/min(S_L - S_M, -verysmall)
+                                    alpha1_R_star = (alpha_R(1)*(S_R - u_n_R) - C_hat_1*(S_M - u_n_R))/max(S_R - S_M, verysmall)
 
-                                    alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - C_hat_2*(S_M - u_n_L))/(S_L - S_M)
-                                    alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - C_hat_2*(S_M - u_n_R))/(S_R - S_M)
+                                    alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - C_hat_2*(S_M - u_n_L))/min(S_L - S_M, -verysmall)
+                                    alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - C_hat_2*(S_M - u_n_R))/max(S_R - S_M, verysmall)
 
                                     ! HLLD flux, register-diet form: pick the wave-fan zone once (it is
                                     ! component-independent), then fold the selected side's star/starstar states into
@@ -876,8 +884,9 @@ contains
                                     else
                                         u_n_face = u_n_R; u_t_face = u_t_R
                                     end if
-                                    ! ADC blend NC face velocities with HLL scalar traces
-                                    if (riemann_hypo_ADC) then
+                                    ! ADC blend NC face velocities with HLL scalar traces (non-degenerate only; the degenerate
+                                    ! branch does not set phi / HLL traces)
+                                    if (riemann_hypo_ADC .and. .not. degenerate) then
                                         u_n_face = u_n_HLL_trace + phi*(u_n_face - u_n_HLL_trace)
                                         u_t_face = u_t_HLL_trace + phi*(u_t_face - u_t_HLL_trace)
                                     end if
@@ -914,8 +923,9 @@ contains
                                                 else
                                                     p_face = pres%R; tau_qq_face = tau_qq_R
                                                 end if
-                                                ! ADC blend face state (HLLD ADC blends all components)
-                                                if (riemann_hypo_ADC) then
+                                                ! ADC blend face state (non-degenerate only; the degenerate branch does not set phi
+                                                ! / HLL traces)
+                                                if (riemann_hypo_ADC .and. .not. degenerate) then
                                                     p_face = p_face_HLL + phi*(p_face - p_face_HLL)
                                                     tau_qq_face = tau_qq_face_HLL + phi*(tau_qq_face - tau_qq_face_HLL)
                                                 end if
