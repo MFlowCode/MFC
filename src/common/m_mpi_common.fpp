@@ -291,7 +291,6 @@ contains
     !! single process, within its assigned section of the computational domain. Finally, note that the global extrema values are
     !! only bookkeept on the rank 0 processor.
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
-
         & Rc_min_glb)
 
         real(wp), intent(in)  :: icfl_max_loc
@@ -1444,7 +1443,6 @@ contains
 
         if (mpi_dir == 1) then
             if (pbc_loc == -1) then  ! PBC at the beginning
-
                 if (bc_x%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
                                       & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -1463,7 +1461,6 @@ contains
             end if
         else if (mpi_dir == 2) then
             if (pbc_loc == -1) then  ! PBC at the beginning
-
                 if (bc_y%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
                                       & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -1482,7 +1479,6 @@ contains
             end if
         else
             if (pbc_loc == -1) then  ! PBC at the beginning
-
                 if (bc_z%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
                                       & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
