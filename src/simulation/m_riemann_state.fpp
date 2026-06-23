@@ -77,7 +77,6 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-
         & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
@@ -99,9 +98,8 @@ contains
     end subroutine s_compute_viscous_source_flux
 
     !> Populate the left and right Riemann state variable buffers based on boundary conditions
-    subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, &
-
-        & dqL_prim_dy_vf, dqL_prim_dz_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
+    subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
+        & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
@@ -197,7 +195,6 @@ contains
             end if
 
             if (bc_x%end == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at end
-
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -295,7 +292,6 @@ contains
             end if
 
             if (bc_y%end == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at end
-
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -387,7 +383,6 @@ contains
             end if
 
             if (bc_z%end == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at end
-
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, sys_size
                     do k = is2%beg, is2%end
@@ -586,7 +581,6 @@ contains
 
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-
         & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_dims), intent(in)    :: velL_vf, velR_vf
@@ -809,7 +803,6 @@ contains
 
     !> Compute Cartesian viscous source flux contributions for momentum and energy
     subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
-
         & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
 
         ! Arguments
