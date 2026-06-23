@@ -199,7 +199,7 @@ contains
                                & idwbuff(3)%beg:idwbuff(3)%end))
                 end do
 
-                if (viscous .or. surface_tension) then
+                if ((viscous .or. surface_tension) .or. igr) then
                     do l = eqn_idx%mom%beg, eqn_idx%E
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                    & idwbuff(3)%beg:idwbuff(3)%end))
@@ -630,7 +630,12 @@ contains
                 end if
 
                 call nvtxStartRange("IGR_SIGMA")
-                call s_igr_sigma(q_cons_vf, rhs_vf, id)
+                call s_igr_sigma(q_cons_vf, flux_src_n(id)%vf, id)
+                call nvtxEndRange
+
+                call nvtxStartRange("RHS-SIGMA")
+                call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                                      & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
                 call nvtxEndRange
             end if
 
@@ -1388,12 +1393,12 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+            if (((surface_tension .or. viscous) .or. igr) .or. chem_params%diffusion) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            if (surface_tension .or. viscous) then
+                            if ((surface_tension .or. viscous) .or. igr) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%mom%beg, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)*(flux_src_n_in(i)%sf(j - 1, k, &
@@ -1473,12 +1478,12 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             else
-                if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+                if (((surface_tension .or. viscous) .or. igr) .or. chem_params%diffusion) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                if (surface_tension .or. viscous) then
+                                if ((surface_tension .or. viscous) .or. igr) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%mom%beg, eqn_idx%E
                                         rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_src_n_in(i)%sf(j, &
@@ -1565,12 +1570,12 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+            if (((surface_tension .or. viscous) .or. igr) .or. chem_params%diffusion) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            if (surface_tension .or. viscous) then
+                            if ((surface_tension .or. viscous) .or. igr) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%mom%beg, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)*(flux_src_n_in(i)%sf(j, k, &
@@ -1871,7 +1876,7 @@ contains
                     @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                 end do
 
-                if (viscous) then
+                if ((viscous .or. surface_tension) .or. igr) then
                     do l = eqn_idx%mom%beg, eqn_idx%E
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do

@@ -403,12 +403,12 @@ contains
     end subroutine s_igr_sigma_x
 
     !> Compute a directional IGR Sigma correction and accumulate into the RHS
-    subroutine s_igr_sigma(q_cons_vf, rhs_vf, idir)
+    subroutine s_igr_sigma(q_cons_vf, flux_src_vf, idir)
 
 #ifdef _CRAYFTN
         ! DIR$ OPTIMIZE (-haggress)
 #endif
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: idir
         real(wp)                                               :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
@@ -427,6 +427,11 @@ contains
                         F_L = 0._wp; F_R = 0._wp
                         vel_L = 0._wp; vel_R = 0._wp
                         rho_L = 0._wp; rho_R = 0._wp
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%E
+                            flux_src_vf(i)%sf(j, k, l) = 0._wp
+                        end do
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
@@ -465,20 +470,8 @@ contains
                         vel_L = vel_L/rho_L
                         vel_R = vel_R/rho_R
 
-                        #:for LR in ['L', 'R']
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                                   & l) + real(0.5_wp*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                                   & l) + real(0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, l) - real(0.5_wp*F_${LR}$*(1._wp/dx(j)), &
-                                   & kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l) - real(0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dx(j)), kind=stp)
-                        #:endfor
+                        flux_src_vf(igr_momxb)%sf(j, k, l) = 0.5_wp*(F_L + F_R)
+                        flux_src_vf(igr_E_idx)%sf(j, k, l) = 0.5_wp*(vel_L*F_L + vel_R*F_R)
                     end do
                 end do
             end do
@@ -492,6 +485,11 @@ contains
                         F_L = 0._wp; F_R = 0._wp
                         vel_L = 0._wp; vel_R = 0._wp
                         rho_L = 0._wp; rho_R = 0._wp
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%E
+                            flux_src_vf(i)%sf(j, k, l) = 0._wp
+                        end do
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
@@ -530,20 +528,8 @@ contains
                         vel_L = vel_L/rho_L
                         vel_R = vel_R/rho_R
 
-                        #:for LR in ['L', 'R']
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_momxb + 1)%sf(j, k + 1, l) = rhs_vf(igr_momxb + 1)%sf(j, k + 1, &
-                                   & l) + real(0.5_wp*F_${LR}$*(1._wp/dy(k + 1)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_E_idx)%sf(j, k + 1, l) = rhs_vf(igr_E_idx)%sf(j, k + 1, &
-                                   & l) + real(0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dy(k + 1)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_momxb + 1)%sf(j, k, l) = rhs_vf(igr_momxb + 1)%sf(j, k, &
-                                   & l) - real(0.5_wp*F_${LR}$*(1._wp/dy(k)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l) - real(0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dy(k)), kind=stp)
-                        #:endfor
+                        flux_src_vf(igr_momxb + 1)%sf(j, k, l) = 0.5_wp*(F_L + F_R)
+                        flux_src_vf(igr_E_idx)%sf(j, k, l) = 0.5_wp*(vel_L*F_L + vel_R*F_R)
                     end do
                 end do
             end do
@@ -557,6 +543,11 @@ contains
                         F_L = 0._wp; F_R = 0._wp
                         vel_L = 0._wp; vel_R = 0._wp
                         rho_L = 0._wp; rho_R = 0._wp
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%E
+                            flux_src_vf(i)%sf(j, k, l) = 0._wp
+                        end do
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
@@ -595,20 +586,8 @@ contains
                         vel_L = vel_L/rho_L
                         vel_R = vel_R/rho_R
 
-                        #:for LR in ['L', 'R']
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_momxb + 2)%sf(j, k, l + 1) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*F_${LR}$*(1._wp/dz(l + 1)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_E_idx)%sf(j, k, l + 1) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l + 1) + real(0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dz(l + 1)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_momxb + 2)%sf(j, k, l) = rhs_vf(igr_momxb + 2)%sf(j, k, &
-                                   & l) - real(0.5_wp*F_${LR}$*(1._wp/dz(l)), kind=stp)
-                            $:GPU_ATOMIC(atomic='update')
-                            rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                                   & l) - real(0.5_wp*vel_${LR}$*F_${LR}$*(1._wp/dz(l)), kind=stp)
-                        #:endfor
+                        flux_src_vf(igr_momxb + 2)%sf(j, k, l) = 0.5_wp*(F_L + F_R)
+                        flux_src_vf(igr_E_idx)%sf(j, k, l) = 0.5_wp*(vel_L*F_L + vel_R*F_R)
                     end do
                 end do
             end do
