@@ -76,7 +76,6 @@ module m_global_parameters
     !> @name Simulation Algorithm Parameters
     !> @{
     ! sys_size, elasticity, b_size, tensor_size, chemistry, eqn_idx: in m_global_parameters_common
-    logical :: hypo_energy_guard  !< guard elastic energy when G near zero (not namelist-exposed in post_process)
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
