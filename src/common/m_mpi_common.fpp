@@ -367,13 +367,13 @@ contains
     !> Reduce a local integer value to its global sum across all MPI ranks.
     impure subroutine s_mpi_allreduce_integer_sum(var_loc, var_glb)
 
-        integer, intent(in)  :: var_loc
-        integer, intent(out) :: var_glb
+        integer(kind=8), intent(in)  :: var_loc
+        integer(kind=8), intent(out) :: var_glb
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
         var_glb = var_loc
 #endif

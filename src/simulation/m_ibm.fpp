@@ -72,8 +72,8 @@ contains
     !> Initializes the values of various IBM variables, such as ghost points and image points.
     impure subroutine s_ibm_setup()
 
-        integer :: i, j, k
-        integer :: max_num_gps
+        integer         :: i, j, k
+        integer(kind=8) :: max_num_gps
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
@@ -119,10 +119,10 @@ contains
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps)
         if (moving_immersed_boundary_flag) then
-            call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
-            max_num_gps = min(max_num_gps*2, (m + 1)*(n + 1)*(p + 1))
+            call s_mpi_allreduce_integer_sum(int(num_gps, 8), max_num_gps)
+            max_num_gps = min(max_num_gps*2_8, int(m + 1, 8)*int(n + 1, 8)*int(p + 1, 8))
         else
-            max_num_gps = num_gps
+            max_num_gps = int(num_gps, 8)
         end if
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
@@ -935,10 +935,10 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, local_force_contribution, &
-                            & cell_volume, local_torque_contribution, dynamic_viscosity, viscous_stress_div, &
-                            & viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces, torques]', &
-                            & copyin='[dynamic_viscosities]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, &
+                            & local_force_contribution, cell_volume, local_torque_contribution, dynamic_viscosity, &
+                            & viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces, &
+                            & torques]', copyin='[dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1071,7 +1071,8 @@ contains
     subroutine s_compute_centroid_offset(ib_marker)
 
         integer, intent(in)      :: ib_marker
-        integer                  :: i, j, k, num_cells, num_cells_local, decoded_gbl_id
+        integer                  :: i, j, k, num_cells_local, decoded_gbl_id
+        integer(kind=8)          :: num_cells
         real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
 
         ! Offset only needs to be computes for specific geometries
@@ -1098,7 +1099,7 @@ contains
             end do
 
             ! reduce the mass contribution over all MPI ranks and compute COM
-            call s_mpi_allreduce_integer_sum(num_cells_local, num_cells)
+            call s_mpi_allreduce_integer_sum(int(num_cells_local, 8), num_cells)
             if (num_cells /= 0) then
                 call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
                 call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
