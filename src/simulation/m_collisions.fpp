@@ -243,7 +243,7 @@ contains
         logical                                           :: already_found
 
         ! Temporary array to hold all detected pairs (with potential duplicates)
-        integer, dimension(2, num_gps) :: raw_pairs
+        integer, dimension(num_gps, 2) :: raw_pairs
         integer                        :: num_raw, local_num_raw
 
         num_raw = 0
