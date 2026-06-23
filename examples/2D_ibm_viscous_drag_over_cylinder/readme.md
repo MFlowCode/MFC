@@ -2,7 +2,7 @@
 
 ## Case Set Up
 
-This case file is an example of the convergence of the viscous drag over the surface of a 2D cylinder. We directly compare this result with the results of Canuto and Taira [1] which are the drag coefficient around a 2D culinder in low-mach viscous flows for varying Mach and Reynolds numbers. The case set up is the exact parameters used by Taira and Colonius [2] with the additional determination of the freestream pressure from the freestream Mach number. A full list of coefficient and flow parameters can be determined in Table 4 of [1]. This case matches their setup for `Re = 40` and `Ma = 0.1`.
+This case file is an example of the convergence of the viscous drag over the surface of a 2D cylinder. We directly compare this result with the results of Canuto and Taira [1] which are the drag coefficient around a 2D cylinder in low-mach viscous flows for varying Mach and Reynolds numbers. The case set up is the exact parameters used by Taira and Colonius [2] with the additional determination of the freestream pressure from the freestream Mach number. A full list of coefficient and flow parameters can be determined in Table 4 of [1]. This case matches their setup for `Re = 40` and `Ma = 0.1`.
 
 ## Numerics
 
@@ -10,7 +10,7 @@ Of particular note in getting the numerics of this case to match closely to thos
 
 1. `"low_mach": 2` enables an improved WENO reconstruction scheme which reduces low-mach disipation from Thornbet et al. [3]
 
-2. `"mp_weno": "F"` disables MPWENO from Dinshaw, Balsara, and Chi-Wang [4] which clamps the WENO flux terms in an attempt to correct in the case of sharp discontinuities. However, these low-Mach low-Renolds cases are very smooth. So the clipping is not needed, but any triggerings could reduce our numeric accuracy. This proved to be a significant improvement.
+2. `"mp_weno": "F"` disables MPWENO from Dinshaw, Balsara, and Shu [4] which clamps the WENO flux terms in an attempt to correct in the case of sharp discontinuities. However, these low-Mach low-Renolds cases are very smooth. So the clipping is not needed, but any triggerings could reduce our numeric accuracy. This proved to be a significant improvement.
 
 ## Result
 
