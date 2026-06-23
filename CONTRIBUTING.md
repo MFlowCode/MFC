@@ -28,3 +28,13 @@ Implementation:
    - ast_analyzer.py
   
 4. I will verify my approach works by calling flag() instead of get() in line 1487 of case_validator.py. If the analyzer correctly returns a value instead of blank, it successfully recognized the flag() function. I will also test the flag() method itself to ensure it correctly returns true or false.
+
+# Implementation Notes
+
+Implementation Progress: I fixed _build_local_param_map() in ast_analyzer.py to recognize flag() method and added a flag() helper method in case_validator.py.
+
+Challenges Faced: The main challenge was understanding the codebase.
+
+Testing Strategy: I tested the flag method itself to ensure it correctly return a bool for all possible params (T, F, null). I also test to see that the old broken code fails and the new code works. 
+
+Branch Link: https://github.com/mansibrahman03/MFlowCode/tree/main
