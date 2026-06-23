@@ -229,7 +229,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
                         isinstance(call.func, ast.Attribute)
                         and isinstance(call.func.value, ast.Name)
                         and call.func.value.id == "self"
-                        and call.func.attr == "get"
+                        and call.func.attr in ("get", "flag")
                         and call.args
                         and isinstance(call.args[0], ast.Constant)
                         and isinstance(call.args[0].value, str)
