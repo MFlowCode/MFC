@@ -585,6 +585,23 @@ class CaseValidator:
         surface_tension = self.get("surface_tension", "F") == "T"
         self.prohibit(riemann_solver == 4 and viscous, "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
         self.prohibit(riemann_solver == 4 and surface_tension, "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
+        cont_damage = self.get("cont_damage", "F") == "T"
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        n = self.get("n", 0)
+        p = self.get("p", 0)
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        num_fluids = self.get("num_fluids")
+        self.prohibit(cyl_coord and p > 0, "3D cylindrical hypoelasticity is not supported")
+        self.prohibit(riemann_solver == 4 and n == 0, "HLLD hypoelasticity requires at least 2D (n > 0)")
+        self.prohibit(riemann_solver == 4 and num_fluids is not None and num_fluids != 2, "HLLD hypoelasticity requires exactly 2 fluid components")
+        self.prohibit(riemann_solver == 4 and cont_damage, "HLLD hypoelasticity does not support continuum damage (the dual-pass does not damage-scale the shear modulus)")
+        self.prohibit(riemann_solver == 4 and bubbles_euler, "HLLD hypoelasticity does not support Euler-Euler bubbles (the dual-pass omits the bubble source and divergence term)")
+        self.prohibit(riemann_solver == 4 and chemistry, "HLLD hypoelasticity does not support chemistry")
+        self.prohibit(
+            riemann_hypo_ADC and (bubbles_euler or surface_tension or chemistry or cont_damage),
+            "riemann_hypo_ADC does not support bubbles, surface tension, chemistry, or continuum damage (the ADC HLL blend omits their flux components)",
+        )
 
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""

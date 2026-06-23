@@ -142,6 +142,11 @@ contains
                    & "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. surface_tension, &
                    & "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. cont_damage, &
+                   & "HLLD hypoelasticity does not support continuum damage (the dual-pass does not damage-scale the shear modulus)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. bubbles_euler, &
+                   & "HLLD hypoelasticity does not support Euler-Euler bubbles (the dual-pass omits the bubble source and divergence term)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. chemistry, "HLLD hypoelasticity does not support chemistry")
         @:PROHIBIT(riemann_solver == 4 .and. (.not. mhd) .and. (.not. hypoelasticity), &
                    & "HLLD is only available for MHD or hypoelasticity")
 
@@ -149,6 +154,8 @@ contains
         @:PROHIBIT(riemann_hypo_ADC .and. .not. hypoelasticity, "riemann_hypo_ADC requires hypoelasticity = T")
         @:PROHIBIT(riemann_hypo_ADC .and. riemann_solver /= 2 .and. riemann_solver /= 4, &
                    & "riemann_hypo_ADC only applies to hypo HLLC/HLLD")
+        @:PROHIBIT(riemann_hypo_ADC .and. (bubbles_euler .or. surface_tension .or. chemistry .or. cont_damage), &
+                   & "riemann_hypo_ADC does not support bubbles, surface tension, chemistry, or continuum damage (the ADC HLL blend omits their flux components)")
         @:PROHIBIT(hypo_hll_interface_rhs .and. .not. hypoelasticity, "hypo_hll_interface_rhs requires hypoelasticity = T")
         @:PROHIBIT(hypo_hll_interface_rhs .and. riemann_solver /= 1, &
                    & "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
