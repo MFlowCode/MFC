@@ -138,7 +138,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. (.not. igr)) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -187,7 +187,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. (.not. igr)) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -238,7 +238,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. (.not. igr)) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -285,7 +285,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. (.not. igr)) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do l = isz%beg, isz%end
@@ -334,7 +334,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. (.not. igr)) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do k = isy%beg, isy%end
@@ -377,7 +377,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (viscous) then
+                if (viscous .and. (.not. igr)) then
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         do k = isy%beg, isy%end
@@ -424,7 +424,7 @@ contains
         ! Reshaping Inputted Data in x-direction
 
         if (norm_dir == 1) then
-            if (viscous .or. (surface_tension)) then
+            if ((viscous .and. (.not. igr)) .or. surface_tension) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -470,7 +470,7 @@ contains
 
             ! Reshaping Inputted Data in y-direction
         else if (norm_dir == 2) then
-            if (viscous .or. (surface_tension)) then
+            if ((viscous .and. (.not. igr)) .or. surface_tension) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -516,7 +516,7 @@ contains
 
             ! Reshaping Inputted Data in z-direction
         else
-            if (viscous .or. (surface_tension)) then
+            if ((viscous .and. (.not. igr)) .or. surface_tension) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do j = is1%beg, is1%end

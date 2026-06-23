@@ -216,7 +216,7 @@ contains
                                 qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                             end do
 
-                            if (viscous) then
+                            if (viscous .and. (.not. igr)) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_L(i) = dflt_real
@@ -603,7 +603,7 @@ contains
             end if
         #:endfor
 
-        if (viscous) then
+        if (viscous .and. .not. igr) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, &
                                 & vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
             do l = isz%beg, isz%end

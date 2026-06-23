@@ -284,7 +284,7 @@ contains
         @:ALLOCATE(qR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
                    & 1:sys_size))
 
-        if (.not. viscous) then
+        if (.not. viscous .or. igr) then
             do i = 1, num_dims
                 @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:sys_size))
                 @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:sys_size))
@@ -306,7 +306,7 @@ contains
             end do
         end if
 
-        if (viscous) then
+        if (viscous .and. (.not. igr)) then
             @:ALLOCATE(tau_Re_vf(1:sys_size))
             do i = 1, num_dims
                 @:ALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
@@ -589,7 +589,7 @@ contains
                 end if
 
                 call nvtxStartRange("IGR-RECONSTRUCTION")
-                call s_igr_reconstruct_cell_boundary_values(q_cons_vf, qL_rsx_vf, qR_rsx_vf, id)
+                call s_igr_reconstruct_cell_boundary_values(q_cons_vf, qL_rsx_vf, qR_rsx_vf, flux_src_n(id)%vf, id)
                 call nvtxEndRange
 
                 ! Configuring Coordinate Direction Indexes
@@ -618,7 +618,10 @@ contains
                 call nvtxEndRange
 
                 if (viscous) then
-                    call s_igr_add_viscous_rhs(q_cons_vf, rhs_vf, id)
+                    call nvtxStartRange("RHS-ADDITIONAL-PHYSICS")
+                    call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                                          & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
+                    call nvtxEndRange
                 end if
 
                 if (id == 1) then
@@ -1755,7 +1758,41 @@ contains
 
         @:DEALLOCATE(qL_rsx_vf, qR_rsx_vf)
 
-        if (viscous) then
+        if (.not. viscous .or. igr) then
+            do i = num_dims, 1, -1
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                    @:DEALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf)
+                    @:DEALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf)
+                    @:DEALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf)
+                    @:DEALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf)
+                    @:DEALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf)
+                    @:DEALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf)
+                end do
+                @:DEALLOCATE(dqL_prim_dx_n(i)%vf)
+                @:DEALLOCATE(dqL_prim_dy_n(i)%vf)
+                @:DEALLOCATE(dqL_prim_dz_n(i)%vf)
+                @:DEALLOCATE(dqR_prim_dx_n(i)%vf)
+                @:DEALLOCATE(dqR_prim_dy_n(i)%vf)
+                @:DEALLOCATE(dqR_prim_dz_n(i)%vf)
+            end do
+        end if
+
+        if (.not. viscous .or. igr) then
+            do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                @:DEALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf)
+                if (n > 0) then
+                    @:DEALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf)
+                    if (p > 0) then
+                        @:DEALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf)
+                    end if
+                end if
+            end do
+            @:DEALLOCATE(dq_prim_dx_qp(1)%vf)
+            @:DEALLOCATE(dq_prim_dy_qp(1)%vf)
+            @:DEALLOCATE(dq_prim_dz_qp(1)%vf)
+        end if
+
+        if (viscous .and. (.not. igr)) then
             do l = eqn_idx%mom%beg, eqn_idx%mom%end
                 @:DEALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf)
             end do
