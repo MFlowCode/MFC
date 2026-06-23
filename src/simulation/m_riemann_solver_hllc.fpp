@@ -117,17 +117,16 @@ contains
         real(wp) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_star
         real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(wp) :: flux_ene_e
-        real(wp) :: flux_tau_L, flux_tau_R
         real(wp) :: zcoef, pcorr                !< low Mach number correction
         integer  :: Re_max, i, j, k, l, q       !< Generic loop iterators
         integer  :: Re_size_loc1, Re_size_loc2  !< host copy of Re_size; amdflang reads the declare-target original stale cross-TU
 
         ! HLLC star-state helpers
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20) :: U_L, U_R, U_star_L, U_star_R
+            real(wp), dimension(20) :: U_L, U_R
             real(wp), dimension(20) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
         #:else
-            real(wp), dimension(sys_size) :: U_L, U_R, U_star_L, U_star_R
+            real(wp), dimension(sys_size) :: U_L, U_R
             real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
         #:endif
         real(wp) :: u_n_HLLC, u_t_HLLC, u_t2_HLLC
@@ -138,15 +137,10 @@ contains
         real(wp) :: tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R
         real(wp) :: tau_qq_L, tau_qq_R
         real(wp) :: p_face, tau_qq_face
-        real(wp) :: A_L, A_R, denom_A, denom_L, denom_R
-        real(wp) :: fac_L, fac_R
-        real(wp) :: rho_L_star, rho_R_star
+        real(wp) :: A_L, A_R, denom_A
         real(wp) :: u_t_star, tau_nt_star
         real(wp) :: u_t2_star, tau_nt2_star
         real(wp) :: pres_tot_star
-        real(wp) :: E_L_star, E_R_star
-        real(wp) :: S_Mid
-        integer  :: mom_n, mom_t1, mom_t2
         integer  :: idx_phys
 
         ! ADC (HLL -> HLLC)
@@ -196,8 +190,8 @@ contains
                                         & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
                                         & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
                                         & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, flux_tau_L, flux_tau_R, &
-                                        & alpha_rho_L, alpha_rho_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, alpha_rho_L, alpha_rho_R]', &
+                                        & firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -1222,8 +1216,8 @@ contains
                 else
                     ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection Private list split across
                     ! _hllc_p1/p2/p3 for Fypp line-length limits
-                    #:set _hllc_p1 = '[Re_max, i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, ptilde_L, ptilde_R, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, flux_ene_e, flux_tau_L, flux_tau_R,'
-                    #:set _hllc_p2 = 'U_L, U_R, U_star_L, U_star_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, denom_L, denom_R, fac_L, fac_R, rho_L_star, rho_R_star, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star, E_L_star, E_R_star, S_Mid, mom_n, mom_t1, mom_t2,'
+                    #:set _hllc_p1 = '[Re_max, i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, ptilde_L, ptilde_R, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, flux_ene_e,'
+                    #:set _hllc_p2 = 'U_L, U_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star,'
                     #:set _hllc_p3 = 'F_HLL, u_n_HLL_trace, u_t_HLL_trace, u_t2_HLL_trace, p_face_HLL, tau_qq_face_HLL, tau_nn_HLL, phi, Sigma_L, Sigma_R, dSigma, Sigma_ref, a_L_ref, a_R_ref, a_ref, du_t, dtau_nt, du_t2, dtau_nt2, sensor_ptot, sensor_vt, sensor_tnt, sensor_combined, idx_phys]'
                     $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_p1 + _hllc_p2 + _hllc_p3, copyin='[is1, is2, is3]', &
                                         & firstprivate='[Re_size_loc1, Re_size_loc2]')

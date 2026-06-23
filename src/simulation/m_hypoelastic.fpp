@@ -346,7 +346,7 @@ contains
         real(wp)                                               :: rho_K, G_K
         real(wp)                                               :: trace, shear, shear2, diag, diag_z, offdiag, cross1, cross2
         real(wp)                                               :: txx, txy, tyy, txz, tyz, tzz
-        integer                                                :: i, k, l, q, r
+        integer                                                :: i, k, l, q
         integer                                                :: ndirs
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3

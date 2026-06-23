@@ -44,37 +44,6 @@
     $:clause_str
 #:enddef
 
-#! Split a long directive string into continuation lines for Fortran compilers
-#! that enforce the 132-character free-form line limit.
-#! continuation_prefix: '!$acc& ' for OpenACC, '!$omp& ' for OpenMP
-#:def SPLIT_LONG_DIRECTIVE(directive, continuation_prefix)
-    #:set _MAX = 120
-    #:if len(directive) <= _MAX
-        $:directive
-    #:else
-        #! Split at commas, respecting parentheses depth
-        #:set _parts = []
-        #:set _cur = ''
-        #:set _depth = 0
-        #:for ch in directive
-            #:if ch == '('
-                #:set _depth = _depth + 1
-            #:elif ch == ')'
-                #:set _depth = _depth - 1
-            #:endif
-            #:set _cur = _cur + ch
-            #:if ch == ',' and _depth <= 1 and len(_cur) >= _MAX - 20
-                #:set _ = _parts.append(_cur)
-                #:set _cur = ''
-            #:endif
-        #:endfor
-        #:if _cur
-            #:set _ = _parts.append(_cur)
-        #:endif
-        $:(' &\n' + continuation_prefix).join(_parts)
-    #:endif
-#:enddef
-
 #:def GEN_PARENTHESES_CLAUSE(clause_name, clause_str)
     #:assert isinstance(clause_name, str)
     #:if clause_str is not None
@@ -150,14 +119,11 @@
 #:enddef
 
 #:def FOLD_DIRECTIVE(directive, sentinel, width=200)
-    #! Fold a long GPU directive across free-form continuation lines so it stays
-    #! under nvfortran's ~1000-char source-line limit. Breaks at whole-clause
-    #! boundaries (clause(args) groups and bare keywords), repeating the sentinel
-    #! (e.g. '!$acc&') on each continuation -- which fypp's --no-folding cannot do
-    #! because its generic folder omits the sentinel. A single clause itself wider
-    #! than `width` (e.g. the hypoelastic HLLD kernel's private() list of ~150
-    #! names) is further split at its top-level commas, so even that clause stays
-    #! within the limit instead of emitting one over-long line.
+    #! Fold a long GPU directive across free-form continuation lines so it stays under
+    #! nvfortran's ~1000-char source-line limit, breaking at whole-clause boundaries
+    #! (clause(args) groups and bare keywords) and repeating the sentinel (e.g. '!$acc&') on
+    #! each continuation -- which fypp's --no-folding cannot do (its generic folder omits the
+    #! sentinel). A single clause wider than `width` is split at its top-level commas too.
     #:set _clauses = re.findall(r'\w+\([^)]*\)|\S+', directive)
     #:set _toks = []
     #:for _cl in _clauses

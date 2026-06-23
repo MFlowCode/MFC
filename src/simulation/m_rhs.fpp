@@ -875,8 +875,8 @@ contains
     end subroutine s_compute_rhs
 
     !> Reconstructs the left/right Riemann states (cell-boundary values) for one sweep direction into the module face buffers
-    !! (qL/qR_rs*_vf and, for WENO-reconstructed viscous fluxes, dqL/dqR_rs*_vf). Depends only on q_prim_qp, so for dual-pass HLLD
-    !! it runs once per RK stage (first pass) and the second pass reuses the buffers.
+    !! (qL/qR_rs*_vf and, for WENO-reconstructed viscous fluxes, dqL/dqR_rs*_vf). Depends only on q_prim_qp, so it runs once per
+    !! sweep direction; both anchored passes of the fused dual-pass HLLD solve in that direction reuse these buffers.
     subroutine s_reconstruct_riemann_states(id)
 
         integer, intent(in) :: id
