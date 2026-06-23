@@ -548,7 +548,7 @@ contains
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
 
-        ! TODO: IGR viscous terms are still evaluated by native IGR logic.
+        ! TODO: IGR viscous terms are still evaluated by legacy IGR logic.
         if ((viscous .and. .not. igr)) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, dqR_prim_dx_n, &
@@ -572,69 +572,9 @@ contains
         ! Loop over coordinate directions for dimensional splitting
         do id = 1, num_dims
             if (igr) then
-                if (id == 1) then
-                    $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                do i = 1, sys_size
-                                    rhs_vf(i)%sf(j, k, l) = 0._stp
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
-
+                ! Reconstruct IGR face states and, when viscous, fill IGR viscous source fluxes.
                 call nvtxStartRange("IGR-RECONSTRUCTION")
                 call s_igr_reconstruct_cell_boundary_values(q_cons_vf, qL_rsx_vf, qR_rsx_vf, flux_src_n(id)%vf, id)
-                call nvtxEndRange
-
-                ! Configuring Coordinate Direction Indexes
-                if (id == 1) then
-                    irx%beg = -1; iry%beg = 0; irz%beg = 0
-                else if (id == 2) then
-                    irx%beg = 0; iry%beg = -1; irz%beg = 0
-                else
-                    irx%beg = 0; iry%beg = 0; irz%beg = -1
-                end if
-                irx%end = m; iry%end = n; irz%end = p
-
-                call nvtxStartRange("IGR-LF-RIEMANN")
-                call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
-                                      & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
-                                      & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
-                                      & flux_gsrc_n(id)%vf, id, irx, iry, irz)
-                call nvtxEndRange
-
-                ! Match legacy IGR alpha-flux/source semantics before shared RHS accumulation.
-                call s_igr_correct_lf_fluxes(qR_rsx_vf, qL_rsx_vf, flux_n(id)%vf, flux_src_n(id)%vf, id)
-
-                ! Additional physics and source terms RHS addition for advection source
-                call nvtxStartRange("RHS-ADVECTION-SRC")
-                call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
-                call nvtxEndRange
-
-                if (viscous) then
-                    call nvtxStartRange("RHS-ADDITIONAL-PHYSICS")
-                    call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
-                                                          & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
-                    call nvtxEndRange
-                end if
-
-                if (id == 1) then
-                    call nvtxStartRange("IGR_Jacobi")
-                    call s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
-                    call nvtxEndRange
-                end if
-
-                call nvtxStartRange("IGR_SIGMA")
-                call s_igr_sigma(q_cons_vf, flux_src_n(id)%vf, id)
-                call nvtxEndRange
-
-                call nvtxStartRange("RHS-SIGMA")
-                call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
-                                                      & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
                 call nvtxEndRange
             end if
 
@@ -734,80 +674,102 @@ contains
                 end if
 
                 call nvtxEndRange
+            end if
 
-                ! Configuring Coordinate Direction Indexes
-                if (id == 1) then
-                    irx%beg = -1; iry%beg = 0; irz%beg = 0
-                else if (id == 2) then
-                    irx%beg = 0; iry%beg = -1; irz%beg = 0
-                else
-                    irx%beg = 0; iry%beg = 0; irz%beg = -1
-                end if
-                irx%end = m; iry%end = n; irz%end = p
+            ! Configuring Coordinate Direction Indexes
+            if (id == 1) then
+                irx%beg = -1; iry%beg = 0; irz%beg = 0
+            else if (id == 2) then
+                irx%beg = 0; iry%beg = -1; irz%beg = 0
+            else
+                irx%beg = 0; iry%beg = 0; irz%beg = -1
+            end if
+            irx%end = m; iry%end = n; irz%end = p
 
-                ! Computing Riemann Solver Flux and Source Flux
-                call nvtxStartRange("RHS-RIEMANN-SOLVER")
-                call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
-                                      & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
-                                      & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
-                                      & flux_gsrc_n(id)%vf, id, irx, iry, irz)
+            ! Computing Riemann Solver Flux and Source Flux
+            call nvtxStartRange("RHS-RIEMANN-SOLVER")
+            call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, qR_prim(id)%vf, &
+                                  & qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, &
+                                  & q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, flux_gsrc_n(id)%vf, id, irx, iry, irz)
+            call nvtxEndRange
+
+            ! Match legacy IGR alpha-flux/source semantics before shared RHS accumulation.
+            if (igr) then
+                call s_igr_correct_lf_fluxes(qR_rsx_vf, qL_rsx_vf, flux_n(id)%vf, flux_src_n(id)%vf, id)
+            end if
+
+            ! Additional physics and source terms RHS addition for advection source
+            call nvtxStartRange("RHS-ADVECTION-SRC")
+            call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
+            call nvtxEndRange
+
+            ! RHS additions for hypoelasticity
+            call nvtxStartRange("RHS-HYPOELASTICITY")
+            if (hypoelasticity) call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
+            call nvtxEndRange
+
+            ! RHS for diffusion
+            if (chemistry .and. chem_params%diffusion) then
+                call nvtxStartRange("RHS-CHEM-DIFFUSION")
+                call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
                 call nvtxEndRange
+            end if
 
-                ! Additional physics and source terms RHS addition for advection source
-                call nvtxStartRange("RHS-ADVECTION-SRC")
-                call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
+            ! Viscous stress contribution to RHS
+            if (viscous .or. surface_tension .or. chem_params%diffusion) then
+                call nvtxStartRange("RHS-ADD-PHYSICS")
+                call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                                      & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
                 call nvtxEndRange
+            end if
 
-                ! RHS additions for hypoelasticity
-                call nvtxStartRange("RHS-HYPOELASTICITY")
-                if (hypoelasticity) call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
+            ! Bubble dynamics source terms
+            if (bubbles_euler) then
+                call nvtxStartRange("RHS-BUBBLES-COMPUTE")
+                call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
                 call nvtxEndRange
+            end if
 
-                ! RHS for diffusion
-                if (chemistry .and. chem_params%diffusion) then
-                    call nvtxStartRange("RHS-CHEM-DIFFUSION")
-                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
-                    call nvtxEndRange
-                end if
+            ! RHS additions for qbmm bubbles
+            if (qbmm) then
+                call nvtxStartRange("RHS-QBMM")
+                call s_compute_qbmm_rhs(id, q_cons_qp%vf, q_prim_qp%vf, rhs_vf, flux_n(id)%vf, pb_in, rhs_pb)
+                call nvtxEndRange
+            end if
+            ! END: Additional physics and source terms
 
-                ! Viscous stress contribution to RHS
-                if (viscous .or. surface_tension .or. chem_params%diffusion) then
-                    call nvtxStartRange("RHS-ADD-PHYSICS")
-                    call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
-                                                          & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
-                    call nvtxEndRange
-                end if
-
-                ! Bubble dynamics source terms
-                if (bubbles_euler) then
-                    call nvtxStartRange("RHS-BUBBLES-COMPUTE")
-                    call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
-                    call nvtxEndRange
-                end if
-
-                ! RHS additions for qbmm bubbles
-                if (qbmm) then
-                    call nvtxStartRange("RHS-QBMM")
-                    call s_compute_qbmm_rhs(id, q_cons_qp%vf, q_prim_qp%vf, rhs_vf, flux_n(id)%vf, pb_in, rhs_pb)
-                    call nvtxEndRange
-                end if
-                ! END: Additional physics and source terms
-
-                if (hyper_cleaning) then
-                    $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(eqn_idx%psi)%sf(j, k, l) = rhs_vf(eqn_idx%psi)%sf(j, k, l) - q_prim_vf(eqn_idx%psi)%sf(j, &
-                                       & k, l)/hyper_cleaning_tau
-                            end do
+            if (hyper_cleaning) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(eqn_idx%psi)%sf(j, k, l) = rhs_vf(eqn_idx%psi)%sf(j, k, l) - q_prim_vf(eqn_idx%psi)%sf(j, k, &
+                                   & l)/hyper_cleaning_tau
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+            ! END: Additional physics and source terms
+
+            ! RHS additions for IGR
+            if (igr) then
+                if (id == 1) then
+                    call nvtxStartRange("IGR_Jacobi")
+                    call s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
+                    call nvtxEndRange
                 end if
 
-                ! END: Additional physics and source terms
+                call nvtxStartRange("IGR_SIGMA")
+                call s_igr_sigma(q_cons_vf, flux_src_n(id)%vf, id)
+                call nvtxEndRange
+
+                call nvtxStartRange("RHS-SIGMA")
+                call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                                      & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
+                call nvtxEndRange
             end if
+            ! END: Additional physics and source terms
         end do
         ! END: Dimensional Splitting Loop
 
@@ -865,7 +827,7 @@ contains
         ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
-            ! TODO: igr divergence point no probing option for igr in the normal path
+            ! IGR keeps q_prim_vf on its native path until primitive workspace semantics are fully integrated.
             if (.not. igr) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
                 do i = 1, sys_size
