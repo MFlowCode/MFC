@@ -375,19 +375,10 @@ contains
         @:ALLOCATE(rhs_vf(1:sys_size))
         @:PREFER_GPU(rhs_vf)
 
-        ! TODO: second igr divergence point
-        if (igr) then
-            do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
-                @:ACC_SETUP_SFs(rhs_vf(i))
-                @:PREFER_GPU(rhs_vf(i)%sf)
-            end do
-        else
-            do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
-                @:ACC_SETUP_SFs(rhs_vf(i))
-            end do
-        end if
+        do i = 1, sys_size
+            @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(rhs_vf(i))
+        end do
 
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

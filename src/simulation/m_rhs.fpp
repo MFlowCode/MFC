@@ -570,14 +570,13 @@ contains
         end if
 
         ! Loop over coordinate directions for dimensional splitting
-        ! TODO: IGR rhs_vf keeps stencil padding required by native IGR correction terms.
         do id = 1, num_dims
             if (igr) then
                 if (id == 1) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
-                    do l = -1, p + 1
-                        do k = -1, n + 1
-                            do j = -1, m + 1
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
                                 do i = 1, sys_size
                                     rhs_vf(i)%sf(j, k, l) = 0._stp
                                 end do
