@@ -161,6 +161,8 @@ contains
                    & "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
         @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. .not. hypoelasticity, &
                    & "alt_soundspeed with HLLD requires hypoelasticity = T")
+        @:PROHIBIT(hypoelasticity .and. alt_soundspeed .and. num_fluids /= 2, &
+                   & "hypoelastic alt_soundspeed requires exactly 2 fluid components")
         @:PROHIBIT(hypoelasticity .and. igr, "Hypoelasticity is not compatible with IGR")
 
     end subroutine s_check_inputs_hypo_branch

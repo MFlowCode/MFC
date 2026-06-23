@@ -592,9 +592,11 @@ class CaseValidator:
         p = self.get("p", 0)
         cyl_coord = self.get("cyl_coord", "F") == "T"
         num_fluids = self.get("num_fluids")
+        alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
         self.prohibit(cyl_coord and p > 0, "3D cylindrical hypoelasticity is not supported")
         self.prohibit(riemann_solver == 4 and n == 0, "HLLD hypoelasticity requires at least 2D (n > 0)")
         self.prohibit(riemann_solver == 4 and num_fluids is not None and num_fluids != 2, "HLLD hypoelasticity requires exactly 2 fluid components")
+        self.prohibit(alt_soundspeed and num_fluids is not None and num_fluids != 2, "hypoelastic alt_soundspeed requires exactly 2 fluid components")
         self.prohibit(riemann_solver == 4 and cont_damage, "HLLD hypoelasticity does not support continuum damage (the dual-pass does not damage-scale the shear modulus)")
         self.prohibit(riemann_solver == 4 and bubbles_euler, "HLLD hypoelasticity does not support Euler-Euler bubbles (the dual-pass omits the bubble source and divergence term)")
         self.prohibit(riemann_solver == 4 and chemistry, "HLLD hypoelasticity does not support chemistry")
