@@ -165,7 +165,7 @@ module m_global_parameters
     integer, dimension(3)  :: dir_idx
     real(wp), dimension(3) :: dir_flg
     integer, dimension(3)  :: dir_idx_tau  !< (nn, nt, nt2) stress indices for wave speeds and momentum flux
-    integer, dimension(6)  :: stress_perm  !< Full tensor permutation: local basis → physical storage index
+    integer, dimension(6)  :: stress_perm  !< Full tensor permutation: local basis -> physical storage index
     !> @}
 
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
