@@ -83,6 +83,7 @@ print(
             # Set IB to True and add 1 patch
             "ib": "T",
             "num_ibs": 1,
+            "fd_order": 2,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
