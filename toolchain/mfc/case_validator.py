@@ -605,6 +605,8 @@ class CaseValidator:
 
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
 
+        fd_order = self.get("fd_order")
+        self.prohibit(ib and fd_order is None, "fd_order must be specified for ib")
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
         has_particle_clouds = num_particle_clouds > 0 and any((self.get(f"particle_cloud({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_clouds + 1))
         self.prohibit(

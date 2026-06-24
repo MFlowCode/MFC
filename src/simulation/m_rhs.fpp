@@ -1347,7 +1347,6 @@ contains
         integer                                                :: i, j, k, l
 
         if (idir == 1) then  ! x-direction
-
             if (surface_tension) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
