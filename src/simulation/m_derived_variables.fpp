@@ -508,7 +508,7 @@ contains
             end if
         end if
 
-        if (probe_wrt) then
+        if (probe_wrt .or. ib) then
             @:DEALLOCATE(accel_mag)
             @:DEALLOCATE(x_accel)
             if (n > 0) then
