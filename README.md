@@ -53,12 +53,13 @@
 
 ## Why MFC?
 
-- **Exascale GPU performance** - Ideal weak scaling to 43K+ GPUs. Near compute-roofline behavior. [Compile-time case optimization](https://mflowcode.github.io/documentation/running.html) for up to 10x speedup.
-- **Compact codebase** - ~40K lines of Fortran with [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming. Small enough to read and modify; powerful enough for [Gordon Bell](https://awards.acm.org/bell).
+- **Performant at exascale** - Ideal weak scaling to 43K+ GPUs. Near compute-roofline behavior. [Compile-time case optimization](https://mflowcode.github.io/documentation/running.html) for ~10x speedup.
+- **Compact code** - ~40K lines of Fortran with [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming. Small enough to read and modify; powerful enough for [Gordon Bell](https://awards.acm.org/bell).
 - **Native multi-phase** - 4, 5, and 6-equation models, phase change, surface tension, bubble dynamics, and Euler-Lagrange particle tracking, all built in.
 - **Portable** - NVIDIA and AMD GPUs, CPUs, laptops to exascale. Docker, Codespaces, Homebrew, and [16+ HPC system templates](https://mflowcode.github.io/documentation/running.html).
 - **Tested** - 500+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) across GNU, Intel, Cray, and NVIDIA compilers.
-- **Truly open** - MIT license, active [Slack](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw), and responsive development team.
+- **Easy to shape** - If MFC is missing something you need, do not get stuck maintaining an old private copy. Open a PR and make your feature, fix, machine support, or workflow part of the maintained codebase.
+- **Open** - MIT license, active [Slack](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw), and a responsive development team.
 
 > If MFC is useful to your work, please ⭐ star the repo and [cite it](#citation)!
 
@@ -115,7 +116,7 @@ Run `./mfc.sh <command> --help` for detailed options, or see the [full documenta
 ## Is this _really_ exascale?
 
 MFC weak scales to the full machines on [El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan) (MI300A), [Frontier](https://www.olcf.ornl.gov/frontier/) (MI250X), and [Alps](https://www.cscs.ch/computers/alps) (GH200) with near-ideal efficiency.
-MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
+MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
 
 <p align="center">
     <picture>
@@ -263,12 +264,12 @@ MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
 Federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE) and National Nuclear Security Administration (NNSA), and the National Science Foundation (NSF).
 
-MFC computations have used many supercomputing systems. A partial list is below
+MFC computations have been run on many supercomputing systems. A partial list is below
   * OLCF Frontier and Summit, and testbeds Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson).
   * LLNL El Capitan, Tuolumne, and Lassen; El Capitan early access system Tioga.
   * NCSA Delta and DeltaAI, PSC Bridges(1/2), SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
   * DOD systems Blueback, Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program.
-  * Sandia National Labs systems Doom and Attaway, and testbed systems Weaver and Vortex.
+  * Sandia National Labs systems, Doom and Attaway, and testbed systems, Weaver and Vortex.
 
 ---
 
