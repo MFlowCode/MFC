@@ -661,7 +661,6 @@ contains
     !! @param t_step   current time step
     !! @param src      optional scalar_field to slice into out%q_sf
     !! @param x_beg, x_end, y_beg, y_end, z_beg, z_end  output region bounds (required if src present)
-
     impure subroutine s_write_field(varname, t_step, src, x_beg, x_end, y_beg, y_end, z_beg, z_end)
 
         character(LEN=name_len), intent(inout)   :: varname
