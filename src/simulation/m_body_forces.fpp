@@ -11,6 +11,7 @@ module m_body_forces
     use m_global_parameters
     use m_variables_conversion
     use m_mpi_proxy
+    use m_helper, only: s_prng, f_unit_vector, f_cross
     use m_nvtx
 
     ! $:USE_GPU_MODULE()
@@ -44,10 +45,10 @@ contains
     !> broadcasts to all MPI ranks and copies to GPU.
     impure subroutine s_initialize_body_forces_module
 
-        integer              :: s, m_wave, m_global
-        integer              :: n_seed
-        integer, allocatable :: seed_arr(:)
-        real(wp)             :: rn1, rn2, kz, r_xy, k_mag
+        integer                :: s, m_wave, m_global
+        integer                :: seed
+        real(wp)               :: rn1, rn2, k_mag
+        real(wp), dimension(3) :: khat, xi, sig, sig_tmp
 
         if (n > 0) then
             if (p > 0) then
@@ -81,16 +82,12 @@ contains
             @:ALLOCATE(synthetic_k_z(1:num_synthetic_wave_numbers))
         end if
 
-        ! Generate random wave vectors and phases on rank 0, then broadcast
+        ! Generate random wave vectors and phases on rank 0, then broadcast. Uses the
+        ! compiler-independent LCG (s_prng) so the forcing is reproducible across
+        ! compilers; the 3-D polarization is built perpendicular to k via a double
+        ! cross product, guaranteeing a divergence-free (solenoidal) mode.
         if (proc_rank == 0) then
-            call random_seed(size=n_seed)
-            allocate (seed_arr(n_seed))
-            ! Vary each element so the seed state is not degenerate
-            do s = 1, n_seed
-                seed_arr(s) = synth_seed + (s - 1)*1000003
-            end do
-            call random_seed(put=seed_arr)
-            deallocate (seed_arr)
+            seed = synth_seed
 
             m_global = 0
             do s = 1, synth_n_shells
@@ -105,41 +102,36 @@ contains
                         synthetic_ey(m_global) = 0._wp
                         synthetic_ez(m_global) = 0._wp
                     else if (num_dims == 2) then
-                        ! Azimuthal angle theta uniform on [0, 2*pi)
-                        call random_number(rn1)
+                        ! In-plane wavevector at azimuth theta; solenoidal dir perpendicular to k
+                        call s_prng(rn1, seed)
                         rn1 = rn1*2._wp*pi
                         synthetic_k_x(m_global) = k_mag*cos(rn1)
                         synthetic_k_y(m_global) = k_mag*sin(rn1)
-                        ! Solenoidal direction perpendicular to k: (-sin theta, cos theta)
                         synthetic_ex(m_global) = -sin(rn1)
                         synthetic_ey(m_global) = cos(rn1)
                         synthetic_ez(m_global) = 0._wp
                     else
-                        ! Uniform on sphere: azimuthal phi, cos(polar) uniform in [-1,1]
-                        call random_number(rn1)
-                        call random_number(rn2)
-                        rn1 = rn1*2._wp*pi
-                        kz = 2._wp*rn2 - 1._wp
-                        r_xy = sqrt(max(0._wp, 1._wp - kz*kz))
-                        synthetic_k_x(m_global) = k_mag*r_xy*cos(rn1)
-                        synthetic_k_y(m_global) = k_mag*r_xy*sin(rn1)
-                        synthetic_k_z(m_global) = k_mag*kz
-                        ! Solenoidal direction: random unit vector perpendicular to k.
-                        ! Build an orthonormal frame: k_hat x (0,0,1) if not degenerate.
-                        if (abs(kz) < 0.9_wp) then
-                            ! Cross k_hat with z-hat -> (-k_y, k_x, 0) / r_xy
-                            synthetic_ex(m_global) = -sin(rn1)
-                            synthetic_ey(m_global) = cos(rn1)
-                            synthetic_ez(m_global) = 0._wp
-                        else
-                            ! k nearly parallel to z; cross with x-hat instead k_hat x x_hat = (0, -kz, k_y)/norm  (normalised)
-                            synthetic_ex(m_global) = 0._wp
-                            synthetic_ey(m_global) = -kz/max(sqrt(kz*kz + (k_mag*sin(rn1))**2), 1e-10_wp)
-                            synthetic_ez(m_global) = (k_mag*sin(rn1))/max(sqrt(kz*kz + (k_mag*sin(rn1))**2), 1e-10_wp)
-                        end if
+                        ! Random unit wavevector uniform on the sphere
+                        call s_prng(rn1, seed)
+                        call s_prng(rn2, seed)
+                        khat = f_unit_vector(rn1, rn2)
+                        ! Random reference vector projected perpendicular to k by a double
+                        ! cross product: sig = khat x (xi x khat) is a unit vector with k.sig = 0
+                        call s_prng(rn1, seed)
+                        call s_prng(rn2, seed)
+                        xi = f_unit_vector(rn1, rn2)
+                        sig_tmp = f_cross(xi, khat)
+                        sig_tmp = sig_tmp/max(sqrt(sum(sig_tmp**2._wp)), 1.e-10_wp)
+                        sig = f_cross(khat, sig_tmp)
+                        synthetic_k_x(m_global) = k_mag*khat(1)
+                        synthetic_k_y(m_global) = k_mag*khat(2)
+                        synthetic_k_z(m_global) = k_mag*khat(3)
+                        synthetic_ex(m_global) = sig(1)
+                        synthetic_ey(m_global) = sig(2)
+                        synthetic_ez(m_global) = sig(3)
                     end if
 
-                    call random_number(rn1)
+                    call s_prng(rn1, seed)
                     synthetic_phase(m_global) = rn1*2._wp*pi
 
                     synthetic_amp(m_global) = synth_amp_shell(s)
@@ -293,7 +285,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: i, j, k, l, n_mode, turb_idx
+        integer                                                :: i, j, k, l, n_mode, turb_idx, iq
         real(wp)                                               :: pos_x, pos_y, pos_z
         real(wp)                                               :: gauss_env, G_norm, f_scale
         real(wp)                                               :: a_m, phase_arg
@@ -323,7 +315,7 @@ contains
         adv_offset = synth_U_inf*mytime
 
         do turb_idx = 1, num_turbulent_sources
-            $:GPU_PARALLEL_LOOP(private='[j, k, l, n_mode, pos_x, pos_y, pos_z, gauss_env, G_norm, f_scale, a_m, phase_arg, &
+            $:GPU_PARALLEL_LOOP(private='[j, k, l, n_mode, iq, pos_x, pos_y, pos_z, gauss_env, G_norm, f_scale, a_m, phase_arg, &
                                 & force_x, force_y, force_z, rho_local, u_local_x, u_local_y, u_local_z, in_box]', collapse=3)
             do l = 0, p
                 do k = 0, n
@@ -364,7 +356,11 @@ contains
                             end do
 
                             ! Scale: rho * (U_inf/L_x) * G_norm
-                            rho_local = q_prim_vf(eqn_idx%cont%beg)%sf(j, k, l)
+                            ! Mixture density = sum of all partial densities (continuity components)
+                            rho_local = 0._wp
+                            do iq = eqn_idx%cont%beg, eqn_idx%cont%end
+                                rho_local = rho_local + q_prim_vf(iq)%sf(j, k, l)
+                            end do
                             f_scale = rho_local*(synth_U_inf/synth_L(turb_idx, 1))*G_norm
 
                             force_x = force_x*f_scale
