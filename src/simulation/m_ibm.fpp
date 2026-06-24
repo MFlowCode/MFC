@@ -281,11 +281,13 @@ contains
 
                 if (patch_ib(patch_id)%moving_ibm /= 0) then
                     ! get the vector that points from the centroid to the ghost
-                    radial_vector(1) = physical_loc(1) - (patch_ib(ib_idx)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg))
-                    radial_vector(2) = physical_loc(2) - (patch_ib(ib_idx)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg))
+                    radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
+                                  & wp)*(x_domain%end - x_domain%beg))
+                    radial_vector(2) = physical_loc(2) - (patch_ib(patch_id)%y_centroid + real(ghost_points(i)%y_periodicity, &
+                                  & wp)*(y_domain%end - y_domain%beg))
                     radial_vector(3) = 0._wp
-                    if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(ib_idx)%z_centroid + real(zp, &
-                        & wp)*(z_domain%end - z_domain%beg))
+                    if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
+                        & + real(ghost_points(i)%z_periodicity, wp)*(z_domain%end - z_domain%beg))
                 end if
 
                 ! Calculate velocity of ghost cell
@@ -909,10 +911,10 @@ contains
     !> Compute pressure and viscous forces and torques on immersed bodies via volume integration
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        type(scalar_field), dimension(1:sys_size), intent(in)          :: q_prim_vf
+        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
         type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
-        integer                                                        :: i, j, k, l, encoded_ib_idx, ib_idx, ib_idx_temp, fluid_idx
-        real(wp), dimension(num_ibs, 3)                                :: forces, torques
+        integer :: i, j, k, l, encoded_ib_idx, xp, yp, zp, ib_idx, ib_idx_temp, fluid_idx
+        real(wp), dimension(num_ibs, 3) :: forces, torques
         ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3,1:3) :: viscous_stress
         real(wp), dimension(1:3)     :: local_force_contribution, radial_vector, local_torque_contribution
