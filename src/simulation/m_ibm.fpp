@@ -1252,7 +1252,7 @@ contains
                 recv_torques_snap = 0._wp
                 tag = 300
 
-                do k = 1, 2*ib_neighborhood_radius
+                do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
                     pack_pos = 0
                     $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
@@ -1300,7 +1300,7 @@ contains
                 send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
                 recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
 
-                do k = 1, 2*ib_neighborhood_radius
+                do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     pack_pos = 0
                     $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
                     do i = 1, num_ibs
