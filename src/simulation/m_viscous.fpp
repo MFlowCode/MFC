@@ -470,10 +470,9 @@ contains
     end subroutine s_compute_viscous_stress_cylindrical_boundary
 
     !> Computes viscous terms
-    subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-
-        & qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, &
-            & dq_prim_dz_qp, ix, iy, iz)
+    subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, &
+                             & dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, ix, &
+                             & iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(vector_field), dimension(num_dims), intent(inout) :: qL_prim, qR_prim
@@ -836,9 +835,7 @@ contains
     end subroutine s_get_viscous
 
     !> Reconstruct left and right cell-boundary values of viscous primitive variables
-    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, &
-
-        & vR_prim_vf, ix, iy, iz)
+    subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
@@ -921,9 +918,8 @@ contains
     end subroutine s_reconstruct_cell_boundary_values_visc
 
     !> Reconstruct left and right cell-boundary values of viscous primitive variable derivatives
-    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, &
+    subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vR_x, norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
-        & vR_prim_vf, ix, iy, iz)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(inout) :: vL_x, vR_x
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
@@ -1263,34 +1259,28 @@ contains
         real(wp), intent(in)                                  :: dynamic_viscosity
         integer, intent(in)                                   :: i, j, k
         real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
-        real(wp), dimension(1:3)                              :: dx
         real(wp)                                              :: divergence
         real(wp)                                              :: mu_eff, gamma_dot_c
         integer                                               :: l, q  !< iterators
         integer                                               :: fl
+        integer                                               :: r
 
-        ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
+        ! zero the viscous stress and collection of velocity derivatives
         viscous_stress_tensor = 0._wp
         velocity_gradient_tensor = 0._wp
-        dx = 0._wp
 
-        ! get the change in x used in the finite difference equation
-        dx(1) = 0.5_wp*(x_cc(i + 1) - x_cc(i - 1))
-        dx(2) = 0.5_wp*(y_cc(j + 1) - y_cc(j - 1))
-        if (num_dims == 3) then
-            dx(3) = 0.5_wp*(z_cc(k + 1) - z_cc(k - 1))
-        end if
-
-        ! compute the velocity gradient tensor
+        ! compute the velocity gradient tensor with the same fd_order-respecting stencil as the stress-divergence outer derivative
         do l = 1, num_dims
-            velocity_gradient_tensor(l, 1) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + 1, j, &
-                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i - 1, j, k))/(2._wp*dx(1))
-            velocity_gradient_tensor(l, 2) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + 1, &
-                                     & k) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j - 1, k))/(2._wp*dx(2))
-            if (num_dims == 3) then
-                velocity_gradient_tensor(l, 3) = (q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
-                                         & k + 1) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k - 1))/(2._wp*dx(3))
-            end if
+            do r = -fd_number, fd_number
+                velocity_gradient_tensor(l, 1) = velocity_gradient_tensor(l, 1) + fd_coeff_x(r, &
+                                         & i)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + r, j, k)
+                velocity_gradient_tensor(l, 2) = velocity_gradient_tensor(l, 2) + fd_coeff_y(r, &
+                                         & j)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + r, k)
+                if (num_dims == 3) then
+                    velocity_gradient_tensor(l, 3) = velocity_gradient_tensor(l, 3) + fd_coeff_z(r, &
+                                             & k)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k + r)
+                end if
+            end do
         end do
 
         ! Non-Newtonian: per-sample mixture viscosity from the local strain rate, so each

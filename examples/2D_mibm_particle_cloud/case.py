@@ -71,6 +71,7 @@ print(
             "mp_weno": "T",
             "riemann_solver": "hllc",
             "wave_speeds": "direct",
+            "fd_order": 2,
             "bc_x%beg": -17,
             "bc_x%end": -8,
             "bc_y%beg": -15,
