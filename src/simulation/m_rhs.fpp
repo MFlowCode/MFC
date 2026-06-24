@@ -226,21 +226,21 @@ contains
 
                     ! flux_src at adv%beg:adv%end is overloaded by design:
                     !
-                    ! adv_src_alpha_iface: flux_src(adv%beg:adv%end) = per-fluid interface alpha values. Each fluid gets a separate
-                    ! 3D array.
+                    ! adv_src_mode_alpha_iface: flux_src(adv%beg:adv%end) = per-fluid interface alpha values. Each fluid
+                    ! gets a separate 3D array.
                     !
-                    ! adv_src_vel_iface: flux_src(adv%beg) = one shared face-normal interface velocity. adv%beg+1:adv%end are
-                    ! pointer-aliased to adv%beg so loops over adv%beg:adv%end can keep fluid indexing while still reading one
-                    ! value. Saves (num_fluids - 1) fields.
+                    ! adv_src_mode_vel_iface: flux_src(adv%beg) = one shared face-normal interface velocity.
+                    ! adv%beg+1:adv%end are pointer-aliased to adv%beg so loops over adv%beg:adv%end can keep fluid indexing
+                    ! while still reading one value. Saves (num_fluids - 1) fields.
                     !
-                    ! adv_src_none: flux_src(adv%beg:adv%end) = zeros. No separate NC advection source term. Allocated for
-                    ! structural consistency with s_finalize_riemann_solver.
+                    ! adv_src_mode_none: flux_src(adv%beg:adv%end) = zeros. No separate NC advection source term. Allocated
+                    ! for structural consistency with s_finalize_riemann_solver.
                     @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
 
-                    if (adv_src_alpha_iface .or. adv_src_none) then
-                        ! Alpha-interface needs separate per-fluid arrays. HLLD (adv_src_none) allocates for structural consistency
-                        ! with s_finalize_riemann_solver.
+                    if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
+                        ! Alpha-interface needs separate per-fluid arrays. HLLD (adv_src_mode_none) allocates for structural
+                        ! consistency with s_finalize_riemann_solver.
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
@@ -268,7 +268,7 @@ contains
                 @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
 
                 if (i == 1) then
-                    if (adv_src_vel_iface) then
+                    if (adv_src_mode == adv_src_mode_vel_iface) then
                         ! u-interface: flux_src(adv%beg) holds one shared face-normal velocity. Pointer-alias adv%beg+1:adv%end to
                         ! the same memory so loops over adv%beg:adv%end can keep fluid indexing while still reading one value. This
                         ! saves (num_fluids - 1) 3D field allocations.
@@ -1368,15 +1368,15 @@ contains
 
             ! Three mutually exclusive modes for the NC volume fraction advection source term:
 
-            !   adv_src_alpha_iface - HLL Method 1: flux_src carries per-fluid interface alpha_k
+            !   adv_src_mode_alpha_iface - HLL Method 1: flux_src carries per-fluid interface alpha_k
 
-            !   adv_src_vel_iface   - HLLC, HLL Method 2, Exact, LF: flux_src carries shared face-normal velocity
+            !   adv_src_mode_vel_iface   - HLLC, HLL Method 2, Exact, LF: flux_src carries shared face-normal velocity
 
-            !   adv_src_none        - HLLD: MHD has no volume fractions; hypo uses dual-pass Riemann flux
+            !   adv_src_mode_none        - HLLD: MHD has no volume fractions; hypo uses dual-pass Riemann flux
 
             select case (current_idir)
             case (1)  ! x-direction
-                if (adv_src_alpha_iface) then
+                if (adv_src_mode == adv_src_mode_alpha_iface) then
                     ! Alpha-interface: flux_src(j_adv) supplies interface alpha_k. RHS applies velocity * d(alpha_k)/dx.
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1410,7 +1410,7 @@ contains
                         end do; end do; end do
                         $:END_GPU_PARALLEL_LOOP()
                     end if
-                else if (adv_src_vel_iface) then
+                else if (adv_src_mode == adv_src_mode_vel_iface) then
                     ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dx.
                     $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1442,7 +1442,7 @@ contains
                     end if
                 end if
             case (2)  ! y-direction
-                if (adv_src_alpha_iface) then
+                if (adv_src_mode == adv_src_mode_alpha_iface) then
                     ! Alpha-interface: flux_src(j_adv) supplies interface alpha_k. RHS applies velocity * d(alpha_k)/dy.
                     $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1489,7 +1489,7 @@ contains
                             $:END_GPU_PARALLEL_LOOP()
                         end if
                     end if
-                else if (adv_src_vel_iface) then
+                else if (adv_src_mode == adv_src_mode_vel_iface) then
                     ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dy.
                     $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1536,7 +1536,7 @@ contains
                 end if
             case (3)  ! z-direction
                 if (grid_geometry == 3) then
-                    if (adv_src_alpha_iface) then
+                    if (adv_src_mode == adv_src_mode_alpha_iface) then
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
@@ -1569,7 +1569,7 @@ contains
                             end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else if (adv_src_vel_iface) then
+                    else if (adv_src_mode == adv_src_mode_vel_iface) then
                         ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dz.
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
@@ -1601,7 +1601,7 @@ contains
                         end if
                     end if
                 else  ! non-cylindrical z-direction
-                    if (adv_src_alpha_iface) then
+                    if (adv_src_mode == adv_src_mode_alpha_iface) then
                         ! Alpha-interface: flux_src(j_adv) supplies interface alpha_k. RHS applies velocity * d(alpha_k)/dz.
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
@@ -1635,7 +1635,7 @@ contains
                             end do; end do; end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
-                    else if (adv_src_vel_iface) then
+                    else if (adv_src_mode == adv_src_mode_vel_iface) then
                         ! u-interface: flux_src(adv%beg) supplies one shared face-normal velocity. RHS applies alpha_k * du/dz.
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
@@ -2160,7 +2160,7 @@ contains
                         @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
                     end if
 
-                    if (adv_src_alpha_iface .or. adv_src_none) then
+                    if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do

@@ -22,11 +22,11 @@ the Riemann solver must export the face quantity needed to discretize it. The
 code selects exactly one of three modes at initialization
 (`m_global_parameters.fpp`):
 
-| Flag | True when | What the solver exports in `flux_src_rs(adv*)` |
+| Mode value | Selected when | What the solver exports in `flux_src_rs(adv*)` |
 |------|-----------|------------------------------------------------|
-| `adv_src_alpha_iface` | HLL Method 1 (`riemann_solver == 1, .not. hll_u_interface`) | Per-fluid interface $\Psi_{\alpha_k}$ in slots `adv%beg:adv%end` |
-| `adv_src_vel_iface` | HLL Method 2, HLLC, Exact, LF | Shared face-normal $\Psi_u$ in slot `adv%beg` only |
-| `adv_src_none` | HLLD (`riemann_solver == 4`) | Zeros (all NC terms handled inside the solver) |
+| `adv_src_mode_alpha_iface` | HLL Method 1 (`riemann_solver == 1, .not. hll_u_interface`) | Per-fluid interface $\Psi_{\alpha_k}$ in slots `adv%beg:adv%end` |
+| `adv_src_mode_vel_iface` | HLL Method 2, HLLC, Exact, LF | Shared face-normal $\Psi_u$ in slot `adv%beg` only |
+| `adv_src_mode_none` | HLLD (`riemann_solver == 4`) | Zeros (all NC terms handled inside the solver) |
 
 Notes:
 
@@ -62,12 +62,12 @@ built directly in physical space by `s_compute_viscous_source_flux` and
 
 ### 3.1 `flux_src_rsx_vf` overloading
 
-| Slot | `adv_src_alpha_iface` (HLL M1) | `adv_src_vel_iface` (HLL M2 / HLLC) | `adv_src_none` (HLLD) | Finalized? |
+| Slot | `adv_src_mode_alpha_iface` (HLL M1) | `adv_src_mode_vel_iface` (HLL M2 / HLLC) | `adv_src_mode_none` (HLLD) | Finalized? |
 |------|------|------|------|------|
 | `adv%beg` | First $\Psi_\alpha$ | $\Psi_u$ | 0 | Always |
-| `adv%beg+1:adv%end` | Remaining $\Psi_\alpha$ per fluid | Unused | 0 | Only when `adv_src_alpha_iface .or. adv_src_none` |
+| `adv%beg+1:adv%end` | Remaining $\Psi_\alpha$ per fluid | Unused | 0 | Only when `adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none` |
 
-When `adv_src_vel_iface` is active, `flux_src_n(dir)%vf(adv%beg+1:adv%end)` are
+When `adv_src_mode_vel_iface` is active, `flux_src_n(dir)%vf(adv%beg+1:adv%end)` are
 pointer-aliased to `flux_src_n(dir)%vf(adv%beg)` in `m_rhs.fpp`, so the RHS loop
 reads the same shared velocity for all alpha equations without branching.
 
@@ -95,7 +95,7 @@ NC source terms need:
    from the x-sweep). `flux_src` only exports one scalar per face, so the
    full velocity vector goes here.
 
-2. **HLL M1 + K*div(u)** (`adv_src_alpha_iface .and. alt_soundspeed`):
+2. **HLL M1 + K*div(u)** (`adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed`):
    `flux_src(adv*)` is already occupied by per-fluid $\Psi_\alpha$, so the
    velocity trace needed for K*div(u) must go in a separate channel.
 
@@ -118,7 +118,7 @@ The x-sweep buffer exists but is not exported.
 |--------|-------------|-----------|
 | `flux_rs(1:sys_size)` | `flux_vf(1:sys_size)` | Always |
 | `flux_src_rs(adv%beg)` | `flux_src_vf(adv%beg)` | Always |
-| `flux_src_rs(adv%beg+1:adv%end)` | `flux_src_vf(adv%beg+1:adv%end)` | `adv_src_alpha_iface .or. adv_src_none` |
+| `flux_src_rs(adv%beg+1:adv%end)` | `flux_src_vf(adv%beg+1:adv%end)` | `adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none` |
 | `nc_iface_vel_rs` | `nc_iface_vel_vf` | `use_nc_iface_vel` |
 | `flux_gsrc_rs` | `flux_gsrc_vf` | `cyl_coord` (y-sweep) or `grid_geometry == 3` (z-sweep) |
 | `vel_src_rs` | — | Never finalized |
@@ -127,13 +127,13 @@ The x-sweep buffer exists but is not exported.
 
 ### 5.1 Advection source (`s_compute_advection_source_term`)
 
-Three branches, selected by the `adv_src_*` flag:
+Three branches, selected by `adv_src_mode`:
 
 | Branch | Face quantity read | RHS formula per $\alpha_k$ | K*div(u) velocity source |
 |--------|-------------------|---------------------------|--------------------------|
-| `adv_src_alpha_iface` | `flux_src_n(dir)%vf(j_adv)` = per-fluid $\Psi_{\alpha_k}$ | $u_\text{cell} \cdot \Delta\Psi_\alpha / \Delta x$ | `nc_iface_vel_n(dir)%vf(1)` |
-| `adv_src_vel_iface` | `flux_src_n(dir)%vf(adv\%beg)` = shared $\Psi_u$ | $\alpha_k \cdot \Delta\Psi_u / \Delta x$ | Same `flux_src_n` slot (already $\Psi_u$) |
-| `adv_src_none` | — | Skipped (HLLD handles internally) | — |
+| `adv_src_mode_alpha_iface` | `flux_src_n(dir)%vf(j_adv)` = per-fluid $\Psi_{\alpha_k}$ | $u_\text{cell} \cdot \Delta\Psi_\alpha / \Delta x$ | `nc_iface_vel_n(dir)%vf(1)` |
+| `adv_src_mode_vel_iface` | `flux_src_n(dir)%vf(adv\%beg)` = shared $\Psi_u$ | $\alpha_k \cdot \Delta\Psi_u / \Delta x$ | Same `flux_src_n` slot (already $\Psi_u$) |
+| `adv_src_mode_none` | — | Skipped (HLLD handles internally) | — |
 
 The K*div(u) correction (active when `alt_soundspeed = T`) adds
 $\pm K \cdot \Delta\Psi_u / \Delta x$ to `adv%beg` / `adv%end`.
@@ -147,7 +147,7 @@ this channel is built in physical space by the viscous/capillary source builders
 
 Surface tension color-function transport also reads `flux_src_n(dir)%vf(adv%beg)`,
 which requires $\Psi_u$ in that slot — so it is only meaningful with
-`adv_src_vel_iface`.
+`adv_src_mode_vel_iface`.
 
 ### 5.3 Hypoelastic stress source
 
@@ -173,11 +173,11 @@ hat_L and hat_R anchored flux sets in one fused solve (whose partial RHS are sum
 ```
 use_nc_iface_vel = hypo_nc_interface
                    .or. (hypo_nc_dual_pass .and. grid_geometry == 2)
-                   .or. (adv_src_alpha_iface .and. alt_soundspeed)
+                   .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
 ```
 
 | Case | Why `nc_iface_vel` is needed |
 |------|------------------------------|
 | `hypo_nc_interface` | Stress RHS needs all velocity components ($\partial_x v$, $\partial_y u$, etc.) |
 | `hypo_nc_dual_pass .and. grid_geometry == 2` | HLLD axisym geometric source needs exported face velocities |
-| `adv_src_alpha_iface .and. alt_soundspeed` | `flux_src` is occupied by $\Psi_\alpha$; K*div(u) needs $\Psi_u$ elsewhere |
+| `adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed` | `flux_src` is occupied by $\Psi_\alpha$; K*div(u) needs $\Psi_u$ elsewhere |

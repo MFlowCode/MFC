@@ -67,11 +67,14 @@ module m_global_parameters
     logical :: hypo_nc_finite_diff
     logical :: hypo_nc_interface
     logical :: hypo_nc_dual_pass
-    logical :: adv_src_alpha_iface  !< flux_src exports per-fluid interface alpha
-    logical :: adv_src_vel_iface    !< flux_src exports shared face-normal interface velocity
-    logical :: adv_src_none         !< flux_src exports no NC advection quantity
-    logical :: use_nc_iface_vel     !< nc_iface_vel exports interface velocities needed outside flux_src
-    integer :: hyper_model          !< hyperelasticity solver algorithm
+    !> NC volume-fraction advection export mode; exactly one value, derived from riemann_solver + hll_u_interface.
+    integer, parameter :: adv_src_mode_unset = 0        !< not yet derived
+    integer, parameter :: adv_src_mode_alpha_iface = 1  !< flux_src exports per-fluid interface alpha
+    integer, parameter :: adv_src_mode_vel_iface = 2    !< flux_src exports shared face-normal interface velocity
+    integer, parameter :: adv_src_mode_none = 3         !< flux_src exports no NC advection quantity
+    integer            :: adv_src_mode
+    logical            :: use_nc_iface_vel              !< nc_iface_vel exports interface velocities needed outside flux_src
+    integer            :: hyper_model                   !< hyperelasticity solver algorithm
     ! elasticity, chemistry: in m_global_parameters_common
     logical                :: shear_stress  !< Shear stresses
     logical                :: bulk_stress   !< Bulk stresses
@@ -350,9 +353,7 @@ contains
         hypo_nc_finite_diff = .false.
         hypo_nc_interface = .false.
         hypo_nc_dual_pass = .false.
-        adv_src_alpha_iface = .false.
-        adv_src_vel_iface = .false.
-        adv_src_none = .false.
+        adv_src_mode = adv_src_mode_unset
         use_nc_iface_vel = .false.
         low_Mach = 0
         wave_speeds = dflt_int
@@ -868,17 +869,18 @@ contains
             end if
         end if
 
-        ! flux_src: choose exactly one export mode for the NC volume fraction advection term. Developer note: keep exactly one of
-        ! adv_src_alpha_iface, adv_src_vel_iface, and adv_src_none true whenever this logic is modified.
-        !
-        ! HLL Method 1 (alpha-interface): flux_src(adv_idx%beg:adv_idx%end) carries interface alpha_k per fluid.
-        adv_src_alpha_iface = (riemann_solver == 1 .and. .not. hll_u_interface)
-        ! HLLC, HLL Method 2 (u-interface), exact, LF: flux_src(adv_idx%beg) carries one shared face-normal interface velocity.
-        adv_src_vel_iface = (riemann_solver == 1 .and. hll_u_interface) .or. riemann_solver == 2 .or. riemann_solver == 3 &
-                             & .or. riemann_solver == 5
-        ! MHD HLLD: single species, so there is no volume fraction to advect. Hypo HLLD: the dual-pass formulation keeps all NC
-        ! terms inside the Riemann flux.
-        adv_src_none = (riemann_solver == 4)
+        ! flux_src: choose exactly one export mode (adv_src_mode) for the NC volume fraction advection term.
+        if (riemann_solver == 1 .and. .not. hll_u_interface) then
+            ! HLL Method 1 (alpha-interface): flux_src(adv_idx%beg:adv_idx%end) carries interface alpha_k per fluid.
+            adv_src_mode = adv_src_mode_alpha_iface
+        else if ((riemann_solver == 1 .and. hll_u_interface) .or. riemann_solver == 2 .or. riemann_solver == 3 &
+                 & .or. riemann_solver == 5) then
+            ! HLLC, HLL Method 2 (u-interface), exact, LF: flux_src(adv_idx%beg) carries one shared face-normal velocity.
+            adv_src_mode = adv_src_mode_vel_iface
+        else if (riemann_solver == 4) then
+            ! MHD HLLD: single species, no volume fraction to advect. Hypo HLLD: the dual-pass keeps all NC terms in the flux.
+            adv_src_mode = adv_src_mode_none
+        end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
                                            & bubbles_lagrange, m, n, p, num_dims, igr, ib)
@@ -902,11 +904,11 @@ contains
         ! nc_iface_vel: use_nc_iface_vel enables a second export channel. Use it when the Riemann solver must expose interface
         ! velocities beyond what flux_src already provides:
         !
-        ! 1. adv_src_alpha_iface + alt_soundspeed: face-normal velocity only, for the KdivU correction (flux_src already carries
-        ! alpha in this mode) 2. hypo_nc_interface: all components for the hypoelastic velocity-gradient tensor 3. hypo_nc_dual_pass
-        ! + axisym: normal + tangential velocity for the axisymmetric geometry correction
-        use_nc_iface_vel = hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) .or. (adv_src_alpha_iface &
-            & .and. alt_soundspeed)
+        ! 1. adv_src_mode_alpha_iface + alt_soundspeed: face-normal velocity only, for the KdivU correction (flux_src already
+        ! carries alpha in this mode) 2. hypo_nc_interface: all components for the hypoelastic velocity-gradient tensor
+        ! 3. hypo_nc_dual_pass + axisym: normal + tangential velocity for the axisymmetric geometry correction
+        use_nc_iface_vel = hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
+            & .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
 
         $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
         $:GPU_UPDATE(device='[b_size, tensor_size]')
