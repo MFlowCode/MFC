@@ -13,7 +13,7 @@ module m_precision_select
     implicit none
 
     ! Define the available precision types
-    integer, parameter :: half_precision = 2  !< selected_real_kind(3, 4)
+    integer, parameter :: half_precision = 2  !< hardcoded half-precision kind (approx. selected_real_kind(3, 4))
     integer, parameter :: single_precision = selected_real_kind(6, 37)
     integer, parameter :: double_precision = selected_real_kind(15, 307)
     integer, parameter :: hp = half_precision

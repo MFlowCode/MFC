@@ -303,8 +303,8 @@ module m_derived_types
         real(wp), dimension(6) :: tau_e  !< Elastic stresses added to primitive variables if hypoelasticity = True
         real(wp) :: R0  !< Bubble size
         real(wp) :: V0  !< Bubble velocity
-        real(wp) :: p0  !< Bubble size
-        real(wp) :: m0  !< Bubble velocity
+        real(wp) :: p0  !< Bubble pressure
+        real(wp) :: m0  !< Bubble mass
         integer :: hcid  !< Hardcoded initial condition ID
         real(wp) :: cf_val  !< Color function value
         real(wp) :: Y(1:num_species)  !< Species mass fractions

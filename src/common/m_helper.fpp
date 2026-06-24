@@ -521,7 +521,7 @@ contains
     elemental function double_factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18)  !< 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  !< kind holding >= 18 decimal digits (64-bit integer)
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 
@@ -533,7 +533,7 @@ contains
     elemental function factorial(n_in) result(R_result)
 
         integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18)  !< 18 bytes for 64-bit integer
+        integer, parameter       :: int64_kind = selected_int_kind(18)  !< kind holding >= 18 decimal digits (64-bit integer)
         integer(kind=int64_kind) :: R_result
         integer                  :: i
 

@@ -136,7 +136,7 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
-                ! 6-EQUATION MODEL WITH HLLC HLLC star-state flux with contact wave speed s_S
+                ! 6-EQUATION MODEL WITH HLLC star-state flux with contact wave speed s_S
                 if (model_eqns == model_eqns_6eq) then
                     ! 6-equation model (model_eqns=3): separate phasic internal energies
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, &

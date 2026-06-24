@@ -39,7 +39,7 @@ contains
     impure subroutine s_initialize_mpi_common_module
 
 #ifdef MFC_MPI
-        ! Allocating buff_send/recv and. Please note that for the sake of simplicity, both variables are provided sufficient storage
+        ! Allocating buff_send/recv. Please note that for the sake of simplicity, both variables are provided sufficient storage
         ! to hold the largest buffer in the computational domain.
 
         if (qbmm .and. .not. polytropic) then
@@ -426,7 +426,6 @@ contains
     end subroutine s_mpi_reduce_min
 
     !> Reduce a 2-element variable to its global maximum value with the owning processor rank (MPI_MAXLOC).
-    !> Reduce a local value to its global maximum with location (rank) across all ranks
     impure subroutine s_mpi_reduce_maxloc(var_loc)
 
         real(wp), dimension(2), intent(inout) :: var_loc

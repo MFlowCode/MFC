@@ -45,7 +45,7 @@ module m_data_output
     !> @{
     real(wp) :: icfl_max  !< ICFL criterion maximum
     real(wp) :: vcfl_max  !< VCFL criterion maximum
-    real(wp) :: Rc_min    !< Rc criterion maximum
+    real(wp) :: Rc_min    !< Rc criterion minimum
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds

@@ -4,8 +4,8 @@
 
 #:include 'macros.fpp'
 
-!> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the
-!! flow state
+!> @brief Immersed-boundary collision handling: detects IB-IB and IB-wall contacts and applies soft-sphere collision forces and
+!! torques
 module m_collisions
 
     use m_derived_types      !< Definitions of the derived types
