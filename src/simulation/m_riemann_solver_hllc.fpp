@@ -1918,7 +1918,7 @@ contains
                                         else
                                             p_face = pres_tot_star + tau_nn_R; tau_qq_face = tau_qq_R
                                         end if
-                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = flux_rsx_vf(j, k, l, &
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = flux_rsx_vf(${SF('')}$, &
                                                          & eqn_idx%cont%end + dir_idx(1)) - p_face + tau_qq_face
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
