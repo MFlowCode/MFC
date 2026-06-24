@@ -410,7 +410,7 @@ contains
             j = neighbor_list(l, 2)
             k = neighbor_list(l, 3)
 
-            if (p_send_counts(i, j, k) > 0 .and. abs(i) + abs(j) + abs(k) /= 0 .and. abs(i) + abs(j) + abs(k) /= 0) then
+            if (p_send_counts(i, j, k) > 0 .and. abs(i) + abs(j) + abs(k) /= 0) then
                 partner = neighbor_ranks(i, j, k)
                 send_tag = neighbor_tag(-i, -j, -k)
 

@@ -1312,7 +1312,7 @@ class CaseValidator:
         self.prohibit(thermal is not None and thermal != 3, "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
         self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
-        self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, or 2")
+        self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, 2, or 3")
         self.prohibit(charNz <= 0 and p == 0, "lag_params%charNz must be positive for 2D bubbles_lagrange")
         self.prohibit(charWidth <= 0 and p == 0, "lag_params%charwidth must be positive for 2D bubbles_lagrange")
         self.prohibit(fd_order == 0 and vel_model > 0, "Non-zero lag_params%vel_model requires fd_order to be set")
