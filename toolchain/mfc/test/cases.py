@@ -1885,6 +1885,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
                 # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
                 "2D_ibm_poiseuille_nn",
+                # Synthetic turbulence seeds Fortran's intrinsic random_number, whose
+                # PRNG sequence differs across compilers (gfortran/Intel/NVHPC). The same
+                # synth_seed therefore yields different forcing fields per lane, so a single
+                # committed golden cannot match across CI compilers. Excluded until the
+                # feature uses a compiler-independent RNG.
+                "2D_synthetic_turbulence",
             ]
             if path in casesToSkip:
                 continue
