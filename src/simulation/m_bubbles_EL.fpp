@@ -928,7 +928,6 @@ contains
             !> Getting p_cell in terms of only the current cell by interpolation
 
             if (fd_order == 2) then  ! Bilinear interpolation
-
                 if (p > 0) then
                     vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
                 else
