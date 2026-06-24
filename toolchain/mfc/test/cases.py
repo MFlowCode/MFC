@@ -685,6 +685,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                                     "fluid_pp(1)%nn": 0.5,
                                     "ib": "T",
                                     "num_ibs": 1,
+                                    "fd_order": 2,
                                     "ib_state_wrt": "T",
                                     "patch_ib(1)%geometry": 3,
                                     "patch_ib(1)%x_centroid": 0.5,
@@ -883,6 +884,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "p": 49,
                         "ib": "T",
                         "num_ibs": 1,
+                        "fd_order": 2,
                         "patch_ib(1)%geometry": 8,
                         "patch_ib(1)%x_centroid": 0.5,
                         "patch_ib(1)%y_centroid": 0.5,
@@ -908,6 +910,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 {
                     "ib": "T",
                     "num_ibs": 1,
+                    "fd_order": 2,
                     "patch_ib(1)%x_centroid": 0.5,
                     "patch_ib(1)%y_centroid": 0.5,
                     "patch_ib(1)%radius": 0.1,
@@ -994,6 +997,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     {
                         "ib": "T",
                         "num_ibs": 1,
+                        "fd_order": 2,
                         "bc_x%beg": -1,
                         "bc_x%end": -1,
                         "bc_y%beg": -1,
@@ -1015,6 +1019,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         common_mods = {
             "t_step_stop": Nt,
             "t_step_save": Nt,
+            "fd_order": 2,
             "num_stl_models": 1,
             "patch_ib(1)%model_id": 1,
             "stl_models(1)%model_scale(1)": 5.0,

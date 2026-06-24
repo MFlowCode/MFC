@@ -136,11 +136,13 @@ contains
 
         if (viscous) then
             @:DEALLOCATE(Re_avg_rsx_vf)
+            @:DEALLOCATE(Res_gs)
         end if
         @:DEALLOCATE(vel_src_rsx_vf)
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
+        @:DEALLOCATE(Gs_rs)
         if (use_nc_iface_vel) then
             @:DEALLOCATE(nc_iface_vel_rsx_vf)
         end if
