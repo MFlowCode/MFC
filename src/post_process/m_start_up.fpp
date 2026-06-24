@@ -669,6 +669,8 @@ contains
         integer, intent(in), optional            :: x_beg, x_end, y_beg, y_end, z_beg, z_end
 
         if (present(src)) then
+            @:ASSERT(present(x_beg) .and. present(x_end) .and. present(y_beg) .and. present(y_end) .and. present(z_beg) &
+                     & .and. present(z_end), "s_write_field: src requires all six output bounds")
             out%q_sf(:,:,:) = src%sf(x_beg:x_end,y_beg:y_end,z_beg:z_end)
         end if
         call s_write_variable_to_formatted_database_file(varname, t_step)
