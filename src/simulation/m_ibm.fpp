@@ -954,9 +954,9 @@ contains
                         if (ib_idx > 0) then
                             ! get the vector pointing to the grid cell from the IB centroid
                             radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg))
-                            radial_vector(2) = y_cc(i) - (patch_ib(ib_idx)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg))
+                            radial_vector(2) = y_cc(j) - (patch_ib(ib_idx)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg))
                             radial_vector(3) = 0._wp
-                            if (num_dims == 3) radial_vector(3) = z_cc(i) - (patch_ib(ib_idx)%z_centroid + real(zp, &
+                            if (num_dims == 3) radial_vector(3) = z_cc(k) - (patch_ib(ib_idx)%z_centroid + real(zp, &
                                 & wp)*(z_domain%end - z_domain%beg))
 
                             local_force_contribution(:) = 0._wp
