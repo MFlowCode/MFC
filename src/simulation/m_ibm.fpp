@@ -279,6 +279,15 @@ contains
                     end if
                 end if
 
+                if (patch_ib(patch_id)%moving_ibm /= 0) then
+                    ! get the vector that points from the centroid to the ghost
+                    radial_vector(1) = physical_loc(1) - (patch_ib(ib_idx)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg))
+                    radial_vector(2) = physical_loc(2) - (patch_ib(ib_idx)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg))
+                    radial_vector(3) = 0._wp
+                    if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(ib_idx)%z_centroid + real(zp, &
+                        & wp)*(z_domain%end - z_domain%beg))
+                end if
+
                 ! Calculate velocity of ghost cell
                 if (gp%slip) then
                     norm(1:3) = gp%levelset_norm
@@ -288,8 +297,6 @@ contains
                     vel_g = vel_IP - vel_norm_IP
                     if (patch_ib(patch_id)%moving_ibm /= 0) then
                         ! compute the linear velocity of the ghost point due to rotation
-                        radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, &
-                            & patch_ib(patch_id)%z_centroid]
                         call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
 
                         ! add only the component of the IB's motion that is normal to the surface
@@ -300,9 +307,6 @@ contains
                         ! we know the object is not moving if moving_ibm is 0 (false)
                         vel_g = 0._wp
                     else
-                        ! get the vector that points from the centroid to the ghost
-                        radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, &
-                            & patch_ib(patch_id)%z_centroid]
                         ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear
                         ! velocity
                         call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
@@ -935,7 +939,7 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, &
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, xp, yp, zp, ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, &
                             & local_force_contribution, cell_volume, local_torque_contribution, dynamic_viscosity, &
                             & viscous_stress]', copy='[forces, torques]', copyin='[dynamic_viscosities]', collapse=3)
         do i = 0, m
@@ -943,13 +947,15 @@ contains
                 do k = 0, p
                     encoded_ib_idx = ib_markers%sf(i, j, k)
                     if (encoded_ib_idx /= 0) then
-                        call s_decode_patch_periodicity(encoded_ib_idx, ib_idx_temp)
+                        call s_decode_patch_periodicity(encoded_ib_idx, ib_idx_temp, xp, yp, zp)
                         call s_get_neighborhood_idx(ib_idx_temp, ib_idx)  ! global patch ID -> local index
                         if (ib_idx > 0) then
                             ! get the vector pointing to the grid cell from the IB centroid
-                            radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, &
-                                                  & patch_ib(ib_idx)%y_centroid, 0._wp]
-                            if (num_dims == 3) radial_vector(3) = patch_ib(ib_idx)%z_centroid
+                            radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg))
+                            radial_vector(2) = y_cc(i) - (patch_ib(ib_idx)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg))
+                            radial_vector(3) = 0._wp
+                            if (num_dims == 3) radial_vector(3) = z_cc(i) - (patch_ib(ib_idx)%z_centroid + real(zp, &
+                                & wp)*(z_domain%end - z_domain%beg))
 
                             local_force_contribution(:) = 0._wp
 
