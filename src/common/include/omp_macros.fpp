@@ -179,7 +179,7 @@
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
     #:elif MFC_COMPILER == CCE_COMPILER_ID
-        #:set omp_start_directive = '!$omp target teams distribute parallel do simd defaultmap(firstprivate:scalar) '
+        #:set omp_start_directive = '!$omp target teams distribute parallel do defaultmap(firstprivate:scalar) '
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams distribute parallel do '
     #:else
@@ -194,7 +194,7 @@
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_end_directive = '!$omp end target teams loop'
     #:elif MFC_COMPILER == CCE_COMPILER_ID
-        #:set omp_end_directive = '!$omp end target teams distribute parallel do simd'
+        #:set omp_end_directive = '!$omp end target teams distribute parallel do'
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_end_directive = '!$omp end target teams distribute parallel do'
     #:else

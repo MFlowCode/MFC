@@ -52,6 +52,7 @@ print(
             "bc_y%end": -2,
             "ib": "T",
             "num_ibs": 1,
+            "fd_order": 2,
             # Formatted Database Files Structure Parameters
             "format": "silo",
             "precision": "double",
