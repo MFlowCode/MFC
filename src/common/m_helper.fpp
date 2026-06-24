@@ -86,8 +86,6 @@ contains
     impure subroutine s_initialize_bubbles_model()
 
         ! Allocate memory
-        ! NOTE: weight, pb0, Re_trans_T are program-lifetime allocations;
-        ! no s_finalize_bubbles_model or s_finalize_* subroutine exists for this module.
         if (bubbles_euler) then
             @:ALLOCATE(weight(nb), R0(nb))
             if (.not. polytropic) then

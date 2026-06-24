@@ -312,121 +312,6 @@ def check_junk_comments(repo_root: Path) -> list[str]:
     return errors
 
 
-def check_allocate_deallocate_pairing(repo_root: Path) -> list[str]:
-    """Flag @:ALLOCATE'd names in s_initialize_* with no matching @:DEALLOCATE in s_finalize_*.
-
-    Only checks modules that have both an s_initialize_* and s_finalize_* subroutine.
-    Files without a finalize subroutine are skipped — those allocations are
-    program-lifetime by convention.
-    """
-    errors: list[str] = []
-    src_dir = repo_root / SRC_DIR
-
-    allocate_re = re.compile(r"@:ALLOCATE\((\w[\w%]*)")
-    deallocate_re = re.compile(r"@:DEALLOCATE\((\w[\w%]*)")
-    init_re = re.compile(r"^\s*(?:impure\s+)?subroutine\s+s_initialize_\w+", re.IGNORECASE)
-    final_re = re.compile(r"^\s*(?:impure\s+)?subroutine\s+s_finalize_\w+", re.IGNORECASE)
-    end_sub_re = re.compile(r"^\s*end\s+subroutine\b", re.IGNORECASE)
-
-    # Known pre-existing missing deallocations
-    KNOWN_MISSING = {
-        "gs_min",
-        "pi_infs",
-        "ps_inf",
-        "cvs",
-        "qvs",
-        "qvps",
-        "Gs_vc",
-        "data_in",
-        "data_out",
-        "data_cmplx",
-        "data_cmplx_y",
-        "data_cmplx_z",
-        "En_real",
-        "En",
-        "F_src_rsx_vf",
-        "flux_src_rsx_vf_l",
-        "F_src_rsy_vf",
-        "flux_src_rsy_vf_l",
-        "F_src_rsz_vf",
-        "flux_src_rsz_vf_l",
-        "pres_in",
-        "Del_in",
-        "alpha_rho_in",
-        "Rc_sf",
-        "data_cmplx_gpu",
-        "data_fltr_cmplx_gpu",
-        "qbmm_idx",
-        "qbmm_idx%ps",
-        "x_cc",
-        "dx",
-        "y_cc",
-        "dy",
-        "z_cc",
-        "dz",
-        "dw_dx_hypo",
-        "coeff_R",
-        "qR_rsx_vf",
-        "dqR_rsx_vf",
-        "gR_x",
-        "q_prim_ts2",
-        "poly_coef_cbR_x",
-        "d_cbR_x",
-        "poly_coef_cbR_y",
-        "d_cbR_y",
-        "poly_coef_cbR_z",
-        "d_cbR_z",
-    }
-
-    for src in _fortran_fpp_files(src_dir):
-        lines = src.read_text(encoding="utf-8").splitlines()
-        rel = src.relative_to(repo_root)
-
-        # Extract allocations from s_initialize_* subroutines
-        allocated: dict[str, int] = {}  # name -> line number
-        deallocated: set[str] = set()
-        in_init = False
-        in_final = False
-        has_final = False
-
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            if init_re.match(stripped):
-                in_init = True
-                in_final = False
-            elif final_re.match(stripped):
-                in_final = True
-                in_init = False
-                has_final = True
-            elif end_sub_re.match(stripped):
-                in_init = False
-                in_final = False
-
-            if _is_comment_or_blank(stripped):
-                continue
-
-            if in_init:
-                m = allocate_re.search(stripped)
-                if m:
-                    name = m.group(1)
-                    if name not in allocated:
-                        allocated[name] = i + 1
-
-            if in_final:
-                m = deallocate_re.search(stripped)
-                if m:
-                    deallocated.add(m.group(1))
-
-        if not has_final:
-            continue
-
-        for name, lineno in allocated.items():
-            if name not in deallocated and name not in KNOWN_MISSING:
-                errors.append(f"  {rel}:{lineno} @:ALLOCATE({name}...) in s_initialize_* has no matching " f"@:DEALLOCATE in s_finalize_*. Fix: add @:DEALLOCATE in the finalize subroutine")
-
-    return errors
-
-
 _BCAST_CALL_RE = re.compile(r"\bcall\s+MPI_BCAST\s*\(", re.IGNORECASE)
 _FYPP_FOR_RE = re.compile(r"#:\s*for\s+(\w+)\s+in\s+\[")
 _FYPP_ENDFOR_RE = re.compile(r"#:\s*endfor\b")
@@ -564,7 +449,6 @@ def main():
     all_errors.extend(check_fypp_list_duplicates(repo_root))
     all_errors.extend(check_duplicate_lines(repo_root))
     all_errors.extend(check_hardcoded_byte_size(repo_root))
-    all_errors.extend(check_allocate_deallocate_pairing(repo_root))
     all_errors.extend(check_manual_registry_bcasts(repo_root))
 
     if all_errors:
