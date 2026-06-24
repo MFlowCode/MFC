@@ -954,59 +954,66 @@ contains
 
     end subroutine s_hypo_hlld_riemann_solver
 
-    !> Copy hypo interface velocities from Riemann-space buffers to physical-space output arrays. Called after the Riemann solver
-    !! for each sweep direction when hypo_nc_interface is active.
+    !> Copy the hypo interface velocities of a fused-solve pass from Riemann-space buffers to physical-space output arrays, called
+    !! after the Riemann solver for each sweep direction. The plain routine handles the hat_L-anchored values (nc_iface_vel_rsx;
+    !! used when hypo_nc_interface is active, and as the hat_L pass of the dual-pass HLLD solve); the _hatR routine handles the
+    !! hat_R-anchored values (nc_iface_vel_hatR_rsx) of the dual-pass solve. Both routines are emitted from one template so the two
+    !! passes cannot drift apart.
     !! @param nc_iface_vel_vf Output: physical velocity components at interfaces
     !! @param norm_dir Sweep direction (1=x, 2=y, 3=z)
-    subroutine s_finalize_nc_iface_vel(nc_iface_vel_vf, norm_dir)
+    #:for SUFFIX, NCV in [('', 'nc_iface_vel_rsx'), ('_hatR', 'nc_iface_vel_hatR_rsx')]
+        subroutine s_finalize_nc_iface_vel${SUFFIX}$ (nc_iface_vel_vf, norm_dir)
 
-        type(scalar_field), dimension(:), intent(inout) :: nc_iface_vel_vf
-        integer, intent(in)                             :: norm_dir
-        integer                                         :: i, j, k, l
+            type(scalar_field), dimension(:), intent(inout) :: nc_iface_vel_vf
+            integer, intent(in)                             :: norm_dir
+            integer                                         :: i, j, k, l
 
-        if (norm_dir == 2) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, num_dims
-                do l = is3%beg, is3%end
-                    do j = is1%beg, is1%end
+            if (norm_dir == 2) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, num_dims
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                nc_iface_vel_vf(i)%sf(k, j, l) = ${NCV}$_vf(k, j, l, i)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            else if (norm_dir == 1) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, num_dims
+                    do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
-                            nc_iface_vel_vf(i)%sf(k, j, l) = nc_iface_vel_rsx_vf(k, j, l, i)
+                            do j = is1%beg, is1%end
+                                nc_iface_vel_vf(i)%sf(j, k, l) = ${NCV}$_vf(j, k, l, i)
+                            end do
                         end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (norm_dir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, num_dims
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            nc_iface_vel_vf(i)%sf(j, k, l) = nc_iface_vel_rsx_vf(j, k, l, i)
+                $:END_GPU_PARALLEL_LOOP()
+            else if (norm_dir == 3) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, num_dims
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                nc_iface_vel_vf(i)%sf(l, k, j) = ${NCV}$_vf(l, k, j, i)
+                            end do
                         end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (norm_dir == 3) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, num_dims
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            nc_iface_vel_vf(i)%sf(l, k, j) = nc_iface_vel_rsx_vf(l, k, j, i)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+                $:END_GPU_PARALLEL_LOOP()
+            end if
 
-    end subroutine s_finalize_nc_iface_vel
+        end subroutine s_finalize_nc_iface_vel${SUFFIX}$
+    #:endfor
 
     !> Unpermute the hat_R-anchored flux set of the fused dual-pass HLLD solve into physical-space output arrays. Mirrors
     !! s_finalize_riemann_solver for the flux_hatR_rs* buffers; flux_src is anchor-independent (already finalized with the hat_L
-    !! set) and the geometric source flux only exists for the axisymmetric y-sweep.
+    !! set) and the geometric source flux only exists for the axisymmetric y-sweep. Kept as its own routine (not folded into the
+    !! shared s_finalize_riemann_solver) because it is a strict subset of it -- no flux_src copy and no grid_geometry==3 z-gsrc --
+    !! so co-generating would couple that general 5-caller routine to this hypo-only path.
     !! @param flux_vf Output: hat_R fluxes (overwrites the consumed hat_L values)
     !! @param flux_gsrc_vf Output: hat_R geometric source fluxes (axisymmetric y-sweep only)
     !! @param norm_dir Sweep direction (1=x, 2=y, 3=z)
@@ -1069,55 +1076,5 @@ contains
         end if
 
     end subroutine s_finalize_riemann_solver_hatR
-
-    !> Copy the hat_R-pass hypo interface velocities of the fused dual-pass HLLD solve from Riemann-space buffers to physical-space
-    !! output arrays. Mirrors s_finalize_nc_iface_vel for the nc_iface_vel_hatR_rs* buffers.
-    !! @param nc_iface_vel_vf Output: physical hat_R velocity components at interfaces
-    !! @param norm_dir Sweep direction (1=x, 2=y, 3=z)
-    subroutine s_finalize_nc_iface_vel_hatR(nc_iface_vel_vf, norm_dir)
-
-        type(scalar_field), dimension(:), intent(inout) :: nc_iface_vel_vf
-        integer, intent(in)                             :: norm_dir
-        integer                                         :: i, j, k, l
-
-        if (norm_dir == 2) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, num_dims
-                do l = is3%beg, is3%end
-                    do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                            nc_iface_vel_vf(i)%sf(k, j, l) = nc_iface_vel_hatR_rsx_vf(k, j, l, i)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (norm_dir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, num_dims
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            nc_iface_vel_vf(i)%sf(j, k, l) = nc_iface_vel_hatR_rsx_vf(j, k, l, i)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (norm_dir == 3) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, num_dims
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            nc_iface_vel_vf(i)%sf(l, k, j) = nc_iface_vel_hatR_rsx_vf(l, k, j, i)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-    end subroutine s_finalize_nc_iface_vel_hatR
 
 end module m_riemann_solver_hypo_hlld
