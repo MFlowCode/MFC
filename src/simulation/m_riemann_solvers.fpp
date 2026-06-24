@@ -111,10 +111,6 @@ contains
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsx_vf)
         end if
-        @:DEALLOCATE(Gs_rs)
-        if (viscous) then
-            @:DEALLOCATE(Res_gs)
-        end if
 
     end subroutine s_finalize_riemann_solvers_module
 
