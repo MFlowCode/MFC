@@ -21,16 +21,7 @@ module m_derived_variables
     private; public :: s_initialize_derived_variables_module, s_initialize_derived_variables, s_compute_derived_variables, &
         & s_finalize_derived_variables_module
 
-    !> @name Finite-difference coefficients Finite-difference (fd) coefficients in x-, y- and z-coordinate directions. Note that
-    !! because sufficient boundary information is available for all the active coordinate directions, the centered family of the
-    !! finite-difference schemes is used.
-    !> @{
-    real(wp), public, allocatable, dimension(:,:) :: fd_coeff_x
-    real(wp), public, allocatable, dimension(:,:) :: fd_coeff_y
-    real(wp), public, allocatable, dimension(:,:) :: fd_coeff_z
-    !> @}
-
-    $:GPU_DECLARE(create='[fd_coeff_x, fd_coeff_y, fd_coeff_z]')
+    ! fd_coeff_x, fd_coeff_y, fd_coeff_z: declared in m_global_parameters so m_viscous can see them too
 
     ! @name Variables for computing acceleration
     !> @{
@@ -50,7 +41,7 @@ contains
         ! to be implemented in the subroutine s_compute_finite_difference_coefficients.
 
         ! Allocating centered finite-difference coefficients
-        if (probe_wrt) then
+        if (probe_wrt .or. ib) then
             @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
             if (n > 0) then
                 @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, 0:n))
@@ -74,9 +65,9 @@ contains
     !> Allocate and open derived variables. Computing FD coefficients.
     impure subroutine s_initialize_derived_variables
 
-        if (probe_wrt) then
+        if (probe_wrt .or. ib) then
             ! Opening and writing header of flow probe files
-            if (proc_rank == 0) then
+            if (proc_rank == 0 .and. probe_wrt) then
                 call s_open_probe_files()
                 call s_open_com_files()
             end if

@@ -54,6 +54,7 @@ print(
             "bc_y%end": -3,
             "ib": "T",
             "num_ibs": 1,
+            "fd_order": 2,
             "viscous": "T",
             # Formatted Database Files Structure Parameters
             "format": "silo",
