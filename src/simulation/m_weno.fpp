@@ -885,9 +885,7 @@ contains
     end subroutine s_pack_weno_input_arr
 
     !> Perform WENO reconstruction of left and right cell-boundary values from cell-averaged variables
-    subroutine s_weno(v_vf, vL_rs_vf_x, vR_rs_vf_x, weno_dir, is1_weno_d, &
-
-        & is2_weno_d, is3_weno_d)
+    subroutine s_weno(v_vf, vL_rs_vf_x, vR_rs_vf_x, weno_dir, is1_weno_d, is2_weno_d, is3_weno_d)
 
         type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x
