@@ -64,6 +64,12 @@ module m_acoustic_substep
     real(wp), allocatable, dimension(:,:,:) :: div_sf
     $:GPU_DECLARE(create='[div_sf]')
 
+    !> Start-of-microstep snapshot of the transported conserved vars (partial densities 1:num_fluids, then total energy in slot
+    !! num_fluids+1), spanning the buffered domain. The forward sweep reads its centered flux stencil ONLY from this frozen state,
+    !! so the flux divergence telescopes and species mass is conserved for any num_fluids (no in-place read hazard).
+    real(wp), allocatable, dimension(:,:,:,:) :: q_snap
+    $:GPU_DECLARE(create='[q_snap]')
+
 contains
 
     !> Allocate scratch storage for the acoustic substep kernel.
@@ -71,6 +77,8 @@ contains
 
         @:ALLOCATE(p_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ALLOCATE(div_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        @:ALLOCATE(q_snap(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
+                   & 1:num_fluids + 1))
 
     end subroutine s_initialize_acoustic_substep_module
 
@@ -101,11 +109,13 @@ contains
         integer  :: f                                   !< Fluid iterator (mixture sums)
         integer  :: i, j, k, l                          !< Generic / spatial iterators
         integer  :: momxb, momxe, contb                 !< First/last momentum and first continuity equation indices
+        integer  :: esnap                               !< Total-energy slot in the q_snap snapshot (= num_fluids + 1)
         integer  :: db_x, de_x, db_y, de_y, db_z, de_z  !< div_sf loop bounds (interior + one ghost layer)
 
         momxb = eqn_idx%mom%beg
         momxe = eqn_idx%mom%end
         contb = eqn_idx%cont%beg
+        esnap = num_fluids + 1
 
         ! div_sf is needed one ghost layer beyond the interior so its centered gradient can be taken
         ! at interior cells; momentum carries >= 2 ghost layers, so this layer is always halo-valid.
@@ -144,6 +154,15 @@ contains
                         end do
 
                         p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
+
+                        ! Freeze the transported conserved state for the forward sweep's flux stencil. Reading the
+                        ! divergence from this snapshot (never an in-place-updated neighbour) makes it telescope, so
+                        ! species mass and energy are conserved for any num_fluids.
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do f = 1, num_fluids
+                            q_snap(j, k, l, f) = q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                        end do
+                        q_snap(j, k, l, esnap) = q_cons_vf(eqn_idx%E)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -164,81 +183,83 @@ contains
                     do j = idwint(1)%beg, idwint(1)%end
                         inv_2dx = 1._wp/(2._wp*dx(j))
 
-                        ! Stencil-neighbour velocities u = mom/rho_mix, formed once per cell from the CURRENT
-                        ! mixture density (sum_k alpha_k*rho_k) and reused by the mass and energy fluxes. For the
-                        ! single-fluid mass flux u*(alpha_k*rho_k) the density cancels to the momentum exactly, so
-                        ! re-forming rho here (rather than caching it across cells) preserves the in-place sweep result.
+                        ! Stencil-neighbour velocities u = mom/rho_mix, formed once per cell from the FROZEN snapshot
+                        ! mixture density (sum_k alpha_k*rho_k) and reused by the mass and energy fluxes. Momentum is
+                        ! untouched by the forward sweep, so mom == its frozen value; reading rho from the snapshot
+                        ! makes u_j a single-valued function of the frozen state, which is what lets the flux telescope.
                         rho_n = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
-                        do f = 0, num_fluids - 1
-                            rho_n = rho_n + q_cons_vf(contb + f)%sf(j + 1, k, l)
+                        do f = 1, num_fluids
+                            rho_n = rho_n + q_snap(j + 1, k, l, f)
                         end do
                         u_xp = q_cons_vf(momxb)%sf(j + 1, k, l)/max(rho_n, sgm_eps)
                         rho_n = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
-                        do f = 0, num_fluids - 1
-                            rho_n = rho_n + q_cons_vf(contb + f)%sf(j - 1, k, l)
+                        do f = 1, num_fluids
+                            rho_n = rho_n + q_snap(j - 1, k, l, f)
                         end do
                         u_xm = q_cons_vf(momxb)%sf(j - 1, k, l)/max(rho_n, sgm_eps)
                         if (n > 0) then
                             rho_n = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
-                            do f = 0, num_fluids - 1
-                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k + 1, l)
+                            do f = 1, num_fluids
+                                rho_n = rho_n + q_snap(j, k + 1, l, f)
                             end do
                             u_yp = q_cons_vf(momxb + 1)%sf(j, k + 1, l)/max(rho_n, sgm_eps)
                             rho_n = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
-                            do f = 0, num_fluids - 1
-                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k - 1, l)
+                            do f = 1, num_fluids
+                                rho_n = rho_n + q_snap(j, k - 1, l, f)
                             end do
                             u_ym = q_cons_vf(momxb + 1)%sf(j, k - 1, l)/max(rho_n, sgm_eps)
                         end if
                         if (p > 0) then
                             rho_n = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
-                            do f = 0, num_fluids - 1
-                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k, l + 1)
+                            do f = 1, num_fluids
+                                rho_n = rho_n + q_snap(j, k, l + 1, f)
                             end do
                             u_zp = q_cons_vf(momxe)%sf(j, k, l + 1)/max(rho_n, sgm_eps)
                             rho_n = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
-                            do f = 0, num_fluids - 1
-                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k, l - 1)
+                            do f = 1, num_fluids
+                                rho_n = rho_n + q_snap(j, k, l - 1, f)
                             end do
                             u_zm = q_cons_vf(momxe)%sf(j, k, l - 1)/max(rho_n, sgm_eps)
                         end if
 
-                        ! Mass equations: d/dt(alpha_k*rho_k) = -div(alpha_k*rho_k * u) + slow
+                        ! Mass equations: d/dt(alpha_k*rho_k) = -div(alpha_k*rho_k * u) + slow.
+                        ! Flux stencil reads the frozen snapshot; apply onto the live field from the frozen center value.
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%cont%beg, eqn_idx%cont%end
-                            div = inv_2dx*(u_xp*q_cons_vf(i)%sf(j + 1, k, l) - u_xm*q_cons_vf(i)%sf(j - 1, k, l))
+                        do f = 1, num_fluids
+                            div = inv_2dx*(u_xp*q_snap(j + 1, k, l, f) - u_xm*q_snap(j - 1, k, l, f))
                             if (n > 0) then
                                 inv_2dy = 1._wp/(2._wp*dy(k))
-                                div = div + inv_2dy*(u_yp*q_cons_vf(i)%sf(j, k + 1, l) - u_ym*q_cons_vf(i)%sf(j, k - 1, l))
+                                div = div + inv_2dy*(u_yp*q_snap(j, k + 1, l, f) - u_ym*q_snap(j, k - 1, l, f))
                             end if
                             if (p > 0) then
                                 inv_2dz = 1._wp/(2._wp*dz(l))
-                                div = div + inv_2dz*(u_zp*q_cons_vf(i)%sf(j, k, l + 1) - u_zm*q_cons_vf(i)%sf(j, k, l - 1))
+                                div = div + inv_2dz*(u_zp*q_snap(j, k, l + 1, f) - u_zm*q_snap(j, k, l - 1, f))
                             end if
-                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + dtau*(-div + rhs_slow_vf(i)%sf(j, k, l))
+                            i = eqn_idx%cont%beg + f - 1
+                            q_cons_vf(i)%sf(j, k, l) = q_snap(j, k, l, f) + dtau*(-div + rhs_slow_vf(i)%sf(j, k, l))
                         end do
 
-                        ! Total-energy equation: d/dt(rho*E) = -div((rho*E + p) * u) + slow
-                        div = inv_2dx*((q_cons_vf(eqn_idx%E)%sf(j + 1, k, l) + p_sf(j + 1, k, &
-                                       & l))*u_xp - (q_cons_vf(eqn_idx%E)%sf(j - 1, k, l) + p_sf(j - 1, k, l))*u_xm)
+                        ! Total-energy equation: d/dt(rho*E) = -div((rho*E + p) * u) + slow. p_sf is the frozen
+                        ! cell pressure (built from the same pre-sweep state as q_snap), so the energy flux is consistent.
+                        div = inv_2dx*((q_snap(j + 1, k, l, esnap) + p_sf(j + 1, k, l))*u_xp - (q_snap(j - 1, k, l, &
+                                       & esnap) + p_sf(j - 1, k, l))*u_xm)
                         if (n > 0) then
                             inv_2dy = 1._wp/(2._wp*dy(k))
-                            div = div + inv_2dy*((q_cons_vf(eqn_idx%E)%sf(j, k + 1, l) + p_sf(j, k + 1, &
-                                                 & l))*u_yp - (q_cons_vf(eqn_idx%E)%sf(j, k - 1, l) + p_sf(j, k - 1, l))*u_ym)
+                            div = div + inv_2dy*((q_snap(j, k + 1, l, esnap) + p_sf(j, k + 1, l))*u_yp - (q_snap(j, k - 1, l, &
+                                                 & esnap) + p_sf(j, k - 1, l))*u_ym)
                         end if
                         if (p > 0) then
                             inv_2dz = 1._wp/(2._wp*dz(l))
-                            div = div + inv_2dz*((q_cons_vf(eqn_idx%E)%sf(j, k, l + 1) + p_sf(j, k, &
-                                                 & l + 1))*u_zp - (q_cons_vf(eqn_idx%E)%sf(j, k, l - 1) + p_sf(j, k, l - 1))*u_zm)
+                            div = div + inv_2dz*((q_snap(j, k, l + 1, esnap) + p_sf(j, k, l + 1))*u_zp - (q_snap(j, k, l - 1, &
+                                                 & esnap) + p_sf(j, k, l - 1))*u_zm)
                         end if
-                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
-                                  & l) + dtau*(-div + rhs_slow_vf(eqn_idx%E)%sf(j, k, l))
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_snap(j, k, l, esnap) + dtau*(-div + rhs_slow_vf(eqn_idx%E)%sf(j, k, l))
 
                         ! Volume fractions: pure slow (material) advection. The frozen slow forcing
                         ! rhs_slow_vf(%adv) already holds the contact-upwinded HLLC volume-fraction
@@ -355,6 +376,7 @@ contains
 
         @:DEALLOCATE(p_sf)
         @:DEALLOCATE(div_sf)
+        @:DEALLOCATE(q_snap)
 
     end subroutine s_finalize_acoustic_substep_module
 
