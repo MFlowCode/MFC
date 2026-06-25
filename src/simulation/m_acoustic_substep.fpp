@@ -36,9 +36,11 @@
 !! negative eigenvalue is -num_dims, so the explicit-smoother stability bound is
 !! acoustic_div_damp <= 2/num_dims per microstep (default 0.1 is well inside this for 1-3D).
 !!
-!! The mixture coefficients (gamma, pi_inf) come from the FROZEN volume
-!! fractions (the alpha_k are pure transport / slow forcing and are not advanced
-!! here), so the EOS pressure is cell-local and cheap.
+!! The mixture coefficients (gamma, pi_inf, qv) come from the cell-local volume
+!! fractions and partial densities. For num_fluids>1 the volume fractions evolve by
+!! pure slow (material) advection (dtau*rhs_slow_vf(%adv) each microstep); their
+!! acoustic div(u) coupling is O(M^2) and dropped in the low-Mach limit. The EOS
+!! pressure is therefore cell-local and cheap.
 module m_acoustic_substep
 
     use m_derived_types
@@ -80,23 +82,26 @@ contains
     !! @param n_micro      Number of microsteps to take.
     impure subroutine s_acoustic_substep(q_cons_vf, rhs_slow_vf, bc_type, dtau, n_micro)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: rhs_slow_vf
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in)        :: rhs_slow_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        real(wp), intent(in) :: dtau
-        integer, intent(in) :: n_micro
-        real(wp) :: rho                                 !< Single-fluid density max(alpha_rho, sgm_eps)
-        real(wp) :: vf                                  !< Frozen volume fraction (advection variable)
+        real(wp), intent(in)                                       :: dtau
+        integer, intent(in)                                        :: n_micro
+        real(wp)                                                   :: rho  !< Mixture density max(sum_k alpha_k*rho_k, sgm_eps)
+        !> Frozen mixture stiffened-gas coefficients (sum_k alpha_k*{gammas,pi_infs}, sum_k alpha_rho_k*qvs)
+        real(wp) :: gamma, pinf, qv
+        real(wp) :: rho_n                               !< Neighbour-cell mixture density (velocity denominator)
         real(wp) :: dyn_p                               !< Dynamic pressure 0.5*rho*|u|^2
         real(wp) :: div                                 !< Centered flux divergence accumulator
         real(wp) :: dpdx                                !< Centered pressure-gradient component
         real(wp) :: damp                                !< Grad-div divergence-damping stencil accumulator
         real(wp) :: inv_2dx, inv_2dy, inv_2dz           !< 1/(2*dx) etc. for centered first differences
         real(wp) :: u_xp, u_xm, u_yp, u_ym, u_zp, u_zm  !< Stencil-neighbour cell-center velocities (computed once per cell)
-        integer :: q                                    !< Microstep iterator
-        integer :: i, j, k, l                           !< Generic / spatial iterators
-        integer :: momxb, momxe, contb                  !< First/last momentum and first continuity equation indices
-        integer :: db_x, de_x, db_y, de_y, db_z, de_z   !< div_sf loop bounds (interior + one ghost layer)
+        integer  :: q                                   !< Microstep iterator
+        integer  :: f                                   !< Fluid iterator (mixture sums)
+        integer  :: i, j, k, l                          !< Generic / spatial iterators
+        integer  :: momxb, momxe, contb                 !< First/last momentum and first continuity equation indices
+        integer  :: db_x, de_x, db_y, de_y, db_z, de_z  !< div_sf loop bounds (interior + one ghost layer)
 
         momxb = eqn_idx%mom%beg
         momxe = eqn_idx%mom%end
@@ -114,15 +119,23 @@ contains
             call s_populate_variables_buffers(bc_type, q_cons_vf)
 
             ! 2a. Cell pressure from the CURRENT conserved state (used by the energy flux), via the
-            !     direct single-fluid stiffened-gas EOS (model_eqns=2, num_fluids=1): inverting
+            !     direct mixture stiffened-gas EOS (model_eqns=2): inverting
             !     rho*E = gamma*p + pi_inf + 0.5*rho*|u|^2 + qv with frozen mixture coefficients
-            !     gamma=vf*gammas(1), pi_inf=vf*pi_infs(1), qv=alpha_rho*qvs(1).
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, vf, dyn_p]')
+            !     rho=sum_k alpha_rho_k, gamma=sum_k alpha_k*gammas(k), pi_inf=sum_k alpha_k*pi_infs(k),
+            !     qv=sum_k alpha_rho_k*qvs(k) (matches s_convert_species_to_mixture_variables_acc).
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p]')
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        vf = q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l)
-                        rho = max(q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l), sgm_eps)
+                        rho = 0._wp; gamma = 0._wp; pinf = 0._wp; qv = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do f = 1, num_fluids
+                            rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                            qv = qv + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)*qvs(f)
+                            gamma = gamma + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*gammas(f)
+                            pinf = pinf + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*pi_infs(f)
+                        end do
+                        rho = max(rho, sgm_eps)
 
                         dyn_p = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
@@ -130,8 +143,7 @@ contains
                             dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
                         end do
 
-                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, &
-                             & l) - dyn_p - vf*pi_infs(1) - q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)*qvs(1))/(vf*gammas(1))
+                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
                     end do
                 end do
             end do
@@ -145,26 +157,56 @@ contains
             !     (alpha_k*rho_k * u) and ((rho*E + p) * u), plus dtau*rhs_slow. Velocity u
             !     is held frozen (computed from the current momentum) for this forward sweep.
             inv_2dx = 0._wp; inv_2dy = 0._wp; inv_2dz = 0._wp
-            $:GPU_PARALLEL_LOOP(collapse=3, &
-                                & private='[i, j, k, l, div, inv_2dx, inv_2dy, inv_2dz, u_xp, u_xm, u_yp, u_ym, u_zp, u_zm]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho_n, div, inv_2dx, inv_2dy, inv_2dz, u_xp, u_xm, u_yp, &
+                                & u_ym, u_zp, u_zm]')
             do l = idwint(3)%beg, idwint(3)%end
                 do k = idwint(2)%beg, idwint(2)%end
                     do j = idwint(1)%beg, idwint(1)%end
                         inv_2dx = 1._wp/(2._wp*dx(j))
 
-                        ! Stencil-neighbour velocities u = mom/rho, formed once per cell from the CURRENT
-                        ! continuity value and reused by the mass and energy fluxes. For the mass flux
-                        ! u*(alpha_k*rho_k) the density cancels to the momentum exactly, so re-forming rho
-                        ! here (rather than caching it across cells) preserves the in-place sweep result.
-                        u_xp = q_cons_vf(momxb)%sf(j + 1, k, l)/max(q_cons_vf(contb)%sf(j + 1, k, l), sgm_eps)
-                        u_xm = q_cons_vf(momxb)%sf(j - 1, k, l)/max(q_cons_vf(contb)%sf(j - 1, k, l), sgm_eps)
+                        ! Stencil-neighbour velocities u = mom/rho_mix, formed once per cell from the CURRENT
+                        ! mixture density (sum_k alpha_k*rho_k) and reused by the mass and energy fluxes. For the
+                        ! single-fluid mass flux u*(alpha_k*rho_k) the density cancels to the momentum exactly, so
+                        ! re-forming rho here (rather than caching it across cells) preserves the in-place sweep result.
+                        rho_n = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do f = 0, num_fluids - 1
+                            rho_n = rho_n + q_cons_vf(contb + f)%sf(j + 1, k, l)
+                        end do
+                        u_xp = q_cons_vf(momxb)%sf(j + 1, k, l)/max(rho_n, sgm_eps)
+                        rho_n = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do f = 0, num_fluids - 1
+                            rho_n = rho_n + q_cons_vf(contb + f)%sf(j - 1, k, l)
+                        end do
+                        u_xm = q_cons_vf(momxb)%sf(j - 1, k, l)/max(rho_n, sgm_eps)
                         if (n > 0) then
-                            u_yp = q_cons_vf(momxb + 1)%sf(j, k + 1, l)/max(q_cons_vf(contb)%sf(j, k + 1, l), sgm_eps)
-                            u_ym = q_cons_vf(momxb + 1)%sf(j, k - 1, l)/max(q_cons_vf(contb)%sf(j, k - 1, l), sgm_eps)
+                            rho_n = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do f = 0, num_fluids - 1
+                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k + 1, l)
+                            end do
+                            u_yp = q_cons_vf(momxb + 1)%sf(j, k + 1, l)/max(rho_n, sgm_eps)
+                            rho_n = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do f = 0, num_fluids - 1
+                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k - 1, l)
+                            end do
+                            u_ym = q_cons_vf(momxb + 1)%sf(j, k - 1, l)/max(rho_n, sgm_eps)
                         end if
                         if (p > 0) then
-                            u_zp = q_cons_vf(momxe)%sf(j, k, l + 1)/max(q_cons_vf(contb)%sf(j, k, l + 1), sgm_eps)
-                            u_zm = q_cons_vf(momxe)%sf(j, k, l - 1)/max(q_cons_vf(contb)%sf(j, k, l - 1), sgm_eps)
+                            rho_n = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do f = 0, num_fluids - 1
+                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k, l + 1)
+                            end do
+                            u_zp = q_cons_vf(momxe)%sf(j, k, l + 1)/max(rho_n, sgm_eps)
+                            rho_n = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do f = 0, num_fluids - 1
+                                rho_n = rho_n + q_cons_vf(contb + f)%sf(j, k, l - 1)
+                            end do
+                            u_zm = q_cons_vf(momxe)%sf(j, k, l - 1)/max(rho_n, sgm_eps)
                         end if
 
                         ! Mass equations: d/dt(alpha_k*rho_k) = -div(alpha_k*rho_k * u) + slow
@@ -197,6 +239,17 @@ contains
                         end if
                         q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
                                   & l) + dtau*(-div + rhs_slow_vf(eqn_idx%E)%sf(j, k, l))
+
+                        ! Volume fractions: pure slow (material) advection. The frozen slow forcing
+                        ! rhs_slow_vf(%adv) already holds the contact-upwinded HLLC volume-fraction
+                        ! flux, integrating to dt_stage*rhs_slow over the stage. The acoustic div(u)
+                        ! coupling to alpha is O(M^2) and intentionally dropped in the low-Mach limit.
+                        if (num_fluids > 1) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + dtau*rhs_slow_vf(i)%sf(j, k, l)
+                            end do
+                        end if
                     end do
                 end do
             end do
@@ -206,12 +259,19 @@ contains
             !    sees the freshly advanced mass and energy.
             call s_populate_variables_buffers(bc_type, q_cons_vf)
 
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, vf, dyn_p]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p]')
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        vf = q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l)
-                        rho = max(q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l), sgm_eps)
+                        rho = 0._wp; gamma = 0._wp; pinf = 0._wp; qv = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do f = 1, num_fluids
+                            rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                            qv = qv + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)*qvs(f)
+                            gamma = gamma + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*gammas(f)
+                            pinf = pinf + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*pi_infs(f)
+                        end do
+                        rho = max(rho, sgm_eps)
 
                         dyn_p = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
@@ -219,8 +279,7 @@ contains
                             dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
                         end do
 
-                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, &
-                             & l) - dyn_p - vf*pi_infs(1) - q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)*qvs(1))/(vf*gammas(1))
+                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
                     end do
                 end do
             end do

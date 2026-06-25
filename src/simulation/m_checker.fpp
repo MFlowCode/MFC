@@ -100,8 +100,6 @@ contains
 
         if (acoustic_substepping) then
             @:PROHIBIT(model_eqns /= 2, "acoustic_substepping requires model_eqns = 2")
-            @:PROHIBIT(num_fluids /= 1, &
-                       & "acoustic_substepping currently supports num_fluids = 1 only (multi-fluid volume-fraction substepping is not yet implemented)")
             @:PROHIBIT(bubbles_euler .or. bubbles_lagrange, "acoustic_substepping is incompatible with bubbles")
             @:PROHIBIT(qbmm, "acoustic_substepping is incompatible with qbmm")
             @:PROHIBIT(ib, "acoustic_substepping is incompatible with immersed boundaries")

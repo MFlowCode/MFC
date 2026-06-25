@@ -1286,7 +1286,6 @@ class CaseValidator:
             return
 
         model_eqns = self.get("model_eqns")
-        num_fluids = self.get("num_fluids")
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         qbmm = self.get("qbmm", "F") == "T"
@@ -1299,7 +1298,6 @@ class CaseValidator:
         acoustic_div_damp = self.get("acoustic_div_damp", 0.1)
 
         self.prohibit(model_eqns is not None and model_eqns != 2, "acoustic_substepping requires model_eqns = 2")
-        self.prohibit(num_fluids is not None and num_fluids != 1, "acoustic_substepping currently supports num_fluids = 1 only (multi-fluid volume-fraction substepping is not yet implemented)")
         self.prohibit(bubbles_euler or bubbles_lagrange, "acoustic_substepping is incompatible with bubbles")
         self.prohibit(qbmm, "acoustic_substepping is incompatible with qbmm")
         self.prohibit(ib, "acoustic_substepping is incompatible with immersed boundaries")
