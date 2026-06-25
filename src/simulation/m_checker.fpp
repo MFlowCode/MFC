@@ -98,6 +98,18 @@ contains
             @:PROHIBIT(dt <= 0)
         end if
 
+        if (acoustic_substepping) then
+            @:PROHIBIT(model_eqns /= 2, "acoustic_substepping requires model_eqns = 2")
+            @:PROHIBIT(bubbles_euler .or. bubbles_lagrange, "acoustic_substepping is incompatible with bubbles")
+            @:PROHIBIT(qbmm, "acoustic_substepping is incompatible with qbmm")
+            @:PROHIBIT(ib, "acoustic_substepping is incompatible with immersed boundaries")
+            @:PROHIBIT(hypoelasticity .or. hyperelasticity, "acoustic_substepping is incompatible with elasticity")
+            @:PROHIBIT(chemistry, "acoustic_substepping is incompatible with chemistry")
+            @:PROHIBIT(relax, "acoustic_substepping is incompatible with phase change")
+            @:PROHIBIT(n_acoustic_substeps < 0, "n_acoustic_substeps must be >= 0 (0 = auto)")
+            @:PROHIBIT(acoustic_div_damp < 0._wp, "acoustic_div_damp must be >= 0")
+        end if
+
     end subroutine s_check_inputs_time_stepping
 
     !> Validate NVIDIA unified virtual memory configuration parameters

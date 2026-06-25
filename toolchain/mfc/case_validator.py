@@ -200,6 +200,18 @@ PHYSICS_DOCS = {
         "category": "Acoustic Sources",
         "explanation": ("Dimension-specific support types. Pulse type in {1,2,3,4}. Non-planar sources require foc_length and aperture."),
     },
+    "check_acoustic_substepping": {
+        "title": "Acoustic Substepping (low-Mach split-explicit)",
+        "category": "Numerical Schemes",
+        "explanation": (
+            "Split-explicit acoustic substepping for low-Mach-number flows. "
+            "Requires model_eqns = 2 (five-equation model). "
+            "Incompatible with bubbles (Euler or Lagrange), QBMM, immersed boundaries, "
+            "elasticity (hypo or hyper), chemistry, and phase change. "
+            "n_acoustic_substeps >= 0 (0 = auto-select). "
+            "acoustic_div_damp >= 0 (divergence damping coefficient)."
+        ),
+    },
     # Post-Processing
     "check_vorticity": {
         "title": "Vorticity Output",
@@ -1265,6 +1277,35 @@ class CaseValidator:
         self.prohibit(not polytropic and not bubbles_lagrange, "adap_dt requires polytropic = T or bubbles_lagrange = T")
         self.prohibit(not adv_n and not bubbles_lagrange, "adap_dt requires adv_n = T or bubbles_lagrange = T")
 
+    def check_acoustic_substepping(self):
+        """Checks acoustic substepping (low-Mach split-explicit) parameter constraints"""
+        acoustic_substepping = self.get("acoustic_substepping", "F") == "T"
+
+        if not acoustic_substepping:
+            return
+
+        model_eqns = self.get("model_eqns")
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        qbmm = self.get("qbmm", "F") == "T"
+        ib = self.get("ib", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        hyperelasticity = self.get("hyperelasticity", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        relax = self.get("relax", "F") == "T"
+        n_acoustic_substeps = self.get("n_acoustic_substeps", 0)
+        acoustic_div_damp = self.get("acoustic_div_damp", 0.1)
+
+        self.prohibit(model_eqns is not None and model_eqns != 2, "acoustic_substepping requires model_eqns = 2")
+        self.prohibit(bubbles_euler or bubbles_lagrange, "acoustic_substepping is incompatible with bubbles")
+        self.prohibit(qbmm, "acoustic_substepping is incompatible with qbmm")
+        self.prohibit(ib, "acoustic_substepping is incompatible with immersed boundaries")
+        self.prohibit(hypoelasticity or hyperelasticity, "acoustic_substepping is incompatible with elasticity")
+        self.prohibit(chemistry, "acoustic_substepping is incompatible with chemistry")
+        self.prohibit(relax, "acoustic_substepping is incompatible with phase change")
+        self.prohibit(n_acoustic_substeps is not None and n_acoustic_substeps < 0, "n_acoustic_substeps must be >= 0 (0 = auto)")
+        self.prohibit(acoustic_div_damp is not None and acoustic_div_damp < 0, "acoustic_div_damp must be >= 0")
+
     def check_alt_soundspeed(self):
         """Checks alternative sound speed parameters (simulation)"""
         alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
@@ -2262,6 +2303,7 @@ class CaseValidator:
         self.check_igr_simulation()
         self.check_acoustic_source()
         self.check_adaptive_time_stepping()
+        self.check_acoustic_substepping()
         self.check_alt_soundspeed()
         self.check_bubbles_lagrange()
         self.check_continuum_damage()

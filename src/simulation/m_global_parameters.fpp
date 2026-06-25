@@ -342,6 +342,9 @@ contains
         weno_Re_flux = .false.
         riemann_solver = dflt_int
         low_Mach = 0
+        acoustic_substepping = .false.
+        n_acoustic_substeps = 0
+        acoustic_div_damp = 0.1_wp
         wave_speeds = dflt_int
         avg_state = dflt_int
         alt_soundspeed = .false.

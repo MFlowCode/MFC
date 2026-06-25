@@ -625,6 +625,11 @@ def _load():
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
 
+    # Acoustic substepping (low-Mach split-explicit)
+    _r("acoustic_substepping", LOG, {"time"})
+    _r("n_acoustic_substeps", INT, {"time"})
+    _r("acoustic_div_damp", REAL, {"time"})
+
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
     _r("chemistry", LOG, {"chemistry"})
@@ -1326,6 +1331,9 @@ _nv(
     "nv_uvm_out_of_core",
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
+    "acoustic_substepping",
+    "n_acoustic_substeps",
+    "acoustic_div_damp",
 )
 _nv(
     _PRE,

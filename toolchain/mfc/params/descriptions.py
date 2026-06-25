@@ -140,6 +140,10 @@ DESCRIPTIONS = {
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",
+    # Acoustic substepping (low-Mach split-explicit)
+    "acoustic_substepping": "Enable split-explicit acoustic substepping for low-Mach flows",
+    "n_acoustic_substeps": "Number of acoustic substeps per flow step (0 = auto)",
+    "acoustic_div_damp": "Divergence damping coefficient for acoustic substepping",
     # Probes and integrals
     "num_probes": "Number of probe points",
     "num_integrals": "Number of integral regions",

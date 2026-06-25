@@ -488,6 +488,9 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
 | `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
 | `low_Mach`                 | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (\cite Chen22); [2] Velocity (\cite Thornber08)	 |
+| `acoustic_substepping`     | Logical | Enable split-explicit acoustic substepping for low-Mach flows |
+| `n_acoustic_substeps`      | Integer | Number of acoustic substeps per flow step (0 = auto) |
+| `acoustic_div_damp`        | Real    | Divergence damping coefficient for acoustic substepping (default 0.1) |
 | `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
 | `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro09)	 |
 | `weno_Re_flux`             | Logical | Compute velocity gradient using scalar divergence theorem	 |
