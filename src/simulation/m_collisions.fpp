@@ -20,7 +20,7 @@ module m_collisions
     implicit none
 
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_local_rank_owns_location, f_neighborhood_ranks_own_location
+        & f_local_rank_owns_location, f_neighborhood_ranks_own_location, ib_gbl_idx_lookup
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
@@ -104,6 +104,7 @@ contains
             call s_decode_patch_periodicity(encoded_pid2, pid2, xp2, yp2, zp2)
             pid1 = collision_lookup(i, 1)
             pid2 = collision_lookup(i, 2)
+
             ! call s_get_neighborhood_idx(pid1, pid1) ! global patch ID -> local index call s_get_neighborhood_idx(pid2, pid2)
             if (pid1 <= 0 .or. pid2 <= 0) cycle
 
@@ -376,7 +377,7 @@ contains
                         end do
                     end do
                 end do
-            end do
+            end do collision_partner_loop
         end do
         $:END_GPU_PARALLEL_LOOP()
 

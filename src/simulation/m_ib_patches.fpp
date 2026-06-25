@@ -23,7 +23,7 @@ module m_ib_patches
     implicit none
 
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
-        & s_initialize_ib_airfoils
+        & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities
 
 contains
 
