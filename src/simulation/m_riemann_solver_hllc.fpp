@@ -1470,35 +1470,65 @@ contains
                                     pcorr = 0._wp
                                 end if
 
-                                ! COMPUTING THE HLLC FLUXES MASS FLUX.
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, eqn_idx%cont%end
-                                    flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
-                                end do
+                                ! NOTE: Split-explicit low-Mach mode (acoustic_substepping) is handled in this
+                                ! general 5eq block only; the 6eq, 4eq, and 5eq+bubbles flux blocks are
+                                ! unreachable under acoustic_substepping (enforced by m_checker.fpp, which
+                                ! @:PROHIBITs split mode unless model_eqns==2 with no bubbles/elasticity/etc.).
+                                if (acoustic_substepping) then
+                                    ! Slow (advective) flux only. Mass and total-energy transport, and the
+                                    ! acoustic/pressure work, are deferred to the acoustic substep, so their
+                                    ! face fluxes are zero here. The momentum face flux keeps only the
+                                    ! contact-upwinded convective part rho*u*u (dissipation scales with |u|):
+                                    ! no pressure term, no acoustic (u+-c) dissipation, no low-Mach pcorr.
 
-                                ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w) identity:
-                                ! xi*(dir_flg*s_S+(1-dir_flg)*u_i)-u_i = (dir_flg*s_L/R+(1-dir_flg)*u_i)*xi_m1
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_dims
+                                    ! COMPUTING THE HLLC FLUXES MASS FLUX. (deferred to acoustic substep)
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, eqn_idx%cont%end
+                                        flux_rsx_vf(${SF('')}$, i) = 0._wp
+                                    end do
+
+                                    ! MOMENTUM FLUX. Slow part only: contact-upwinded rho*u*u advection.
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_dims
+                                        flux_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%cont%end + dir_idx(i)) = xi_M*rho_L*vel_L(dir_idx(1)) &
+                                                    & *vel_L(dir_idx(i)) + xi_P*rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i))
+                                    end do
+
+                                    ! ENERGY FLUX. (deferred to acoustic substep)
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%E) = 0._wp
+                                else
+                                    ! COMPUTING THE HLLC FLUXES MASS FLUX.
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, eqn_idx%cont%end
+                                        flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                    & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                    end do
+
+                                    ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w) identity:
+                                    ! xi*(dir_flg*s_S+(1-dir_flg)*u_i)-u_i = (dir_flg*s_L/R+(1-dir_flg)*u_i)*xi_m1
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_dims
+                                        flux_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%cont%end + dir_idx(i)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
+                                                    & *vel_L(dir_idx(i)) + s_M*(dir_flg(dir_idx(i))*s_L + (1._wp &
+                                                    & - dir_flg(dir_idx(i)))*vel_L(dir_idx(i)))*xi_L_m1) + dir_flg(dir_idx(i)) &
+                                                    & *(pres_L)) + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(i)) &
+                                                    & + s_P*(dir_flg(dir_idx(i))*s_R + (1._wp - dir_flg(dir_idx(i))) &
+                                                    & *vel_R(dir_idx(i)))*xi_R_m1) + dir_flg(dir_idx(i))*(pres_R)) + (s_M/s_L) &
+                                                    & *(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
+                                    end do
+
+                                    ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
+                                    ! xi*(E+expr)-E = E*xi_m1 + xi*expr avoids E*(xi-1) cancellation
                                     flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%cont%end + dir_idx(i)) = xi_M*(rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(i) &
-                                                & ) + s_M*(dir_flg(dir_idx(i))*s_L + (1._wp - dir_flg(dir_idx(i))) &
-                                                & *vel_L(dir_idx(i)))*xi_L_m1) + dir_flg(dir_idx(i))*(pres_L)) &
-                                                & + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(i)) + s_P*(dir_flg(dir_idx(i)) &
-                                                & *s_R + (1._wp - dir_flg(dir_idx(i)))*vel_R(dir_idx(i)))*xi_R_m1) &
-                                                & + dir_flg(dir_idx(i))*(pres_R)) + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
-                                end do
-
-                                ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                ! xi*(E+expr)-E = E*xi_m1 + xi*expr avoids E*(xi-1) cancellation
-                                flux_rsx_vf(${SF('')}$, &
-                                            & eqn_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(E_L*xi_L_m1 + xi_L*(s_S &
-                                            & - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1)))))) &
-                                            & + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(E_R*xi_R_m1 + xi_R*(s_S &
-                                            & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))) + (s_M/s_L) &
-                                            & *(s_P/s_R)*pcorr*s_S
+                                                & eqn_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(E_L*xi_L_m1 &
+                                                & + xi_L*(s_S - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) &
+                                                & ) + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(E_R*xi_R_m1 + xi_R*(s_S &
+                                                & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))) &
+                                                & + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
+                                end if
 
                                 ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
                                 if (elasticity) then
