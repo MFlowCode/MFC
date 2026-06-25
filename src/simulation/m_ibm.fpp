@@ -34,9 +34,6 @@ module m_ibm
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
 
-    integer, dimension(:), allocatable :: ib_gbl_idx_lookup
-    $:GPU_DECLARE(create='[ib_gbl_idx_lookup]')
-
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[gp_layers, num_gps]')
