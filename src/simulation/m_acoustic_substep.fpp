@@ -85,27 +85,22 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         real(wp), intent(in) :: dtau
         integer, intent(in) :: n_micro
-        real(wp) :: rho, gamma_K, pi_inf_K, qv_K                 !< Mixture EOS coefficients (frozen alpha_k)
-        real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K  !< Per-fluid partial densities / volume fractions
-        real(wp), dimension(2) :: Re_K                           !< Reynolds numbers (unused here; required by mixture routine)
-        real(wp) :: dyn_p                                        !< Dynamic pressure 0.5*rho*|u|^2
-        real(wp) :: T                                            !< Temperature (unused for the 5-eq stiffened-gas EOS branch)
-        real(wp), dimension(1:num_species) :: rhoYks             !< Species partial densities (unused for non-reacting)
-        real(wp) :: u_x, u_y, u_z                                !< Cell-center velocity components
-        real(wp) :: div                                          !< Centered flux divergence accumulator
-        real(wp) :: dpdx                                         !< Centered pressure-gradient component
-        real(wp) :: damp                                         !< Grad-div divergence-damping stencil accumulator
-        real(wp) :: inv_2dx, inv_2dy, inv_2dz                    !< 1/(2*dx) etc. for centered first differences
-        integer :: q                                             !< Microstep iterator
-        integer :: i, j, k, l                                    !< Generic / spatial iterators
-        integer :: momxb, momxe                                  !< First/last momentum equation indices
-        integer :: db_x, de_x, db_y, de_y, db_z, de_z            !< div_sf loop bounds (interior + one ghost layer)
+        real(wp) :: rho                                 !< Single-fluid density max(alpha_rho, sgm_eps)
+        real(wp) :: vf                                  !< Frozen volume fraction (advection variable)
+        real(wp) :: dyn_p                               !< Dynamic pressure 0.5*rho*|u|^2
+        real(wp) :: div                                 !< Centered flux divergence accumulator
+        real(wp) :: dpdx                                !< Centered pressure-gradient component
+        real(wp) :: damp                                !< Grad-div divergence-damping stencil accumulator
+        real(wp) :: inv_2dx, inv_2dy, inv_2dz           !< 1/(2*dx) etc. for centered first differences
+        real(wp) :: u_xp, u_xm, u_yp, u_ym, u_zp, u_zm  !< Stencil-neighbour cell-center velocities (computed once per cell)
+        integer :: q                                    !< Microstep iterator
+        integer :: i, j, k, l                           !< Generic / spatial iterators
+        integer :: momxb, momxe, contb                  !< First/last momentum and first continuity equation indices
+        integer :: db_x, de_x, db_y, de_y, db_z, de_z   !< div_sf loop bounds (interior + one ghost layer)
 
-        T = 0._wp
-        rhoYks = 0._wp
-        Re_K = 0._wp
         momxb = eqn_idx%mom%beg
         momxe = eqn_idx%mom%end
+        contb = eqn_idx%cont%beg
 
         ! div_sf is needed one ghost layer beyond the interior so its centered gradient can be taken
         ! at interior cells; momentum carries >= 2 ghost layers, so this layer is always halo-valid.
@@ -118,25 +113,25 @@ contains
             !    are all carried in q_cons_vf; the centered stencil needs one ghost cell).
             call s_populate_variables_buffers(bc_type, q_cons_vf)
 
-            ! 2a. Cell pressure from the CURRENT conserved state (used by the energy flux).
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_K, alpha_K, Re_K, rho, gamma_K, pi_inf_K, qv_K, &
-                                & dyn_p, T, rhoYks]')
+            ! 2a. Cell pressure from the CURRENT conserved state (used by the energy flux), via the
+            !     direct single-fluid stiffened-gas EOS (model_eqns=2, num_fluids=1): inverting
+            !     rho*E = gamma*p + pi_inf + 0.5*rho*|u|^2 + qv with frozen mixture coefficients
+            !     gamma=vf*gammas(1), pi_inf=vf*pi_infs(1), qv=alpha_rho*qvs(1).
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, vf, dyn_p]')
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        call s_compute_species_fraction(q_cons_vf, j, k, l, alpha_rho_K, alpha_K)
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
-                        rho = max(rho, sgm_eps)
+                        vf = q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l)
+                        rho = max(q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l), sgm_eps)
 
                         dyn_p = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                        do i = momxb, momxe
                             dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
                         end do
 
-                        T = 0._wp
-                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, k, l), q_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_p, &
-                                                & pi_inf_K, gamma_K, rho, qv_K, rhoYks, p_sf(j, k, l), T)
+                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, &
+                             & l) - dyn_p - vf*pi_infs(1) - q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)*qvs(1))/(vf*gammas(1))
                     end do
                 end do
             end do
@@ -150,45 +145,55 @@ contains
             !     (alpha_k*rho_k * u) and ((rho*E + p) * u), plus dtau*rhs_slow. Velocity u
             !     is held frozen (computed from the current momentum) for this forward sweep.
             inv_2dx = 0._wp; inv_2dy = 0._wp; inv_2dz = 0._wp
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, u_x, u_y, u_z, div, inv_2dx, inv_2dy, inv_2dz, rho]')
+            $:GPU_PARALLEL_LOOP(collapse=3, &
+                                & private='[i, j, k, l, div, inv_2dx, inv_2dy, inv_2dz, u_xp, u_xm, u_yp, u_ym, u_zp, u_zm]')
             do l = idwint(3)%beg, idwint(3)%end
                 do k = idwint(2)%beg, idwint(2)%end
                     do j = idwint(1)%beg, idwint(1)%end
                         inv_2dx = 1._wp/(2._wp*dx(j))
 
+                        ! Stencil-neighbour velocities u = mom/rho, formed once per cell from the CURRENT
+                        ! continuity value and reused by the mass and energy fluxes. For the mass flux
+                        ! u*(alpha_k*rho_k) the density cancels to the momentum exactly, so re-forming rho
+                        ! here (rather than caching it across cells) preserves the in-place sweep result.
+                        u_xp = q_cons_vf(momxb)%sf(j + 1, k, l)/max(q_cons_vf(contb)%sf(j + 1, k, l), sgm_eps)
+                        u_xm = q_cons_vf(momxb)%sf(j - 1, k, l)/max(q_cons_vf(contb)%sf(j - 1, k, l), sgm_eps)
+                        if (n > 0) then
+                            u_yp = q_cons_vf(momxb + 1)%sf(j, k + 1, l)/max(q_cons_vf(contb)%sf(j, k + 1, l), sgm_eps)
+                            u_ym = q_cons_vf(momxb + 1)%sf(j, k - 1, l)/max(q_cons_vf(contb)%sf(j, k - 1, l), sgm_eps)
+                        end if
+                        if (p > 0) then
+                            u_zp = q_cons_vf(momxe)%sf(j, k, l + 1)/max(q_cons_vf(contb)%sf(j, k, l + 1), sgm_eps)
+                            u_zm = q_cons_vf(momxe)%sf(j, k, l - 1)/max(q_cons_vf(contb)%sf(j, k, l - 1), sgm_eps)
+                        end if
+
                         ! Mass equations: d/dt(alpha_k*rho_k) = -div(alpha_k*rho_k * u) + slow
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%cont%beg, eqn_idx%cont%end
-                            div = inv_2dx*(f_velx(q_cons_vf, j + 1, k, l)*q_cons_vf(i)%sf(j + 1, k, l) - f_velx(q_cons_vf, j - 1, &
-                                           & k, l)*q_cons_vf(i)%sf(j - 1, k, l))
+                            div = inv_2dx*(u_xp*q_cons_vf(i)%sf(j + 1, k, l) - u_xm*q_cons_vf(i)%sf(j - 1, k, l))
                             if (n > 0) then
                                 inv_2dy = 1._wp/(2._wp*dy(k))
-                                div = div + inv_2dy*(f_vely(q_cons_vf, j, k + 1, l)*q_cons_vf(i)%sf(j, k + 1, &
-                                                     & l) - f_vely(q_cons_vf, j, k - 1, l)*q_cons_vf(i)%sf(j, k - 1, l))
+                                div = div + inv_2dy*(u_yp*q_cons_vf(i)%sf(j, k + 1, l) - u_ym*q_cons_vf(i)%sf(j, k - 1, l))
                             end if
                             if (p > 0) then
                                 inv_2dz = 1._wp/(2._wp*dz(l))
-                                div = div + inv_2dz*(f_velz(q_cons_vf, j, k, l + 1)*q_cons_vf(i)%sf(j, k, &
-                                                     & l + 1) - f_velz(q_cons_vf, j, k, l - 1)*q_cons_vf(i)%sf(j, k, l - 1))
+                                div = div + inv_2dz*(u_zp*q_cons_vf(i)%sf(j, k, l + 1) - u_zm*q_cons_vf(i)%sf(j, k, l - 1))
                             end if
                             q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + dtau*(-div + rhs_slow_vf(i)%sf(j, k, l))
                         end do
 
                         ! Total-energy equation: d/dt(rho*E) = -div((rho*E + p) * u) + slow
-                        div = inv_2dx*((q_cons_vf(eqn_idx%E)%sf(j + 1, k, l) + p_sf(j + 1, k, l))*f_velx(q_cons_vf, j + 1, k, &
-                                       & l) - (q_cons_vf(eqn_idx%E)%sf(j - 1, k, l) + p_sf(j - 1, k, l))*f_velx(q_cons_vf, j - 1, &
-                                       & k, l))
+                        div = inv_2dx*((q_cons_vf(eqn_idx%E)%sf(j + 1, k, l) + p_sf(j + 1, k, &
+                                       & l))*u_xp - (q_cons_vf(eqn_idx%E)%sf(j - 1, k, l) + p_sf(j - 1, k, l))*u_xm)
                         if (n > 0) then
                             inv_2dy = 1._wp/(2._wp*dy(k))
-                            div = div + inv_2dy*((q_cons_vf(eqn_idx%E)%sf(j, k + 1, l) + p_sf(j, k + 1, l))*f_vely(q_cons_vf, j, &
-                                                 & k + 1, l) - (q_cons_vf(eqn_idx%E)%sf(j, k - 1, l) + p_sf(j, k - 1, &
-                                                 & l))*f_vely(q_cons_vf, j, k - 1, l))
+                            div = div + inv_2dy*((q_cons_vf(eqn_idx%E)%sf(j, k + 1, l) + p_sf(j, k + 1, &
+                                                 & l))*u_yp - (q_cons_vf(eqn_idx%E)%sf(j, k - 1, l) + p_sf(j, k - 1, l))*u_ym)
                         end if
                         if (p > 0) then
                             inv_2dz = 1._wp/(2._wp*dz(l))
-                            div = div + inv_2dz*((q_cons_vf(eqn_idx%E)%sf(j, k, l + 1) + p_sf(j, k, l + 1))*f_velz(q_cons_vf, j, &
-                                                 & k, l + 1) - (q_cons_vf(eqn_idx%E)%sf(j, k, l - 1) + p_sf(j, k, &
-                                                 & l - 1))*f_velz(q_cons_vf, j, k, l - 1))
+                            div = div + inv_2dz*((q_cons_vf(eqn_idx%E)%sf(j, k, l + 1) + p_sf(j, k, &
+                                                 & l + 1))*u_zp - (q_cons_vf(eqn_idx%E)%sf(j, k, l - 1) + p_sf(j, k, l - 1))*u_zm)
                         end if
                         q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
                                   & l) + dtau*(-div + rhs_slow_vf(eqn_idx%E)%sf(j, k, l))
@@ -201,24 +206,21 @@ contains
             !    sees the freshly advanced mass and energy.
             call s_populate_variables_buffers(bc_type, q_cons_vf)
 
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_K, alpha_K, Re_K, rho, gamma_K, pi_inf_K, qv_K, &
-                                & dyn_p, T, rhoYks]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, vf, dyn_p]')
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        call s_compute_species_fraction(q_cons_vf, j, k, l, alpha_rho_K, alpha_K)
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
-                        rho = max(rho, sgm_eps)
+                        vf = q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l)
+                        rho = max(q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l), sgm_eps)
 
                         dyn_p = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                        do i = momxb, momxe
                             dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
                         end do
 
-                        T = 0._wp
-                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, k, l), q_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_p, &
-                                                & pi_inf_K, gamma_K, rho, qv_K, rhoYks, p_sf(j, k, l), T)
+                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, &
+                             & l) - dyn_p - vf*pi_infs(1) - q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)*qvs(1))/(vf*gammas(1))
                     end do
                 end do
             end do
@@ -288,54 +290,6 @@ contains
         end do
 
     end subroutine s_acoustic_substep
-
-    !> Cell-center x-velocity = rho*u_x / rho, with rho the mixture density.
-    pure function f_velx(q_cons_vf, j, k, l) result(u)
-
-        $:GPU_ROUTINE(function_name='f_velx', parallelism='[seq]', cray_noinline=True)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, intent(in)                                 :: j, k, l
-        real(wp)                                            :: u, rho
-        integer                                             :: i
-        rho = 0._wp
-        do i = eqn_idx%cont%beg, eqn_idx%cont%end
-            rho = rho + q_cons_vf(i)%sf(j, k, l)
-        end do
-        u = q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)/max(rho, sgm_eps)
-
-    end function f_velx
-
-    !> Cell-center y-velocity.
-    pure function f_vely(q_cons_vf, j, k, l) result(u)
-
-        $:GPU_ROUTINE(function_name='f_vely', parallelism='[seq]', cray_noinline=True)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, intent(in)                                 :: j, k, l
-        real(wp)                                            :: u, rho
-        integer                                             :: i
-        rho = 0._wp
-        do i = eqn_idx%cont%beg, eqn_idx%cont%end
-            rho = rho + q_cons_vf(i)%sf(j, k, l)
-        end do
-        u = q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/max(rho, sgm_eps)
-
-    end function f_vely
-
-    !> Cell-center z-velocity.
-    pure function f_velz(q_cons_vf, j, k, l) result(u)
-
-        $:GPU_ROUTINE(function_name='f_velz', parallelism='[seq]', cray_noinline=True)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, intent(in)                                 :: j, k, l
-        real(wp)                                            :: u, rho
-        integer                                             :: i
-        rho = 0._wp
-        do i = eqn_idx%cont%beg, eqn_idx%cont%end
-            rho = rho + q_cons_vf(i)%sf(j, k, l)
-        end do
-        u = q_cons_vf(eqn_idx%mom%end)%sf(j, k, l)/max(rho, sgm_eps)
-
-    end function f_velz
 
     !> Deallocate scratch storage.
     impure subroutine s_finalize_acoustic_substep_module
