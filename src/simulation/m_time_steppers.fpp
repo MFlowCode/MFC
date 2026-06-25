@@ -970,6 +970,29 @@ contains
             call s_close_run_time_information_file()
         end if
 
+        if (chemistry) then
+            @:DEALLOCATE(q_T_sf%sf)
+        end if
+        @:DEALLOCATE(pb_ts(1)%sf)
+        @:DEALLOCATE(pb_ts(2)%sf)
+        @:DEALLOCATE(rhs_pb)
+        @:DEALLOCATE(pb_ts)
+        @:DEALLOCATE(mv_ts(1)%sf)
+        @:DEALLOCATE(mv_ts(2)%sf)
+        @:DEALLOCATE(rhs_mv)
+        @:DEALLOCATE(mv_ts)
+        if (cfl_dt) then
+            @:DEALLOCATE(max_dt)
+        end if
+        do i = 1, num_dims
+            @:DEALLOCATE(bc_type(i,1)%sf)
+            @:DEALLOCATE(bc_type(i,2)%sf)
+        end do
+        @:DEALLOCATE(bc_type)
+        if (any(time_stepper == (/1, 2, 3/))) then
+            @:DEALLOCATE(rk_coef)
+        end if
+
     end subroutine s_finalize_time_steppers_module
 
 end module m_time_steppers

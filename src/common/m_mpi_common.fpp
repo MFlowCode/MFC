@@ -1915,7 +1915,12 @@ contains
     impure subroutine s_finalize_mpi_common_module
 
 #ifdef MFC_MPI
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+        @:DEALLOCATE(buff_send, buff_recv)
+#else
+        $:GPU_EXIT_DATA(delete='[buff_send, buff_recv]')
         deallocate (buff_send, buff_recv)
+#endif
 #endif
 
     end subroutine s_finalize_mpi_common_module
