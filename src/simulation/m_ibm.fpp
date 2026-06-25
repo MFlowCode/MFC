@@ -1197,14 +1197,14 @@ contains
                         if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
                             ! if the boundary exited "left", wrap it back around to the "right"
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end &
-                                    & - ${X}$_domain%beg)
+                                     & - ${X}$_domain%beg)
                         else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
                             ! if the boundary exited "right", wrap it back around to the "left"
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end &
-                                    & - ${X}$_domain%beg)
+                                     & - ${X}$_domain%beg)
                         end if
                     end if
-                  end if
+                end if
             #:endfor
         end do
         $:END_GPU_PARALLEL_LOOP()
