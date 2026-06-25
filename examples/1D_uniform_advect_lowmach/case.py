@@ -36,9 +36,13 @@ L = 1.0  # domain length [m]
 Nx = 99  # cells (m parameter)
 dx = L / (Nx + 1)
 
-# Time step: small CFL based on the (advective) velocity; only a couple of steps
+# CFL-based time stepping. Split-explicit (acoustic_substepping) mode requires
+# CFL-based dt: the advective CFL sets dt and n_substeps is derived from the
+# acoustic-to-advective wave-speed ratio. dt below is just the initial guess.
 CFL = 0.5
 dt = CFL * dx / c0
+# Run a few advective steps (t_stop ~ a couple of advective dt).
+t_stop = 3.0 * (CFL * dx / u0)
 
 # Stiffened-gas EOS: Gamma = 1/(gamma-1), pi_inf = 0 for ideal gas
 Gamma = 1.0 / (gamma - 1.0)
@@ -56,9 +60,12 @@ print(
             "n": 0,
             "p": 0,
             "dt": dt,
+            "cfl_adap_dt": "T",
+            "cfl_target": CFL,
             "t_step_start": 0,
-            "t_step_stop": 2,
-            "t_step_save": 1,
+            "n_start": 0,
+            "t_stop": t_stop,
+            "t_save": t_stop / 2.0,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,

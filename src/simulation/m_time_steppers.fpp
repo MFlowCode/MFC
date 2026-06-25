@@ -78,6 +78,10 @@ contains
         integer :: i, j  !< Generic loop iterators
         ! Setting number of time-stages for selected time-stepping scheme
 
+        ! Defensive default: the acoustic substep count is computed in s_compute_dt
+        ! (only reached under CFL-based dt, which the checker enforces for split mode).
+        n_substeps = 0
+
         if (time_stepper == time_stepper_rk1) then
             num_ts = 1
         else if (any(time_stepper == (/time_stepper_rk2, time_stepper_rk3/))) then

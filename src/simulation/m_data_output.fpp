@@ -269,7 +269,10 @@ contains
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
-            else if (icfl_max_glb > 1._wp) then
+            else if (icfl_max_glb > 1._wp .and. .not. acoustic_substepping) then
+                ! In split-explicit low-Mach mode the timestep is set by the advective
+                ! CFL and is intentionally above the acoustic CFL, so this inviscid
+                ! (acoustic) ICFL exceeding 1 is expected and must not abort.
                 print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting.')
             end if

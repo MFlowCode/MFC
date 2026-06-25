@@ -30,12 +30,14 @@ L = 1.0  # domain length [m]
 Nx = 199  # cells (m parameter)
 dx = L / (Nx + 1)
 
-# Time step: CFL ~ 0.5 based on acoustic wave speed
+# CFL-based time stepping. In split-explicit (acoustic_substepping) mode the
+# timestep is set from the ADVECTIVE CFL (uses |u|, not |u|+c), so it is ~1/Mach
+# larger than the acoustic CFL; the acoustic waves are resolved by the internal
+# substeps. CFL-based dt is required for split mode (it is how n_substeps is
+# computed) and also works for the baseline (acoustic_substepping='F') path.
 CFL = 0.5
-dt = CFL * dx / c0
+dt = CFL * dx / c0  # initial dt guess; the solver recomputes from cfl_target each step
 t_end = L / c0  # one acoustic transit
-Nt = int(math.ceil(t_end / dt))
-t_save = max(1, Nt // 10)
 
 # Gaussian pressure pulse: dp = eps_p * p0 * exp(-((x-0.5)/sigma)^2)
 # sigma = 0.05 * L (narrow pulse, well-resolved on the grid)
@@ -59,9 +61,12 @@ print(
             "n": 0,
             "p": 0,
             "dt": dt,
+            "cfl_adap_dt": "T",
+            "cfl_target": CFL,
             "t_step_start": 0,
-            "t_step_stop": Nt,
-            "t_step_save": t_save,
+            "n_start": 0,
+            "t_stop": t_end,
+            "t_save": t_end / 10.0,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
@@ -81,8 +86,9 @@ print(
             "avg_state": "arithmetic",
             "bc_x%beg": -1,
             "bc_x%end": -1,
-            # Acoustic substepping (split-explicit low-Mach): off by default (baseline)
-            "acoustic_substepping": "F",
+            # Acoustic substepping (split-explicit low-Mach). Set to 'T' to exercise
+            # the split-explicit pathway; CFL-based dt above supports both modes.
+            "acoustic_substepping": "T",
             # Formatted Database Files Structure Parameters
             "format": "binary",
             "precision": "double",
