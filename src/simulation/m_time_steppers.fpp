@@ -27,6 +27,7 @@ module m_time_steppers
     use m_body_forces
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+    use m_acoustic_substep
 
     implicit none
 
@@ -594,6 +595,115 @@ contains
         end if
 
     end subroutine s_tvd_rk
+
+    !> Advance the solution one full step with the split-explicit low-Mach RK3 integrator.
+    !!
+    !! A 3-stage Wicker--Skamarock / Nazari--Nair RK3: the slow (advective) forcing is
+    !! recomputed once per stage from the latest state, then the conserved field is
+    !! advanced by the cheap forward-backward acoustic subcycle (s_acoustic_substep)
+    !! rather than by a linear rk_coef combination. Each stage RESTARTS the subcycle
+    !! from the saved state U^n and integrates to t + dt/3, t + dt/2, and t + dt
+    !! respectively, with the stage's slow forcing held frozen across its microsteps.
+    !!
+    !! The microstep size dtau = dt/n_substeps is constant; the three stages take
+    !! ns/3, ns/2, ns microsteps. n_substeps is even (set in s_compute_dt) so ns/2 is
+    !! exact; ns/3 is rounded to the nearest integer (floored at 1). The resulting
+    !! ns/3*dtau is the closest achievable approximation of the dt/3 stage time and is
+    !! the standard Nazari--Nair treatment.
+    impure subroutine s_split_explicit_rk(t_step, time_avg)
+
+#ifdef _CRAYFTN
+        ! DIR$ OPTIMIZE (-haggress)
+#endif
+        integer, intent(in)     :: t_step
+        real(wp), intent(inout) :: time_avg
+        integer                 :: i, j, k, l, s  !< Generic loop iterators
+        real(wp)                :: start, finish
+        real(wp)                :: dtau           !< Constant acoustic microstep size
+        integer                 :: n_micro        !< Microsteps taken in the current stage
+
+        call cpu_time(start)
+        call nvtxStartRange("TIMESTEP")
+
+        ! Constant microstep size; even n_substeps guaranteed by s_compute_dt.
+        dtau = dt/real(n_substeps, wp)
+
+        do s = 1, 3
+            ! Slow (advective) forcing at the current stage state. In split mode the
+            ! HLLC solver zeros the mass/energy face fluxes, so rhs_vf holds only the
+            ! slow divergence (momentum advection + volume fraction + viscous/sources).
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
+                               & t_step, time_avg, s)
+
+            if (s == 1) then
+                if (run_time_info) then
+                    call s_write_run_time_information(q_prim_vf, t_step)
+                end if
+
+                if (probe_wrt) then
+                    call s_time_step_cycling(t_step)
+                    call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
+                end if
+
+                if (cfl_dt) then
+                    if (mytime >= t_stop) return
+                else
+                    if (t_step == t_step_stop) return
+                end if
+
+                ! Save U^n into the storage level so every stage can restart from it.
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            else
+                ! Restart this stage's subcycle from the saved U^n.
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) = q_cons_ts(stor)%vf(i)%sf(j, k, l)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            ! Microstep count for this stage: ns/3 (stage 1), ns/2 (stage 2), ns (stage 3).
+            if (s == 1) then
+                n_micro = max(1, nint(real(n_substeps, wp)/3._wp))
+            else if (s == 2) then
+                n_micro = n_substeps/2
+            else
+                n_micro = n_substeps
+            end if
+
+            ! Advance {alpha_k*rho_k, rho*E, rho*u} by the acoustic subcycle with the
+            ! frozen slow forcing, integrating from U^n to the stage end time.
+            call s_acoustic_substep(q_cons_ts(1)%vf, rhs_vf, bc_type, dtau, n_micro)
+        end do
+
+        call nvtxEndRange
+        call cpu_time(finish)
+
+        wall_time = abs(finish - start)
+
+        if (t_step - t_step_start >= 2) then
+            wall_time_avg = (wall_time + (t_step - t_step_start - 2)*wall_time_avg)/(t_step - t_step_start - 1)
+        else
+            wall_time_avg = 0._wp
+        end if
+
+    end subroutine s_split_explicit_rk
 
     !> Bubble source part in Strang operator splitting scheme
     impure subroutine s_adaptive_dt_bubble(stage)

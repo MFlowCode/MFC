@@ -106,6 +106,7 @@ contains
             @:PROHIBIT(hypoelasticity .or. hyperelasticity, "acoustic_substepping is incompatible with elasticity")
             @:PROHIBIT(chemistry, "acoustic_substepping is incompatible with chemistry")
             @:PROHIBIT(relax, "acoustic_substepping is incompatible with phase change")
+            @:PROHIBIT(igr, "acoustic_substepping is incompatible with the information geometric regularization (igr) solver")
             @:PROHIBIT(n_acoustic_substeps < 0, "n_acoustic_substeps must be >= 0 (0 = auto)")
             @:PROHIBIT(acoustic_div_damp < 0._wp, "acoustic_div_damp must be >= 0")
         end if

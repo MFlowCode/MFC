@@ -622,7 +622,9 @@ contains
         end if
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-        if (any(time_stepper == (/time_stepper_rk1, time_stepper_rk2, time_stepper_rk3/))) then
+        if (acoustic_substepping) then
+            call s_split_explicit_rk(t_step, time_avg)
+        else if (any(time_stepper == (/time_stepper_rk1, time_stepper_rk2, time_stepper_rk3/))) then
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
