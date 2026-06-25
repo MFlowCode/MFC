@@ -171,23 +171,22 @@ contains
     subroutine s_finalize_boundary_common_module()
 
         if (bc_io) then
-            deallocate (bc_buffers(1, 1)%sf)
-            deallocate (bc_buffers(1, 2)%sf)
+            @:DEALLOCATE(bc_buffers(1, 1)%sf)
+            @:DEALLOCATE(bc_buffers(1, 2)%sf)
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                 if (n > 0) then
-                    deallocate (bc_buffers(2, 1)%sf)
-                    deallocate (bc_buffers(2, 2)%sf)
+                    @:DEALLOCATE(bc_buffers(2, 1)%sf)
+                    @:DEALLOCATE(bc_buffers(2, 2)%sf)
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                         if (p > 0) then
-                            deallocate (bc_buffers(3, 1)%sf)
-                            deallocate (bc_buffers(3, 2)%sf)
+                            @:DEALLOCATE(bc_buffers(3, 1)%sf)
+                            @:DEALLOCATE(bc_buffers(3, 2)%sf)
                         end if
                     #:endif
                 end if
             #:endif
         end if
-
-        deallocate (bc_buffers)
+        @:DEALLOCATE(bc_buffers)
 
     end subroutine s_finalize_boundary_common_module
 
