@@ -1062,7 +1062,7 @@ def _load():
     # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
     # were removed from the Fortran type by upstream #1085/#1093 — they must NOT be
     # registered (namelist read would crash).
-    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol"]:
+    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol", "kahan_summation"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
     for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})

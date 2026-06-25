@@ -140,24 +140,31 @@ contains
                         strength_vol = volpart
                         strength_vel = 4._wp*pi*lbk_rad(bub_idx, 2)**2._wp*lbk_vel(bub_idx, 2)
 
-                        ! Kahan summation for void fraction
-                        y_kahan = real(strength_vol/Vol, kind=wp) - kcomp(1)%sf(i, j, k)
-                        t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
-                        kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
-                        updatedvar(1)%sf(i, j, k) = t_kahan
+                        if (lag_params%kahan_summation) then
+                            ! Kahan summation for void fraction
+                            y_kahan = real(strength_vol/Vol, kind=wp) - kcomp(1)%sf(i, j, k)
+                            t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
+                            kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
+                            updatedvar(1)%sf(i, j, k) = t_kahan
 
-                        ! Kahan summation for time derivative of void fraction
-                        y_kahan = real(strength_vel/Vol, kind=wp) - kcomp(2)%sf(i, j, k)
-                        t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
-                        kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
-                        updatedvar(2)%sf(i, j, k) = t_kahan
+                            ! Kahan summation for time derivative of void fraction
+                            y_kahan = real(strength_vel/Vol, kind=wp) - kcomp(2)%sf(i, j, k)
+                            t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
+                            kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
+                            updatedvar(2)%sf(i, j, k) = t_kahan
+                        else
+                            updatedvar(1)%sf(i, j, k) = updatedvar(1)%sf(i, j, k) + real(strength_vol/Vol, kind=wp)
+                            updatedvar(2)%sf(i, j, k) = updatedvar(2)%sf(i, j, k) + real(strength_vel/Vol, kind=wp)
+                        end if
 
                         ! Product of two smeared functions
-                        if (lag_params%cluster_type >= 4) then
+                        if (lag_params%kahan_summation .and. lag_params%cluster_type >= 4) then
                             y_kahan = real((strength_vol*strength_vel)/Vol, kind=wp) - kcomp(5)%sf(i, j, k)
                             t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
                             kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
                             updatedvar(5)%sf(i, j, k) = t_kahan
+                        else if (lag_params%cluster_type >= 4) then
+                            updatedvar(5)%sf(i, j, k) = updatedvar(5)%sf(i, j, k) + real((strength_vol*strength_vel)/Vol, kind=wp)
                         end if
                     end do
                 end do

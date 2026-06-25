@@ -122,14 +122,18 @@ contains
         $:GPU_UPDATE(device='[lag_num_ts, q_beta_idx]')
 
         @:ALLOCATE(q_beta(1:q_beta_idx))
-        @:ALLOCATE(kahan_comp(1:q_beta_idx))
+        if (lag_params%kahan_summation) then
+            @:ALLOCATE(kahan_comp(1:q_beta_idx))
+        end if
 
         do i = 1, q_beta_idx
             @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_beta(i))
-            @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                       & idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(kahan_comp(i))
+            if (lag_params%kahan_summation) then
+                @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(kahan_comp(i))
+            end if
         end do
 
         ! Allocating space for lagrangian variables
@@ -854,7 +858,7 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         q_beta(i)%sf(j, k, l) = 0._wp
-                        kahan_comp(i)%sf(j, k, l) = 0._wp
+                        if (lag_params%kahan_summation) kahan_comp(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
@@ -2076,10 +2080,14 @@ contains
 
         do i = 1, q_beta_idx
             @:DEALLOCATE(q_beta(i)%sf)
-            @:DEALLOCATE(kahan_comp(i)%sf)
+            if (lag_params%kahan_summation) then
+                @:DEALLOCATE(kahan_comp(i)%sf)
+            end if
         end do
         @:DEALLOCATE(q_beta)
-        @:DEALLOCATE(kahan_comp)
+        if (lag_params%kahan_summation) then
+            @:DEALLOCATE(kahan_comp)
+        end if
 
         ! Deallocating space
         @:DEALLOCATE(lag_id)
