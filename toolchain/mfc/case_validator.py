@@ -208,7 +208,7 @@ PHYSICS_DOCS = {
             "Requires model_eqns = 2 (five-equation model). "
             "Incompatible with bubbles (Euler or Lagrange), QBMM, immersed boundaries, "
             "elasticity (hypo or hyper), chemistry, and phase change. "
-            "n_acoustic_substeps >= 0 (0 = auto-select). "
+            "n_acoustic_substeps >= 0 (0 = pure auto; >0 = minimum floor on the auto-computed count). "
             "acoustic_div_damp >= 0 (divergence damping coefficient)."
         ),
     },
