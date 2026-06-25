@@ -385,6 +385,11 @@
         q_prim_vf(eqn_idx%E)%sf(i, j, 0) = P_atm
         q_prim_vf(eqn_idx%species%beg)%sf(i, j, 0) = Y_O2
         q_prim_vf(eqn_idx%species%end)%sf(i, j, 0) = Y_N2
+    case (264)  ! Parameterized low-Mach Gaussian acoustic pressure pulse (benchmark / split-explicit)
+        ! Uniform background (rho, vel, p) from patch params; adds dp = 1e-3 * pres * exp(-r^2/sigma^2),
+        ! sigma = 0.05, centered at (x_centroid, y_centroid). Numeric hcid -> no case.fpp codegen -> no rebuild.
+        r2 = (x_cc(i) - patch_icpp(patch_id)%x_centroid)**2 + (y_cc(j) - patch_icpp(patch_id)%y_centroid)**2
+        q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(patch_id)%pres*(1._wp + 1.e-3_wp*exp(-r2/(0.05_wp**2)))
     case default
         if (proc_rank == 0) then
             call s_int_to_str(patch_id, iStr)

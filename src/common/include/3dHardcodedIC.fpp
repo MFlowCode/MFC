@@ -2,6 +2,7 @@
     ! Place any declaration of intermediate variables here
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph, Mach
     real(wp) :: eps
+    real(wp) :: r2  ! squared distance from pulse centroid (hcid 304)
 
     ! IGR Jets Arrays to stor position and radii of jets from input file
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
@@ -178,6 +179,12 @@
             q_prim_vf(eqn_idx%mom%beg + 0)%sf(i, j, k) = Mach*376.636429464809*sin(x_cc(i)/1)*cos(y_cc(j)/1)*sin(z_cc(k)/1)
             q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
         end if
+    case (304)  ! Parameterized low-Mach Gaussian acoustic pressure pulse (benchmark / split-explicit)
+        ! Uniform background (rho, vel, p) from patch params; adds dp = 1e-3 * pres * exp(-r^2/sigma^2),
+        ! sigma = 0.05, centered at the patch centroid. Numeric hcid -> no case.fpp codegen -> no rebuild.
+        r2 = (x_cc(i) - patch_icpp(patch_id)%x_centroid)**2 + (y_cc(j) - patch_icpp(patch_id)%y_centroid)**2 + (z_cc(k) &
+              & - patch_icpp(patch_id)%z_centroid)**2
+        q_prim_vf(eqn_idx%E)%sf(i, j, k) = patch_icpp(patch_id)%pres*(1._wp + 1.e-3_wp*exp(-r2/(0.05_wp**2)))
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch " // trim(iStr))

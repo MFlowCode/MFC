@@ -1,6 +1,7 @@
 #:def Hardcoded1DVariables()
     ! Place any declaration of intermediate variables here
     real(wp) :: x_mid_diffu, width_sq, profile_shape, temp, molar_mass_inv, y1, y2, y3, y4
+    real(wp) :: r2  ! squared distance from pulse centroid (hcid 183)
 #:enddef
 
 #:def Hardcoded1D()
@@ -64,6 +65,12 @@
 
         molar_mass_inv = 1.0_wp/2.01588_wp
         q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 101325.0_wp/(temp*8.3144626_wp*1000.0_wp*molar_mass_inv)
+    case (183)  ! Parameterized low-Mach Gaussian acoustic pressure pulse (benchmark / split-explicit)
+        ! Uniform background (rho, vel, p) come from the patch params; this adds a Gaussian
+        ! pressure perturbation dp = 1e-3 * pres * exp(-r^2/sigma^2), sigma = 0.05, centered at
+        ! the patch x_centroid. No analytic IC string -> no case.fpp codegen -> no per-case rebuild.
+        r2 = (x_cc(i) - patch_icpp(patch_id)%x_centroid)**2
+        q_prim_vf(eqn_idx%E)%sf(i, 0, 0) = patch_icpp(patch_id)%pres*(1._wp + 1.e-3_wp*exp(-r2/(0.05_wp**2)))
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch " // trim(iStr))
