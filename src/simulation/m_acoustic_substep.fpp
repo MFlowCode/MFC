@@ -21,8 +21,20 @@
 !!                the current (frozen-this-microstep) velocity u, plus
 !!                dtau * rhs_slow
 !!   3. EOS     : recompute the cell pressure p from the updated conserved state
-!!   4. backward: advance rho*u by  -dtau*grad(p_new) + dtau*rhs_slow_mom
-!!                + dtau*acoustic_div_damp*grad(div(rho*u))   (divergence damping)
+!!   4a. divergence: build div_sf = centered div(rho*u) over the interior + one ghost layer
+!!   4b. backward: advance rho*u by  -dtau*grad(p_new) + dtau*rhs_slow_mom
+!!                 + acoustic_div_damp*[Dx_i^2 * d/dx_i(div(rho*u))]   (grad-div divergence damping)
+!!
+!! The divergence damping is a grad-div smoother that suppresses ONLY compressive
+!! (nonzero-divergence) acoustic noise. The damping increment is the CENTERED gradient of
+!! the CENTERED momentum divergence div_sf, so the two share one discrete stencil: the
+!! resulting operator is exactly -v v^T in Fourier space (rank one), giving a zero eigenvalue
+!! on every discretely divergence-free mode -> vortical flow is left untouched to machine
+!! precision (a per-component Laplacian would instead dissipate it). acoustic_div_damp is
+!! DIMENSIONLESS: the Dx_i^2 normalization cancels the grid spacing (raw differences on a
+!! uniform grid), NOT scaled by dtau and NOT divided by Dx^2. The discrete operator's most
+!! negative eigenvalue is -num_dims, so the explicit-smoother stability bound is
+!! acoustic_div_damp <= 2/num_dims per microstep (default 0.1 is well inside this for 1-3D).
 !!
 !! The mixture coefficients (gamma, pi_inf) come from the FROZEN volume
 !! fractions (the alpha_k are pure transport / slow forcing and are not advanced
@@ -44,12 +56,19 @@ module m_acoustic_substep
     real(wp), allocatable, dimension(:,:,:) :: p_sf
     $:GPU_DECLARE(create='[p_sf]')
 
+    !> Momentum-divergence scratch div(rho*u) (working precision), spanning the buffered domain. Built from the halo-valid momentum
+    !! each microstep, so its centered gradient (the grad-div damping) shares the divergence stencil and exactly annihilates
+    !! divergence-free vortical modes.
+    real(wp), allocatable, dimension(:,:,:) :: div_sf
+    $:GPU_DECLARE(create='[div_sf]')
+
 contains
 
     !> Allocate scratch storage for the acoustic substep kernel.
     impure subroutine s_initialize_acoustic_substep_module
 
         @:ALLOCATE(p_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        @:ALLOCATE(div_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
 
     end subroutine s_initialize_acoustic_substep_module
 
@@ -75,14 +94,24 @@ contains
         real(wp) :: u_x, u_y, u_z                                !< Cell-center velocity components
         real(wp) :: div                                          !< Centered flux divergence accumulator
         real(wp) :: dpdx                                         !< Centered pressure-gradient component
-        real(wp) :: damp                                         !< Divergence-damping (grad of div(rho*u)) accumulator
+        real(wp) :: damp                                         !< Grad-div divergence-damping stencil accumulator
         real(wp) :: inv_2dx, inv_2dy, inv_2dz                    !< 1/(2*dx) etc. for centered first differences
         integer :: q                                             !< Microstep iterator
         integer :: i, j, k, l                                    !< Generic / spatial iterators
+        integer :: momxb, momxe                                  !< First/last momentum equation indices
+        integer :: db_x, de_x, db_y, de_y, db_z, de_z            !< div_sf loop bounds (interior + one ghost layer)
 
         T = 0._wp
         rhoYks = 0._wp
         Re_K = 0._wp
+        momxb = eqn_idx%mom%beg
+        momxe = eqn_idx%mom%end
+
+        ! div_sf is needed one ghost layer beyond the interior so its centered gradient can be taken
+        ! at interior cells; momentum carries >= 2 ghost layers, so this layer is always halo-valid.
+        db_x = idwint(1)%beg - 1; de_x = idwint(1)%end + 1
+        if (n > 0) then; db_y = idwint(2)%beg - 1; de_y = idwint(2)%end + 1; else; db_y = 0; de_y = 0; end if
+        if (p > 0) then; db_z = idwint(3)%beg - 1; de_z = idwint(3)%end + 1; else; db_z = 0; de_z = 0; end if
 
         do q = 1, n_micro
             ! 1. Narrow halo exchange of the conserved field (alpha_k*rho_k, rho*u, rho*E
@@ -195,10 +224,34 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! 4. BACKWARD: advance rho*u by  -dtau*grad(p_new) + dtau*rhs_slow_mom
-            !    + dtau*acoustic_div_damp*grad(div(rho*u))   (divergence damping).
-            !    The momentum needs its halo current (div(rho*u) uses neighbours) - q_cons_vf
-            !    was just exchanged above and momentum was untouched by the forward sweep.
+            ! 4a. DIVERGENCE: build div_sf = centered div(rho*u) over the interior + one ghost
+            !     layer. The momentum halo is current from the exchange above and was untouched
+            !     by the forward sweep, so all neighbours are valid.
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, div, inv_2dx, inv_2dy, inv_2dz]')
+            do l = db_z, de_z
+                do k = db_y, de_y
+                    do j = db_x, de_x
+                        inv_2dx = 1._wp/(2._wp*dx(j))
+                        div = inv_2dx*(q_cons_vf(momxb)%sf(j + 1, k, l) - q_cons_vf(momxb)%sf(j - 1, k, l))
+                        if (n > 0) then
+                            inv_2dy = 1._wp/(2._wp*dy(k))
+                            div = div + inv_2dy*(q_cons_vf(momxb + 1)%sf(j, k + 1, l) - q_cons_vf(momxb + 1)%sf(j, k - 1, l))
+                        end if
+                        if (p > 0) then
+                            inv_2dz = 1._wp/(2._wp*dz(l))
+                            div = div + inv_2dz*(q_cons_vf(momxe)%sf(j, k, l + 1) - q_cons_vf(momxe)%sf(j, k, l - 1))
+                        end if
+                        div_sf(j, k, l) = div
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            ! 4b. BACKWARD: advance rho*u by  -dtau*grad(p_new) + dtau*rhs_slow_mom
+            !     + acoustic_div_damp*[Dx_i^2 * d/dx_i(div(rho*u))]   (grad-div divergence damping).
+            !     The damping is the centered gradient of div_sf scaled by Dx_i^2 so that
+            !     acoustic_div_damp is dimensionless; sharing the divergence stencil makes the
+            !     operator annihilate divergence-free vortical modes exactly.
             $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, dpdx, damp, inv_2dx, inv_2dy, inv_2dz]')
             do l = idwint(3)%beg, idwint(3)%end
                 do k = idwint(2)%beg, idwint(2)%end
@@ -207,29 +260,26 @@ contains
 
                         ! x-momentum
                         dpdx = inv_2dx*(p_sf(j + 1, k, l) - p_sf(j - 1, k, l))
-                        damp = (q_cons_vf(eqn_idx%mom%beg)%sf(j + 1, k, l) - 2._wp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                & l) + q_cons_vf(eqn_idx%mom%beg)%sf(j - 1, k, l))/(dx(j)*dx(j))
-                        q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l) = q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                  & l) + dtau*(-dpdx + rhs_slow_vf(eqn_idx%mom%beg)%sf(j, k, l) + acoustic_div_damp*damp)
+                        damp = 0.5_wp*dx(j)*(div_sf(j + 1, k, l) - div_sf(j - 1, k, l))
+                        q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, l) + dtau*(-dpdx + rhs_slow_vf(momxb)%sf(j, k, &
+                                  & l)) + acoustic_div_damp*damp
 
                         ! y-momentum
                         if (n > 0) then
                             inv_2dy = 1._wp/(2._wp*dy(k))
                             dpdx = inv_2dy*(p_sf(j, k + 1, l) - p_sf(j, k - 1, l))
-                            damp = (q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k + 1, l) - 2._wp*q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, &
-                                    & k, l) + q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k - 1, l))/(dy(k)*dy(k))
-                            q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                      & l) + dtau*(-dpdx + rhs_slow_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) + acoustic_div_damp*damp)
+                            damp = 0.5_wp*dy(k)*(div_sf(j, k + 1, l) - div_sf(j, k - 1, l))
+                            q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, &
+                                      & l) + dtau*(-dpdx + rhs_slow_vf(momxb + 1)%sf(j, k, l)) + acoustic_div_damp*damp
                         end if
 
                         ! z-momentum
                         if (p > 0) then
                             inv_2dz = 1._wp/(2._wp*dz(l))
                             dpdx = inv_2dz*(p_sf(j, k, l + 1) - p_sf(j, k, l - 1))
-                            damp = (q_cons_vf(eqn_idx%mom%end)%sf(j, k, l + 1) - 2._wp*q_cons_vf(eqn_idx%mom%end)%sf(j, k, &
-                                    & l) + q_cons_vf(eqn_idx%mom%end)%sf(j, k, l - 1))/(dz(l)*dz(l))
-                            q_cons_vf(eqn_idx%mom%end)%sf(j, k, l) = q_cons_vf(eqn_idx%mom%end)%sf(j, k, &
-                                      & l) + dtau*(-dpdx + rhs_slow_vf(eqn_idx%mom%end)%sf(j, k, l) + acoustic_div_damp*damp)
+                            damp = 0.5_wp*dz(l)*(div_sf(j, k, l + 1) - div_sf(j, k, l - 1))
+                            q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) + dtau*(-dpdx + rhs_slow_vf(momxe)%sf(j, &
+                                      & k, l)) + acoustic_div_damp*damp
                         end if
                     end do
                 end do
@@ -291,6 +341,7 @@ contains
     impure subroutine s_finalize_acoustic_substep_module
 
         @:DEALLOCATE(p_sf)
+        @:DEALLOCATE(div_sf)
 
     end subroutine s_finalize_acoustic_substep_module
 

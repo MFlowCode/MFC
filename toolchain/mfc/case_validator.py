@@ -209,7 +209,8 @@ PHYSICS_DOCS = {
             "Incompatible with bubbles (Euler or Lagrange), QBMM, immersed boundaries, "
             "elasticity (hypo or hyper), chemistry, and phase change. "
             "n_acoustic_substeps >= 0 (0 = pure auto; >0 = minimum floor on the auto-computed count). "
-            "acoustic_div_damp >= 0 (divergence damping coefficient)."
+            "acoustic_div_damp >= 0 (dimensionless grad-div divergence damping coefficient; "
+            "stable for <~ 0.5/num_dims per microstep)."
         ),
     },
     # Post-Processing

@@ -143,7 +143,7 @@ DESCRIPTIONS = {
     # Acoustic substepping (low-Mach split-explicit)
     "acoustic_substepping": "Enable split-explicit acoustic substepping for low-Mach flows",
     "n_acoustic_substeps": "Number of acoustic substeps per flow step (0 = auto)",
-    "acoustic_div_damp": "Divergence damping coefficient for acoustic substepping",
+    "acoustic_div_damp": "Dimensionless grad-div divergence damping coefficient for acoustic substepping (stable for <~ 0.5/num_dims)",
     # Probes and integrals
     "num_probes": "Number of probe points",
     "num_integrals": "Number of integral regions",
