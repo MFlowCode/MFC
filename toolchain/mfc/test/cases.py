@@ -2090,6 +2090,78 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     chemistry_cases()
 
+    def acoustic_substepping_cases():
+        """1D acoustic-pulse golden test for acoustic_substepping (split-explicit low-Mach).
+
+        Uniform background at M=0.1 with a small Gaussian pressure perturbation on
+        a periodic domain.  With acoustic_substepping='T' and cfl_adap_dt='T', the
+        outer dt is set by the advective CFL (~10x larger than the acoustic dt),
+        and acoustic waves are resolved by the forward-backward substep loop.
+        The golden file verifies stability and conservation across ~4 outer steps
+        (each ≈10 acoustic substeps at M=0.1).
+        """
+        import math as _math
+
+        gamma = 1.4
+        c0 = _math.sqrt(gamma)  # sqrt(1.4) ≈ 1.183, normalised units (p0=1, rho0=1)
+        Mach = 0.1
+        u0 = Mach * c0  # mean flow velocity
+        Nx = 31  # m=31 → 32 cells; dx = 1/(m+1) = 1/32
+        dx = 1.0 / (Nx + 1)
+        CFL = 0.5
+        dt_init = CFL * dx / c0  # acoustic-CFL initial dt guess ≈ 0.0132
+
+        stack.push(
+            "1D -> Acoustic Substepping",
+            {
+                "m": Nx,
+                "n": 0,
+                "p": 0,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "dt": dt_init,
+                "cfl_adap_dt": "T",
+                "cfl_target": CFL,
+                "n_start": 0,
+                "t_stop": 0.5,
+                "t_save": 0.5,
+                "num_patches": 1,
+                "model_eqns": 2,
+                "num_fluids": 1,
+                "alt_soundspeed": "F",
+                "mpp_lim": "F",
+                "mixture_err": "F",
+                "time_stepper": 3,
+                "weno_order": 5,
+                "weno_eps": 1.0e-16,
+                "mapped_weno": "F",
+                "null_weights": "F",
+                "mp_weno": "F",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "acoustic_substepping": "T",
+                "n_acoustic_substeps": 0,
+                "acoustic_div_damp": 0.1,
+                # Patch 1: uniform background + small Gaussian pressure perturbation
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%vel(1)": u0,
+                "patch_icpp(1)%pres": "1.0 + 1e-3 * exp(-((x - xc) / 0.05)**2)",
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(1)%pi_inf": 0.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+    acoustic_substepping_cases()
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 
