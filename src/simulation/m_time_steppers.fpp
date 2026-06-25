@@ -630,6 +630,9 @@ contains
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
 
+        ! n_substeps may be 0 for cfl_const_dt restarts where s_compute_dt was not called at startup.
+        if (n_substeps <= 0) call s_compute_dt()
+
         ! Constant microstep size; even n_substeps guaranteed by s_compute_dt.
         dtau = dt/real(n_substeps, wp)
 
@@ -835,6 +838,9 @@ contains
                 call s_mpi_allreduce_min(acou_dt_local, acou_dt_min)
             end if
             n_substeps = ceiling(dt/(cfl_target*max(acou_dt_min, sgm_eps)))
+            ! Guard against near-quiescent flow: acou_dt_min -> 0 makes ratio -> c/sgm_eps -> huge ceiling.
+            @:PROHIBIT(n_substeps > 10000, &
+                       & "acoustic_substepping: computed n_substeps exceeds 10000 (near-quiescent flow); set n_acoustic_substeps explicitly in your case")
             ! Apply user-specified minimum floor (0 = pure auto).
             n_substeps = max(n_substeps, n_acoustic_substeps)
             ! Round up to nearest even number (required for RK3 substep nesting).
