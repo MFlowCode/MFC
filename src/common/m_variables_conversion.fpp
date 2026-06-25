@@ -1237,6 +1237,9 @@ contains
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
+        if (viscous) then
+            @:DEALLOCATE(Res_vc)
+        end if
 #else
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
         if (bubbles_euler) then

@@ -1519,17 +1519,13 @@ contains
                 @:DEALLOCATE(ib_airfoil_grids(i)%lower)
             end if
         end do
-
         if (allocated(models)) then
-            if (size(models) > 0) then
-                @:DEALLOCATE(models)
-            else
-                deallocate (models)
-            end if
+            @:DEALLOCATE(models)
         end if
-
+        if (allocated(ghost_points)) then
+            @:DEALLOCATE(ghost_points)
+        end if
         if (collision_model > 0) call s_finalize_collisions_module()
-
 #ifdef MFC_MPI
         if (num_procs > 1) then
             @:DEALLOCATE(send_ids, send_ft)
