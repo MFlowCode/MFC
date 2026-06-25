@@ -222,21 +222,24 @@ contains
     !! dx_i/(|u_i|+c) -- the SAME quantity that sets dt in the .not. acoustic_substepping path. The caller reduces acou_dt_sf with a
     !! global MIN and divides the (already globally reduced) advective dt by cfl_target*acou_dt_min to get the substep count,
     !! guaranteeing the acoustic microstep CFL (|u_i|+c)*dtau/dx_i <= cfl_target everywhere (see s_compute_dt).
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l, acou_dt_sf)
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l, acou_dt_sf, acoustic_sub)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in)                 :: vel
-        real(wp), intent(in)                                      :: c, rho
-        real(wp), dimension(0:m,0:n,0:p), intent(inout)           :: max_dt
-        real(wp), dimension(2), intent(in)                        :: Re_l
-        integer, intent(in)                                       :: j, k, l
-        real(wp), dimension(0:m,0:n,0:p), intent(inout), optional :: acou_dt_sf
-        real(wp)                                                  :: icfl_dt, vcfl_dt
-        real(wp)                                                  :: fltr_dtheta
-        real(wp)                                                  :: adv_speed  !< sum(|vel|) for 1D advective CFL
+        real(wp), dimension(num_vels), intent(in)       :: vel
+        real(wp), intent(in)                            :: c, rho
+        real(wp), dimension(0:m,0:n,0:p), intent(inout) :: max_dt
+        real(wp), dimension(2), intent(in)              :: Re_l
+        integer, intent(in)                             :: j, k, l
+        real(wp), dimension(0:m,0:n,0:p), intent(inout) :: acou_dt_sf
+        ! Passed by value (not read from the module) so this `acc routine seq` does not require the
+        ! acoustic_substepping module variable to be in `acc declare create` (nvfortran W-1054 -> nvlink undefined ref).
+        logical, intent(in) :: acoustic_sub
+        real(wp)            :: icfl_dt, vcfl_dt
+        real(wp)            :: fltr_dtheta
+        real(wp)            :: adv_speed  !< sum(|vel|) for 1D advective CFL
 
         ! Inviscid CFL calculation
-        if (acoustic_substepping) then
+        if (acoustic_sub) then
             ! Advective-only wave speed: drop the sound speed c. In multi-D the limit is the per-dimension min
             ! dx_i/|u_i| (NOT dx/sum(|vel|)).
             if (p > 0 .or. n > 0) then
@@ -247,7 +250,7 @@ contains
                 adv_speed = sum(abs(vel(1:num_vels)))
                 icfl_dt = cfl_target*(dx(j)/max(adv_speed, sgm_eps))
             end if
-            if (present(acou_dt_sf)) then
+            if (acoustic_sub) then
                 ! Per-cell acoustic CFL dt limit min_i dx_i/(|u_i|+c). The caller reduces this with a GLOBAL MIN
                 ! (NOT a per-cell ratio with the advective dt -- that would blow up at near-stagnation cells, where
                 ! adv_dt is huge but the cell does not limit dt). Using independently reduced minima of the advective

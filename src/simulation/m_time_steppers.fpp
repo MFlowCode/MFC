@@ -406,9 +406,10 @@ contains
 
         if (cfl_dt) then
             @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
-            if (acoustic_substepping) then
-                @:ALLOCATE(acou_dt_sf(0:m, 0:n, 0:p))
-            end if
+            ! acou_dt_sf is always allocated under cfl_dt (it is a required, non-optional arg of
+            ! s_compute_dt_from_cfl so that routine generates valid GPU device code; written only when
+            ! acoustic_substepping). nvfortran `acc routine seq` cannot handle optional arguments.
+            @:ALLOCATE(acou_dt_sf(0:m, 0:n, 0:p))
         end if
 
         ! Allocating arrays to store the bc types
@@ -795,11 +796,7 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    if (acoustic_substepping) then
-                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l, acou_dt_sf)
-                    else
-                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
-                    end if
+                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l, acou_dt_sf, acoustic_substepping)
                 end do
             end do
         end do
@@ -1150,9 +1147,7 @@ contains
         @:DEALLOCATE(mv_ts)
         if (cfl_dt) then
             @:DEALLOCATE(max_dt)
-            if (acoustic_substepping) then
-                @:DEALLOCATE(acou_dt_sf)
-            end if
+            @:DEALLOCATE(acou_dt_sf)
         end if
         do i = 1, num_dims
             @:DEALLOCATE(bc_type(i,1)%sf)
