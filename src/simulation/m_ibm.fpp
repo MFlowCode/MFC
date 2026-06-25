@@ -85,7 +85,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[i]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
-                call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel)
+                call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, patch_ib(i)%moment)
             end if
             call s_update_ib_rotation_matrix(i)
         end do
@@ -1108,12 +1108,13 @@ contains
     end subroutine s_compute_centroid_offset
 
     !> Computes the moment of inertia for an immersed boundary
-    subroutine s_compute_moment_of_inertia(patch, moment)
+    subroutine s_compute_moment_of_inertia(patch, axis, moment)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ib_patch_parameters), intent(in) :: patch
-        real(wp), dimension(3), intent(out)   :: moment
+        real(wp), dimension(3), intent(in)    :: axis
+        real(wp), intent(out)                 :: moment
         real(wp)                              :: distance_to_axis, cell_volume
         real(wp), dimension(3)                :: position, closest_point_along_axis, vector_to_axis, normal_axis
         integer                               :: i, j, k, count, ib_marker
@@ -1129,7 +1130,6 @@ contains
             moment = 0.4*patch%mass*(patch%radius)**2
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
-            moment = 0._wp
             cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
             ! computed without grid stretching. Update in the loop to perform with stretching
             if (p /= 0) then
@@ -1140,13 +1140,15 @@ contains
 
             if (p == 0) then
                 normal_axis = [0, 0, 1]
-            else if (sqrt(sum(moment**2)) < sgm_eps) then
+            else if (sqrt(sum(axis**2)) < sgm_eps) then
                 ! if the object is not actually rotating at this time, return a dummy value and exit
                 moment = 1._wp
                 return
             else
-                normal_axis = moment/sqrt(sum(moment**2))
+                normal_axis = axis/sqrt(sum(axis**2))
             end if
+
+            moment = 0._wp
 
             do i = 0, m
                 do j = 0, n

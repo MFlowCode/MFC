@@ -1,12 +1,12 @@
-This file was created on 2026-06-25 11:22:36.164306.
+This file was created on 2026-06-25 14:14:05.260095.
 
 mfc.sh:
 
     Invocation: test --only 38B4AED7 --generate
     Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        ecddbcfd646d6f734fdfe4f7e835cd402acf7f01 on fix-periodic-ib-issues (clean)
+    Git:        2bd2b594e083aa5d1c25c1b289a29a6d1f8f3a87 on fix-periodic-ib-issues (dirty)
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -16,8 +16,8 @@ simulation:
         Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -40,7 +40,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -50,8 +50,8 @@ post_process:
         Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               1
     Stepping:                                2
-    CPU(s) scaling MHz:                      25%
+    CPU(s) scaling MHz:                      34%
     CPU max MHz:                             5100.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                7219.20
