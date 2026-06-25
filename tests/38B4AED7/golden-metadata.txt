@@ -1,44 +1,10 @@
-This file was created on 2026-06-25 14:14:05.260095.
+This file was created on 2026-06-25 16:59:21.255227.
 
 mfc.sh:
 
-    Invocation: test --only 38B4AED7 --generate
-    Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        2bd2b594e083aa5d1c25c1b289a29a6d1f8f3a87 on fix-periodic-ib-issues (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on schwarzschild
-    
-        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
-        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-        OpenMP  : OFF
-    
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --only 38B4AED7 --no-gpu -j 8 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        4e2b871ca2fa90dced462027e8e6c9b30a20ec00 on fix-periodic-ib-issues (dirty)
 
 simulation:
 
@@ -57,7 +23,41 @@ simulation:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
+        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
+        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on schwarzschild
+    
+        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
+        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
@@ -91,7 +91,7 @@ syscheck:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : ON
+        OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
@@ -125,7 +125,7 @@ pre_process:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : ON
+        OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp

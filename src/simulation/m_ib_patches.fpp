@@ -48,8 +48,9 @@ contains
         real(wp), dimension(3) :: center, xyz_local, length
         real(wp) :: radius, eta
 
-        !  3D Patch Geometries
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
+        !  3D Patch Geometries
         if (num_dims == 3) then
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
             do xp = xp_lower, xp_upper

@@ -1186,38 +1186,28 @@ contains
 
         integer :: patch_id
 
+        $:GPU_PARALLEL_LOOP(private='[patch_id]')
         do patch_id = 1, num_ibs
             ! check domain wraps in x, y,
-            #:for X in [('x'), ('y')]
-                ! check for periodicity
-                if (ib_bc_${X}$%beg == BC_PERIODIC) then
-                    ! check if the boundary has left the domain, and then correct
-                    if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
-                        ! if the boundary exited "left", wrap it back around to the "right"
-                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end &
-                                 & - ${X}$_domain%beg)
-                    else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
-                        ! if the boundary exited "right", wrap it back around to the "left"
-                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end &
-                                 & - ${X}$_domain%beg)
+            #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+                if (num_dims >= ${ID}$) then
+                    ! check for periodicity
+                    if (ib_bc_${X}$%beg == BC_PERIODIC) then
+                        ! check if the boundary has left the domain, and then correct
+                        if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
+                            ! if the boundary exited "left", wrap it back around to the "right"
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end &
+                                    & - ${X}$_domain%beg)
+                        else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
+                            ! if the boundary exited "right", wrap it back around to the "left"
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end &
+                                    & - ${X}$_domain%beg)
+                        end if
                     end if
-                end if
+                  end if
             #:endfor
-
-            if (p /= 0) then
-                ! check for periodicity
-                if (ib_bc_z%beg == BC_PERIODIC) then
-                    ! check if the boundary has left the domain, and then correct
-                    if (patch_ib(patch_id)%z_centroid < z_domain%beg) then
-                        ! if the boundary exited "left", wrap it back around to the "right"
-                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + (z_domain%end - z_domain%beg)
-                    else if (patch_ib(patch_id)%z_centroid > z_domain%end) then
-                        ! if the boundary exited "right", wrap it back around to the "left"
-                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid - (z_domain%end - z_domain%beg)
-                    end if
-                end if
-            end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_wrap_periodic_ibs
 
