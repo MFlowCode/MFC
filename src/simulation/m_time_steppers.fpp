@@ -36,16 +36,19 @@ module m_time_steppers
     type(integer_field), allocatable, dimension(:,:) :: bc_type    !< Boundary condition identifiers
     !> Cell-average primitive variables at consecutive TIMESTEPS
     type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2
-    real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_pb
-    type(scalar_field)                            :: q_T_sf  !< Cell-average temperature variables at the current time-stage
-    real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_mv
-    real(wp), allocatable, dimension(:,:,:)       :: max_dt
-    integer, private                              :: num_ts  !< Number of time stages in the time-stepping scheme
-    integer                                       :: stor    !< storage index
-    real(wp), allocatable, dimension(:,:)         :: rk_coef
-    integer, private                              :: num_probe_ts
+    real(wp), allocatable, dimension(:,:,:,:,:) :: rhs_pb
+    type(scalar_field) :: q_T_sf                          !< Cell-average temperature variables at the current time-stage
+    real(wp), allocatable, dimension(:,:,:,:,:) :: rhs_mv
+    real(wp), allocatable, dimension(:,:,:) :: max_dt
+    real(wp), allocatable, dimension(:,:,:) :: max_ratio  !< Per-cell acoustic-to-advective wave-speed ratio (acoustic substepping)
+    integer, private :: num_ts                            !< Number of time stages in the time-stepping scheme
+    integer :: stor                                       !< storage index
+    integer :: n_substeps                                 !< Acoustic substep count for split-explicit low-Mach mode
+    real(wp), allocatable, dimension(:,:) :: rk_coef
+    integer, private :: num_probe_ts
 
-    $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, max_dt, rk_coef, stor, bc_type]')
+    $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, max_dt, max_ratio, &
+                  & rk_coef, stor, bc_type]')
 
     !> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
@@ -397,6 +400,9 @@ contains
 
         if (cfl_dt) then
             @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
+            if (acoustic_substepping) then
+                @:ALLOCATE(max_ratio(0:m, 0:n, 0:p))
+            end if
         end if
 
         ! Allocating arrays to store the bc types
@@ -628,17 +634,19 @@ contains
             real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
         #:endif
-        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)               :: pres     !< Cell-avg. pressure
-        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv       !< Cell-avg. fluid reference energy
-        real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp)               :: H        !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum       !< Cell-avg. velocity sum
+        real(wp)               :: pres          !< Cell-avg. pressure
+        real(wp)               :: gamma         !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf        !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv            !< Cell-avg. fluid reference energy
+        real(wp)               :: c             !< Cell-avg. sound speed
+        real(wp)               :: H             !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re            !< Cell-avg. Reynolds numbers
         real(wp)               :: dt_local
-        integer                :: j, k, l  !< Generic loop iterators
-        integer                :: fl       !< Fluid loop iterator
+        real(wp)               :: ratio_local   !< Local max acoustic-to-advective ratio (acoustic substepping)
+        real(wp)               :: ratio_global  !< Global max acoustic-to-advective ratio (acoustic substepping)
+        integer                :: j, k, l       !< Generic loop iterators
+        integer                :: fl            !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -669,7 +677,11 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                    if (acoustic_substepping) then
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l, max_ratio)
+                    else
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                    end if
                 end do
             end do
         end do
@@ -686,6 +698,27 @@ contains
         end if
 
         $:GPU_UPDATE(device='[dt]')
+
+        ! Compute acoustic substep count when in split-explicit low-Mach mode
+        if (acoustic_substepping) then
+            if (n_acoustic_substeps > 0) then
+                ! User-specified fixed substep count
+                n_substeps = n_acoustic_substeps
+            else
+                ! Compute from global max acoustic-to-advective ratio
+                #:call GPU_PARALLEL(copyout='[ratio_local]', copyin='[max_ratio]')
+                    ratio_local = maxval(max_ratio)
+                #:endcall GPU_PARALLEL
+                if (num_procs == 1) then
+                    ratio_global = ratio_local
+                else
+                    call s_mpi_allreduce_max(ratio_local, ratio_global)
+                end if
+                ! Round up to nearest even number (required for RK3 substep nesting)
+                n_substeps = ceiling(ratio_global)
+                n_substeps = n_substeps + mod(n_substeps, 2)
+            end if
+        end if
 
     end subroutine s_compute_dt
 
@@ -990,6 +1023,9 @@ contains
         @:DEALLOCATE(mv_ts)
         if (cfl_dt) then
             @:DEALLOCATE(max_dt)
+            if (acoustic_substepping) then
+                @:DEALLOCATE(max_ratio)
+            end if
         end if
         do i = 1, num_dims
             @:DEALLOCATE(bc_type(i,1)%sf)

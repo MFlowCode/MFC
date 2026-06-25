@@ -69,6 +69,36 @@ contains
 
     end function f_compute_multidim_cfl_terms
 
+    !> Computes advective-only CFL terms for multi-dimensional cases (2D/3D only). Uses per-dimension velocity magnitude with
+    !! sgm_eps guard (no sound speed).
+    function f_compute_multidim_advective_cfl_terms(vel, j, k, l) result(cfl_terms)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), dimension(num_vels), intent(in) :: vel
+        integer, intent(in)                       :: j, k, l
+        real(wp)                                  :: cfl_terms
+        real(wp)                                  :: fltr_dtheta
+
+        fltr_dtheta = f_compute_filtered_dtheta(k, l)
+
+        if (p > 0) then
+            ! 3D
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (grid_geometry == 3) then
+                    cfl_terms = min(dx(j)/max(abs(vel(1)), sgm_eps), dy(k)/max(abs(vel(2)), sgm_eps), &
+                                    & fltr_dtheta/max(abs(vel(3)), sgm_eps))
+                else
+                    cfl_terms = min(dx(j)/max(abs(vel(1)), sgm_eps), dy(k)/max(abs(vel(2)), sgm_eps), dz(l)/max(abs(vel(3)), &
+                                    & sgm_eps))
+                end if
+            #:endif
+        else
+            ! 2D
+            cfl_terms = min(dx(j)/max(abs(vel(1)), sgm_eps), dy(k)/max(abs(vel(2)), sgm_eps))
+        end if
+
+    end function f_compute_multidim_advective_cfl_terms
+
     !> Computes enthalpy
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
@@ -187,25 +217,45 @@ contains
 
     end subroutine s_compute_stability_from_dt
 
-    !> Computes dt for a specified CFL number
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+    !> Computes dt for a specified CFL number. When acoustic_substepping is true, icfl_dt is based on the advective wave speed
+    !! sum(|vel|) only (dropping c), and max_ratio (if present) is filled with the per-cell acoustic-to-advective ratio
+    !! (|vel|+c)/max(sum(|vel|), sgm_eps) for later use in computing the acoustic substep count.
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l, max_ratio)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in)       :: vel
-        real(wp), intent(in)                            :: c, rho
-        real(wp), dimension(0:m,0:n,0:p), intent(inout) :: max_dt
-        real(wp), dimension(2), intent(in)              :: Re_l
-        integer, intent(in)                             :: j, k, l
-        real(wp)                                        :: icfl_dt, vcfl_dt
-        real(wp)                                        :: fltr_dtheta
+        real(wp), dimension(num_vels), intent(in)                 :: vel
+        real(wp), intent(in)                                      :: c, rho
+        real(wp), dimension(0:m,0:n,0:p), intent(inout)           :: max_dt
+        real(wp), dimension(2), intent(in)                        :: Re_l
+        integer, intent(in)                                       :: j, k, l
+        real(wp), dimension(0:m,0:n,0:p), intent(inout), optional :: max_ratio
+        real(wp)                                                  :: icfl_dt, vcfl_dt
+        real(wp)                                                  :: fltr_dtheta
+        real(wp)                                                  :: adv_speed  !< sum(|vel|) for advective CFL
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            ! 2D/3D cases
-            icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        if (acoustic_substepping) then
+            ! Advective-only wave speed: use sum(|vel|) instead of |vel|+c
+            adv_speed = sum(abs(vel(1:num_vels)))
+            if (p > 0 .or. n > 0) then
+                ! 2D/3D: per-dimension advective CFL (no sound speed)
+                icfl_dt = cfl_target*f_compute_multidim_advective_cfl_terms(vel, j, k, l)
+            else
+                ! 1D case
+                icfl_dt = cfl_target*(dx(j)/max(adv_speed, sgm_eps))
+            end if
+            if (present(max_ratio)) then
+                ! Per-cell acoustic-to-advective ratio for substep count
+                max_ratio(j, k, l) = (adv_speed + c)/max(adv_speed, sgm_eps)
+            end if
         else
-            ! 1D case
-            icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
+            if (p > 0 .or. n > 0) then
+                ! 2D/3D cases
+                icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
+            else
+                ! 1D case
+                icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
+            end if
         end if
 
         ! Viscous calculations
